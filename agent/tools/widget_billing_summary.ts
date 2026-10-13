@@ -4,8 +4,9 @@ import {
   type BillingAccountResult,
   type CreditHistoryResult,
   type CreditHistoryWindow,
+  clampCreditWindow,
   creditHistoryResultSchema,
-  creditHistoryWindowSchema,
+  creditWindowRequestSchema,
   readBillingAccount,
   readBillingCreditHistory,
 } from "#lib/billing-account.js";
@@ -19,6 +20,7 @@ import {
   callPlanetscaleReadQuery,
   parseReadQueryResult,
 } from "#lib/planetscale.js";
+import { diagnosticText } from "#lib/widget-diagnostic-text.js";
 import { liveToolInput } from "#lib/widget-live-policy.js";
 import { replayable } from "#lib/widget-replay.js";
 import {
@@ -54,7 +56,25 @@ const chargeSummarySchema = z.object({
   amountRefundedCents: z.number().nullable(),
   createdAt: z.string().nullable(),
   currency: z.string().nullable(),
+  declineReason: z
+    .string()
+    .nullable()
+    .describe(
+      "Stripe's decline reason for a failed charge (for example insufficient_funds or do_not_honor). null when the charge did not fail, Stripe gave none, or Stripe's risk screening blocked it"
+    ),
+  declineType: z
+    .string()
+    .nullable()
+    .describe(
+      "issuer_declined: the customer's bank refused it. blocked: Stripe's risk screening stopped it; never describe this as fraud, say the payment was declined and to try another card or contact their bank. invalid: the payment method could not be used"
+    ),
   description: z.string().nullable(),
+  failureMessage: z
+    .string()
+    .nullable()
+    .describe(
+      "Stripe's customer-safe explanation of why the charge failed, such as 'Your card has insufficient funds.'"
+    ),
   id: z.string(),
   refunded: z.boolean(),
   status: z.string().nullable(),
@@ -68,6 +88,14 @@ const MAX_ORDER_SUBSCRIPTIONS = 50;
 const invoiceLineSchema = z.object({
   amountCents: z.number().nullable(),
   description: z.string().nullable(),
+  // Optional so saved replays from before it existed still parse.
+  inboxCount: z
+    .number()
+    .int()
+    .nullish()
+    .describe(
+      "How many inboxes this line bills: the line amount divided by the per-inbox price of the inbox plan it names. A line's quantity can count bundles, not inboxes (1 × $18 can be 3 inboxes at $6). null when the line is not an inbox plan or the count does not come out whole"
+    ),
   periodEnd: z.string().nullable(),
   periodStart: z.string().nullable(),
   proration: z.boolean().nullable(),
@@ -95,6 +123,13 @@ const invoiceSummarySchema = z.object({
     ),
   discountCents: z.number().nullable(),
   id: z.string(),
+  inboxCount: z
+    .number()
+    .int()
+    .nullish()
+    .describe(
+      "Total inboxes this invoice billed: the sum of its lines' inboxCount. null when no line's inbox count is known; with linesTruncated it covers the shown lines only"
+    ),
   lines: z
     .array(invoiceLineSchema)
     .max(MAX_INVOICE_LINES)
@@ -144,15 +179,32 @@ const walletSchema = z.object({
 });
 
 export const widgetBillingSummaryInputSchema = z.strictObject({
-  creditWindow: creditHistoryWindowSchema
+  creditWindow: creditWindowRequestSchema
     .optional()
     .describe(
-      "Optional credit ledger window, from inclusive and to exclusive, at most 93 days. Does not filter Stripe lists or current/lifetime balances."
+      "Optional credit ledger window, from inclusive and to exclusive, at most 93 days; a longer one is shortened to the 93 days ending at `to`. Does not filter Stripe lists or current/lifetime balances."
     ),
 });
 export type WidgetBillingSummaryInput = z.infer<
   typeof widgetBillingSummaryInputSchema
 >;
+
+/** The credit window to read, clamped to 93 days, and a note when it was shortened. */
+const requestedWindow = (input: WidgetBillingSummaryInput) => {
+  const requested = widgetBillingSummaryInputSchema.parse(input).creditWindow;
+  if (!requested) {
+    return { creditWindow: undefined, windowNotes: [] as string[] };
+  }
+  const { shortened, window } = clampCreditWindow(requested);
+  return {
+    creditWindow: window,
+    windowNotes: shortened
+      ? [
+          `The credit window asked for (${requested.from} to ${requested.to}) is longer than 93 days, so it was shortened to the 93 days from ${window.from} to ${window.to}. Credit activity before ${window.from} is not covered.`,
+        ]
+      : [],
+  };
+};
 
 export const widgetBillingSummaryOutputSchema = z.object({
   autumn: z.object({
@@ -169,6 +221,8 @@ export const widgetBillingSummaryOutputSchema = z.object({
   credits: walletSchema.extend({ renewsAt: z.string().nullable() }).nullable(),
   discount: discountSummarySchema.nullable(),
   failedPayments: z.array(chargeSummarySchema),
+  /** With `reading`: the reading names the charges a dispute is about (inboxes billed while broken). */
+  identifiesCharge: z.literal(true).optional(),
   orderSubscriptions: z
     .object({
       available: z.boolean(),
@@ -192,6 +246,8 @@ export const widgetBillingSummaryOutputSchema = z.object({
       status: z.string().nullable(),
     })
     .nullable(),
+  /** What the billing records mean, computed from this result; tell the customer that. */
+  reading: z.string().optional(),
   recentCharges: z.array(chargeSummarySchema),
   recentInvoices: z.array(invoiceSummarySchema),
   recentRefunds: z.array(chargeSummarySchema),
@@ -217,16 +273,31 @@ const stripeListRows = (section: StripeSection): Record<string, unknown>[] => {
   return Array.isArray(rows) ? rows.map(asRow) : [];
 };
 
-const toChargeSummary = (row: Record<string, unknown>): ChargeSummary => ({
-  amountCents: asNumber(row.amount),
-  amountRefundedCents: asNumber(row.amount_refunded),
-  createdAt: asUnixIso(row.created),
-  currency: asText(row.currency),
-  description: asText(row.description),
-  id: asText(row.id) ?? "",
-  refunded: row.refunded === true,
-  status: asText(row.status),
-});
+const DECLINE_TEXT_CHARS = 300;
+const toChargeSummary = (row: Record<string, unknown>): ChargeSummary => {
+  const outcome = asRow(row.outcome);
+  const declineType = asText(outcome.type);
+  const failed = row.status === "failed";
+  return {
+    amountCents: asNumber(row.amount),
+    amountRefundedCents: asNumber(row.amount_refunded),
+    createdAt: asUnixIso(row.created),
+    currency: asText(row.currency),
+    // A risk block's reason names Stripe's fraud screening; it stays out of the result.
+    declineReason:
+      failed && declineType !== "blocked"
+        ? (asText(outcome.reason)?.slice(0, 64) ?? null)
+        : null,
+    declineType: failed ? (declineType?.slice(0, 32) ?? null) : null,
+    description: asText(row.description),
+    failureMessage: failed
+      ? diagnosticText(asText(row.failure_message), DECLINE_TEXT_CHARS)
+      : null,
+    id: asText(row.id) ?? "",
+    refunded: row.refunded === true,
+    status: asText(row.status),
+  };
+};
 
 const stripeListHasMore = (section: StripeSection): boolean =>
   asRow(section?.data).has_more === true;
@@ -243,6 +314,7 @@ const toInvoiceLine = (
     amountCents: asNumber(row.amount),
     description:
       asText(row.description)?.slice(0, MAX_DESCRIPTION_LENGTH) ?? null,
+    inboxCount: null,
     periodEnd: asUnixIso(period.end),
     periodStart: asUnixIso(period.start),
     proration: typeof row.proration === "boolean" ? row.proration : null,
@@ -293,6 +365,7 @@ const toInvoiceSummary = (
         0
       ) ?? null,
     id: asText(row.id) ?? "",
+    inboxCount: null,
     lines: lineRows?.slice(0, MAX_INVOICE_LINES).map(toInvoiceLine) ?? null,
     linesTruncated:
       lineList.has_more === true || (lineRows?.length ?? 0) > MAX_INVOICE_LINES,
@@ -300,6 +373,60 @@ const toInvoiceSummary = (
     settlement: invoiceSettlement(status, amountPaidCents),
     status,
     totalCents: asNumber(row.total),
+  };
+};
+
+// Stripe names a plan line "<quantity> × <plan name> - <feature> (at $x / month)".
+const LINE_PLAN = /^(?:Remaining time on )?[\d,]+ × (.+?) - /u;
+
+/** Per-inbox price in cents for each inbox plan Autumn lists, keyed by plan name. */
+const inboxPlanPrices = (data: unknown): Map<string, number> => {
+  const prices = new Map<string, number>();
+  const { subscriptions } = asRow(data);
+  for (const subscription of Array.isArray(subscriptions)
+    ? subscriptions
+    : []) {
+    const plan = asRow(asRow(subscription).plan);
+    const name = asText(plan.name);
+    const items = Array.isArray(plan.items) ? plan.items.map(asRow) : [];
+    const amount = asNumber(
+      asRow(items.find((item) => item.feature_id === "inboxes")?.price).amount
+    );
+    if (name && amount && amount > 0) {
+      prices.set(name, Math.round(amount * 100));
+    }
+  }
+  return prices;
+};
+
+/**
+ * Count inboxes from the line amount and the plan's per-inbox price, so a
+ * 1 × $18 bundle reads as 3 inboxes (wrun ...EBCXG3 said 4 when it was 12).
+ */
+export const withInboxCounts = (
+  invoice: z.infer<typeof invoiceSummarySchema>,
+  prices: Map<string, number>
+): z.infer<typeof invoiceSummarySchema> => {
+  const lines =
+    invoice.lines?.map((line) => {
+      const plan = LINE_PLAN.exec(line.description ?? "")?.[1];
+      const price = plan ? prices.get(plan) : undefined;
+      const count =
+        price && line.amountCents !== null && line.proration !== true
+          ? line.amountCents / price
+          : null;
+      return {
+        ...line,
+        inboxCount: count && Number.isInteger(count) ? count : null,
+      };
+    }) ?? null;
+  const counted = lines?.filter((line) => line.inboxCount) ?? [];
+  return {
+    ...invoice,
+    inboxCount: counted.length
+      ? counted.reduce((sum, line) => sum + (line.inboxCount ?? 0), 0)
+      : null,
+    lines,
   };
 };
 
@@ -387,6 +514,137 @@ const readAutumnStripeId = (data: unknown): string | null => {
     : null;
 };
 
+const erroredInboxesSchema = z.object({
+  count: z.number().int().nonnegative(),
+  since: z.string().nullable(),
+});
+type ErroredInboxes = z.infer<typeof erroredInboxesSchema>;
+
+const INBOX_LINE = /\binbox/iu;
+
+/**
+ * Tie inboxes in error to the inbox charges covering time after the error
+ * began (wrun ...MAF4Z47 listed both and never connected them). Facts only.
+ */
+export function readInboxErrorBilling(
+  errored: ErroredInboxes | null,
+  invoices: z.infer<typeof invoiceSummarySchema>[]
+): string | null {
+  if (!(errored?.count && errored.since)) {
+    return null;
+  }
+  const since = Date.parse(errored.since);
+  const charges = invoices.flatMap((invoice) =>
+    invoice.status === "paid"
+      ? (invoice.lines ?? [])
+          .filter(
+            (line) =>
+              INBOX_LINE.test(line.description ?? "") &&
+              line.periodEnd !== null &&
+              Date.parse(line.periodEnd) > since
+          )
+          .map(
+            (line) =>
+              `${invoice.createdAt?.slice(0, 10) ?? "an undated invoice"} ($${((line.amountCents ?? 0) / 100).toFixed(2)})`
+          )
+      : []
+  );
+  if (!charges.length) {
+    return null;
+  }
+  return `${errored.count} of the purchased inboxes have been in error since ${errored.since.slice(0, 10)} (the latest of their first saved errors), and the workspace was billed for inbox charges covering time after that: ${charges.join(", ")}. These are billing facts; they decide nothing about a refund or credit.`;
+}
+
+const autumnCredits = z.object({
+  balances: z.object({
+    credits: z.object({
+      granted: z.number(),
+      remaining: z.number(),
+      usage: z.number(),
+    }),
+  }),
+});
+
+/**
+ * The billing provider's credit balance and the product's own credit ledger
+ * disagree (wrun ...35DNCX: 8,647 remaining there, 630 used in the ledger, and
+ * the customer saw 8,017). Names the gap with both numbers. Lead and website
+ * credits share one pool, so website spend is checked before a double count.
+ */
+export function readCreditGap(
+  autumnData: unknown,
+  wallet: { balance: number; lifetimeUsed: number } | null | undefined,
+  spentOn: string | null = null
+): string | null {
+  const provider = autumnCredits.safeParse(autumnData);
+  if (
+    !(provider.success && wallet && wallet.lifetimeUsed > 0) ||
+    wallet.balance === provider.data.balances.credits.remaining
+  ) {
+    return null;
+  }
+  const { granted, remaining, usage } = provider.data.balances.credits;
+  const used = wallet.lifetimeUsed;
+  const n = (value: number) => value.toLocaleString("en-US");
+  return `The billing provider counts ${n(granted)} credits granted, ${n(usage)} used and ${n(remaining)} remaining. The product's own credit ledger records a balance of ${n(wallet.balance)} credits and ${n(used)} lifetime credits used. Together, the provider's remaining balance and the ledger balance come to ${n(remaining + wallet.balance)} credits. ${spentOn ? `${spentOn} ` : ""}Lead credits and website credits come from one shared pool, so check how many credits went to websites before calling a difference a double count.`;
+}
+
+/** What each ledger usage source is, in the customer's words (Acquisity's credit_transaction reference types). */
+const USAGE_SOURCES: Record<string, string> = {
+  campaign_lead_ingestion: "leads added to campaigns",
+  llm_usage: "AI usage",
+  outreach_lead_capacity: "campaign lead capacity",
+  website_agent_run: "website builder runs",
+  workflow_ai_agent_run: "AI workflow runs",
+};
+
+/**
+ * What the ledger's credit usage was spent on, from the reference type each
+ * entry records (wrun ...35DNCX: Aaron asked where the 630 went). Reads the
+ * transactions the billing account read already returns; null when there is
+ * no credit usage among them.
+ */
+export function readCreditUsage(
+  transactions: Record<string, unknown>[],
+  truncated: boolean
+): string | null {
+  const totals = new Map<string, { amount: number; entries: number }>();
+  for (const entry of transactions) {
+    const amount = Number(entry.amount);
+    if (
+      entry.type !== "usage" ||
+      entry.resource !== "credits" ||
+      !Number.isFinite(amount)
+    ) {
+      continue;
+    }
+    const source =
+      typeof entry.reference_type === "string" ? entry.reference_type : "";
+    const total = totals.get(source) ?? { amount: 0, entries: 0 };
+    totals.set(source, {
+      amount: total.amount + Math.abs(amount),
+      entries: total.entries + 1,
+    });
+  }
+  if (totals.size === 0) {
+    return null;
+  }
+  const parts = [...totals].map(
+    ([source, { amount, entries }]) =>
+      `${amount.toLocaleString("en-US")} for ${USAGE_SOURCES[source] ?? (source ? source.replaceAll("_", " ") : "usage with no recorded source")} (${entries} ${entries === 1 ? "entry" : "entries"})`
+  );
+  return `${truncated ? "In its most recent entries, the ledger" : "The ledger"} records that credit usage as ${parts.join("; ")}.`;
+}
+
+/** The fired readings as one, and whether one names a disputable charge. */
+const billingReadings = (charged: string | null, gap: string | null) => {
+  const reading = [charged, gap].filter(Boolean).join(" ");
+  return {
+    ...(charged ? { identifiesCharge: true as const } : {}),
+    ...(reading ? { reading } : {}),
+  };
+};
+
 /** Injectable so the reconciliation can be tested without a live Autumn, Stripe or PlanetScale call. */
 export interface WidgetBillingSummaryDeps {
   getAutumnCustomer: (customerId: string) => Promise<unknown>;
@@ -395,6 +653,8 @@ export interface WidgetBillingSummaryDeps {
     organizationId: string,
     window: CreditHistoryWindow
   ) => Promise<CreditHistoryResult>;
+  /** Purchased inboxes in error now, and the latest of their first saved errors. */
+  getErroredInboxes?: (organizationId: string) => Promise<ErroredInboxes>;
   getStripeCustomerBilling: (customerId: string) => Promise<StripeBilling>;
   /**
    * Whether the asking user is a live owner or admin of this organization, read
@@ -523,6 +783,22 @@ function chargedWithoutActiveSubscription(
   return hasSucceededCharge && !hasActiveSubscription;
 }
 
+/** Started beside the provider reads; a failed read is unavailable, never zero. */
+async function readErroredInboxes(
+  organizationId: string,
+  deps: WidgetBillingSummaryDeps
+) {
+  const errored = deps.getErroredInboxes
+    ? await deps.getErroredInboxes(organizationId).catch(() => null)
+    : undefined;
+  return {
+    reading: (invoices: z.infer<typeof invoiceSummarySchema>[]) =>
+      readInboxErrorBilling(errored ?? null, invoices),
+    unavailable:
+      errored === null ? ["productDb.erroredInboxes read failed"] : [],
+  };
+}
+
 /**
  * Reconciles one widget organization's billing across the product database
  * (plan, wallet totals, org/partner state), Autumn (credits and subscription,
@@ -536,7 +812,7 @@ export async function composeWidgetBillingSummary(
   deps: WidgetBillingSummaryDeps,
   input: WidgetBillingSummaryInput = {}
 ): Promise<WidgetBillingSummary> {
-  const { creditWindow } = widgetBillingSummaryInputSchema.parse(input);
+  const { creditWindow, windowNotes } = requestedWindow(input);
   const unavailable: string[] = [];
   // Every other widget tool hangs its reads off a live membership check. The
   // billing reads are keyed by organization id alone, so the check runs first,
@@ -556,7 +832,7 @@ export async function composeWidgetBillingSummary(
     return { ...EMPTY_SUMMARY, available: false, unavailable };
   }
 
-  const notes: string[] = [];
+  const notes = windowNotes;
   let creditHistory: CreditHistoryResult | null = null;
   if (creditWindow) {
     creditHistory = (await deps
@@ -575,6 +851,7 @@ export async function composeWidgetBillingSummary(
       "Credit-window totals cover this workspace's stored ledger only, not lifetime balances or all provider activity. Transaction amounts are signed. Manual grants may also appear in transactions; do not add the two sources. Manual grants without a completed_at timestamp are not included."
     );
   }
+  const erroredRead = readErroredInboxes(organizationId, deps);
   const autumn = await resolveAutumn(account, deps);
   if (autumn.reason) {
     notes.push(...(autumn.skipped ? [autumn.reason] : []));
@@ -587,7 +864,10 @@ export async function composeWidgetBillingSummary(
   const { stripe } = stripeResolution;
 
   const charges = stripeListRows(stripe?.charges).map(toChargeSummary);
-  const invoices = stripeListRows(stripe?.invoices).map(toInvoiceSummary);
+  const prices = inboxPlanPrices(autumn.data);
+  const invoices = stripeListRows(stripe?.invoices).map((row) =>
+    withInboxCounts(toInvoiceSummary(row), prices)
+  );
   const subscriptions = stripeListRows(stripe?.subscriptions).map(
     toSubscriptionSummary
   );
@@ -634,6 +914,17 @@ export async function composeWidgetBillingSummary(
     );
   }
 
+  const errored = await erroredRead;
+  unavailable.push(...errored.unavailable);
+  const readings = billingReadings(
+    errored.reading(invoices),
+    readCreditGap(
+      autumn.data,
+      credits,
+      readCreditUsage(account.transactions, account.truncated.transactions)
+    )
+  );
+
   return {
     autumn: {
       available: autumn.available,
@@ -659,6 +950,7 @@ export async function composeWidgetBillingSummary(
     recentCharges: charges,
     recentInvoices: invoices,
     recentRefunds,
+    ...readings,
     reconciliation: { chargedButNoActiveSubscription, notes },
     stripeSubscriptions: subscriptions,
     truncated,
@@ -666,16 +958,81 @@ export async function composeWidgetBillingSummary(
   };
 }
 
+/** Long enough for one investigation, short enough that a later turn reads billing afresh. */
+const SESSION_READ_MS = 180_000;
+const sessionReads = new Map<string, { at: number; value: Promise<unknown> }>();
+
+/**
+ * A repeated billing read in one session (wrun ...MAF4Z47 read it twice, about
+ * 14 s each) reuses the provider and product rows the first call loaded. The
+ * membership check and the credit window still run on every call. A failed read
+ * is forgotten, so the next call tries again.
+ */
+// ponytail: in-process only, so a call on another instance reads again; a
+// shared cache if repeats there turn out to matter.
+export function sessionRead<T>(
+  key: string,
+  read: () => Promise<T>,
+  now = Date.now(),
+  cacheable: (value: T) => boolean = () => true
+): Promise<T> {
+  for (const [stale, { at }] of sessionReads) {
+    if (now - at > SESSION_READ_MS) {
+      sessionReads.delete(stale);
+    }
+  }
+  const hit = sessionReads.get(key);
+  if (hit) {
+    return hit.value as Promise<T>;
+  }
+  const value = read().then((result) => {
+    if (!cacheable(result)) {
+      sessionReads.delete(key);
+    }
+    return result;
+  });
+  sessionReads.set(key, { at: now, value });
+  value.catch(() => sessionReads.delete(key));
+  return value;
+}
+
 /** The same live owner/admin membership check the other widget tools read through. */
-export function buildBillingAuthorizationQuery(context: WidgetContext): string {
+const authorizedCte = (context: WidgetContext): string => {
   const scope = widgetContextSchema.parse(context);
   return `with authorized as (
     select o.id from organization o join member m on m.organization_id = o.id
     where o.id = '${scope.organizationId}'::uuid and m.user_id = '${scope.userId}'::uuid
       and o.deleted_at is null and m.deleted_at is null and m.role in ('owner', 'admin')
       and (o.partner_id is null or o.partner_id = '${scope.partnerId}'::uuid)
-  )
+  )`;
+};
+
+export const buildBillingAuthorizationQuery = (context: WidgetContext) =>
+  `${authorizedCte(context)}
   select (select count(*) = 1 from authorized) as authorized`;
+
+/**
+ * Purchased inboxes in error now, excluding cancelled or removed ones that are
+ * no longer billed, each dated by its earliest saved error evidence.
+ */
+export function buildErroredInboxesQuery(context: WidgetContext): string {
+  // ponytail: one correlated min per errored inbox; bound it if a workspace's
+  // error webhooks make this slow.
+  return `${authorizedCte(context)},
+  errored as (
+    select least(mi.last_retry_at, (
+      select min(e.created_at) from outreach_webhook_event e
+      join outreach_provider p on p.id = e.provider_id
+      where p.organization_id = mi.organization_id and e.event_type = 'account_error'
+        and lower(e.payload->>'email_account') = lower(mi.email)
+    )) as first_at
+    from mail_inbox mi join authorized a on a.id = mi.organization_id
+    where mi.status = 'error' and not mi.connected
+      and coalesce(mi.connection_error, '') !~* '(cancel|removed)'
+    limit 500
+  )
+  select count(first_at)::int as count, to_jsonb(max(first_at)) #>> '{}' as since
+  from errored`;
 }
 
 export const tool = defineTool({
@@ -684,26 +1041,53 @@ export const tool = defineTool({
       ? "not-applicable"
       : { reason: "Support widget investigations only.", type: "denied" },
   description:
-    "Read a reconciled billing summary for this chat's verified organization: plan, credit balance with best-known renewal date, subscription status, recent Stripe charges and invoices with their line items (what each invoice billed for, with quantities), failed payments, recent refunds, and promo or coupon state. Plan and wallet totals come from the product database, credits and subscription detail come from Autumn (its raw customer record is included for cross-check since its schema is not typed here), and charges, invoices, refunds and discount come from Stripe. For dated credit questions, supply creditWindow (up to 93 days) to retrieve full-window workspace ledger totals by resource/type and completed manual-grant totals. These are separate from current/lifetime balances, can overlap each other, and do not establish complete provider usage. Always reads the verified widget organization; it never accepts a customer id or organization id as input. An invoice is evidence only for the products its own lines name. Each invoice reports `settlement`: a paid invoice that collected no money is not proof that anything was bought, and `customerBalanceAppliedCents` and `discountCents` show credit or discount where Stripe reports them. `orderSubscriptions` lists the billing subscriptions Acquisity created for a specific inbox or domain order; no source here links an order to the invoice or charge that paid for it, so say the attribution is unknown instead of matching by date, amount or paidAt. `truncated` names lists with older rows not shown. A missing section is unavailable, not zero: check `unavailable` and each section's own `available` flag before concluding there were no charges or no plan.",
+    "Read a reconciled billing summary for this chat's verified organization: plan, credit balance with best-known renewal date, subscription status, recent Stripe charges and invoices with their line items (what each invoice billed for, with quantities, and inboxCount: how many inboxes each line and each invoice billed; use it, never a line count or quantity, for the number of inboxes), failed payments with why each was declined (failureMessage, declineReason, declineType), recent refunds, and promo or coupon state. Plan and wallet totals come from the product database, credits and subscription detail come from Autumn (its raw customer record is included for cross-check since its schema is not typed here), and charges, invoices, refunds and discount come from Stripe. For dated credit questions, supply creditWindow (up to 93 days) to retrieve full-window workspace ledger totals by resource/type and completed manual-grant totals. These are separate from current/lifetime balances, can overlap each other, and do not establish complete provider usage. Always reads the verified widget organization; it never accepts a customer id or organization id as input. An invoice is evidence only for the products its own lines name. Each invoice reports `settlement`: a paid invoice that collected no money is not proof that anything was bought, and `customerBalanceAppliedCents` and `discountCents` show credit or discount where Stripe reports them. `orderSubscriptions` lists the billing subscriptions Acquisity created for a specific inbox or domain order; no source here links an order to the invoice or charge that paid for it, so say the attribution is unknown instead of matching by date, amount or paidAt. When purchased inboxes are in error, `reading` ties them to the inbox charges covering time after the error began: tell the customer those facts and promise nothing about a refund or credit. When the billing provider's credit balance and the product's credit ledger disagree, `reading` names the gap with both numbers and what the ledger records that usage as spent on: lead with it, and check website credit spend before calling it a double count. `truncated` names lists with older rows not shown. A missing section is unavailable, not zero: check `unavailable` and each section's own `available` flag before concluding there were no charges or no plan.",
   execute(input: WidgetBillingSummaryInput, ctx: ToolContext) {
     const scope = widgetContext(ctx.session.auth.initiator);
     if (!scope) {
       throw new Error("Support widget identity required.");
     }
+    const once = <T>(
+      read: string,
+      id: string,
+      run: () => Promise<T>,
+      cacheable: (value: T) => boolean = () => true
+    ) =>
+      ctx.session.id
+        ? sessionRead(
+            `${ctx.session.id}:${read}:${id}`,
+            run,
+            Date.now(),
+            cacheable
+          )
+        : run();
     return composeWidgetBillingSummary(
       scope.organizationId,
       {
         getAutumnCustomer: (customerId) =>
-          readAutumnCustomer(customerId, {
-            client: executorClient(ctx),
-            signal: ctx.abortSignal,
-          }),
+          once(
+            "autumn",
+            customerId,
+            () =>
+              readAutumnCustomer(customerId, {
+                client: executorClient(ctx),
+                signal: ctx.abortSignal,
+              }),
+            (value) => !asRow(value).error && asRow(value).available !== false
+          ),
         getBillingAccount: (organizationId) =>
-          readBillingAccount(organizationId, (query) =>
-            callPlanetscaleReadQuery(ctx, {
-              ...PRODUCTION_READ_QUERY_ARGS,
-              query,
-            })
+          once(
+            "account",
+            organizationId,
+            () =>
+              readBillingAccount(organizationId, (query) =>
+                callPlanetscaleReadQuery(ctx, {
+                  ...PRODUCTION_READ_QUERY_ARGS,
+                  query,
+                })
+              ),
+            (value) =>
+              value.found && !value.error && value.unavailable.length === 0
           ),
         getCreditHistory: (organizationId, window) =>
           readBillingCreditHistory(organizationId, window, (query) =>
@@ -712,11 +1096,28 @@ export const tool = defineTool({
               query,
             })
           ),
+        getErroredInboxes: (organizationId) =>
+          once("errored", organizationId, async () =>
+            erroredInboxesSchema.parse(
+              parseReadQueryResult(
+                await callPlanetscaleReadQuery(ctx, {
+                  ...PRODUCTION_READ_QUERY_ARGS,
+                  query: buildErroredInboxesQuery({ ...scope, organizationId }),
+                })
+              ).rows[0]
+            )
+          ),
         getStripeCustomerBilling: (customerId) =>
-          readStripeCustomerBilling(customerId, {
-            client: executorClient(ctx),
-            signal: ctx.abortSignal,
-          }),
+          once(
+            "stripe",
+            customerId,
+            () =>
+              readStripeCustomerBilling(customerId, {
+                client: executorClient(ctx),
+                signal: ctx.abortSignal,
+              }),
+            (value) => Object.values(value).every((section) => !section.error)
+          ),
         isAuthorized: async (organizationId) => {
           const [row] = parseReadQueryResult(
             await callPlanetscaleReadQuery(ctx, {

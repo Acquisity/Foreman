@@ -3,11 +3,13 @@ import { test } from "node:test";
 import { verifiedWidgetContext as scope } from "./widget.fixture.js";
 import {
   composerInput,
+  composeWithin,
   defaultGateDeps,
   extractIdentifiers,
   type GateDeps,
   gate,
   guardedJudge,
+  reaskedDetails,
   redactableItems,
   removeItems,
   scanIdentifiers,
@@ -1156,4 +1158,296 @@ test("the live gate blocks stacked extensions in composed replies and removes th
   );
   assert.equal(allowed.decision, "allow");
   assert.equal(allowed.message, text);
+});
+
+const CLAIMED =
+  "Your campaign paused because its inbox disconnected. I've reported this to the engineering team as a ticket.";
+const claimingDeps = (replies: string[]) => {
+  const { calls, deps: d } = deps({
+    compose: (input) => {
+      calls.compose.push(input);
+      return Promise.resolve(replies[calls.compose.length - 1] ?? "");
+    },
+  });
+  return { calls, d };
+};
+const corrections = (calls: { compose: unknown[] }) =>
+  calls.compose.map((input) => (input as { correction?: string }).correction);
+
+test("a filed ticket keeps the reply's report sentence and needs no recompose", async () => {
+  const { calls, d } = claimingDeps([CLAIMED]);
+  const result = await gate(
+    scope,
+    question,
+    findings({
+      ticket: { id: "ENG-1", url: "https://linear.app/acquisity/issue/ENG-1" },
+    }),
+    d
+  );
+  assert.equal(result.message, CLAIMED);
+  assert.deepEqual(corrections(calls), [undefined]);
+});
+
+test("an unfiled ticket claim is recomposed once with the correction", async () => {
+  const { calls, d } = claimingDeps([
+    CLAIMED,
+    "Your campaign paused because its inbox disconnected. Reconnect it, then resume.",
+  ]);
+  const result = await gate(scope, question, findings(), d);
+  assert.match(result.message ?? "", RECONNECT);
+  assert.equal(calls.compose.length, 2);
+  assert.ok(corrections(calls)[1]?.includes("No ticket was filed"));
+});
+
+test("a claim the recompose repeats is deleted, and a conditional promise stays", async () => {
+  const conditional =
+    "Send me the exact error and I'll report it to engineering if it is a fault on our side.";
+  const { d } = claimingDeps([CLAIMED, `${CLAIMED} ${conditional}`]);
+  const result = await gate(scope, question, findings(), d);
+  assert.equal(result.reason, "in scope");
+  assert.equal(
+    result.message,
+    `Your campaign paused because its inbox disconnected. ${conditional}`
+  );
+});
+
+test("an email's dotted local part is not read as a domain", () => {
+  // "jane.smith" ends in a TLD-shaped "smith"; no domain table can vouch for it.
+  assert.deepEqual(
+    scanIdentifiers("You sign in as jane.smith@acme-owned.com.").candidates
+      .domains,
+    []
+  );
+  assert.deepEqual(
+    scanIdentifiers("Send from jane.smith@acme-owned.com via other-tenant.com.")
+      .candidates.domains,
+    ["other-tenant.com"]
+  );
+});
+
+test("sending accounts this org's own provider webhooks report are vouched for only through the verified workspace", () => {
+  const query = buildOwnershipQuery(scope, {
+    emails: ["sender@followup-owned.co"],
+    slugs: [],
+    uuids: [],
+  });
+  assert.ok(
+    query.includes(
+      "lower(e.payload->>'email_account') from outreach_webhook_event e join authorized a on a.id = e.organization_id"
+    )
+  );
+});
+
+test("leads of this org's own campaigns are vouched for only through the verified workspace", () => {
+  const query = buildOwnershipQuery(scope, {
+    emails: ["lead@prospect.net"],
+    slugs: [],
+    uuids: [],
+  });
+  assert.ok(
+    query.includes(
+      "lower(cl.email) from outreach_campaign_lead cl join authorized a on a.id = cl.organization_id"
+    )
+  );
+  assert.ok(
+    query.includes(
+      "lower(e.lead_email) from outreach_webhook_event e join authorized a on a.id = e.organization_id"
+    )
+  );
+  // A webhook row with a mixed-case lead email still matches the lowercased list.
+  assert.ok(query.includes("where lower(e.lead_email) = any("));
+});
+
+test("a sending account or lead from another org still blocks", async () => {
+  const other = "lead@other-org-campaign.net";
+  const { calls, deps: d } = deps({
+    resolve: () =>
+      Promise.resolve({
+        domains: new Set<string>(),
+        emails: new Set(["sender@followup-owned.co"]),
+        slugs: new Set<string>(),
+        uuids: new Set<string>(),
+      }),
+  });
+  const result = await gate(
+    scope,
+    question,
+    findings({
+      facts: [],
+      recommendation: `sender@followup-owned.co sent a follow-up early to ${other}.`,
+    }),
+    d
+  );
+  assert.equal(result.decision, "block");
+  assert.equal(result.reason, `foreign_identifier:${other}`);
+  assert.equal(calls.compose.length, 0);
+});
+
+test("an email the customer typed in this conversation may be repeated back", async () => {
+  const typed = "fredy.host@gmail.com";
+  const { deps: d } = deps({
+    resolve: () =>
+      Promise.resolve({
+        domains: new Set<string>(),
+        emails: new Set<string>(),
+        slugs: new Set<string>(),
+        uuids: new Set<string>(),
+      }),
+  });
+  const result = await gate(
+    scope,
+    `Fredy (${typed}) says the campaign still names Tammy as host.`,
+    findings({
+      facts: [],
+      recommendation: `No AI SDR threads are saved for ${typed}.`,
+    }),
+    d
+  );
+  assert.notEqual(result.decision, "block");
+});
+
+test("an email the customer never typed still blocks beside one they did", async () => {
+  const other = "someone@other-tenant.net";
+  const { deps: d } = deps({
+    resolve: () =>
+      Promise.resolve({
+        domains: new Set<string>(),
+        emails: new Set<string>(),
+        slugs: new Set<string>(),
+        uuids: new Set<string>(),
+      }),
+  });
+  const result = await gate(
+    scope,
+    "Why does fredy.host@gmail.com get no replies?",
+    findings({
+      facts: [],
+      recommendation: `fredy.host@gmail.com has no threads, and ${other} does.`,
+    }),
+    d
+  );
+  assert.equal(result.decision, "block");
+  assert.equal(result.reason, `foreign_identifier:${other}`);
+});
+
+test("a compose that times out retries once in what the finish has left, never past it", async () => {
+  // Hangs until aborted, like the round 15 composes cut at exactly 25.0 s.
+  const stall = (abortSignal: AbortSignal) =>
+    new Promise<string>((_resolve, reject) =>
+      abortSignal.addEventListener("abort", () => reject(abortSignal.reason))
+    );
+  let calls = 0;
+  const reply = await composeWithin(
+    (abortSignal) => {
+      calls += 1;
+      return calls === 1 ? stall(abortSignal) : Promise.resolve("reply");
+    },
+    { finishAt: Date.now() + 60_000, firstMs: 20 }
+  );
+  assert.deepEqual([reply, calls], ["reply", 2]);
+  // Under 10 s left after the reply scan's 20 s reserve: no retry, the gate fails closed.
+  calls = 0;
+  await assert.rejects(
+    composeWithin(
+      (abortSignal) => {
+        calls += 1;
+        return stall(abortSignal);
+      },
+      { finishAt: Date.now() + 25_000, firstMs: 20 }
+    )
+  );
+  assert.equal(calls, 1);
+  // The finish deadline itself passing is never retried.
+  const finish = new AbortController();
+  calls = 0;
+  const pending = composeWithin(
+    (abortSignal) => {
+      calls += 1;
+      return stall(abortSignal);
+    },
+    { finishAt: Date.now() + 60_000, firstMs: 5000, signal: finish.signal }
+  );
+  finish.abort();
+  await assert.rejects(pending);
+  assert.equal(calls, 1);
+});
+
+// Round 16 replies that re-asked what the conversation already held (redacted).
+const HELD =
+  "LATEST CUSTOMER MESSAGE (the one to work on):\nWhen will this be reviewed?\n\nEARLIER TURNS (context only):\nCustomer: I still got charged today even though I cancelled\nSupport: The charge was $54 which is for your email inboxes.";
+const REASKED =
+  "The most recent charge is $54 on 2026-09-20. Which charge are you asking about? If you can tell me the amount and date as you see them under Settings > Billing, I can work from that.";
+
+test("a reply asking for a detail the conversation holds is found, with the values given", () => {
+  assert.deepEqual(reaskedDetails(REASKED, HELD), ["date (today)"]);
+  assert.deepEqual(
+    reaskedDetails(
+      "Tell me the dates and the balance you saw on screen.",
+      "I only have 8,017 and not the 8,647"
+    ),
+    ["balance (8,017, 8,647)"]
+  );
+  assert.deepEqual(
+    reaskedDetails(
+      "Then reply here with the 3 domains you still use and the dates you believe you were over-charged.",
+      "invoiced both for the monthly plan and inboxes as if they were both in Sept and Oct"
+    ),
+    ["date (Sept, Oct)"]
+  );
+  assert.deepEqual(
+    reaskedDetails(
+      "Search People and tell me the exact address shown on the row.",
+      "Customer: person-1@domain-1.example"
+    ),
+    ["email address (person-1@domain-1.example)"]
+  );
+  // Not given, or not asked for: nothing.
+  assert.deepEqual(reaskedDetails(REASKED, "Why was I charged?"), []);
+  assert.deepEqual(
+    reaskedDetails("The charge was $54 on 2026-09-20.", HELD),
+    []
+  );
+});
+
+test("a reply re-asking a detail the conversation holds is recomposed once with what was given", async () => {
+  const { calls, d } = claimingDeps([
+    REASKED,
+    "The most recent charge is $54 on 2026-09-20, and none is dated today.",
+  ]);
+  const result = await gate(scope, question, findings(), d, HELD);
+  assert.equal(
+    result.message,
+    "The most recent charge is $54 on 2026-09-20, and none is dated today."
+  );
+  assert.equal(calls.compose.length, 2);
+  assert.ok(String(corrections(calls)[1]).includes("date (today)"));
+});
+
+test("a reply that asks for nothing already given is composed once", async () => {
+  const { calls, d } = claimingDeps([REASKED]);
+  const result = await gate(scope, question, findings(), d);
+  assert.equal(result.message, REASKED);
+  assert.deepEqual(corrections(calls), [undefined]);
+});
+
+test("re-ask repairs ignore details supplied only by Support or screenshot readings", () => {
+  const conversation =
+    "LATEST CUSTOMER MESSAGE (the one to work on):\nA CRM email edit will not save.\n\nSCREENSHOTS ATTACHED TO THE LATEST MESSAGE (context):\nThe image shows screenshot@example.com.\n\nEARLIER TURNS (context only):\nCustomer: My inbox needs checking.\nSupport: Your sending inbox is support@example.com.\nThe charge was $54 on 2026-09-20 with a balance of 8,017 credits.";
+  assert.deepEqual(
+    reaskedDetails(
+      "Which email address did you try to add to the CRM?",
+      conversation
+    ),
+    []
+  );
+  assert.deepEqual(reaskedDetails(REASKED, conversation), []);
+  assert.deepEqual(reaskedDetails("Tell me the balance.", conversation), []);
+  assert.deepEqual(
+    reaskedDetails(
+      "Which email address did you try to add to the CRM?",
+      conversation +
+        "\nCustomer: It was customer@example.com.\nI used that address yesterday."
+    ),
+    ["email address (customer@example.com)"]
+  );
 });

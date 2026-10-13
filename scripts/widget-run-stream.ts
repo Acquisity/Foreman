@@ -79,7 +79,9 @@ const runRecord = z.object({
 
 export async function streamRun(
   runId: string,
-  target: Target
+  target: Target,
+  /** A local live re-run is a staff (inbox) run by design (`widget:live score`). */
+  allowInbox = false
 ): Promise<{ raw: WidgetCase; scope: WidgetContext }> {
   const streams = z
     .array(z.object({ streamId: z.string() }))
@@ -127,7 +129,7 @@ export async function streamRun(
     throw new Error(`${runId} is not a widget support run.`);
   }
   const context = z.object(widgetContextSchema.shape).parse(auth.attributes);
-  if (context.source !== "widget") {
+  if (context.source !== "widget" && !(allowInbox && target === "local")) {
     throw new Error(`${runId} is a team inbox run, not a customer widget run.`);
   }
   const question = events.find((e) => e.type === "message.received")?.data

@@ -13,6 +13,7 @@ import {
   type WidgetDependencies,
 } from "./widget-investigation.js";
 import { liveDependencies, liveRunStore } from "./widget-live-store.js";
+import { LIVE_TICKET } from "./widget-replay.js";
 
 const secret = "s".repeat(40);
 const findings: WidgetFindings = {
@@ -236,7 +237,7 @@ test("a reconstructed local run retains its server filing receipt without SQL or
     randomUUID(),
     "Can I speak to a person?"
   );
-  const receipt = { filed: false as const, live: "not filed" as const };
+  const receipt = LIVE_TICKET;
   await store.saveTicket(fixture, run.id, receipt);
   const recovered = liveRunStore(directory);
   assert.deepEqual(await recovered.readTicket(fixture, run.id), receipt);

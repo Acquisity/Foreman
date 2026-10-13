@@ -21,7 +21,6 @@ import {
   stepUsage,
   unrecordedReads,
 } from "#lib/widget-graders.js";
-import { MAX_WIDGET_TOOL_CALLS } from "#lib/widget-investigation-model.js";
 import {
   citedArticles,
   claimsFor,
@@ -30,6 +29,7 @@ import {
   reviewedSample,
   saveRecord,
 } from "#lib/widget-judge.js";
+import { MAX_WIDGET_TOOL_CALLS } from "#lib/widget-next-action.js";
 import { AFTER_HOURS_TICKET } from "#lib/widget-office-hours.js";
 import { replayRecording } from "#lib/widget-replay.js";
 import { replyElapsed } from "#lib/widget-replay-timing.js";
@@ -41,11 +41,42 @@ const DEADLINE_MS = 300_000;
 /** One review directory per eval invocation, shared by every case in it. */
 const REVIEW_DIR = `${JUDGE_OUTPUT}/${new Date().toISOString().replace(/[:.]/g, "-")}`;
 
-// WIDGET_REPLAY=1 enables the server; each request/session selects its own cassette.
-export default readdirSync("evals/widget/cases")
+const CASE_FILES = readdirSync("evals/widget/cases")
   .filter((file) => file.endsWith(".json"))
-  .sort()
-  .map((file) =>
+  .sort();
+
+/**
+ * WIDGET_REPLAY_CASES names a subset of cases (comma-separated, without
+ * `.json`) and WIDGET_REPLAY_RUNS replays each one that many times in this
+ * invocation, so a change is tested on the fewest runs that answer the
+ * question. An unknown name fails loudly instead of shrinking the run.
+ */
+const selected = (() => {
+  const names = process.env.WIDGET_REPLAY_CASES?.split(",")
+    .map((name) => name.trim())
+    .filter(Boolean);
+  if (!names?.length) {
+    return CASE_FILES;
+  }
+  const unknown = names.filter((name) => !CASE_FILES.includes(`${name}.json`));
+  if (unknown.length) {
+    throw new Error(`WIDGET_REPLAY_CASES names no case: ${unknown.join(", ")}`);
+  }
+  return CASE_FILES.filter((file) => names.includes(file.slice(0, -5)));
+})();
+const RUNS = Math.max(1, Number(process.env.WIDGET_REPLAY_RUNS) || 1);
+
+/**
+ * The first replay to start runs alone; the rest wait for it, so its
+ * investigator and composer calls write the shared prompt cache before the
+ * parallel batch reads it instead of each missing it at once.
+ */
+let warming: Promise<void> | undefined;
+
+// WIDGET_REPLAY=1 enables the server; each request/session selects its own cassette.
+export default Array.from({ length: RUNS }, () => selected)
+  .flat()
+  .map((file, index) =>
     defineEval({
       description: `Replay ${file} through the widget route with live models and recorded tool results.`,
       tags: ["widget"],
@@ -60,89 +91,107 @@ export default readdirSync("evals/widget/cases")
           return;
         }
         const path = `evals/widget/cases/${file}`;
+        const run = Math.floor(index / selected.length);
         // The legacy single-case fallback replays only the case it names.
         const legacy = process.env.WIDGET_REPLAY_CASE;
         if (process.env.WIDGET_REPLAY !== "1" && legacy && legacy !== path) {
           t.skip(`WIDGET_REPLAY_CASE selects ${legacy}.`);
           return;
         }
-        const recorded = widgetCaseSchema.parse(
-          JSON.parse(readFileSync(path, "utf8"))
-        );
-        const scope = {
-          conversation_id: randomUUID(),
-          organization_id: fixture.organizationId,
-        };
-        const post = async (body: object) => {
-          const response = await t.target.fetch("/internal/widget/message", {
-            body: JSON.stringify({ ...scope, ...body }),
-            headers: {
-              // Any token: replay answers identity from the case's fixture scope.
-              authorization: "Bearer replay",
-              "content-type": "application/json",
-              "x-widget-replay-case": file.slice(0, -5),
-              [SERVICE_SECRET_HEADER]:
-                process.env.FOREMAN_DIAGNOSTICS_SECRET ?? "",
-            },
-            method: "POST",
-            signal: t.signal,
-          });
-          return (await response.json()) as Record<string, unknown>;
-        };
-        const sent = Date.now();
-        let result = await post({
-          ...toRequest(recorded.question),
-          ...(recorded.mode ? { mode: recorded.mode } : {}),
-          message_id: randomUUID(),
-          recording: replayRecording(recorded),
-        });
-        const runId = await t.require(
-          result.run_id,
-          satisfies((id) => typeof id === "string", "the route started a run")
-        );
-        const deadline = Date.now() + DEADLINE_MS;
-        let firstReplyMs = replyElapsed(result, sent, Date.now());
-        while (result.status === "pending" && Date.now() < deadline) {
-          // biome-ignore lint/performance/noAwaitInLoops: each poll waits for the previous one.
-          await sleep(POLL_MS, undefined, { signal: t.signal });
-          result = await post({ action: "result", run_id: runId });
-          firstReplyMs ??= replyElapsed(result, sent, Date.now());
+        if (warming) {
+          // A failed warm-up fails its own case only.
+          await warming.catch(() => undefined);
+          await replayCase(t, file, path, run);
+          return;
         }
-        const replyTimes = {
-          finalReplyMs: result.status === "pending" ? null : Date.now() - sent,
-          firstReplyMs,
-        };
-        t.log(`outcome: ${JSON.stringify(result)}`);
-        t.log(
-          "The front door's help-center index and article fetch, if it ran, was a live read of the public docs."
-        );
-        await t.require(result.status, equals("completed"));
-        t.check(
-          result.message,
-          result.decision === "block"
-            ? equals(null)
-            : satisfies(
-                (message) => typeof message === "string" && message.length > 0,
-                "the customer got an answer"
-              )
-        );
-        await gradeReplay(
-          t,
-          await readWidgetRun(String(runId)),
-          recorded,
-          path,
-          replyTimes
-        );
+        warming = replayCase(t, file, path, run);
+        await warming;
       },
     })
   );
+
+async function replayCase(
+  t: EveEvalContext,
+  file: string,
+  path: string,
+  runIndex: number
+) {
+  const recorded = widgetCaseSchema.parse(
+    JSON.parse(readFileSync(path, "utf8"))
+  );
+  const scope = {
+    conversation_id: randomUUID(),
+    organization_id: fixture.organizationId,
+  };
+  const post = async (body: object) => {
+    const response = await t.target.fetch("/internal/widget/message", {
+      body: JSON.stringify({ ...scope, ...body }),
+      headers: {
+        // Any token: replay answers identity from the case's fixture scope.
+        authorization: "Bearer replay",
+        "content-type": "application/json",
+        "x-widget-replay-case": file.slice(0, -5),
+        [SERVICE_SECRET_HEADER]: process.env.FOREMAN_DIAGNOSTICS_SECRET ?? "",
+      },
+      method: "POST",
+      signal: t.signal,
+    });
+    return (await response.json()) as Record<string, unknown>;
+  };
+  const sent = Date.now();
+  let result = await post({
+    ...toRequest(recorded.question),
+    ...(recorded.mode ? { mode: recorded.mode } : {}),
+    message_id: randomUUID(),
+    recording: replayRecording(recorded),
+  });
+  const runId = await t.require(
+    result.run_id,
+    satisfies((id) => typeof id === "string", "the route started a run")
+  );
+  const deadline = Date.now() + DEADLINE_MS;
+  let firstReplyMs = replyElapsed(result, sent, Date.now());
+  while (result.status === "pending" && Date.now() < deadline) {
+    // biome-ignore lint/performance/noAwaitInLoops: each poll waits for the previous one.
+    await sleep(POLL_MS, undefined, { signal: t.signal });
+    result = await post({ action: "result", run_id: runId });
+    firstReplyMs ??= replyElapsed(result, sent, Date.now());
+  }
+  const replyTimes = {
+    finalReplyMs: result.status === "pending" ? null : Date.now() - sent,
+    firstReplyMs,
+  };
+  t.log(`outcome: ${JSON.stringify(result)}`);
+  t.log(
+    "The front door's help-center index and article fetch, if it ran, was a live read of the public docs."
+  );
+  await t.require(result.status, equals("completed"));
+  t.check(
+    result.message,
+    result.decision === "block"
+      ? equals(null)
+      : satisfies(
+          (message) => typeof message === "string" && message.length > 0,
+          "the customer got an answer"
+        )
+  );
+  await gradeReplay(
+    t,
+    await readWidgetRun(String(runId)),
+    recorded,
+    path,
+    replyTimes,
+    runIndex
+  );
+}
 
 async function gradeReplay(
   t: EveEvalContext,
   run: WidgetRun,
   recorded: WidgetCase,
   path: string,
-  replyTimes: { finalReplyMs: number | null; firstReplyMs: number | null }
+  replyTimes: { finalReplyMs: number | null; firstReplyMs: number | null },
+  runIndex: number
 ) {
   const lane = answeredLane(run);
   const session =
@@ -185,6 +234,7 @@ async function gradeReplay(
       case: path,
       citations: (run.outcome?.citations ?? []).map(({ url }) => url),
       replayOutcome: outcome,
+      run: runIndex,
       scored,
       ...(scored
         ? grades
@@ -196,7 +246,7 @@ async function gradeReplay(
       budgetHit: tools.length >= MAX_WIDGET_TOOL_CALLS,
       // The gate's reason names the items a rewrite removed, e.g. jev:remove_items:2,3.
       gateReason: run.outcome?.reason ?? null,
-      handedOff: handedOff(lane, run.outcome?.reason ?? null, tools),
+      handedOff: handedOff(lane, run.outcome?.reason ?? null),
       toolCalls: tools.length,
       ...replyTimes,
       ...usageRow(events),
@@ -226,7 +276,7 @@ async function gradeReplay(
       .soft();
     return;
   }
-  await judgeClaims(t, run, recorded, path);
+  await judgeClaims(t, run, recorded, path, runIndex);
   if (!session) {
     t.log("No investigation session: the front door answered.");
     return;
@@ -242,7 +292,8 @@ async function judgeClaims(
   t: EveEvalContext,
   run: WidgetRun,
   recorded: WidgetCase,
-  path: string
+  path: string,
+  runIndex: number
 ) {
   const answer = run.outcome?.message;
   if (!answer) {
@@ -274,10 +325,10 @@ async function judgeClaims(
   }
   const name = path.split("/").at(-1)?.slice(0, -5) ?? path;
   const { gaps, verdicts } = judged;
-  saveRecord(
-    REVIEW_DIR,
-    reviewedSample(name, recorded, answer, verdicts, gaps)
-  );
+  saveRecord(REVIEW_DIR, {
+    ...reviewedSample(name, recorded, answer, verdicts, gaps),
+    run: runIndex || undefined,
+  });
   t.log(`judge review: ${REVIEW_DIR}/review.md`);
   for (const gap of gaps) {
     t.log(`judge gap ${gap.kind}: ${gap.capability ?? ""}`);

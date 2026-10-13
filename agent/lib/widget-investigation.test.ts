@@ -3,7 +3,7 @@ import { type TestContext, test } from "node:test";
 import type { RouteHandlerArgs, Session } from "eve/channels";
 import { isUnattended } from "./trust.js";
 import { verifiedWidgetContext as scope } from "./widget.fixture.js";
-import type { GateResult } from "./widget-egress.js";
+import { composerInput, type GateResult } from "./widget-egress.js";
 import { WorkspaceAccessDenied } from "./widget-evidence.js";
 import { parseFindings, type WidgetFindings } from "./widget-findings.js";
 import {
@@ -17,6 +17,7 @@ import {
   waitForWidgetInvestigation,
   widgetRunResponse,
   withHistory,
+  withReadings,
 } from "./widget-investigation.js";
 import type { KbAnswer, KbCustomer } from "./widget-kb.js";
 import type { WidgetProgress } from "./widget-progress.js";
@@ -1466,6 +1467,98 @@ test("a filed ticket is taken from the tool's own result, whatever the write-up 
   for (const none of refused) {
     assert.equal(none.status === "completed" && none.ticket, null);
   }
+});
+
+test("a reading a tool fired reaches the composer even when the write-up set it aside", async () => {
+  const startUp =
+    "This campaign was created less than a day ago and has no sends yet.";
+  const notFound =
+    "Reconnect failed because the email provider reported the mailbox not found.";
+  const result = (toolName: string, output: unknown) =>
+    event("action.result", {
+      result: { callId: toolName, kind: "tool-result", output, toolName },
+    });
+  const outcome = await waitForWidgetInvestigation(
+    session([
+      result("widget_outreach_health", {
+        campaigns: [
+          { live: { sendingRules: { reading: startUp } }, name: "Launch" },
+          { live: { sendingRules: { reading: null } }, name: "Quiet" },
+        ],
+      }),
+      // A second read of the same campaign states it once.
+      result("widget_outreach_health", {
+        campaigns: [
+          { live: { sendingRules: { reading: startUp } }, name: "Launch" },
+        ],
+      }),
+      result("widget_inbox_health", { reading: notFound }),
+      event("message.completed", {
+        message: "The live read says no sends yet; I'm not relying on it.",
+      }),
+      event("session.completed"),
+    ])
+  );
+  assert.equal(outcome.status, "completed");
+  const { deps, gated, run } = dependencies();
+  if (outcome.status === "completed") {
+    await finishWidgetRun(run, "widget-session-readings", outcome, deps);
+  }
+  const [raw] = gated as WidgetFindings[];
+  assert.ok(raw);
+  // Readings lead the facts, marked for the composer.
+  assert.deepEqual(composerInput(raw).facts.slice(0, 2), [
+    { claim: `Campaign "Launch": ${startUp}`, reading: true },
+    { claim: notFound, reading: true },
+  ]);
+  assert.deepEqual(
+    raw.facts.slice(0, 2).map((fact) => fact.evidence),
+    [
+      { ref: "reading", tool: "widget_outreach_health" },
+      { ref: "reading", tool: "widget_inbox_health" },
+    ]
+  );
+});
+
+test("a fired reading leads the composer's facts and a write-up fact calling it unconfirmed is dropped", () => {
+  const fact = (claim: string, ref = "") => ({
+    claim,
+    entityIds: [],
+    evidence: { ref, tool: "widget_inbox_health" },
+  });
+  const notFound =
+    "Reconnect failed because the email provider reported the mailbox not found. The mailbox no longer exists at the provider, so Reconnect can't fix it.";
+  const likely =
+    "New leads come first, so follow-ups wait until those leads get one. This is the likely reason follow-ups are low, not a certainty.";
+  const written: WidgetFindings = {
+    confidence: "medium",
+    facts: [
+      fact("All three sending accounts read as error."),
+      fact(
+        "The inbox read's interpretation says the mailbox was not found at the provider, while the recorded reconnect errors say authorization needs manual attention, so the cause is unconfirmed"
+      ),
+      fact(
+        "The tool's own reading says the mailbox may no longer exist, but the recorded error text does not say that directly, so that cause is unconfirmed"
+      ),
+      // Unrelated uncertainty stays: only doubt about a reading is dropped.
+      fact("Whether the refund covered this order could not be confirmed."),
+    ],
+    needsHuman: false,
+    recommendation: "Stop retrying Reconnect.",
+    report: "r",
+  };
+  const merged = withReadings(
+    [fact(notFound, "reading"), fact(likely, "reading")],
+    written
+  );
+  assert.ok(merged);
+  assert.deepEqual(composerInput(merged).facts, [
+    { claim: notFound, reading: true },
+    // The tool's own hedge is kept word for word.
+    { claim: likely, reading: true },
+    { claim: "All three sending accounts read as error." },
+    { claim: "Whether the refund covered this order could not be confirmed." },
+  ]);
 });
 
 test("a filed refund ticket is the handoff to billing, so the customer gets a reply instead of a person", async () => {

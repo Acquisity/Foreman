@@ -1,12 +1,173 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { test } from "node:test";
+import { composePrompt } from "./prompts.js";
+import { sessionLane } from "./session-lane.js";
 import { verifiedWidgetContext as scope } from "./widget.fixture.js";
-import { widgetInstructions } from "./widget-instructions.js";
+import { CHAT_PROMPT } from "./widget-chat.js";
+import { COMPOSER_PROMPT, composerRequest } from "./widget-egress.js";
+import {
+  cacheGuide,
+  WIDGET_VOICE,
+  widgetInstructions,
+  withoutGuide,
+} from "./widget-instructions.js";
+import { JUDGE_TIMEOUT_MS } from "./widget-judge.js";
+import { DESCRIPTION_CHARS } from "./widget-next-action.js";
+import { PRODUCT_GUIDE } from "./widget-product-guide.js";
 import { widgetAuth } from "./widget-scope.js";
+import { SUPPORT_GUIDE } from "./widget-support-guide.js";
+
+test("shared support facts keep unpaid cleanup guidance without investigator tool commands", () => {
+  for (const tool of [
+    "widget_inbox_health",
+    "widget_provisioning_status",
+    "widget_billing_summary",
+  ]) {
+    assert.equal(SUPPORT_GUIDE.includes(tool), false);
+  }
+  assert.equal(SUPPORT_GUIDE.includes("before anything else"), false);
+  assert.ok(
+    SUPPORT_GUIDE.includes("Reconnect cannot bring back a cancelled mailbox")
+  );
+});
 
 const FAILED_STEP_RULE =
-  /already tried the documented step and it failed[^.]*recent reconnect attempts all failed, do not tell them to repeat that step or wait it out: state what failed, with its error, and set needsHuman true/;
+  /already tried the documented step and it failed[^.]*recent reconnect attempts all failed, do not tell them to repeat that step or wait it out: state what failed, with its error, and file it with widget_file_ticket/;
+const NEXT_STEP_RULE =
+  /ends with what the customer should do next: the steps[^.]*, the workaround for a[^.]*limitation, or the single most useful[^.]*check they can make/;
+const STATED_FINDING_RULE =
+  /a recorded count, status or absence[^;]*goes in the reply as stated, never replaced by saying it could not be confirmed or checked; what a live check could not show is said after it, never instead of it/;
+const NO_INVENTION_RULES = [
+  /Never explain why data is missing unless/,
+  /never offer a service, migration or team action/,
+  /never promise to report[^.]* it later/,
+  // wrun_41M4EWN90A0GKYHE33ARYJJB31 stated a pasted blocklist listing as fact.
+  /pasted from another tool[^.]* is their report, not something checked here/,
+];
+const UNFILED_TICKET_RULE =
+  /When ticketFiled is absent, nothing was reported[^.]*never say or suggest that this was reported, escalated or handed to engineering, billing or a person, even when the findings say it needs one/;
 
-test("a failed documented step is reported and handed to a person, never repeated", () => {
+test("both lanes forbid unbacked reasons for missing data, invented services and report promises", () => {
+  // Round 9: "may have been cleared when the subscription was cancelled",
+  // "ask for that here in the chat" to move domains, "I'll report it to engineering".
+  for (const prompt of [
+    composePrompt(sessionLane(widgetAuth(scope))),
+    COMPOSER_PROMPT,
+  ]) {
+    for (const rule of NO_INVENTION_RULES) {
+      assert.match(prompt, rule);
+    }
+  }
+});
+
+test("a failed documented step is reported and filed as a ticket, never repeated", () => {
   assert.match(widgetInstructions(widgetAuth(scope)), FAILED_STEP_RULE);
+});
+
+const A = "00000000-0000-4000-8000-00000000000a";
+const B = "00000000-0000-4000-8000-00000000000b";
+
+const user = (text: string) => ({
+  content: [{ text, type: "text" }],
+  role: "user",
+});
+const investigator = (userId: string, question: string) =>
+  cacheGuide<{ content: unknown; role: string }>([
+    {
+      content: composePrompt(sessionLane(widgetAuth({ ...scope, userId }))),
+      role: "system",
+    },
+    user(question),
+  ]);
+
+test("the investigator leads the first user message with the cached guide, the same for every question and workspace", () => {
+  const [first, second] = [
+    investigator(A, "Why was I charged?"),
+    investigator(B, "My campaign stopped sending"),
+  ];
+  for (const [prompt, userId] of [
+    [first, A],
+    [second, B],
+  ] as const) {
+    assert.ok(!String(prompt[0].content).includes(PRODUCT_GUIDE));
+    assert.ok(String(prompt[0].content).includes(userId));
+  }
+  const [guide] = first[1].content as {
+    providerOptions?: unknown;
+    text: string;
+  }[];
+  assert.deepEqual(guide, (second[1].content as unknown[])[0]);
+  assert.ok(guide.text.endsWith(SUPPORT_GUIDE));
+  assert.deepEqual(guide.providerOptions, {
+    anthropic: { cacheControl: { type: "ephemeral" } },
+  });
+});
+
+test("the step-filler's prompt carries no guide", () => {
+  const { prompt } = withoutGuide({ prompt: investigator(A, "Why?") });
+  assert.ok(!JSON.stringify(prompt).includes(PRODUCT_GUIDE));
+  assert.deepEqual(prompt[1], user("Why?"));
+});
+
+test("every composer reply shares one cached guide-first prefix and keeps the guide out of system", () => {
+  const [first, second] = [
+    composerRequest({
+      findings: { facts: [] },
+      question: "Why was I charged?",
+    }),
+    composerRequest({ findings: { facts: [1] }, question: "Is my inbox ok?" }),
+  ];
+  assert.ok(!first.system.includes(PRODUCT_GUIDE));
+  assert.equal(first.system, second.system);
+  const [guide, rest] = first.messages[0].content;
+  assert.deepEqual(guide, second.messages[0].content[0]);
+  assert.equal(guide.text, SUPPORT_GUIDE);
+  assert.ok(guide.providerOptions);
+  assert.ok(rest.text.includes("Why was I charged?"));
+});
+
+test("the chat and the reply composer share one voice", () => {
+  assert.ok(CHAT_PROMPT.includes(WIDGET_VOICE));
+  assert.ok(COMPOSER_PROMPT.includes(WIDGET_VOICE));
+  assert.ok(!COMPOSER_PROMPT.includes("No greetings"));
+});
+
+test("without a filed ticket the composer never says it was reported", () => {
+  assert.match(COMPOSER_PROMPT, UNFILED_TICKET_RULE);
+});
+
+test("the write-up and the reply both end with what the customer does next", () => {
+  assert.match(COMPOSER_PROMPT, NEXT_STEP_RULE);
+  assert.match(widgetInstructions(widgetAuth(scope)), NEXT_STEP_RULE);
+});
+
+test("the composer reports a stated finding, never as could not confirm", () => {
+  assert.match(COMPOSER_PROMPT, STATED_FINDING_RULE);
+});
+
+test("outside-call inventory matches local judge and widget retry contracts", () => {
+  const lines = readFileSync(
+    new URL("../../.github/OUTSIDE-CALLS.md", import.meta.url),
+    "utf8"
+  ).split("\n");
+  const judge =
+    lines.find((line) => line.startsWith("| `agent/lib/widget-judge.ts`")) ??
+    "";
+  assert.ok(judge.includes(`${JUDGE_TIMEOUT_MS / 1000}s per judge call`));
+  assert.ok(judge.includes("three concurrent local processes"));
+  assert.ok(judge.includes("local `claude -p --model opus`"));
+  const proxy = lines.find((line) => line.startsWith("| CLI Proxy (`")) ?? "";
+  assert.equal(proxy.includes("eval judge"), false);
+  assert.ok(proxy.includes("one timeout retry"));
+  assert.ok(proxy.includes("20s reply-scan reserve"));
+  const selector =
+    lines.find((line) =>
+      line.startsWith("| `agent/lib/widget-next-action.ts`")
+    ) ?? "";
+  assert.ok(
+    selector.includes(
+      `${DESCRIPTION_CHARS.toLocaleString("en-US")} characters each`
+    )
+  );
 });

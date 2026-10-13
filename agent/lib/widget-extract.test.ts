@@ -10,7 +10,7 @@ import {
 import type { WidgetFindings } from "./widget-findings.js";
 
 const FAILED_STEP_RULE =
-  /also true when the customer already tried the documented step and it failed[^)]*never tells them to repeat that step or wait it out/;
+  /a documented step the customer already tried that failed are filed as a ticket, not handed to a person[^)]*never tells them to repeat that step or wait it out/;
 
 // What the small model returns: the lenient extraction shape.
 const lenient = {
@@ -189,6 +189,6 @@ test("the default extractor runs under a deadline, so a stalled call hands the w
   assert.ok(signals[0] instanceof AbortSignal);
 });
 
-test("a failed documented step goes to a person, never a repeat or a wait", () => {
+test("a failed documented step is a ticket, never a person, a repeat or a wait", () => {
   assert.match(EXTRACT_PROMPT, FAILED_STEP_RULE);
 });

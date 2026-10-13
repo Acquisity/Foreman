@@ -1,18 +1,23 @@
 import assert from "node:assert/strict";
+import { readdirSync } from "node:fs";
 import { describe, it } from "node:test";
 import { simulateStreamingMiddleware, wrapLanguageModel } from "ai";
 import { MockLanguageModelV4 } from "ai/test";
+import { WIDGET_GUIDE } from "./widget-instructions.js";
 import { widgetInvestigationMiddleware } from "./widget-investigation-model.js";
 import {
   askJev,
+  DESCRIPTION_CHARS,
   nextActionEnabled,
   note,
+  ruledTicket,
   selectNextAction,
   turnEvidence,
   widgetNextActionMiddleware,
 } from "./widget-next-action.js";
 
 const RUN_ENDED = /run ended/;
+const SUPPORT_BLOCKED = /Support investigation capability is unavailable/u;
 
 const usage = {
   inputTokens: { cacheRead: 0, cacheWrite: 0, noCache: 1, total: 1 },
@@ -155,12 +160,70 @@ const RE_7 = /could not be checked/;
 const RE_8 = /not a reason for a person/;
 const RE_9 = /A person should take over/;
 const RE_10 = /Stop gathering/;
+const RE_TICKET_NOTE = /Call widget_file_ticket once now/;
+const RE_ONLY_EXPLICIT =
+  /^The customer explicitly asked to talk to a person\. A billing dispute/;
+const RE_DUPLICATE = /duplicate charge/;
+const RE_DISPUTE = /disputes a charge/;
 
-const WRITE_UP_TOOLS = [
-  "widget_file_ticket",
-  "widget_help_article",
-  "widget_read_help_article",
-];
+/** Every step lists the same tools, the allowlisted ones, in order. */
+const LISTED = TOOLS.map((tool) => tool.name).filter(
+  (name) => name !== "web_fetch"
+);
+const forced = (toolName: string) => ({ toolName, type: "tool" });
+
+for (const mode of ["generate", "stream"] as const) {
+  for (const action of ["finish", "human", "asked", "found"] as const) {
+    for (const tool of ["widget_ask_customer", "widget_billing_summary"]) {
+      it(`${mode}: ${action} refuses ${tool} in the no-tool redo without another retry`, async () => {
+        const ask = {
+          input: { question: "Which campaign do you mean?" },
+          output: { asked: "Which campaign do you mean?" },
+          tool: "widget_ask_customer",
+        };
+        const workspaceRead = {
+          input: {},
+          output: {},
+          tool: "widget_outreach_health",
+        };
+        const reads = {
+          asked: [ask],
+          finish: [],
+          found: [workspaceRead, ask],
+          human: [workspaceRead],
+        }[action];
+        const { base, model } = harness(
+          jev(action === "human" ? "human" : "finish", 1),
+          call("widget_billing_summary", {}),
+          call(tool, { question: "Which campaign do you mean?" })
+        );
+        const params = {
+          prompt: prompt("Please help with my campaign", reads),
+          tools: [
+            ...TOOLS,
+            {
+              inputSchema: { type: "object" as const },
+              name: "widget_ask_customer",
+              type: "function" as const,
+            },
+          ],
+        };
+        await assert.rejects(async () => {
+          if (mode === "generate") {
+            await model.doGenerate(params);
+          } else {
+            const { stream } = await model.doStream(params);
+            for await (const part of stream) {
+              assert.notEqual(part.type, "tool-call");
+            }
+          }
+        }, SUPPORT_BLOCKED);
+        assert.equal(base.doGenerateCalls.length, 2);
+        assert.deepEqual(base.doGenerateCalls[1].toolChoice, { type: "none" });
+      });
+    }
+  }
+}
 
 const campaigns = {
   campaigns: [
@@ -196,7 +259,7 @@ describe("widget next-action selector", () => {
       prompt: prompt("Why was I charged?", []),
       tools: TOOLS,
     });
-    assert.deepEqual(sent().tools, ["widget_billing_summary"]);
+    assert.deepEqual(sent().toolChoice, forced("widget_billing_summary"));
     assert.equal(seen.length, 1);
     assert.equal(seen[0].questions?.handoff_eligible, undefined);
     assert.equal("clarify" in (seen[0].questions?.action.criteria ?? {}), true);
@@ -221,7 +284,7 @@ describe("widget next-action selector", () => {
       prompt: prompt("Is my calendar free tomorrow from 9 to 5 Eastern?", []),
       tools: [...TOOLS, ask],
     });
-    assert.deepEqual(sent().tools, ["widget_ask_customer"]);
+    assert.deepEqual(sent().tools, [...LISTED, "widget_ask_customer"]);
     assert.deepEqual(sent().toolChoice, {
       toolName: "widget_ask_customer",
       type: "tool",
@@ -319,7 +382,7 @@ describe("widget next-action selector", () => {
         ]),
         tools: TOOLS,
       });
-      assert.deepEqual(sent().tools, [pick]);
+      assert.deepEqual(sent().tools, LISTED);
       assert.deepEqual(sent().toolChoice, { toolName: pick, type: "tool" });
       assert.equal(out.content[0]?.type, "tool-call");
     });
@@ -393,7 +456,7 @@ describe("widget next-action selector", () => {
       ]),
       tools: TOOLS,
     });
-    assert.deepEqual(sent().tools, WRITE_UP_TOOLS);
+    assert.deepEqual(sent().tools, LISTED);
     assert.equal(sent().toolChoice, undefined);
     assert.equal(first.content[0]?.type, "tool-call");
     await model.doGenerate({
@@ -409,7 +472,7 @@ describe("widget next-action selector", () => {
     });
     // wrun_41M32MCAVG0GN0CZ5AYEW3AYV8: finish, finish, then a forced outreach read.
     assert.equal(seen.length, 1);
-    assert.deepEqual(sent(1).tools, WRITE_UP_TOOLS);
+    assert.deepEqual(sent(1).tools, LISTED);
     assert.equal(sent(1).toolChoice, undefined);
   });
 
@@ -430,7 +493,7 @@ describe("widget next-action selector", () => {
       tools: TOOLS,
     });
     assert.equal(seen.length, 1);
-    assert.deepEqual(sent().tools, ["widget_outreach_health"]);
+    assert.deepEqual(sent().toolChoice, forced("widget_outreach_health"));
   });
 
   it("a tool that has already run is offered to Jev as a re-read with its own bar, for every tool alike", async () => {
@@ -466,10 +529,209 @@ describe("widget next-action selector", () => {
     assert.equal(menu.includes("widget_outreach_health"), true);
     assert.equal(
       menu.some(
-        (key) => key.includes("help_article") || key.includes("ticket")
+        (key) => key.includes("help_article") || key === "widget_file_ticket"
       ),
       false
     );
+    // Filing is its own choice, never a read.
+    assert.equal(menu.includes("ticket"), true);
+  });
+
+  it("a ticket pick forces widget_file_ticket on the investigator, then the write-up", async () => {
+    const { base, model, sent } = harness(
+      jev("ticket", 0),
+      call("widget_file_ticket", { summary: "s", title: "t" }),
+      text("findings")
+    );
+    const reconnects = [
+      {
+        input: {},
+        output: { reconnects: "all 3 failed", status: "error" },
+        tool: "widget_inbox_health",
+      },
+    ];
+    const out = await model.doGenerate({
+      prompt: prompt(
+        "I reconnected my inbox three times and it still fails.",
+        reconnects
+      ),
+      tools: TOOLS,
+    });
+    assert.deepEqual(sent().toolChoice, forced("widget_file_ticket"));
+    assert.match(sent().note, RE_TICKET_NOTE);
+    assert.equal(out.content[0]?.type, "tool-call");
+    // The ticket result leads to the findings, never to another selector pick or ticket.
+    const after = harness(jev("ticket", 0), text("findings"));
+    await after.model.doGenerate({
+      prompt: prompt("I reconnected my inbox three times and it still fails.", [
+        ...reconnects,
+        {
+          input: { summary: "s", title: "t" },
+          output: { identifier: "ENG-1", url: "u" },
+          tool: "widget_file_ticket",
+        },
+      ]),
+      tools: TOOLS,
+    });
+    assert.equal(after.sent().toolChoice, undefined);
+    assert.match(after.sent().note, RE_10);
+    assert.equal(base.doGenerateCalls.length, 1);
+    assert.equal(after.base.doGenerateCalls.length, 1);
+  });
+
+  it("a ticket already filed this turn takes the ticket choice off the menu", async () => {
+    const seen: { questions?: { action?: { criteria?: object } } }[] = [];
+    const { model } = harness(jev("finish", 0, seen as never));
+    await model.doGenerate({
+      prompt: prompt("It still fails.", [
+        { input: {}, output: { status: "error" }, tool: "widget_inbox_health" },
+        {
+          input: {},
+          output: { identifier: "ENG-1", url: "u" },
+          tool: "widget_file_ticket",
+        },
+        {
+          input: {},
+          output: { status: "error" },
+          tool: "widget_outreach_health",
+        },
+      ]),
+      tools: TOOLS,
+    });
+    const menu = Object.keys(seen[0].questions?.action?.criteria ?? {});
+    assert.equal(menu.includes("ticket"), false);
+  });
+
+  it("files the ticket in code: a refund ask with a billing reading that names the charge, or a fault reading", async () => {
+    const billed = {
+      identifiesCharge: true,
+      reading:
+        "6 of the purchased inboxes have been in error since 2026-09-18, and inbox charges covering time after that were billed for them: 2026-10-01 ($48.00), 2026-09-01 ($48.00).",
+      status: "ok",
+    };
+    const early = {
+      campaigns: [
+        {
+          diagnostics: {
+            earlyFollowUps: {
+              platformFault: true,
+              reading: "221 follow-ups went out sooner than the delay.",
+            },
+          },
+          name: "A",
+        },
+      ],
+      status: "ok",
+    };
+    const cases = [
+      {
+        kind: "billing",
+        question:
+          "My inboxes broke in September but I was invoiced anyway. Can you please reimburse the amounts?",
+        reads: [{ input: {}, output: billed, tool: "widget_billing_summary" }],
+      },
+      {
+        kind: "fault",
+        question: "All follow-ups went out 3 hours after the first email.",
+        reads: [{ input: {}, output: early, tool: "widget_outreach_health" }],
+      },
+    ];
+    for (const { question, reads } of cases) {
+      const seen: unknown[] = [];
+      const { model, sent } = harness(
+        jev("clarify", 0.9, seen as never),
+        call("widget_file_ticket", { summary: "s", title: "t" })
+      );
+      // biome-ignore lint/performance/noAwaitInLoops: each case is its own harness.
+      await model.doGenerate({ prompt: prompt(question, reads), tools: TOOLS });
+      assert.deepEqual(sent().toolChoice, forced("widget_file_ticket"));
+      assert.match(sent().note, RE_TICKET_NOTE);
+      // Decided before Jev: a clarify pick can no longer ask which domains.
+      assert.equal(seen.length, 0);
+    }
+    assert.deepEqual(
+      cases.map(({ question, reads }) =>
+        ruledTicket(
+          question,
+          reads.map((read) => ({
+            result: JSON.stringify({ type: "json", value: read.output }),
+            tool: read.tool,
+          }))
+        )
+      ),
+      cases.map(({ kind }) => kind)
+    );
+  });
+
+  it("files nothing in code without a flagged reading, or with a charge reading and no dispute", async () => {
+    const result = (value: object) => JSON.stringify({ type: "json", value });
+    // The billing reading alone, with no refund ask, is not a dispute.
+    assert.equal(
+      ruledTicket("How many inboxes am I paying for?", [
+        {
+          result: result({ identifiesCharge: true, reading: "r" }),
+          tool: "widget_billing_summary",
+        },
+      ]),
+      null
+    );
+    // A refund ask with no reading naming the charge: Jev still decides (clarify).
+    assert.equal(
+      ruledTicket("I want a refund.", [
+        { result: result({ status: "ok" }), tool: "widget_billing_summary" },
+      ]),
+      null
+    );
+    // A mailbox-not-found reading is not a fault: Reconnect can't help, check non-payment.
+    assert.equal(
+      ruledTicket("Reconnect keeps failing.", [
+        {
+          result: result({ reading: "mailbox not found" }),
+          tool: "widget_inbox_health",
+        },
+      ]),
+      null
+    );
+    const seen: unknown[] = [];
+    const { model, sent } = harness(
+      jev("finish", 0.9, seen as never),
+      text("findings")
+    );
+    await model.doGenerate({
+      prompt: prompt("How many inboxes am I paying for?", [
+        {
+          input: {},
+          output: { identifiesCharge: true, reading: "r" },
+          tool: "widget_billing_summary",
+        },
+      ]),
+      tools: TOOLS,
+    });
+    assert.equal(seen.length, 1);
+    assert.equal(sent().toolChoice, undefined);
+  });
+
+  it("a billing dispute is a ticket, not a person: the handoff rule names only an explicit ask", async () => {
+    const seen: {
+      questions?: Record<
+        string,
+        { instructions?: string; criteria?: Record<string, string> }
+      >;
+    }[] = [];
+    const { model } = harness(jev("finish", 0, seen as never));
+    await model.doGenerate({
+      prompt: prompt("I was charged twice for the same inbox order.", [
+        { input: {}, output: { charges: 2 }, tool: "widget_billing_summary" },
+      ]),
+      tools: TOOLS,
+    });
+    const { action, handoff_eligible } = seen[0].questions as {
+      action: { criteria: Record<string, string> };
+      handoff_eligible: { instructions: string };
+    };
+    assert.match(handoff_eligible.instructions, RE_ONLY_EXPLICIT);
+    assert.doesNotMatch(action.criteria.human, RE_DUPLICATE);
+    assert.match(action.criteria.ticket, RE_DISPUTE);
   });
 
   it("the selector reads each tool's whole description, caveats included", async () => {
@@ -506,7 +768,7 @@ describe("widget next-action selector", () => {
       prompt: prompt("Why did my campaign stop?", reads),
       tools: [...TOOLS, ASK],
     });
-    assert.deepEqual(sent().tools, ["widget_ask_customer"]);
+    assert.deepEqual(sent().tools, [...LISTED, "widget_ask_customer"]);
     assert.deepEqual(sent().toolChoice, {
       toolName: "widget_ask_customer",
       type: "tool",
@@ -527,14 +789,198 @@ describe("widget next-action selector", () => {
       tools: [...TOOLS, ASK],
     });
     assert.equal(seen.length, 1);
-    assert.deepEqual(sent(1).tools, []);
-    // A read or a fallback step never exposes it.
-    const other = harness(() => Promise.reject(new Error("down")));
-    await other.model.doGenerate({
+    assert.equal(sent(1).toolChoice, undefined);
+    // A read or a fallback step refuses it: that step is asked again with no tool.
+    const other = harness(
+      () => Promise.reject(new Error("down")),
+      call("widget_ask_customer", { question: "Which campaign do you mean?" }),
+      text("findings")
+    );
+    const out = await other.model.doGenerate({
       prompt: prompt("Why did my campaign stop?", reads),
       tools: [...TOOLS, ASK],
     });
-    assert.equal(other.sent().tools.includes("widget_ask_customer"), false);
+    assert.deepEqual(out.content, [{ text: "findings", type: "text" }]);
+    assert.equal(other.sent(0).toolChoice, undefined);
+    assert.deepEqual(other.sent(1).toolChoice, { type: "none" });
+  });
+
+  it("the write-up runs at medium effort and a forced read keeps the default", async () => {
+    const effort = (h: ReturnType<typeof harness>) =>
+      (
+        h.base.doGenerateCalls[0]?.providerOptions?.anthropic as
+          | { effort?: string }
+          | undefined
+      )?.effort;
+    const read = harness(jev("read"), call("widget_outreach_health", {}));
+    await read.model.doGenerate({
+      prompt: prompt("Why did my campaign stop?", []),
+      tools: TOOLS,
+    });
+    assert.equal(read.base.doGenerateCalls.length, 1);
+    assert.equal(effort(read), undefined);
+    const writeUp = harness(jev("finish"), text("findings"));
+    await writeUp.model.doGenerate({
+      prompt: prompt("Why did my campaign stop?", [
+        { input: {}, output: {}, tool: "widget_outreach_health" },
+      ]),
+      tools: TOOLS,
+    });
+    assert.equal(effort(writeUp), "medium");
+  });
+
+  it("a model that rejects a forced tool_choice is asked unforced, with only the pick admitted", async () => {
+    const ASK = {
+      inputSchema: { type: "object" as const },
+      name: "widget_ask_customer",
+      type: "function" as const,
+    };
+    const base = new MockLanguageModelV4({
+      doGenerate: () =>
+        Promise.resolve({
+          ...call("widget_ask_customer", { question: "Which campaign?" }),
+          content: [
+            ...call("widget_billing_summary", {}).content,
+            ...call("widget_ask_customer", { question: "Which campaign?" })
+              .content,
+          ],
+        }),
+      modelId: "claude-sonnet-5-5",
+    });
+    const model = wrapLanguageModel({
+      middleware: [
+        widgetInvestigationMiddleware(),
+        widgetNextActionMiddleware({ apiKey: "k", fetch: jev("clarify") }),
+      ],
+      model: base,
+    });
+    const out = await model.doGenerate({
+      prompt: prompt("Why did my campaign stop?", [
+        { input: {}, output: campaigns, tool: "widget_outreach_health" },
+      ]),
+      tools: [...TOOLS, ASK],
+    });
+    assert.equal(base.doGenerateCalls.length, 1);
+    assert.equal(base.doGenerateCalls[0].toolChoice, undefined);
+    assert.deepEqual(
+      (base.doGenerateCalls[0].tools ?? []).map((tool) => tool.name),
+      [...LISTED, "widget_ask_customer"]
+    );
+    assert.deepEqual(
+      out.content.map((part) => part.type === "tool-call" && part.toolName),
+      ["widget_ask_customer"]
+    );
+  });
+
+  it("unforceable selections retain the single non-repeated call and ask-result contract", async () => {
+    const ASK = { ...TOOLS[0], name: "widget_ask_customer" };
+    const firstAsk = call("widget_ask_customer", {
+      question: "Which campaign?",
+    });
+    const twoAsks = {
+      ...firstAsk,
+      content: [
+        ...firstAsk.content,
+        ...call("widget_ask_customer", {
+          question: "Which inbox?",
+        }).content.map((part) => ({ ...part, toolCallId: "second" })),
+      ],
+    };
+    const reads = [
+      { input: {}, output: campaigns, tool: "widget_billing_summary" },
+    ];
+    await Promise.all(
+      [
+        {
+          choice: "clarify",
+          output: text("Which campaign?"),
+          reads: [],
+          selected: [],
+        },
+        {
+          choice: "clarify",
+          output: twoAsks,
+          reads: [],
+          selected: firstAsk.content,
+        },
+        {
+          choice: "widget_billing_summary",
+          output: call("widget_billing_summary", {}),
+          reads,
+          selected: [],
+        },
+        {
+          choice: "clarify",
+          output: call("widget_billing_summary", {}),
+          reads: [],
+          selected: [],
+        },
+        {
+          choice: "clarify",
+          output: firstAsk,
+          reads: [],
+          selected: firstAsk.content,
+        },
+      ].map(async (scenario) => {
+        const seen: { state?: string }[] = [];
+        const results = [scenario.output, text("findings")];
+        const base = new MockLanguageModelV4({
+          doGenerate: () =>
+            Promise.resolve(results.shift() ?? text("findings")),
+          modelId: "claude-sonnet-5-5",
+        });
+        const model = wrapLanguageModel({
+          middleware: [
+            widgetInvestigationMiddleware(),
+            widgetNextActionMiddleware({
+              apiKey: "k",
+              fetch: jev(scenario.choice, 0, seen),
+            }),
+          ],
+          model: base,
+        });
+        const out = await model.doGenerate({
+          prompt: prompt("Why did my campaign stop?", scenario.reads),
+          tools: [...TOOLS, ASK],
+        });
+        assert.equal(base.doGenerateCalls[0].toolChoice, undefined);
+        assert.equal(
+          base.doGenerateCalls[0].providerOptions?.anthropic
+            ?.disableParallelToolUse,
+          true
+        );
+        assert.deepEqual(
+          out.content,
+          scenario.selected.length
+            ? scenario.selected
+            : text("findings").content
+        );
+        assert.equal(
+          base.doGenerateCalls.length,
+          scenario.selected.length ? 1 : 2
+        );
+        if (scenario.selected.length) {
+          const { question } = JSON.parse(scenario.selected[0].input);
+          const afterAsk = prompt("Why did my campaign stop?", [
+            {
+              input: { question },
+              output: { asked: question },
+              tool: "widget_ask_customer",
+            },
+          ]);
+          assert.equal(turnEvidence(afterAsk).asked, question);
+          await model.doGenerate({ prompt: afterAsk, tools: [...TOOLS, ASK] });
+          assert.equal(seen.length, 1);
+          const last = base.doGenerateCalls[1].prompt.at(-1);
+          assert.ok(last?.role === "user" && last.content[0]?.type === "text");
+          assert.ok(
+            last.content[0].text.includes(
+              "question for the customer is recorded"
+            )
+          );
+        }
+      })
+    );
   });
 
   it("a useful partial answer: an unavailable source finishes with limitations, not a person", async () => {
@@ -554,12 +1000,13 @@ describe("widget next-action selector", () => {
     assert.equal(sent().toolChoice, undefined);
   });
 
-  it("a human pick stands for an explicit request and for a complex billing dispute", async () => {
-    for (const question of [
-      "Please connect me with a person.",
-      "I was charged twice for the same inbox order across my workspaces.",
-    ]) {
-      const { model, sent } = harness(jev("human", 0.9));
+  it("a human pick stands for an explicit request for a person", async () => {
+    for (const question of ["Please connect me with a person."]) {
+      const { base, model, sent } = harness(
+        jev("human", 0.9),
+        call("widget_billing_summary", {}),
+        text("findings")
+      );
       // biome-ignore lint/performance/noAwaitInLoops: each case needs its own fresh harness, in order.
       await model.doGenerate({
         prompt: prompt(question, [
@@ -568,8 +1015,10 @@ describe("widget next-action selector", () => {
         tools: TOOLS,
       });
       assert.match(sent().note, RE_9);
-      // Reconciling never widens the reads: no evidence tool is left to call.
-      assert.deepEqual(sent().tools, ["widget_file_ticket"]);
+      // Reconciling never widens the reads: an evidence call is refused and
+      // the step is asked again with no tool.
+      assert.equal(base.doGenerateCalls.length, 2);
+      assert.deepEqual(sent(1).toolChoice, { type: "none" });
     }
   });
 
@@ -606,7 +1055,7 @@ describe("widget next-action selector", () => {
       tools: TOOLS,
     });
     assert.equal(base.doGenerateCalls.length, 2);
-    assert.deepEqual(sent(1).tools, WRITE_UP_TOOLS);
+    assert.deepEqual(sent(1).tools, LISTED);
     assert.match(sent(1).note, RE_10);
     assert.deepEqual(out.content, [{ text: "findings", type: "text" }]);
   });
@@ -894,7 +1343,8 @@ describe("widget next-action selector", () => {
       tools: TOOLS,
     });
     assert.equal(called, false);
-    assert.deepEqual(sent().tools, []);
+    assert.deepEqual(sent().tools, LISTED);
+    assert.equal(sent().toolChoice, undefined);
   });
 
   it("the decision holds on the streaming path Eve uses", async () => {
@@ -914,7 +1364,7 @@ describe("widget next-action selector", () => {
     }>) {
       types.push(part.type);
     }
-    assert.deepEqual(sent().tools, ["widget_website_status"]);
+    assert.deepEqual(sent().toolChoice, forced("widget_website_status"));
     assert.equal(types.includes("tool-call"), true);
   });
 });
@@ -1024,10 +1474,121 @@ describe("step model", () => {
     });
     assert.equal(step.doGenerateCalls.length, 1);
     assert.deepEqual(
-      step.doGenerateCalls[0].tools?.map((tool) => tool.name),
-      ["widget_billing_summary"]
+      step.doGenerateCalls[0].toolChoice,
+      forced("widget_billing_summary")
     );
     assert.equal(main.doGenerateCalls.length, 0);
+  });
+
+  it("logs the shape of a step-filler reply that lacks the picked call, never its text", async (t) => {
+    const lines: string[] = [];
+    t.mock.method(console, "info", (line: unknown) => {
+      lines.push(JSON.stringify(line));
+    });
+    const { model } = build(
+      "widget_billing_summary",
+      text("secret reply") as unknown as ReturnType<typeof call>
+    );
+    await model.doGenerate({
+      prompt: prompt("Why was I charged?", []),
+      tools: TOOLS,
+    });
+    const miss = lines.find((line) => line.includes("missing_pick"));
+    assert.ok(miss?.includes("finish=stop parts=1 calls=0"), miss);
+    assert.equal(miss?.includes("secret reply"), false);
+    assert.equal(
+      lines.some((line) => line.includes("repeated_read")),
+      false
+    );
+  });
+
+  it("missing-pick logs contain only known categories and offered names", async (t) => {
+    const lines: string[] = [];
+    t.mock.method(console, "info", (line: unknown) => lines.push(String(line)));
+    const customerName = "customer_account_482";
+    const rawReason = "Acme renewal dispute";
+    const { model } = build("widget_billing_summary", {
+      ...call(customerName, { customer: "secret argument" }),
+      finishReason: { raw: rawReason, unified: "tool-calls" },
+    });
+    await model.doGenerate({
+      prompt: prompt("Why was I charged?", []),
+      tools: TOOLS,
+    });
+    const logs = lines.join("\n");
+    assert.equal(logs.includes(customerName), false);
+    assert.equal(logs.includes(rawReason), false);
+    assert.equal(logs.includes("secret argument"), false);
+    const missing = lines.find((line) => line.includes("missing_pick"));
+    assert.ok(missing?.includes("finish=tool-calls"), missing);
+    assert.ok(missing?.includes("calls=1"), missing);
+    assert.ok(missing?.includes("unknown_tool"), missing);
+  });
+
+  it("unforceable filler overrides use the filler with a guide-free prompt", async () => {
+    const result = call("widget_billing_summary", {});
+    const main = new MockLanguageModelV4({
+      doGenerate: () => Promise.resolve(result),
+    });
+    const step = new MockLanguageModelV4({
+      doGenerate: () => Promise.resolve(result),
+      modelId: "claude-sonnet-5-5",
+    });
+    const model = wrapLanguageModel({
+      middleware: [
+        widgetInvestigationMiddleware(),
+        widgetNextActionMiddleware({
+          apiKey: "k",
+          fetch: jev("widget_billing_summary"),
+          stepModel: wrapLanguageModel({ middleware: [], model: step }),
+        }),
+      ],
+      model: main,
+    });
+    const out = await model.doGenerate({
+      prompt: [
+        { content: `instructions\n\n${WIDGET_GUIDE}`, role: "system" },
+        ...prompt("Why was I charged?", []).slice(1),
+      ],
+      tools: TOOLS,
+    });
+    assert.equal(main.doGenerateCalls.length, 0);
+    assert.equal(step.doGenerateCalls.length, 1);
+    assert.equal(step.doGenerateCalls[0].toolChoice, undefined);
+    assert.equal(
+      JSON.stringify(step.doGenerateCalls[0].prompt).includes(
+        "# Product guide"
+      ),
+      false
+    );
+    assert.deepEqual(out.content, result.content);
+    assert.deepEqual(
+      step.doGenerateCalls[0].tools?.map((tool) => tool.name),
+      LISTED
+    );
+  });
+
+  it("steered filler requests disable parallel tool use and preserve provider options and tools", async () => {
+    const { model, step } = build(
+      "widget_billing_summary",
+      call("widget_billing_summary", {})
+    );
+    await model.doGenerate({
+      prompt: prompt("Why was I charged?", []),
+      providerOptions: {
+        anthropic: { existing: "preserved" },
+        other: { value: 1 },
+      },
+      tools: TOOLS,
+    });
+    assert.deepEqual(step.doGenerateCalls[0].providerOptions, {
+      anthropic: { disableParallelToolUse: true, existing: "preserved" },
+      other: { value: 1 },
+    });
+    assert.deepEqual(
+      step.doGenerateCalls[0].tools?.map((tool) => tool.name),
+      LISTED
+    );
   });
 
   it("leaves a finish write-up to the main model", async () => {
@@ -1086,4 +1647,95 @@ describe("askJev", () => {
     await assert.rejects(pending, RUN_ENDED);
     assert.equal(calls, 1);
   });
+});
+
+describe("tool descriptions Jev reads", () => {
+  it("shows Jev every widget tool's whole description, routing guidance included", async () => {
+    // Round 10: outreach's sending-rules guidance sat past a 1,500 cut, so Jev asked the customer.
+    const dir = new URL("../tools/", import.meta.url);
+    const files = readdirSync(dir).filter(
+      (file) => file.startsWith("widget_") && !file.endsWith(".test.ts")
+    );
+    const tools = await Promise.all(
+      files.map(async (file) => ({
+        file,
+        tool: (await import(new URL(file, dir).href)).tool,
+      }))
+    );
+    for (const { file, tool } of tools) {
+      const description: string = tool?.description ?? "";
+      assert.ok(
+        description.length <= DESCRIPTION_CHARS,
+        `${file}: ${description.length} characters, Jev sees ${DESCRIPTION_CHARS}`
+      );
+    }
+    const { tool } = await import(
+      new URL("widget_outreach_health.ts", dir).href
+    );
+    const guidance = tool.description.indexOf("sendingRules.reading");
+    assert.ok(guidance > 0 && guidance < DESCRIPTION_CHARS);
+  });
+});
+
+it("ticket rules inspect only customer messages for a billing dispute", () => {
+  const billing = {
+    result: JSON.stringify({
+      type: "json",
+      value: { identifiesCharge: true, reading: "Inbox charges" },
+    }),
+    tool: "widget_billing_summary",
+  };
+  const supportOnly =
+    "LATEST CUSTOMER MESSAGE (the one to work on):\nWhat plan am I on?\n\nEARLIER TURNS (context only):\nCustomer: My inbox needs checking.\nSupport: You can request a refund.\nSend us a dispute.";
+  assert.equal(ruledTicket(supportOnly, [billing]), null);
+  // An earlier turn's refund ask does not force another ticket on a follow-up.
+  assert.equal(
+    ruledTicket(
+      supportOnly +
+        "\nCustomer: Please refund those charges.\nI was billed while the inboxes were broken.",
+      [billing]
+    ),
+    null
+  );
+  assert.equal(
+    ruledTicket(
+      "LATEST CUSTOMER MESSAGE (the one to work on):\nPlease refund those charges.\n\nEARLIER TURNS (context only):\nSupport: Which inboxes?",
+      [billing]
+    ),
+    "billing"
+  );
+});
+
+it("ticket rules ignore provider metadata flags and flags on other tools", () => {
+  assert.equal(
+    ruledTicket("What plan am I on?", [
+      {
+        result: JSON.stringify({
+          autumn: { data: { metadata: { platformFault: true } } },
+        }),
+        tool: "widget_billing_summary",
+      },
+    ]),
+    null
+  );
+  assert.equal(
+    ruledTicket("Refund please", [
+      {
+        result: JSON.stringify({ identifiesCharge: true }),
+        tool: "widget_inbox_health",
+      },
+    ]),
+    null
+  );
+  assert.equal(
+    ruledTicket("Refund please", [
+      {
+        result: JSON.stringify({
+          autumn: { data: { identifiesCharge: true } },
+        }),
+        tool: "widget_billing_summary",
+      },
+    ]),
+    null
+  );
 });

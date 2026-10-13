@@ -23,6 +23,37 @@ export const creditHistoryWindowSchema = z
     return duration > 0 && duration <= 93 * 24 * 60 * 60 * 1000;
   }, "Credit history requires a positive window of at most 93 days; from inclusive, to exclusive.");
 export type CreditHistoryWindow = z.infer<typeof creditHistoryWindowSchema>;
+
+const CREDIT_WINDOW_MAX_MS = 93 * 24 * 60 * 60 * 1000;
+/**
+ * What a caller may ask for: any positive window. Round 14 (wrun ...MAF4Z47) had
+ * 6 of 6 billing reads rejected for asking more than 93 days, so a longer one is
+ * clamped by {@link clampCreditWindow} instead.
+ */
+export const creditWindowRequestSchema = z
+  .strictObject({
+    from: z.iso.datetime({ offset: true }),
+    to: z.iso.datetime({ offset: true }),
+  })
+  .refine(
+    ({ from, to }) => Date.parse(to) > Date.parse(from),
+    "Credit history requires a positive window; from inclusive, to exclusive."
+  );
+/** The most recent 93 days of a longer window, ending at its requested end. */
+export const clampCreditWindow = (
+  window: CreditHistoryWindow
+): { shortened: boolean; window: CreditHistoryWindow } =>
+  Date.parse(window.to) - Date.parse(window.from) <= CREDIT_WINDOW_MAX_MS
+    ? { shortened: false, window }
+    : {
+        shortened: true,
+        window: {
+          from: new Date(
+            Date.parse(window.to) - CREDIT_WINDOW_MAX_MS
+          ).toISOString(),
+          to: window.to,
+        },
+      };
 const historyTotal = z.object({
   amount: z.coerce.number().int(),
   entries: z.coerce.number().int().nonnegative(),

@@ -2,6 +2,9 @@
  * Re-run production widget investigations live, read-only (ENG-15026).
  *
  * Usage: pnpm widget:live <wrun_id...> [--server <eve dev url>]
+ *        pnpm widget:live score [--set <name>] [--pick 20] [--runs 1] [--server <eve dev url>]
+ *        pnpm widget:live score --set <name> --combine <result directory...>
+ *        pnpm widget:live rejudge --from <score result directory> [--claims needs_human,cause]
  *
  * For each production run: read its customer message, scope and tool calls
  * from the session stream, and its reply and date from `widget_support_runs`
@@ -11,9 +14,25 @@
  * WIDGET_LIVE=1, where every read is live and widget_file_ticket files nothing.
  * Raw results go to the gitignored `.eve/widget-live/<timestamp>/`; printed
  * output has customer identifiers replaced.
+ *
+ * `score` picks (or reuses) a set of recent production investigations,
+ * snapshots each under `.eve/widget-live/sets/<name>/`, re-runs every case
+ * live, judges each reply with the replay judge and no authored expectations,
+ * and prints the scorecard (ENG-15044 round 7). `--runs N` re-runs the whole
+ * set N times and reports each goal's mean pass rate over runs with its min
+ * and max; `--combine` reports saved score results of one set the same way,
+ * running and judging nothing (round 12).
+ *
+ * `rejudge` re-asks the judge only for the `--claims` named (default
+ * needs_human) on a saved score result, plus any claim a changed cause label
+ * makes stale, keeping every other verdict, and prints the scorecard and each
+ * changed handoff verdict (ENG-15044 round 8c). It runs nothing live, so a
+ * saved run is re-graded against the set's cause labels cheaply (round 9).
  */
 import { randomUUID } from "node:crypto";
-import { mkdir, writeFile } from "node:fs/promises";
+import { existsSync } from "node:fs";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { dirname } from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
 import { parseArgs } from "node:util";
 import { getToken as getConnectToken } from "@vercel/connect";
@@ -21,11 +40,34 @@ import type { ToolContext } from "eve/tools";
 import { z } from "zod";
 import { privateDatabase } from "../agent/lib/private-postgres.js";
 import {
+  candidateRowSchema,
+  parseExcludedOrgs,
+} from "../agent/lib/widget-candidates.js";
+import {
   findLeaks,
   scrubCase,
   toRequest,
   type WidgetCase,
 } from "../agent/lib/widget-case.js";
+import {
+  answeredLane,
+  handedOff,
+  leaks,
+  rawFields,
+} from "../agent/lib/widget-graders.js";
+import {
+  citedArticles,
+  type JudgeRecord,
+  judgeAnswer,
+  type ReplayRow,
+  readRecords,
+  renderScorecard,
+  reviewedSample,
+  SCORECARD_TARGETS,
+  type ScoredReplay,
+  saveRecord,
+  type Verdict,
+} from "../agent/lib/widget-judge.js";
 import {
   driftVerdict,
   gapSentences,
@@ -39,6 +81,31 @@ import {
   liveServerUrl,
   verifyLiveServer,
 } from "../agent/lib/widget-live-policy.js";
+import {
+  type CauseLabels,
+  type ConversationExport,
+  carriedVerdicts,
+  DEFAULT_PICK,
+  exportVerdicts,
+  LIVE_SET_QUERY,
+  LIVE_SETS,
+  type LiveSet,
+  type LiveSnapshot,
+  labelLine,
+  liveCase,
+  liveClaims,
+  liveScorecard,
+  liveSetSchema,
+  NEEDS_HUMAN,
+  parseCauseLabels,
+  rankSet,
+  rejudgedClaims,
+  splitNeedsHuman,
+  twoColumnScorecard,
+} from "../agent/lib/widget-live-score.js";
+import { MAX_WIDGET_TOOL_CALLS } from "../agent/lib/widget-next-action.js";
+import { replyElapsed } from "../agent/lib/widget-replay-timing.js";
+import { widgetRunSchema } from "../agent/lib/widget-run-store.js";
 import { type WidgetContext, widgetAuth } from "../agent/lib/widget-scope.js";
 import { SERVICE_SECRET_HEADER } from "../agent/lib/widget-service-secret.js";
 import { RUN_ID, streamRun } from "./widget-run-stream.js";
@@ -48,13 +115,44 @@ const RUN_DEADLINE_MS = 600_000;
 const READ_DEADLINE_MS = 120_000;
 const TOOL_NAME = /^widget_[a-z_]{1,60}$/;
 
+const SET_NAME = /^[\w-]{1,64}$/;
+const TRAILING_SLASHES = /\/+$/;
+
 const { positionals: runIds, values } = parseArgs({
   allowPositionals: true,
-  options: { server: { default: "http://localhost:2000", type: "string" } },
+  options: {
+    claims: { default: NEEDS_HUMAN.id, type: "string" },
+    combine: { type: "boolean" },
+    from: { type: "string" },
+    pick: { default: String(DEFAULT_PICK), type: "string" },
+    runs: { default: "1", type: "string" },
+    server: { default: "http://localhost:2000", type: "string" },
+    set: { type: "string" },
+  },
 });
-if (!(runIds.length && runIds.every((id) => RUN_ID.test(id)))) {
+const combining =
+  runIds[0] === "score" && Boolean(values.combine) && runIds.length > 1;
+const scoring =
+  (runIds[0] === "score" && runIds.length === 1 && !values.combine) ||
+  combining;
+const rejudging =
+  runIds[0] === "rejudge" && runIds.length === 1 && Boolean(values.from);
+const pick = Number(values.pick);
+const runs = Number(values.runs);
+if (
+  !(
+    rejudging ||
+    (scoring &&
+      Number.isInteger(pick) &&
+      pick > 0 &&
+      Number.isInteger(runs) &&
+      runs > 0 &&
+      (!values.set || SET_NAME.test(values.set))) ||
+    (runIds.length && runIds.every((id) => RUN_ID.test(id)))
+  )
+) {
   console.error(
-    "Usage: pnpm widget:live <wrun_id...> [--server <eve dev url>]"
+    "Usage: pnpm widget:live <wrun_id...> [--server <eve dev url>]\n       pnpm widget:live score [--set <name>] [--pick 20] [--runs 1] [--server <eve dev url>]\n       pnpm widget:live score --set <name> --combine <result directory...>\n       pnpm widget:live rejudge --from <score result directory> [--claims needs_human,cause]"
   );
   process.exit(2);
 }
@@ -68,9 +166,35 @@ if (
   );
 }
 const server = liveServerUrl(values.server);
-await verifyLiveServer(server, process.env.FOREMAN_DIAGNOSTICS_SECRET ?? "");
-const outputDirectory = `.eve/widget-live/${new Date().toISOString().replace(/[:.]/g, "-")}`;
+if (!(rejudging || combining)) {
+  await verifyLiveServer(server, process.env.FOREMAN_DIAGNOSTICS_SECRET ?? "");
+}
+const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+const setName = values.set ?? stamp.slice(0, 10);
+const from = (values.from ?? "").replace(TRAILING_SLASHES, "");
+let outputDirectory = `.eve/widget-live/${stamp}`;
+if (rejudging) {
+  outputDirectory = `${from}/rejudge-${stamp}`;
+} else if (combining) {
+  outputDirectory = `${LIVE_SETS}/${setName}/combined-${stamp}`;
+} else if (scoring) {
+  outputDirectory = `${LIVE_SETS}/${setName}/${stamp}`;
+}
 await mkdir(outputDirectory, { mode: 0o700, recursive: true });
+
+/** The set directory a score or rejudge result sits in: the nearest one holding set.json. */
+const setDirectory = rejudging
+  ? [dirname(from), dirname(dirname(from))].find((dir) =>
+      existsSync(`${dir}/set.json`)
+    )
+  : `${LIVE_SETS}/${setName}`;
+if (!setDirectory) {
+  throw new Error("No set.json above the rejudge directory.");
+}
+const labelsPath = `${setDirectory}/cause-labels.json`;
+const labels: CauseLabels = parseCauseLabels(
+  existsSync(labelsPath) ? await readFile(labelsPath, "utf8") : null
+);
 
 /** The production run's reply and when it was asked. */
 async function recordedRun(runId: string) {
@@ -154,22 +278,30 @@ async function liveRun(question: string, scope: WidgetContext, sentAt: string) {
     return (await response.json()) as Record<string, unknown>;
   };
   const originalRequest = toRequest(question);
+  const sent = Date.now();
   let result = await post({
     ...originalRequest,
     message_id: randomUUID(),
     question: pinnedQuestion(originalRequest.question, sentAt),
   });
   const deadline = Date.now() + RUN_DEADLINE_MS;
+  // Measured at the 3-second poll, like replay.
+  let firstReplyMs = replyElapsed(result, sent, Date.now());
   while (result.status === "pending" && Date.now() < deadline) {
     // biome-ignore lint/performance/noAwaitInLoops: each poll waits for the previous one.
     await sleep(POLL_MS);
     result = await post({ action: "result", run_id: result.run_id });
+    firstReplyMs ??= replyElapsed(result, sent, Date.now());
   }
-  return result;
+  return {
+    finalReplyMs: result.status === "pending" ? null : Date.now() - sent,
+    firstReplyMs,
+    result,
+  };
 }
 
-/** Printed text with every customer identifier replaced, or a notice when the scrubber cannot clear it. */
-function redacted(raw: WidgetCase, scope: WidgetContext, texts: string[]) {
+/** The case and texts with every customer identifier replaced, or null when the scrubber cannot clear them. */
+function scrubTexts(raw: WidgetCase, scope: WidgetContext, texts: string[]) {
   const replies = texts.map((text, index) => ({
     input: null,
     output: text,
@@ -183,15 +315,25 @@ function redacted(raw: WidgetCase, scope: WidgetContext, texts: string[]) {
     scope
   );
   if (findLeaks(scrubbed).length) {
-    return texts.map(
-      () =>
-        `[withheld: identifiers left after redaction; see ${outputDirectory}]`
-    );
+    return null;
   }
-  return scrubbed.case.cassette
-    .slice(-texts.length)
-    .map((entry) => String(entry.output));
+  const { cassette } = scrubbed.case;
+  return {
+    case: {
+      ...scrubbed.case,
+      cassette: cassette.slice(0, raw.cassette.length),
+    },
+    texts: cassette
+      .slice(raw.cassette.length)
+      .map((entry) => String(entry.output)),
+  };
 }
+
+const WITHHELD = `[withheld: identifiers left after redaction; see ${outputDirectory}]`;
+
+/** Printed text with every customer identifier replaced, or a notice when the scrubber cannot clear it. */
+const redacted = (raw: WidgetCase, scope: WidgetContext, texts: string[]) =>
+  scrubTexts(raw, scope, texts)?.texts ?? texts.map(() => WITHHELD);
 
 async function rerun(runId: string) {
   const { raw, scope } = await streamRun(runId, "production");
@@ -207,7 +349,7 @@ async function rerun(runId: string) {
       }))
   );
   const drift = driftVerdict(reads);
-  const live = await liveRun(
+  const { result: live } = await liveRun(
     raw.question,
     scope,
     original.sentAt.toISOString()
@@ -255,8 +397,655 @@ async function rerun(runId: string) {
   );
 }
 
+/** Pick a set from production and snapshot each run while its stream still exists. */
+async function pickSet(path: string): Promise<LiveSet> {
+  const rows = z
+    .array(candidateRowSchema)
+    .parse(
+      await privateDatabase(30_000).query(LIVE_SET_QUERY, [
+        [...parseExcludedOrgs(process.env.WIDGET_CANDIDATES_EXCLUDE_ORGS)],
+      ])
+    );
+  const cases: LiveSnapshot[] = [];
+  for (const { row, topic } of rankSet(rows)) {
+    if (cases.length >= pick) {
+      break;
+    }
+    try {
+      // biome-ignore lint/performance/noAwaitInLoops: one production decrypt at a time bounds CLI load.
+      const { raw, scope } = await streamRun(
+        row.session_id ?? "",
+        "production"
+      );
+      cases.push({
+        cassette: raw.cassette,
+        question: raw.question,
+        reason: row.outcome?.reason ?? null,
+        reply: row.outcome?.message ?? null,
+        runId: row.session_id ?? "",
+        scope,
+        sentAt: row.created_at.toISOString(),
+        topic,
+      });
+      console.log(`Snapshotted ${row.session_id} (${topic}).`);
+    } catch {
+      // A fixed class, never the error text: it can carry customer data.
+      console.log(`Skipped ${row.session_id}: snapshot_failed.`);
+    }
+  }
+  const set = liveSetSchema.parse({
+    cases,
+    pickedAt: new Date().toISOString(),
+  });
+  await writeFile(path, `${JSON.stringify(set, null, 2)}\n`, { mode: 0o600 });
+  return set;
+}
+
+/** The local store's row for a live run: its session, reason and citations. */
+async function liveStoreRun(id: string) {
+  const entries = z
+    .array(z.object({ run: widgetRunSchema }))
+    .parse(
+      JSON.parse(await readFile(".eve/widget-live/runs/store.json", "utf8"))
+    );
+  const entry = entries.find(({ run }) => run.id === id);
+  if (!entry) {
+    throw new Error("The live run is not in the local store.");
+  }
+  return entry.run;
+}
+
+interface Scored {
+  conversation: ConversationExport;
+  production: ScoredReplay;
+  replay: ScoredReplay;
+}
+
+/** Judge one live reply: the replay claims plus needs_human, or needs_human alone when nothing was sent. */
+async function judgeLive(
+  name: string,
+  scrubbed: WidgetCase,
+  answer: string | null,
+  citations: string[],
+  directory = outputDirectory
+) {
+  const articles = await citedArticles(citations);
+  if (!answer) {
+    const { verdicts } = await judgeAnswer(
+      scrubbed,
+      "(No message was sent to the customer.)",
+      [NEEDS_HUMAN],
+      undefined,
+      undefined,
+      articles
+    );
+    const { needsHuman, reason } = splitNeedsHuman(verdicts);
+    return { needsHuman, reason, record: null };
+  }
+  const claims = liveClaims(scrubbed);
+  const judged = await judgeAnswer(
+    scrubbed,
+    answer,
+    [...claims, NEEDS_HUMAN],
+    undefined,
+    undefined,
+    articles
+  );
+  const { needsHuman, reason, verdicts } = splitNeedsHuman(judged.verdicts);
+  const record: JudgeRecord = reviewedSample(
+    name,
+    scrubbed,
+    answer,
+    verdicts,
+    judged.gaps,
+    claims
+  );
+  saveRecord(directory, record);
+  return { needsHuman, reason, record };
+}
+
+/** Re-run one snapshot live; the judge call is returned unawaited so the next live run can start. */
+async function scoreCase(snapshot: LiveSnapshot) {
+  const { finalReplyMs, firstReplyMs, result } = await liveRun(
+    snapshot.question,
+    snapshot.scope,
+    snapshot.sentAt
+  );
+  if (result.status !== "completed") {
+    throw new Error("The live run did not complete.");
+  }
+  const run = await liveStoreRun(String(result.run_id));
+  const cassette = run.session_id
+    ? (await streamRun(run.session_id, "local", true)).raw.cassette
+    : [];
+  const tools = cassette.map(({ tool }) => tool);
+  const message = run.outcome?.message ?? null;
+  const citations = (run.outcome?.citations ?? []).map(({ url }) => url);
+  const raw = liveCase({
+    cassette,
+    question: snapshot.question,
+    runId: snapshot.runId,
+    scope: {
+      role: snapshot.scope.role,
+      workspace: snapshot.scope.organizationSlug,
+    },
+  });
+  const row = {
+    answer: message,
+    budgetHit: tools.length >= MAX_WIDGET_TOOL_CALLS,
+    citations,
+    finalReplyMs,
+    firstReplyMs,
+    handedOff: handedOff(answeredLane(run), run.outcome?.reason ?? null),
+    leaks: leaks(message, raw).length ? "fail" : "pass",
+    rawFields: rawFields(message).length ? "fail" : "pass",
+    scored: true,
+  };
+  await writeFile(
+    `${outputDirectory}/${snapshot.runId}.json`,
+    `${JSON.stringify({ cassette, liveRun: run, row, runId: snapshot.runId }, null, 2)}\n`,
+    { mode: 0o600 }
+  );
+  // Returned unawaited so the next live run starts while this one is judged.
+  const pending = judgeCase(snapshot, cassette, row, judgeLive);
+  pending.catch(() => undefined);
+  return { pending };
+}
+
+/** Judge a live run's reply and the original production reply the same way. */
+function judgeCase(
+  snapshot: LiveSnapshot,
+  cassette: WidgetCase["cassette"],
+  row: ReplayRow,
+  judge: typeof judgeLive
+): Promise<Scored> {
+  const tools = cassette.map(({ tool }) => tool);
+  const message = row.answer ?? null;
+  const citations = row.citations ?? [];
+  const label = labels[snapshot.runId];
+  const scope = {
+    role: snapshot.scope.role,
+    workspace: snapshot.scope.organizationSlug,
+  };
+  const raw = liveCase(
+    {
+      cassette,
+      question: snapshot.question,
+      runId: snapshot.runId,
+      scope,
+    },
+    false,
+    label
+  );
+  const scrubbed = scrubTexts(raw, snapshot.scope, [
+    message ?? "",
+    snapshot.reply ?? "",
+  ]);
+  // The original reply, judged the same way against its own production tool results.
+  const productionRaw = liveCase(
+    {
+      cassette: snapshot.cassette,
+      question: snapshot.question,
+      runId: snapshot.runId,
+      scope,
+    },
+    false,
+    label
+  );
+  const productionTools = snapshot.cassette.map(({ tool }) => tool);
+  const productionRow = {
+    answer: snapshot.reply,
+    budgetHit: productionTools.length >= MAX_WIDGET_TOOL_CALLS,
+    citations: [],
+    finalReplyMs: null,
+    firstReplyMs: null,
+    handedOff:
+      snapshot.reason === undefined
+        ? undefined
+        : handedOff("investigate", snapshot.reason),
+    leaks: leaks(snapshot.reply, productionRaw).length ? "fail" : "pass",
+    rawFields: rawFields(snapshot.reply).length ? "fail" : "pass",
+    scored: true,
+  };
+  const productionScrubbed = scrubTexts(productionRaw, snapshot.scope, [
+    snapshot.reply ?? "",
+  ]);
+  const judgeOrMissing = async (
+    texts: typeof scrubbed,
+    answer: string | null,
+    urls: string[],
+    directory: string
+  ): ReturnType<typeof judgeLive> => {
+    if (texts) {
+      try {
+        return await judge(
+          snapshot.runId,
+          texts.case,
+          answer && (texts.texts[0] ?? null),
+          urls,
+          directory
+        );
+      } catch {
+        console.log(`${snapshot.runId}: judge_failed (missing coverage)`);
+      }
+    }
+    return { needsHuman: undefined, reason: null, record: null };
+  };
+  const judging = async (): Promise<Scored> => {
+    const [judged, original] = await Promise.all([
+      judgeOrMissing(scrubbed, message, citations, outputDirectory),
+      judgeOrMissing(
+        productionScrubbed,
+        snapshot.reply,
+        [],
+        `${outputDirectory}/production`
+      ),
+    ]);
+    const request = toRequest(scrubbed?.case.question ?? WITHHELD);
+    return {
+      conversation: {
+        customer: [
+          ...(request.history ?? []),
+          { role: "customer", text: request.question },
+        ],
+        liveReply: message && (scrubbed?.texts[0] ?? WITHHELD),
+        newToolCalls: tools,
+        originalReply: snapshot.reply && (scrubbed?.texts[1] ?? WITHHELD),
+        originalToolCalls: productionTools,
+        originalVerdicts: exportVerdicts(original.record, {
+          reason: original.reason,
+          value: original.needsHuman,
+        }),
+        runId: snapshot.runId,
+        topic: snapshot.topic,
+        verdicts: exportVerdicts(judged.record, {
+          reason: judged.reason,
+          value: judged.needsHuman,
+        }),
+      },
+      production: {
+        caseName: snapshot.runId,
+        record: original.record,
+        recorded: liveCase(
+          {
+            cassette: snapshot.cassette,
+            question: snapshot.question,
+            runId: snapshot.runId,
+            scope,
+          },
+          original.needsHuman,
+          label
+        ),
+        row: productionRow,
+        runDir: `${outputDirectory}/production`,
+      },
+      replay: {
+        caseName: snapshot.runId,
+        record: judged.record,
+        recorded: liveCase(
+          {
+            cassette,
+            question: snapshot.question,
+            runId: snapshot.runId,
+            scope,
+          },
+          judged.needsHuman,
+          label
+        ),
+        row,
+        runDir: outputDirectory,
+      },
+    };
+  };
+  return judging();
+}
+
+async function score() {
+  const setPath = `${LIVE_SETS}/${setName}/set.json`;
+  const set = existsSync(setPath)
+    ? liveSetSchema.parse(JSON.parse(await readFile(setPath, "utf8")))
+    : await pickSet(setPath);
+  console.log(
+    `Set ${setName}: ${set.cases.length} cases picked ${set.pickedAt}.`
+  );
+  const root = outputDirectory;
+  const results: Scored[][] = [];
+  for (let run = 1; run <= runs; run += 1) {
+    if (runs > 1) {
+      // Each run is a complete score result of its own, so rejudge and --combine read it.
+      outputDirectory = `${root}/run-${run}`;
+      // biome-ignore lint/performance/noAwaitInLoops: runs are sequential; one live run at a time.
+      await mkdir(outputDirectory, { mode: 0o700, recursive: true });
+      console.log(`\nRun ${run} of ${runs}.`);
+    }
+    results.push(await scoreRun(set));
+  }
+  if (runs > 1) {
+    outputDirectory = root;
+    await report(
+      results,
+      `Live set ${setName}, ${runs} runs: ${results.map((done) => done.length).join(", ")} of ${set.cases.length} cases scored per run.`
+    );
+  }
+}
+
+/** One live run of every case in the set, judged and reported in the current output directory. */
+async function scoreRun(set: LiveSet) {
+  const judged: { pending: Promise<Scored>; runId: string }[] = [];
+  const failed: string[] = [];
+  for (const snapshot of set.cases) {
+    try {
+      // biome-ignore lint/performance/noAwaitInLoops: one live run at a time keeps provider load and the local store readable.
+      const { pending } = await scoreCase(snapshot);
+      judged.push({ pending, runId: snapshot.runId });
+      console.log(`Re-ran ${snapshot.runId} (${snapshot.topic}).`);
+    } catch {
+      // A fixed class, never the error text: it can carry customer data.
+      failed.push(snapshot.runId);
+      console.log(`${snapshot.runId}: run_failed; continuing`);
+    }
+  }
+  const done: Scored[] = [];
+  for (const { pending, runId } of judged) {
+    try {
+      // biome-ignore lint/performance/noAwaitInLoops: these are already running; this only collects them in order.
+      done.push(await pending);
+    } catch {
+      failed.push(runId);
+    }
+  }
+  await report(
+    [done],
+    `Live set ${setName}, ${done.length} of ${set.cases.length} re-run (run_failed: ${failed.join(", ") || "none"}).`
+  );
+  failures += failed.length;
+  return done;
+}
+
+/**
+ * Write and print the two-column scorecard; for one run also each column's
+ * full scorecard and the review export.
+ */
+async function report(results: Scored[][], heading: string) {
+  const live = results.map((done) =>
+    liveScorecard(
+      done.map(({ replay }) => replay),
+      labels
+    )
+  );
+  const production = results.map((done) =>
+    liveScorecard(
+      done.map(({ production: original }) => original),
+      labels
+    )
+  );
+  const single = results.length === 1 ? results[0] : undefined;
+  const text = [
+    heading,
+    ...new Set(live.map(labelLine)),
+    "",
+    twoColumnScorecard(production, live),
+    "",
+    ...(single
+      ? [
+          "## Live at HEAD",
+          "",
+          renderScorecard(live[0] as (typeof live)[0], SCORECARD_TARGETS),
+          "## Production (the original replies)",
+          "",
+          renderScorecard(
+            production[0] as (typeof production)[0],
+            SCORECARD_TARGETS
+          ),
+        ]
+      : []),
+  ].join("\n");
+  await writeFile(`${outputDirectory}/scorecard.md`, text, { mode: 0o600 });
+  console.log(`\n${text}`);
+  if (!single) {
+    return;
+  }
+  await writeFile(
+    `${outputDirectory}/conversations.json`,
+    `${JSON.stringify(
+      single.map(({ conversation }) => conversation),
+      null,
+      2
+    )}\n`,
+    { mode: 0o600 }
+  );
+}
+
+const NO_MESSAGE = "(No message was sent to the customer.)";
+const savedRunSchema = z.object({
+  cassette: z.array(z.unknown()),
+  row: z.record(z.string(), z.unknown()),
+});
+const savedVerdictsSchema = z.array(
+  z.object({
+    originalVerdicts: z.array(
+      z.object({
+        goal: z.string(),
+        reason: z.string().optional(),
+        verdict: z.string(),
+      })
+    ),
+    runId: z.string(),
+    verdicts: z.array(
+      z.object({
+        goal: z.string(),
+        reason: z.string().optional(),
+        verdict: z.string(),
+      })
+    ),
+  })
+);
+
+const readSet = async () =>
+  liveSetSchema.parse(
+    JSON.parse(await readFile(`${setDirectory}/set.json`, "utf8"))
+  );
+
+/** A saved score result's export, and its needs_human verdict for one side of a case. */
+async function savedExport(dir: string) {
+  const before = new Map(
+    savedVerdictsSchema
+      .parse(JSON.parse(await readFile(`${dir}/conversations.json`, "utf8")))
+      .map((saved) => [saved.runId, saved])
+  );
+  const savedNeedsHuman = (name: string, production: boolean) => {
+    const saved = before.get(name);
+    const verdict = (
+      production ? saved?.originalVerdicts : saved?.verdicts
+    )?.find(({ goal }) => goal === NEEDS_HUMAN.id);
+    return {
+      needsHuman: verdict ? verdict.verdict === "yes" : undefined,
+      reason: verdict?.reason ?? null,
+    };
+  };
+  return { before, savedNeedsHuman };
+}
+
+/** Rebuild a saved score result's cases through judgeCase with `judge`; nothing runs live. */
+function savedCases(dir: string, set: LiveSet, judge: typeof judgeLive) {
+  // A rejudge result keeps no run files; they sit in the score result above it.
+  const runFile = (runId: string) =>
+    [dir, dirname(dir)]
+      .map((parent) => `${parent}/${runId}.json`)
+      .find((path) => existsSync(path));
+  return Promise.all(
+    set.cases
+      .filter((snapshot) => runFile(snapshot.runId))
+      .map(async (snapshot) => {
+        const { cassette, row } = savedRunSchema.parse(
+          JSON.parse(await readFile(runFile(snapshot.runId) as string, "utf8"))
+        );
+        const saved = row as ReplayRow;
+        // The raw-field grade is deterministic: regrade it so a grader fix shows.
+        return judgeCase(
+          snapshot,
+          cassette as WidgetCase["cassette"],
+          {
+            ...saved,
+            rawFields: rawFields(saved.answer ?? null).length ? "fail" : "pass",
+          },
+          judge
+        );
+      })
+  );
+}
+
+/** Saved score results of one set, reported together with their saved verdicts; nothing is re-run or re-judged. */
+async function combine() {
+  const set = await readSet();
+  const dirs = runIds.slice(1).map((dir) => {
+    const path = dir.replace(TRAILING_SLASHES, "");
+    return existsSync(path) ? path : `${setDirectory}/${path}`;
+  });
+  const results = await Promise.all(
+    dirs.map(async (dir) => {
+      const { savedNeedsHuman } = await savedExport(dir);
+      const saved: typeof judgeLive = (
+        name,
+        _scrubbed,
+        _answer,
+        _citations,
+        directory = outputDirectory
+      ) => {
+        const production = directory !== outputDirectory;
+        const record =
+          readRecords(production ? `${dir}/production` : dir).find(
+            (entry) => entry.case === name
+          ) ?? null;
+        return Promise.resolve({
+          ...savedNeedsHuman(name, production),
+          record,
+        });
+      };
+      return savedCases(dir, set, saved);
+    })
+  );
+  await report(
+    results,
+    `Live set ${setName}, ${results.length} saved results combined, nothing re-run or re-judged: ${dirs.join(", ")} (${results.map((done) => done.length).join(", ")} of ${set.cases.length} cases).`
+  );
+}
+
+/**
+ * Re-judge the `--claims` named on a saved score result, plus any claim its
+ * record lacks or a changed cause label makes stale, keeping every other
+ * verdict; nothing runs live.
+ */
+async function rejudge() {
+  const set = await readSet();
+  const forced = new Set((values.claims ?? "").split(","));
+  const { before, savedNeedsHuman } = await savedExport(from);
+  const rejudged: typeof judgeLive = async (
+    name,
+    scrubbed,
+    answer,
+    citations,
+    directory = outputDirectory
+  ) => {
+    const old =
+      readRecords(directory.replace(outputDirectory, from)).find(
+        (saved) => saved.case === name
+      ) ?? null;
+    const savedNeeds = savedNeedsHuman(name, directory !== outputDirectory);
+    const claims = answer ? liveClaims(scrubbed) : [];
+    const carried = carriedVerdicts(old, scrubbed);
+    const toJudge = [
+      ...rejudgedClaims(claims, carried, forced, scrubbed),
+      ...(forced.has(NEEDS_HUMAN.id) || savedNeeds.needsHuman === undefined
+        ? [NEEDS_HUMAN]
+        : []),
+    ];
+    const judged = toJudge.length
+      ? await judgeAnswer(
+          scrubbed,
+          answer ?? NO_MESSAGE,
+          toJudge,
+          undefined,
+          undefined,
+          await citedArticles(citations)
+        )
+      : { gaps: [], verdicts: [] };
+    const split = splitNeedsHuman(judged.verdicts);
+    const fresh = new Map(
+      split.verdicts.map((verdict) => [verdict.id, verdict])
+    );
+    const record =
+      answer && (old || fresh.size)
+        ? reviewedSample(
+            name,
+            scrubbed,
+            answer,
+            claims.map(
+              ({ id }) => (fresh.get(id) ?? carried.get(id)) as Verdict
+            ),
+            old?.gaps ?? judged.gaps,
+            claims
+          )
+        : null;
+    if (record) {
+      saveRecord(directory, record);
+    }
+    return split.needsHuman === undefined
+      ? { ...savedNeeds, record }
+      : { needsHuman: split.needsHuman, reason: split.reason, record };
+  };
+  const done = await savedCases(from, set, rejudged);
+  await report(
+    [done],
+    `${from} re-judged for ${[...forced].join(", ")} and stale claims only (${done.length} of ${set.cases.length} saved).`
+  );
+  const verdictIn = (list: { goal: string; verdict: string }[] | undefined) =>
+    list?.find(({ goal }) => goal === NEEDS_HUMAN.id)?.verdict ?? "missing";
+  console.log("\nChanged needs_human verdicts:");
+  let changed = 0;
+  for (const { conversation, production, replay } of done) {
+    const old = before.get(conversation.runId);
+    for (const [side, scored, oldList, newList] of [
+      [
+        "production",
+        production,
+        old?.originalVerdicts,
+        conversation.originalVerdicts,
+      ],
+      ["live", replay, old?.verdicts, conversation.verdicts],
+    ] as const) {
+      const was = verdictIn(oldList);
+      const now = verdictIn(newList);
+      if (was !== now) {
+        changed += 1;
+        const handed = scored.row.handedOff;
+        const grade = (verdict: string) =>
+          handed === undefined || verdict === "missing"
+            ? "n/a"
+            : String(handed === (verdict === "yes"));
+        const reason = newList.find(
+          ({ goal }) => goal === NEEDS_HUMAN.id
+        )?.reason;
+        console.log(
+          `${conversation.runId} ${side}: needs_human ${was} -> ${now}, handed off ${handed ?? "unknown"}, goal pass ${grade(was)} -> ${grade(now)}: ${reason ?? ""}`
+        );
+      }
+    }
+  }
+  if (!changed) {
+    console.log("none");
+  }
+}
+
 let failures = 0;
-for (const runId of runIds) {
+if (rejudging) {
+  await rejudge();
+} else if (combining) {
+  await combine();
+} else if (scoring) {
+  await score();
+}
+for (const runId of scoring || rejudging ? [] : runIds) {
   try {
     // biome-ignore lint/performance/noAwaitInLoops: one case at a time keeps provider load and output readable.
     await rerun(runId);

@@ -62,7 +62,9 @@ export interface Candidate {
 /** Explicit test-workspace organization ids, comma separated. Anything else is refused, so a typo cannot silently exclude nothing. */
 export const parseExcludedOrgs = (value: string | undefined) =>
   new Set([
+    // Trivox AI, the seeded demo workspace.
     "5a30d304-32ab-4ee0-b7ea-c5605aa34ce5",
+    // Aaron Fraga's Workspace (Aaron's own; also the scrubber's fixture name, so scrubbed text naming it is not this org).
     "af11d514-3fbd-459c-8425-81b6b80929a0",
     // Internal, not customers (Aaron, 2026-10-09).
     "196e6aca-a8d4-4531-bbd0-babd8aa2f26f",
