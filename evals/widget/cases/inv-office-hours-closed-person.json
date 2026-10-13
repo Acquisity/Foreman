@@ -1,0 +1,76 @@
+{
+  "cassette": [
+    {
+      "tool": "widget_help_article",
+      "input": {
+        "query": "AI Consultant"
+      },
+      "output": {
+        "articles": [
+          {
+            "title": "AI Consultant",
+            "url": "https://app.acquisity.ai/docs/ai-consultant"
+          }
+        ]
+      },
+      "requestedAt": "2026-10-13T18:00:00.000Z",
+      "resultAt": "2026-10-13T18:00:00.001Z",
+      "status": "completed"
+    },
+    {
+      "tool": "widget_read_help_article",
+      "input": {
+        "url": "https://app.acquisity.ai/docs/ai-consultant"
+      },
+      "output": {
+        "title": "AI Consultant",
+        "url": "https://app.acquisity.ai/docs/ai-consultant",
+        "content": "---\ntitle: AI Consultant\ndescription: Chat with an AI growth consultant for strategy, advice, and next-step recommendations.\n---\n\nThe AI Consultant is a conversational AI for growth strategy, positioning, cold email, offers, and automation questions. It answers from its training knowledge, a built-in library of growth and cold-email material, and whatever you put in the chat.\n\nIt does not read your campaigns, CRM, or call recordings on its own. For the best answers, paste the exact campaign numbers, email copy, call notes, or lead-list context you want it to review.\n\n## What It Does\n\n- **Strategy advice** - ask about pricing, positioning, offer structure, niche selection, or go-to-market tactics\n- **Reviews of what you paste in** - drop in campaign results, email copy, or an offer and get feedback on what to change\n- **Troubleshooting** - describe a problem (\"my reply rate dropped to 1%\") and get a diagnostic walkthrough\n- **Tool recommendations** - it can search a directory of AI tools when you ask what software fits a task\n- **Web research** - in **Market Researcher** mode it can search the web for current information\n\n## Where to Find It\n\nAt the top of the left sidebar, under the workspace switcher, there is a **Home** / **Chat** toggle. Click **Chat** to open the AI Consultant. The page header reads **AI Consultant**.\n\nThe home screen says **How can I help you, [your name]?** and shows four prompt tabs: **Plan**, **Automate**, **Analyze**, and **Learn**. Click a suggested prompt, or type your own question in the box that says **Ask me anything about cold email, sales, and business growth. Drag & drop files to upload.**\n\nUse **Open Chat History** to find previous chats. Inside an existing conversation, **New Chat** starts a fresh one.\n\n## Modes and Files\n\nThe mode selector sits at the bottom left of the message box. The modes you see depend on your workspace. Most workspaces start with:\n\n| Mode | Use it for |\n| --- | --- |\n| **Jordan AI** | General business, sales, growth, and strategy advice |\n| **Market Researcher** | Market, trend, competitor, and niche research, with web search |\n| **Jacob AI** | Ad copy, campaign angles, and offer messaging |\n| **Tech Wiz** | Technical help, automation ideas, and workflow troubleshooting |\n\nSome workspaces have extra modes enabled by the Acquisity team or their partner. See [What are the AI Consultant modes?](/docs/ai-consultant/faq/what-are-the-ai-consultant-modes).\n\nYou can attach images, PDFs, TXT, MD, or DOCX files with the paperclip button or by dragging files into the input area. Size limits are per file type: images up to 5 MB, PDF and DOCX up to 10 MB, TXT and MD up to 1 MB.\n\n## Chat History and Settings\n\nClick **Open Chat History** to search previous chats. The history dialog has a **Search your chats...** field and a **Recent Chats** list, with edit-title and delete controls on each chat.\n\nThe **Settings** (gear) button next to the paperclip opens a small menu:\n\n- **Export Chat** - downloads the current conversation as a Markdown file. Only shown inside an existing chat.\n- **Enable AI Model Switcher** - adds a model picker next to the mode selector so you can choose which AI model answers.\n\nMessage actions appear under chat messages. You can copy a message as Markdown or plain text, edit your own message, rate an AI reply with thumbs up or down, retry the latest AI reply, or delete a message.\n\n## How to Get Good Answers\n\nThe quality of the answer depends on the quality of the question.\n\n- **Be specific.** \"How do I improve my cold email?\" is too vague. \"My reply rate on this campaign is 0.8% - here are the first three emails, what would you change?\" gets concrete advice.\n- **Paste context.** The AI Consultant does not see your campaigns, CRM, or sales calls. If you are asking about one, paste the relevant data directly into the chat.\n- **Say what you have tried.** It does not know your history, so list what you have already tested.\n- **Pick the right mode.** Use **Market Researcher** for research, **Jacob AI** for ad and copy angles, and **Tech Wiz** for automation questions.\n- **Iterate.** Push back, ask for alternatives, and keep going until you have something you can act on. If the answer is far off, start over with more context.\n- **Ask for the reasoning.** If a recommendation does not make sense, ask \"why did you suggest that?\" and check its assumptions.\n\n## When to Use the AI Consultant vs Other Tools\n\nPick the AI Consultant when you want **advice and strategy**. Pick a dedicated tool (Niche Researcher, Offer Creator, Cold Email Agent, Sales Call Analyzer) when you want a **structured workflow that creates or analyzes something inside the platform**. If you are not sure what to work on next, start with the AI Consultant and let it point you to the right tool.\n\n<Callout title=\"Common questions about AI Consultant\">\n  Have a specific question? Check the [AI Consultant FAQ](/docs/ai-consultant/faq) for quick answers.\n</Callout>\n"
+      },
+      "requestedAt": "2026-10-13T18:00:01.000Z",
+      "resultAt": "2026-10-13T18:00:01.001Z",
+      "status": "completed"
+    }
+  ],
+  "expectations": {
+    "cause": "This is a product navigation question and an explicit request for a person after hours, not evidence of a workspace fault.",
+    "claims": [
+      "Says the support team is away right now and is back Monday, Oct 19 at 9:00 AM EDT, when a teammate will pick this up.",
+      "Does not promise that a person will reply soon or right away.",
+      "Explains that the AI Consultant is opened with the Chat toggle at the top of the left sidebar."
+    ],
+    "fileTicket": true,
+    "foreignIdentifiers": [],
+    "gateVerdict": "allow",
+    "lane": "investigate",
+    "toolBudget": 14,
+    "causeType": "unclear"
+  },
+  "officeHours": {
+    "customerTimeZone": "America/New_York",
+    "enabled": true,
+    "nextOpenAt": "2026-10-19T13:00:00.000Z",
+    "nextOpenText": "Monday, Oct 19 at 9:00 AM EDT",
+    "open": false,
+    "replyTimeMinutes": 20,
+    "replyTimeText": "20 minutes",
+    "showReplyTime": true,
+    "timeZone": "America/New_York"
+  },
+  "question": "I'd like to speak with a person. Where do I find the AI Consultant?",
+  "scope": {
+    "role": "owner",
+    "workspace": "Company One"
+  },
+  "source": {
+    "runId": null,
+    "target": "production"
+  },
+  "tags": {
+    "lane": "investigate",
+    "role": "owner",
+    "safety": [],
+    "tools": ["widget_help_article", "widget_read_help_article"]
+  },
+  "mode": "investigate"
+}

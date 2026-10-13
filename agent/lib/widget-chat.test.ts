@@ -160,3 +160,37 @@ test("the guide's own words never reach the customer", () => {
     "Tap the magnifying glass next to the message box and send your message again to have your account investigated.";
   assert.equal(customerWords(glass), glass);
 });
+
+test("the guide writer's after-hours person note replaces the no-notification rule while its default prompt stays identical", async () => {
+  const { CHAT_PROMPT, chatPrompt } = await import("./widget-chat.js");
+  assert.equal(chatPrompt(), CHAT_PROMPT);
+  assert.ok(CHAT_PROMPT.includes("nobody is notified"));
+  assert.ok(!chatPrompt(true).includes("nobody is notified"));
+  assert.ok(chatPrompt(true).includes("Do not deny notification or follow-up"));
+  const calls: Parameters<
+    import("./widget-chat.js").ChatDeps["generate"]
+  >[0][] = [];
+  await answerFromGuide(
+    "Where do I find the AI Consultant?",
+    { conversationId: "c", runId: "r" },
+    {
+      afterHoursPerson: true,
+      canInvestigate: true,
+      role: "owner",
+      workspace: "Company One",
+    },
+    undefined,
+    {
+      generate: (input) => {
+        calls.push(input);
+        return Promise.reject(new Error("mock"));
+      },
+    }
+  );
+  assert.equal(calls[0].afterHoursPerson, true);
+  assert.ok(
+    calls[0].messages[0].content.includes(
+      "Code handles filing this conversation"
+    )
+  );
+});

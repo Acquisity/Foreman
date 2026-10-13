@@ -46,7 +46,8 @@ export async function ticketInsteadOfHandoff(
     },
     signal
       ? AbortSignal.any([signal, AbortSignal.timeout(TICKET_TIMEOUT_MS)])
-      : AbortSignal.timeout(TICKET_TIMEOUT_MS)
+      : AbortSignal.timeout(TICKET_TIMEOUT_MS),
+    ids.runId
   ).catch(() => ({ error: "unavailable" }));
   const ok = !("error" in filed);
   logOpsEvent("widget.handoff.after_hours", {

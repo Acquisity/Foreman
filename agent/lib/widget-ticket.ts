@@ -1,4 +1,5 @@
 import { getToken as getConnectToken } from "@vercel/connect";
+import { z } from "zod";
 import { executorClient } from "./executor/client.js";
 import {
   createWidgetTicket,
@@ -23,6 +24,11 @@ import {
   LIVE_TICKET,
   REPLAY_TICKET,
 } from "./widget-replay.js";
+import {
+  readWidgetTicketReceipt,
+  saveWidgetTicketReceipt,
+  type WidgetTicketReceipt,
+} from "./widget-run-store.js";
 import {
   requireWidgetContext,
   type WidgetContext,
@@ -81,9 +87,15 @@ export const existingTicket = (
   url: issue.url,
 });
 
-export type WidgetTicketResult =
-  | { existing: boolean; identifier: string; refund: boolean; url: string }
-  | { error: string };
+export type WidgetTicketResult = WidgetTicketReceipt | { error: string };
+
+const ticketDependencies = {
+  create: createWidgetTicket,
+  readReceipt: readWidgetTicketReceipt,
+  refund: isRefundTicket,
+  saveReceipt: saveWidgetTicketReceipt,
+  search: findRelatedIssues,
+};
 
 /**
  * File this verified conversation's one ticket, or return the one it already
@@ -92,14 +104,42 @@ export type WidgetTicketResult =
  */
 export async function fileWidgetTicket(
   ctx: ProviderContext,
-  input: { summary: string; title: string }
+  input: { summary: string; title: string },
+  overrides: Partial<typeof ticketDependencies> = {}
 ): Promise<WidgetTicketResult> {
+  const deps = { ...ticketDependencies, ...overrides };
+  if (isLiveActive() && !overrides.readReceipt && !overrides.saveReceipt) {
+    const { liveRunStore } = await import("./widget-live-store.js");
+    const store = liveRunStore();
+    deps.readReceipt = store.readTicket;
+    deps.saveReceipt = store.saveTicket;
+  }
   const scope = requireWidgetContext(ctx.session?.auth.initiator);
+  // The active turn's auth changes on each run; the initiator may be an earlier run.
+  const runId = z
+    .uuid()
+    .optional()
+    .parse(ctx.session?.auth.current?.attributes?.widgetRunId);
   try {
-    const refund = await isRefundTicket(input, ctx.abortSignal);
+    const saved = runId
+      ? await deps.readReceipt(scope, runId, ctx.abortSignal)
+      : null;
+    if (saved) {
+      return saved;
+    }
+    const confirm = async (receipt: WidgetTicketReceipt) => {
+      if (runId) {
+        await deps.saveReceipt(scope, runId, receipt, ctx.abortSignal);
+      }
+      return receipt;
+    };
+    if (isReplayActive() || isLiveActive()) {
+      return await confirm(isReplayActive() ? REPLAY_TICKET : LIVE_TICKET);
+    }
+    const refund = await deps.refund(input, ctx.abortSignal);
     // One ticket per conversation: every widget ticket carries the conversation
     // id in its server-written scope block, so an earlier one is found by it.
-    const earlier = await findRelatedIssues(
+    const earlier = await deps.search(
       {
         phrases: [scope.conversationId],
         scope: "duplicates",
@@ -113,12 +153,14 @@ export async function fileWidgetTicket(
     );
     if (existing) {
       const opts = { client: executorClient(ctx), signal: ctx.abortSignal };
-      return existingTicket(
-        existing,
-        refund && (await inRefundQueue(existing.identifier, opts))
+      return await confirm(
+        existingTicket(
+          existing,
+          refund && (await inRefundQueue(existing.identifier, opts))
+        )
       );
     }
-    const result = await createWidgetTicket(ctx, {
+    const result = await deps.create(ctx, {
       refund,
       report: formatCustomerReport(input.summary),
       title: input.title,
@@ -127,7 +169,11 @@ export async function fileWidgetTicket(
       return { error: "Linear did not accept the ticket." };
     }
     try {
-      return { existing: false, refund, ...confirmedIssue(result.data) };
+      return await confirm({
+        existing: false,
+        refund,
+        ...confirmedIssue(result.data),
+      });
     } catch {
       return {
         error:
@@ -148,9 +194,10 @@ export async function fileWidgetTicket(
 /** The investigator session's provider context, rebuilt from the verified scope under the app principal. */
 export const appTicketContext = (
   scope: WidgetContext,
-  signal: AbortSignal
+  signal: AbortSignal,
+  runId?: string
 ): ProviderContext => {
-  const initiator = widgetAuth(scope);
+  const initiator = widgetAuth(scope, runId);
   return {
     abortSignal: signal,
     getToken: async () => {
@@ -171,13 +218,8 @@ export const appTicketContext = (
 export const fileTicketFor = (
   scope: WidgetContext,
   input: { summary: string; title: string },
-  signal: AbortSignal
-): Promise<WidgetTicketResult | typeof REPLAY_TICKET | typeof LIVE_TICKET> => {
-  if (isReplayActive()) {
-    return Promise.resolve(REPLAY_TICKET);
-  }
-  if (isLiveActive()) {
-    return Promise.resolve(LIVE_TICKET);
-  }
-  return fileWidgetTicket(appTicketContext(scope, signal), input);
-};
+  signal: AbortSignal,
+  runId?: string,
+  deps: Partial<typeof ticketDependencies> = {}
+): Promise<WidgetTicketResult | typeof REPLAY_TICKET | typeof LIVE_TICKET> =>
+  fileWidgetTicket(appTicketContext(scope, signal, runId), input, deps);

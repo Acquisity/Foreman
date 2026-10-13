@@ -91,10 +91,16 @@ export function requireWidgetContext(
 }
 
 /** Stamp only server-verified context, unattended so no write policy treats the run as watched. */
-export function widgetAuth(scope: WidgetContext): SessionAuthContext {
+export function widgetAuth(
+  scope: WidgetContext,
+  runId?: string
+): SessionAuthContext {
   const { officeHours: _hours, ...verified } = widgetContextSchema.parse(scope);
   return stampUnattended({
-    attributes: { ...verified },
+    attributes: {
+      ...verified,
+      ...(runId ? { widgetRunId: z.uuid().parse(runId) } : {}),
+    },
     authenticator: "bearer",
     issuer: WIDGET_SUPPORT_ISSUER,
     principalId: verified.userId,

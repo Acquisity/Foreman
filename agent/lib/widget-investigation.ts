@@ -27,6 +27,7 @@ import {
 import {
   AFTER_HOURS_TICKET,
   awayHours,
+  backAtLine,
   ticketInsteadOfHandoff,
 } from "./widget-office-hours.js";
 import {
@@ -58,6 +59,7 @@ import {
   FINISH_CLAIM_SECONDS,
   latestWidgetScope,
   readWidgetRun,
+  readWidgetTicketReceipt,
   recentInboxTurns,
   recentWidgetTurns,
   requestWidgetRecording,
@@ -403,6 +405,7 @@ export const defaultWidgetDependencies = {
   plan: planWidgetChecks,
   progress: saveWidgetProgress,
   read: readWidgetRun,
+  readTicket: readWidgetTicketReceipt,
   requestRecording: requestWidgetRecording,
   route: routeWidgetMessage,
   /** Throws unless the scoped user is a current owner or admin of the scoped workspace. */
@@ -418,6 +421,7 @@ export type WidgetDependencies = Omit<
   | "plan"
   | "progress"
   | "requestRecording"
+  | "readTicket"
 > &
   Partial<
     Pick<
@@ -429,6 +433,7 @@ export type WidgetDependencies = Omit<
       | "plan"
       | "progress"
       | "requestRecording"
+      | "readTicket"
     >
   >;
 
@@ -570,9 +575,8 @@ function humanHandoff(
 const asksForPerson = (route: WidgetRoute) =>
   route.asksForHuman >= HUMAN_REQUEST_SCORE;
 
-/** The investigator's note when an after-hours ask for a person was turned into a ticket. */
-const AWAY_PERSON_NOTE =
-  "\n\nThe customer asked to speak with a person, and the support team is away right now, so nobody can take over this turn. Investigate as usual and answer what you can, and set needsHuman true so a teammate picks it up when the team is back.";
+const CONFIRMED_AWAY_TICKET_NOTE =
+  "\n\nThe app has already filed or reused this conversation's ticket for a teammate, and the support team is away right now. Answer the customer's remaining question as usual. Do not deny that a teammate will pick this up, and do not promise pickup or a time yourself: the server appends its availability line to the allowed reply.";
 
 /** An explicit ask for a person returns its completion promise; other intents return null. */
 function requestedHumanHandoff(
@@ -727,17 +731,30 @@ async function structureWriteUp(
  * The away line is fixed text added after the gate: a blocked reply stays
  * blocked, and the app's own after-hours handoff line covers it.
  */
-const withAwayLine = (
+async function withAwayLine(
   result: WidgetOutcome,
-  awayLine: string | undefined
-): WidgetOutcome =>
-  awayLine && result.message
+  awayLine: string | undefined,
+  run: Pick<WidgetRun, "id" | "scope">,
+  ticket: FiledTicket | null | undefined,
+  read: WidgetDependencies["readTicket"],
+  signal: AbortSignal
+): Promise<WidgetOutcome> {
+  const hours = awayHours(run.scope);
+  if (!(hours && result.message) || result.decision === "block") {
+    return result;
+  }
+  const receipt = awayLine
+    ? null
+    : (ticket ?? (await read?.(run.scope, run.id, signal)));
+  const line = awayLine ?? (receipt ? backAtLine(hours) : undefined);
+  return line
     ? {
         ...result,
-        message: `${result.message}\n\n${awayLine}`,
+        message: `${result.message}\n\n${line}`,
         reason: `${AFTER_HOURS_TICKET} ${result.reason}`,
       }
     : result;
+}
 
 /** Gate, then persist. Runs once per session outcome; a replay finds the fenced row unchanged. */
 export async function finishWidgetRun(
@@ -754,7 +771,11 @@ export async function finishWidgetRun(
     Partial<
       Pick<
         WidgetDependencies,
-        "changeRequested" | "fileTicket" | "handoffEligible" | "progress"
+        | "changeRequested"
+        | "fileTicket"
+        | "handoffEligible"
+        | "progress"
+        | "readTicket"
       >
     >,
   clock: FinishClock = systemClock
@@ -853,14 +874,18 @@ export async function finishWidgetRun(
         runId: run.id,
         sessionId,
       });
-      result = withAwayLine(
+      result = await withAwayLine(
         {
           decision: gated.decision,
           message: gated.message,
           reason: gated.reason,
           status: "completed",
         },
-        awayLine
+        awayLine,
+        run,
+        outcome.ticket,
+        deps.readTicket,
+        deadline
       );
     } else if (handoff) {
       ({ findings, result } = handoff);
@@ -1052,7 +1077,7 @@ async function answerFromKnowledgeBase(
   // The guide lane starts writing while the router scores the message, and is
   // dropped when the router sends the message somewhere else.
   const drafting = new AbortController();
-  const draft = deps.answerChat?.(
+  let draft = deps.answerChat?.(
     { ...ask, recordingOffered: false },
     log,
     customer,
@@ -1069,6 +1094,17 @@ async function answerFromKnowledgeBase(
   // After hours nobody can take an ask for a person: the message is answered
   // as any other, and the reply files the ticket (see ticketInsteadOfHandoff).
   const away = asksForPerson(route) && awayHours(scope) !== null;
+  if (away) {
+    // Only this routed path gets the notification exception. Every other draft is unchanged.
+    drafting.abort();
+    Object.assign(customer, { afterHoursPerson: true });
+    draft = deps.answerChat?.(
+      { ...ask, recordingOffered: false },
+      log,
+      customer,
+      signal
+    );
+  }
   const complete = (
     message: string,
     reason: string,
@@ -1165,7 +1201,7 @@ async function startInvestigation(
     const existing = resolveSession ? await resolveSession(address) : null;
     const startIndex = existing ? await existing.getStreamTailIndex() : 0;
     const session = await from(address).send(question, {
-      auth: widgetAuth(scope),
+      auth: widgetAuth(scope, run.id),
       mode: "task",
       state: { runId: run.id },
     });
@@ -1278,8 +1314,9 @@ async function investigationDenied(
 
 /**
  * A toggled ask for a person: in office hours the completed handoff. After
- * hours the ticket is filed now, the investigation still runs, and the note
- * returned for the investigator says why nobody takes over; "" for any other ask.
+ * hours the ticket is filed now and its receipt supplies the availability line
+ * at finish. A note acknowledges that confirmation without forcing findings;
+ * an empty note continues any other investigation.
  */
 async function toggledPersonAsk(
   run: WidgetRun,
@@ -1303,7 +1340,7 @@ async function toggledPersonAsk(
     deps.fileTicket
   );
   return awayLine
-    ? AWAY_PERSON_NOTE
+    ? CONFIRMED_AWAY_TICKET_NOTE
     : ((await requestedHumanHandoff(run, route, deps)) ?? null);
 }
 

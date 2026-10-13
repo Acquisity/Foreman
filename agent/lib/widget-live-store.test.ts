@@ -214,3 +214,33 @@ test("full live staff lifecycle persists locally without SQL or external writes"
   Reflect.deleteProperty(process.env, "WIDGET_LIVE");
   assert.equal(liveDependencies(base, directory), base);
 });
+
+test("a reconstructed local run retains its server filing receipt without SQL or provider writes", async (t) => {
+  const directory = `.eve/widget-live/receipt-${randomUUID()}`;
+  t.after(() => rm(directory, { force: true, recursive: true }));
+  const previous = process.env.WIDGET_LIVE;
+  process.env.WIDGET_LIVE = "1";
+  t.after(() => {
+    if (previous === undefined) {
+      Reflect.deleteProperty(process.env, "WIDGET_LIVE");
+    } else {
+      process.env.WIDGET_LIVE = previous;
+    }
+  });
+  t.mock.method(globalThis, "fetch", () => {
+    throw new Error("unexpected transport");
+  });
+  const store = liveRunStore(directory);
+  const { run } = await store.claim(
+    fixture,
+    randomUUID(),
+    "Can I speak to a person?"
+  );
+  const receipt = { filed: false as const, live: "not filed" as const };
+  await store.saveTicket(fixture, run.id, receipt);
+  const recovered = liveRunStore(directory);
+  assert.deepEqual(await recovered.readTicket(fixture, run.id), receipt);
+  await assert.rejects(
+    recovered.readTicket({ ...fixture, conversationId: randomUUID() }, run.id)
+  );
+});

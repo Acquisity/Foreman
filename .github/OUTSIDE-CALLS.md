@@ -132,6 +132,8 @@ Acquiring the stream is exempt for the same reason the marker calls are. The `re
 
 `agent/lib/private-postgres.ts` constructs the shared Neon client with a fresh 15-second default deadline. Memory supplies its existing operation timeout and shares that client within an operation; support requests a fresh client per query. The shared module owns transport only, never store authorization or schemas.
 
+Widget ticket receipt reads and writes (`readWidgetTicketReceipt` and `saveWidgetTicketReceipt` in `widget-run-store.ts`) use its 15-second deadline composed with the filing or finish signal. The confirmation lives in the pending run's existing findings JSON and needs no table or migration; source and verified owner checks fence it. The local live harness persists the same receipt to its existing filesystem store, and replay/live receipts mark simulated filing rather than an external write.
+
 Widget progress writes use the same private-DB transport with a 1.5-second deadline. Progress storage failure never blocks the investigation result.
 
 ## Local widget live harness (ENG-15026)

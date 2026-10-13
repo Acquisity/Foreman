@@ -9,10 +9,14 @@ import { widgetProgressSchema } from "./widget-progress.js";
 import {
   assertWidgetRunOwner,
   FINISH_CLAIM_SECONDS,
+  ticketReceipt,
+  type WidgetTicketReceipt,
   widgetOutcomeSchema,
   widgetRunSchema,
+  widgetTicketReceiptSchema,
 } from "./widget-run-store.js";
 import type { WidgetContext } from "./widget-scope.js";
+import { fileTicketFor } from "./widget-ticket.js";
 
 const entrySchema = z.object({
   finishingAt: z.number().nullable(),
@@ -233,9 +237,33 @@ export function liveRunStore(directory = `${ROOT}/runs`) {
         }
       }),
     read: (id) => access((entries) => owned(entries, id).run),
+    readTicket: (scope, id) =>
+      access((entries) => {
+        const { run } = owned(entries, id);
+        assertWidgetRunOwner(run, scope);
+        if (run.scope.source !== scope.source) {
+          throw new Error("Local source mismatch.");
+        }
+        return ticketReceipt(run.findings);
+      }),
     requestRecording: (id) =>
       access((entries) => {
         owned(entries, id).run.recording_requested = true;
+      }),
+    saveTicket: (
+      scope: WidgetContext,
+      id: string,
+      receipt: WidgetTicketReceipt
+    ) =>
+      access((entries) => {
+        const { run } = owned(entries, id);
+        assertWidgetRunOwner(run, scope);
+        if (run.scope.source !== scope.source || run.outcome) {
+          throw new Error("Local ticket ownership mismatch.");
+        }
+        run.findings = {
+          ticketReceipt: widgetTicketReceiptSchema.parse(receipt),
+        };
       }),
   } satisfies Pick<
     WidgetDependencies,
@@ -251,7 +279,14 @@ export function liveRunStore(directory = `${ROOT}/runs`) {
     | "requestRecording"
     | "expire"
     | "expireAll"
-  >;
+    | "readTicket"
+  > & {
+    saveTicket: (
+      scope: WidgetContext,
+      id: string,
+      receipt: WidgetTicketReceipt
+    ) => Promise<void>;
+  };
 }
 
 /** One composition boundary replaces every SQL binding, including lifecycle failure delivery. */
@@ -260,7 +295,17 @@ export function liveDependencies<T extends WidgetDependencies>(
   directory?: string
 ): T {
   assertLiveAllowed();
-  return process.env.WIDGET_LIVE === "1"
-    ? { ...deps, ...liveRunStore(directory) }
-    : deps;
+  if (process.env.WIDGET_LIVE !== "1") {
+    return deps;
+  }
+  const store = liveRunStore(directory);
+  return {
+    ...deps,
+    ...store,
+    fileTicket: (scope, input, signal, runId) =>
+      fileTicketFor(scope, input, signal, runId, {
+        readReceipt: store.readTicket,
+        saveReceipt: store.saveTicket,
+      }),
+  };
 }

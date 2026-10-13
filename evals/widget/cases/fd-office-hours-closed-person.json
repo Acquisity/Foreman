@@ -5,7 +5,7 @@
     "claims": [
       "Says the support team is away right now and is back Monday, Oct 19 at 9:00 AM EDT, when a teammate will pick this up.",
       "Does not promise that a person will reply soon or right away.",
-      "Still helps with getting at the lead credits, or says plainly what it is not sure of, instead of only saying the team is away."
+      "Explains that the AI Consultant is opened with the Chat toggle at the top of the left sidebar."
     ],
     "fileTicket": true,
     "foreignIdentifiers": [],
@@ -24,10 +24,10 @@
     "showReplyTime": true,
     "timeZone": "America/New_York"
   },
-  "question": "I think I may need a human. I have a workspace that was for the past client where we have ended the engagement. I shut down aquisity and the inbox, but I have lead credits of more than 11,000 and I want to simply attach those leads to one of the past campaign so I can download them and use them in my normal workspace. I set all the filters there are adequate leads available. I have the lead credits, but it will not allow me to confirm. How do I get at my lead credits?",
+  "question": "I'd like to speak with a person. Where do I find the AI Consultant?",
   "scope": {
     "role": "owner",
-    "workspace": "aaron-fragas-workspace-wMUMT"
+    "workspace": "Company One"
   },
   "source": {
     "runId": null,

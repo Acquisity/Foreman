@@ -20,10 +20,10 @@
     "showReplyTime": true,
     "timeZone": "America/New_York"
   },
-  "question": "I think I may need a human. I have a workspace that was for the past client where we have ended the engagement. I shut down aquisity and the inbox, but I have lead credits of more than 11,000 and I want to simply attach those leads to one of the past campaign so I can download them and use them in my normal workspace. I set all the filters there are adequate leads available. I have the lead credits, but it will not allow me to confirm. How do I get at my lead credits?",
+  "question": "I'd like to speak with a person. Where do I find the AI Consultant?",
   "scope": {
     "role": "owner",
-    "workspace": "aaron-fragas-workspace-wMUMT"
+    "workspace": "Company One"
   },
   "source": {
     "runId": null,

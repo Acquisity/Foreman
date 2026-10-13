@@ -564,3 +564,24 @@ test("causeType is optional and limited to the four cause types", () => {
   }
   assert.ok(!withType("misconfiguration"));
 });
+
+test("office-hours acceptance cases isolate navigation from cross-workspace credit transfers", () => {
+  const directory = new URL("../../evals/widget/cases/", import.meta.url);
+  for (const name of [
+    "fd-office-hours-open-person",
+    "fd-office-hours-closed-person",
+    "inv-office-hours-closed-person",
+  ]) {
+    const recorded = widgetCaseSchema.parse(
+      JSON.parse(readFileSync(new URL(`${name}.json`, directory), "utf8"))
+    );
+    assert.equal(
+      recorded.question,
+      "I'd like to speak with a person. Where do I find the AI Consultant?"
+    );
+    assert.equal(recorded.scope.workspace, "Company One");
+    if (name.startsWith("inv-")) {
+      assert.equal(recorded.mode, "investigate");
+    }
+  }
+});
