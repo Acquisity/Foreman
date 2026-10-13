@@ -3,9 +3,10 @@
   "expectations": {
     "cause": null,
     "claims": [
-      "Says the support team is away right now and is back Monday, Oct 19 at 9:00 AM EDT, when a teammate will pick this up.",
-      "Does not promise that a person will reply soon or right away.",
-      "Explains that the AI Consultant is opened with the Chat toggle at the top of the left sidebar."
+      "Explains that the AI Consultant is opened with the Chat toggle at the top of the left sidebar.",
+      "Does not open by introducing the assistant or describing what it can and cannot do.",
+      "After the answer, says the support team is away right now and is back Monday, Oct 19 at 9:00 AM EDT, when a teammate will pick this up.",
+      "Does not promise that a person will reply soon or right away."
     ],
     "fileTicket": true,
     "foreignIdentifiers": [],

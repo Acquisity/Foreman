@@ -908,4 +908,5 @@ test("the legacy writer's after-hours person note replaces the no-notification r
   const away = replyPrompt({ ...customer, afterHoursPerson: true });
   assert.ok(!away.includes("nobody is notified"));
   assert.ok(away.includes("Do not deny notification or follow-up"));
+  assert.ok(away.includes("do not introduce yourself"));
 });

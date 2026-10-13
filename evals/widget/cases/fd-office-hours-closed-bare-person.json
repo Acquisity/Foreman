@@ -1,0 +1,44 @@
+{
+  "cassette": [],
+  "expectations": {
+    "cause": null,
+    "claims": [
+      "Opens by saying the support team is away right now and is back Monday, Oct 19 at 9:00 AM EDT, when a teammate will pick this up.",
+      "Then invites the customer to say what they need help with in the meantime.",
+      "Does not introduce the assistant or describe what it can and cannot do.",
+      "Gives no product answer and cites no help-center article.",
+      "Does not promise that a person will reply soon or right away."
+    ],
+    "fileTicket": false,
+    "foreignIdentifiers": [],
+    "gateVerdict": "allow",
+    "lane": "kb",
+    "toolBudget": null
+  },
+  "officeHours": {
+    "customerTimeZone": "America/New_York",
+    "enabled": true,
+    "nextOpenAt": "2026-10-19T13:00:00.000Z",
+    "nextOpenText": "Monday, Oct 19 at 9:00 AM EDT",
+    "open": false,
+    "replyTimeMinutes": 20,
+    "replyTimeText": "20 minutes",
+    "showReplyTime": true,
+    "timeZone": "America/New_York"
+  },
+  "question": "I'd like to speak with a person.",
+  "scope": {
+    "role": "owner",
+    "workspace": "Company One"
+  },
+  "source": {
+    "runId": null,
+    "target": "production"
+  },
+  "tags": {
+    "lane": "asked_for_human",
+    "role": "owner",
+    "safety": [],
+    "tools": []
+  }
+}

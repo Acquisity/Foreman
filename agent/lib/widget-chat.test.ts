@@ -167,6 +167,7 @@ test("the guide writer's after-hours person note replaces the no-notification ru
   assert.ok(CHAT_PROMPT.includes("nobody is notified"));
   assert.ok(!chatPrompt(true).includes("nobody is notified"));
   assert.ok(chatPrompt(true).includes("Do not deny notification or follow-up"));
+  assert.ok(chatPrompt(true).includes("do not introduce yourself"));
   const calls: Parameters<
     import("./widget-chat.js").ChatDeps["generate"]
   >[0][] = [];

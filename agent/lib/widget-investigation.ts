@@ -26,8 +26,10 @@ import {
   validAsk,
 } from "./widget-next-action.js";
 import {
+  AFTER_HOURS_INVITE,
   AFTER_HOURS_TICKET,
   awayHours,
+  awayInvite,
   backAtLine,
   ticketInsteadOfHandoff,
 } from "./widget-office-hours.js";
@@ -1255,7 +1257,24 @@ async function answerFromKnowledgeBase(
   );
   // After hours nobody can take an ask for a person: the message is answered
   // as any other, and the reply files the ticket (see ticketInsteadOfHandoff).
-  const away = asksForPerson(route) && awayHours(scope) !== null;
+  const hours = asksForPerson(route) ? awayHours(scope) : null;
+  const away = hours !== null;
+  if (hours && route.noNeed) {
+    // Nothing to answer or file yet: the away line and an invitation, no model.
+    drafting.abort();
+    return deps.complete(
+      run.id,
+      {
+        citations: [],
+        decision: "allow",
+        message: awayInvite(hours, log),
+        reason: AFTER_HOURS_INVITE,
+        status: "completed",
+      },
+      null,
+      run.id
+    );
+  }
   if (away) {
     // Only this routed path gets the notification exception. Every other draft is unchanged.
     drafting.abort();
@@ -1476,7 +1495,8 @@ async function investigationDenied(
 
 /**
  * A toggled ask for a person: in office hours the completed handoff. After
- * hours the ticket is filed now and its receipt supplies the availability line
+ * hours one that states no need gets the away line and an invitation, no
+ * ticket; otherwise the ticket is filed now and its receipt supplies the availability line
  * at finish. A note acknowledges that confirmation without forcing findings;
  * an empty note continues any other investigation.
  */
@@ -1490,6 +1510,24 @@ async function toggledPersonAsk(
 ): Promise<string | WidgetRun | null> {
   if (!asksForPerson(route)) {
     return "";
+  }
+  const hours = awayHours(scope);
+  if (hours && route.noNeed) {
+    return deps.complete(
+      run.id,
+      {
+        citations: [],
+        decision: "allow",
+        message: awayInvite(hours, {
+          conversationId: scope.conversationId,
+          runId: run.id,
+        }),
+        reason: AFTER_HOURS_INVITE,
+        status: "completed",
+      },
+      null,
+      run.id
+    );
   }
   const awayLine = await ticketInsteadOfHandoff(
     scope,

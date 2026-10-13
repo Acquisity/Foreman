@@ -2461,6 +2461,42 @@ test("after hours, an ask for a person is answered with the back-at line and fil
   assert.ok(filed[0].summary.includes("Connect your calendar first"));
 });
 
+test("after hours, an ask for a person that states no need leads with the away line and an invitation, with no ticket, writer, or sources", async (t) => {
+  enabled(t);
+  for (const mode of [undefined, "investigate"] as const) {
+    const { deps, run } = dependencies();
+    const { fileTicket, filed } = ticketFiler();
+    deps.route = () =>
+      Promise.resolve({ asksForHuman: 0.95, noNeed: true, source: "jev" });
+    deps.fileTicket = fileTicket;
+    deps.answerChat = (_ask, _log, customer) => {
+      assert.ok(!customer?.afterHoursPerson, "no after-hours writer runs");
+      return new Promise(() => undefined);
+    };
+    // biome-ignore lint/performance/noAwaitInLoops: each case needs its own fresh run.
+    const response = await receiveWidgetMessage(
+      request({
+        ...start,
+        question: "Can I talk to a person?",
+        ...(mode ? { mode } : {}),
+      }),
+      noWork(),
+      200,
+      () => Promise.resolve({ ...scope, officeHours: closedHours }),
+      deps
+    );
+    const body = (await response.json()) as Record<string, unknown>;
+    assert.equal(body.decision, "allow");
+    assert.equal(
+      body.message,
+      `${AWAY} In the meantime, tell me what you need help with and I'll try to sort it out now.`
+    );
+    assert.deepEqual(run.outcome?.citations ?? [], []);
+    assert.equal(run.outcome?.reason, "after_hours_invite");
+    assert.equal(filed.length, 0);
+  }
+});
+
 test("an ask for a person still hands off in office hours, with no office hours sent, or when the after-hours ticket fails", async (t) => {
   enabled(t);
   for (const [officeHours, fails] of [

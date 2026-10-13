@@ -19,6 +19,22 @@ export const backAtLine = (hours: OfficeHours) =>
     ? `Our team is away right now. We're back ${hours.nextOpenText}, and a teammate will pick this up then.`
     : "Our team is away right now, and a teammate will pick this up when they're back.";
 
+/** The outcome reason of an after-hours ask for a person that stated no need: no ticket, nothing to act on yet. */
+export const AFTER_HOURS_INVITE = "after_hours_invite";
+
+/**
+ * The whole reply to an after-hours ask for a person that says nothing else
+ * (ENG-15262). No ticket: one is filed later only if the customer then
+ * describes a problem Foreman cannot resolve.
+ */
+export const awayInvite = (
+  hours: OfficeHours,
+  ids: { conversationId: string; runId: string }
+) => {
+  logOpsEvent("widget.handoff.after_hours", { ...ids, decision: "invite" });
+  return `${backAtLine(hours)} In the meantime, tell me what you need help with and I'll try to sort it out now.`;
+};
+
 /**
  * The after-hours rule (ENG-15262), for every turn that would hand the
  * conversation to a person: an explicit ask for one, or findings that need one.

@@ -42,6 +42,7 @@ describe("routeWidgetMessage", () => {
       "asks_for_ticket",
       "offers_recording",
       "reports_bug",
+      "states_need",
     ]);
     assert.equal(
       (sent as { headers: Record<string, string> }).headers.authorization,
@@ -88,6 +89,20 @@ describe("routeWidgetMessage", () => {
       [below.bug, below.recording, below.refund, below.ticket],
       [undefined, undefined, undefined, undefined]
     );
+  });
+
+  it("flags a message that states no need beyond a person only when Jev scored it below the bar", async () => {
+    const route = (answers: Record<string, unknown>) =>
+      routeWidgetMessage("can I talk to a person", {
+        apiKey: "test-key",
+        fetch: () => Promise.resolve(jevReply(answers)),
+      });
+    assert.equal((await route({ states_need: { noul: 0.1 } })).noNeed, true);
+    assert.equal(
+      (await route({ states_need: { noul: 0.8 } })).noNeed,
+      undefined
+    );
+    assert.equal((await route({})).noNeed, undefined);
   });
 
   it("scores everything zero without a key and never calls out", async () => {

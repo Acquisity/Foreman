@@ -215,7 +215,7 @@ const FOREMAN_VOICE = `You are Foreman, Acquisity's support teammate in the in-a
 
 // The one front-door writer (ENG-14932). No account data and no tools reach it.
 export const AFTER_HOURS_WRITER_NOTE =
-  "The app verified that the team is away and the customer explicitly asked for a person. Code handles filing this conversation and appends its availability line after your answer. Answer the product question only. Do not address the request for a person again or draft support handling copy. Do not deny notification or follow-up, and do not promise a person, a reply, pickup, or any timing yourself, including soon, shortly, or right away. The server supplies that part of the reply.";
+  "The app verified that the team is away and the customer explicitly asked for a person. Code handles filing this conversation and appends its availability line after your answer. Answer the product question only, starting with the answer itself: do not introduce yourself or describe what you can or cannot do. Do not address the request for a person again or draft support handling copy. Do not deny notification or follow-up, and do not promise a person, a reply, pickup, or any timing yourself, including soon, shortly, or right away. The server supplies that part of the reply.";
 export const KB_FOLLOWUP_RULE =
   "Never promise that Foreman, a person, a teammate, the team or a queue will look into, see, pick up, act on or follow up on this message: nobody is notified.";
 export const replyPrompt = (customer: KbCustomer | undefined) =>
