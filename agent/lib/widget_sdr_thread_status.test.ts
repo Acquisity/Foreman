@@ -664,3 +664,15 @@ test("the notetaker's settings and recent meeting outcomes are read for this wor
     assert.deepEqual(result.evidence.workspace.recording, recording);
   }
 });
+
+test("recording text columns are cut in SQL to the lengths the schema accepts", () => {
+  const query = buildWidgetSdrQuery(scope, {});
+  for (const bounded of [
+    "left(r.status, 32)",
+    "left(r.recording_readiness, 32)",
+    "left(r.terminal_reason, 40)",
+    "left(r.match_status, 32)",
+  ]) {
+    assert.ok(query.includes(bounded), bounded);
+  }
+});

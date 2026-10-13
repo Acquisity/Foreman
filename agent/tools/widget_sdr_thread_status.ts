@@ -337,9 +337,9 @@ export function buildWidgetSdrQuery(
         'requesterOptedOut', exists(select 1 from crm_recall_calendar_recording_user_preference up
           where up.organization_id = a.id and up.opted_out and up.user_id = '${scope.userId}'::uuid),
         'recentMeetings', coalesce((select jsonb_agg(to_jsonb(rm) order by rm."startsAt" desc nulls last) from (
-          select r.starts_at as "startsAt", left(r.meeting_platform, 32) as platform, r.status,
-            r.recording_readiness as "recordingReadiness", r.terminal_reason as "terminalReason",
-            r.match_status as "matchStatus"
+          select r.starts_at as "startsAt", left(r.meeting_platform, 32) as platform,
+            left(r.status, 32) as status, left(r.recording_readiness, 32) as "recordingReadiness",
+            left(r.terminal_reason, 40) as "terminalReason", left(r.match_status, 32) as "matchStatus"
           from crm_recall_calendar_recording r
           where r.organization_id = a.id
             and r.starts_at between current_timestamp - interval '30 days' and current_timestamp
