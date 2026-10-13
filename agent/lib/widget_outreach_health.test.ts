@@ -13,6 +13,7 @@ import definition, {
   readEarlyFollowUps,
   readSendingRules,
   readWidgetOutreachHealth,
+  tool,
   widgetOutreachHealthInput,
   widgetOutreachHealthOutput,
 } from "../tools/widget_outreach_health.js";
@@ -651,7 +652,6 @@ test("per-step sends, first-touch counts and step delays are read only for the o
   const listed = buildWidgetOutreachHealthQuery(scope, {});
   for (const text of [
     "outreach_campaign_step_variant_metrics",
-    "new_leads_contacted_count",
     "'sequences'",
   ]) {
     assert.equal(listed.includes(text), false, text);
@@ -904,6 +904,7 @@ test("early follow-ups are found across the selected campaign's leads without a 
     assert.equal(query.includes(forbidden), false, forbidden);
   }
   const earlyFollowUps = {
+    earliestAt: "2026-10-07T15:08:00.000Z",
     earlyCount: 221,
     earlyLeads: 221,
     examples: [
@@ -955,7 +956,7 @@ test("early follow-ups are found across the selected campaign's leads without a 
     ...earlyFollowUps,
     platformFault: true,
     reading:
-      "221 follow-ups went out sooner than the campaign's configured delay, 221 of them within 24 hours of the email before them, although that step's delay is set to 3 days. A sending schedule can move a send by hours, not by days, so the product sent these follow-ups early: a platform fault for the team, not something the customer set up wrong.",
+      "221 follow-ups went out earlier than the delay currently saved on the step, 221 of them within 24 hours of the email before them, although that step's current delay is 3 days. The campaign has not changed since before those sends. A sending schedule can move a send by hours, not by days, so the product sent these follow-ups early: a platform fault for the team, not something the customer set up wrong.",
   });
   assert.ok(result.caveats.some((text) => text.includes("sameDayCount")));
   // A few hours short of a 1-day delay can be the schedule; none found is no fault.
@@ -989,7 +990,7 @@ test("the listing reads each provisioned workspace's campaign list once and read
               leadsNotPushedCount: 0,
               providerCampaignId: second,
               recentSends: [
-                { date: "2026-09-17", emailsSent: 117 },
+                { date: "2026-09-17", emailsSent: 117, newLeadsContacted: 117 },
                 { date: "2026-09-16", emailsSent: 0 },
               ],
             },
@@ -1035,7 +1036,7 @@ test("the listing reads each provisioned workspace's campaign list once and read
   assert.match(String(readings[0]), WAITING_LEADS);
   assert.equal(
     readings[1],
-    "This campaign is new and its daily sends are at or near its cap of 120 new leads a day, so that daily new-lead cap is what limits first emails."
+    "This campaign is new and its first emails are at or near its cap of 120 new leads a day, so that daily new-lead cap is what limits first emails."
   );
   assert.ok(!JSON.stringify(result).includes("Instantly"));
 });
@@ -1130,4 +1131,94 @@ test("a live re-run reads a campaign saved minutes before the message as new, an
   assert.deepEqual(result.campaigns[0].recentSends, [
     { date: "2026-10-06", emailsSent: 196 },
   ]);
+});
+
+test("a first-email cap reading uses first touches on the same day, not total emails", () => {
+  const rules = { maxNewLeadsPerDay: 100, newLeadsFirst: false };
+  const campaign = {
+    ...row,
+    createdAt: "2026-10-12T00:00:00Z",
+    leadsNotPushedCount: 0,
+    recentSends: [{ date: "2026-10-12", emailsSent: 300 }],
+  };
+  const now = Date.parse("2026-10-13T00:00:00Z");
+  assert.equal(readSendingRules(rules, campaign, now), null);
+  assert.equal(
+    readSendingRules(
+      rules,
+      {
+        ...campaign,
+        recentSends: [{ ...campaign.recentSends[0], newLeadsContacted: 0 }],
+      },
+      now
+    ),
+    null
+  );
+  assert.ok(
+    readSendingRules(
+      rules,
+      {
+        ...campaign,
+        recentSends: [{ ...campaign.recentSends[0], newLeadsContacted: 100 }],
+      },
+      now
+    )?.includes("first emails are at or near its cap")
+  );
+  assert.ok(
+    buildWidgetOutreachHealthQuery(scope, {}).includes(
+      'cm.new_leads_contacted_count as "newLeadsContacted"'
+    )
+  );
+});
+
+test("historical early sends are a fault only when the campaign predates the earliest send", () => {
+  assert.ok(
+    tool.description.includes("Only platformFault true establishes a fault")
+  );
+  const early = {
+    earliestAt: "2026-10-01T03:00:00Z",
+    earlyCount: 1,
+    earlyLeads: 1,
+    examples: [
+      {
+        at: "2026-10-05T03:00:00Z",
+        configuredDelayDays: 3,
+        leadEmail: "lead@example.com",
+        previousAt: "2026-10-05T00:00:00Z",
+        sendingInbox: null,
+        step: 2,
+      },
+    ],
+    followUpsChecked: 1,
+    sameDayCount: 1,
+    withoutPreviousSend: 0,
+  };
+  for (const updatedAt of [
+    "2026-10-02T00:00:00Z",
+    "2026-10-01T03:00:00Z",
+    null,
+  ]) {
+    const result = readEarlyFollowUps(early, updatedAt);
+    assert.equal(result?.platformFault, undefined);
+    assert.ok(
+      result?.reading.includes(
+        "earlier than the delay currently saved on the step"
+      )
+    );
+    assert.ok(result?.reading.includes("does not establish a platform fault"));
+  }
+  assert.equal(
+    readEarlyFollowUps(early, "2026-09-30T00:00:00Z")?.platformFault,
+    true
+  );
+  assert.equal(
+    readEarlyFollowUps({ ...early, earliestAt: null }, "2026-09-30T00:00:00Z")
+      ?.platformFault,
+    undefined
+  );
+  assert.ok(
+    buildWidgetOutreachHealthQuery(scope, { campaignId }).includes(
+      "'earliestAt', (select min(at) from early)"
+    )
+  );
 });
