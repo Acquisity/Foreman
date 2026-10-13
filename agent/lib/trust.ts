@@ -121,6 +121,37 @@ export function isIntakeOnly(auth: SessionAuthContext | null): boolean {
 }
 
 /**
+ * Auth attribute marking a session opened from an Asks-receiver triage intake
+ * channel (feedback, refunds), either by the receiver's Slack mention or by a
+ * Linear Agent Session on a ticket whose 'Ask from' link points there.
+ *
+ * @remarks
+ * It selects models only (ENG-15226): the root investigates on the `triage`
+ * slot and the requester reply and investigation document are reworded by the
+ * `writer` slot. It grants nothing.
+ */
+export const TRIAGE_INTAKE_ATTRIBUTE = "triageIntake";
+
+/**
+ * Returns a copy of `auth` carrying the {@link TRIAGE_INTAKE_ATTRIBUTE} stamp.
+ */
+export function stampTriageIntake(
+  auth: SessionAuthContext
+): SessionAuthContext {
+  return {
+    ...auth,
+    attributes: { ...auth.attributes, [TRIAGE_INTAKE_ATTRIBUTE]: "true" },
+  };
+}
+
+/**
+ * Whether the session was opened from a triage intake channel.
+ */
+export function isTriageIntake(auth: SessionAuthContext | null): boolean {
+  return auth !== null && auth.attributes[TRIAGE_INTAKE_ATTRIBUTE] === "true";
+}
+
+/**
  * Auth attribute marking a Slack session from a questions-only channel.
  *
  * @remarks

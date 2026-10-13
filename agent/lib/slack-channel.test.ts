@@ -11,6 +11,7 @@ import type {
   SlackMessage,
 } from "eve/channels/slack";
 import { FINAL_SLACK_POST_RULE } from "./slack-intake.js";
+import { isTriageIntake } from "./trust.js";
 
 // Connector variables the channel module requires at evaluation time.
 // Nothing here is contacted; the values only have to exist.
@@ -374,6 +375,36 @@ describe("slack channel", () => {
     assert.equal(await dispatch(ctx, authorless), null);
     assert.deepEqual(calls, []);
     assert.deepEqual(posts, []);
+  });
+
+  it("stamps the receiver's mention in the two triage intake channels only", async () => {
+    const fromReceiver = (channelId: string): SlackMessage => ({
+      ...message("New ask", channelId),
+      author: {
+        fullName: "Asks",
+        isBot: true,
+        isMe: false,
+        userId: "UASKS",
+        userName: "asks",
+      },
+    });
+    const cases = [
+      ["C0BBPVC3N2X", true],
+      ["C0BC011NAQL", true],
+      ["C0BLFDUN6Q7", false],
+      ["C0INTAKEONLY", false],
+      ["C0DEV", false],
+    ] as const;
+    await Promise.all(
+      cases.map(async ([channelId, stamped]) => {
+        const result = await dispatch(
+          inboundContext(undefined),
+          fromReceiver(channelId)
+        );
+        assert.ok(result?.auth, channelId);
+        assert.equal(isTriageIntake(result.auth), stamped, channelId);
+      })
+    );
   });
 
   it("delivers longer stop requests as ordinary input without resetting", async () => {

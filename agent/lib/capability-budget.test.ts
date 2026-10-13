@@ -672,8 +672,8 @@ describe("capability report", () => {
       );
     }
     // No loss on the admitted side: the repository lane carries every authored
-    // tool except tools exclusive to scheduled support or verified Fin customer
-    // investigations, plus both declared children.
+    // tool except tools exclusive to scheduled support, plus both declared
+    // children.
     const entries = (
       lane: (typeof CAPABILITY_LANES)[number],
       kind: string,
@@ -696,8 +696,6 @@ describe("capability report", () => {
           // Every tools/widget_* module is offered to the support widget lane alone.
           !tool.sourceId.startsWith("tools/widget_") &&
           ![
-            "tools/file_fin_investigation_ticket.ts",
-            "tools/read_fin_outreach_evidence.ts",
             "tools/support_investigation.ts",
             "tools/support_provider.ts",
           ].includes(tool.sourceId)

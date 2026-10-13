@@ -2,9 +2,12 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { LinearAgentSessionEvent } from "eve/channels/linear";
 
-const { askFromName, buildLinearContext, LINEAR_TRIAGE_ROUTE } = await import(
-  "./linear-context.js"
-);
+const {
+  askFromName,
+  buildLinearContext,
+  isTriageIntakeAsk,
+  LINEAR_TRIAGE_ROUTE,
+} = await import("./linear-context.js");
 
 function makeEvent(overrides: {
   action: string;
@@ -110,5 +113,37 @@ describe("askFromName", () => {
   it("returns null without an 'Ask from' attachment", () => {
     assert.equal(askFromName([]), null);
     assert.equal(askFromName(["Support conversation", "Ask from "]), null);
+  });
+});
+
+describe("isTriageIntakeAsk", () => {
+  const ask = (url: string, title = "Ask from Andrea Estifano") => [
+    { title, url },
+  ];
+  const thread = (channel: string) =>
+    `https://fegrowthpartner.slack.com/archives/${channel}/p1791000000000100`;
+
+  it("accepts an 'Ask from' link into either triage intake channel", () => {
+    assert.equal(isTriageIntakeAsk(ask(thread("C0BBPVC3N2X"))), true);
+    assert.equal(isTriageIntakeAsk(ask(thread("C0BC011NAQL"))), true);
+  });
+
+  it("rejects other channels, other titles, and malformed URLs", () => {
+    assert.equal(isTriageIntakeAsk(ask(thread("C0BLFDUN6Q7"))), false);
+    assert.equal(
+      isTriageIntakeAsk(ask(thread("C0BBPVC3N2X"), "Slack thread")),
+      false
+    );
+    for (const url of [
+      "https://fegrowthpartner.slack.com/archives/C0BBPVC3N2X",
+      "http://fegrowthpartner.slack.com/archives/C0BBPVC3N2X/p1",
+      "https://evil.example/archives/C0BBPVC3N2X/p1",
+      "https://fegrowthpartner.slack.com.evil.example/archives/C0BBPVC3N2X/p1",
+      `https://fegrowthpartner.slack.com/archives/C0BBPVC3N2X/${"p".repeat(2048)}`,
+      "not a url",
+    ]) {
+      assert.equal(isTriageIntakeAsk(ask(url)), false, url);
+    }
+    assert.equal(isTriageIntakeAsk([]), false);
   });
 });

@@ -37,6 +37,9 @@ export const MODELS = {
   // with the same articles or better; flash p50 12.7s, max 27.8s.
   kbSelect: "google/gemini-3.5-flash-lite",
   orchestrator: "deepseek/deepseek-v4-pro-0813",
+  // Root model for sessions from the two Asks-receiver triage intake channels
+  // (ENG-15226); every other session stays on the orchestrator.
+  triage: "anthropic/claude-opus-5.5",
   // Cheap and vision-capable: this slot reads pixels, it does not reason.
   vision: "google/gemini-3.5-flash",
   // Support widget diagnosis: the investigator's write-up of what the evidence
@@ -52,6 +55,9 @@ export const MODELS = {
   // arguments. haiku-4.5 took ~1s a call; gemini-3.5-flash took ~15s a call the
   // same afternoon. Moved to haiku-5.5 on Aaron's call with the CLI Proxy (ENG-15082).
   widgetSteps: "anthropic/claude-haiku-5.5",
+  // Rewords a triage-intake session's requester reply and investigation
+  // document before they are posted (intake-writer.ts, ENG-15226).
+  writer: "anthropic/claude-sonnet-5.5",
 } as const;
 
 export type AgentModelSlot = keyof typeof MODELS;

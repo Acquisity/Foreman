@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { z } from "zod";
-import { stampUnattended } from "./trust.js";
+import { stampTriageIntake, stampUnattended } from "./trust.js";
 
 const CARD_OR_BANK = /card or bank/u;
 
@@ -75,6 +75,7 @@ describe("save_investigation_document tool", () => {
         requested = true;
         throw new Error("no");
       },
+      session: { auth: { current: null, initiator: null } },
     } as unknown as Context;
     const results = (await Promise.all(
       [
@@ -90,5 +91,45 @@ describe("save_investigation_document tool", () => {
       assert.match(result.error ?? "", CARD_OR_BANK);
     }
     assert.equal(requested, false);
+  });
+
+  it("refuses sensitive triage-intake billing content before calling the writer", async (t) => {
+    const { env } = process;
+    process.env = {
+      ...env,
+      CLIPROXY_API_KEY: "test-key",
+      CLIPROXY_BASE_URL: "https://proxy.test/v1",
+    };
+    t.after(() => {
+      process.env = env;
+    });
+    const fetch = t.mock.method(globalThis, "fetch", () =>
+      Promise.resolve(new Response("{}", { status: 400 }))
+    );
+    const context = {
+      abortSignal: new AbortController().signal,
+      session: {
+        auth: {
+          initiator: stampTriageIntake({
+            attributes: {},
+            authenticator: "app",
+            issuer: "eve",
+            principalId: "eve:app",
+            principalType: "runtime",
+          }),
+        },
+      },
+    } as unknown as Context;
+    const result = (await tool.execute(
+      {
+        content: "Card 4242 4242 4242 4242 charged",
+        issue: "ENG-1",
+        lane: "billing",
+      },
+      context
+    )) as { error?: string; saved: boolean };
+    assert.equal(result.saved, false);
+    assert.match(result.error ?? "", CARD_OR_BANK);
+    assert.equal(fetch.mock.callCount(), 0);
   });
 });

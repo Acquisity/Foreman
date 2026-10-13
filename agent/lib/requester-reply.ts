@@ -9,7 +9,7 @@ import {
   RELAY_HEADER,
   SLACK_PROMPT,
 } from "./jev-decisions.js";
-import { askFromName } from "./linear-context.js";
+import { askFromName, isTriageIntakeAsk } from "./linear-context.js";
 import { WIDGET_FEEDBACK_PROJECT_ID } from "./widget-feedback.js";
 
 /**
@@ -123,25 +123,30 @@ const THREAD_QUERY = `query RequesterThread($id: String!) {
 }`;
 
 const ASK_FROM_QUERY = `query AskFrom($id: String!) {
-  issue(id: $id) { attachments(first: 50) { nodes { title } } }
+  issue(id: $id) { attachments(first: 50) { nodes { title url } } }
 }`;
 
-/** The intake requester from the issue's 'Ask from <name>' attachment, or null. */
+/**
+ * The intake requester from the issue's 'Ask from <name>' attachment, or null,
+ * and whether that attachment links a triage intake channel.
+ */
 export async function readAskFrom(
   issue: string,
   credentials: LinearChannelCredentials
-): Promise<string | null> {
+): Promise<{ requester: string | null; triageIntake: boolean }> {
   const result = await callLinearGraphQL<{
-    issue: { attachments: { nodes: { title: string }[] } } | null;
+    issue: { attachments: { nodes: { title: string; url: string }[] } } | null;
   }>({
     credentials,
     query: ASK_FROM_QUERY,
     queryName: "AskFrom",
     variables: { id: issue },
   });
-  return askFromName(
-    result.issue?.attachments.nodes.map((node) => node.title) ?? []
-  );
+  const attachments = result.issue?.attachments.nodes ?? [];
+  return {
+    requester: askFromName(attachments.map((node) => node.title)),
+    triageIntake: isTriageIntakeAsk(attachments),
+  };
 }
 
 const REPLY_MUTATION = `mutation RequesterReply($input: CommentCreateInput!) {
@@ -386,7 +391,9 @@ export async function replyToRequester(
   issue: string,
   message: string,
   accessToken: string,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  /** Rewords the message once Jev has said a reply is needed (ENG-15226). */
+  rewrite?: (message: string) => Promise<string>
 ): Promise<ReplyResult> {
   const credentials = { accessToken };
   const { issueId, plan } = await readThread(issue, credentials);
@@ -405,7 +412,7 @@ export async function replyToRequester(
     queryName: "RequesterReply",
     variables: {
       input: {
-        body: message,
+        body: rewrite ? await rewrite(message) : message,
         issueId,
         parentId: plan.anchorId,
       },

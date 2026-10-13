@@ -1,8 +1,12 @@
 import { defineAgent, defineDynamic } from "eve";
-import { isFinInvestigation } from "./lib/fin-investigation-auth.js";
-import { finInvestigationModel } from "./lib/fin-investigation-model.js";
-import { fastCallOptions, gatewayRouting, resolveModel } from "./lib/models.js";
+import {
+  type AgentModelSlot,
+  fastCallOptions,
+  gatewayRouting,
+  resolveModel,
+} from "./lib/models.js";
 import { ticketLinkedModel } from "./lib/ticket-link-model.js";
+import { isTriageIntake } from "./lib/trust.js";
 import { widgetInvestigationModel } from "./lib/widget-investigation-model.js";
 import { isWidgetSupport } from "./lib/widget-scope.js";
 
@@ -15,11 +19,18 @@ function investigationModel(
   if (isWidgetSupport(auth)) {
     return widgetInvestigationModel(id, sessionId, stepsId);
   }
-  if (isFinInvestigation(auth)) {
-    return finInvestigationModel(id);
-  }
   return ticketLinkedModel(id);
 }
+
+/** The root's model slot: widget sessions, then triage intake (ENG-15226), then everyone else. */
+export const rootModelSlot = (
+  auth: Parameters<typeof isWidgetSupport>[0]
+): AgentModelSlot => {
+  if (isWidgetSupport(auth)) {
+    return "widget";
+  }
+  return isTriageIntake(auth ?? null) ? "triage" : "orchestrator";
+};
 
 // Root agent runtime configuration: the model for Foreman, Acquisity's
 // general-purpose agent; the rest of the surface (channels, connections,
@@ -43,7 +54,9 @@ export default defineAgent({
     events: {
       "step.started": async (_event, ctx) => {
         const widget = isWidgetSupport(ctx.session.auth.initiator);
-        const id = await resolveModel(widget ? "widget" : "orchestrator");
+        const id = await resolveModel(
+          rootModelSlot(ctx.session.auth.initiator)
+        );
         return {
           model: investigationModel(
             ctx.session.auth.initiator,

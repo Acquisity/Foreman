@@ -103,7 +103,6 @@ describe("widget support investigation model boundary", () => {
     "browser__navigate",
     "bash",
     "sign_in",
-    "file_fin_investigation_ticket",
     "executor__execute",
     "search_investigation_memory",
   ]) {
