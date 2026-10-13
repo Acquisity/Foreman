@@ -131,3 +131,34 @@ test("code filing then a tool call in one run reuses the confirmed receipt despi
   assert.equal(writes, 1);
   assert.equal(searches, 1);
 });
+
+test("a confirmed ticket stays confirmed when its receipt cannot be saved", async (t) => {
+  t.mock.method(globalThis, "fetch", () =>
+    Promise.reject(new Error("unexpected transport"))
+  );
+  const runId = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+  const { signal } = new AbortController();
+  const filed = await fileTicketFor(
+    scope,
+    { summary: "The customer asked for a person.", title: "Support" },
+    signal,
+    runId,
+    {
+      create: () =>
+        Promise.resolve({
+          data: {
+            id: "ENG-43",
+            url: "https://linear.app/acquisity/issue/ENG-43/support",
+          },
+          ok: true as const,
+        }),
+      readReceipt: async () => null,
+      refund: () => Promise.resolve(false),
+      saveReceipt: () => Promise.reject(new Error("db down")),
+      search: () =>
+        Promise.resolve({ createdAfter: null, issues: [], truncated: false }),
+    }
+  );
+  assert.ok(!("error" in filed));
+  assert.equal("identifier" in filed && filed.identifier, "ENG-43");
+});

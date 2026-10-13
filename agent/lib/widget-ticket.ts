@@ -17,6 +17,7 @@ import {
   confirmedIssue,
   formatCustomerReport,
 } from "./linear-ticket-report.js";
+import { logOpsEvent } from "./ops-log.js";
 import { isRefundTicket } from "./widget-next-action.js";
 import {
   isLiveActive,
@@ -127,9 +128,21 @@ export async function fileWidgetTicket(
     if (saved) {
       return saved;
     }
+    // The ticket exists once Linear confirms it, so a failed receipt save
+    // must not turn it into an unconfirmed outcome.
     const confirm = async (receipt: WidgetTicketReceipt) => {
       if (runId) {
-        await deps.saveReceipt(scope, runId, receipt, ctx.abortSignal);
+        await deps
+          .saveReceipt(scope, runId, receipt, ctx.abortSignal)
+          .catch((error) => {
+            if (ctx.abortSignal.aborted) {
+              throw error;
+            }
+            logOpsEvent("widget.ticket.receipt_unsaved", {
+              conversationId: scope.conversationId,
+              runId,
+            });
+          });
       }
       return receipt;
     };
