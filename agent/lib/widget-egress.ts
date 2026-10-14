@@ -586,7 +586,7 @@ const unaskedChangeRemoved = (composed: string, askedForChange: boolean) =>
  * such sentence left. "I'll report it to engineering if..." is not a claim.
  */
 const TICKET_CLAIM =
-  /[^.!?\n]*\b(?:I(?:'|’)ve|I have|I(?:'|’)m|I am|we(?:'|’)ve|we have|has been|have been|was|is now)\s+(?:also\s+)?(?:reported|passed|filed|sent|flagged|escalated|raised|logged|opened|submitted|reporting|passing|filing|escalating|flagging)\b[^.!?\n]{0,100}?\b(?:engineering|ticket|billing team|team)\b[^.!?\n]*[.!?]?/giu;
+  /[^.!?\n]*\b(?:I(?:'|’)ve|I have|I(?:'|’)m|I am|we(?:'|’)ve|we have|has been|have been|was|is now)\s+(?:also\s+)?(?:reported|passed|filed|sent|flagged|escalated|raised|logged|opened|submitted|asked|handed|reporting|passing|filing|escalating|flagging|asking|handing)\b[^.!?\n]{0,100}?\b(?:engineering|ticket|billing team|team|person|teammate|someone)\b[^.!?\n]*[.!?]?/giu;
 const withoutTicketClaims = (text: string) =>
   text.replace(TICKET_CLAIM, "").trim();
 const NO_TICKET_CORRECTION =

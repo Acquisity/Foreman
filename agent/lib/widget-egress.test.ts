@@ -1227,6 +1227,18 @@ test("an unfiled ticket claim is recomposed once with the correction", async () 
   assert.ok(corrections(calls)[1]?.includes("No ticket was filed"));
 });
 
+test("a handoff reply that announces the handoff itself is recomposed", async () => {
+  const { calls, d } = claimingDeps([
+    "I've asked for a person to take over. Your campaign paused because its inbox disconnected.",
+    "Your campaign paused because its inbox disconnected. A teammate will take up your request.",
+  ]);
+  const result = await gate(scope, question, findings({ needsHuman: true }), d);
+  assert.equal(result.reason, "needs_human");
+  assert.equal(result.message?.includes("asked for a person"), false);
+  assert.equal(result.message?.includes("A teammate will take up"), true);
+  assert.equal(calls.compose.length, 2);
+});
+
 test("a claim the recompose repeats is deleted, and a conditional promise stays", async () => {
   const conditional =
     "Send me the exact error and I'll report it to engineering if it is a fault on our side.";
