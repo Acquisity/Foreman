@@ -344,6 +344,25 @@ test("a handoff whose reply cannot be composed still hands off as needs_human", 
   );
 });
 
+test("a handoff the rewrite leaves without facts hands off with no reply", async () => {
+  const { calls, deps: d } = deps({
+    judge: (input) =>
+      Promise.resolve({
+        decision: "rewrite",
+        reason: "facts concern another workspace",
+        remove: input.items
+          .filter((item) => item.kind === "fact")
+          .map((item) => item.n),
+      }),
+  });
+  const result = await gate(scope, question, findings({ needsHuman: true }), d);
+  assert.deepEqual(
+    [result.decision, result.reason, result.message],
+    ["block", "needs_human", null]
+  );
+  assert.equal(calls.compose.length, 0);
+});
+
 test("a handoff the reviewer blocks keeps the reviewer's reason", async () => {
   const { calls, deps: d } = deps({
     judge: () => Promise.resolve({ decision: "block", reason: "foreign data" }),

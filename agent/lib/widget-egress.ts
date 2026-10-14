@@ -957,6 +957,10 @@ export async function gate(
         return stop(rewritten);
       }
       gated = rewritten;
+      // A handoff the rewrite left without facts has no diagnosis to give.
+      if (handoffOnly(gated)) {
+        return stop("needs_human");
+      }
       const again = await timed("scan", () =>
         deterministicReason(scope, gated, resolve, signal)
       );
