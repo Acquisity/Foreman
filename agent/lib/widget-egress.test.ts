@@ -320,22 +320,28 @@ test("a claim with no evidence reference is judged by the model gate, not blocke
   assert.equal(calls.judge.length, 1);
 });
 
-test("a reviewed handoff with useful findings skips the composer and keeps them; a normal answer still composes", async () => {
+test("a reviewed handoff with useful findings is composed as a handoff reply", async () => {
   const { calls, deps: d } = deps();
   const raw = findings({ needsHuman: true });
   const result = await gate(scope, question, raw, d);
+  assert.deepEqual([result.decision, result.reason], ["allow", "needs_human"]);
+  assert.match(result.message ?? "", RECONNECT);
+  assert.deepEqual(result.findings, raw);
+  assert.equal(calls.judge.length, 1);
+  const [composed] = calls.compose as { handoff?: boolean }[];
+  assert.equal(composed.handoff, true);
+  const answered = await gate(scope, question, findings(), d);
+  assert.equal(answered.reason, "in scope");
+  assert.equal((calls.compose as { handoff?: boolean }[])[1].handoff, false);
+});
+
+test("a handoff whose reply cannot be composed still hands off as needs_human", async () => {
+  const { deps: d } = deps({ compose: () => Promise.resolve("") });
+  const result = await gate(scope, question, findings({ needsHuman: true }), d);
   assert.deepEqual(
     [result.decision, result.reason, result.message],
     ["block", "needs_human", null]
   );
-  assert.deepEqual(result.findings, raw);
-  // The safety review still ran; only the discarded reply was skipped.
-  assert.equal(calls.judge.length, 1);
-  assert.equal(calls.compose.length, 0);
-  const answered = await gate(scope, question, findings(), d);
-  assert.equal(answered.decision, "allow");
-  assert.match(answered.message ?? "", RECONNECT);
-  assert.equal(calls.compose.length, 1);
 });
 
 test("a handoff the reviewer blocks keeps the reviewer's reason", async () => {
@@ -668,7 +674,7 @@ test("a source file named in a website fix is not a domain; a real unowned domai
   );
 });
 
-test("a billing review keeps its verified facts and open questions for the teammate, and repurchase advice never reaches the composer", async () => {
+test("a billing review composes from the reviewed findings, and repurchase advice never reaches the composer", async () => {
   const raw = findings({
     needsHuman: true,
     recommendation:
@@ -685,9 +691,12 @@ test("a billing review keeps its verified facts and open questions for the teamm
       }),
   });
   const result = await gate(scope, question, raw, d);
-  assert.equal(result.reason, "needs_human");
-  assert.deepEqual(result.findings, raw);
-  assert.equal(calls.compose.length, 0);
+  assert.deepEqual(
+    [result.decision, result.reason],
+    ["rewrite", "needs_human"]
+  );
+  assert.equal(result.findings.facts.length, raw.facts.length);
+  assert.equal(calls.compose.length, 1);
   assert.equal(JSON.stringify(calls.compose).includes("fresh domain"), false);
 });
 
