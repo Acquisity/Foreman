@@ -905,8 +905,17 @@ export async function gate(
   // Set once the reviewer passes a handoff: any later failure still hands off
   // as needs_human, so Acquisity posts its note and handoff line as before.
   let handoff = false;
-  const stop = (reason: string) =>
-    done(blocked(findings, handoff ? "needs_human" : reason));
+  const stop = (reason: string) => {
+    if (handoff) {
+      // The decision line reads needs_human; this keeps the failure behind it.
+      logOpsEvent("widget.egress.handoff_fallback", {
+        conversationId: scope.conversationId,
+        message: reason,
+        outcome: "error",
+      });
+    }
+    return done(blocked(findings, handoff ? "needs_human" : reason));
+  };
   try {
     let reason = await timed("scan", () =>
       deterministicReason(scope, findings, resolve, signal)
