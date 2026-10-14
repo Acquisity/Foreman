@@ -783,7 +783,12 @@ function applyRewrite(
   findings: WidgetFindings,
   remove: number[]
 ): WidgetFindings | string {
-  return removeItems(findings, remove) ?? "model_gate:invalid_rewrite";
+  const rewritten = removeItems(findings, remove);
+  if (!rewritten) {
+    return "model_gate:invalid_rewrite";
+  }
+  // A handoff the rewrite left without facts has no diagnosis to give.
+  return handoffOnly(rewritten) ? "needs_human" : rewritten;
 }
 
 const blocked = (findings: WidgetFindings, reason: string): GateResult => ({
@@ -957,10 +962,6 @@ export async function gate(
         return stop(rewritten);
       }
       gated = rewritten;
-      // A handoff the rewrite left without facts has no diagnosis to give.
-      if (handoffOnly(gated)) {
-        return stop("needs_human");
-      }
       const again = await timed("scan", () =>
         deterministicReason(scope, gated, resolve, signal)
       );
