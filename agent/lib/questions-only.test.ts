@@ -109,7 +109,7 @@ describe("questions-only channel", () => {
     const migration = slackIntakeContext(MIGRATION);
     assert.doesNotMatch(migration, APP_PUBLISHING_ID);
     assert.doesNotMatch(migration, APP_PUBLISHING_NAME);
-    assert.equal(QUESTIONS_ONLY_WORKSPACES["C0NOTMAPPED"], undefined);
+    assert.equal(QUESTIONS_ONLY_WORKSPACES.C0NOTMAPPED, undefined);
     assert.equal(QUESTIONS_ONLY_CHANNELS.has("C0NOTMAPPED"), false);
   });
 
