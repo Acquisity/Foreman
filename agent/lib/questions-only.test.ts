@@ -13,7 +13,7 @@ import { slackSessionAuth } from "./session-auth.js";
 import {
   admitsSlackMention,
   QUESTIONS_ONLY_CHANNELS,
-  QUESTIONS_ONLY_WORKSPACE,
+  QUESTIONS_ONLY_WORKSPACES,
   resolveSlackIntakeWorkflow,
   SLACK_INTAKE_WORKFLOWS,
   slackIntakeContext,
@@ -26,7 +26,10 @@ import { isIntakeOnly, isQuestionsOnly } from "./trust.js";
 
 const MIGRATION = "C0BQM9V6P47";
 const SANDBOX = "C0C6DM2MB39";
-const WORKSPACE_ID = new RegExp(QUESTIONS_ONLY_WORKSPACE.id, "u");
+const APP_PUBLISHING = "C0C8XP8HAFL";
+const WORKSPACE_ID = /1cfacf97-f4f2-4dae-b2a0-7f7a85b7d6ac/u;
+const APP_PUBLISHING_ID = /ca1c5b07-6ffc-4658-b317-584db40d53dc/u;
+const APP_PUBLISHING_NAME = /App Publishing Academy/u;
 const WORKSPACE_NAME = /AI Acquisition Sales Team/u;
 const NO_LINEAR_WORK = /Do not create or change Linear issues/u;
 const FORM_COMMAND = /\/acquisityasks/u;
@@ -86,6 +89,28 @@ describe("questions-only channel", () => {
     };
     assert.equal(admitsSlackMention(MIGRATION, person), true);
     assert.equal(admitsSlackMention("C0BBPVC3N2X", person), false);
+  });
+
+  it("pins each channel to its own workspace", () => {
+    assert.equal(
+      SLACK_INTAKE_WORKFLOWS[APP_PUBLISHING]?.mode,
+      "questions-only"
+    );
+    assert.equal(
+      QUESTIONS_ONLY_WORKSPACES[MIGRATION]?.id,
+      QUESTIONS_ONLY_WORKSPACES[SANDBOX]?.id
+    );
+    const appPublishing = slackIntakeContext(APP_PUBLISHING);
+    assert.match(appPublishing, APP_PUBLISHING_ID);
+    assert.match(appPublishing, APP_PUBLISHING_NAME);
+    assert.match(appPublishing, NO_LINEAR_WORK);
+    assert.doesNotMatch(appPublishing, WORKSPACE_ID);
+    assert.doesNotMatch(appPublishing, WORKSPACE_NAME);
+    const migration = slackIntakeContext(MIGRATION);
+    assert.doesNotMatch(migration, APP_PUBLISHING_ID);
+    assert.doesNotMatch(migration, APP_PUBLISHING_NAME);
+    assert.equal(QUESTIONS_ONLY_WORKSPACES["C0NOTMAPPED"], undefined);
+    assert.equal(QUESTIONS_ONLY_CHANNELS.has("C0NOTMAPPED"), false);
   });
 
   it("pins the workspace and forbids Linear work in the injected task", () => {
