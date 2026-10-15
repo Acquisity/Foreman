@@ -28,9 +28,16 @@ export const askFromName = (titles: readonly string[]): string | null => {
 const SLACK_ARCHIVE =
   /^https:\/\/[a-z0-9-]{1,63}\.slack\.com\/archives\/([A-Z0-9]{1,20})\//u;
 
+// The triage intake channels (feedback, refunds) plus #aqcuisity-migration,
+// whose migration form files CRM tickets to Foreman in Linear.
+const TRIAGE_ASK_CHANNELS: ReadonlySet<string> = new Set([
+  ...RECEIVER_ONLY_CHANNELS,
+  "C0BQM9V6P47",
+]);
+
 /**
- * Whether an 'Ask from' attachment links a thread in a triage intake channel
- * (feedback, refunds), which puts the session on the triage models (ENG-15226).
+ * Whether an 'Ask from' attachment links a thread in a triage ask channel,
+ * which puts the session on the triage models (ENG-15226).
  */
 export const isTriageIntakeAsk = (
   attachments: readonly { title: string; url: string }[]
@@ -39,7 +46,7 @@ export const isTriageIntakeAsk = (
     ({ title, url }) =>
       ASK_FROM.test(title.trim()) &&
       url.length <= 2048 &&
-      RECEIVER_ONLY_CHANNELS.has(SLACK_ARCHIVE.exec(url)?.[1] ?? "")
+      TRIAGE_ASK_CHANNELS.has(SLACK_ARCHIVE.exec(url)?.[1] ?? "")
   );
 
 /**
