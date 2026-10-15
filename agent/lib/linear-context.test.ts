@@ -123,9 +123,10 @@ describe("isTriageIntakeAsk", () => {
   const thread = (channel: string) =>
     `https://fegrowthpartner.slack.com/archives/${channel}/p1791000000000100`;
 
-  it("accepts an 'Ask from' link into either triage intake channel", () => {
+  it("accepts an 'Ask from' link into a triage intake or migration channel", () => {
     assert.equal(isTriageIntakeAsk(ask(thread("C0BBPVC3N2X"))), true);
     assert.equal(isTriageIntakeAsk(ask(thread("C0BC011NAQL"))), true);
+    assert.equal(isTriageIntakeAsk(ask(thread("C0BQM9V6P47"))), true);
   });
 
   it("rejects other channels, other titles, and malformed URLs", () => {

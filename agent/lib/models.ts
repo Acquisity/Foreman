@@ -38,7 +38,8 @@ export const MODELS = {
   kbSelect: "google/gemini-3.5-flash-lite",
   orchestrator: "deepseek/deepseek-v4-pro-0813",
   // Root model for sessions from the two Asks-receiver triage intake channels
-  // (ENG-15226); every other session stays on the orchestrator.
+  // (ENG-15226) and Linear tickets from #aqcuisity-migration's form; every
+  // other session stays on the orchestrator.
   triage: "anthropic/claude-opus-5.5",
   // Cheap and vision-capable: this slot reads pixels, it does not reason.
   vision: "google/gemini-3.5-flash",
