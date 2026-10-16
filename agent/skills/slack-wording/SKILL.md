@@ -1,5 +1,5 @@
 ---
-description: "Wording rules only for acquisity-feedback (C0BBPVC3N2X) and acquisity-refunds-request (C0BC011NAQL). Load before replies or questions in those two channels. Does not apply to other Slack channels."
+description: "Wording rules only for acquisity-feedback (C0BBPVC3N2X) and acquisity-refunds-request (C0BC011NAQL). Load before replies in those two channels. Does not apply to other Slack channels."
 ---
 
 # Slack wording
@@ -12,7 +12,7 @@ In every other channel, none of this skill's wording restrictions apply, even if
 
 Within the two scoped channels, the audience is the internal team member who opened the ticket, not the customer. Write so a non-engineer can read or forward it. Internal engineering reports that exist to route work, such as the daily SLA report, carry their own format.
 
-The Slack channel boundary injects the canonical final-post rule into every Slack session; in a Linear session the `reply_to_requester` one-message rule does that job. Follow the one that applies for the final message and for clarifying questions; do not restate or replace it here.
+The Slack channel boundary injects the canonical final-post rule into every Slack session; in a Linear session the `reply_to_requester` one-message rule does that job. Follow the one that applies for the final message; do not restate or replace it here.
 
 ## Never in a Slack-facing message
 
@@ -37,7 +37,3 @@ If missing evidence materially limits the answer, name the product fact that rem
 - **Bug**: identified a bug and passed it to the team; keep it short. Say the team is already working on this, or working on a fix, only when a matching engineering issue covering the same problem is In Progress or current explicit evidence shows active engineering work; this holds when the requester's own ticket is new or a Duplicate. Finding a duplicate, or creating or routing a Todo ticket, does not show active work. Never imply a delivery date or a deployed fix.
 - **Duplicate**: say it is already reported and with the team.
 - **Backlog/low-impact**: say it is logged as low impact, without promising a next action.
-
-## Asking a question mid-investigation
-
-Batch every question into one message, be specific about what you need, say why in half a sentence, and keep the same tone rules.

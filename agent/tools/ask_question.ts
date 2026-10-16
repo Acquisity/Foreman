@@ -21,7 +21,6 @@ import { disableTool } from "eve/tools";
  *
  * Nothing is lost on a message surface. The model asks in its reply and the
  * next message answers it, which is how Slack, Linear, and GitHub threads
- * already work, and how the clarify-with-requester and triage skills are
- * already written.
+ * already work.
  */
 export default disableTool();

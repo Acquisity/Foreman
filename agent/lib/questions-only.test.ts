@@ -74,9 +74,7 @@ describe("questions-only channel", () => {
     // The private sandbox twin runs the same path for Preview testing.
     assert.equal(SLACK_INTAKE_WORKFLOWS[SANDBOX]?.mode, "questions-only");
     assert.equal(SLACK_INTAKE_WORKFLOWS[MIGRATION]?.mode, "questions-only");
-    assert.deepEqual(resolveSlackIntakeWorkflow(MIGRATION)?.skills, [
-      "clarify-with-requester",
-    ]);
+    assert.deepEqual(resolveSlackIntakeWorkflow(MIGRATION)?.skills, []);
   });
 
   it("admits a person's tag, unlike the receiver-only Asks channels", () => {

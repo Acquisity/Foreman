@@ -42,7 +42,7 @@ Two short paragraphs, the tickets linked inline, the document attached below.
 
 Duplicate of [ENG-12820](<link>) Michael Simon - AI SDR not answering emails: same customer and same ask, filed 17 Aug. That ticket now carries the full investigation and is attached to the active incident [ENG-12983](<link>) Restore and bulletproof Instantly webhook reply delivery, the 13 August Instantly webhook outage.
 
-Bottom line: Michael's workspace was hit by the 13 Aug Instantly webhook outage. Inbound replies stopped arriving 13-16 Aug and 8 were lost on 18 Aug, so the AI SDR had nothing to answer. The webhook is restored and the AI SDR is answering again (5 replies today, 10 yesterday). Missed replies are being recovered by [ENG-12985](<link>) Restore the affected webhooks and recover missed replies. Asking the requester to confirm which specific emails Michael expected answered, to catch anything still broken today.
+Bottom line: Michael's workspace was hit by the 13 Aug Instantly webhook outage. Inbound replies stopped arriving 13-16 Aug and 8 were lost on 18 Aug, so the AI SDR had nothing to answer. The webhook is restored and the AI SDR is answering again (5 replies today, 10 yesterday). Missed replies are being recovered by [ENG-12985](<link>) Restore the affected webhooks and recover missed replies. Specific emails still unanswered after the recovery would reopen this.
 
 [Triage investigation](<link>)
 ```

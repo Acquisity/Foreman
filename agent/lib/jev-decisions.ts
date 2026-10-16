@@ -20,7 +20,7 @@ import {
  * closing a ticket as a duplicate is not.
  */
 export const BARS = {
-  /** Below this, money versus product is unclear and the requester is asked. */
+  /** Below this, money versus product is unclear and the model follows the leaning. */
   askKind: 0.7,
   /** Below this, an existing investigation is not reused. */
   continuation: 0.6,
@@ -107,6 +107,8 @@ export interface AskKindDecision {
   bucket: BillingBucket | null;
   confidence: number;
   kind: "money" | "product" | "unclear";
+  /** Jev's choice regardless of the bar. */
+  leaning: "money" | "product";
   sourceLabels: string[];
 }
 
@@ -143,12 +145,15 @@ export async function decideAskKind(
     opts
   );
   const kind = choiceOf(answers.kind);
-  const settled = kind.confidence >= BARS.askKind;
-  const isMoney = settled && kind.choice === "money";
+  const leaning = kind.choice as "money" | "product";
   return {
-    bucket: isMoney ? (choiceOf(answers.bucket).choice as BillingBucket) : null,
+    bucket:
+      leaning === "money"
+        ? (choiceOf(answers.bucket).choice as BillingBucket)
+        : null,
     confidence: kind.confidence,
-    kind: settled ? (kind.choice as "money" | "product") : "unclear",
+    kind: kind.confidence >= BARS.askKind ? leaning : "unclear",
+    leaning,
     sourceLabels: sourceLabels(answers),
   };
 }
@@ -880,8 +885,8 @@ export async function decideBilling(
 
 export const FOLLOW_UP_OUTCOMES = {
   respond:
-    "speaks to Foreman: asks Foreman something, answers a question Foreman asked in lastReply, approves or withdraws the ask, doubts it (for example, says they may have made a mistake), or changes the outcome they want",
-  skip: "anything else: people in the thread talking to each other (a question to a teammate, a hand-off), context that settles nothing Foreman asked, an acknowledgement, thanks, or noise",
+    "speaks to Foreman: asks Foreman something, gives a new fact or evidence about the issue, including the fact lastReply said would reopen it, approves or withdraws the ask, doubts it (for example, says they may have made a mistake), or changes the outcome they want",
+  skip: "anything else: people in the thread talking to each other (a question to a teammate, a hand-off), context that adds nothing new about the issue, an acknowledgement, thanks, or noise",
 } as const;
 /** status: the only ask is a ticket status move, so nothing is re-checked. */
 export type FollowUpOutcome = keyof typeof FOLLOW_UP_OUTCOMES | "status";

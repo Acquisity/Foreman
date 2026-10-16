@@ -7,7 +7,7 @@ export default defineTool({
   description:
     "Jev decides whether a report is a money ask or a product ask, which billing bucket a money ask falls in, and which source labels apply. " +
     "Call it once with the report text before choosing the triage or billing procedure, and follow its answer. " +
-    "kind unclear means ask the requester one batched question that places it. " +
+    "kind unclear means Jev is below its bar: follow leaning and write that assumption into the document. " +
     "decided false means Jev could not answer: decide by the skill's rules and say so in the document.",
   async execute({ report }, ctx) {
     try {
@@ -44,6 +44,7 @@ export default defineTool({
     decided: z.boolean(),
     error: z.string().optional(),
     kind: z.enum(["money", "product", "unclear"]).optional(),
+    leaning: z.enum(["money", "product"]).optional(),
     sourceLabels: z.array(z.string()).optional(),
   }),
 });
