@@ -4,6 +4,7 @@ import { askJev, type JevAnswer } from "./jev.js";
 import {
   type BillingInput,
   billingQuestions,
+  decideAskKind,
   decideFollowUp,
   decidePriorWork,
   followUpText,
@@ -333,6 +334,49 @@ test("askJev sends one TypeSafe-only gateway request and returns the answers", a
     gateway: { only: ["typesafe-ai"] },
   });
   assert.equal(answers.kind?.type, "choice");
+});
+
+const askKind = (kind: string, confidence: number) =>
+  decideAskKind("r", {
+    fetch: () =>
+      reply({
+        answers: {
+          bucket: {
+            choice: "refund",
+            probabilities: { refund: 0.8 },
+            type: "choice",
+          },
+          kind: {
+            choice: kind,
+            probabilities: { [kind]: confidence },
+            type: "choice",
+          },
+          source_customer: { probability: 0.1, type: "boolean" },
+          source_intercom: { probability: 0.1, type: "boolean" },
+          source_internal: { probability: 0.1, type: "boolean" },
+        },
+        model: "typesafe-ai/jev",
+      }),
+    token: "t",
+  });
+
+test("decideAskKind keeps Jev's leaning below the bar, with the bucket for a money leaning", async () => {
+  const money = await askKind("money", 0.5);
+  assert.equal(money.kind, "unclear");
+  assert.equal(money.leaning, "money");
+  assert.equal(money.bucket, "refund");
+  const product = await askKind("product", 0.5);
+  assert.equal(product.kind, "unclear");
+  assert.equal(product.leaning, "product");
+  assert.equal(product.bucket, null);
+  const settled = await askKind("money", 0.9);
+  assert.deepEqual(settled, {
+    bucket: "refund",
+    confidence: 0.9,
+    kind: "money",
+    leaning: "money",
+    sourceLabels: [],
+  });
 });
 
 test("askJev refuses an answer off the menu, a missing answer, or a bad status", async () => {

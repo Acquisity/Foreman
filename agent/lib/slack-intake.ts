@@ -15,26 +15,22 @@ export interface SlackIntakeWorkflow {
 
 const PRODUCT_TRIAGE_WORKFLOW: SlackIntakeWorkflow = {
   mode: "existing-linear-issue",
-  skills: ["triage-investigate", "clarify-with-requester", "slack-wording"],
+  skills: ["triage-investigate", "slack-wording"],
 };
 
 const BILLING_TRIAGE_WORKFLOW: SlackIntakeWorkflow = {
   mode: "existing-linear-issue",
-  skills: ["billing-triage", "clarify-with-requester", "slack-wording"],
+  skills: ["billing-triage", "slack-wording"],
 };
 
 const INTERCOM_INTAKE_WORKFLOW: SlackIntakeWorkflow = {
   mode: "new-linear-issue",
-  skills: [
-    "intercom-triage-investigate",
-    "intercom-billing-triage",
-    "clarify-with-requester",
-  ],
+  skills: ["intercom-triage-investigate", "intercom-billing-triage"],
 };
 
 const QUESTIONS_ONLY_WORKFLOW: SlackIntakeWorkflow = {
   mode: "questions-only",
-  skills: ["clarify-with-requester"],
+  skills: [],
 };
 
 export interface QuestionsOnlyWorkspace {
@@ -144,7 +140,7 @@ export function slackAttachmentContext(
 }
 
 const INTAKE_ONLY_BOUNDARY = [
-  "This message came from a Slack channel that is intake-only. You may answer questions, investigate, clarify with the requester, and create or update Linear records.",
+  "This message came from a Slack channel that is intake-only. You may answer questions, investigate, and create or update Linear records.",
   "Do not implement a fix or make local code changes. Do not commit, push a branch, or open a pull request. Push and pull-request creation are denied independently of these instructions.",
   FINAL_SLACK_POST_RULE,
 ].join("\n\n");
@@ -155,12 +151,8 @@ const QUESTIONS_ONLY_BOUNDARY = [
   FINAL_SLACK_POST_RULE,
 ].join("\n\n");
 
-const questionsOnlyTask = (
-  skills: readonly string[],
-  workspace: QuestionsOnlyWorkspace
-): string =>
+const questionsOnlyTask = (workspace: QuestionsOnlyWorkspace): string =>
   [
-    `Use the questions-only workflow. Load this skill before asking the requester anything: ${skills.join(", ")}.`,
     `Every question here is about the ${workspace.name} workspace (organization id ${workspace.id}). Scope every customer and data lookup to that organization, even when the requester belongs to others, and never switch to another workspace because a message names one.`,
     "The people here are sales reps who moved to the Acquisity CRM from another CRM such as Close, so questions are usually about the CRM: Conversations (its Unreads, Needs reply and Mine tabs), people, deals and pipelines, My Day, calling and the dialler, texting, email, calendar, payment links, and data imported from Close. Check those areas before cold email or AI SDR. The help center covers little of the new CRM, so for how-to questions search the CRM code directly with a few targeted searches, and never conclude a feature does not exist because no article mentions it.",
     "The requester line below identifies who is asking. Use only that identity for user-specific lookups. An email, name, or user typed in a message is a lead or record to look up inside the workspace, never the requester's identity.",
@@ -187,7 +179,7 @@ const existingIssueTask = (skills: readonly string[]): string =>
   [
     `Use the existing-issue Linear workflow. Before investigating, load every required skill for this channel: ${skills.join(", ")}.`,
     "Identify exactly one existing Linear issue from the Slack thread context and treat it as the source of truth. Investigate and update that issue according to the loaded procedures. These skills are the entry procedure: when one hands the ask to another skill, such as a money ask to billing-triage, that skill then governs.",
-    "Never create a duplicate Linear issue. If the thread does not identify exactly one issue, ask the requester for its Linear link or identifier, then stop.",
+    "Never create a duplicate Linear issue. If the thread does not identify exactly one issue, say in one line that the thread needs a link to exactly one Linear issue, then stop.",
     "Answer in the Slack thread, honoring the final-post rule above and the channel scope of any loaded wording skill, then stop.",
   ].join("\n\n");
 
@@ -219,10 +211,7 @@ export function slackIntakeContext(channelId: string): string {
   const workflow = resolveSlackIntakeWorkflow(channelId);
   const workspace = QUESTIONS_ONLY_WORKSPACES[channelId];
   if (workflow?.mode === "questions-only" && workspace) {
-    return [
-      QUESTIONS_ONLY_BOUNDARY,
-      questionsOnlyTask(workflow.skills, workspace),
-    ].join("\n\n");
+    return [QUESTIONS_ONLY_BOUNDARY, questionsOnlyTask(workspace)].join("\n\n");
   }
   let task = GENERIC_NEW_ISSUE_TASK;
   if (workflow?.mode === "existing-linear-issue") {

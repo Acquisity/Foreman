@@ -54,7 +54,6 @@ describe("intake-only channels", () => {
     assert.equal(production?.mode, "existing-linear-issue");
     assert.deepEqual(production?.skills, [
       "triage-investigate",
-      "clarify-with-requester",
       "slack-wording",
     ]);
   });
@@ -67,11 +66,7 @@ describe("intake-only channels", () => {
       skills: production?.skills.filter((skill) => skill !== "slack-wording"),
     });
     assert.equal(production?.mode, "existing-linear-issue");
-    assert.deepEqual(production?.skills, [
-      "billing-triage",
-      "clarify-with-requester",
-      "slack-wording",
-    ]);
+    assert.deepEqual(production?.skills, ["billing-triage", "slack-wording"]);
   });
 
   it("maps Intercom and its sandbox to the dedicated new-issue workflow", () => {
@@ -82,7 +77,6 @@ describe("intake-only channels", () => {
     assert.deepEqual(production?.skills, [
       "intercom-triage-investigate",
       "intercom-billing-triage",
-      "clarify-with-requester",
     ]);
   });
 
@@ -111,7 +105,7 @@ describe("intake-only channels", () => {
       true
     );
     assert.equal(context.includes("exactly one existing Linear issue"), true);
-    assert.equal(context.includes("Linear link or identifier"), true);
+    assert.equal(context.includes("a link to exactly one Linear issue"), true);
     assert.equal(context.includes("triage-investigate"), true);
     assert.equal(context.includes("The final post in the Slack thread"), true);
     assert.equal(context.includes("<eve-empty-delivery/>"), true);

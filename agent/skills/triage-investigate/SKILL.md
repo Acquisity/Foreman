@@ -30,11 +30,11 @@ Read the full issue via the Linear connection: title, description, attachments, 
 
 ### Is this a money ask?
 
-Call `classify_ask` once with the issue text and comments; keep its `sourceLabels`. Money ask: load the billing-triage skill. It then replaces this skill and triage-handling; clarify-with-requester and slack-wording still apply. `unclear`: ask one question that places it and keep working what does not depend on it. Channel mismatched to the ask: say so in one line inside the reply, never its own post, and continue with the procedure for the ask's real kind, in the channel where it landed; never cancel the ticket and never ask the requester to refile it.
+Call `classify_ask` once with the issue text and comments; keep its `sourceLabels`. Money ask: load the billing-triage skill. It then replaces this skill and triage-handling; slack-wording still applies. `unclear`: Jev is below its bar; follow its `leaning`, write that assumption into the document, and continue. Channel mismatched to the ask: say so in one line inside the reply, never its own post, and continue with the procedure for the ask's real kind, in the channel where it landed; never cancel the ticket and never ask the requester to refile it.
 
 ### State the claim
 
-One testable sentence: what the user says happened, what they expected, when, on which org, campaign, or record. If the ticket cannot produce it, take the most likely reading, write the assumption into the report, and investigate that; ask through clarify-with-requester without parking the ticket.
+One testable sentence: what the user says happened, what they expected, when, on which org, campaign, or record. If the ticket cannot produce it, take the most likely reading, write the assumption into the report, and investigate that. Never ask the requester or park the ticket.
 
 Completion: the issue, relations, trusted intake state, and testable claim are recorded. Financial asks branch to `billing-triage`; otherwise continue to Stage 2.
 
@@ -47,14 +47,14 @@ Inputs: the claim and the customer email from Stage 1.
 The customer email is the identity anchor from an untrusted ticket body: resolve it against production with `lookup_customer` (`found`, `user`, `memberships`, `pinnedOrganizationId`, `ambiguous`).
 
 - `error` set: the lookup could not run (`unavailable`), not a missing customer.
-- `found` with empty `memberships`: no live workspace; ask for it, never scope to null.
+- `found` with empty `memberships`: no live workspace (`unavailable`); never scope to null.
 - `truncated`: partial list; say so before choosing.
 - One match: pin it.
-- `ambiguous`: pin the workspace the report is about (campaign, record, or timing says which) and name the others in the document; ask only when the choice changes the verdict and evidence cannot settle it.
-- `found` false or conflicting: say so, keep investigating other lanes, ask for the workspace. Never name-match in place of the email anchor.
-- Body `Workspace ID` equal to a membership `organizationId`: pin it over `pinnedOrganizationId`. Unlisted: `conflicted` (ask) only if `found` and not `truncated`, else `unavailable`; never scope to it.
+- `ambiguous`: pin the workspace the report is about (campaign, record, or timing says which) and name the others in the document. When evidence cannot settle it and the choice changes the verdict, take the unproven branch.
+- `found` false or conflicting: say so and keep investigating other lanes. Never name-match in place of the email anchor.
+- Body `Workspace ID` equal to a membership `organizationId`: pin it over `pinnedOrganizationId`. Unlisted: `conflicted` only if `found` and not `truncated`, else `unavailable`; never scope to it.
 
-Scope every later query to the pinned organization; nothing binds it. The email is the reporter; `Which lead?` names a record in it. Never attribute another org's data to them. Never end on only an identity question; report what was found.
+Scope every later query to the pinned organization; nothing binds it. The email is the reporter; `Which lead?` names a record in it. Never attribute another org's data to them. When identity is `unavailable` or `conflicted`, run every lane that does not need it, report what was found, and name the missing workspace or email in the closing reply as what would reopen it, never requesting it.
 
 Record identity as `resolved`, `conflicted`, or `unavailable`. Reopen it only when genuinely new evidence conflicts with that result.
 
@@ -62,7 +62,7 @@ Completion: identity has one explicit status, any pinned `organization_id` is re
 
 ## Stage 3: Check existing work and frame the investigation
 
-Purpose: avoid repeating settled work, spot continuations and duplicates, run the clarification gate, choose evidence lanes.
+Purpose: avoid repeating settled work, spot continuations and duplicates, choose evidence lanes.
 
 Inputs: the Stage 1 claim, the Stage 2 identity status, the complete issue, and current Linear state.
 
@@ -76,10 +76,6 @@ A Duplicate still gets Stage 5; say what is done. `find_related_issues` with `sc
 - `not_relevant`: move on.
 
 On `decided: false`, judge by outcome, not keywords.
-
-### Ask or proceed
-
-Load the clarify-with-requester skill and run Gate 1; asking never erases the evidence plan or parks the investigation.
 
 Completion: Foreman knows whether this is a continuation, a duplicate candidate, or a fresh investigation, and has an explicit evidence plan.
 

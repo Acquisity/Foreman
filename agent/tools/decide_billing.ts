@@ -43,7 +43,7 @@ export default defineTool({
       .min(1)
       .max(20_000)
       .describe(
-        "The completed investigation: the three systems of record with ids and amounts, where they diverge, the requester's account, and the answers to the clarifying questions."
+        "The completed investigation: the three systems of record with ids and amounts, where they diverge, the requester's account, and any facts the requester volunteered."
       ),
     sourceLabels: z
       .array(z.string().trim().min(1).max(120))

@@ -18,7 +18,7 @@ Inputs: the completed Stage 4 evidence record. Historical memory is analogy only
 
 ### Rehash the claim against the evidence
 
-The lanes are recorded, so the evidence is complete. Say plainly whether the evidence supports the claim, contradicts it, or leaves it unproven. Run Gate 2 (the stop-gate) before any verdict.
+The lanes are recorded, so the evidence is complete. Say plainly whether the evidence supports the claim, contradicts it, or leaves it unproven. A missing deciding fact takes the unproven branch, never a question.
 
 ### Find the unblock
 
@@ -158,7 +158,7 @@ Completion: the attended surface follows the canonical final-post stamp from `sl
 
 ## Follow-ups
 
-Answer follow-ups with the gathered evidence and keep internal detail in the document. Asking stops at clarify-with-requester's two-round cap: then close with the best answer and its reopen condition. A follow-up that corrects your conclusion is not one to close: handle it as a correction under Stage 7.
+Answer follow-ups from the gathered evidence. Every close names the fact that would reopen it. The requester's concrete evidence beats a hypothesis, and new specifics reopen a closed ticket. For a correction, or a fact landing after routing, handle it as a correction under Stage 7.
 
 ## Reporting reference
 

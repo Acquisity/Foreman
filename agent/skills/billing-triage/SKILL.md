@@ -10,10 +10,10 @@ How to investigate a money ask and leave a proposal a human can act on. The agen
 
 Jev decides whether this ticket is a **money** ask or a **product** ask: after reading the issue text and comments (Step 1), call `classify_ask` once, or reuse its answer when triage already called it. It also returns the bucket and the source labels.
 
-- If it is a money ask, continue with this skill. It replaces triage-investigate and triage-handling for this ticket: their identity, classification, memory, and routing rules no longer apply. clarify-with-requester and slack-wording still do.
+- If it is a money ask, continue with this skill. It replaces triage-investigate and triage-handling for this ticket: their identity, classification, memory, and routing rules no longer apply. slack-wording still does.
 - If it is a product ask, hand it to triage-investigate instead, which then governs.
 - If the ask is money but the ticket landed in a product channel (or vice versa), handle it where it landed. Say in one line which kind of ask it is, then run the procedure for that kind. That line is a sentence inside the reply, never its own post, and a Linear session has no channel to mismatch. Never cancel the ticket and never ask the requester to refile it; routing sets the project and labels from the evidence, so the channel it arrived in changes nothing.
-- If it answers `unclear`, ask one batched question to place it and keep reading what does not depend on the answer. When they answer, call `classify_ask` again with the report and their answer, and use its new bucket and source labels.
+- If it answers `unclear`, Jev is below its bar: follow its `leaning` (and its bucket when the leaning is money), write that assumption into the document, and continue. If the requester later volunteers an answer, call `classify_ask` again with the report and their answer, and use its new bucket and source labels.
 
 ## Step 1: Read the Linear issue
 
@@ -45,13 +45,12 @@ There is one credit pool. Autumn may surface lead credits and website credits un
 
 1. Step 1 issue read: read the full ticket and route every screenshot to the `vision` subagent.
 2. Step 0 classification: money vs product, from what Step 1 read. If the channel mismatches, say so in one sentence inside the reply and continue with the procedure for the ask's real kind.
-3. Identity gate: call `lookup_customer` with the customer email and pin `pinnedOrganizationId` before any other lookup. The pin scopes PlanetScale only; Autumn and Stripe are keyed by the billing account, read in step 5. A body `Workspace ID` equal to a membership `organizationId` is the pin; unlisted, run no customer-scoped read. If `ambiguous` is true, pick the workspace the evidence establishes and pin its membership `organizationId`, name the others in the document, and ask only when the choice changes the financial verdict and evidence cannot settle it. If `error` is set, the lookup could not run; say so rather than treating the customer as missing. If `found` is false with no `error`, or `memberships` is empty, no live workspace carries that email: run no customer-scoped read, do not call `decide_billing`, ask for the workspace or billing email, and end the turn.
+3. Identity gate: call `lookup_customer` with the customer email and pin `pinnedOrganizationId` before any other lookup. The pin scopes PlanetScale only; Autumn and Stripe are keyed by the billing account, read in step 5. A body `Workspace ID` equal to a membership `organizationId` is the pin; unlisted, run no customer-scoped read. If `ambiguous` is true, pick the workspace the evidence establishes and pin its membership `organizationId`, name the others in the document. When evidence cannot settle it and the choice changes the financial verdict, name that missing fact in the evidence you pass to `decide_billing`, which leaves it `needs-human`. If `error` is set, the lookup could not run; say so rather than treating the customer as missing. If `found` is false with no `error`, or `memberships` is empty, no live workspace carries that email: run no customer-scoped read, do not call `decide_billing`, name the missing workspace or billing email in the closing reply as what would reopen it, and end the turn.
 4. Approval trail: every ticket comment, including the requester's replies under "Slack thread connected in", plus the thread history a Slack session supplies. There is no Slack read tool, so what is in neither cannot be fetched. Quote any prior approval or promise verbatim. Pass it to `decide_billing` as `approvalQuote` only when it predates the current thread; an approval found only in the current thread is quoted in the document but passed as null, which makes the discretion `needs-human`. When the trail is absent, say so. Never assume an approval exists.
 5. Systems of record: read each one named below. Read-only everywhere.
-6. Clarifying questions: batched, before any verdict, within clarify-with-requester's two-round cap. This is its Gate 2; Gate 1 is the Step 0 `unclear` question and the identity question. Keep reading what does not depend on the answer.
-7. Verdict: gather evidence for each of the seven checklist items, then call `decide_billing` with the completed evidence, the bucket, the approval quote or null, and the source labels. It settles the discretion note and the justification checklist; record them as it returns them, with its notes and its `unconfirmed` list unchanged.
-8. Document: the full investigation, attached to the ticket.
-9. Comment: a short human-readable `## Refund investigation` comment on the ticket. In a Linear session the requester also gets one `reply_to_requester` message; the comment is not that message.
+6. Verdict: gather evidence for each of the seven checklist items, then call `decide_billing` with the completed evidence, the bucket, the approval quote or null, and the source labels. It settles the discretion note and the justification checklist; record them as it returns them, with its notes and its `unconfirmed` list unchanged.
+7. Document: the full investigation, attached to the ticket.
+8. Comment: a short human-readable `## Refund investigation` comment on the ticket. In a Linear session the requester also gets one `reply_to_requester` message; the comment is not that message.
 
 ## Systems of record
 
@@ -101,16 +100,6 @@ This stays an explanation, never a fix. Billing triage proposes money decisions,
 ## Provider governance — Autumn vs Whop
 
 `read_billing_account` returns `organization.partnerId`, `organization.partnerGoverned`, and `billingAccount.provider`. Route on `partnerGoverned`, never on the provider alone and never on `partnerId` being non-null: native Acquisity organizations carry the default partner id `00000000-0000-0000-0000-000000000001`, which is not a partner. `partnerGoverned` true means a partner owns the account, whatever the provider says.
-
-## Clarifying questions per type
-
-- **refund**: what was charged, when, and what the requester expected instead; whether the charge was for a renewal they did not intend.
-- **overcharged**: the amount charged vs the amount expected, and which plan/add-on they believe they are on.
-- **coupon_code**: the code, where it was entered, and the error or silence they saw.
-- **credits**: the balance they expected vs the balance shown, how many they believe were consumed, and the action that should have credited or debited them.
-- **stripe_credit**: which subscription or upcoming charge should be covered, the amount, and whether they would rather have the money back than have it applied.
-
-Ask only the facts the systems of record did not already settle, at most three. Each question names the fact it discriminates. Batch them into one message, keep reading what does not depend on the answer, and withhold only `decide_billing`, routing, and the closing reply.
 
 ## Justification checklist (7 items)
 
@@ -204,7 +193,7 @@ Anything worth a separate ticket, kept out of this refund decision.
 
 ## Requester reply
 
-At most two things reach the requester on a financial ticket, one message each: the batched clarifying questions, if any, and one closing reply. A channel-mismatch note is one sentence inside the first of them. In a Linear session each goes through `reply_to_requester`; in a Slack session it is the thread message. A follow-up whose only ask is to move the ticket to a status (done, complete, close, cancel) means a person already finished the work: move it with `route_ticket`, confirm in one line, and stop, with no re-verification, decision tool, document change, or critic. If it also asks a question or asks you to check something, handle that normally.
+One message reaches the requester on a financial ticket: the closing reply, which carries its reopen condition, the one fact that would reopen it. Never ask the requester for a fact; a missing one is a stated assumption in the document. A channel-mismatch note is one sentence inside the closing reply. In a Linear session it goes through `reply_to_requester`; in a Slack session it is the thread message. A requester's concrete evidence beats a working hypothesis, new specifics they volunteer reopen a closed ticket, and a fact that lands after routing means calling `decide_billing` again and re-routing. A follow-up whose only ask is to move the ticket to a status (done, complete, close, cancel) means a person already finished the work: move it with `route_ticket`, confirm in one line, and stop, with no re-verification, decision tool, document change, or critic. If it also asks a question or asks you to check something, handle that normally.
 
 The closing reply says what happened and what happens next, and by whom, in two or three plain sentences: never a promise to move money, and never Stripe, Autumn, or billing systems by name.
 
