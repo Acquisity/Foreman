@@ -1,5 +1,5 @@
 ---
-description: "Refund, overcharge, coupon, lead-credit, and website-credit investigation — classify the predominant ask, verify against the systems of record, ask the justification questions before any verdict, and leave a proposal on Linear. Never moves money. Load for any ticket about refunds, credits, coupons, charges, subscriptions, invoices, or plans."
+description: "Refund, overcharge, coupon, lead-credit, and website-credit investigation: classify the predominant ask, verify against the systems of record, check the justification before any verdict, and leave a proposal on Linear. Never moves money. Load for any ticket about refunds, credits, coupons, charges, subscriptions, invoices, or plans."
 ---
 
 # Billing triage
@@ -35,7 +35,7 @@ No tool can issue, schedule, or promise a refund or credit. Stripe and Autumn lo
 - `credits`
 - `stripe_credit`
 
-`stripe_credit` puts money on the Stripe customer balance so it comes off future invoices. It is the usual remedy when the customer is staying: an existing Acquisity subscription, or domains and inboxes they are keeping, and they want the cost covered rather than money returned. It needs something to apply against, so with no active subscription the credit sits unspent and a refund is the honest remedy instead. Ask which the requester wants when both would work; the money is the same and where it lands is not. When their answer changes the outcome they want, call `classify_ask` again with the report plus that answer and use its new bucket and labels.
+`stripe_credit` puts money on the Stripe customer balance so it comes off future invoices. When the preference is missing, pick the bucket the evidence supports: `stripe_credit` when the customer is staying and has a subscription, domains, or inboxes to apply it against, otherwise `refund`. Write that choice as an assumption in the document and name the preference as the reopen condition; when the preference alone decides the outcome, it is `needs-human`. If the requester later volunteers a different outcome, call `classify_ask` again with the report and that fact, and use its new bucket and labels.
 
 `stripe_credit` and `credits` share a word and nothing else. `credits` is the product feature balance in Autumn that is spent inside the app. `stripe_credit` is money against an invoice. Never satisfy one by granting the other.
 
