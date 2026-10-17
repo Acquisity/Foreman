@@ -2672,6 +2672,31 @@ test("after hours, a blocked reply stays blocked with no away line", async () =>
   assert.equal(run.outcome?.reason, "model_gate:unsafe");
 });
 
+test("after hours, a handoff reply gets no away line and keeps reason needs_human", async () => {
+  const { deps, run } = dependencies({ ...allowed, reason: "needs_human" });
+  const { fileTicket } = ticketFiler(true);
+  run.scope = { ...scope, officeHours: closedHours };
+  // A persisted receipt would otherwise add the back-at line.
+  run.findings = {
+    ticketReceipt: {
+      existing: false,
+      identifier: "ENG-42",
+      refund: false,
+      url: "https://linear.app/acquisity/issue/ENG-42/support",
+    },
+  };
+  deps.extract = () => Promise.resolve({ ...findings, needsHuman: true });
+  deps.fileTicket = fileTicket;
+  await finishWidgetRun(
+    run,
+    "widget-session-away",
+    { findings: null, status: "completed", text: "Needs a person." },
+    deps
+  );
+  assert.equal(run.outcome?.message, allowed.message);
+  assert.equal(run.outcome?.reason, "needs_human");
+});
+
 test("after hours, a toggled ask for a person files the ticket and still investigates", async (t) => {
   enabled(t);
   const { deps, run } = dependencies();

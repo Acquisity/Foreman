@@ -320,22 +320,47 @@ test("a claim with no evidence reference is judged by the model gate, not blocke
   assert.equal(calls.judge.length, 1);
 });
 
-test("a reviewed handoff with useful findings skips the composer and keeps them; a normal answer still composes", async () => {
+test("a reviewed handoff with useful findings is composed as a handoff reply", async () => {
   const { calls, deps: d } = deps();
   const raw = findings({ needsHuman: true });
   const result = await gate(scope, question, raw, d);
+  assert.deepEqual([result.decision, result.reason], ["allow", "needs_human"]);
+  assert.match(result.message ?? "", RECONNECT);
+  assert.deepEqual(result.findings, raw);
+  assert.equal(calls.judge.length, 1);
+  const [composed] = calls.compose as { handoff?: boolean }[];
+  assert.equal(composed.handoff, true);
+  const answered = await gate(scope, question, findings(), d);
+  assert.equal(answered.reason, "in scope");
+  assert.equal((calls.compose as { handoff?: boolean }[])[1].handoff, false);
+});
+
+test("a handoff whose reply cannot be composed still hands off as needs_human", async () => {
+  const { deps: d } = deps({ compose: () => Promise.resolve("") });
+  const result = await gate(scope, question, findings({ needsHuman: true }), d);
   assert.deepEqual(
     [result.decision, result.reason, result.message],
     ["block", "needs_human", null]
   );
-  assert.deepEqual(result.findings, raw);
-  // The safety review still ran; only the discarded reply was skipped.
-  assert.equal(calls.judge.length, 1);
+});
+
+test("a handoff the rewrite leaves without facts hands off with no reply", async () => {
+  const { calls, deps: d } = deps({
+    judge: (input) =>
+      Promise.resolve({
+        decision: "rewrite",
+        reason: "facts concern another workspace",
+        remove: input.items
+          .filter((item) => item.kind === "fact")
+          .map((item) => item.n),
+      }),
+  });
+  const result = await gate(scope, question, findings({ needsHuman: true }), d);
+  assert.deepEqual(
+    [result.decision, result.reason, result.message],
+    ["block", "needs_human", null]
+  );
   assert.equal(calls.compose.length, 0);
-  const answered = await gate(scope, question, findings(), d);
-  assert.equal(answered.decision, "allow");
-  assert.match(answered.message ?? "", RECONNECT);
-  assert.equal(calls.compose.length, 1);
 });
 
 test("a handoff the reviewer blocks keeps the reviewer's reason", async () => {
@@ -668,7 +693,7 @@ test("a source file named in a website fix is not a domain; a real unowned domai
   );
 });
 
-test("a billing review keeps its verified facts and open questions for the teammate, and repurchase advice never reaches the composer", async () => {
+test("a billing review composes from the reviewed findings, and repurchase advice never reaches the composer", async () => {
   const raw = findings({
     needsHuman: true,
     recommendation:
@@ -685,9 +710,12 @@ test("a billing review keeps its verified facts and open questions for the teamm
       }),
   });
   const result = await gate(scope, question, raw, d);
-  assert.equal(result.reason, "needs_human");
-  assert.deepEqual(result.findings, raw);
-  assert.equal(calls.compose.length, 0);
+  assert.deepEqual(
+    [result.decision, result.reason],
+    ["rewrite", "needs_human"]
+  );
+  assert.equal(result.findings.facts.length, raw.facts.length);
+  assert.equal(calls.compose.length, 1);
   assert.equal(JSON.stringify(calls.compose).includes("fresh domain"), false);
 });
 
@@ -1197,6 +1225,28 @@ test("an unfiled ticket claim is recomposed once with the correction", async () 
   assert.match(result.message ?? "", RECONNECT);
   assert.equal(calls.compose.length, 2);
   assert.ok(corrections(calls)[1]?.includes("No ticket was filed"));
+});
+
+test("a handoff reply that announces the handoff itself is recomposed", async () => {
+  const { calls, d } = claimingDeps([
+    "I've asked for a person to take over. Your campaign paused because its inbox disconnected.",
+    "Your campaign paused because its inbox disconnected. A teammate will take up your request.",
+  ]);
+  const result = await gate(scope, question, findings({ needsHuman: true }), d);
+  assert.equal(result.reason, "needs_human");
+  assert.equal(result.message?.includes("asked for a person"), false);
+  assert.equal(result.message?.includes("A teammate will take up"), true);
+  assert.equal(calls.compose.length, 2);
+});
+
+test("a simple past handoff announcement is recomposed too", async () => {
+  const { calls, d } = claimingDeps([
+    "I asked a teammate to take over. Your campaign paused because its inbox disconnected.",
+    "Your campaign paused because its inbox disconnected. A teammate will take up your request.",
+  ]);
+  const result = await gate(scope, question, findings({ needsHuman: true }), d);
+  assert.equal(result.message?.includes("I asked a teammate"), false);
+  assert.equal(calls.compose.length, 2);
 });
 
 test("a claim the recompose repeats is deleted, and a conditional promise stays", async () => {
