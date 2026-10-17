@@ -92,6 +92,7 @@ jobs:
           CLIPROXY_API_KEY: ${{ secrets.CLIPROXY_API_KEY }}
         run: pnpm widget:guide --repo acquisity --ref HEAD $FULL | tee "$RUNNER_TEMP/guide.log"
       - name: Open or update the PR
+        id: pr
         env:
           GH_TOKEN: ${{ secrets.WIDGET_GUIDE_TOKEN }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
@@ -100,6 +101,11 @@ jobs:
             unchanged=$(pnpm exec tsx --eval 'import { readFileSync } from "node:fs"; import { guideArtifactsEqual } from "./agent/lib/widget-guide-cache.ts"; const before = { guide: readFileSync(`${process.env.RUNNER_TEMP}/bot-guide.ts`, "utf8"), cache: readFileSync(`${process.env.RUNNER_TEMP}/bot-cache.json`, "utf8") }; const after = { guide: readFileSync("agent/lib/widget-product-guide.ts", "utf8"), cache: readFileSync("scripts/widget-product-guide.cache.json", "utf8") }; console.log(guideArtifactsEqual(before, after));')
             if [[ "$unchanged" == true ]]; then
               echo "Pending guide and cache unchanged; no commit or push."
+              number=$(gh api "repos/$GITHUB_REPOSITORY/pulls?head=$GITHUB_REPOSITORY_OWNER:bot/widget-guide&state=open" --jq '.[0].number // empty')
+              if [ -n "$number" ]; then
+                echo "number=$number" >> "$GITHUB_OUTPUT"
+                echo "sha=$(git rev-parse origin/bot/widget-guide)" >> "$GITHUB_OUTPUT"
+              fi
               exit 0
             fi
           fi
@@ -130,11 +136,31 @@ jobs:
 
           If this change touched the sidebar catalog or apps/web/lib/features.ts, check the hardcoded facts at the top of scripts/widget-product-guide.ts (AVAILABILITY, ENTRY_POINTS) in the app; this workflow cannot verify them.
 
-          Review and merge by hand; nothing merges this automatically.
+          This workflow merges this PR itself once pnpm validate passes on the regenerated guide. If it is still open, validate or the merge failed: see the run.
           EOF_BODY
           number=$(gh api "repos/$GITHUB_REPOSITORY/pulls?head=$GITHUB_REPOSITORY_OWNER:bot/widget-guide&state=open" --jq '.[0].number // empty')
           if [ -n "$number" ]; then
             gh api -X PATCH "repos/$GITHUB_REPOSITORY/pulls/$number" -f title="$title" -F body=@"$RUNNER_TEMP/body.md" --jq .html_url
           else
-            gh api -X POST "repos/$GITHUB_REPOSITORY/pulls" -f title="$title" -f head=bot/widget-guide -f base=main -F body=@"$RUNNER_TEMP/body.md" --jq .html_url
+            number=$(gh api -X POST "repos/$GITHUB_REPOSITORY/pulls" -f title="$title" -f head=bot/widget-guide -f base=main -F body=@"$RUNNER_TEMP/body.md" --jq .number)
           fi
+          echo "number=$number" >> "$GITHUB_OUTPUT"
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+      # Same placeholders as validate.yml; no secret is in scope while validate runs.
+      - name: Validate the regenerated guide
+        if: steps.pr.outputs.number != ''
+        env:
+          EXECUTOR_MCP_CONNECTOR: placeholder/foreman-ci
+          LINEAR_CONNECTOR: placeholder/foreman-ci
+        run: |
+          rm -rf acquisity
+          pnpm validate
+      - name: Merge the PR
+        if: steps.pr.outputs.number != ''
+        env:
+          GH_TOKEN: ${{ secrets.WIDGET_GUIDE_TOKEN }}
+          NUMBER: ${{ steps.pr.outputs.number }}
+          HEAD_SHA: ${{ steps.pr.outputs.sha }}
+        run: |
+          gh api -X PUT "repos/$GITHUB_REPOSITORY/pulls/$NUMBER/merge" -f merge_method=squash -f sha="$HEAD_SHA" --jq .message
+          gh api -X DELETE "repos/$GITHUB_REPOSITORY/git/refs/heads/bot/widget-guide"
