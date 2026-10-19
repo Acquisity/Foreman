@@ -7,6 +7,7 @@ import {
   countedGuideAttempt,
   guideArtifactsEqual,
   guideCallKey,
+  guideLimitsCitations,
   joinGuideLimits,
   parseGuideCache,
   splitGuideLimits,
@@ -217,5 +218,15 @@ test("summary lines go to the first article they cite, so a rerun keeps the othe
       [limits.get("a"), limits.get("b")].filter((l) => l !== undefined)
     ),
     "## Who can do what\n\n- Members view settings {a}.\n- Only owners bill {slug: b} {slug: a}.\n\n## What Acquisity cannot do\n\n- No undo {slug: a}."
+  );
+});
+
+test("a stored summary lists every article its lines cite", () => {
+  assert.deepEqual(
+    guideLimitsCitations({
+      cannot: ["- No undo {a}."],
+      who: ["- Only owners bill {slug: b} {slug: a}."],
+    }),
+    ["b", "a", "a"]
   );
 });

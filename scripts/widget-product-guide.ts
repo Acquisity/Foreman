@@ -39,6 +39,7 @@ import {
   type GuideLimits,
   guideArtifactsEqual,
   guideCallKey,
+  guideLimitsCitations,
   joinGuideLimits,
   parseGuideCache,
   splitGuideLimits,
@@ -555,6 +556,15 @@ const stale = slugs.filter((slug) => {
   }
   return text === undefined;
 });
+// A stored line that also cites a changed article is written again with it.
+const changedSlugs = new Set(stale);
+for (const [slug, summary] of summarised) {
+  if (guideLimitsCitations(summary).some((cited) => changedSlugs.has(cited))) {
+    summarised.delete(slug);
+    stale.push(slug);
+  }
+}
+stale.sort((a, b) => slugs.indexOf(a) - slugs.indexOf(b));
 let limitsFresh = false;
 if (stale.length) {
   const whole = stale.length === slugs.length;

@@ -143,6 +143,12 @@ export function splitGuideLimits(
   return { dropped, limits };
 }
 
+/** Every article an article's summary lines cite, its own included. */
+export const guideLimitsCitations = (limits: GuideLimits): string[] =>
+  [...limits.who, ...limits.cannot].flatMap((line) =>
+    [...line.matchAll(CITED)].map((m) => m[1].trim())
+  );
+
 /** The summary's two sections, lines in article order. */
 export const joinGuideLimits = (limits: readonly GuideLimits[]): string =>
   `${WHO}\n\n${limits.flatMap((l) => l.who).join("\n")}\n\n${CANNOT}\n\n${limits.flatMap((l) => l.cannot).join("\n")}`;
