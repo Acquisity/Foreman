@@ -80,3 +80,69 @@ export async function checkedGuideCall<
     }
   }
 }
+
+const SECTION_HEAD = /^### .+ \{slug: ([^}\n]+)\}$/u;
+
+/** A distilled batch split into each article's own section, by its heading. */
+export function splitGuideSections(text: string): Map<string, string> {
+  const sections = new Map<string, string[]>();
+  let current: string[] | undefined;
+  for (const line of text.split("\n")) {
+    const slug = SECTION_HEAD.exec(line)?.[1];
+    if (slug) {
+      current = [];
+      sections.set(slug, current);
+    }
+    current?.push(line);
+  }
+  return new Map(
+    [...sections].map(([slug, lines]) => [slug, lines.join("\n").trim()])
+  );
+}
+
+const WHO = "## Who can do what";
+const CANNOT = "## What Acquisity cannot do";
+const CITED = /\{(?:slug: )?([^}\n]+)\}/gu;
+
+export interface GuideLimits {
+  cannot: string[];
+  who: string[];
+}
+
+/**
+ * The role and limit summary split by article: each line goes to the first
+ * article it cites among `slugs`, so a rerun only rewrites the lines of the
+ * articles that changed. A line citing none of them is returned in `dropped`.
+ */
+export function splitGuideLimits(
+  text: string,
+  slugs: readonly string[]
+): { dropped: string[]; limits: Map<string, GuideLimits> } {
+  const known = new Set(slugs);
+  const limits = new Map(
+    slugs.map((slug) => [slug, { cannot: [], who: [] } as GuideLimits])
+  );
+  const dropped: string[] = [];
+  let part: keyof GuideLimits | undefined;
+  for (const line of text.split("\n")) {
+    if (line.trim() === WHO) {
+      part = "who";
+    } else if (line.trim() === CANNOT) {
+      part = "cannot";
+    } else if (part && line.startsWith("- ")) {
+      const slug = [...line.matchAll(CITED)]
+        .map((m) => m[1].trim())
+        .find((cited) => known.has(cited));
+      if (slug) {
+        limits.get(slug)?.[part].push(line);
+      } else {
+        dropped.push(line);
+      }
+    }
+  }
+  return { dropped, limits };
+}
+
+/** The summary's two sections, lines in article order. */
+export const joinGuideLimits = (limits: readonly GuideLimits[]): string =>
+  `${WHO}\n\n${limits.flatMap((l) => l.who).join("\n")}\n\n${CANNOT}\n\n${limits.flatMap((l) => l.cannot).join("\n")}`;
