@@ -7,7 +7,11 @@ import {
   countedGuideAttempt,
   guideArtifactsEqual,
   guideCallKey,
+  guideLimitsCitations,
+  joinGuideLimits,
   parseGuideCache,
+  splitGuideLimits,
+  splitGuideSections,
 } from "./widget-guide-cache.js";
 
 const FAILED_BATCH =
@@ -172,4 +176,57 @@ test("model attempt counts include failures and successful calls count resolved 
     (text) => text
   );
   assert.deepEqual(stats, { attempts: 3, successfulCalls: 1 });
+});
+
+test("a distilled batch splits into one section per article heading", () => {
+  const sections = splitGuideSections(
+    "preamble\n### A {slug: a}\nGet here: x\n- one\n\n### B {slug: b/c}\n- two\n"
+  );
+  assert.deepEqual(
+    [...sections],
+    [
+      ["a", "### A {slug: a}\nGet here: x\n- one"],
+      ["b/c", "### B {slug: b/c}\n- two"],
+    ]
+  );
+});
+
+test("summary lines go to the first article they cite, so a rerun keeps the others", () => {
+  const text = [
+    "## Who can do what",
+    "",
+    "- Only owners bill {slug: b} {slug: a}.",
+    "- Members view settings {a}.",
+    "- Nobody here {z}.",
+    "",
+    "## What Acquisity cannot do",
+    "",
+    "- No undo {slug: a}.",
+  ].join("\n");
+  const { dropped, limits } = splitGuideLimits(text, ["a", "b"]);
+  assert.deepEqual(dropped, ["- Nobody here {z}."]);
+  assert.deepEqual(limits.get("a"), {
+    cannot: ["- No undo {slug: a}."],
+    who: ["- Members view settings {a}."],
+  });
+  assert.deepEqual(limits.get("b"), {
+    cannot: [],
+    who: ["- Only owners bill {slug: b} {slug: a}."],
+  });
+  assert.equal(
+    joinGuideLimits(
+      [limits.get("a"), limits.get("b")].filter((l) => l !== undefined)
+    ),
+    "## Who can do what\n\n- Members view settings {a}.\n- Only owners bill {slug: b} {slug: a}.\n\n## What Acquisity cannot do\n\n- No undo {slug: a}."
+  );
+});
+
+test("a stored summary lists every article its lines cite", () => {
+  assert.deepEqual(
+    guideLimitsCitations({
+      cannot: ["- No undo {a}."],
+      who: ["- Only owners bill {slug: b} {slug: a}."],
+    }),
+    ["b", "a", "a"]
+  );
 });

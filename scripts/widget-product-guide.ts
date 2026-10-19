@@ -36,9 +36,14 @@ import {
   cachedGuideText,
   checkedGuideCall,
   countedGuideAttempt,
+  type GuideLimits,
   guideArtifactsEqual,
   guideCallKey,
+  guideLimitsCitations,
+  joinGuideLimits,
   parseGuideCache,
+  splitGuideLimits,
+  splitGuideSections,
 } from "../agent/lib/widget-guide-cache.js";
 import { guideSourcePath } from "../agent/lib/widget-guide-source.js";
 import {
@@ -281,22 +286,6 @@ const articles: Article[] = order(root).map((path) => {
 
 const available = articles;
 
-/** Consecutive articles of one section, up to BATCH_CHARS each. */
-const batches: Article[][] = [];
-for (const article of available) {
-  const last = batches.at(-1);
-  const size = (last ?? []).reduce((sum, a) => sum + a.text.length, 0);
-  if (
-    last &&
-    last[0].section === article.section &&
-    size + article.text.length <= BATCH_CHARS
-  ) {
-    last.push(article);
-  } else {
-    batches.push([article]);
-  }
-}
-
 const DISTILL_PROMPT = `You turn Acquisity help-center articles into sections of a compact product guide. A support chatbot will answer customers from this guide alone, so it must keep every fact a customer could need and drop everything else.
 
 Cover every article in the batch, in order. For each article write a heading line exactly like this, using the article's own title and slug as given:
@@ -394,10 +383,44 @@ const relink = (text: string) =>
       : `{slug: ${matches[0]}}`;
   });
 
+/**
+ * Each article's section is stored under a key of its own inputs, so a rerun
+ * distills only the articles that changed and leaves every other section as
+ * it was, word for word.
+ */
+const articleKey = (a: Article) =>
+  guideCallKey(MODEL, DISTILL_PROMPT, SIDEBAR, a.title, a.slug, a.text);
+const distilled = new Map<string, string>();
+const pending = available.filter((a) => {
+  const text = cachedGuideText(
+    productGuideCache,
+    articleKey(a),
+    values.full ?? false
+  );
+  if (text !== undefined) {
+    distilled.set(a.slug, text);
+  }
+  return text === undefined;
+});
+
+/** Consecutive pending articles of one section, up to BATCH_CHARS each. */
+const batches: Article[][] = [];
+for (const article of pending) {
+  const last = batches.at(-1);
+  const size = (last ?? []).reduce((sum, a) => sum + a.text.length, 0);
+  if (
+    last &&
+    last[0].section === article.section &&
+    size + article.text.length <= BATCH_CHARS
+  ) {
+    last.push(article);
+  } else {
+    batches.push([article]);
+  }
+}
+
 const startedAt = Date.now();
-const sections: string[] = new Array(batches.length);
-const keys: string[] = new Array(batches.length);
-const fresh: boolean[] = new Array(batches.length);
+const rewritten: string[] = [];
 let next = 0;
 await Promise.all(
   Array.from({ length: CONCURRENCY }, async () => {
@@ -433,17 +456,18 @@ await Promise.all(
           return repaired;
         }
       );
-      sections[index] = out.text;
-      keys[index] = out.key;
-      fresh[index] = out.fresh;
+      for (const [slug, section] of splitGuideSections(out.text)) {
+        distilled.set(slug, section);
+      }
       if (out.fresh) {
+        rewritten.push(...batch.map((a) => a.slug));
         console.log(`batch ${index + 1}/${batches.length} ${batch[0].slug}`);
       }
     }
   })
 );
 
-const linked = sections.join("\n\n");
+const linked = slugs.map((slug) => distilled.get(slug)).join("\n\n");
 /**
  * Each section keeps its own "Get here:" line when it is a usable path: it
  * quotes at least one label, every quoted label appears in the article or the
@@ -511,23 +535,84 @@ const headed = new Set(
   [...body.matchAll(/^#{2,4} .*\{slug: ([^}]+)\}/gmu)].map((m) => m[1])
 );
 assertGuideSections(body, slugs);
-const limitsCall = await checkedGuideCall(
-  "role and limit summary",
-  BATCH_TRIES,
-  () => call(LIMITS_PROMPT, body, 8000, NAV_MODEL),
-  (text) => text
-);
-const limits = limitsCall.text;
-for (const [index, key] of keys.entries()) {
-  cache.set(key, sections[index]);
+/**
+ * The role and limit summary is stored per article as well, under that
+ * article's finished section, so only the lines of changed sections are
+ * written again. With nothing stored (a first run or --full) the whole guide
+ * goes in one call.
+ */
+const finished = splitGuideSections(body);
+const limitsKey = (slug: string) =>
+  guideCallKey(NAV_MODEL, LIMITS_PROMPT, finished.get(slug) ?? "");
+const summarised = new Map<string, GuideLimits>();
+const stale = slugs.filter((slug) => {
+  const text = cachedGuideText(
+    productGuideCache,
+    limitsKey(slug),
+    values.full ?? false
+  );
+  if (text !== undefined) {
+    summarised.set(slug, JSON.parse(text));
+  }
+  return text === undefined;
+});
+// A stored line that also cites a changed article is written again with it.
+const changedSlugs = new Set(stale);
+for (const [slug, summary] of summarised) {
+  if (guideLimitsCitations(summary).some((cited) => changedSlugs.has(cited))) {
+    summarised.delete(slug);
+    stale.push(slug);
+  }
 }
-cache.set(limitsCall.key, limits);
+stale.sort((a, b) => slugs.indexOf(a) - slugs.indexOf(b));
+let limitsFresh = false;
+if (stale.length) {
+  const whole = stale.length === slugs.length;
+  const limitsCall = await checkedGuideCall(
+    "role and limit summary",
+    BATCH_TRIES,
+    () =>
+      call(
+        whole
+          ? LIMITS_PROMPT
+          : LIMITS_PROMPT.replace(
+              "About 2,000 words in total.",
+              "Write nothing for an article that states no role limit or unsupported thing."
+            ),
+        whole ? body : stale.map((slug) => finished.get(slug)).join("\n\n"),
+        8000,
+        NAV_MODEL
+      ),
+    (text) => {
+      if (!text.startsWith("## Who can do what")) {
+        throw new Error('summary does not start with "## Who can do what"');
+      }
+      return text;
+    }
+  );
+  limitsFresh = limitsCall.fresh;
+  const { dropped: uncited, limits } = splitGuideLimits(limitsCall.text, stale);
+  for (const line of uncited) {
+    console.log(`  summary line cites no summarised article: ${line}`);
+  }
+  for (const [slug, summary] of limits) {
+    summarised.set(slug, summary);
+  }
+}
+const limits = joinGuideLimits(
+  slugs.map((slug) => summarised.get(slug) ?? { cannot: [], who: [] })
+);
+for (const article of available) {
+  cache.set(articleKey(article), distilled.get(article.slug) ?? "");
+}
+for (const slug of slugs) {
+  cache.set(limitsKey(slug), JSON.stringify(summarised.get(slug)));
+}
 const regenerated = [
-  ...batches
-    .filter((_, index) => fresh[index])
-    .flat()
-    .map((a) => a.slug),
-  ...(limitsCall.fresh ? ["(role and limit summary)"] : []),
+  ...rewritten,
+  ...(limitsFresh
+    ? [`(role and limit summary, ${stale.length} articles)`]
+    : []),
 ];
 const availability = AVAILABILITY.map((line) => `- ${line}`).join("\n");
 const guide = `# Acquisity product guide

@@ -783,54 +783,54 @@ Each article below opens with "Get here:", the path to the page it describes.
 ## Who can do what
 
 - Owners and Admins can delete campaigns via the row three-dot menu, while other roles cannot {slug: cold-email-agent/faq/campaigns/how-do-i-find-the-campaign-delete-menu}.
-- Owners and Admins can rename a workspace from the general settings page, while other roles cannot {slug: workspace-settings/faq/workspace-management/how-do-i-rename-a-workspace}.
+- Client roles can only access the AI SDR if the white-label partner has enabled it for their workspace {slug: ai-sdr}.
+- Owner, Admin, and Member roles have full access to the Sales Call Analyzer, whereas Client roles have no access to this tool {slug: sales-call-analyzer/faq/can-my-team-members-access-sales-call-analyzer}.
+- Owners and Admins can edit workspace settings, Members can only view them, and Client users cannot see workspace settings at all {slug: workspace-settings}.
 - Owners and Admins can invite team members to a workspace, change member roles, or remove members, while other roles cannot {slug: workspace-settings/members}.
 - Owners can view the Billing page, cancel subscriptions, and view combined credit balances, while Admins, Members, and Clients cannot {slug: workspace-settings/billing}.
-- Owners and Admins can edit workspace settings, Members can only view them, and Client users cannot see workspace settings at all {slug: workspace-settings}.
-- Owner, Admin, and Member roles have full access to the Sales Call Analyzer, whereas Client roles have no access to this tool {slug: sales-call-analyzer/faq/can-my-team-members-access-sales-call-analyzer}.
-- Clients cannot see or access the "Feedback" menu or the support chat bubble, while Owners, Admins, and Members can {slug: support}.
+- Owners and Admins can rename a workspace from the general settings page, while other roles cannot {slug: workspace-settings/faq/workspace-management/how-do-i-rename-a-workspace}.
 - Clients cannot see or access any cards in the Resources section, while Owners, Admins, and Members can {slug: resources}.
-- Client roles can only access the AI SDR if the white-label partner has enabled it for their workspace {slug: ai-sdr}.
+- Clients cannot see or access the "Feedback" menu or the support chat bubble, while Owners, Admins, and Members can {slug: support}.
 
 ## What Acquisity cannot do
 
+- The CRM cannot automatically delete or sync meeting appointments with external calendar systems once deleted in the CRM, without notifying the attendee {slug: crm/faq/can-i-delete-appointments-from-the-crm}.
 - Acquisity cannot natively sync or integrate with GoHighLevel CRM {slug: crm/faq/does-acquisity-integrate-with-gohighlevel-ghl-crm}.
-- Acquisity cannot natively sync or connect with external applications like Zapier, Slack, Claude, or other third-party CRMs {slug: account-settings/faq/can-i-connect-acquisity-to-claude-zapier-slack-or-ghl}.
-- Acquisity cannot swap out its built-in AI models for external or custom models {slug: account-settings/faq/can-i-connect-acquisity-to-claude-zapier-slack-or-ghl}.
+- The AI SDR cannot automatically update CRM deal stages based on conversational events {slug: crm/faq/does-the-ai-sdr-update-crm-deal-stages-automatically}.
+- The CRM does not support the bulk deletion of deals or any undo actions on deleted records {slug: crm/faq/how-do-i-reset-my-crm-pipeline-delete-deals}.
 - The AI Consultant cannot directly build systems, run campaigns, or send emails for you {slug: ai-consultant/faq/what-can-the-ai-consultant-do-vs-what-should-i-ask-support}.
 - The Offer Creator cannot generate proposals directly from offers {slug: offer-creator/faq/can-i-create-proposals-from-offers}.
 - The Offer Creator cannot connect to or set up payment processing {slug: offer-creator/faq/does-it-connect-to-payment-processing}.
 - The Cold Email Agent wizard cannot generate or launch campaigns using the Masterclass email method {slug: cold-email-agent/campaigns/create-a-campaign}.
 - The Cold Email Agent does not support connecting existing external email accounts as a self-service option {slug: cold-email-agent/email-accounts/buying-inboxes}.
 - The Cold Email Agent does not support purchasing or configuring more than 3 inboxes per registered domain {slug: cold-email-agent/email-accounts/buying-inboxes}.
-- The Cold Email Agent does not have a user-configurable setting to adjust or raise the daily limit of 35 campaign emails per inbox {slug: cold-email-agent/faq/campaigns/how-do-i-cap-per-inbox-email-volume-across-campaigns}.
 - The Cold Email Agent does not allow users to manually set or edit custom DNS records on platform-managed domains {slug: cold-email-agent/email-accounts/domain-provisioning}.
 - The Cold Email Agent does not support redirecting or forwarding domains to any address that does not use the HTTPS protocol {slug: cold-email-agent/email-accounts/domain-forwarding}.
 - The Cold Email Agent cannot automatically resume campaigns that have been paused by the system for safety or high bounce reasons {slug: cold-email-agent/concepts/campaign-states}.
-- The CRM does not support the bulk deletion of deals or any undo actions on deleted records {slug: crm/faq/how-do-i-reset-my-crm-pipeline-delete-deals}.
-- The CRM cannot automatically delete or sync meeting appointments with external calendar systems once deleted in the CRM, without notifying the attendee {slug: crm/faq/can-i-delete-appointments-from-the-crm}.
-- The AI SDR cannot automatically update CRM deal stages based on conversational events {slug: crm/faq/does-the-ai-sdr-update-crm-deal-stages-automatically}.
+- White-label partners cannot transfer domain registrar management or access to domain registrar portals to their clients {slug: cold-email-agent/faq/billing-domains/who-owns-my-purchased-domains-after-i-cancel}.
+- The Cold Email Agent does not have a user-configurable setting to adjust or raise the daily limit of 35 campaign emails per inbox {slug: cold-email-agent/faq/campaigns/how-do-i-cap-per-inbox-email-volume-across-campaigns}.
+- The AI Ads Maker cannot generate video files, image assets, or connect directly to external advertising platforms {slug: ad-writer/faq/can-it-generate-video-or-images}.
+- The AI SDR cannot automatically gate interested calls or prevent auto-booking into a connected calendar without campaign-wide or thread-wide deactivation {slug: ai-sdr/faq/configuration/can-i-prevent-the-ai-sdr-from-auto-booking-into-the-clients-calendar-gate-interested-calls-instead}.
 - The AI SDR cannot support multiple distinct knowledge bases within a single workspace {slug: ai-sdr/faq/configuration/can-i-support-multiple-knowledge-bases-for-separate-offersclients}.
 - The AI SDR cannot route meeting bookings or manage schedules outside of your configured calendar availability hours {slug: ai-sdr/faq/inbox-replies/what-are-the-ai-sdrs-capabilities-and-limits}.
 - The AI SDR cannot track participant names with absolute reliability or negotiate call terms dynamically {slug: ai-sdr/faq/inbox-replies/what-are-the-ai-sdrs-capabilities-and-limits}.
 - The AI SDR cannot run in a semi-manual or hybrid automated mode on a per-thread basis {slug: ai-sdr/faq/inbox-replies/what-are-the-ai-sdrs-capabilities-and-limits}.
-- The AI SDR cannot automatically gate interested calls or prevent auto-booking into a connected calendar without campaign-wide or thread-wide deactivation {slug: ai-sdr/faq/configuration/can-i-prevent-the-ai-sdr-from-auto-booking-into-the-clients-calendar-gate-interested-calls-instead}.
-- The AI SDR cannot support custom timezone settings separate from the configured call handler's timezone {slug: ai-sdr/faq/scheduling-calendar/how-do-i-set-the-correct-timezone-for-my-ai-sdr}.
 - The AI SDR does not provide or maintain a revision history of changes made to the Knowledge Base {slug: ai-sdr/faq/inbox-replies/where-do-i-find-the-ai-sdr-knowledge-base-in-the-app}.
-- The AI Ads Maker cannot generate video files, image assets, or connect directly to external advertising platforms {slug: ad-writer/faq/can-it-generate-video-or-images}.
-- The Sales Call Analyzer cannot analyze the emotional tone or physical characteristics of a speaker's voice {slug: sales-call-analyzer/faq/does-it-analyze-voice-tone}.
+- The AI SDR cannot support custom timezone settings separate from the configured call handler's timezone {slug: ai-sdr/faq/scheduling-calendar/how-do-i-set-the-correct-timezone-for-my-ai-sdr}.
 - The Sales Call Analyzer cannot export generated meeting analyses to a PDF format {slug: sales-call-analyzer/faq/can-i-export-to-pdf}.
+- The Sales Call Analyzer cannot analyze the emotional tone or physical characteristics of a speaker's voice {slug: sales-call-analyzer/faq/does-it-analyze-voice-tone}.
 - The Growth Plan Creator cannot add custom logos to your generated growth plans {slug: growth-plan-creator/faq/can-i-add-my-logo-to-the-plan}.
 - The Growth Plan Creator cannot export plans directly to Word or PDF formats {slug: growth-plan-creator/faq/can-i-export-to-word-or-pdf}.
 - The Growth Plan Creator cannot automatically calculate or account for your client's budget when generating a plan {slug: growth-plan-creator/faq/the-growth-plan-doesnt-account-for-my-clients-budget}.
-- The AI Automation Creator does not support the general export of custom workflow JSON into external n8n platforms {slug: resources/faq/how-do-i-import-the-n8n-workflow-creator-json-into-n8n}.
-- The Hiring Portal does not allow users to post or host job listings on the platform {slug: hiring-portal/faq/can-i-post-a-job-listing-on-the-hiring-portal}.
-- The Hiring Portal does not support automatic candidate matching, native contracts, escrow, or payment handling {slug: hiring-portal/faq/is-there-a-subcontractor-contract-template}.
-- White-label partners cannot transfer domain registrar management or access to domain registrar portals to their clients {slug: cold-email-agent/faq/billing-domains/who-owns-my-purchased-domains-after-i-cancel}.
+- Acquisity cannot natively sync or connect with external applications like Zapier, Slack, Claude, or other third-party CRMs {slug: account-settings/faq/can-i-connect-acquisity-to-claude-zapier-slack-or-ghl}.
+- Acquisity cannot swap out its built-in AI models for external or custom models {slug: account-settings/faq/can-i-connect-acquisity-to-claude-zapier-slack-or-ghl}.
+- Personal account settings do not provide a global, self-service button to sign out of all active web sessions across all devices simultaneously {slug: account-settings/faq/how-do-i-sign-out-of-acquisity}.
 - White-label partners cannot alter or customize the fixed, pre-set onboarding steps for their clients {slug: white-label-partners/features-settings}.
 - Workspace Settings do not support the deletion or removal of created workspaces {slug: workspace-settings/general}.
 - Workspace Settings do not support using different billing payment cards for different workspaces under the same account {slug: workspace-settings/faq/billing-subscriptions/can-i-use-different-payment-cards-per-workspace}.
-- Personal account settings do not provide a global, self-service button to sign out of all active web sessions across all devices simultaneously {slug: account-settings/faq/how-do-i-sign-out-of-acquisity}.
+- The AI Automation Creator does not support the general export of custom workflow JSON into external n8n platforms {slug: resources/faq/how-do-i-import-the-n8n-workflow-creator-json-into-n8n}.
+- The Hiring Portal does not allow users to post or host job listings on the platform {slug: hiring-portal/faq/can-i-post-a-job-listing-on-the-hiring-portal}.
+- The Hiring Portal does not support automatic candidate matching, native contracts, escrow, or payment handling {slug: hiring-portal/faq/is-there-a-subcontractor-contract-template}.
 
 ## Articles
 
