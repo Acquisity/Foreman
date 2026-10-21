@@ -18,10 +18,22 @@ async function reportFailure(claim: SupportClaim | null) {
   }
 }
 
+async function settleRootTurn(
+  _event: unknown,
+  channel: { state: { claim: SupportClaim | null } },
+  ctx: { session: { parent?: unknown } }
+) {
+  if (!ctx.session.parent) {
+    await reportFailure(channel.state.claim);
+  }
+}
+
 /**
  * Internal schedule handoff only. HTTP requests cannot start sessions. The
- * run bound lives in agent/hooks/support-bound.ts: eve swallows an error
- * thrown by a channel event handler, while a thrown hook fails the turn.
+ * run bound lives in agent/hooks/support-bound.ts, which cancels the turn with
+ * `ctx.cancel()`; eve swallows a throw from a channel handler or a hook. No
+ * human can cancel a support session, so a root cancel is the bound and
+ * settles the claim like a root failure.
  */
 export default defineChannel({
   context: (state) => ({ state }),
@@ -30,11 +42,8 @@ export default defineChannel({
       // This event has no session context. Only the root receive seeds a claim.
       await reportFailure(channel.state.claim);
     },
-    async "turn.failed"(_event, channel, ctx) {
-      if (!ctx.session.parent) {
-        await reportFailure(channel.state.claim);
-      }
-    },
+    "turn.cancelled": settleRootTurn,
+    "turn.failed": settleRootTurn,
   },
   async receive(input, { from }) {
     if (!isSupportAuth(input.auth)) {
