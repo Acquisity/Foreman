@@ -779,12 +779,14 @@ describe("slack channel", () => {
     const handler = handlerFor("message.completed");
     const calls: string[] = [];
     const next = countingNext();
-    await handler(
-      completed("stop", "  \n"),
-      completedEventChannel(calls),
-      {},
-      next
-    );
+    const silent = completedEventChannel(calls);
+    silent.state.progress = {
+      posts: 0,
+      startedAtMs: Date.now(),
+      toolCalls: 2,
+      waitLabel: null,
+    };
+    await handler(completed("stop", "  \n"), silent, {}, next);
     await handler(
       completed("stop", null),
       completedEventChannel(calls),
@@ -793,6 +795,8 @@ describe("slack channel", () => {
     );
     assert.deepEqual(calls, []);
     assert.equal(next.calls, 2);
+    // A silent end still stops progress, so no late line follows it.
+    assert.equal(silent.state.progress, undefined);
   });
 
   it("leaves tool-call narration to eve's default", async () => {

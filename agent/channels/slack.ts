@@ -297,15 +297,17 @@ export const foremanRenderer = defineSlackRenderer({
       if (data.finishReason === "tool-calls") {
         return next();
       }
+      // The final message, even a silent one, ends progress tracking for the
+      // turn, so no late checkpoint posts after it.
+      channel.state.progress = undefined;
       if (!data.message?.trim()) {
         // eve's default clears the status and posts nothing for "".
         return next({ ...data, message: "" });
       }
-      // This branch owns final delivery, so it never calls next(). The final
-      // message ends progress tracking for the turn. The post is verbatim:
-      // trimming would destroy leading Markdown indentation in the reply. A
-      // throw here makes eve post its content-free "couldn't deliver" notice.
-      channel.state.progress = undefined;
+      // This branch owns final delivery, so it never calls next(). The post
+      // is verbatim: trimming would destroy leading Markdown indentation in
+      // the reply. A throw here makes eve post its content-free "couldn't
+      // deliver" notice.
       channel.state.pendingToolCallMessage = null;
       channel.state.threadStatus = null;
       await postSlackReply((chunk) => channel.thread.post(chunk), data.message);
