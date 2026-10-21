@@ -75,6 +75,8 @@ Checked against Eve 0.44.0 for ENG-13601 and corrected for ENG-13724. A custom c
 
 Eve 0.54.2 update: support runs use conversation sessions so background results can return. Normal parent-turn completion does not settle a claim. The public `defineState` counter enforces 150 total root steps across turns, preserving the original eighteen-minute deadline. Public input/authorization hooks prevent unattended root and child waits. Root turn failures use auth and terminal session failures use persisted channel claim state. An unfinished first intake gets the existing notice on a later claim after its twenty-minute lease expires; pending outboxes reconcile first. Dormant sessions use Eve's default thirty-day lifetime from creation. These changes do not create a durable wall-clock interruption for a silent provider call.
 
+Eve 0.81.1 update: since 0.68.0 a hook that throws no longer fails the turn; eve logs the error and continues, so the thrown bound above enforced nothing after that release. Eve 0.68.0 also added `ctx.cancel()` for hooks, which resolves the cancellation need: the support hook now logs one bounded `support.run_bound` line and cancels the turn, which ends with `turn.cancelled`, and the support channel settles a root cancel the same way as a root failure. A custom channel still cannot fail a turn from its event handlers, but a hook can cancel one.
+
 Proposal: expose a runtime-owned per-run deadline on channel sends that cancels model calls, delegated work and token resolution durably.
 
 ## Register receive-only channels
