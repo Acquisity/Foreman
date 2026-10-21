@@ -34,8 +34,7 @@
  *   the bundled module map fails the measurement instead of being reported as
  *   a smaller number.
  * - The subagent delegation tools eve lowers at runtime. The prepared name,
- *   description, and input schema are read from eve for each compiled subagent,
- *   including the background-task instructions eve appends to its description.
+ *   description, and input schema are read from eve for each compiled subagent.
  *
  * eve's own built-in tools (`bash`, `read_file`, and the rest) are identified
  * by framework ownership and excluded from this measurement. They are the same in every
@@ -85,7 +84,7 @@ export const MEASURED_MANIFEST_KIND = "eve-agent-compiled-manifest";
  * numbers mean anything. Failing on an unrecognized revision is the point:
  * measuring it anyway would publish a total nobody had verified.
  */
-export const MEASURED_MANIFEST_VERSION = 48;
+export const MEASURED_MANIFEST_VERSION = 54;
 
 const capabilityOwnerSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("application") }),
@@ -139,7 +138,11 @@ export const capabilityManifestSchema = z
       .default([]),
     subagents: z.array(compiledSubagentSchema).default([]),
     tools: z
-      .array(namedEntrySchema.extend({ inputSchema: z.unknown().optional() }))
+      .array(
+        namedEntrySchema.extend({
+          modelInputSchema: z.record(z.string(), z.unknown()).optional(),
+        })
+      )
       .default([]),
     version: z.literal(MEASURED_MANIFEST_VERSION),
   })
@@ -421,9 +424,6 @@ interface MeasuredEntry {
   readonly source: string;
 }
 
-const schemaChars = (schema: unknown): number =>
-  schema === undefined ? 0 : JSON.stringify(schema).length;
-
 const groupRows = (
   kind: CapabilityKind,
   entries: readonly MeasuredEntry[]
@@ -464,17 +464,23 @@ export function measureLane(
   const toolRows = groupRows("tool", [
     ...manifest.tools.flatMap((tool) => {
       const source = toolSource(manifest, tool.sourceId);
-      return source === null
-        ? []
-        : [
-            {
-              bodyChars: 0,
-              descriptionChars: tool.description.length,
-              nameChars: tool.name.length,
-              schemaChars: schemaChars(tool.inputSchema),
-              source,
-            },
-          ];
+      if (source === null) {
+        return [];
+      }
+      if (tool.modelInputSchema === undefined) {
+        throw new Error(
+          `Measured static tool ${tool.sourceId} has no modelInputSchema, so the catalog cannot be measured.`
+        );
+      }
+      return [
+        {
+          bodyChars: 0,
+          descriptionChars: tool.description.length,
+          nameChars: tool.name.length,
+          schemaChars: JSON.stringify(tool.modelInputSchema).length,
+          source,
+        },
+      ];
     }),
     ...resolved.dynamicTools.map((tool) => ({
       bodyChars: 0,

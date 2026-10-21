@@ -14,6 +14,8 @@ Proposal: let a mount take an availability resolver, for example `github(config,
 
 Eve 0.54.2 update: dynamic connections are now supported alongside tools, skills, instructions and subagents. There is still no whole-mount availability resolver; channel, schedule and hook lifecycle is not made session-dynamic by a tool replacement. Keep the existing GitHub slot gate.
 
+Eve 0.81.1 update (ENG-15874): still unresolved. No release through 0.81.1 adds a mount availability resolver; 0.69.0 (b34bab8) only moved extension configuration and state to each logical mount. Keep the GitHub slot gate.
+
 ## 2. Remove a same-named authored tool from a dynamic resolver
 
 Checked against eve 0.44.0.
@@ -26,13 +28,17 @@ Proposal: let a dynamic resolver returning `null` for a name suppress a same-nam
 
 Eve 0.54.2 update: separate-file null suppression is still unavailable. Keep the same-slot authored wrappers and stamped callbacks; the supported built-in replacement described in section 5 does not suppress an unrelated static definition.
 
+Eve 0.81.1 update (ENG-15874): still unresolved. 0.59.1 (1e872e3) added `tool: false` and a same-named `disableTool()`, but both hide a subagent's derived delegation tool, not a static authored tool from a separate resolver; see section 3. Keep the same-slot wrappers.
+
 ## 3. Gate a subagent's delegation tool without gating the subagent
 
 Checked against eve 0.44.0.
 
 `defineDynamic` in a subagent's `agent.ts` supports per-session availability. The factory-specific motivation is retired: Foreman now retains only critic and vision, both used by ordinary triage. No new child gate is needed for factory removal.
 
-Eve 0.54.2 still prepares the delegation schema for each declared subagent; Foreman does not supply a narrower custom schema. Launches now return working receipts and results arrive later. Resolved by eve 0.69 tasks: a call returns a receipt and its result arrives in the same held turn. The report uses each compiled node's prepared tool, including its actual background-work description. `pnpm report:capabilities` reads the installed schema rather than preserving the former eight-station count. A narrower framework schema remains a possible upstream improvement; it is not an upgrade prerequisite.
+Eve 0.54.2 still prepares the delegation schema for each declared subagent; Foreman does not supply a narrower custom schema. Launches now return working receipts and results arrive later. Resolved by eve 0.69 tasks: a call returns a receipt and its result arrives in the same held turn. The report uses each compiled node's prepared tool. `pnpm report:capabilities` reads the installed schema rather than preserving the former eight-station count. A narrower framework schema remains a possible upstream improvement; it is not an upgrade prerequisite.
+
+Eve 0.81.1 update (ENG-15874): resolved by 0.59.1 (1e872e3). `tool: false` on a subagent, or a same-named `disableTool()`, hides its delegation tool while workflow tools can still reach it through `ctx.agent()`; `defineDynamic` still covers per-session availability. Foreman needs neither for critic or vision. Measured on 0.81.1, the prepared delegation description equals the authored description: eve no longer appends background-task text (0.69.0, efa0869).
 
 ## 4. Gate a static extension tool per session without one slot per tool
 
@@ -42,11 +48,15 @@ The browser extension contributes 21 static tools, 11,828 catalog characters, to
 
 Proposal: the mount-level availability resolver of section 1, which would gate all 21 tools and the instructions fragment together.
 
+Eve 0.81.1 update (ENG-15874): no longer applies to Foreman. The eve 0.81.1 upgrade removed the browser extension, so `agent/extensions/` mounts only GitHub and no lane carries these 21 tools. The framework limit itself is section 1 and remains unresolved.
+
 ## 5. Gate eve's built-in tools per session (supported in 0.54.2)
 
 The original Eve 0.44.0 check found only global `disableTool()` overrides. Eve 0.54.2 gives framework defaults the same file slots as authored tools, so a same-slot `defineDynamic` can return the imported default or `null` for that session. The requested mechanism is now available; no replacement gating system is needed.
 
 Foreman keeps its current choices: native `agent` enabled and `ask_question` not added on root, critic and vision. No extra per-session built-in gate is introduced by this upgrade. Framework defaults now appear in the compiled manifest; the capability report excludes them by their compiled owner bindings, while measuring Foreman's authored and extension contributions. Dynamic MCP connections are also now public; the support dispatcher below remains for its existing policy and journal requirements.
+
+Eve 0.81.1 update (ENG-15874): still resolved. The same-slot mechanism is unchanged. `ask_question` stopped being a default tool and `todo` was removed in 0.65.0 (60998d6); built-in tools moved into the reserved `eve` namespace (`eve__task_wait`, `eve__task_cancel`) in 0.76.0; and since 0.78.0 (db71190) a resolver no longer adds the catalog tools `eve__search`, `eve__tool`, and `eve__skill` on its own. The capability report still excludes every framework-owned tool by its compiled owner binding.
 
 ## 6. Time one tool call
 
@@ -57,6 +67,8 @@ A tool-call duration is not expressible from a hook. `ActionResultStreamEvent.da
 Shipped: one bounded line per tool call with no duration, naming the tool, the connection, and `ok` or `error`. The hook keeps no state and starts no timer. Timing the call from a hook would mean carrying the `actions.requested` event's `meta.at`, keyed by call ID, and reading it back at `action.result`, which is hook-owned state that outlives the event that created it: it leaks whenever a call never returns, it is wrong under a resumed or replayed turn, and it invents a number eve never measured. That is exactly the unsafe approximation this file exists to avoid, so the line reports reach and failure and stays silent about latency.
 
 Eve 0.54.2 adds workflow-tool action variants but still supplies no framework-measured tool duration on these result events. Keep the existing bounded outcome logs.
+
+Eve 0.81.1 update (ENG-15874): resolved for instrumentation, not for hooks. 0.70.3 (3b1fe5c) gives `defineInstrumentation` providers a framework-measured `durationMs` on `tool.call.completed` and records `gen_ai.execute_tool.duration` on `execute_tool` spans. `ActionResultStreamEvent.data` still carries no timing field, so the `action.result` ops line stays duration-free; a duration belongs in an instrumentation provider if one is wanted.
 
 Proposal: put a framework-measured elapsed time, or a start timestamp, on `ActionResultStreamEvent.data`. eve already owns both ends of the execution it is projecting, so the measurement is free there and unreachable anywhere else.
 

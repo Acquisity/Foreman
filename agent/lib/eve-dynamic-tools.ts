@@ -163,6 +163,7 @@ const loadAuthoredModuleMapOnce = async (
   });
   const { moduleMapCode } = z.object({ moduleMapCode: z.string() }).parse(
     await prepareAuthoredRuntimeModules({
+      appRoot,
       manifest,
       moduleMapPath: join(appRoot, COMPILED_MODULE_MAP_PATH),
     })
@@ -384,34 +385,52 @@ export async function openDynamicToolTurn(
   resolvers: readonly DynamicToolResolver[],
   session: DynamicToolSession
 ): Promise<DynamicToolTurn> {
-  const [{ ContextContainer }, keys, { dispatchDynamicToolEvent }] =
-    await Promise.all([
-      eveRuntimeModule(
-        "./dist/src/context/container.js",
-        z.object({
-          ContextContainer: z.custom<new () => EveContext>(isFunction),
-        })
-      ),
-      eveRuntimeModule(
-        "./dist/src/context/keys.js",
-        z.object({
-          AuthKey: contextKeySchema,
-          InitiatorAuthKey: contextKeySchema,
-          SessionDynamicToolMetadataKey: contextKeySchema,
-          SessionIdKey: contextKeySchema,
-          StepDynamicToolMetadataKey: contextKeySchema,
-          TurnDynamicToolMetadataKey: contextKeySchema,
-        })
-      ),
-      eveRuntimeModule(
-        "./dist/src/context/dynamic-tool-lifecycle.js",
-        z.object({ dispatchDynamicToolEvent: eveFunction })
-      ),
-    ]);
+  const [
+    { ContextContainer },
+    keys,
+    { dispatchDynamicToolEvent },
+    { buildDynamicTools },
+    { serializeModelInputSchema },
+  ] = await Promise.all([
+    eveRuntimeModule(
+      "./dist/src/context/container.js",
+      z.object({
+        ContextContainer: z.custom<new () => EveContext>(isFunction),
+      })
+    ),
+    eveRuntimeModule(
+      "./dist/src/context/keys.js",
+      z.object({
+        AuthKey: contextKeySchema,
+        InitiatorAuthKey: contextKeySchema,
+        SessionDynamicToolMetadataKey: contextKeySchema,
+        SessionIdKey: contextKeySchema,
+        StaticModelReferenceKey: contextKeySchema,
+        StepDynamicToolMetadataKey: contextKeySchema,
+        TurnDynamicToolMetadataKey: contextKeySchema,
+      })
+    ),
+    eveRuntimeModule(
+      "./dist/src/context/dynamic-tool-lifecycle.js",
+      z.object({ dispatchDynamicToolEvent: eveFunction })
+    ),
+    eveRuntimeModule(
+      "./dist/src/context/build-dynamic-tools.js",
+      z.object({ buildDynamicTools: eveFunction })
+    ),
+    eveRuntimeModule(
+      "./dist/src/tools/schema.js",
+      z.object({ serializeModelInputSchema: eveFunction })
+    ),
+  ]);
   const ctx = new ContextContainer();
   ctx.set(keys.SessionIdKey, session.id);
   ctx.set(keys.AuthKey, session.auth);
   ctx.set(keys.InitiatorAuthKey, session.auth);
+  // eve builds every resolver's context with the effective model and fails the
+  // resolver before calling it when no model state is set. No model is selected
+  // here, which resolvers read as `ctx.model === null`.
+  ctx.set(keys.StaticModelReferenceKey, null);
   const returned = { count: 0 };
   const counted = resolvers.map((resolver) =>
     countingResolver(resolver, returned)
@@ -448,16 +467,20 @@ export async function openDynamicToolTurn(
           `eve admitted ${forEvent.length} of the ${returned.count} tools '${slugs}' resolves on ${eventName}, so the catalog cannot be measured. eve drops a resolver's whole result when an entry is not a defineTool() or one of its callbacks has no durable descriptor; its dynamic-tools log line names the entry.`
         );
       }
-      const admitted = DYNAMIC_TOOL_EVENTS.flatMap((name) =>
-        admittedToolSchema
-          .array()
-          .parse(ctx.get(keys[DYNAMIC_TOOL_METADATA_KEY[name]]) ?? [])
-      );
+      // Replay the admitted metadata before serializing, as eve's harness does.
+      // Validated durable schemas are closed for the model at this boundary.
+      const admitted = admittedToolSchema
+        .extend({ inputSchema: z.unknown() })
+        .array()
+        .parse(buildDynamicTools(ctx));
       return admitted.map((tool) => ({
         description: tool.description,
         name: tool.name,
-        // Serialized by eve without the dialect keyword, as the model sees it.
-        schemaChars: JSON.stringify(tool.inputSchema).length,
+        schemaChars: JSON.stringify(
+          z
+            .record(z.string(), z.unknown())
+            .parse(serializeModelInputSchema(tool.inputSchema))
+        ).length,
       }));
     },
   };
