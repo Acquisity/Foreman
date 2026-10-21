@@ -45,6 +45,8 @@ Complete this rehearsal on Preview before Production acceptance. Verify the actu
 3. Resume the verified connector trigger and continue an existing Slack thread. Confirm a fresh internal session, bounded visible history, real provider access and another normal reply. Retain the 0.54.2 deployment URL for recovery.
 4. Rehearse rollback by draining work and resetting the upgraded sessions through the still-running 0.54.2 deployment before deploying the code revert. Eve 0.44 cannot reset a surviving 0.54 driver. Verify a fresh session after rollback; a code revert does not restore prior internal state.
 
+Before deploying the eve 0.81.1 cutover, rebuild the warm snapshot with the 0.81 builder (`rebuild_warm_snapshot`) and set Production `VERCEL_SANDBOX_BASE_SNAPSHOT_ID` to the new id. A snapshot built for an older eve image fails every session with "chdir /vercel/sandbox: no such file or directory".
+
 The upgrade requires Aaron's acceptance and explicit merge approval before Production. Browser build/typecheck/unit success and local store tests are separate evidence from this live battery. Record unrun cases as outstanding unless Aaron explicitly waived or deferred them, and preserve that distinction.
 
 Production is deployed from main. Regressions are undone by reverting the slice on main; never use vercel rollback. Aaron accepts one PR before the next opens.

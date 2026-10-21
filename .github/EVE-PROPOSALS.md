@@ -117,3 +117,9 @@ Checked against Eve 0.54.2 for ENG-14746. The public `t.skip(reason)` rejects ca
 Foreman keeps those safety gates and records one tracked-only `.soft()` assertion without a threshold, named "replay coverage", stating the unrecorded tools. Uncovered rows carry `scored: false` and `unrecordedReads`; behavior checks are computed but are not asserted or counted, the claims judge does not run, and loop measurements exclude those rows. Eve's verdict reflects safety checks, not a fully covered replay pass.
 
 Proposal: support a public post-activity not-scored result that retains failed safety gates and excludes uncovered runs from grading totals.
+
+## Warm snapshot image tracks eve's sandbox image
+
+Checked against Eve 0.81.1 for ENG-15910. When the sandbox source is a snapshot, `vercel-create-sdk.js` passes no `image` to `Sandbox.create`, so the session runs on the image the snapshot was built from. eve 0.81 moved its Vercel image to `vcr.vercel.com/vercel/eve/base:<eve version>` (`EVE_SANDBOX_IMAGE_TAG` overrides the tag), and its initialization command runs in the default `/vercel/sandbox`. A snapshot built from eve 0.54's older `vercel/eve` image lacks that directory, so every session failed with "chdir /vercel/sandbox: no such file or directory". `agent/lib/repository-snapshot.ts` now derives the image the way eve does, because eve's resolver is not exported. Every eve upgrade requires a snapshot rebuild.
+
+Proposal: export the resolved sandbox image from a public entry, and reject or warn on a snapshot source built from a different image.

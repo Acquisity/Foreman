@@ -1,3 +1,4 @@
+import { createRequire } from "node:module";
 import { type NetworkPolicy, Sandbox } from "@vercel/sandbox";
 import { githubCredentials } from "./github/credentials.js";
 import { brokerPolicy, mintInstallationToken } from "./github/git-remote.js";
@@ -14,14 +15,28 @@ import {
 } from "./repository-warmup.js";
 
 /**
- * The image the snapshot is built from. It must match eve's own sandbox image
- * (`VERCEL_EVE_SANDBOX_IMAGE` = "vercel/eve:latest") so the installed deps
- * (bun/pnpm/node_modules and any native binaries) are built against the same
- * toolchain the sessions run on, and so the template built from this snapshot
- * inherits the eve image rather than pinning a stock runtime. If eve bumps its
- * image, this must track it.
+ * The image the snapshot is built from: eve 0.81's Vercel sandbox image,
+ * `vcr.vercel.com/vercel/eve/base:<tag>`, derived the way eve derives it
+ * (`EVE_SANDBOX_IMAGE_TAG` when set, else the installed eve version without
+ * build metadata). eve's resolver is not exported, so this mirrors it.
+ *
+ * It must match because eve passes no image when the session source is a
+ * snapshot: the session runs on the snapshot's own filesystem. A snapshot built
+ * from another image (eve 0.54's older `vercel/eve` image) has no `/vercel/sandbox`,
+ * and every session fails with "chdir /vercel/sandbox: no such file or
+ * directory". Any eve upgrade therefore requires a snapshot rebuild.
  */
-const EVE_SANDBOX_IMAGE = "vercel/eve:latest";
+export const eveSandboxImage = (): string => {
+  const override = process.env.EVE_SANDBOX_IMAGE_TAG?.trim();
+  const tag = override
+    ? override
+    : (
+        createRequire(import.meta.url)("eve/package.json") as {
+          version: string;
+        }
+      ).version.split("+", 1)[0];
+  return `vcr.vercel.com/vercel/eve/base:${tag}`;
+};
 
 // Snapshots expire 30 days after their last use. Rebuilds are human-driven and
 // rare, so the TTL bounds storage from superseded snapshots when a rebuild does
@@ -94,7 +109,7 @@ export const createWarmSnapshot = async (): Promise<string> => {
   const networkPolicy = brokerPolicy(token) as unknown as NetworkPolicy;
 
   const sandbox = await Sandbox.create({
-    image: EVE_SANDBOX_IMAGE,
+    image: eveSandboxImage(),
     networkPolicy,
     resources: { vcpus: 4 },
     timeout: BUILD_TIMEOUT_MS,

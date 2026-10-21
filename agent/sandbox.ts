@@ -25,7 +25,8 @@ import { isWidgetSupport } from "#lib/widget-scope.js";
  * environment omits `source` and `prepare_repository` cold-clones, which is the safe
  * fallback before the first snapshot exists. eve's environment configuration hash includes
  * `source`, so a new snapshot id prepares a new environment. eve does not detect a snapshot
- * rebuilt under the same id.
+ * rebuilt under the same id. The snapshot carries eve's base sandbox image, so it must be
+ * rebuilt after any eve upgrade.
  *
  * The selector marks `/workspace` as a safe git directory before the GitHub channel's
  * built-in per-turn checkout runs there. The sandbox filesystem is owned by the builder uid,
