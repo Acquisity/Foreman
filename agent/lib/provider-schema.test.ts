@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { generateText, type ToolSet } from "ai";
+import { asSchema, type FlexibleSchema, generateText, type ToolSet } from "ai";
 import { MockLanguageModelV4 } from "ai/test";
 import { z } from "zod";
 import { evePackageUrl } from "./eve-dynamic-tools.js";
@@ -17,8 +17,10 @@ const [{ default: image }, { default: instantly }, harness, serializer] =
     import(
       new URL("./dist/src/harness/tools.js", evePackageUrl()).href
     ) as Promise<{
-      buildToolSetFromDefinitions: (input: {
-        tools: readonly unknown[];
+      buildToolSet: (input: {
+        describe: (definition: { description: string }) => string;
+        resolve: () => undefined;
+        tools: ReadonlyMap<string, unknown>;
       }) => ToolSet;
     }>,
     import(
@@ -32,6 +34,15 @@ const definitions = [
   { ...image, name: "read_image" },
   { ...instantly, name: "read_instantly_subworkspace" },
 ];
+// No call is resolved here: the test only inspects provider-facing schemas.
+const toolSet = (): ToolSet =>
+  harness.buildToolSet({
+    describe: (definition) => definition.description,
+    resolve: () => undefined,
+    tools: new Map(
+      definitions.map((definition) => [definition.name, definition])
+    ),
+  });
 const flatSchema = z
   .object({
     $schema: z.string().optional(),
@@ -57,7 +68,7 @@ describe("provider tool schemas on Eve and AI SDK 7", () => {
         maxRetries: 0,
         model,
         prompt: "Inspect the available tools without calling them.",
-        tools: harness.buildToolSetFromDefinitions({ tools: definitions }),
+        tools: toolSet(),
       }),
       (error) => error === captured
     );
@@ -118,24 +129,28 @@ describe("provider tool schemas on Eve and AI SDK 7", () => {
 
   it("retains runtime source and resource filters that JSON Schema cannot express", async () => {
     const workspaceId = "e05cbe7b-67db-4b07-b712-46b9365dc83f";
-    // The harness receives the original Standard Schema validator. Flattening
-    // its advertised input must not replace the pipe's resource checks.
-    const tools = harness.buildToolSetFromDefinitions({ tools: definitions });
-    assert.equal(tools.read_image?.inputSchema, image.inputSchema);
-    assert.equal(
-      tools.read_instantly_subworkspace?.inputSchema,
-      instantly.inputSchema
-    );
+    // eve 0.81 hands the provider an AI SDK schema that validates through the
+    // original Standard Schema. Flattening its advertised input must not
+    // replace the pipe's resource checks, so validate through the tool set.
+    const tools = toolSet();
     assert.ok(image.inputSchema instanceof z.ZodType);
     assert.ok(instantly.inputSchema instanceof z.ZodType);
-    const imageInput = image.inputSchema["~standard"];
-    assert.ok(
-      (await imageInput.validate({ url: "https://evil.example/image.png" }))
-        .issues
+    const validate = (schema: unknown, value: unknown) => {
+      const check = asSchema(schema as FlexibleSchema<unknown>).validate;
+      assert.ok(check);
+      return check(value);
+    };
+    const imageInput = tools.read_image?.inputSchema;
+    assert.equal(
+      (await validate(imageInput, { url: "https://evil.example/image.png" }))
+        .success,
+      false
     );
-    const validImage = await imageInput.validate({ path: "/tmp/image.png" });
-    assert.equal(validImage.issues, undefined);
-    const instantlyInput = instantly.inputSchema["~standard"];
+    assert.deepEqual(await validate(imageInput, { path: "/tmp/image.png" }), {
+      success: true,
+      value: { path: "/tmp/image.png" },
+    });
+    const instantlyInput = tools.read_instantly_subworkspace?.inputSchema;
     await Promise.all(
       [
         { resource: "accounts", status: 0, workspaceId },
@@ -148,19 +163,23 @@ describe("provider tool schemas on Eve and AI SDK 7", () => {
           workspaceName: "duplicate selector",
         },
       ].map(async (input) => {
-        assert.ok(
-          (await instantlyInput.validate(input)).issues,
+        assert.equal(
+          (await validate(instantlyInput, input)).success,
+          false,
           JSON.stringify(input)
         );
       })
     );
-    const validCampaign = await instantlyInput.validate({
-      resource: "campaigns",
-      status: 0,
-      workspaceId,
-    });
-    assert.deepEqual(validCampaign, {
-      value: { limit: 20, resource: "campaigns", status: 0, workspaceId },
-    });
+    assert.deepEqual(
+      await validate(instantlyInput, {
+        resource: "campaigns",
+        status: 0,
+        workspaceId,
+      }),
+      {
+        success: true,
+        value: { limit: 20, resource: "campaigns", status: 0, workspaceId },
+      }
+    );
   });
 });

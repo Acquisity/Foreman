@@ -163,6 +163,7 @@ const loadAuthoredModuleMapOnce = async (
   });
   const { moduleMapCode } = z.object({ moduleMapCode: z.string() }).parse(
     await prepareAuthoredRuntimeModules({
+      appRoot,
       manifest,
       moduleMapPath: join(appRoot, COMPILED_MODULE_MAP_PATH),
     })
@@ -399,6 +400,7 @@ export async function openDynamicToolTurn(
           InitiatorAuthKey: contextKeySchema,
           SessionDynamicToolMetadataKey: contextKeySchema,
           SessionIdKey: contextKeySchema,
+          StaticModelReferenceKey: contextKeySchema,
           StepDynamicToolMetadataKey: contextKeySchema,
           TurnDynamicToolMetadataKey: contextKeySchema,
         })
@@ -412,6 +414,10 @@ export async function openDynamicToolTurn(
   ctx.set(keys.SessionIdKey, session.id);
   ctx.set(keys.AuthKey, session.auth);
   ctx.set(keys.InitiatorAuthKey, session.auth);
+  // eve builds every resolver's context with the effective model and fails the
+  // resolver before calling it when no model state is set. No model is selected
+  // here, which resolvers read as `ctx.model === null`.
+  ctx.set(keys.StaticModelReferenceKey, null);
   const returned = { count: 0 };
   const counted = resolvers.map((resolver) =>
     countingResolver(resolver, returned)

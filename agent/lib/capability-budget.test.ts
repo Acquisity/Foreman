@@ -99,7 +99,7 @@ const MANIFEST_HEADER = {
   appRoot: APP_ROOT,
   bindings: {},
   kind: "eve-agent-compiled-manifest",
-  version: 48,
+  version: 54,
 } as const;
 
 // A hand-built manifest with one capability of each kind from each source, so
@@ -486,9 +486,8 @@ describe("dynamic capability resolution", () => {
       assert.equal(tool.nodeId, definition.nodeId);
       assert.equal(tool.name, definition.name);
       assert.ok(tool.schemaChars > 0);
-      assert.ok(tool.description.startsWith(definition.description));
-      assert.ok(tool.description.includes("background task"));
-      assert.ok(tool.description.length > definition.description.length);
+      // eve 0.69 made subagent calls blocking and stopped appending background-task text.
+      assert.equal(tool.description, definition.description);
     }
     assert.equal(
       measureLane(compiled, "slack", { dynamicTools: [], subagentTools: tools })

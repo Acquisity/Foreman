@@ -21,7 +21,7 @@ async function verify() {
   await import("../.output/server/index.mjs");
   const require = createRequire(import.meta.url);
   const evePackage = pathToFileURL(require.resolve("eve/package.json"));
-  // Eve 0.54 inlines installed extensions into the server entry. Read the
+  // Eve 0.81.1 inlines installed extensions into the server entry. Read the
   // module map that this actual server boot registered, never a source import
   // or a second locally compiled bundle.
   const { readBundledCompiledArtifacts } = await import(
@@ -79,6 +79,8 @@ async function verify() {
         type: "step.started",
       },
       {
+        // The upstream resolver reads the step's model input, as eve passes it.
+        messages: [],
         session: {
           auth: { current: laneAuth(lane) },
           id: "built-github-proof",
@@ -109,7 +111,7 @@ async function verify() {
   const callbackPhases = {};
   for (const entryKey of names) {
     const identity = owner(entryKey);
-    // Eve 0.54 registers every callback under its exact resolver owner.
+    // Eve 0.81.1 registers every callback under its exact resolver owner.
     const callbacks = validateDurableDynamicToolCallbacks(
       identity.name,
       entries[entryKey],
@@ -117,7 +119,8 @@ async function verify() {
     );
     assert.deepEqual(
       Object.keys(callbacks).sort(),
-      ["approvalRequest", "execute", "toModelOutput"],
+      // eve 0.59.0 replays input schemas through durable schema factories.
+      ["approvalRequest", "execute", "inputSchema", "toModelOutput"],
       `Unexpected durable callback phases for ${identity.name}.`
     );
     for (const phase of Object.keys(callbacks)) {
