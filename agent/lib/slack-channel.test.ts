@@ -5,12 +5,18 @@ import { describe, it, type TestContext } from "node:test";
 import { fileURLToPath } from "node:url";
 import type { Session } from "eve/channels";
 import type {
-  SlackChannelEvents,
   SlackEventContext,
   SlackInboundMessageContext,
   SlackMessage,
+  SlackRendererEvents,
+  SlackTaskCard,
+  TaskCardView,
 } from "eve/channels/slack";
-import { FINAL_SLACK_POST_RULE } from "./slack-intake.js";
+import { evePackageUrl } from "./eve-dynamic-tools.js";
+import {
+  FINAL_SLACK_POST_RULE,
+  QUESTIONS_ONLY_CHANNELS,
+} from "./slack-intake.js";
 import { isTriageIntake } from "./trust.js";
 
 // Connector variables the channel module requires at evaluation time.
@@ -35,8 +41,51 @@ process.env.SLACK_INTAKE_ONLY_CHANNELS = "C0INTAKEONLY";
 const {
   default: channel,
   dispatch,
-  slackChannelEvents,
+  foremanRenderer,
 } = await import("../channels/slack.js");
+
+// The renderer reads and writes durable eve state, so handlers run inside a
+// real eve context, the same way eve calls them.
+const { ContextContainer, contextStorage } = (await import(
+  new URL("./dist/src/context/container.js", evePackageUrl()).href
+)) as {
+  ContextContainer: new () => unknown;
+  contextStorage: { run: <T>(store: unknown, body: () => T) => T };
+};
+const eveContext = new ContextContainer();
+
+type RendererHandler<K extends keyof SlackRendererEvents> = NonNullable<
+  SlackRendererEvents[K]
+>;
+
+// Calls the renderer's handler with a counting `next`, so each test can
+// assert whether eve's default ran.
+const handlerFor = <K extends keyof SlackRendererEvents>(key: K) => {
+  const handler = foremanRenderer.events?.[key] as
+    | ((...args: unknown[]) => Promise<void>)
+    | undefined;
+  assert.ok(handler);
+  return (
+    data: Parameters<RendererHandler<K>>[0],
+    eventChannel: SlackEventContext,
+    ctx: unknown,
+    next: () => Promise<void> = () => Promise.resolve()
+  ) =>
+    contextStorage.run(eveContext, () =>
+      handler(data, eventChannel, ctx, next)
+    );
+};
+
+const countingNext = () => {
+  const next = Object.assign(
+    () => {
+      next.calls += 1;
+      return Promise.resolve();
+    },
+    { calls: 0 }
+  );
+  return next;
+};
 
 const message = (text: string, channelId = "C0DEV"): SlackMessage => ({
   attachments: [],
@@ -467,7 +516,7 @@ describe("slack channel", () => {
     assert.equal(result.context[0], FINAL_SLACK_POST_RULE);
     const line = result.context[1] ?? "";
     assert.ok(line.includes('"screenshot.png", "trace.log"'));
-    assert.ok(line.includes("/workspace/attachments"));
+    assert.ok(line.includes("/workspace/.eve/attachments"));
     assert.ok(line.includes("vision subagent"));
   });
 
@@ -553,7 +602,7 @@ describe("slack channel", () => {
     assert.deepEqual(result?.context, [FINAL_SLACK_POST_RULE]);
   });
 
-  it("does not list audio or video, which eve never stages", async () => {
+  it("does not list audio or video, which the vision subagent cannot read", async () => {
     const result = await dispatch(
       inboundContext(undefined),
       attached("listen to this", undefined, [
@@ -571,8 +620,7 @@ describe("slack channel", () => {
   });
 
   it("clears progress without attributing cooperative cancellation to stop", async () => {
-    const handler = slackChannelEvents["turn.cancelled"];
-    assert.ok(handler);
+    const handler = handlerFor("turn.cancelled");
     const posts: string[] = [];
     const eventChannel = {
       state: {
@@ -590,9 +638,11 @@ describe("slack channel", () => {
         },
       },
     } as unknown as SlackEventContext;
-    await handler({ sequence: 1, turnId: "t1" }, eventChannel, {} as never);
+    const next = countingNext();
+    await handler({ sequence: 1, turnId: "t1" }, eventChannel, {}, next);
     assert.deepEqual(posts, []);
     assert.equal(eventChannel.state.progress, undefined);
+    assert.equal(next.calls, 1);
   });
 
   const completedEventChannel = (calls: string[]) =>
@@ -615,16 +665,17 @@ describe("slack channel", () => {
     text: string | null
   ) => ({
     finishReason,
-    message: text,
+    // eve types the message as a string; null is its empty delivery.
+    message: text as string,
     sequence: 1,
     stepIndex: 0,
     turnId: "t1",
   });
 
-  it("posts the complete final message verbatim", async () => {
-    const handler = slackChannelEvents["message.completed"];
-    assert.ok(handler);
+  it("posts the complete final message verbatim and owns delivery", async () => {
+    const handler = handlerFor("message.completed");
     const calls: string[] = [];
+    const next = countingNext();
     // The retired marker is now ordinary content: nothing splits the post.
     // Joined so the marker-removal scan below never matches this source.
     const marker = ["---", "reply", "---"].join("");
@@ -632,38 +683,99 @@ describe("slack channel", () => {
     await handler(
       completed("stop", full),
       completedEventChannel(calls),
-      {} as never
+      {},
+      next
     );
     assert.deepEqual(calls, [`post:${full}`]);
+    assert.equal(next.calls, 0);
   });
 
-  it("starts typing instead of posting an empty final message", async () => {
-    const handler = slackChannelEvents["message.completed"];
-    assert.ok(handler);
+  it("leaves a blank or null final message to eve's default", async () => {
+    const handler = handlerFor("message.completed");
     const calls: string[] = [];
+    const next = countingNext();
     await handler(
       completed("stop", "  \n"),
       completedEventChannel(calls),
-      {} as never
+      {},
+      next
     );
-    assert.deepEqual(calls, ["typing"]);
-  });
-
-  it("keeps tool-call narration out of the thread", async () => {
-    const handler = slackChannelEvents["message.completed"];
-    assert.ok(handler);
-    const calls: string[] = [];
-    const eventChannel = completedEventChannel(calls);
     await handler(
-      completed("tool-calls", "Checking Stripe now."),
-      eventChannel,
-      {} as never
+      completed("stop", null),
+      completedEventChannel(calls),
+      {},
+      next
     );
     assert.deepEqual(calls, []);
-    assert.equal(
-      eventChannel.state.pendingToolCallMessage,
-      "Checking Stripe now."
+    assert.equal(next.calls, 2);
+  });
+
+  it("leaves tool-call narration to eve's default", async () => {
+    const handler = handlerFor("message.completed");
+    const calls: string[] = [];
+    const next = countingNext();
+    await handler(
+      completed("tool-calls", "Checking Stripe now."),
+      completedEventChannel(calls),
+      {},
+      next
     );
+    assert.deepEqual(calls, []);
+    assert.equal(next.calls, 1);
+  });
+
+  const slackMessageIn = (channelId: string) =>
+    ({ ...message("hello", channelId) }) as SlackMessage;
+
+  it("skips the received status in intake-only and questions-only channels", async () => {
+    const { received } = foremanRenderer;
+    assert.ok(received);
+    const [questionsOnly] = QUESTIONS_ONLY_CHANNELS;
+    assert.ok(questionsOnly);
+    const counts = await Promise.all(
+      ["C0INTAKEONLY", questionsOnly, "C0DEV"].map(async (channelId) => {
+        const next = countingNext();
+        await received(slackMessageIn(channelId), {} as never, next);
+        return next.calls;
+      })
+    );
+    assert.deepEqual(counts, [0, 0, 1]);
+  });
+
+  it("drops the task card only in a quiet thread, across a serialized step", async () => {
+    const { taskCard } = foremanRenderer;
+    assert.ok(taskCard);
+    const card: SlackTaskCard = { blocks: [], text: "card" };
+    const view = { turnId: "t1" } as TaskCardView;
+    const quietCtx = {
+      session: { auth: { current: { attributes: { intakeOnly: "true" } } } },
+    };
+    const loudCtx = { session: { auth: { current: null } } };
+    // eve serializes the context after each step and restores it for the
+    // next one, so the flag set at turn.started is read back from a fresh
+    // container, as the task card writer reads it on a later event.
+    const { deserializeContext, serializeContext } = (await import(
+      new URL("./dist/src/context/serialize.js", evePackageUrl()).href
+    )) as {
+      deserializeContext: (value: unknown) => Promise<unknown>;
+      serializeContext: (ctx: unknown) => unknown;
+    };
+    const started = foremanRenderer.events?.["turn.started"] as (
+      ...args: unknown[]
+    ) => Promise<void>;
+    const nextCard = (): SlackTaskCard | null => card;
+    const cardAfterStart = async (ctx: unknown) => {
+      const store = new ContextContainer();
+      await contextStorage.run(store, () =>
+        started({ sequence: 1, turnId: "t1" }, { state: {} }, ctx, () =>
+          Promise.resolve()
+        )
+      );
+      const restored = await deserializeContext(serializeContext(store));
+      return contextStorage.run(restored, () => taskCard(view, nextCard));
+    };
+    assert.equal(await cardAfterStart(quietCtx), null);
+    assert.equal(await cardAfterStart(loudCtx), card);
   });
 });
 
@@ -718,15 +830,6 @@ describe("slack channel progress", () => {
 
   const postsOf = (calls: string[]) =>
     calls.filter((call) => call.startsWith("post:"));
-
-  const typingsOf = (calls: string[]) =>
-    calls.filter((call) => call.startsWith("typing:"));
-
-  const handlerFor = <K extends keyof SlackChannelEvents>(key: K) => {
-    const handler = slackChannelEvents[key];
-    assert.ok(handler);
-    return handler;
-  };
 
   // Event fixtures use the real stream-event shapes and valid statuses.
   const turnStartedEvent = { sequence: 1, turnId: "t1" };
@@ -804,24 +907,78 @@ describe("slack channel progress", () => {
       turnId: "t1",
     }) as const;
 
-  it("seeds progress state and mirrors the Working indicator on turn start", async () => {
-    const handler = handlerFor("turn.started");
+  it("seeds progress state on turn start and keeps eve's default", async () => {
     const calls: string[] = [];
-    const eventChannel = progressChannel(calls, {
-      lastReasoningTypingAtMs: 1,
-      pendingToolCallMessage: "Checking Stripe now.",
-    });
+    const eventChannel = progressChannel(calls);
+    const next = countingNext();
     const before = Date.now();
-    await handler(turnStartedEvent, eventChannel, trustedCtx);
-    assert.deepEqual(calls, ["typing:Working..."]);
-    assert.equal(eventChannel.state.pendingToolCallMessage, null);
-    assert.equal(eventChannel.state.lastReasoningTypingAtMs, null);
+    await handlerFor("turn.started")(
+      turnStartedEvent,
+      eventChannel,
+      trustedCtx,
+      next
+    );
+    assert.deepEqual(calls, []);
+    assert.equal(next.calls, 1);
     const { progress } = eventChannel.state;
     assert.ok(progress);
     assert.equal(progress.posts, 0);
     assert.equal(progress.toolCalls, 0);
     assert.equal(progress.waitLabel, null);
     assert.ok(progress.startedAtMs >= before);
+  });
+
+  it("keeps eve's default after every checkpoint and on completion", async (t) => {
+    const now = clock(t);
+    const calls: string[] = [];
+    const eventChannel = progressChannel(calls);
+    await handlerFor("turn.started")(
+      turnStartedEvent,
+      eventChannel,
+      trustedCtx
+    );
+    now.advance(5 * MINUTE_MS + 1000);
+    const nexts = {
+      "action.result": countingNext(),
+      "actions.requested": countingNext(),
+      "reasoning.appended": countingNext(),
+    };
+    await handlerFor("reasoning.appended")(
+      reasoningEvent("Thinking."),
+      eventChannel,
+      trustedCtx,
+      nexts["reasoning.appended"]
+    );
+    await handlerFor("actions.requested")(
+      actionsRequestedEvent,
+      eventChannel,
+      trustedCtx,
+      nexts["actions.requested"]
+    );
+    assert.equal(eventChannel.state.progress?.waitLabel, "grep");
+    await handlerFor("action.result")(
+      toolResultEvent,
+      eventChannel,
+      trustedCtx,
+      nexts["action.result"]
+    );
+    assert.equal(eventChannel.state.progress?.toolCalls, 1);
+    for (const [name, next] of Object.entries(nexts)) {
+      assert.equal(next.calls, 1, name);
+    }
+    // The 5-minute line posted at the first checkpoint, before eve's default.
+    assert.deepEqual(postsOf(calls), [
+      "post:Still working: 5 minutes in, 0 tool calls so far.",
+    ]);
+    const completedNext = countingNext();
+    await handlerFor("turn.completed")(
+      { sequence: 9, turnId: "t1" },
+      eventChannel,
+      trustedCtx,
+      completedNext
+    );
+    assert.equal(completedNext.calls, 1);
+    assert.equal(eventChannel.state.progress, undefined);
   });
 
   it("posts both thresholds in order across one long turn", async (t) => {
@@ -1054,6 +1211,7 @@ describe("slack channel progress", () => {
             callId: "c2",
             input: { skill: "triage-investigate" },
             kind: "load-skill",
+            name: "triage-investigate",
           },
         ],
       },
@@ -1072,11 +1230,12 @@ describe("slack channel progress", () => {
     await handlerFor("action.result")(
       {
         ...skillResultEvent,
+        // Older eve reported a skill result with no name; 0.81 types it out.
         result: {
           callId: "c4",
           kind: "load-skill-result",
           output: {},
-        },
+        } as never,
       },
       eventChannel,
       trustedCtx
@@ -1132,6 +1291,7 @@ describe("slack channel progress", () => {
       eventChannel,
       trustedCtx
     );
+    const failedNext = countingNext();
     await handlerFor("turn.failed")(
       {
         code: "model-error",
@@ -1141,8 +1301,10 @@ describe("slack channel progress", () => {
         turnId: "t1",
       },
       eventChannel,
-      trustedCtx
+      trustedCtx,
+      failedNext
     );
+    assert.equal(failedNext.calls, 0);
     assert.deepEqual(postsOf(calls), [
       "post:I hit an error while handling your request.\n\nPlease try again, rephrase, or reach out if it keeps failing.\n\n_Error id: `err_123`_",
     ]);
@@ -1155,6 +1317,33 @@ describe("slack channel progress", () => {
       trustedCtx
     );
     assert.equal(postsOf(calls).length, 1);
+    assert.equal(eventChannel.state.progress, undefined);
+  });
+
+  it("leaves a terminal failure to eve's session.failed notice", async () => {
+    const calls: string[] = [];
+    const eventChannel = progressChannel(calls);
+    await handlerFor("turn.started")(
+      turnStartedEvent,
+      eventChannel,
+      trustedCtx
+    );
+    const next = countingNext();
+    await handlerFor("turn.failed")(
+      {
+        code: "model-error",
+        details: { errorId: "err_123" },
+        message: "Model call failed",
+        sequence: 7,
+        terminal: true,
+        turnId: "t1",
+      },
+      eventChannel,
+      trustedCtx,
+      next
+    );
+    assert.deepEqual(postsOf(calls), []);
+    assert.equal(next.calls, 0);
     assert.equal(eventChannel.state.progress, undefined);
   });
 
@@ -1198,13 +1387,11 @@ describe("slack channel progress", () => {
       trustedCtx
     );
     await handlerFor("message.completed")(
-      { ...finalMessageEvent(""), message: null, turnId: "t2" },
+      { ...finalMessageEvent(""), message: null as never, turnId: "t2" },
       eventChannel,
       trustedCtx
     );
     assert.deepEqual(postsOf(calls), ["post:The answer."]);
-    // No typing indicator is left hanging after the silent turn.
-    assert.equal(calls.at(-1), "typing:Working...");
   });
 
   it("clears progress state when the turn is cancelled", async () => {
@@ -1218,176 +1405,11 @@ describe("slack channel progress", () => {
         waitLabel: null,
       },
     });
-    await handler({ sequence: 1, turnId: "t1" }, eventChannel, {} as never);
+    const next = countingNext();
+    await handler({ sequence: 1, turnId: "t1" }, eventChannel, {}, next);
     assert.deepEqual(calls, []);
     assert.equal(eventChannel.state.progress, undefined);
-  });
-
-  it("mirrors the default actions.requested typing label and prefers narration", async (t) => {
-    const now = clock(t);
-    const calls: string[] = [];
-    const eventChannel = progressChannel(calls);
-    await handlerFor("turn.started")(
-      turnStartedEvent,
-      eventChannel,
-      trustedCtx
-    );
-    await handlerFor("actions.requested")(
-      actionsRequestedEvent,
-      eventChannel,
-      trustedCtx
-    );
-    assert.deepEqual(typingsOf(calls), [
-      "typing:Working...",
-      "typing:grep useEveAgent",
-    ]);
-    // Buffered model narration wins over the derived label and is consumed.
-    eventChannel.state.pendingToolCallMessage = "Checking Stripe now.";
-    now.advance(1000);
-    await handlerFor("actions.requested")(
-      actionsRequestedEvent,
-      eventChannel,
-      trustedCtx
-    );
-    assert.deepEqual(typingsOf(calls), [
-      "typing:Working...",
-      "typing:grep useEveAgent",
-      "typing:Checking Stripe now.",
-    ]);
-    assert.equal(eventChannel.state.pendingToolCallMessage, null);
-  });
-
-  it("accumulates reasoning deltas while throttling small extensions", async (t) => {
-    const now = clock(t);
-    const calls: string[] = [];
-    const eventChannel = progressChannel(calls);
-    await handlerFor("turn.started")(
-      turnStartedEvent,
-      eventChannel,
-      trustedCtx
-    );
-    await handlerFor("reasoning.appended")(
-      reasoningEvent("First thought."),
-      eventChannel,
-      trustedCtx
-    );
-    now.advance(1000);
-    await handlerFor("reasoning.appended")(
-      reasoningEvent(" E"),
-      eventChannel,
-      trustedCtx
-    );
-    now.advance(1000);
-    await handlerFor("reasoning.appended")(
-      reasoningEvent("xtended."),
-      eventChannel,
-      trustedCtx
-    );
-    assert.deepEqual(typingsOf(calls), [
-      "typing:Working...",
-      "typing:First thought.",
-      "typing:First thought. Extended.",
-    ]);
-    assert.equal(Object.hasOwn(eventChannel.state, "reasoning"), false);
-  });
-
-  it("shares reasoning within one live state and isolates other sessions", async () => {
-    const firstCalls: string[] = [];
-    const secondCalls: string[] = [];
-    const first = progressChannel(firstCalls);
-    const second = progressChannel(secondCalls);
-    await handlerFor("reasoning.appended")(
-      reasoningEvent("First session."),
-      first,
-      trustedCtx
-    );
-    await handlerFor("reasoning.appended")(
-      reasoningEvent("Second session."),
-      second,
-      trustedCtx
-    );
-    await handlerFor("reasoning.appended")(
-      reasoningEvent(" Continued."),
-      { ...first },
-      trustedCtx
-    );
-    assert.deepEqual(typingsOf(firstCalls), [
-      "typing:First session.",
-      "typing:First session. Continued.",
-    ]);
-    assert.deepEqual(typingsOf(secondCalls), ["typing:Second session."]);
-  });
-
-  it("does not serialize full reasoning or reuse it in a rebuilt channel state", async () => {
-    const calls: string[] = [];
-    const eventChannel = progressChannel(calls);
-    await handlerFor("reasoning.appended")(
-      reasoningEvent("Visible first line.\nTransient later reasoning."),
-      eventChannel,
-      trustedCtx
-    );
-    const serialized = JSON.stringify(eventChannel.state);
-    assert.equal(serialized.includes("Transient later reasoning."), false);
-    assert.equal(Object.hasOwn(eventChannel.state, "reasoning"), false);
-    // Eve rebuilds channel context from serialized state at a durable step.
-    const rebuilt = progressChannel(calls, JSON.parse(serialized));
-    await handlerFor("reasoning.appended")(
-      reasoningEvent("Rebuilt stream."),
-      rebuilt,
-      trustedCtx
-    );
-    assert.deepEqual(typingsOf(calls), [
-      "typing:Visible first line.",
-      "typing:Rebuilt stream.",
-    ]);
-  });
-
-  it("resets reasoning at step, block and turn boundaries", async () => {
-    const calls: string[] = [];
-    const eventChannel = progressChannel(calls);
-    await handlerFor("reasoning.appended")(
-      reasoningEvent("Old step."),
-      eventChannel,
-      trustedCtx
-    );
-    const nextStep = { ...reasoningEvent("New step."), stepIndex: 1 };
-    await handlerFor("reasoning.appended")(nextStep, eventChannel, trustedCtx);
-    await handlerFor("reasoning.completed")(
-      { reasoning: "New step.", sequence: 3, stepIndex: 1, turnId: "t1" },
-      eventChannel,
-      trustedCtx
-    );
-    assert.equal(eventChannel.state.lastReasoningTypingAtMs, null);
-    assert.equal(eventChannel.state.lastReasoningTypingStatus, null);
-    await handlerFor("reasoning.appended")(
-      { ...nextStep, reasoningDelta: "New block." },
-      eventChannel,
-      trustedCtx
-    );
-    await handlerFor("reasoning.appended")(
-      { ...nextStep, reasoningDelta: "New turn.", turnId: "t2" },
-      eventChannel,
-      trustedCtx
-    );
-    assert.deepEqual(typingsOf(calls), [
-      "typing:Old step.",
-      "typing:New step.",
-      "typing:New block.",
-      "typing:New turn.",
-    ]);
-    await handlerFor("turn.completed")(
-      { sequence: 4, turnId: "t2" },
-      eventChannel,
-      trustedCtx
-    );
-    assert.equal(eventChannel.state.lastReasoningTypingAtMs, null);
-    assert.equal(eventChannel.state.lastReasoningTypingStatus, null);
-    await handlerFor("reasoning.appended")(
-      { ...nextStep, reasoningDelta: "After completion.", turnId: "t2" },
-      eventChannel,
-      trustedCtx
-    );
-    assert.equal(typingsOf(calls).at(-1), "typing:After completion.");
+    assert.equal(next.calls, 1);
   });
 
   it("labels real workflow tool requests", async () => {
@@ -1415,7 +1437,6 @@ describe("slack channel progress", () => {
       trustedCtx
     );
     assert.equal(eventChannel.state.progress?.waitLabel, "sleep");
-    assert.equal(typingsOf(calls).at(-1), "typing:sleep");
   });
 });
 
