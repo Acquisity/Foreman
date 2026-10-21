@@ -9,7 +9,6 @@ import {
   warmInstallCommand,
   warmInstallEnv,
   warmRepositoryPath,
-  warmSnapshotRevalidationKey,
 } from "./repository-warmup.js";
 
 const INVALID_REPOSITORY_PATTERN = /Invalid GitHub repository/u;
@@ -54,23 +53,5 @@ describe("repository warm-up", () => {
 
   it("installs bun where every uid on the default PATH can reach it", () => {
     assert.equal(bunInstallCommand(), `npm install -g bun@${BUN_VERSION}`);
-  });
-
-  it("folds the warm-up revision and snapshot id into the revalidation key", () => {
-    assert.equal(
-      warmSnapshotRevalidationKey("snap_123"),
-      "warm-1:snapshot-snap_123"
-    );
-  });
-
-  it("falls back to a 'none' snapshot id when no snapshot exists yet", () => {
-    assert.equal(
-      warmSnapshotRevalidationKey(undefined),
-      "warm-1:snapshot-none"
-    );
-  });
-
-  it("treats an empty snapshot id the same as an unset one", () => {
-    assert.equal(warmSnapshotRevalidationKey(""), "warm-1:snapshot-none");
   });
 });

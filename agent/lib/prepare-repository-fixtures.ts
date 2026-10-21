@@ -1,4 +1,5 @@
-import type { SandboxNetworkPolicy, SandboxSession } from "eve/sandbox";
+import type { SandboxNetworkPolicy } from "eve/sandbox";
+import type { VercelSandboxSession } from "eve/sandbox/vercel";
 
 // The commit identity resolves from the environment, so a switch never reaches
 // the connector metadata call a Connect runtime would have to serve. Stamped
@@ -59,13 +60,13 @@ export const fakeSandbox = (
       policies.push(policy);
       return Promise.resolve();
     },
-  } as unknown as SandboxSession;
+  } as unknown as VercelSandboxSession;
   return { commands, policies, sandbox };
 };
 
 // Stands in for the brokered GitHub token so the tests never mint one; the
 // firewall write is what the `finally` has to undo.
-export const broker = (sandbox: SandboxSession) =>
+export const broker = (sandbox: VercelSandboxSession) =>
   sandbox.setNetworkPolicy({ allow: { "*": [] } });
 
 export const ran = (commands: RunOptions[], needle: string) =>

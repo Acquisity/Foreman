@@ -3,7 +3,7 @@ import { existsSync } from "node:fs";
 import { describe, it } from "node:test";
 import type { UserContent } from "ai";
 import type { SessionAuthContext } from "eve/context";
-import type { SandboxSession } from "eve/sandbox";
+import type { VercelSandboxSession } from "eve/sandbox/vercel";
 import {
   evePackageUrl,
   loadCompiledDynamicToolResolvers,
@@ -232,7 +232,7 @@ const workspaceSandbox = () =>
       }),
     setNetworkPolicy: () => Promise.resolve(),
     writeTextFile: () => Promise.resolve(),
-  }) as unknown as SandboxSession;
+  }) as unknown as VercelSandboxSession;
 
 const prepare = async (auth: SessionAuthContext, repository: string) => {
   const { prepareRepositoryWorkspace } = await import(

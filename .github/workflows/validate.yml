@@ -2,7 +2,7 @@ name: validate
 
 on:
   pull_request:
-    branches: [main]
+    branches: [main, feature/eng-15868-eve-0.81.1]
 
 concurrency:
   group: validate-${{ github.event.pull_request.number }}

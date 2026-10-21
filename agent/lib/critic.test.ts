@@ -126,9 +126,7 @@ describe("critic subagent", () => {
   it("disables every write-capable default tool", () => {
     const tools = readdirSync(new URL("tools/", criticRoot)).sort();
     for (const name of [
-      "ask_question.ts",
       "bash.ts",
-      "todo.ts",
       "web_fetch.ts",
       "web_search.ts",
       "write_file.ts",

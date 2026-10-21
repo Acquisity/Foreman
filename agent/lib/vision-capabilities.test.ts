@@ -27,15 +27,7 @@ const HAS_COMPILED_MANIFEST = [
  * it was never given, a child with these crawled the shared sandbox for 106
  * steps and 46 out-of-memory kills before failing.
  */
-const DISABLED = [
-  "ask_question",
-  "bash",
-  "read_file",
-  "todo",
-  "web_fetch",
-  "web_search",
-  "write_file",
-];
+const DISABLED = ["bash", "read_file", "web_fetch", "web_search", "write_file"];
 
 // The nested subagent node, which capability-budget's own schema drops: it
 // measures the root's delegation tools, not the child's own capability surface.
