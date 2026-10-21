@@ -26,11 +26,12 @@ const TASK_WAIT = "eve__task_wait";
 const finalMessage = (events: readonly MessageStreamEvent[]) =>
   events
     .filter((event) => event.type === "message.completed")
-    .find(
+    .filter(
       (event) =>
         event.data.finishReason !== "tool-calls" &&
         Boolean(event.data.message?.trim())
-    );
+    )
+    .at(-1);
 
 export default defineEval({
   description:
