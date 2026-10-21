@@ -298,8 +298,8 @@ export const foremanRenderer = defineSlackRenderer({
         return next();
       }
       if (!data.message?.trim()) {
-        // eve accepts null for empty delivery despite its string-only type.
-        return next({ ...data, message: null as never });
+        // eve's default clears the status and posts nothing for "".
+        return next({ ...data, message: "" });
       }
       // This branch owns final delivery, so it never calls next(). The final
       // message ends progress tracking for the turn. The post is verbatim:
