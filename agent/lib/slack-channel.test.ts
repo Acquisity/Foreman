@@ -44,6 +44,18 @@ const {
   foremanRenderer,
 } = await import("../channels/slack.js");
 
+const { defaultEvents } = (await import(
+  new URL("./dist/src/public/channels/slack/defaults.js", evePackageUrl()).href
+)) as typeof import("../../node_modules/eve/dist/src/public/channels/slack/defaults.js");
+const { composeSlackRenderers } = (await import(
+  new URL("./dist/src/public/channels/slack/renderers.js", evePackageUrl()).href
+)) as typeof import("../../node_modules/eve/dist/src/public/channels/slack/renderers.js");
+const { events: composedEvents } = composeSlackRenderers([foremanRenderer], {
+  events: defaultEvents,
+  received: () => Promise.resolve(),
+  taskCard: () => null,
+});
+
 // The renderer reads and writes durable eve state, so handlers run inside a
 // real eve context, the same way eve calls them.
 const { ContextContainer, contextStorage } = (await import(
@@ -690,6 +702,79 @@ describe("slack channel", () => {
     assert.equal(next.calls, 0);
   });
 
+  it("resets eve's delivery state before posting a final reply", async () => {
+    const calls: string[] = [];
+    const eventChannel = completedEventChannel(calls);
+    eventChannel.state.pendingToolCallMessage = "Old narration";
+    eventChannel.state.threadStatus = {
+      atMs: Date.now(),
+      text: "Reading logs",
+    };
+    await composedEvents["message.completed"]?.(
+      completed("stop", "The answer."),
+      eventChannel,
+      {} as never
+    );
+    assert.equal(eventChannel.state.pendingToolCallMessage, null);
+    assert.equal(eventChannel.state.threadStatus, null);
+    assert.deepEqual(calls, ["post:The answer."]);
+  });
+
+  it("clears blank replies through eve's real default without posting", async () => {
+    await Promise.all(
+      ["  \n", "", null].map(async (text) => {
+        const calls: string[] = [];
+        const eventChannel = completedEventChannel(calls);
+        eventChannel.state.threadStatus = {
+          atMs: Date.now(),
+          text: "Thinking...",
+        };
+        await composedEvents["message.completed"]?.(
+          completed("stop", text),
+          eventChannel,
+          {} as never
+        );
+        assert.deepEqual(calls, ["typing"]);
+        assert.equal(eventChannel.state.threadStatus, null);
+      })
+    );
+  });
+
+  it("posts one content-free terminal notice over eve's real defaults", async () => {
+    await Promise.all(
+      [false, true].map(async (semantic) => {
+        const calls: string[] = [];
+        const eventChannel = completedEventChannel(calls);
+        const sensitive = "Authorization: Bearer SYNTHETIC";
+        const failure = {
+          code: "model-error",
+          details: {
+            errorId: "err_terminal",
+            hint: sensitive,
+            message: sensitive,
+            name: sensitive,
+            ...(semantic ? { semanticErrorId: "synthetic" } : {}),
+          },
+          message: sensitive,
+          sequence: 1,
+          sessionId: "s1",
+          terminal: true,
+          turnId: "t1",
+        };
+        await composedEvents["turn.failed"]?.(
+          failure,
+          eventChannel,
+          {} as never
+        );
+        assert.deepEqual(calls, []);
+        await composedEvents["session.failed"]?.(failure, eventChannel);
+        assert.deepEqual(calls, [
+          "post:I hit an error while handling your request.\n\nStart a new thread to continue because I can't pick this one back up.\n\n_Error id: `err_terminal`_",
+        ]);
+      })
+    );
+  });
+
   it("leaves a blank or null final message to eve's default", async () => {
     const handler = handlerFor("message.completed");
     const calls: string[] = [];
@@ -1168,7 +1253,7 @@ describe("slack channel progress", () => {
       "post:Still working: 5 minutes in, 0 tool calls so far. Currently waiting on investigator.",
     ]);
     assert.equal(eventChannel.state.progress?.toolCalls, 0);
-    assert.equal(eventChannel.state.progress?.waitLabel, "investigator");
+    assert.equal(eventChannel.state.progress.waitLabel, "investigator");
     // A skill load also refreshes the label without increasing the count.
     await handlerFor("action.result")(
       skillResultEvent,
@@ -1320,7 +1405,7 @@ describe("slack channel progress", () => {
     assert.equal(eventChannel.state.progress, undefined);
   });
 
-  it("leaves a terminal failure to eve's session.failed notice", async () => {
+  it("leaves a terminal failure to Foreman's session.failed notice", async () => {
     const calls: string[] = [];
     const eventChannel = progressChannel(calls);
     await handlerFor("turn.started")(

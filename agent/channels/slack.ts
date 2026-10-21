@@ -109,8 +109,8 @@ import { isIntakeOnly, stampTriageIntake } from "../lib/trust.js";
  * through `slack-post.ts`: ordered chunks that prefer paragraph then line
  * boundaries, plus one short visible fallback naming the Slack error when a
  * post is rejected. A non-terminal turn failure posts Foreman's short text
- * with the error id; a terminal one is left to eve's `session.failed` notice
- * so the thread sees one message.
+ * with the error id; Foreman's `session.failed` notice owns terminal failures
+ * so the thread sees one content-free message.
  */
 
 export const dispatch = async (
@@ -191,6 +191,17 @@ const extractErrorId = (
   const id = details?.errorId;
   return typeof id === "string" && id.length > 0 ? id : undefined;
 };
+
+const slackFailureText = (
+  nextStep: string,
+  errorId: string | undefined
+): string =>
+  [
+    "I hit an error while handling your request.",
+    "",
+    nextStep,
+    ...(errorId ? ["", `_Error id: \`${errorId}\`_`] : []),
+  ].join("\n");
 
 // --- Progress checkpoint ----------------------------------------------------
 // turn.started seeds the state (never for intake-only sessions),
@@ -283,19 +294,33 @@ export const foremanRenderer = defineSlackRenderer({
     async "message.completed"(data, channel, _ctx, next) {
       // Narration before a tool call and an empty delivery stay with eve,
       // which buffers the narration or clears the thread status.
-      if (data.finishReason === "tool-calls" || !data.message?.trim()) {
+      if (data.finishReason === "tool-calls") {
         return next();
+      }
+      if (!data.message?.trim()) {
+        // eve accepts null for empty delivery despite its string-only type.
+        return next({ ...data, message: null as never });
       }
       // This branch owns final delivery, so it never calls next(). The final
       // message ends progress tracking for the turn. The post is verbatim:
       // trimming would destroy leading Markdown indentation in the reply. A
       // throw here makes eve post its content-free "couldn't deliver" notice.
       channel.state.progress = undefined;
+      channel.state.pendingToolCallMessage = null;
+      channel.state.threadStatus = null;
       await postSlackReply((chunk) => channel.thread.post(chunk), data.message);
     },
     async "reasoning.appended"(data, channel, _ctx, next) {
       await checkSlackProgress(channel, data.turnId);
       await next();
+    },
+    async "session.failed"(data, channel) {
+      await channel.thread.post(
+        slackFailureText(
+          "Start a new thread to continue because I can't pick this one back up.",
+          extractErrorId(data.details)
+        )
+      );
     },
     async "turn.cancelled"(_data, channel, _ctx, next) {
       // The explicit stop path owns its exact-turn acknowledgement. This
@@ -311,7 +336,7 @@ export const foremanRenderer = defineSlackRenderer({
     },
     async "turn.failed"(data, channel) {
       // A failed turn leaves no progress state behind. A terminal failure
-      // posts nothing here, because eve's session.failed default posts the
+      // posts nothing here, because Foreman's session.failed handler posts the
       // one terminal notice. Otherwise the thread gets a short outcome and
       // the error id only, in place of eve's default text; the raw error
       // name and message stay in operator records.
@@ -319,14 +344,11 @@ export const foremanRenderer = defineSlackRenderer({
       if (data.terminal) {
         return;
       }
-      const errorId = extractErrorId(data.details);
       await channel.thread.post(
-        [
-          "I hit an error while handling your request.",
-          "",
+        slackFailureText(
           "Please try again, rephrase, or reach out if it keeps failing.",
-          ...(errorId ? ["", `_Error id: \`${errorId}\`_`] : []),
-        ].join("\n")
+          extractErrorId(data.details)
+        )
       );
     },
     async "turn.started"(_data, channel, ctx, next) {
