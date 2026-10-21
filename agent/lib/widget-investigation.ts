@@ -451,10 +451,26 @@ const completed = (
     : done;
 };
 
+type StreamEvent =
+  Awaited<ReturnType<Session["getEventStream"]>> extends ReadableStream<
+    infer Event
+  >
+    ? Event
+    : never;
+/** A failed or cancelled turn, or one waiting on a person nobody in the widget can answer. */
+const failedTurn = (event: StreamEvent) =>
+  event.type === "turn.failed" ||
+  event.type === "turn.cancelled" ||
+  event.type === "session.failed" ||
+  (event.type === "turn.waiting" && event.data.on === "input");
+
 /**
- * Task completion owns the answer. The structured result is the findings
- * channel; the last assistant message is kept as a fallback so a finish that
- * narrated instead of returning the schema still hands the teammate real prose.
+ * Turn completion owns the answer: since eve 0.67 the session parks after every
+ * turn, so `session.completed` never marks a turn's end. A held turn waiting on
+ * its tasks keeps reading; one waiting on a person fails, because nobody can
+ * answer in the widget. The structured result is the findings channel; the last
+ * assistant message is kept as a fallback so a finish that narrated instead of
+ * returning the schema still hands the teammate real prose.
  */
 export async function waitForWidgetInvestigation(
   session: Pick<Session, "getEventStream">,
@@ -493,9 +509,9 @@ export async function waitForWidgetInvestigation(
         findings = parseFindings(event.data.result);
       } else if (event.type === "message.completed") {
         text = messageText(event.data) ?? text;
-      } else if (event.type === "session.completed") {
+      } else if (event.type === "turn.completed") {
         return completed(so, { findings, status: "completed", text });
-      } else if (event.type === "session.failed") {
+      } else if (failedTurn(event)) {
         return { status: "failed" };
       }
     }
@@ -1393,7 +1409,6 @@ async function startInvestigation(
     const startIndex = existing ? await existing.getStreamTailIndex() : 0;
     const session = await from(address).send(question, {
       auth: widgetAuth(scope, run.id),
-      mode: "task",
       state: { runId: run.id },
     });
     sessionId = session.id;
@@ -1660,7 +1675,7 @@ async function cancelRun(
     await deps.cancel(run.id);
     if (run.session_id && attachSession) {
       await attachSession(run.session_id)
-        .cancel({ tasks: true })
+        .cancel()
         .catch(() => undefined);
     }
   }

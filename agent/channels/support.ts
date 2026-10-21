@@ -46,7 +46,6 @@ export default defineChannel({
       input.message,
       {
         auth: input.auth,
-        mode: "conversation",
         state: { claim },
         turnPolicy: "queue",
       }

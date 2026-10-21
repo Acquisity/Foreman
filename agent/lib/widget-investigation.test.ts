@@ -192,7 +192,7 @@ const completedSession = (id = "widget-session-1") =>
         finishReason: "stop",
         message: "The inbox disconnected; reconnect it to resume sending.",
       }),
-      event("session.completed"),
+      event("turn.completed"),
     ],
     id
   );
@@ -597,7 +597,7 @@ test("a completed investigation is gated, answered with the composed reply, and 
   assert.equal(auth.issuer, WIDGET_SUPPORT_ISSUER);
   assert.equal(isUnattended(auth as never), true);
   assert.equal(auth.attributes.organizationId, scope.organizationId);
-  assert.equal(sent.options.mode, "task");
+  assert.equal("mode" in sent.options, false);
   assert.equal(sent.options.outputSchema, undefined);
   assert.deepEqual(gated, [findings]);
   assert.deepEqual(await response.json(), {
@@ -1325,7 +1325,8 @@ test("cancel closes an open run and stops its session; a settled run is left alo
       {
         attachSession: (id) =>
           ({
-            cancel: () => {
+            cancel: (...args: unknown[]) => {
+              assert.deepEqual(args, []);
               cancelled.push(id);
               return Promise.resolve();
             },
@@ -1400,7 +1401,7 @@ test("a finish with no prose at all blocks with no findings", async (t) => {
     {
       from: () =>
         ({
-          send: () => Promise.resolve(session([event("session.completed")])),
+          send: () => Promise.resolve(session([event("turn.completed")])),
         }) as unknown as ReturnType<RouteHandlerArgs["from"]>,
       waitUntil: () => undefined,
     },
@@ -1414,6 +1415,42 @@ test("a finish with no prose at all blocks with no findings", async (t) => {
     ["block", null, null]
   );
   assert.equal(gated.length, 0);
+});
+
+test("a turn ends the wait: completed on turn.completed, failed on a failed, cancelled or input-waiting turn", async () => {
+  const message = event("message.completed", {
+    message: "Reconnect the inbox.",
+  });
+  const ends = await Promise.all(
+    [
+      event("turn.failed"),
+      event("turn.cancelled"),
+      event("session.failed"),
+      event("turn.waiting", { on: "input" }),
+    ].map((end) => waitForWidgetInvestigation(session([message, end])))
+  );
+  for (const outcome of ends) {
+    assert.deepEqual(outcome, { status: "failed" });
+  }
+  const held = await waitForWidgetInvestigation(
+    session([
+      event("turn.waiting", { on: "tasks" }),
+      message,
+      event("turn.completed"),
+    ])
+  );
+  assert.equal(held.status, "completed");
+  assert.equal(
+    held.status === "completed" && held.text,
+    "Reconnect the inbox."
+  );
+  // A session.completed alone no longer marks a turn's end.
+  assert.deepEqual(
+    await waitForWidgetInvestigation(
+      session([message, event("session.completed")])
+    ),
+    { status: "pending" }
+  );
 });
 
 test("a failed session blocks its run once", async () => {
@@ -1446,7 +1483,7 @@ test("a filed ticket is taken from the tool's own result, whatever the write-up 
     session([
       ticketResult({ existing: false, identifier: "ENG-14067", url }),
       event("message.completed", { message: "Engineering ticket filed." }),
-      event("session.completed"),
+      event("turn.completed"),
     ])
   );
   assert.deepEqual(outcome.status === "completed" && outcome.ticket, {
@@ -1461,7 +1498,7 @@ test("a filed ticket is taken from the tool's own result, whatever the write-up 
       ticketResult({ identifier: "ENG-14067", url }, { isError: true }),
       ticketResult({ identifier: "ENG-14067", url }, { toolName: "other" }),
     ].map((result) =>
-      waitForWidgetInvestigation(session([result, event("session.completed")]))
+      waitForWidgetInvestigation(session([result, event("turn.completed")]))
     )
   );
   for (const none of refused) {
@@ -1496,7 +1533,7 @@ test("a reading a tool fired reaches the composer even when the write-up set it 
       event("message.completed", {
         message: "The live read says no sends yet; I'm not relying on it.",
       }),
-      event("session.completed"),
+      event("turn.completed"),
     ])
   );
   assert.equal(outcome.status, "completed");
@@ -1628,7 +1665,7 @@ test("the ticket result carries whether Jev read it as a refund", async () => {
           toolName: "widget_file_ticket",
         },
       }),
-      event("session.completed"),
+      event("turn.completed"),
     ])
   );
   assert.deepEqual(outcome.status === "completed" && outcome.ticket, {
@@ -1652,7 +1689,7 @@ test("stream observation starts at the turn's index, resets on a new turn, and r
       event("result.completed", { result: findings }),
       event("turn.started"),
       event("result.completed", { result: { bad: true } }),
-      event("session.completed"),
+      event("turn.completed"),
     ]),
     7
   );
@@ -1679,7 +1716,7 @@ test("a finish the extractor cannot structure hands the prose to a human", async
     "Your sending inbox looks disconnected, so nothing is going out right now.";
   const proseSession = session([
     event("message.completed", { finishReason: "stop", message: prose }),
-    event("session.completed"),
+    event("turn.completed"),
   ]);
   const response = await receiveWidgetMessage(
     request(investigate),

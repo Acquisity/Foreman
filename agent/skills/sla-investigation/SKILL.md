@@ -2,7 +2,7 @@
 description: "Daily SLA bug report: find new SLA bugs (Bug + Urgent/High, SLA started at or after the window the dispatch provides) for a feature, investigate each with the right tool, and post a bottom-line report to the feature's Slack channel tagging whoever the dispatch names. Load for every sla-report schedule dispatch."
 ---
 
-Company-service tools use Executor. Use `connection_search` with the `connection` argument set to the Executor connection named in this turn's access instructions. Inside `execute`, search one provider namespace with `tools.search({ namespace, query })`, inspect `tools.describe.tool({ path })`, and call the returned `tools[path](input)`. Check `result.ok` before reading `result.data`. The provider tool names below are search hints, not callable Executor addresses. Never guess paths or use a removed direct provider connection. Authored Foreman helpers keep their bare names and require no discovery.
+Company-service tools use Executor. Use `eve__search` with a query that starts with `<connection>__`, where `<connection>` is the Executor connection named in this turn's access instructions, so it searches only that connection, and call what it returns with `eve__tool`. Inside `execute`, search one provider namespace with `tools.search({ namespace, query })`, inspect `tools.describe.tool({ path })`, and call the returned `tools[path](input)`. Check `result.ok` before reading `result.data`. The provider tool names below are search hints, not callable Executor addresses. Never guess paths or use a removed direct provider connection. Authored Foreman helpers keep their bare names and require no discovery.
 
 # SLA investigation
 
@@ -229,6 +229,6 @@ Blank line between blocks.
 
 ## When there are no bugs
 
-Deliver nothing at all. Not a summary, not an explanation of why there was nothing, not a note that you checked. Reply with exactly `<eve-empty-delivery/>` and no other text, unfenced and unquoted. Anything else you write is posted to the channel, which is the failure this rule exists to prevent.
+Deliver nothing at all. Not a summary, not an explanation of why there was nothing, not a note that you checked. Call `no_reply` and write no other text. Anything else you write is posted to the channel, which is the failure this rule exists to prevent.
 
 There are no bugs only when a feature has zero in-scope tickets of either kind. A day with only customer reports of existing masters is not an empty report: those still get their brief notes and the message posts.

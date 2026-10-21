@@ -95,7 +95,9 @@ describe("vision capability surface", () => {
     assert.match(instructions, NO_IMAGE_REFUSAL);
   });
 
-  it("compiles only the image tool and retained framework defaults", {
+  // eve adds its `eve__` catalog and task tools at runtime, outside the
+  // compiled node, so the image tool is the whole compiled surface.
+  it("compiles only the image tool", {
     skip: HAS_COMPILED_MANIFEST
       ? false
       : "run pnpm validate to compile the repository manifest first",
@@ -103,16 +105,9 @@ describe("vision capability surface", () => {
     const { connections, dynamicTools, sourceComposition, tools } =
       visionNode();
     assert.deepEqual(tools, [
-      { name: "load_skill", sourceId: "eve:defaults:tools/load_skill.ts" },
-      { name: "task_cancel", sourceId: "eve:defaults:tools/task_cancel.ts" },
       { name: "read_image", sourceId: "tools/read_image.ts" },
     ]);
-    assert.deepEqual(dynamicTools, [
-      {
-        slug: "connection_search",
-        sourceId: "eve:defaults:tools/connection_search.ts",
-      },
-    ]);
+    assert.deepEqual(dynamicTools, []);
     assert.deepEqual(connections, []);
     assert.deepEqual(
       sourceComposition.entries

@@ -22,9 +22,9 @@ export const isStopRequest = (text: string): boolean =>
 
 /**
  * Retire the exact session, including a parent parked while children work.
- * Cancelling tasks alone lets their cancellation results wake the parent into
- * another turn. Reset directly; the next Slack message starts fresh with
- * visible history, without restoring hidden state or sandbox files.
+ * Reset retires the session; `session.cancel()` alone would stop its tasks but
+ * leave the session. The next Slack message starts fresh with visible history,
+ * without restoring hidden state or sandbox files.
  */
 export const stopSlackSession = async (
   ctx: SlackInboundMessageContext
