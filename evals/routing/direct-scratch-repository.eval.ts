@@ -23,7 +23,7 @@ export default defineEval({
     // Run through Eve's local-dev or Vercel OIDC eval principal, which carries
     // no Foreman trust stamp. Approve only this run's exact branch and repo.
     assert.equal(turn.inputRequests.length, 1);
-    const request = await t.requireInputRequest({
+    const request = turn.session.requireInputRequest({
       input: { branch },
       optionIds: ["approve", "cancel"],
       toolName: "push_branch",
@@ -40,7 +40,7 @@ export default defineEval({
     );
     assert.equal(prepared.output.success, true);
     assert.equal(prepared.output.repository, repository);
-    const completed = await t.respond([
+    const completed = await turn.session.respond([
       { optionId: "approve", requestId: request.requestId },
     ]);
     t.succeeded();
@@ -54,11 +54,9 @@ export default defineEval({
     });
     assert.ok(typeof pullRequest.input.body === "string");
     assert.ok(pullRequest.input.body.includes(ticket));
-    t.judge.autoevals
-      .closedQA(
-        "Does the reply link a concrete pull request, describe the change and checks, and leave merging to a human?"
-      )
-      .atLeast(0.5);
+    t.judge(
+      "Does the reply link a concrete pull request, describe the change and checks, and leave merging to a human?"
+    ).atLeast(0.5);
   },
   timeoutMs: 1_800_000,
 });
