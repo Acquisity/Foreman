@@ -20,8 +20,8 @@ const COMPUTATIONS = [
   },
 ] as const;
 const RECEIPT = /^Started task (\S+)\. /u;
-// eve's own wait tool: the held turn may call it while both children work.
-const TASK_WAIT = "eve__task_wait";
+// The root may wait for its children and check its reply before delivery.
+const ROOT_CONTROL_TOOLS = new Set(["eve__task_wait", "check_reply"]);
 
 const finalMessage = (events: readonly MessageStreamEvent[]) =>
   events
@@ -68,10 +68,16 @@ export default defineEval({
         .flatMap((event) => event.data.actions)
         .filter(
           (action) =>
-            !(action.kind === "tool-call" && action.toolName === TASK_WAIT)
+            !(
+              action.kind === "tool-call" &&
+              ROOT_CONTROL_TOOLS.has(action.toolName)
+            )
         );
       const calls = requests.filter(
-        (action) => action.kind === "tool-call" && action.toolName === "agent"
+        (action) =>
+          action.kind === "subagent-call" &&
+          action.name === "agent" &&
+          action.subagentName === "agent"
       );
       await t.require(
         requests.length === 2 &&
@@ -93,6 +99,7 @@ export default defineEval({
             `Native call ${call.callId} did not receive its assigned computation.`
           );
         }
+        // Native calls return tool-result receipts; child results arrive later.
         const results = launch.events
           .filter((event) => event.type === "action.result")
           .filter((event) => event.data.result.callId === call.callId);

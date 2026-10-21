@@ -5,10 +5,10 @@ import { defineEvalConfig } from "eve/evals";
  *
  * @remarks
  * The judge model scores `t.judge.*` assertions only; it never changes the
- * agent under test. A small, cheap model is enough for the yes/no grading the
- * suite uses. Run the default loop with `pnpm eval --tag fast`; see the
- * README's evals section for the full matrix.
+ * agent under test. The typesafe-ai/jev decision model resolves through AI
+ * Gateway for the yes/no grading the suite uses. Run the default loop with
+ * `pnpm eval --tag fast`; see the README's evals section for the full matrix.
  */
 export default defineEvalConfig({
-  judge: { model: "google/gemini-3.6-flash" },
+  judge: { model: "typesafe-ai/jev" },
 });
