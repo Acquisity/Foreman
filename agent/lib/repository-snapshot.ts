@@ -1,5 +1,5 @@
-import { createRequire } from "node:module";
 import { type NetworkPolicy, Sandbox } from "@vercel/sandbox";
+import evePackage from "eve/package.json" with { type: "json" };
 import { githubCredentials } from "./github/credentials.js";
 import { brokerPolicy, mintInstallationToken } from "./github/git-remote.js";
 import { remoteUrl } from "./repository.js";
@@ -28,13 +28,7 @@ import {
  */
 export const eveSandboxImage = (): string => {
   const override = process.env.EVE_SANDBOX_IMAGE_TAG?.trim();
-  const tag = override
-    ? override
-    : (
-        createRequire(import.meta.url)("eve/package.json") as {
-          version: string;
-        }
-      ).version.split("+", 1)[0];
+  const tag = override ? override : evePackage.version.split("+", 1)[0];
   return `vcr.vercel.com/vercel/eve/base:${tag}`;
 };
 
