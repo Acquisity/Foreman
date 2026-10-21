@@ -184,7 +184,7 @@ export function replayable<T extends { description: string }>(
       const scope = requireWidgetContext(ctx.session?.auth.initiator);
       return live ? LIVE_TICKET : replayRead(name, input, scope.replayCaseId);
     },
-    inputSchema,
+    inputSchema: schemas.get(name) as z.ZodType,
   }) as unknown as T;
 }
 
