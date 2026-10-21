@@ -123,7 +123,7 @@ Superseded by eve 0.69 tasks: the reporting instruction, delivery policy and `<e
 
 Before 0.69, eve appended its own "Background task reporting" instruction to root turns (`tasks/delivery-context.js`, chosen in `tasks/delivery-policy.js`). A turn that launches a task is told to end with a launch acknowledgement, and a turn started by settled tasks is told "Do not reply with `<eve-empty-delivery/>`. Send one user-facing response that combines their useful results." An agent cannot change or disable either instruction, and a channel handler cannot see `taskDeliveryPhase`, so it cannot tell a settled-task turn from a user turn.
 
-On ENG-14042 the root answered the requester while a child was still running; the settled-task turn then had to say something, and an internal recap reached the Slack thread. Foreman works with the policy instead of approximating a gate: the Slack final-post rule keeps the answer out of any turn that still has a task running, so the settled-task turn carries the answer. The empty delivery marker is still honoured mechanically when the model sends it, and the rule uses it only for a result that arrives after the answer.
+Before 0.69, Foreman delayed the requester answer until the settled-task turn and used the empty-delivery marker to suppress late recaps after ENG-14042 exposed that failure.
 
 Proposal: let the agent set the task delivery policy per session or per channel (allow empty delivery on settled turns, suppress the launch acknowledgement), and expose the delivery phase on `turn.started` to channel handlers.
 

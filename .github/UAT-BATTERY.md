@@ -47,10 +47,11 @@ No session moves between a 0.54.2 deployment and a 0.81.1 deployment. The bounda
 - 0.70.0 and 0.75: the handoff checkpoint changed shape and then version, so no idle session hands off across them.
 - 0.69 also moved the message stream to version 26, which clients that accept only up to 25 reject. Foreman's own consumers run on the same eve, so only external tooling such as the workflow CLI used for production inspection is affected.
 
-1. Pause ingress: the Slack and Linear connector triggers and every enabled schedule that starts sessions. Pausing Slack alone does not stop a schedule. Let active root and child work finish, and record the deployment and the exact old session IDs, active and parked.
+0. Record the current Production and general Preview `VERCEL_SANDBOX_BASE_SNAPSHOT_ID` values in private operator notes, with only their last four characters in this document (today `nHgK`). Keep the 0.54 snapshot for the rollback window; never delete it. Before the cutover deploy, rebuild the warm snapshot with the 0.81 builder (`rebuild_warm_snapshot`) and set Production and general Preview to the new id. A snapshot built for an older eve image fails every session with "chdir /vercel/sandbox: no such file or directory".
+1. Record the current trigger destinations and which schedules are enabled, then pause ingress: the Slack and Linear connector triggers and every enabled schedule that starts sessions. Pausing Slack alone does not stop a schedule. Let active root and child work finish, and record the deployment and the exact old session IDs, active and parked.
 2. Retire every recorded old session through the 0.54.2 deployment's authenticated native `/eve/v1/session/:sessionId/reset` endpoint, before the 0.81.1 deployment takes the trigger.
 3. Deploy the tested 0.81.1 commit, verify its SHA, resume the verified triggers and continue an existing Slack thread. Confirm a fresh internal session, bounded visible history, real provider access and another normal reply. Retain the 0.81.1 deployment URL for recovery.
-4. Rehearse rollback by draining work and resetting the upgraded sessions through the still-running 0.81.1 deployment before deploying the code revert. The older eve cannot reset or import a 0.81.1 session. Verify a fresh session after rollback; a code revert does not restore prior internal state.
+4. Rehearse rollback by pausing ingress as in step 1, draining work, and resetting the upgraded sessions through the still-running 0.81.1 deployment. Restore Production and general Preview `VERCEL_SANDBOX_BASE_SNAPSHOT_ID` to the recorded 0.54 values before deploying the code revert. The older eve cannot reset or import a 0.81.1 session. Verify the reverted deployment is READY on the expected SHA, then restore the recorded trigger destinations and previously enabled schedules, leaving disabled support schedules as they were. Read both back, then continue an existing Slack thread and a Linear session through real connector ingress. Verify a fresh sandbox session and a real provider read; a code revert does not restore prior internal state.
 
 Also confirm these 0.81.1 behaviors on the exact Preview deployment:
 
@@ -59,8 +60,6 @@ Also confirm these 0.81.1 behaviors on the exact Preview deployment:
 | Long `bash` command | A command still running after 30 seconds returns `status: "running"` with its output so far, and the model continues, reading the output files with later commands instead of hanging the turn. |
 | Approved call identity | An approved call runs as the requester, never the approver. No approval card appears on Slack or Linear; Foreman's gates deny instead of parking. |
 | Model stream timeout | A model stream silent for ten minutes is abandoned and retried; when retries run out the turn ends with a terminal `turn.failed`, which posts exactly one failure notice and no double post. |
-
-Before deploying the eve 0.81.1 cutover, rebuild the warm snapshot with the 0.81 builder (`rebuild_warm_snapshot`) and set Production `VERCEL_SANDBOX_BASE_SNAPSHOT_ID` to the new id. A snapshot built for an older eve image fails every session with "chdir /vercel/sandbox: no such file or directory".
 
 The upgrade requires Aaron's acceptance and explicit merge approval before Production. Browser build/typecheck/unit success and local store tests are separate evidence from this live battery. Record unrun cases as outstanding unless Aaron explicitly waived or deferred them, and preserve that distinction.
 
