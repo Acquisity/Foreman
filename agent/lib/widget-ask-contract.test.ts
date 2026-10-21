@@ -156,7 +156,7 @@ async function deliver(
       type: "action.result",
     },
     { data: { message: closing }, type: "message.completed" },
-    { data: {}, type: "session.completed" },
+    { data: {}, type: "turn.completed" },
   ];
   const outcome = await waitForWidgetInvestigation({
     getEventStream: () =>
@@ -306,7 +306,7 @@ test("an errored tool call is not a recorded question either", async () => {
               },
               type: "action.result",
             });
-            controller.enqueue({ data: {}, type: "session.completed" });
+            controller.enqueue({ data: {}, type: "turn.completed" });
             controller.close();
           },
         })

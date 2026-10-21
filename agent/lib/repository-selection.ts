@@ -21,7 +21,7 @@ import { defineState } from "eve/context";
  *
  * eve's `defineState` reads through `loadContext()`, and eve dispatches a
  * dynamic resolver at `step.started` with that context active, which is how
- * eve's own `connection_search` reads its registry. So a repository prepared
+ * eve's own `eve__search` reads its registry. So a repository prepared
  * mid-turn is visible on the next step of the same turn, and
  * `prepare_repository` followed by a push works in one message. Both accessors
  * are still defensive: a resolver that throws loses its whole result, so an

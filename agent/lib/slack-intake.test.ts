@@ -108,7 +108,8 @@ describe("intake-only channels", () => {
     assert.equal(context.includes("a link to exactly one Linear issue"), true);
     assert.equal(context.includes("triage-investigate"), true);
     assert.equal(context.includes("The final post in the Slack thread"), true);
-    assert.equal(context.includes("<eve-empty-delivery/>"), true);
+    assert.equal(context.includes("eve__task_wait"), true);
+    assert.equal(context.includes("<eve-empty-delivery/>"), false);
     assert.equal(context.includes("progress updates are allowed"), false);
     assert.equal(context.includes("only the requester-facing answer"), true);
     assert.equal(context.includes("no internal summary or action log"), true);

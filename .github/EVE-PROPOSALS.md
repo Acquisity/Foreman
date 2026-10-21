@@ -32,7 +32,7 @@ Checked against eve 0.44.0.
 
 `defineDynamic` in a subagent's `agent.ts` supports per-session availability. The factory-specific motivation is retired: Foreman now retains only critic and vision, both used by ordinary triage. No new child gate is needed for factory removal.
 
-Eve 0.54.2 still prepares the delegation schema for each declared subagent; Foreman does not supply a narrower custom schema. Launches now return working receipts and results arrive later. The report uses each compiled node's prepared tool, including its actual background-work description. `pnpm report:capabilities` reads the installed schema rather than preserving the former eight-station count. A narrower framework schema remains a possible upstream improvement; it is not an upgrade prerequisite.
+Eve 0.54.2 still prepares the delegation schema for each declared subagent; Foreman does not supply a narrower custom schema. Launches now return working receipts and results arrive later. Resolved by eve 0.69 tasks: a call returns a receipt and its result arrives in the same held turn. The report uses each compiled node's prepared tool, including its actual background-work description. `pnpm report:capabilities` reads the installed schema rather than preserving the former eight-station count. A narrower framework schema remains a possible upstream improvement; it is not an upgrade prerequisite.
 
 ## 4. Gate a static extension tool per session without one slot per tool
 
@@ -88,6 +88,8 @@ Eve 0.54.2 upgrade: retain the inert route and verify it in `channelRoutes.effec
 Proposal: compile receive-only channels independently of routes and resolve cross-channel targets by durable channel identity.
 
 ## Author-controlled background task reporting
+
+Superseded by eve 0.69 tasks: the reporting instruction, delivery policy and `<eve-empty-delivery/>` are gone, results arrive in the same held turn, and Foreman uses eve's `no_reply` tool for an empty scheduled report.
 
 Eve 0.54.2 appends its own "Background task reporting" instruction to root turns (`tasks/delivery-context.js`, chosen in `tasks/delivery-policy.js`). A turn that launches a task is told to end with a launch acknowledgement, and a turn started by settled tasks is told "Do not reply with `<eve-empty-delivery/>`. Send one user-facing response that combines their useful results." An agent cannot change or disable either instruction, and a channel handler cannot see `taskDeliveryPhase`, so it cannot tell a settled-task turn from a user turn.
 

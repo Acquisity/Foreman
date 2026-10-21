@@ -25,28 +25,4 @@ export default defineAgent({
       "step.started": async () => modelFor(await resolveModel("vision")),
     },
   }),
-  outputSchema: {
-    additionalProperties: false,
-    properties: {
-      answer: {
-        description:
-          "The answer to the question that was asked, and nothing else.",
-        type: "string",
-      },
-      uncertainties: {
-        description:
-          "What could not be read with confidence: cropped, blurred, ambiguous, or absent from the image.",
-        items: { type: "string" },
-        type: "array",
-      },
-      visible_text: {
-        description:
-          "Text transcribed from the image that bears on the question, verbatim.",
-        items: { type: "string" },
-        type: "array",
-      },
-    },
-    required: ["answer", "visible_text", "uncertainties"],
-    type: "object",
-  },
 });

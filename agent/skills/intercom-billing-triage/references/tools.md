@@ -1,6 +1,6 @@
 # Billing investigation tools
 
-Company-service tools use Executor. Use `connection_search` with the `connection` argument set to the Executor connection named in this turn's access instructions. Inside `execute`, search one provider namespace with `tools.search({ namespace, query })`, inspect `tools.describe.tool({ path })`, and call the returned `tools[path](input)`. Check `result.ok` before reading `result.data`. The provider tool names below are search hints, not callable Executor addresses. Never guess paths or use a removed direct provider connection. Authored Foreman helpers keep their bare names and require no discovery.
+Company-service tools use Executor. Use `eve__search` with a query that starts with `<connection>__`, where `<connection>` is the Executor connection named in this turn's access instructions, so it searches only that connection, and call what it returns with `eve__tool`. Inside `execute`, search one provider namespace with `tools.search({ namespace, query })`, inspect `tools.describe.tool({ path })`, and call the returned `tools[path](input)`. Check `result.ok` before reading `result.data`. The provider tool names below are search hints, not callable Executor addresses. Never guess paths or use a removed direct provider connection. Authored Foreman helpers keep their bare names and require no discovery.
 
 Never guess a tool name. A service's REST API, its CLI, and its MCP server rarely share naming, and an invented call fails in a way that reads like the customer has no data.
 

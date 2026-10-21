@@ -312,7 +312,7 @@ test("a post-tool clarify question is delivered without structuring or composing
         },
         type: "message.completed",
       },
-      { data: {}, type: "session.completed" },
+      { data: {}, type: "turn.completed" },
     ];
     const waited = await waitForWidgetInvestigation({
       getEventStream: () =>
