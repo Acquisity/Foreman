@@ -45,6 +45,7 @@ const { canUseInvestigationMemory, isIntakeOnly, isTrusted, isUnattended } =
 const { repositoryFromAuth } = await import("./repository.js");
 
 const MISSING_OWNERSHIP = /no ownership binding/u;
+const MISSING_MODEL_SCHEMA = /tools\/t\.ts.*modelInputSchema/u;
 const UNSUPPORTED_DYNAMIC_SKILLS = /does not support dynamic skills/u;
 const UNRESOLVED_TOOL = /ext:crm:tools\/crm\.mjs/u;
 const GITHUB_TOOL_NAME = /^github__/u;
@@ -161,11 +162,16 @@ const FIXTURE = parseCapabilityManifest({
     {
       description: "abc",
       // JSON.stringify gives {"type":"object"}, 17 characters.
-      inputSchema: { type: "object" },
+      modelInputSchema: { type: "object" },
       name: "t",
       sourceId: "tools/t.ts",
     },
-    { description: "z", name: "b", sourceId: "ext:browser:tools/b.mjs" },
+    {
+      description: "z",
+      modelInputSchema: {},
+      name: "b",
+      sourceId: "ext:browser:tools/b.mjs",
+    },
   ],
 });
 
@@ -308,6 +314,40 @@ describe("manifest provenance", () => {
 });
 
 describe("lane measurement", () => {
+  it("counts the model-facing static schema instead of its validation schema", () => {
+    const modelInputSchema = { additionalProperties: false, type: "object" };
+    const manifest = parseCapabilityManifest({
+      ...MANIFEST_HEADER,
+      bindings: { "tools/t.ts": { owner: APPLICATION_OWNER } },
+      tools: [
+        {
+          inputSchema: { type: "object" },
+          modelInputSchema,
+          name: "t",
+          sourceId: "tools/t.ts",
+        },
+      ],
+    });
+    assert.equal(
+      measureLane(manifest, "slack", NO_DYNAMIC).rows[0]?.schemaChars,
+      JSON.stringify(modelInputSchema).length
+    );
+  });
+
+  it("refuses a measured static tool without a model-facing schema", () => {
+    const manifest = parseCapabilityManifest({
+      ...MANIFEST_HEADER,
+      bindings: { "tools/t.ts": { owner: APPLICATION_OWNER } },
+      tools: [
+        { inputSchema: { type: "object" }, name: "t", sourceId: "tools/t.ts" },
+      ],
+    });
+    assert.throws(
+      () => measureLane(manifest, "slack", NO_DYNAMIC),
+      MISSING_MODEL_SCHEMA
+    );
+  });
+
   it("counts names, descriptions, schemas, and bodies by source", () => {
     const budget = measureLane(FIXTURE, "slack", RESOLVED);
     assert.deepEqual(budget.rows, [
@@ -317,7 +357,7 @@ describe("lane measurement", () => {
         entries: 1,
         kind: "tool",
         nameChars: 1,
-        schemaChars: 0,
+        schemaChars: 2,
         source: "ext:browser",
       },
       {
@@ -358,7 +398,7 @@ describe("lane measurement", () => {
         source: "subagents/",
       },
     ]);
-    assert.equal(budget.catalogChars, 2 + 14 + 21 + 4 + 11);
+    assert.equal(budget.catalogChars, 4 + 14 + 21 + 4 + 11);
     assert.equal(budget.bodyChars, 4);
   });
 
@@ -370,8 +410,18 @@ describe("lane measurement", () => {
         "tools/two.ts": { owner: APPLICATION_OWNER },
       },
       tools: [
-        { description: "ab", name: "one", sourceId: "tools/one.ts" },
-        { description: "c", name: "two", sourceId: "tools/two.ts" },
+        {
+          description: "ab",
+          modelInputSchema: {},
+          name: "one",
+          sourceId: "tools/one.ts",
+        },
+        {
+          description: "c",
+          modelInputSchema: {},
+          name: "two",
+          sourceId: "tools/two.ts",
+        },
       ],
     });
     assert.deepEqual(measureLane(manifest, "slack", NO_DYNAMIC).rows, [
@@ -381,7 +431,7 @@ describe("lane measurement", () => {
         entries: 2,
         kind: "tool",
         nameChars: 6,
-        schemaChars: 0,
+        schemaChars: 4,
         source: "tools/",
       },
     ]);
@@ -549,7 +599,7 @@ describe("session lanes", () => {
 const LANE_HEADING = /## slack\n/u;
 const TABLE_HEADING = /kind {6}source/u;
 const TOTALS_LINE =
-  /catalog 52 characters \(about 13 tokens\), body 4 characters/u;
+  /catalog 54 characters \(about 14 tokens\), body 4 characters/u;
 const SHARE_LINE =
   /slack carries 50\.0% of the repository-interactive catalog/u;
 

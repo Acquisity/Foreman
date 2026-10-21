@@ -138,7 +138,11 @@ export const capabilityManifestSchema = z
       .default([]),
     subagents: z.array(compiledSubagentSchema).default([]),
     tools: z
-      .array(namedEntrySchema.extend({ inputSchema: z.unknown().optional() }))
+      .array(
+        namedEntrySchema.extend({
+          modelInputSchema: z.record(z.string(), z.unknown()).optional(),
+        })
+      )
       .default([]),
     version: z.literal(MEASURED_MANIFEST_VERSION),
   })
@@ -420,9 +424,6 @@ interface MeasuredEntry {
   readonly source: string;
 }
 
-const schemaChars = (schema: unknown): number =>
-  schema === undefined ? 0 : JSON.stringify(schema).length;
-
 const groupRows = (
   kind: CapabilityKind,
   entries: readonly MeasuredEntry[]
@@ -463,17 +464,23 @@ export function measureLane(
   const toolRows = groupRows("tool", [
     ...manifest.tools.flatMap((tool) => {
       const source = toolSource(manifest, tool.sourceId);
-      return source === null
-        ? []
-        : [
-            {
-              bodyChars: 0,
-              descriptionChars: tool.description.length,
-              nameChars: tool.name.length,
-              schemaChars: schemaChars(tool.inputSchema),
-              source,
-            },
-          ];
+      if (source === null) {
+        return [];
+      }
+      if (tool.modelInputSchema === undefined) {
+        throw new Error(
+          `Measured static tool ${tool.sourceId} has no modelInputSchema, so the catalog cannot be measured.`
+        );
+      }
+      return [
+        {
+          bodyChars: 0,
+          descriptionChars: tool.description.length,
+          nameChars: tool.name.length,
+          schemaChars: JSON.stringify(tool.modelInputSchema).length,
+          source,
+        },
+      ];
     }),
     ...resolved.dynamicTools.map((tool) => ({
       bodyChars: 0,
