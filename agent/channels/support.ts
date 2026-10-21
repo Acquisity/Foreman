@@ -18,7 +18,7 @@ async function reportFailure(claim: SupportClaim | null) {
   }
 }
 
-export async function settleRootTurn(
+async function settleRootTurn(
   _event: unknown,
   channel: { state: { claim: SupportClaim | null } },
   ctx: { session: { parent?: unknown } }
