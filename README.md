@@ -25,7 +25,7 @@ Skills under `agent/skills/` are load-on-demand procedures the model pulls in wh
 
 Foreman handles conversation, investigation, service operations, and repository changes with one general prompt. For an authorized change it resolves the repository, prepares a workspace, creates a validated feature branch, makes the change, runs proportionate checks, pushes, and opens a pull request. Foreman never merges.
 
-The root can use eve's native `agent` tool for independent subtasks. On eve 0.44 each call creates a fresh copy with the root's instructions, tools, connections, and sandbox; the child starts with fresh history and state and cannot delegate recursively. Give children self-contained instructions and avoid concurrent edits to the same files. Critic remains the independent read-only triage reviewer. Vision reads staged screenshots in the shared sandbox. There is no authored station pipeline, run-state coordinator, or automatic GitHub stabilization.
+The root can use eve's native `agent` tool for independent subtasks. On eve 0.81.1 each call creates a fresh copy with the root's instructions, tools, connections, and sandbox; the child starts with fresh history and state and cannot delegate recursively. Give children self-contained instructions and avoid concurrent edits to the same files. Critic remains the independent read-only triage reviewer. Vision reads staged screenshots in the shared sandbox. There is no authored station pipeline, run-state coordinator, or automatic GitHub stabilization.
 
 ## Trust and safety
 

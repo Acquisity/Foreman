@@ -2,7 +2,7 @@
 
 Company MCPs and authored provider helpers use one app-scoped Executor toolkit, `Foreman`. Root, native delegates, critic, and schedules share the same provider access; skills define workflow behavior and the critic remains instructed to review read-only. The toolkit manifest and exact operation bindings live under `.github/executor/`. Inbound delivery, storage, models, and sandbox infrastructure remain separate.
 
-Foreman is a repository-neutral Eve 0.54.2 agent with one general execution path. The upgrade pins AI SDK 7.0.97 and the GitHub extension 0.7.1.
+Foreman is a repository-neutral Eve 0.81.1 agent with one general execution path. The upgrade pins AI SDK 7.0.148 and the GitHub extension 0.8.1.
 
 ## Routing
 
@@ -72,6 +72,6 @@ Investigation memory is a private Foreman-owned Postgres database, separate from
 
 Every Foreman-authored outside call is inventoried in [OUTSIDE-CALLS.md](./OUTSIDE-CALLS.md). `pnpm validate` checks generated specs, Ultracite, TypeScript, `eve info`, and unit tests. `pnpm report:capabilities` reads manifest version 54, distinguishes framework defaults through compiled owner bindings, and measures each declared child's actual prepared delegation description and schema. It checks three lanes and admits GitHub dynamic tools through Eve's real preparation before counting them; all 31 must survive. Ordinary Slack must carry no more than 75% of the repository catalog. The compiled catalog must retain exactly critic and vision as declared children.
 
-`pnpm verify:built-github` boots the actual server and reads its registered compiled module map, including the GitHub extension inlined by Eve 0.54.2. It verifies the exact 31-tool allowlist and all 31 execute, approvalRequest and toModelOutput callbacks, mounted lane gates, distinct approval policies and an unstamped negative fixture.
+`pnpm verify:built-github` boots the actual server and reads its registered compiled module map, including the GitHub extension inlined by Eve 0.81.1. It verifies the exact 31-tool allowlist and all 31 execute, approvalRequest and toModelOutput callbacks, mounted lane gates, distinct approval policies and an unstamped negative fixture.
 
 Evals cover direct questions, clarification, repository/model approvals, prompt injection, native delegation, and opt-in scratch delivery. Build and discovery do not prove runtime dispatch: run [UAT-BATTERY.md](./UAT-BATTERY.md) on the exact Preview commit, including attachments, intake restrictions, critic, native children, cancellation, and real provider reads. Configure the current PR's Preview trigger and Executor environment before testing. Production rollback is a revert on `main`, never `vercel rollback`.

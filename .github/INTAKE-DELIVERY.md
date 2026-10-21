@@ -25,7 +25,7 @@ Inferred or unknown:
 - Whether the critic verdict preceded the requester answer. The recap says the "background assessment confirmed my applied decisions", which suggests routing was applied before it returned. Not proven.
 - The reasoning setting used by the run.
 
-Framework cause, found in review: eve 0.54.2 appends a "Background task reporting" instruction to root turns. A turn that launches a task must end with an acknowledgement, and a turn started by settled tasks is told not to use the empty delivery and to send one user-facing response. The 18:20 answer went out while a child was running, so the 18:21 settled-task turn had to say something. See the EVE-PROPOSALS.md section on background task reporting.
+Framework cause, found in review: the eve release then running (before 0.69) appended a "Background task reporting" instruction to root turns. A turn that launches a task must end with an acknowledgement, and a turn started by settled tasks is told not to use the empty delivery and to send one user-facing response. The 18:20 answer went out while a child was running, so the 18:21 settled-task turn had to say something. See the EVE-PROPOSALS.md section on background task reporting. Eve 0.81.1 no longer appends that instruction: since 0.69 a task call holds the turn and each result arrives in that same turn, so there is no separate settled-task turn (`node_modules/eve/docs/tools/tasks.md`, `tasks-upgrade.md`).
 
 Instructed causes found in authored text (addressed in slice 1 by prompt rule; model compliance is unproven until live UAT):
 

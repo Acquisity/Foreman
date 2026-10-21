@@ -4,7 +4,7 @@ ENG-13601 adds two disabled-by-default Eve schedules. `intercom-handoffs` runs e
 
 ## Eve contract
 
-The ENG-13737 lifecycle migration uses installed, lockfile-pinned Eve 0.54.2 documentation: `node_modules/eve/docs/schedules.mdx`, `patterns/dynamic-scheduling.md`, `patterns/durable-cross-channel-notifications.md`, `channels/custom.mdx`, and `concepts/state.md`.
+The ENG-13737 lifecycle migration follows the installed, lockfile-pinned Eve documentation, now Eve 0.81.1: `node_modules/eve/docs/schedules.mdx`, `patterns/dynamic-scheduling.md`, `patterns/durable-cross-channel-notifications.md`, `channels/custom.mdx`, and `concepts/state.md`.
 
 Schedules are root files discovered at build time. Each supplies a five-field UTC cron and a `run` handler; asynchronous work is registered with `waitUntil`. `to(...).send(...)` starts an agent session, not a Slack API post. The internal `support` channel retains an inert GET `/internal/support` route returning 404 so it remains in the compiled channel catalog. Only the authenticated internal receive path starts sessions. It sends each claim in conversation mode and seeds the claim into persisted channel state. Parent-turn completion leaves the lease active for later critic/vision results; only explicit completion or the fenced failure paths settle it. The root uses the existing Intercom product/billing skills and delegates their existing review and vision work. The scheduled adaptation skips attended-only investigation memory, reports missing details to Aaron instead of waiting, and replaces only the final Slack wording. Ordinary interactive skills are unchanged.
 
