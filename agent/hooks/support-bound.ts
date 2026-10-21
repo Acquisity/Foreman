@@ -1,10 +1,11 @@
 /**
- * A thrown authored hook fails the turn; a channel handler cannot enforce this
- * bound because eve swallows its errors. The counter spans background-result
+ * A hook stops a turn with `ctx.cancel()`; eve logs and swallows an error
+ * raised by a hook or a channel handler alike. The counter spans background-result
  * turns without extending the original deadline.
  */
 import { defineState } from "eve/context";
 import { defineHook } from "eve/hooks";
+import { logOpsEvent } from "../lib/ops-log.js";
 import { isSupportAuth } from "../lib/support/auth.js";
 import {
   countSupportStep,
@@ -22,16 +23,37 @@ const runSteps = defineState<SupportRunSteps>(
   })
 );
 
+const stop = (
+  ctx: { cancel: () => void; session: { id: string } },
+  turnId: string,
+  message: string
+) => {
+  logOpsEvent("support.run_bound", {
+    message,
+    sessionId: ctx.session.id,
+    turnId,
+  });
+  ctx.cancel();
+};
+
 export default defineHook({
   events: {
-    "authorization.required": (_event, ctx) => {
+    "authorization.required": (event, ctx) => {
       if (isSupportAuth(ctx.session.auth.initiator)) {
-        throw new Error("Scheduled support cannot wait for authorization.");
+        stop(
+          ctx,
+          event.data.turnId,
+          "Scheduled support cannot wait for authorization."
+        );
       }
     },
-    "input.requested": (_event, ctx) => {
+    "input.requested": (event, ctx) => {
       if (isSupportAuth(ctx.session.auth.initiator)) {
-        throw new Error("Scheduled support cannot wait for human input.");
+        stop(
+          ctx,
+          event.data.turnId,
+          "Scheduled support cannot wait for human input."
+        );
       }
     },
     "step.started": (event, ctx) => {
@@ -47,7 +69,12 @@ export default defineHook({
           steps: steps.count,
         })
       ) {
-        throw new Error("Support investigation reached its run bound.");
+        stop(
+          ctx,
+          event.data.turnId,
+          "Support investigation reached its run bound."
+        );
+        return;
       }
       runSteps.update(() => steps);
     },
