@@ -1,4 +1,5 @@
 import type { RouteHandlerArgs, Session } from "eve/channels";
+import type { MessageStreamEvent } from "eve/client";
 import { z } from "zod";
 import { readRequestBody } from "./bounded-body.js";
 import { logOpsEvent } from "./ops-log.js";
@@ -451,14 +452,8 @@ const completed = (
     : done;
 };
 
-type StreamEvent =
-  Awaited<ReturnType<Session["getEventStream"]>> extends ReadableStream<
-    infer Event
-  >
-    ? Event
-    : never;
 /** A failed or cancelled turn, or one waiting on a person nobody in the widget can answer. */
-const failedTurn = (event: StreamEvent) =>
+const failedTurn = (event: MessageStreamEvent) =>
   event.type === "turn.failed" ||
   event.type === "turn.cancelled" ||
   event.type === "session.failed" ||
