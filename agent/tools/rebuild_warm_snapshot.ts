@@ -23,7 +23,7 @@ import { createWarmSnapshot } from "#lib/repository-snapshot.js";
 export default defineTool({
   approval: warmSnapshotPolicy,
   description:
-    "Rebuild the warm dependency snapshot for the pre-warmed repositories and return its id. Takes several minutes. Run it after the warm-up itself changes or after an eve upgrade (the snapshot carries eve's sandbox image), not to pick up new commits. The id must then be set as VERCEL_SANDBOX_BASE_SNAPSHOT_ID and the app redeployed before it takes effect.",
+    "Rebuild the warm dependency snapshot for the pre-warmed repositories and return its id. Takes several minutes. Run it after the warm-up itself changes or after an eve upgrade or EVE_SANDBOX_IMAGE_TAG change (the snapshot carries eve's sandbox image), not to pick up new commits. The id must then be set as VERCEL_SANDBOX_BASE_SNAPSHOT_ID and the app redeployed before it takes effect.",
   execute: async () => {
     try {
       const snapshotId = await createWarmSnapshot();
