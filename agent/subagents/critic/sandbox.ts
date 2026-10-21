@@ -5,4 +5,4 @@
 // same safe.directory session hook. It prepares and pins the repository itself
 // with prepare_repository and checkout_commit.
 // biome-ignore lint/performance/noBarrelFile: eve discovers a child sandbox by path, so the root definition is mounted here rather than duplicated.
-export { default } from "../../sandbox.js";
+export { default, environment } from "../../sandbox.js";

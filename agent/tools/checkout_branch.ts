@@ -9,6 +9,7 @@ import {
 import { readPreparedRepository, remoteUrl } from "#lib/repository.js";
 import { repositoryCapabilitiesAvailable } from "#lib/repository-lane.js";
 import { boundedRun } from "#lib/sandbox-deadline.js";
+import { environment } from "#sandbox.js";
 
 export const checkoutBranchTool = defineTool({
   description:
@@ -18,7 +19,7 @@ export const checkoutBranchTool = defineTool({
     if (refusal) {
       return { error: refusal, success: false as const };
     }
-    const sandbox = await ctx.getSandbox();
+    const sandbox = await ctx.getSandbox(environment);
     const prepared = await readPreparedRepository(sandbox);
     const token = await mintInstallationToken(githubCredentials);
     await sandbox.setNetworkPolicy(brokerPolicy(token));

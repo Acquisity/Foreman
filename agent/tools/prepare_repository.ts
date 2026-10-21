@@ -1,5 +1,6 @@
 import type { SessionAuthContext } from "eve/context";
 import type { SandboxSession } from "eve/sandbox";
+import type { VercelSandboxSession } from "eve/sandbox/vercel";
 import { defineTool } from "eve/tools";
 import { z } from "zod";
 import { FALLBACK_BOT_NAME, resolveBotName } from "#lib/github/bot-name.js";
@@ -29,6 +30,7 @@ import {
   TIMED_OUT_EXIT_CODE,
 } from "#lib/sandbox-deadline.js";
 import { isUnattended } from "#lib/trust.js";
+import { environment } from "#sandbox.js";
 
 const SAFE_IDENTITY_PATTERN = /^[A-Za-z0-9._-]{1,80}$/u;
 
@@ -39,7 +41,7 @@ const COMMIT_PATTERN = /^[0-9a-f]{7,64}$/u;
  * Applies the brokered GitHub credential to the sandbox firewall for the
  * duration of one credential window.
  */
-export type CredentialBroker = (sandbox: SandboxSession) => Promise<void>;
+export type CredentialBroker = (sandbox: VercelSandboxSession) => Promise<void>;
 
 export interface CheckoutOptions {
   readonly broker?: CredentialBroker;
@@ -310,7 +312,7 @@ export const detectWorktree = async (
 };
 
 export const cloneExplicitRepository = async (
-  sandbox: SandboxSession,
+  sandbox: VercelSandboxSession,
   repository: string,
   {
     broker = brokerGitHubToken,
@@ -411,7 +413,7 @@ const lockfileChanged = async (
  * retry can start over.
  */
 export const refreshCheckout = async (
-  sandbox: SandboxSession,
+  sandbox: VercelSandboxSession,
   repository: string,
   warmed: WarmRepository | null,
   installAnyway: boolean,
@@ -523,7 +525,7 @@ export const refreshCheckout = async (
  * pre-warmed (or whose warmed checkout is missing).
  */
 export const prepareWarmedOrClone = async (
-  sandbox: SandboxSession,
+  sandbox: VercelSandboxSession,
   repository: string,
   options: CheckoutOptions = {}
 ): Promise<string | null> => {
@@ -606,7 +608,7 @@ export const prepareWarmedOrClone = async (
  * longer holds the repository it names.
  */
 const replaceCheckout = async (
-  sandbox: SandboxSession,
+  sandbox: VercelSandboxSession,
   repository: string,
   options: CheckoutOptions
 ): Promise<{ error: string; restored: boolean } | null> => {
@@ -650,7 +652,7 @@ const replaceCheckout = async (
 
 /** Prepares a repository for a session that has none prepared yet. */
 const prepareFreshCheckout = (
-  sandbox: SandboxSession,
+  sandbox: VercelSandboxSession,
   repository: string,
   worktree: "/workspace" | "/workspace/repo",
   options: CheckoutOptions
@@ -664,7 +666,7 @@ const prepareFreshCheckout = (
  * leaving the session on a usable checkout either way.
  */
 const switchPreparedRepository = async (
-  sandbox: SandboxSession,
+  sandbox: VercelSandboxSession,
   previous: PreparedMarker,
   {
     auth,
@@ -789,7 +791,7 @@ const refuse = (code: string, error: string) => {
 
 /** The part of eve's tool context preparing a repository reads. */
 interface PrepareContext {
-  getSandbox: () => Promise<SandboxSession>;
+  getSandbox: (sandbox: typeof environment) => Promise<VercelSandboxSession>;
   session: { auth: { current: SessionAuthContext | null } };
 }
 
@@ -817,7 +819,7 @@ export const prepareRepositoryWorkspace = async (
     );
   }
 
-  const sandbox = await ctx.getSandbox();
+  const sandbox = await ctx.getSandbox(environment);
   const timeoutMs = options.timeoutMs ?? REPOSITORY_OPERATION_TIMEOUT_MS;
   const previous = await readExistingMarker(sandbox);
   // Reusing the marker and setting its checkout aside both trust it, so an

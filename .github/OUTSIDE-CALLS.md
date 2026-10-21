@@ -120,10 +120,6 @@ Draining the stream is bounded. `read_image` reads it through its own reader und
 
 Acquiring the stream is exempt for the same reason the marker calls are. The `readFile` call that returns it takes the same dropped signal, and nothing Foreman owns exists yet to cancel, so its only bound is the Vercel function's own invocation ceiling. Racing a timer against it would report a failure while the request kept running. Revisit with the adapter.
 
-### Agent browser install
-
-`installAgentBrowser` in `agent/sandbox.ts` bootstrap is third-party (`@agent-browser/eve`) and runs during eve's own sandbox bootstrap, not inside a turn. It exposes no deadline parameter, and a bootstrap that never finishes fails template creation rather than holding a Slack thread open.
-
 ### Linked Linear follow-up reads
 
 `agent/lib/support/triage-completion.ts` reads the journaled customer report, its one investigation document and bounded comment history before final completion, through the same support reads. It adds no writes or transport.

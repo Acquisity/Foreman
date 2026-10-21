@@ -1,20 +1,6 @@
 import { parseRepository } from "./repository.js";
 
 /**
- * Warm-up revision: a manual lever for forcing a template rebuild.
- *
- * @remarks
- * Changing the warm-up mechanics (a new repository, a different install
- * command, a cache layout move) does not need a bump. Those now run in
- * `createWarmSnapshot`, not in the template build, and reach the template only
- * through the snapshot id, which is different for every rebuild and already
- * moves the revalidation key. Rebuilding the template against an unchanged
- * snapshot id would only re-seed the same stale snapshot. Bump this when
- * something outside the snapshot has to invalidate the template.
- */
-export const WARM_UP_REVISION = "1";
-
-/**
  * Shared, world-writable cache roots so the snapshot builder uid and the
  * session user (runtime install) hit the same package store instead of each
  * paying a cold install from HOME.
@@ -115,14 +101,3 @@ export const BUN_VERSION = "1.3.5";
  */
 export const bunInstallCommand = (): string =>
   `npm install -g bun@${BUN_VERSION}`;
-
-/**
- * Build-time revalidation component for the warm-up. Folds in the warm-up
- * revision and the external snapshot id so a rebuilt snapshot (or the first
- * snapshot ever) rebuilds the template. When no snapshot exists yet the id is
- * `"none"` and the template cold-clones, which is the safe pre-first-snapshot
- * fallback.
- */
-export const warmSnapshotRevalidationKey = (
-  snapshotId: string | undefined
-): string => `warm-${WARM_UP_REVISION}:snapshot-${snapshotId || "none"}`;

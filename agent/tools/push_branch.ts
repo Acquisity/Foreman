@@ -1,5 +1,5 @@
 import type { SessionAuthContext } from "eve/context";
-import type { SandboxSession } from "eve/sandbox";
+import type { VercelSandboxSession } from "eve/sandbox/vercel";
 import { defineDynamic, defineTool } from "eve/tools";
 import { z } from "zod";
 import { deliveryPolicy } from "#lib/github/approval.js";
@@ -17,6 +17,7 @@ import {
 } from "#lib/repository.js";
 import { repositoryCapabilitiesAvailable } from "#lib/repository-lane.js";
 import { boundedRun } from "#lib/sandbox-deadline.js";
+import { environment } from "#sandbox.js";
 
 /**
  * Returns the refusal to the model and leaves exactly one bounded warning
@@ -37,11 +38,11 @@ const refuse = (code: string, error: string) => {
  * Applies the brokered GitHub credential to the sandbox firewall for the
  * duration of one push.
  */
-export type CredentialBroker = (sandbox: SandboxSession) => Promise<void>;
+export type CredentialBroker = (sandbox: VercelSandboxSession) => Promise<void>;
 
 /** The part of eve's tool context a push reads. */
 interface PushContext {
-  getSandbox: () => Promise<SandboxSession>;
+  getSandbox: (sandbox: typeof environment) => Promise<VercelSandboxSession>;
   session: { auth: { current: SessionAuthContext | null } };
 }
 
@@ -68,7 +69,7 @@ export const pushPreparedBranch = async (
   if (refusal) {
     return refuse("invalid_branch", refusal);
   }
-  const sandbox = await ctx.getSandbox();
+  const sandbox = await ctx.getSandbox(environment);
   const prepared = await readPreparedRepository(sandbox);
   // Only a signed GitHub webhook binds the session, and that binding is a
   // hard gate: message text must not retarget a push away from the
