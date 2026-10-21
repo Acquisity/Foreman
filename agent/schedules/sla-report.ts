@@ -116,7 +116,7 @@ export default defineSchedule({
 
     try {
       const heartbeat = to(slack, { channelId: OWNER_USER_ID }).send(
-        `Daily SLA check health line. Load the sla-investigation skill and run only the Linear query step for every feature: ${FEATURE_CHANNELS.map((entry) => entry.feature).join(", ")}. Do not investigate anything and do not open any other tool. Post exactly one line naming each feature and how many in-scope bugs it has for SLA started at or after ${since}, then one line listing any in-scope bug whose project maps to no feature, by identifier and project, so a new or cross-cutting project is visible instead of dropped. This run always posts, so neither the skill's required investigation nor its empty-delivery rule applies here: never reply with the empty-delivery marker, and report zero counts as zeros.`,
+        `Daily SLA check health line. Load the sla-investigation skill and run only the Linear query step for every feature: ${FEATURE_CHANNELS.map((entry) => entry.feature).join(", ")}. Do not investigate anything and do not open any other tool. Post exactly one line naming each feature and how many in-scope bugs it has for SLA started at or after ${since}, then one line listing any in-scope bug whose project maps to no feature, by identifier and project, so a new or cross-cutting project is visible instead of dropped. This run always posts, so neither the skill's required investigation nor its empty-delivery rule applies here: never call no_reply, and report zero counts as zeros.`,
         { auth: authFor(OWNER_USER_ID) }
       );
       waitUntil(

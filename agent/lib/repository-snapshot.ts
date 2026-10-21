@@ -22,7 +22,7 @@ import {
  *
  * It must match because eve passes no image when the session source is a
  * snapshot: the session runs on the snapshot's own filesystem. A snapshot built
- * from another image (eve 0.54's older `vercel/eve` image) has no `/vercel/sandbox`,
+ * from another image (an earlier eve's older `vercel/eve` image) has no `/vercel/sandbox`,
  * and every session fails with "chdir /vercel/sandbox: no such file or
  * directory". Any eve upgrade therefore requires a snapshot rebuild.
  */
