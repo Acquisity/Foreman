@@ -10,7 +10,7 @@ export default defineEval({
       "In Acquisity/Foreman, explain the steps for a tiny README wording correction. Answer directly without delegation. This is a plan only: do not edit files, commit, push, or open a PR."
     );
     t.succeeded();
-    t.notEvent("subagent.called");
+    t.notEvent("task.started", { data: { kind: "agent" } });
     for (const tool of WRITE_TOOLS) {
       t.notCalledTool(tool);
     }

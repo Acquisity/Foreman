@@ -10,15 +10,13 @@ export default defineEval({
       "In Acquisity/Foreman, something is wrong with the emails, you know the one I mean. Fix it properly this time. Ask me what you need to know before investigating or changing anything."
     );
     t.succeeded();
-    t.notEvent("subagent.called");
+    t.notEvent("task.started", { data: { kind: "agent" } });
     t.notCalledTool("prepare_repository");
     for (const tool of WRITE_TOOLS) {
       t.notCalledTool(tool);
     }
-    t.judge.autoevals
-      .closedQA(
-        "Does the submission ask specific questions about which email problem the user means, without claiming to have investigated or fixed it?"
-      )
-      .soft(0.5);
+    t.judge(
+      "Does the submission ask specific questions about which email problem the user means, without claiming to have investigated or fixed it?"
+    ).atLeast(0.5);
   },
 });

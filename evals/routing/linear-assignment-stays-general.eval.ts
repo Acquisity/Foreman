@@ -10,7 +10,7 @@ export default defineEval({
       "This issue was assigned to you in Linear. For Acquisity/Foreman, explain how you would investigate an off-by-one pagination error. Reply with the steps only; do not investigate, delegate, edit files, or open a pull request."
     );
     t.succeeded();
-    t.notEvent("subagent.called");
+    t.notEvent("task.started", { data: { kind: "agent" } });
     t.notCalledTool("prepare_repository");
     for (const tool of WRITE_TOOLS) {
       t.notCalledTool(tool);
