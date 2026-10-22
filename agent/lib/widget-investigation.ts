@@ -898,8 +898,9 @@ async function structureWriteUp(
 }
 
 /**
- * The away line is fixed text added after the gate: a blocked reply stays
- * blocked, and the app's own after-hours handoff line covers it.
+ * The away line is fixed text added after the gate: a blocked reply or a
+ * handoff reply gets none, since the app's own handoff line follows it and
+ * already covers office hours.
  */
 async function withAwayLine(
   result: WidgetOutcome,
@@ -911,7 +912,11 @@ async function withAwayLine(
   history: WidgetAsk["turns"]
 ): Promise<WidgetOutcome> {
   const hours = awayHours(run.scope);
-  if (!(hours && result.message) || result.decision === "block") {
+  if (
+    !(hours && result.message) ||
+    result.decision === "block" ||
+    result.reason === "needs_human"
+  ) {
     return result;
   }
   // An unreadable receipt counts as none; it must not fail an allowed reply.
