@@ -10,7 +10,7 @@ export default defineEval({
       "Hi! What are you and what can you do for me on this repository?"
     );
     t.succeeded();
-    t.notEvent("subagent.called");
+    t.notEvent("task.started", { data: { kind: "agent" } });
     for (const tool of GITHUB_WRITE_TOOLS) {
       t.notCalledTool(tool);
     }

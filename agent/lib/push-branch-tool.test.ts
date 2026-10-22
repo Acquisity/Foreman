@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { SessionAuthContext } from "eve/context";
-import type { SandboxNetworkPolicy, SandboxSession } from "eve/sandbox";
+import type { SandboxNetworkPolicy } from "eve/sandbox";
+import type { VercelSandboxSession } from "eve/sandbox/vercel";
 import { REPOSITORY_MARKER, stampRepository } from "./repository.js";
 
 process.env.LINEAR_CONNECTOR ??= "linear/test";
@@ -65,7 +66,7 @@ const fakeSandbox = () => {
       policies.push(policy);
       return Promise.resolve();
     },
-  } as unknown as SandboxSession;
+  } as unknown as VercelSandboxSession;
   return { commands, policies, sandbox };
 };
 

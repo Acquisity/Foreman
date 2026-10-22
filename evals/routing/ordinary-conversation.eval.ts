@@ -9,6 +9,6 @@ export default defineEval({
       "For Acquisity/Foreman, what is the difference between a feature branch and a pull request? Answer only; this is not a work item."
     );
     t.succeeded();
-    t.notEvent("subagent.called");
+    t.notEvent("task.started", { data: { kind: "agent" } });
   },
 });

@@ -37,8 +37,8 @@ export const CRITIC_VERDICTS = [
  * verifies the claims that would change the outcome against their sources at
  * the recorded commit, and returns one verdict. It never writes anything.
  *
- * This schema is the only output contract. The caller must not pass an
- * `outputSchema` of its own: PR #53 failed in production because the live call
+ * The reply shape lives in instructions.md, which is the only output contract.
+ * Callers pass no schema: PR #53 failed in production because the live call
  * overrode the child's declared shape and nothing downstream could read it.
  */
 export default defineAgent({
@@ -56,106 +56,4 @@ export default defineAgent({
       "step.started": async () => modelFor(await resolveModel("critic")),
     },
   }),
-  outputSchema: {
-    additionalProperties: false,
-    properties: {
-      advisory_notes: {
-        description:
-          "Non-blocking observations. Never a reason to withhold APPROVE.",
-        items: { type: "string" },
-        type: "array",
-      },
-      blocking_findings: {
-        description:
-          "Every problem that blocks approval. Empty when the verdict is APPROVE.",
-        items: {
-          additionalProperties: false,
-          properties: {
-            claim: {
-              description:
-                "The exact claim or proposed decision being challenged.",
-              type: "string",
-            },
-            evidence: {
-              description:
-                "The concrete evidence, or the specific missing evidence, with its source.",
-              type: "string",
-            },
-            impact: {
-              description:
-                "Why it matters: customer, engineering, privacy, or operational impact.",
-              type: "string",
-            },
-            next_check: {
-              description:
-                "The smallest check or correction that would resolve this finding.",
-              type: "string",
-            },
-          },
-          required: ["claim", "evidence", "impact", "next_check"],
-          type: "object",
-        },
-        type: "array",
-      },
-      criteria_results: {
-        description:
-          "Exactly one entry per criterion slug, in order, for any review that ran. Empty only when the review could not start, which is always INSUFFICIENT_EVIDENCE. FAIL needs the blocking evidence so a recheck has an exact target. NOT_APPLICABLE only for a criterion the proposal does not rely on.",
-        items: {
-          additionalProperties: false,
-          properties: {
-            criterion: { enum: [...CRITIC_CRITERIA], type: "string" },
-            evidence: {
-              description:
-                "What was read or queried to judge this criterion, with its source.",
-              type: "string",
-            },
-            rationale: { type: "string" },
-            result: {
-              enum: ["PASS", "FAIL", "NOT_APPLICABLE"],
-              type: "string",
-            },
-          },
-          required: ["criterion", "result", "evidence", "rationale"],
-          type: "object",
-        },
-        maxItems: CRITIC_CRITERIA.length,
-        type: "array",
-      },
-      reviewed: {
-        additionalProperties: false,
-        description:
-          "Echo of exactly what was reviewed. Foreman compares this to the current document before acting on an APPROVE.",
-        properties: {
-          commit: {
-            description:
-              "The commit checkout_commit returned, or the word unpinned when the checkout could not be made.",
-            type: "string",
-          },
-          document_id: { type: "string" },
-          document_updated_at: {
-            description:
-              "The document updatedAt value that was reviewed, verbatim.",
-            type: "string",
-          },
-          issue_id: { type: "string" },
-        },
-        required: ["issue_id", "document_id", "document_updated_at", "commit"],
-        type: "object",
-      },
-      summary: {
-        description: "One paragraph: the verdict and what drove it.",
-        type: "string",
-      },
-      verdict: { enum: [...CRITIC_VERDICTS], type: "string" },
-    },
-    required: [
-      "verdict",
-      "reviewed",
-      "criteria_results",
-      "blocking_findings",
-      "advisory_notes",
-      "summary",
-    ],
-    type: "object",
-  },
 });

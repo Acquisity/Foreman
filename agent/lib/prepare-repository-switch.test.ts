@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { SessionAuthContext } from "eve/context";
-import type { SandboxSession } from "eve/sandbox";
+import type { VercelSandboxSession } from "eve/sandbox/vercel";
 import { OPS_LOG_LINE_LIMIT, OPS_LOG_STRING_LIMIT } from "./ops-log.js";
 import {
   broker,
@@ -99,7 +99,7 @@ const preparedSandbox = (
       written.push(content);
       return write();
     },
-  } as unknown as SandboxSession;
+  } as unknown as VercelSandboxSession;
   return { commands, sandbox, written };
 };
 

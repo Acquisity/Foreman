@@ -133,7 +133,7 @@ test("full live staff lifecycle persists locally without SQL or external writes"
       data: { finishReason: "stop", message: "The inbox is active." },
       type: "message.completed",
     },
-    { type: "session.completed" },
+    { type: "turn.completed" },
   ];
   const backgrounds: Promise<unknown>[] = [];
   const handlers = {

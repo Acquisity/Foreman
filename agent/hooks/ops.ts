@@ -1,10 +1,9 @@
 /**
  * Countable lifecycle logging. Every handler routes through the
- * never-throwing `logOpsEvent`, because eve surfaces a thrown hook as
- * `turn.failed` and escalates a failure-cascade hook throw to
- * `session.failed`. Failure events log the bounded code and message; payloads
- * such as message text, authorization challenge URLs, and input request
- * bodies never enter the log.
+ * never-throwing `logOpsEvent`, because eve logs and swallows an error a hook
+ * raises, so throwing here would only lose the log line. Failure events log
+ * the bounded code and message; payloads such as message text, authorization
+ * challenge URLs, and input request bodies never enter the log.
  *
  * `action.result` adds one line per tool call so a scan of `vercel logs` can
  * tabulate reach and failure per tool and per connection: successes are

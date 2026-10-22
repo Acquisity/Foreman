@@ -1,4 +1,5 @@
 import type { RouteHandlerArgs, Session } from "eve/channels";
+import type { MessageStreamEvent } from "eve/client";
 import { z } from "zod";
 import { readRequestBody } from "./bounded-body.js";
 import { logOpsEvent } from "./ops-log.js";
@@ -218,13 +219,16 @@ const json = (body: unknown, status = 200) =>
     status,
   });
 
-/** Inbox runs get their own session, so a teammate's instruction never sits in the customer's. */
-export const widgetAddress = (scope: {
-  organizationId: string;
-  conversationId: string;
-  source?: "widget" | "inbox";
-}) =>
-  `${scope.organizationId}:${scope.conversationId}${scope.source === "inbox" ? ":inbox" : ""}`;
+/** Each run gets its own session and verified scope; inbox runs keep their distinct suffix. */
+export const widgetAddress = (
+  scope: {
+    organizationId: string;
+    conversationId: string;
+    source?: "widget" | "inbox";
+  },
+  runId: string
+) =>
+  `${scope.organizationId}:${scope.conversationId}:${runId}${scope.source === "inbox" ? ":inbox" : ""}`;
 
 export type WaitOutcome =
   | { status: "pending" }
@@ -451,10 +455,21 @@ const completed = (
     : done;
 };
 
+/** A failed or cancelled turn, or one waiting on a person nobody in the widget can answer. */
+const failedTurn = (event: MessageStreamEvent) =>
+  event.type === "turn.failed" ||
+  event.type === "turn.cancelled" ||
+  event.type === "session.failed" ||
+  (event.type === "turn.waiting" && event.data.on === "input");
+
 /**
- * Task completion owns the answer. The structured result is the findings
- * channel; the last assistant message is kept as a fallback so a finish that
- * narrated instead of returning the schema still hands the teammate real prose.
+ * Turn completion owns the answer: since eve 0.67 the session parks after every
+ * turn, so `session.completed` never marks a turn's end. A held turn waiting on
+ * its tasks keeps reading; one waiting on a person fails, because nobody can
+ * answer in the widget. The structured result is the findings channel; the last
+ * assistant message is kept as a fallback so a finish that narrated instead of
+ * returning the schema still hands the teammate real prose.
+ * Sessions are per run; follow-up context arrives in the message's EARLIER TURNS block.
  */
 export async function waitForWidgetInvestigation(
   session: Pick<Session, "getEventStream">,
@@ -493,9 +508,9 @@ export async function waitForWidgetInvestigation(
         findings = parseFindings(event.data.result);
       } else if (event.type === "message.completed") {
         text = messageText(event.data) ?? text;
-      } else if (event.type === "session.completed") {
+      } else if (event.type === "turn.completed") {
         return completed(so, { findings, status: "completed", text });
-      } else if (event.type === "session.failed") {
+      } else if (failedTurn(event)) {
         return { status: "failed" };
       }
     }
@@ -1384,7 +1399,7 @@ async function startInvestigation(
 ): Promise<WidgetRun> {
   let sessionId: string | undefined;
   try {
-    const address = widgetAddress(scope);
+    const address = widgetAddress(scope, run.id);
     // Guessed while the session starts, so it costs the customer no wait.
     const planning = (deps.plan ?? (() => Promise.resolve([])))(question, {
       runId: run.id,
@@ -1393,7 +1408,6 @@ async function startInvestigation(
     const startIndex = existing ? await existing.getStreamTailIndex() : 0;
     const session = await from(address).send(question, {
       auth: widgetAuth(scope, run.id),
-      mode: "task",
       state: { runId: run.id },
     });
     sessionId = session.id;
@@ -1660,7 +1674,7 @@ async function cancelRun(
     await deps.cancel(run.id);
     if (run.session_id && attachSession) {
       await attachSession(run.session_id)
-        .cancel({ tasks: true })
+        .cancel()
         .catch(() => undefined);
     }
   }

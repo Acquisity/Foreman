@@ -6,14 +6,14 @@ Foreman is Acquisity's general-purpose agent, built on [eve](https://eve.dev). I
 
 ## Surfaces
 
-Foreman runs on four channels, with GitHub and browser extensions, and one shared company-service Executor connection:
+Foreman runs on four channels, with a GitHub extension and one shared company-service Executor connection:
 
 - **GitHub** — trusted mentions (owners, members, collaborators) dispatch interactive sessions. Labels, PR opens, CI changes, reviews, and synchronizations do not launch work or automatic summaries.
 - **Linear** — Agent Sessions trusted by workspace membership. Assigned issues use the same general agent.
-- **Slack** — mentions and DMs trusted by channel membership. Channels listed as intake-only can investigate and answer but cannot ship code. An ask filed in the mismatched intake channel is handled in place: the reply notes which kind of ask it is and the matching triage procedure runs there, with the project and labels routed from the evidence rather than the channel. A screenshot or file attached to a mention is staged by eve under `/workspace/attachments` in the sandbox, and the Slack channel adds one context line naming the files and that directory, so the text-only chat model can hand the path to the vision subagent on the same turn.
+- **Slack** — mentions and DMs trusted by channel membership. Channels listed as intake-only can investigate and answer but cannot ship code. An ask filed in the mismatched intake channel is handled in place: the reply notes which kind of ask it is and the matching triage procedure runs there, with the project and labels routed from the evidence rather than the channel. A screenshot or file attached to a mention is staged by eve under `/workspace/.eve/attachments` in the sandbox, and the Slack channel adds one context line naming the files and that directory, so the text-only chat model can hand the path to the vision subagent on the same turn.
 - **eve** — the HTTP channel for the local dev TUI and Vercel OIDC.
 
-The GitHub extension adds an API surface (reads, triage, PR authoring; no merge) and the browser extension adds agent-browser, both running inside the sandbox.
+The GitHub extension adds an API surface (reads, triage, PR authoring; no merge) running inside the sandbox.
 
 Foreman reaches company services through Executor, using shared company accounts for authorized investigations. Existing bounded helpers still perform customer lookup, billing, Instantly investigation, run searches, Linear routing, and help-center searches; their provider calls go through Executor. Root, native delegates, critic, and scheduled work use one shared Foreman toolkit. Company-service credentials stay in Executor; Vercel Connect brokers Foreman's Executor credential and the retained channel and personal connections. See [.github/EXECUTOR-CONTRACT.md](.github/EXECUTOR-CONTRACT.md) for the shared toolkit, exact helper bindings, and the preview-first cutover. This revision requires that setup before provider traffic is enabled.
 
@@ -25,7 +25,7 @@ Skills under `agent/skills/` are load-on-demand procedures the model pulls in wh
 
 Foreman handles conversation, investigation, service operations, and repository changes with one general prompt. For an authorized change it resolves the repository, prepares a workspace, creates a validated feature branch, makes the change, runs proportionate checks, pushes, and opens a pull request. Foreman never merges.
 
-The root can use eve's native `agent` tool for independent subtasks. On eve 0.44 each call creates a fresh copy with the root's instructions, tools, connections, and sandbox; the child starts with fresh history and state and cannot delegate recursively. Give children self-contained instructions and avoid concurrent edits to the same files. Critic remains the independent read-only triage reviewer. Vision reads staged screenshots in the shared sandbox. There is no authored station pipeline, run-state coordinator, or automatic GitHub stabilization.
+The root can use eve's native `agent` tool for independent subtasks. On eve 0.81.1 each call creates a fresh copy with the root's instructions, tools, connections, and sandbox; the child starts with fresh history and state and cannot delegate recursively. Give children self-contained instructions and avoid concurrent edits to the same files. Critic remains the independent read-only triage reviewer. Vision reads staged screenshots in the shared sandbox. There is no authored station pipeline, run-state coordinator, or automatic GitHub stabilization.
 
 ## Trust and safety
 
@@ -78,7 +78,7 @@ Settled investigations, including ticketless Intercom and Slack ones and conclus
 | `FOREMAN_REVIEW_BOT_LOGINS` | empty | Comma-separated lowercase bot logins for an explicitly requested AI review-bot loop; supply the chosen logins in the request because the sandbox cannot read this setting. It does not start automatic reviews. |
 | `SLACK_INTAKE_ONLY_CHANNELS` | empty | Comma-separated Slack channel IDs that can talk and investigate but cannot deliver code |
 | `FOREMAN_MEMORY_DATABASE_URL` | unset | Pooled Postgres connection for investigation memory; unset disables it without affecting triage |
-| `VERCEL_SANDBOX_BASE_SNAPSHOT_ID` | unset | Warm snapshot id for the session template; unset falls back to a cold clone |
+| `VERCEL_SANDBOX_BASE_SNAPSHOT_ID` | unset | Warm snapshot id for the session template; unset falls back to a cold clone; rebuild it after every eve upgrade |
 
 See [.env.example](.env.example) for the Executor and retained channel/personal connection settings. No repository or setup command is configured through the environment.
 

@@ -10,7 +10,7 @@ export default defineEval({
       "In Acquisity/Foreman, what is the repository about and what does its README say about getting started? Answer directly without delegation."
     );
     t.succeeded();
-    t.notEvent("subagent.called");
+    t.notEvent("task.started", { data: { kind: "agent" } });
     for (const tool of WRITE_TOOLS) {
       t.notCalledTool(tool);
     }

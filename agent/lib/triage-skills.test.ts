@@ -491,7 +491,7 @@ test("shared triage preserves every evidence lane and exact tool catalog", () =>
   );
   for (const note of [
     "Never guess paths",
-    "with the `connection` argument set to the Executor connection",
+    "with a query that starts with `<connection>__`",
     "Authored Foreman helpers keep their bare names",
     "constrained by the active Executor toolkit allowlist",
     "Resend currently publishes snake_case names",
@@ -1009,7 +1009,7 @@ test("triage reviews a Bug with the critic before routing it", () => {
     "the next message the thread receives is the final reply",
     "Delegate to the `critic` subagent exactly once",
     "the full 40-character SHA",
-    "Do not pass an `outputSchema`",
+    "The critic replies in its fixed JSON shape; pass no schema",
     "this reading is the one adjudication",
     "exactly one entry for each of the twelve criterion slugs with no slug missing or repeated",
     "An `APPROVE` with any `FAIL` criterion, a missing or repeated slug, or a non-empty `blocking_findings` is handled as a `CHALLENGE`",

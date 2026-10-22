@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { test } from "node:test";
+import { mock, test } from "node:test";
 import hook from "../../hooks/support-bound.js";
 import criticHook from "../../subagents/critic/hooks/support-bound.js";
 import visionHook from "../../subagents/vision/hooks/support-bound.js";
@@ -21,6 +21,7 @@ const stepStarted = (stepIndex: number, turnId = "initial") => ({
   type: "step.started",
 });
 const context = (issuer: string, deadline: string, parent?: unknown) => ({
+  cancel: mock.fn(),
   session: {
     auth: {
       current: null,
@@ -37,40 +38,48 @@ const context = (issuer: string, deadline: string, parent?: unknown) => ({
 });
 const live = String(Date.now() + SUPPORT_RUN_MS);
 const support = "foreman:intercom-support";
-const bound = /run bound/;
-const cannotWait = /cannot wait/;
+const cancels = (
+  run: (ctx: ReturnType<typeof context>) => unknown,
+  ctx: ReturnType<typeof context>
+) => {
+  assert.doesNotThrow(() => run(ctx));
+  return ctx.cancel.mock.callCount();
+};
 
 test("support step cap survives later parent turns without charging retries twice", () => {
   const store = new ContextContainer();
   const inStep = (stepIndex: number, turnId = "initial") =>
-    contextStorage.run(store, () =>
-      handler(stepStarted(stepIndex, turnId), context(support, live))
+    cancels(
+      (ctx) =>
+        contextStorage.run(store, () =>
+          handler(stepStarted(stepIndex, turnId), ctx)
+        ),
+      context(support, live)
     );
   for (let step = 0; step < SUPPORT_MAX_STEPS - 1; step += 1) {
-    inStep(step);
-    inStep(step);
+    assert.equal(inStep(step), 0);
+    assert.equal(inStep(step), 0);
   }
-  assert.doesNotThrow(() => inStep(0, "child-result"));
-  assert.doesNotThrow(() => inStep(0, "child-result"));
-  assert.throws(() => inStep(1, "child-result"), bound);
+  assert.equal(inStep(0, "child-result"), 0);
+  assert.equal(inStep(0, "child-result"), 0);
+  assert.equal(inStep(1, "child-result"), 1);
   // A different session gets its own fresh counter.
-  contextStorage.run(new ContextContainer(), () =>
-    assert.doesNotThrow(() => handler(stepStarted(0), context(support, live)))
-  );
+  const fresh = (ctx: ReturnType<typeof context>) =>
+    contextStorage.run(new ContextContainer(), () =>
+      handler(stepStarted(0), ctx)
+    );
+  assert.equal(cancels(fresh, context(support, live)), 0);
 });
 
-test("deadline fails the root while attended sessions and child steps are uncounted", () => {
-  contextStorage.run(new ContextContainer(), () => {
-    assert.throws(
-      () => handler(stepStarted(0), context(support, String(Date.now() - 1))),
-      bound
+test("deadline cancels the root while attended sessions and child steps are uncounted", () => {
+  const step = (ctx: ReturnType<typeof context>) =>
+    contextStorage.run(new ContextContainer(), () =>
+      handler(stepStarted(0), ctx)
     );
-    assert.throws(() => handler(stepStarted(0), context(support, "")), bound);
-  });
-  assert.doesNotThrow(() => handler(stepStarted(0), context("slack", "0")));
-  assert.doesNotThrow(() =>
-    handler(stepStarted(0), context(support, "0", { id: "p" }))
-  );
+  assert.equal(cancels(step, context(support, String(Date.now() - 1))), 1);
+  assert.equal(cancels(step, context(support, "")), 1);
+  assert.equal(cancels(step, context("slack", "0")), 0);
+  assert.equal(cancels(step, context(support, "0", { id: "p" })), 0);
 });
 
 test("support root and declared child hooks reject input and authorization waits", () => {
@@ -83,12 +92,11 @@ test("support root and declared child hooks reject input and authorization waits
         event: unknown,
         ctx: unknown
       ) => unknown;
-      assert.throws(() => deny({}, context(support, live)), cannotWait);
-      assert.throws(
-        () => deny({}, context(support, live, { id: "p" })),
-        cannotWait
-      );
-      assert.doesNotThrow(() => deny({}, context("slack", live)));
+      const wait = (ctx: ReturnType<typeof context>) =>
+        deny({ data: { turnId: "t" } }, ctx);
+      assert.equal(cancels(wait, context(support, live)), 1);
+      assert.equal(cancels(wait, context(support, live, { id: "p" })), 1);
+      assert.equal(cancels(wait, context("slack", live)), 0);
     }
   }
 });

@@ -18,35 +18,11 @@ import { modelFor, resolveModel } from "../../lib/models.js";
  */
 export default defineAgent({
   description:
-    "Read an image in the sandbox and answer a specific question about it. Pass the file path and exactly what you need to know, for example whether a button is disabled and what the error text says. A file attached in Slack is already staged under /workspace/attachments, and that staged path is what to pass. Returns findings as text, never pixels, so the image never enters your history. Not for pixel-precise coordinates.",
+    "Read an image in the sandbox and answer a specific question about it. Pass the file path and exactly what you need to know, for example whether a button is disabled and what the error text says. A file attached in Slack is already staged under /workspace/.eve/attachments, and that staged path is what to pass. Returns findings as text, never pixels, so the image never enters your history. Not for pixel-precise coordinates.",
   // Step-scoped for the same reason as the critic's model.
   model: defineDynamic({
     events: {
       "step.started": async () => modelFor(await resolveModel("vision")),
     },
   }),
-  outputSchema: {
-    additionalProperties: false,
-    properties: {
-      answer: {
-        description:
-          "The answer to the question that was asked, and nothing else.",
-        type: "string",
-      },
-      uncertainties: {
-        description:
-          "What could not be read with confidence: cropped, blurred, ambiguous, or absent from the image.",
-        items: { type: "string" },
-        type: "array",
-      },
-      visible_text: {
-        description:
-          "Text transcribed from the image that bears on the question, verbatim.",
-        items: { type: "string" },
-        type: "array",
-      },
-    },
-    required: ["answer", "visible_text", "uncertainties"],
-    type: "object",
-  },
 });

@@ -110,7 +110,7 @@ Each of these is a call Foreman makes with no deadline, for a stated reason.
 
 Foreman authors four file-I/O calls: `readTextFile` on the repository marker in `agent/lib/repository.ts` and `agent/tools/prepare_repository.ts`, `writeTextFile` on the same marker in `agent/tools/prepare_repository.ts`, and `readFile` on a sandbox image path in `agent/subagents/vision/tools/read_image.ts`.
 
-The original Eve 0.44.0 audit found that the production Vercel backend dropped the abort signal on both reads and writes. In the installed Eve 0.54.2 adapter, `readFile` still calls the SDK as `readFile({ path })`; stream acquisition and the marker reads therefore remain without an authored cancellation surface. `writeFile` now forwards its signal to path resolution and `writeFiles`, so the marker write can be cancelled with its turn. Foreman still adds no independent wall-clock deadline to that small write. These paths are in `dist/src/execution/sandbox/abort-bound-session.js` and `dist/src/execution/sandbox/bindings/vercel.js`.
+The original Eve 0.44.0 audit found that the production Vercel backend dropped the abort signal on both reads and writes. In the installed Eve 0.81.1 adapter, `readFile` still calls the SDK as `readFile({ path })`; stream acquisition and the marker reads therefore remain without an authored cancellation surface. `writeFile` now forwards its signal to path resolution and `writeFiles`, so the marker write can be cancelled with its turn. Foreman still adds no independent wall-clock deadline to that small write. These paths are in `dist/src/execution/sandbox/abort-bound-session.js` and `dist/src/execution/sandbox/bindings/vercel.js`.
 
 The marker read/write call sites handle a JSON document of a few hundred bytes on a path Foreman controls. Their wall-clock ceiling remains the Vercel function invocation limit; the write additionally honors native turn cancellation. Revisit the read exemption when Eve forwards that signal, or if a marker operation is observed to hang. Do not race a timer against a read that would continue after the reported failure.
 
@@ -119,10 +119,6 @@ The image read is split in two, because it is the one that reads an arbitrary pa
 Draining the stream is bounded. `read_image` reads it through its own reader under one 20-second deadline covering the whole read, and starts cancelling the reader in `finally` without waiting on it, so neither a stalled transfer nor a cancellation that never settles can hold the turn open. Cancelling the reader is the layer that can actually stop the transfer; the signal eve would pass is not.
 
 Acquiring the stream is exempt for the same reason the marker calls are. The `readFile` call that returns it takes the same dropped signal, and nothing Foreman owns exists yet to cancel, so its only bound is the Vercel function's own invocation ceiling. Racing a timer against it would report a failure while the request kept running. Revisit with the adapter.
-
-### Agent browser install
-
-`installAgentBrowser` in `agent/sandbox.ts` bootstrap is third-party (`@agent-browser/eve`) and runs during eve's own sandbox bootstrap, not inside a turn. It exposes no deadline parameter, and a bootstrap that never finishes fails template creation rather than holding a Slack thread open.
 
 ### Linked Linear follow-up reads
 

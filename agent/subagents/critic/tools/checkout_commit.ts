@@ -7,6 +7,7 @@ import {
 } from "../../../lib/github/git-remote.js";
 import { readPreparedRepository, remoteUrl } from "../../../lib/repository.js";
 import { boundedRun } from "../../../lib/sandbox-deadline.js";
+import { environment } from "../../../sandbox.js";
 
 const COMMIT_SHA_PATTERN = /^[a-f0-9]{40}$/iu;
 
@@ -37,7 +38,7 @@ export default defineTool({
       };
     }
     const sha = commit.toLowerCase();
-    const sandbox = await ctx.getSandbox();
+    const sandbox = await ctx.getSandbox(environment);
     const prepared = await readPreparedRepository(sandbox);
     if (prepared.slug.toLowerCase() !== REVIEWED_REPOSITORY) {
       return {
