@@ -569,7 +569,7 @@ test("a completed investigation is gated, answered with the composed reply, and 
       from: (address) => {
         assert.equal(
           address,
-          `${scope.organizationId}:${scope.conversationId}`
+          `${scope.organizationId}:${scope.conversationId}:${runId}`
         );
         return {
           send: (message: string, options: { auth: unknown }) => {
@@ -1795,7 +1795,7 @@ test("a teammate's inbox run skips the front door, verifies as staff, and keeps 
   assert.equal(verifiedAsStaff, true);
   assert.equal(
     address,
-    `${scope.organizationId}:${scope.conversationId}:inbox`
+    `${scope.organizationId}:${scope.conversationId}:${runId}:inbox`
   );
 
   // The customer's own token never reads a teammate's run.
@@ -2223,6 +2223,52 @@ test("a recording the customer sent skips the front door and binds its id to the
     auth?.attributes?.recordingId,
     "0f3c9d6e-1b2a-4c5d-8e9f-a0b1c2d3e4f5"
   );
+});
+
+test("two runs in one conversation use separate sessions with the second run's recording and auth", async (t) => {
+  enabled(t);
+  const first = dependencies();
+  const second = dependencies();
+  second.run.id = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+  const recordingId = "second-run-recording";
+  const sends: {
+    address: string;
+    auth: { attributes: Record<string, unknown> };
+  }[] = [];
+  const args = {
+    from: (address: string) => ({
+      send: (
+        _message: string,
+        { auth }: { auth: { attributes: Record<string, unknown> } }
+      ) => {
+        sends.push({ address, auth });
+        return Promise.resolve(
+          completedSession(`widget-session-${sends.length}`)
+        );
+      },
+    }),
+    waitUntil: () => undefined,
+  } as unknown as Pick<RouteHandlerArgs, "from" | "waitUntil">;
+  const initial = await receiveWidgetMessage(
+    request(investigate),
+    args,
+    200,
+    verify,
+    first.deps
+  );
+  const followUp = await receiveWidgetMessage(
+    request({ ...start, recording: { id: recordingId } }),
+    args,
+    200,
+    verify,
+    second.deps
+  );
+  assert.equal(initial.status, 200);
+  assert.equal(followUp.status, 200);
+  assert.equal(sends.length, 2);
+  assert.notEqual(sends[0].address, sends[1].address);
+  assert.equal(sends[1].auth.attributes.recordingId, recordingId);
+  assert.equal(sends[1].auth.attributes.widgetRunId, second.run.id);
 });
 
 test("a member's recording still takes the help-center front door, and a malformed recording id is refused", async (t) => {

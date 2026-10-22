@@ -219,13 +219,16 @@ const json = (body: unknown, status = 200) =>
     status,
   });
 
-/** Inbox runs get their own session, so a teammate's instruction never sits in the customer's. */
-export const widgetAddress = (scope: {
-  organizationId: string;
-  conversationId: string;
-  source?: "widget" | "inbox";
-}) =>
-  `${scope.organizationId}:${scope.conversationId}${scope.source === "inbox" ? ":inbox" : ""}`;
+/** Each run gets its own session and verified scope; inbox runs keep their distinct suffix. */
+export const widgetAddress = (
+  scope: {
+    organizationId: string;
+    conversationId: string;
+    source?: "widget" | "inbox";
+  },
+  runId: string
+) =>
+  `${scope.organizationId}:${scope.conversationId}:${runId}${scope.source === "inbox" ? ":inbox" : ""}`;
 
 export type WaitOutcome =
   | { status: "pending" }
@@ -466,6 +469,7 @@ const failedTurn = (event: MessageStreamEvent) =>
  * answer in the widget. The structured result is the findings channel; the last
  * assistant message is kept as a fallback so a finish that narrated instead of
  * returning the schema still hands the teammate real prose.
+ * Sessions are per run; follow-up context arrives in the message's EARLIER TURNS block.
  */
 export async function waitForWidgetInvestigation(
   session: Pick<Session, "getEventStream">,
@@ -1395,7 +1399,7 @@ async function startInvestigation(
 ): Promise<WidgetRun> {
   let sessionId: string | undefined;
   try {
-    const address = widgetAddress(scope);
+    const address = widgetAddress(scope, run.id);
     // Guessed while the session starts, so it costs the customer no wait.
     const planning = (deps.plan ?? (() => Promise.resolve([])))(question, {
       runId: run.id,
