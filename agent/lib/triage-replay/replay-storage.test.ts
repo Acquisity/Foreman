@@ -22,6 +22,7 @@ import {
   ctx,
   KEY,
   lists,
+  makeLabel,
   RUN,
   replayHandler,
   replayProcess,
@@ -29,9 +30,11 @@ import {
   TEST_SECRET,
   triageCase,
 } from "./fixtures.js";
+import { answerLinear } from "./linear-simulation.js";
 import { readReplayResult } from "./route.js";
+import { fieldMatches } from "./score.js";
 import { seedReplayState } from "./store.js";
-import { replayDocumentText } from "./views.js";
+import { appliedRoute, replayDocumentText } from "./views.js";
 
 const NEEDS_SECRET = /needs FOREMAN_DIAGNOSTICS_SECRET/u;
 const BLOB_DOWN = /blob down/u;
@@ -91,6 +94,59 @@ describe("simulated store", () => {
     assert.equal(
       result.issues.find((i) => i.identifier === "ENG-90")?.assignee,
       "Ada Lovelace"
+    );
+  });
+});
+
+describe("source ticket as filed", () => {
+  const filed = {
+    assignee: "Ada Lovelace",
+    labels: ["Bug"],
+    parent: "ENG-90",
+    priority: 3,
+    project: "Cold Email Core",
+  };
+
+  it("seeds the fields the case records, and clears them only when it records none", () => {
+    assert.deepEqual(
+      seedReplayState({ ...triageCase, asFiled: filed }, lists, ARCHIVE_URL)
+        .issue,
+      { ...filed, state: "Triage" }
+    );
+    assert.deepEqual(seedReplayState(triageCase, lists, ARCHIVE_URL).issue, {
+      assignee: null,
+      labels: [],
+      parent: null,
+      priority: 0,
+      project: null,
+      state: "Triage",
+    });
+  });
+
+  it("keeps the filed owner when a closure leaves the assignee alone, so a label that preserved it scores right", () => {
+    const store = seedReplayState(
+      { ...triageCase, asFiled: filed },
+      lists,
+      ARCHIVE_URL
+    );
+    answerLinear(store, "RouteIssueUpdate", {
+      id: "replay-case",
+      input: { stateId: "s-todo" },
+    });
+    const applied = appliedRoute(store);
+    assert.equal(applied.assignee, "Ada Lovelace");
+    assert.equal(applied.project, "Cold Email Core");
+    assert.equal(
+      fieldMatches(makeLabel("ENG-100", { owner: "Ada Lovelace" }), {
+        assignee: applied.assignee,
+        classification: "Bug",
+        duplicateOf: null,
+        master: null,
+        outcome: "route",
+        path: "fix",
+        project: applied.project,
+      }).owner,
+      true
     );
   });
 });

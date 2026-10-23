@@ -21,6 +21,18 @@ export const relatedIssueSchema = z.strictObject({
   title: asOf(z.string()),
 });
 
+/**
+ * The source ticket's fields as first filed. A case that records none seeds
+ * the ticket cleared, which a closure that preserves the owner can't match.
+ */
+export const asFiledSchema = z.strictObject({
+  assignee: z.string().nullable(),
+  labels: z.array(z.string()),
+  parent: z.string().nullable(),
+  priority: z.int().min(0).max(4),
+  project: z.string().nullable(),
+});
+
 export const STRATA = [
   "bug_master",
   "duplicate",
@@ -32,6 +44,7 @@ export const STRATA = [
 ] as const;
 
 export const triageCaseSchema = z.strictObject({
+  asFiled: asFiledSchema.optional(),
   createdAt: z.iso.datetime(),
   flags: z.strictObject({
     alreadyFixedAtTriage: z.boolean(),
