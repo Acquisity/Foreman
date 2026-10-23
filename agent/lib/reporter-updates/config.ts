@@ -7,6 +7,7 @@ const HOUR_MS = 3_600_000;
 const DEFAULT_LOOKBACK_HOURS = 12;
 const MAX_LOOKBACK_HOURS = 72;
 const DEFAULT_MAX_POSTS = 20;
+export const RUN_DEADLINE_MS = 240_000;
 const MAX_MAX_POSTS = 100;
 
 const boundedInteger = (
@@ -48,6 +49,7 @@ export const reporterUpdatesConfig = (
       MAX_MAX_POSTS
     ),
     nameOwner: env.REPORTER_UPDATES_NAME_OWNER === "true",
+    runDeadlineMs: RUN_DEADLINE_MS,
     since: new Date(since).toISOString(),
   };
 };

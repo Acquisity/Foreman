@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { withDeadline } from "./deadline.js";
 import { DEPLOY_REPOSITORY, type PullFacts } from "./plan.js";
 
 export interface DeployProbe {
@@ -53,29 +54,32 @@ const pullSchema = z.object({
 });
 const compareSchema = z.object({ status: z.string() });
 
-const read = async (
+const read = (
   token: () => Promise<string>,
   fetchImpl: Fetch,
-  path: string
-): Promise<unknown> => {
-  const response = await fetchImpl(`${API}${path}`, {
-    headers: {
-      accept: "application/vnd.github+json",
-      authorization: `Bearer ${await token()}`,
-      "x-github-api-version": "2022-11-28",
-    },
-    redirect: "error",
-    signal: AbortSignal.timeout(TIMEOUT_MS),
-  });
-  if (!response.ok) {
-    throw new Error(`GitHub read failed: HTTP ${response.status}.`);
-  }
-  return response.json();
-};
+  path: string,
+  timeoutMs: number
+): Promise<unknown> =>
+  withDeadline(async (signal) => {
+    const response = await fetchImpl(`${API}${path}`, {
+      headers: {
+        accept: "application/vnd.github+json",
+        authorization: `Bearer ${await token()}`,
+        "x-github-api-version": "2022-11-28",
+      },
+      redirect: "error",
+      signal,
+    });
+    if (!response.ok) {
+      throw new Error(`GitHub read failed: HTTP ${response.status}.`);
+    }
+    return response.json();
+  }, timeoutMs);
 
 export const githubDeployProbe = (
   token: () => Promise<string>,
-  fetchImpl: Fetch = fetch
+  fetchImpl: Fetch = fetch,
+  timeoutMs: number = TIMEOUT_MS
 ): DeployProbe => ({
   async isAncestor(repo, base, head) {
     if (!(REPOSITORY.test(repo) && SHA.test(base) && SHA.test(head))) {
@@ -85,7 +89,8 @@ export const githubDeployProbe = (
       await read(
         token,
         fetchImpl,
-        `/repos/${repo}/compare/${base}...${head}?per_page=1`
+        `/repos/${repo}/compare/${base}...${head}?per_page=1`,
+        timeoutMs
       )
     );
     return status === "identical" || status === "ahead";
@@ -95,7 +100,8 @@ export const githubDeployProbe = (
       await read(
         token,
         fetchImpl,
-        `/repos/${DEPLOY_REPOSITORY}/deployments?environment=production&per_page=${DEPLOYMENTS_SCANNED}`
+        `/repos/${DEPLOY_REPOSITORY}/deployments?environment=production&per_page=${DEPLOYMENTS_SCANNED}`,
+        timeoutMs
       )
     );
     const live = await Promise.all(
@@ -105,7 +111,8 @@ export const githubDeployProbe = (
             await read(
               token,
               fetchImpl,
-              `/repos/${DEPLOY_REPOSITORY}/deployments/${id}/statuses?per_page=${STATUSES_READ}`
+              `/repos/${DEPLOY_REPOSITORY}/deployments/${id}/statuses?per_page=${STATUSES_READ}`,
+              timeoutMs
             )
           )
         )
@@ -119,7 +126,7 @@ export const githubDeployProbe = (
       throw new Error("Refused a malformed repository.");
     }
     const pull = pullSchema.parse(
-      await read(token, fetchImpl, `/repos/${repo}/pulls/${number}`)
+      await read(token, fetchImpl, `/repos/${repo}/pulls/${number}`, timeoutMs)
     );
     let state: PullFacts["state"] = "open";
     if (pull.merged) {

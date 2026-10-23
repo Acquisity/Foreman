@@ -19,6 +19,7 @@ export interface RunConfig {
   lookbackMs: number;
   maxPosts: number;
   nameOwner: boolean;
+  runDeadlineMs: number;
   since: string;
 }
 
@@ -234,7 +235,8 @@ const settle = async (
 
 export const runReporterUpdates = async (
   deps: Deps,
-  nowMs: number
+  nowMs: number,
+  clock: () => number = Date.now
 ): Promise<RunReport> => {
   const sinceIso = new Date(nowMs - deps.config.lookbackMs).toISOString();
   const [recent, waiting] = await Promise.all([
@@ -260,7 +262,10 @@ export const runReporterUpdates = async (
   let posts = 0;
   await todo.reduce(async (previous, identifier) => {
     await previous;
-    if (posts >= deps.config.maxPosts) {
+    if (
+      posts >= deps.config.maxPosts ||
+      clock() - nowMs >= deps.config.runDeadlineMs
+    ) {
       return;
     }
     const result = await settle(identifier, deps, liveSha);

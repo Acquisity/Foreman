@@ -141,13 +141,18 @@ const threadChannel = (
   return first && channels.every((channel) => channel === first) ? first : null;
 };
 
+const REQUEST_TIMEOUT_MS = 20_000;
+
 export const linearPort = (
   accessToken: string,
-  fetchImpl?: Fetch
+  fetchImpl: Fetch = fetch,
+  timeoutMs: number = REQUEST_TIMEOUT_MS
 ): LinearPort => {
+  const timed: Fetch = (input, init) =>
+    fetchImpl(input, { ...init, signal: AbortSignal.timeout(timeoutMs) });
   const call = <T>(query: string, queryName: string, variables: Variables) =>
     callLinearGraphQL<T>({
-      api: fetchImpl ? { fetch: fetchImpl } : undefined,
+      api: { fetch: timed },
       credentials: { accessToken },
       query,
       queryName,
@@ -156,7 +161,7 @@ export const linearPort = (
   return {
     async postUnderAnchor(issueId, anchorId, body) {
       const created = await createThreadComment({
-        api: fetchImpl ? { fetch: fetchImpl } : undefined,
+        api: { fetch: timed },
         body,
         credentials: { accessToken },
         issueId,

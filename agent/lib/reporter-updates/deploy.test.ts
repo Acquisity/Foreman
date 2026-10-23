@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
+import { DeadlineError } from "./deadline.js";
 import { githubDeployProbe } from "./deploy.js";
 import { MERGE_SHA, NEW_SHA, OLD_SHA } from "./fakes.js";
 
@@ -185,5 +186,33 @@ describe("pull", () => {
       (await closed.probe.pull("Acquisity/Acquisity", 7)).state,
       "closed"
     );
+  });
+});
+
+describe("deadline", () => {
+  const never = () => new Promise<never>(() => undefined);
+
+  it("covers token resolution, so a stalled token broker cannot hang a read", async () => {
+    let requested = false;
+    const probe = githubDeployProbe(
+      never,
+      () => {
+        requested = true;
+        return Promise.resolve(json([]));
+      },
+      40
+    );
+    await assert.rejects(probe.liveSha(), DeadlineError);
+    await assert.rejects(probe.pull("Acquisity/Acquisity", 7), DeadlineError);
+    await assert.rejects(
+      probe.isAncestor("Acquisity/Acquisity", MERGE_SHA, NEW_SHA),
+      DeadlineError
+    );
+    assert.equal(requested, false);
+  });
+
+  it("covers a request that never answers", async () => {
+    const probe = githubDeployProbe(() => Promise.resolve("token"), never, 40);
+    await assert.rejects(probe.liveSha(), DeadlineError);
   });
 });

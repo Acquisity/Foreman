@@ -392,12 +392,16 @@ describe("run over several tickets", () => {
 
   it("gives each of five Done tickets one fixed message, only after the deploy, and nothing on replay", async () => {
     const s = setup(five(), fiveDeploy(OLD_SHA, false));
-    const before = await runReporterUpdates(s.deps, NOW);
+    const before = await runReporterUpdates(s.deps, NOW, () => NOW);
     assert.equal(before.errors.length, 0);
     assert.equal(s.linear.posts.length, 0);
     assert.equal((await s.memory.store.listWaiting()).length, 5);
 
-    const unchanged = await runReporterUpdates(s.deps, NOW + 300_000);
+    const unchanged = await runReporterUpdates(
+      s.deps,
+      NOW + 300_000,
+      () => NOW + 300_000
+    );
     assert.equal(s.linear.posts.length, 0);
     assert.equal(unchanged.errors.length, 0);
 
@@ -406,7 +410,11 @@ describe("run over several tickets", () => {
       s.probe.state.ancestors[`${MERGE_SHA.slice(0, -1)}${n}>${NEW_SHA}`] =
         true;
     }
-    const after = await runReporterUpdates(s.deps, NOW + 600_000);
+    const after = await runReporterUpdates(
+      s.deps,
+      NOW + 600_000,
+      () => NOW + 600_000
+    );
     assert.equal(after.errors.length, 0);
     assert.equal(s.linear.posts.length, 5);
     assert.deepEqual(
@@ -417,13 +425,21 @@ describe("run over several tickets", () => {
     );
     assert.ok(s.linear.posts.every((p) => p.body === fixedText()));
 
-    const replay = await runReporterUpdates(s.deps, NOW + 900_000);
+    const replay = await runReporterUpdates(
+      s.deps,
+      NOW + 900_000,
+      () => NOW + 900_000
+    );
     assert.equal(s.linear.posts.length, 5);
     assert.equal(
       replay.outcomes.filter((o) => o.outcome.kind === "posted").length,
       0
     );
-    const again = await runReporterUpdates(s.deps, NOW + 1_200_000);
+    const again = await runReporterUpdates(
+      s.deps,
+      NOW + 1_200_000,
+      () => NOW + 1_200_000
+    );
     assert.equal(again.errors.length, 0);
     assert.equal(s.linear.posts.length, 5);
   });
@@ -431,14 +447,14 @@ describe("run over several tickets", () => {
   it("rechecks a waiting ticket that has dropped out of the recent list when the live commit changes", async () => {
     const tickets = five().slice(0, 1);
     const s = setup(tickets, fiveDeploy(OLD_SHA, false));
-    await runReporterUpdates(s.deps, NOW);
+    await runReporterUpdates(s.deps, NOW, () => NOW);
     s.linear.port.recentIdentifiers = () => Promise.resolve([]);
     const readsBefore = s.linear.state.reads;
-    await runReporterUpdates(s.deps, NOW + 300_000);
+    await runReporterUpdates(s.deps, NOW + 300_000, () => NOW + 300_000);
     assert.equal(s.linear.state.reads, readsBefore);
     s.probe.state.liveSha = NEW_SHA;
     s.probe.state.ancestors[`${MERGE_SHA.slice(0, -1)}1>${NEW_SHA}`] = true;
-    await runReporterUpdates(s.deps, NOW + 600_000);
+    await runReporterUpdates(s.deps, NOW + 600_000, () => NOW + 600_000);
     assert.equal(s.linear.posts.length, 1);
     assert.equal(s.linear.posts[0]?.body, fixedText());
   });
@@ -453,7 +469,7 @@ describe("run over several tickets", () => {
       },
     });
     delete (s.probe.state.pulls as Record<string, unknown>)[pullKey(2)];
-    const report = await runReporterUpdates(s.deps, NOW);
+    const report = await runReporterUpdates(s.deps, NOW, () => NOW);
     assert.equal(report.errors.length, 1);
     assert.ok(report.errors[0]?.startsWith("ENG-2:"));
     assert.equal(s.linear.posts.length, 4);
@@ -468,10 +484,33 @@ describe("run over several tickets", () => {
       })
     );
     const s = setup(tickets, { liveSha: OLD_SHA, pulls: {} }, { maxPosts: 2 });
-    await runReporterUpdates(s.deps, NOW);
+    await runReporterUpdates(s.deps, NOW, () => NOW);
     assert.equal(s.linear.posts.length, 2);
-    await runReporterUpdates(s.deps, NOW + 300_000);
+    await runReporterUpdates(s.deps, NOW + 300_000, () => NOW + 300_000);
     assert.equal(s.linear.posts.length, 4);
+  });
+
+  it("stops starting new tickets once the run deadline has passed", async () => {
+    const tickets = [1, 2, 3].map((n) =>
+      ticket({
+        identifier: `ENG-${n}`,
+        stateName: "Duplicate",
+        stateType: "canceled",
+      })
+    );
+    const s = setup(
+      tickets,
+      { liveSha: OLD_SHA, pulls: {} },
+      { runDeadlineMs: 1000 }
+    );
+    let now = NOW;
+    const original = s.linear.port.postUnderAnchor;
+    s.linear.port.postUnderAnchor = (...args) => {
+      now += 600;
+      return original(...args);
+    };
+    await runReporterUpdates(s.deps, NOW, () => now);
+    assert.equal(s.linear.posts.length, 2);
   });
 
   it("only ever posts messages that are short and free of banned words", async () => {
@@ -490,7 +529,7 @@ describe("run over several tickets", () => {
       ticket({ identifier: "ENG-4", stateType: "completed" }),
     ];
     const s = setup(tickets);
-    await runReporterUpdates(s.deps, NOW);
+    await runReporterUpdates(s.deps, NOW, () => NOW);
     assert.equal(s.linear.posts.length, 4);
     for (const post of s.linear.posts) {
       assert.ok(wordCount(post.body) <= 50, post.body);

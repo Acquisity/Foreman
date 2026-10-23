@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { reporterUpdatesConfig } from "./config.js";
+import { RUN_DEADLINE_MS, reporterUpdatesConfig } from "./config.js";
 
 const base = {
   REPORTER_UPDATES_CHANNELS: "C0AAAAAAAAA, C0BBBBBBBBB",
@@ -63,5 +63,12 @@ describe("reporterUpdatesConfig", () => {
         ?.maxPosts,
       20
     );
+  });
+});
+
+describe("run deadline", () => {
+  it("is well under the ten minutes a claim lasts", () => {
+    assert.ok(RUN_DEADLINE_MS <= 300_000);
+    assert.equal(reporterUpdatesConfig(base)?.runDeadlineMs, RUN_DEADLINE_MS);
   });
 });

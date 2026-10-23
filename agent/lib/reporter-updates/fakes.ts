@@ -16,6 +16,7 @@ export const config = (over: Partial<RunConfig> = {}): RunConfig => ({
   lookbackMs: 3_600_000,
   maxPosts: 20,
   nameOwner: true,
+  runDeadlineMs: 240_000,
   since: "2026-10-01T00:00:00.000Z",
   ...over,
 });

@@ -338,3 +338,22 @@ describe("recentIdentifiers", () => {
     );
   });
 });
+
+describe("deadline", () => {
+  it("gives up on a Linear request that never answers", async () => {
+    const hung = linearPort(
+      "token",
+      (_url, init) =>
+        new Promise<Response>((_resolve, reject) => {
+          init?.signal?.addEventListener("abort", () =>
+            reject(new Error("aborted"))
+          );
+        }),
+      40
+    );
+    await assert.rejects(hung.readTicket("ENG-1"), { message: "aborted" });
+    await assert.rejects(hung.postUnderAnchor("uuid-1", "c-anchor", "Hello"), {
+      message: "aborted",
+    });
+  });
+});
