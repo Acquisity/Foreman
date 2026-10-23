@@ -6,9 +6,11 @@ import {
   TRIAGE_REPLAY_PREFIX,
   writePrivateDocument,
 } from "../blob.js";
+import { logOpsEvent } from "../ops-log.js";
 import { stampTriageIntake, stampUnattended } from "../trust.js";
 import {
   loadReplayState,
+  ReplayStateConflictError,
   replayBackend,
   replayKeyDigest,
   replayStateKey,
@@ -90,10 +92,15 @@ export function replayRefusal(
   return null;
 }
 
-/** The admission ledger: the starts this approved run has used and the model spend charged for them, with the version read. */
+/**
+ * The admission ledger: the starts this approved run has used, the starts
+ * reserved but not yet dispatched (with when each was reserved), and the model
+ * spend charged for both, with the version read.
+ */
 export interface LedgerEntries {
   admitted: string[];
   chargedUsd: number;
+  reserved: Record<string, number>;
 }
 
 export interface AdmissionLedger {
@@ -111,6 +118,7 @@ const ledgerKey = (runId: string) =>
 const ledgerSchema = z.strictObject({
   admitted: z.array(z.string()),
   chargedUsd: z.number().nonnegative(),
+  reserved: z.record(z.string(), z.number()).default({}),
 });
 
 export const blobLedger: AdmissionLedger = {
@@ -118,7 +126,7 @@ export const blobLedger: AdmissionLedger = {
     const result = await readPrivateDocument(ledgerKey(runId));
     return result.found
       ? { ...ledgerSchema.parse(JSON.parse(result.content)), etag: result.etag }
-      : { admitted: [], chargedUsd: 0, etag: null };
+      : { admitted: [], chargedUsd: 0, etag: null, reserved: {} };
   },
   write: (runId, entries, etag) =>
     writePrivateDocument(ledgerKey(runId), JSON.stringify(entries), {
@@ -128,6 +136,8 @@ export const blobLedger: AdmissionLedger = {
 };
 
 const ADMISSION_ATTEMPTS = 8;
+/** How long a reservation blocks a second start of the same case and run. */
+export const RESERVATION_LEASE_MS = 120_000;
 
 interface Allowance {
   costPerCase: number;
@@ -137,69 +147,142 @@ interface Allowance {
 
 const usd = (value: number) => `$${value.toFixed(2)}`;
 
-async function claim(
-  entry: string,
-  runId: string,
-  allowance: Allowance,
-  ledger: AdmissionLedger,
-  attempt = 0
-): Promise<string | null> {
-  if (attempt >= ADMISSION_ATTEMPTS) {
-    return "The admission ledger kept changing, so this start is refused.";
-  }
-  const { admitted, chargedUsd, etag } = await ledger.read(runId);
-  if (admitted.includes(entry)) {
-    return `${entry} was already started in this run.`;
-  }
-  if (admitted.length >= allowance.maxRuns) {
-    return `This run has used its ${allowance.maxRuns} admitted replays.`;
-  }
-  if (chargedUsd + allowance.costPerCase > allowance.maxUsd) {
-    return `This run has charged an estimated ${usd(chargedUsd)} of its ${usd(allowance.maxUsd)} model spend cap, and another case would add ${usd(allowance.costPerCase)}.`;
-  }
-  const written = await ledger.write(
-    runId,
-    {
-      admitted: [...admitted, entry],
-      chargedUsd: chargedUsd + allowance.costPerCase,
-    },
-    etag
-  );
-  return written === "written"
-    ? null
-    : claim(entry, runId, allowance, ledger, attempt + 1);
-}
-
 const positive = (value: string | undefined) => {
   const parsed = Number(value);
   return value && Number.isFinite(parsed) && parsed > 0 ? parsed : null;
 };
 
-/** Admits one start for the approved run, or says why not; a lost race rereads the ledger. */
-export function admit(
+async function updateLedger(
+  runId: string,
+  ledger: AdmissionLedger,
+  change: (entries: LedgerEntries) => LedgerEntries | string,
+  attempt = 0
+): Promise<string | null> {
+  if (attempt >= ADMISSION_ATTEMPTS) {
+    return "The admission ledger kept changing, so this start is refused.";
+  }
+  const { etag, ...entries } = await ledger.read(runId);
+  const next = change({ ...entries, reserved: entries.reserved ?? {} });
+  if (typeof next === "string") {
+    return next;
+  }
+  return (await ledger.write(runId, next, etag)) === "written"
+    ? null
+    : updateLedger(runId, ledger, change, attempt + 1);
+}
+
+function allowanceOf(env: NodeJS.ProcessEnv): Allowance | string {
+  const maxUsd = positive(env.TRIAGE_REPLAY_MAX_USD);
+  const costPerCase = positive(env.TRIAGE_REPLAY_EST_USD_PER_CASE);
+  if (maxUsd === null || costPerCase === null) {
+    return "TRIAGE_REPLAY_MAX_USD and TRIAGE_REPLAY_EST_USD_PER_CASE must both be set on the server.";
+  }
+  return {
+    costPerCase,
+    maxRuns: Number(env.TRIAGE_REPLAY_MAX_RUNS ?? 3),
+    maxUsd,
+  };
+}
+
+/**
+ * Reserves one start for the approved run, or says why not. A reservation
+ * holds a slot and its estimated spend until `confirm` or `release`; a lost
+ * race rereads the ledger. A second start of the same case and run is refused
+ * while the first holds a fresh reservation, and may reuse one that has gone
+ * stale without charging again.
+ */
+export function reserve(
   request: StartRequest,
   ledger: AdmissionLedger,
-  env: NodeJS.ProcessEnv = process.env
+  env: NodeJS.ProcessEnv = process.env,
+  now: number = Date.now()
 ): Promise<string | null> {
   if (!env.TRIAGE_REPLAY_RUN_ID || request.runId !== env.TRIAGE_REPLAY_RUN_ID) {
     return Promise.resolve(
       "This run id is not the one approved on the server."
     );
   }
-  const maxUsd = positive(env.TRIAGE_REPLAY_MAX_USD);
-  const costPerCase = positive(env.TRIAGE_REPLAY_EST_USD_PER_CASE);
-  if (maxUsd === null || costPerCase === null) {
-    return Promise.resolve(
-      "TRIAGE_REPLAY_MAX_USD and TRIAGE_REPLAY_EST_USD_PER_CASE must both be set on the server."
-    );
+  const allowance = allowanceOf(env);
+  if (typeof allowance === "string") {
+    return Promise.resolve(allowance);
   }
-  return claim(
-    `${request.case.id}#${request.run}`,
-    request.runId,
-    { costPerCase, maxRuns: Number(env.TRIAGE_REPLAY_MAX_RUNS ?? 3), maxUsd },
-    ledger
-  );
+  const entry = caseKeyOf(request);
+  return updateLedger(request.runId, ledger, (entries) => {
+    if (entries.admitted.includes(entry)) {
+      return `${entry} was already started in this run.`;
+    }
+    const reservedAt = entries.reserved[entry];
+    if (reservedAt !== undefined) {
+      return now - reservedAt < RESERVATION_LEASE_MS
+        ? `${entry} is already starting in this run.`
+        : { ...entries, reserved: { ...entries.reserved, [entry]: now } };
+    }
+    if (
+      entries.admitted.length + Object.keys(entries.reserved).length >=
+      allowance.maxRuns
+    ) {
+      return `This run has used its ${allowance.maxRuns} admitted replays.`;
+    }
+    if (entries.chargedUsd + allowance.costPerCase > allowance.maxUsd) {
+      return `This run has charged an estimated ${usd(entries.chargedUsd)} of its ${usd(allowance.maxUsd)} model spend cap, and another case would add ${usd(allowance.costPerCase)}.`;
+    }
+    return {
+      admitted: entries.admitted,
+      chargedUsd: entries.chargedUsd + allowance.costPerCase,
+      reserved: { ...entries.reserved, [entry]: now },
+    };
+  });
 }
+
+async function settle(
+  request: StartRequest,
+  ledger: AdmissionLedger,
+  change: (entries: LedgerEntries, entry: string) => LedgerEntries
+) {
+  const entry = caseKeyOf(request);
+  const problem = await updateLedger(request.runId, ledger, (entries) =>
+    change(entries, entry)
+  );
+  if (problem) {
+    throw new Error(problem);
+  }
+}
+
+const withoutReservation = (entries: LedgerEntries, entry: string) => {
+  const { [entry]: _held, ...reserved } = entries.reserved;
+  return reserved;
+};
+
+/** Turns a reservation into an admitted start once its session has been dispatched. */
+export const confirm = (request: StartRequest, ledger: AdmissionLedger) =>
+  settle(request, ledger, (entries, entry) => ({
+    admitted: entries.admitted.includes(entry)
+      ? entries.admitted
+      : [...entries.admitted, entry],
+    chargedUsd: entries.chargedUsd,
+    reserved: withoutReservation(entries, entry),
+  }));
+
+/** Gives a reservation's slot and estimated spend back when its start failed before dispatch. */
+export const release = (
+  request: StartRequest,
+  ledger: AdmissionLedger,
+  env: NodeJS.ProcessEnv = process.env
+) =>
+  settle(request, ledger, (entries, entry) => {
+    if (entries.reserved[entry] === undefined) {
+      return entries;
+    }
+    const allowance = allowanceOf(env);
+    return {
+      admitted: entries.admitted,
+      chargedUsd:
+        typeof allowance === "string"
+          ? entries.chargedUsd
+          : Math.max(0, entries.chargedUsd - allowance.costPerCase),
+      reserved: withoutReservation(entries, entry),
+    };
+  });
 
 /** The signed identity a replay session and its subagents carry. */
 export function replayAuth(runId: string, caseId: string): SessionAuthContext {
@@ -231,17 +314,34 @@ export function replayMessage(request: StartRequest): string {
 export const caseKeyOf = (request: { case: { id: string }; run: number }) =>
   `${request.case.id}#${request.run}`;
 
-/** Seeds the case's store; a second start of the same case and run is refused by the ledger first. */
+const neverDispatched = (state: ReplayState) =>
+  state.steps === 0 && state.rootTurn === null && state.cancelled === null;
+
+/**
+ * Seeds the case's store. A store left by a start that failed before its
+ * session ran is reused, and given its seed input if that was what failed;
+ * one a session has touched is refused.
+ */
 export async function seedStore(request: StartRequest) {
-  await seedReplayStore(
-    replayStateKey(request.runId, caseKeyOf(request)),
-    seedReplayState(
-      request.case,
-      request.lists,
-      request.archiveUrl,
-      request.cohortSha256
-    )
+  const key = replayStateKey(request.runId, caseKeyOf(request));
+  const seed = seedReplayState(
+    request.case,
+    request.lists,
+    request.archiveUrl,
+    request.cohortSha256
   );
+  const backend = replayBackend();
+  const stored = await backend.read(key);
+  if (!stored) {
+    await seedReplayStore(key, seed);
+    return;
+  }
+  if (!neverDispatched(stored.state)) {
+    throw new ReplayStateConflictError(key);
+  }
+  if ((await backend.listInputs(key)).length === 0) {
+    await backend.appendInputs(key, seed.inputs);
+  }
 }
 
 /** Reads one replay's store and builds its result; `settled` is false while it still works. */
@@ -290,15 +390,35 @@ export async function startReplay(
     return json({ error: "Invalid replay start request." }, 400);
   }
   const start = parsed.data;
-  const refused = await admit(start, ledger);
+  const refused = await reserve(start, ledger);
   if (refused) {
     return json({ error: refused }, 429);
   }
-  await seedStore(start);
   const key = caseKeyOf(start);
-  const session = await args
-    .from(`triage-replay:${start.runId}:${key}`)
-    .send(replayMessage(start), { auth: replayAuth(start.runId, key) });
+  let session: { id: string };
+  try {
+    await seedStore(start);
+    session = await args
+      .from(`triage-replay:${start.runId}:${key}`)
+      .send(replayMessage(start), { auth: replayAuth(start.runId, key) });
+  } catch (error) {
+    try {
+      await release(start, ledger);
+    } catch (releaseError) {
+      throw new Error(
+        `Replay ${key} failed to start (${String(error)}), and its reservation could not be released.`,
+        { cause: releaseError }
+      );
+    }
+    throw error;
+  }
+  try {
+    await confirm(start, ledger);
+  } catch {
+    logOpsEvent("triage_replay.ledger_unconfirmed", {
+      sessionId: session.id,
+    });
+  }
   return json({ caseKey: key, sessionId: session.id });
 }
 

@@ -8,7 +8,11 @@ import {
   setReplayBackend,
 } from "./backend.js";
 import { triageReplayHook } from "./hook.js";
-import { replayAuth } from "./route.js";
+import {
+  type AdmissionLedger,
+  type LedgerEntries,
+  replayAuth,
+} from "./route.js";
 import type { TriageCase, TriageLabel, TriageResult } from "./schema.js";
 import { seedReplayState } from "./store.js";
 
@@ -236,3 +240,29 @@ export async function outputOf<T>(
   }
   return value as T;
 }
+
+export const sharedLedger = () => {
+  let stored: (LedgerEntries & { etag: string }) | null = null;
+  let version = 0;
+  return (): AdmissionLedger => ({
+    read: () =>
+      Promise.resolve(
+        stored
+          ? {
+              admitted: [...stored.admitted],
+              chargedUsd: stored.chargedUsd,
+              etag: stored.etag,
+              reserved: { ...stored.reserved },
+            }
+          : { admitted: [], chargedUsd: 0, etag: null, reserved: {} }
+      ),
+    write: (_run, entries, etag) => {
+      if ((stored?.etag ?? null) !== etag) {
+        return Promise.resolve("conflict" as const);
+      }
+      version += 1;
+      stored = { ...entries, etag: `v${version}` };
+      return Promise.resolve("written" as const);
+    },
+  });
+};
