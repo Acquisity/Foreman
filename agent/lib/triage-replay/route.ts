@@ -328,6 +328,15 @@ export class ReplayAlreadyStartedError extends Error {
 
 const SETTLE_ATTEMPTS = 3;
 
+async function provenNeverDispatched(key: string): Promise<boolean> {
+  try {
+    const stored = await replayBackend().read(key);
+    return !stored || neverDispatched(stored.state);
+  } catch {
+    return false;
+  }
+}
+
 async function persistently(work: () => Promise<unknown>) {
   let failure: unknown = null;
   for (let attempt = 0; attempt < SETTLE_ATTEMPTS; attempt += 1) {
@@ -438,13 +447,15 @@ export async function startReplay(
       await confirm(start, ledger);
       return json({ error: `${key} was already started in this run.` }, 409);
     }
-    try {
-      await release(start, ledger);
-    } catch (releaseError) {
-      throw new Error(
-        `Replay ${key} failed to start (${String(error)}), and its reservation could not be released.`,
-        { cause: releaseError }
-      );
+    if (await provenNeverDispatched(replayStateKey(start.runId, key))) {
+      try {
+        await release(start, ledger);
+      } catch (releaseError) {
+        throw new Error(
+          `Replay ${key} failed to start (${String(error)}), and its reservation could not be released.`,
+          { cause: releaseError }
+        );
+      }
     }
     throw error;
   }

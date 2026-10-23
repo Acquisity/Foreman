@@ -208,7 +208,7 @@ describe("starting a replay", () => {
       ledgerDown = false;
       const later = Date.now() + RESERVATION_LEASE_MS + 1;
       t.mock.method(Date, "now", () => later);
-      return { args, first, ledger: shared, sent };
+      return { args, backend, first, ledger: shared, sent };
     };
 
     const settled = async (ledger: ReturnType<typeof sharedLedger>) => {
@@ -235,6 +235,21 @@ describe("starting a replay", () => {
         admitted: [KEY],
         charged: 4,
         reserved: [],
+      });
+    });
+
+    it("keeps the dispatched run's slot and charge when a retry can't read the store", async (t) => {
+      const { args, backend, ledger, sent } = await dispatchedWithoutConfirm(t);
+      setReplayBackend({
+        ...backend,
+        read: () => Promise.reject(new Error("blob down")),
+      });
+      await assert.rejects(startReplay(start(), args, ledger()), BLOB_DOWN);
+      assert.equal(sent.length, 1);
+      assert.deepEqual(await settled(ledger), {
+        admitted: [],
+        charged: 4,
+        reserved: [KEY],
       });
     });
 
