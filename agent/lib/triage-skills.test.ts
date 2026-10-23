@@ -1199,3 +1199,14 @@ test("ENG-13397-shaped wrong-channel money ask is handled in place", () => {
   assert.ok(labelRules.includes("One type label from the verdict"));
   assert.ok(!labelRules.includes("channel"));
 });
+
+test("the engineering hand-off admits an approved feature request", () => {
+  const preconditions = extractInstruction(
+    handoffSkill,
+    "## Preconditions",
+    "## Match by cause, not symptom"
+  );
+  assert.ok(preconditions.includes("feature request labelled `Approved`"));
+  assert.ok(preconditions.includes("`Engineering Todo` path"));
+  assert.ok(preconditions.includes("`Feature Request` type label"));
+});

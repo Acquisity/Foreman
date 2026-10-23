@@ -561,11 +561,11 @@ export function resolveTriage(
     needsCriticReview,
     notes,
     outcome: "route",
-    path,
+    path: ownership.path,
     route: {
       ...ownershipRoute(ownership, labels),
       priority,
-      state: ownership.approval === "approved" ? "Todo" : PATH_STATE[path],
+      state: PATH_STATE[ownership.path],
       ...(projectSettled ? { project: project.choice } : {}),
       ...(duplicate
         ? {

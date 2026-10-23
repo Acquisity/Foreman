@@ -35,6 +35,7 @@ export interface Ownership {
   approval: "approved" | "needed" | "not-applicable";
   area: { key: AreaKey; label: string; matched: boolean } | null;
   assignee: string | null;
+  path: HandlingPath;
 }
 
 export const areaQuestion = (): JevQuestion => ({
@@ -79,26 +80,12 @@ const settledArea = (
     : { key: FALLBACK_AREA, matched: false };
 };
 
-const developerEligibility = (
+const isFeatureRequest = (
   classification: TriageClassification,
-  path: HandlingPath,
-  duplicate: boolean,
-  input: TriageInput,
   answers: Answers
-): "approved" | "bug" | "needed" | "none" => {
-  if (classification === "Bug" && (duplicate || path === "Engineering Todo")) {
-    return "bug";
-  }
-  const featureRequest =
-    classification === "Platform Limitation" &&
-    probabilityOf(answers.wants_limit_lifted) >= SIGNAL_BAR;
-  if (!featureRequest) {
-    return "none";
-  }
-  return hasLabel(input.ticketLabels ?? [], APPROVED_LABEL)
-    ? "approved"
-    : "needed";
-};
+): boolean =>
+  classification === "Platform Limitation" &&
+  probabilityOf(answers.wants_limit_lifted) >= SIGNAL_BAR;
 
 export function resolveOwnership(context: {
   answers: Answers;
@@ -111,40 +98,56 @@ export function resolveOwnership(context: {
   project: string | null;
 }): Ownership {
   const { answers, classification, duplicate, input, notes, path } = context;
-  if (input.identifier.toUpperCase().startsWith("SAN-")) {
-    return { approval: "not-applicable", area: null, assignee: SUPPORT_OWNER };
-  }
-  const eligibility = developerEligibility(
-    classification,
+  const none: Ownership = {
+    approval: "not-applicable",
+    area: null,
+    assignee: null,
     path,
-    duplicate,
-    input,
-    answers
-  );
-  if (eligibility === "needed") {
+  };
+  if (input.identifier.toUpperCase().startsWith("SAN-")) {
+    return { ...none, assignee: SUPPORT_OWNER };
+  }
+  const place = () => {
+    const area = settledArea(
+      answers,
+      context.project,
+      input.codePath,
+      context.bar
+    );
+    return { ...area, label: AREAS[area.key].label };
+  };
+  if (classification === "Bug") {
+    const area = place();
+    const developer = duplicate || path === "Engineering Todo";
+    if (developer && !area.matched) {
+      notes.push(
+        `The evidence does not place this in a mapped area, so it goes to ${FALLBACK_OWNER}; say which evidence is missing in the document.`
+      );
+    }
+    return {
+      ...none,
+      area,
+      assignee: developer ? ownerForArea(area.key) : null,
+    };
+  }
+  if (!isFeatureRequest(classification, answers)) {
+    return none;
+  }
+  if (!hasLabel(input.ticketLabels ?? [], APPROVED_LABEL)) {
     notes.push(
       `A feature request that nobody has approved gets no developer. It is labelled "${NEEDS_APPROVAL_LABEL}" for James to approve; add the "${APPROVED_LABEL}" label to release it.`
     );
-    return { approval: "needed", area: null, assignee: null };
+    return { ...none, approval: "needed" };
   }
-  if (eligibility === "none" && classification !== "Bug") {
-    return { approval: "not-applicable", area: null, assignee: null };
+  if (path !== "Platform Limitation") {
+    return { ...none, approval: "approved" };
   }
-  const { key, matched } = settledArea(
-    answers,
-    context.project,
-    input.codePath,
-    context.bar
-  );
-  if (!matched && eligibility !== "none") {
-    notes.push(
-      `The evidence does not place this in a mapped area, so it goes to ${FALLBACK_OWNER}; say which evidence is missing in the document.`
-    );
-  }
+  const area = place();
   return {
-    approval: eligibility === "approved" ? "approved" : "not-applicable",
-    area: { key, label: AREAS[key].label, matched },
-    assignee: eligibility === "none" ? null : ownerForArea(key),
+    approval: "approved",
+    area,
+    assignee: ownerForArea(area.key),
+    path: "Engineering Todo",
   };
 }
 

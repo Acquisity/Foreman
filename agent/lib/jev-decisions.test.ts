@@ -826,3 +826,65 @@ test("a shared CRM file does not override a CRM sub-area the model settled", () 
   assert.equal(specific.area?.key, "crm_phone");
   assert.equal(specific.assignee, "Ebubeker Rexha");
 });
+
+test("an approved feature request that duplicates another stays a Duplicate", () => {
+  const decision = resolveTriage(
+    triageInput({
+      duplicateCandidates: [
+        { identifier: "ENG-9", priority: 3, summary: "same", title: "t" },
+      ],
+      ticketLabels: ["Approved", "Feature Request"],
+    }),
+    bugAnswers({
+      area: pick("ai_sdr"),
+      classification: pick("platform_limitation"),
+      duplicate_0: pick("same_outcome", 0.9),
+      path: pick("Platform Limitation"),
+      wants_limit_lifted: yes(),
+    })
+  );
+  assert.ok(decision.outcome === "route");
+  assert.equal(decision.path, "Duplicate");
+  assert.equal(decision.route.state, "Duplicate");
+  assert.equal(decision.route.duplicateOf, "ENG-9");
+  assert.equal(decision.route.assignee, undefined);
+});
+
+test("an approved feature request takes the engineering path so the hand-off can build it", () => {
+  const decision = resolveTriage(
+    triageInput({ ticketLabels: ["Approved", "Feature Request"] }),
+    bugAnswers({
+      area: pick("ai_sdr"),
+      classification: pick("platform_limitation"),
+      path: pick("Platform Limitation"),
+      wants_limit_lifted: yes(),
+    })
+  );
+  assert.ok(decision.outcome === "route");
+  assert.equal(decision.classification, "Platform Limitation");
+  assert.equal(decision.path, "Engineering Todo");
+  assert.equal(decision.route.state, "Todo");
+  assert.equal(decision.route.assignee, "Koppany Kondricz");
+  assert.ok(decision.route.addLabels.includes("Area: AI SDR"));
+});
+
+test("an approved feature request on a path that closes or delegates it keeps that path", () => {
+  for (const path of ["Resolved by triage", "Support/Product follow-up"]) {
+    const decision = resolveTriage(
+      triageInput({ ticketLabels: ["Approved", "Feature Request"] }),
+      bugAnswers({
+        area: pick("ai_sdr"),
+        classification: pick("platform_limitation"),
+        path: pick(path),
+        wants_limit_lifted: yes(),
+      })
+    );
+    assert.ok(decision.outcome === "route");
+    assert.equal(decision.path, path);
+    assert.equal(
+      decision.route.state,
+      path === "Resolved by triage" ? "Done" : "Todo"
+    );
+    assert.equal(decision.route.assignee, undefined, path);
+  }
+});

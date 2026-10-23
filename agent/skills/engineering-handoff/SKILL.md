@@ -12,7 +12,7 @@ Create durable engineering work from a diagnosis settled by approval or adjudica
 
 All of these hold before anything is written:
 
-- Stage 5 settled the classification as `Bug` and the handling path as `Engineering Todo`.
+- Stage 5 settled the classification as `Bug` and the handling path as `Engineering Todo`, or settled a feature request labelled `Approved` as a `Platform Limitation` on the `Engineering Todo` path; its master takes the `Feature Request` type label instead of `Bug`.
 - The `Triage investigation` document is attached to the customer ticket and current.
 - When the workflow ran the critic, the review settled this exact document version: on an approval the document id and `updatedAt` the critic echoed in `reviewed`, and on an adjudication the `updatedAt` Stage 5 read back after its settling save, still match what Linear returns now. The critic reviews a ticket once and Foreman adjudicates once. A later change records its reason on the `**Review**` line and proceeds on the settled version; it never triggers a second review or a second adjudication.
 - When the workflow ran `incident-hotlane`, its route is `HOTLANE` or `STANDARD_ENGINEERING`; `NEEDS_HUMAN_URGENT` never reaches this skill. When the workflow did not run it, treat the route as `STANDARD_ENGINEERING`: proceed normally and apply no `fast-lane` label.
