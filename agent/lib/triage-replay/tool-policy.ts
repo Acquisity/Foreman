@@ -4,15 +4,31 @@
  * asks for a tool that isn't `allow`, so a new tool can't slip through: the
  * tool-policy test fails until it's listed here. `allow` tools are local,
  * model-only, answered by the simulated store or the pinned sandbox, or fail
- * closed at the Executor or egress walls; the reason says which.
+ * closed at the Executor or egress walls; the reason says which. `own` marks
+ * a tool whose result is the replay's own work, a draft, a decision or a store
+ * answer it wrote, so the leakage scan skips it.
  */
 interface Policy {
+  generated: boolean;
   mode: "allow" | "deny";
   reason: string;
 }
 
-const allow = (reason: string): Policy => ({ mode: "allow", reason });
-const deny = (reason: string): Policy => ({ mode: "deny", reason });
+const allow = (reason: string): Policy => ({
+  generated: false,
+  mode: "allow",
+  reason,
+});
+const own = (reason: string): Policy => ({
+  generated: true,
+  mode: "allow",
+  reason,
+});
+const deny = (reason: string): Policy => ({
+  generated: false,
+  mode: "deny",
+  reason,
+});
 
 const MODEL = "model call only";
 const STORE = "answered by the simulated Linear store";
@@ -25,18 +41,18 @@ const CONNECTION =
 
 export const REPLAY_TOOL_POLICY: Readonly<Record<string, Policy>> = {
   bash: allow(SANDBOX),
-  check_reply: allow(MODEL),
+  check_reply: own(MODEL),
   checkout_branch: deny(WRITE),
   checkout_commit: allow(SANDBOX),
-  classify_ask: allow(MODEL),
+  classify_ask: own(MODEL),
   clear_user_preferences: deny(WRITE),
-  comment_triage_replay_issue: allow(STORE),
+  comment_triage_replay_issue: own(STORE),
   correct_investigation_case: deny(WRITE),
-  create_triage_replay_issue: allow(STORE),
+  create_triage_replay_issue: own(STORE),
   critic: allow("the critic subagent, under the same replay boundary"),
-  decide_billing: allow(MODEL),
-  decide_prior_work: allow(MODEL),
-  decide_triage: allow(MODEL),
+  decide_billing: own(MODEL),
+  decide_prior_work: own(MODEL),
+  decide_triage: own(MODEL),
   describe_table: allow(CLOSED),
   executor__execute: allow(CONNECTION),
   executor__skills: allow(CONNECTION),
@@ -48,7 +64,7 @@ export const REPLAY_TOOL_POLICY: Readonly<Record<string, Policy>> = {
   grep: allow(SANDBOX),
   list_gateway_models: deny(OFF_LANE),
   list_instantly_subworkspaces: allow(CLOSED),
-  list_triage_replay_catalog: allow(STORE),
+  list_triage_replay_catalog: own(STORE),
   lookup_customer: allow(CLOSED),
   no_reply: allow("ends the turn without a message"),
   planetscale_execute_read_query: allow(CLOSED),
@@ -67,13 +83,13 @@ export const REPLAY_TOOL_POLICY: Readonly<Record<string, Policy>> = {
   ),
   read_sentry_issue: allow(CLOSED),
   read_stripe_billing: allow(CLOSED),
-  read_triage_replay_document: allow(STORE),
-  read_triage_replay_issue: allow(STORE),
+  read_triage_replay_document: own(STORE),
+  read_triage_replay_issue: own(STORE),
   rebuild_warm_snapshot: deny(WRITE),
-  record_investigation_case: allow(STORE),
-  reply_to_requester: allow(STORE),
-  route_ticket: allow(STORE),
-  save_investigation_document: allow(STORE),
+  record_investigation_case: own(STORE),
+  reply_to_requester: own(STORE),
+  route_ticket: own(STORE),
+  save_investigation_document: own(STORE),
   save_user_preferences: deny(WRITE),
   search_investigation_memory: allow("memory is off in a replay process"),
   set_agent_models: deny(WRITE),
@@ -97,3 +113,7 @@ export function replayMayCall(toolName: string): boolean {
   }
   return REPLAY_TOOL_POLICY[toolName]?.mode === "allow";
 }
+
+/** Whether a tool's result is this replay's own work, which the leakage scan skips. */
+export const replayOutputIsGenerated = (toolName: string): boolean =>
+  REPLAY_TOOL_POLICY[toolName]?.generated === true;

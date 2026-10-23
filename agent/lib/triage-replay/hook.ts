@@ -4,24 +4,11 @@ import { criticVerdictFields } from "../triage-log.js";
 import { withReplayState } from "./backend.js";
 import { replaySessionOf } from "./mode.js";
 import type { ReplayState } from "./store.js";
-import { replayMayCall } from "./tool-policy.js";
+import { replayMayCall, replayOutputIsGenerated } from "./tool-policy.js";
 
 /** Model steps one replay session may take before the hook cancels its turn. */
 export const replayMaxSteps = (env: NodeJS.ProcessEnv = process.env) =>
   Number(env.TRIAGE_REPLAY_MAX_STEPS ?? 80);
-
-/** Tools whose results echo what this replay itself wrote, never outside evidence. */
-const GENERATED_RESULTS = new Set([
-  "comment_triage_replay_issue",
-  "create_triage_replay_issue",
-  "list_triage_replay_catalog",
-  "read_triage_replay_document",
-  "read_triage_replay_issue",
-  "record_investigation_case",
-  "reply_to_requester",
-  "route_ticket",
-  "save_investigation_document",
-]);
 
 const AS_OF_CASE_RESULTS = new Set([
   "bash",
@@ -240,7 +227,7 @@ export const triageReplayHook = defineHook({
         ctx,
         () =>
           withReplayState(session.runId, session.caseId, (state) => {
-            const generated = GENERATED_RESULTS.has(result.toolName);
+            const generated = replayOutputIsGenerated(result.toolName);
             state.inputs.push({
               availableAt:
                 !generated && AS_OF_CASE_RESULTS.has(result.toolName)

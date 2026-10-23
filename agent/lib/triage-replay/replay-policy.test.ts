@@ -9,12 +9,14 @@ import {
   auth,
   CASE_CREATED,
   ctx,
+  makeLabel,
   RUN,
   replayHandler,
   replayProcess,
   state,
 } from "./fixtures.js";
 import { replayMaxSteps, triageReplayHook } from "./hook.js";
+import { findLeaks } from "./leakage.js";
 import {
   assertTriageReplayAllowed,
   installReplayEgressGuard,
@@ -22,7 +24,11 @@ import {
 } from "./mode.js";
 import { replayToolsMiddleware } from "./model.js";
 import { buildReplayResult } from "./route.js";
-import { REPLAY_TOOL_POLICY, replayMayCall } from "./tool-policy.js";
+import {
+  REPLAY_TOOL_POLICY,
+  replayMayCall,
+  replayOutputIsGenerated,
+} from "./tool-policy.js";
 
 const CANNOT_RUN = /Triage replay cannot run/u;
 const EVIDENCE_UNAVAILABLE = /replay_evidence_unavailable/u;
@@ -390,6 +396,78 @@ describe("replay leakage recording", () => {
     assert.deepEqual(recorded, [
       ["subagent:vision", "seeded", null],
       ["subagent:critic", "generated", null],
+    ]);
+  });
+
+  it("records the model's own drafts and decisions as generated, so they never count as leakage", async (t) => {
+    await replayProcess(t);
+    const phrase =
+      "The save handler cleared the cached layout before the panel rendered it again.";
+    const handler = replayHandler("action.result");
+    const rootCtx = {
+      cancel: () => undefined,
+      session: { auth: { current: auth, initiator: auth }, id: "sess-1" },
+    };
+    const own = [
+      "check_reply",
+      "classify_ask",
+      "decide_billing",
+      "decide_prior_work",
+      "decide_triage",
+    ];
+    for (const toolName of [...own, "grep"]) {
+      // biome-ignore lint/performance/noAwaitInLoops: each result is recorded in turn.
+      await handler(
+        {
+          data: {
+            result: {
+              callId: toolName,
+              kind: "tool-result",
+              output: { reply: phrase },
+              toolName,
+            },
+          },
+        },
+        rootCtx
+      );
+    }
+    const { inputs } = await state();
+    assert.deepEqual(
+      inputs
+        .filter((input) => own.includes(input.source))
+        .map((input) => input.provenance),
+      own.map(() => "generated")
+    );
+    assert.equal(
+      inputs.find((input) => input.source === "grep")?.provenance,
+      "seeded"
+    );
+    const hits = findLeaks({
+      label: makeLabel("ENG-100"),
+      result: { inputs: inputs.filter((input) => input.source !== "grep") },
+    });
+    assert.deepEqual(hits, []);
+  });
+
+  it("marks exactly the tools that echo the model's own work as generated", () => {
+    const generated = Object.keys(REPLAY_TOOL_POLICY)
+      .filter((name) => replayOutputIsGenerated(name))
+      .sort((a, b) => a.localeCompare(b));
+    assert.deepEqual(generated, [
+      "check_reply",
+      "classify_ask",
+      "comment_triage_replay_issue",
+      "create_triage_replay_issue",
+      "decide_billing",
+      "decide_prior_work",
+      "decide_triage",
+      "list_triage_replay_catalog",
+      "read_triage_replay_document",
+      "read_triage_replay_issue",
+      "record_investigation_case",
+      "reply_to_requester",
+      "route_ticket",
+      "save_investigation_document",
     ]);
   });
 
