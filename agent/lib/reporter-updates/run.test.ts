@@ -625,6 +625,7 @@ describe("discovery", () => {
       claimedAt: 0,
       commentId: "c",
       message: "",
+      retryAfter: 0,
       stage: "received",
       status: "sent",
       token: null,
@@ -941,7 +942,7 @@ describe("run over several tickets", () => {
     const s = setup(tickets, fiveDeploy(OLD_SHA, false));
     await runReporterUpdates(s.deps, NOW, () => NOW);
     s.linear.port.discover = () =>
-      Promise.resolve({ complete: true, identifiers: [] });
+      Promise.resolve({ identifiers: [], next: null });
     const readsBefore = s.linear.state.reads;
     await runReporterUpdates(s.deps, NOW + 300_000, () => NOW + 300_000);
     assert.equal(s.linear.state.reads, readsBefore);
