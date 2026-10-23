@@ -7,7 +7,7 @@ import { linearPort } from "./linear.js";
 import { runReporterUpdates } from "./run.js";
 import { databaseReporterStore } from "./store.js";
 
-const LINEAR_SCOPES = ["read", "write", "comments:create"];
+const LINEAR_SCOPES = ["read", "write", "issues:create", "comments:create"];
 
 export const runScheduledReporterUpdates = async (): Promise<void> => {
   const config = reporterUpdatesConfig();

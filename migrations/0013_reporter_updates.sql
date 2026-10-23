@@ -1,4 +1,3 @@
--- One row per reporter ticket and message stage. The primary key is the once-only guard.
 CREATE TABLE reporter_updates (
   issue text NOT NULL,
   stage text NOT NULL CHECK (stage IN ('received', 'owner', 'fixed', 'not_fixed')),

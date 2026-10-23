@@ -21,45 +21,99 @@ const probeWith = (routes: Record<string, () => Response>) => {
 };
 
 const DEPLOYMENTS =
-  "/repos/Acquisity/Acquisity/deployments?environment=production&per_page=10";
+  "/repos/Acquisity/Acquisity/deployments?environment=production&per_page=30";
 const statusesOf = (id: number) =>
-  `/repos/Acquisity/Acquisity/deployments/${id}/statuses?per_page=1`;
+  `/repos/Acquisity/Acquisity/deployments/${id}/statuses?per_page=10`;
+
+const VERCEL = "vercel[bot]";
+const statusOf = (state: string, login: string) => ({
+  creator: { login },
+  state,
+});
+const DEPLOY_DONE = [
+  statusOf("success", VERCEL),
+  statusOf("success", "actor"),
+  statusOf("in_progress", "actor"),
+  statusOf("queued", "actor"),
+];
+const MIGRATE_ONLY = [
+  statusOf("success", "actor"),
+  statusOf("in_progress", "actor"),
+  statusOf("queued", "actor"),
+];
+const BUILT_THEN_FAILED = [
+  statusOf("error", "actor"),
+  statusOf("success", VERCEL),
+  statusOf("in_progress", "actor"),
+  statusOf("queued", "actor"),
+];
+const STILL_RUNNING = [
+  statusOf("success", VERCEL),
+  statusOf("in_progress", "actor"),
+  statusOf("queued", "actor"),
+];
 
 describe("liveSha", () => {
-  it("is the newest production deployment whose latest status is success", async () => {
+  it("is the newest deployment that Vercel built and whose job then succeeded", async () => {
     const { probe } = probeWith({
       [DEPLOYMENTS]: () =>
         json([
-          { id: 3, sha: NEW_SHA },
+          { id: 5, sha: NEW_SHA },
+          { id: 4, sha: NEW_SHA },
+          { id: 3, sha: MERGE_SHA },
           { id: 2, sha: MERGE_SHA },
           { id: 1, sha: OLD_SHA },
         ]),
-      [statusesOf(1)]: () => json([{ state: "success" }]),
-      [statusesOf(2)]: () => json([{ state: "failure" }]),
-      [statusesOf(3)]: () => json([{ state: "in_progress" }]),
+      [statusesOf(1)]: () => json(DEPLOY_DONE),
+      [statusesOf(2)]: () => json(MIGRATE_ONLY),
+      [statusesOf(3)]: () => json(BUILT_THEN_FAILED),
+      [statusesOf(4)]: () => json(STILL_RUNNING),
+      [statusesOf(5)]: () => json(MIGRATE_ONLY),
     });
     assert.equal(await probe.liveSha(), OLD_SHA);
   });
 
-  it("takes the newest deployment when it has succeeded", async () => {
+  it("takes the newest deployment when it is fully done", async () => {
     const { probe } = probeWith({
       [DEPLOYMENTS]: () =>
         json([
           { id: 3, sha: NEW_SHA },
           { id: 1, sha: OLD_SHA },
         ]),
-      [statusesOf(1)]: () => json([{ state: "success" }]),
-      [statusesOf(3)]: () => json([{ state: "success" }]),
+      [statusesOf(1)]: () => json(DEPLOY_DONE),
+      [statusesOf(3)]: () => json(DEPLOY_DONE),
     });
     assert.equal(await probe.liveSha(), NEW_SHA);
   });
 
-  it("is null when nothing has succeeded, so nothing is called live", async () => {
+  it("does not call a database or ingress job live, because Vercel never built it", async () => {
     const { probe } = probeWith({
       [DEPLOYMENTS]: () => json([{ id: 3, sha: NEW_SHA }]),
-      [statusesOf(3)]: () => json([]),
+      [statusesOf(3)]: () => json(MIGRATE_ONLY),
     });
     assert.equal(await probe.liveSha(), null);
+  });
+
+  it("does not call a release live while its job is still moving traffic or has failed", async () => {
+    const running = probeWith({
+      [DEPLOYMENTS]: () => json([{ id: 3, sha: NEW_SHA }]),
+      [statusesOf(3)]: () => json(STILL_RUNNING),
+    });
+    assert.equal(await running.probe.liveSha(), null);
+    const failed = probeWith({
+      [DEPLOYMENTS]: () => json([{ id: 3, sha: NEW_SHA }]),
+      [statusesOf(3)]: () => json(BUILT_THEN_FAILED),
+    });
+    assert.equal(await failed.probe.liveSha(), null);
+  });
+
+  it("still calls a release live after GitHub marks it inactive for a newer one", async () => {
+    const { probe } = probeWith({
+      [DEPLOYMENTS]: () => json([{ id: 1, sha: OLD_SHA }]),
+      [statusesOf(1)]: () =>
+        json([statusOf("inactive", "actor"), ...DEPLOY_DONE]),
+    });
+    assert.equal(await probe.liveSha(), OLD_SHA);
   });
 
   it("fails loudly when GitHub refuses, rather than reporting nothing deployed", async () => {

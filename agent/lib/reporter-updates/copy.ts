@@ -13,17 +13,10 @@ export const MAX_UPDATE_WORDS = 50;
 const NAME = "[\\p{L}][\\p{L}'-]{0,39}";
 const NAME_ONLY = new RegExp(`^${NAME}$`, "u");
 const WHITESPACE = /\s+/u;
+const WHITESPACE_RUN = /\s+/gu;
+const REGEXP_SPECIALS = /[.*+?^${}()|[\]\\]/gu;
+const SLOT = "\u0000";
 const NOTHING_TO_DO = "Nothing for you to do";
-
-export const STAGE_PATTERNS: Record<Stage, RegExp> = {
-  fixed: /^Good news: this is fixed and live now\./u,
-  not_fixed: /^We looked into this/u,
-  owner: new RegExp(
-    `^(?:${NAME}|Our team) is now looking after your report\\.`,
-    "u"
-  ),
-  received: /^We've received your report/u,
-};
 
 export const firstName = (fullName: string | null): string | null => {
   const [first] = (fullName ?? "").trim().split(WHITESPACE);
@@ -50,8 +43,42 @@ const NOT_FIXED_REASONS: Record<NotFixedReason, string> = {
 export const notFixedText = (reason: NotFixedReason): string =>
   NOT_FIXED_REASONS[reason];
 
+const REASON_KEYS = Object.keys(NOT_FIXED_REASONS) as NotFixedReason[];
+
+export const PAST_TEXTS: Record<Stage, readonly string[]> = {
+  fixed: [],
+  not_fixed: [],
+  owner: [],
+  received: [],
+};
+
+const exactly = (texts: readonly string[]): RegExp =>
+  new RegExp(
+    `^(?:${texts
+      .map((text) => text.replace(REGEXP_SPECIALS, "\\$&").replace(SLOT, NAME))
+      .join("|")})$`,
+    "u"
+  );
+
+export const STAGE_PATTERNS: Record<Stage, RegExp> = {
+  fixed: exactly([fixedText(), ...PAST_TEXTS.fixed]),
+  not_fixed: exactly([
+    ...REASON_KEYS.map(notFixedText),
+    ...PAST_TEXTS.not_fixed,
+  ]),
+  owner: exactly([ownerText(SLOT), ...PAST_TEXTS.owner]),
+  received: exactly([
+    receivedText(null),
+    receivedText(SLOT),
+    ...PAST_TEXTS.received,
+  ]),
+};
+
+const normalized = (body: string): string =>
+  body.trim().replace(WHITESPACE_RUN, " ");
+
 export const stageOfBody = (body: string): Stage | null => {
-  const text = body.trim();
+  const text = normalized(body);
   return STAGES.find((stage) => STAGE_PATTERNS[stage].test(text)) ?? null;
 };
 

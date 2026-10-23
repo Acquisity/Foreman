@@ -1,4 +1,3 @@
-/** Runs the reporter-updates SQL against a disposable local Postgres: REPORTER_STORE_TEST_URL. */
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";

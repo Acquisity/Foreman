@@ -11,14 +11,41 @@ type Fetch = typeof fetch;
 
 const API = "https://api.github.com";
 const TIMEOUT_MS = 15_000;
-const DEPLOYMENTS_SCANNED = 10;
+const DEPLOYMENTS_SCANNED = 30;
 const REPOSITORY = /^[\w.-]+\/[\w.-]+$/u;
 const SHA = /^[0-9a-f]{7,40}$/iu;
 
 const deploymentsSchema = z.array(
   z.object({ id: z.number().int().positive(), sha: z.string().regex(SHA) })
 );
-const statusesSchema = z.array(z.object({ state: z.string() })).max(1);
+const statusesSchema = z
+  .array(
+    z.object({
+      creator: z.object({ login: z.string() }).nullish(),
+      state: z.string(),
+    })
+  )
+  .max(10);
+const VERCEL_LOGIN = "vercel[bot]";
+const STATUSES_READ = 10;
+
+type Status = z.infer<typeof statusesSchema>[number];
+
+const isLive = (statuses: readonly Status[]): boolean => {
+  const vercel = statuses.filter(
+    (status) => status.creator?.login === VERCEL_LOGIN
+  );
+  const job = statuses.filter(
+    (status) => status.creator?.login !== VERCEL_LOGIN
+  );
+  return (
+    vercel.some((status) => status.state === "success") &&
+    job.some((status) => status.state === "success") &&
+    !job.some(
+      (status) => status.state === "error" || status.state === "failure"
+    )
+  );
+};
 const pullSchema = z.object({
   merge_commit_sha: z.string().regex(SHA).nullish(),
   merged: z.boolean(),
@@ -71,19 +98,20 @@ export const githubDeployProbe = (
         `/repos/${DEPLOY_REPOSITORY}/deployments?environment=production&per_page=${DEPLOYMENTS_SCANNED}`
       )
     );
-    const latest = await Promise.all(
-      deployments.map(async ({ id }) => {
-        const [status] = statusesSchema.parse(
-          await read(
-            token,
-            fetchImpl,
-            `/repos/${DEPLOY_REPOSITORY}/deployments/${id}/statuses?per_page=1`
+    const live = await Promise.all(
+      deployments.map(async ({ id }) =>
+        isLive(
+          statusesSchema.parse(
+            await read(
+              token,
+              fetchImpl,
+              `/repos/${DEPLOY_REPOSITORY}/deployments/${id}/statuses?per_page=${STATUSES_READ}`
+            )
           )
-        );
-        return status?.state ?? null;
-      })
+        )
+      )
     );
-    const index = latest.indexOf("success");
+    const index = live.indexOf(true);
     return index === -1 ? null : (deployments[index]?.sha ?? null);
   },
   async pull(repo, number) {

@@ -40,7 +40,7 @@ If missing evidence materially limits the answer, name the product fact that rem
 
 ## Automatic reporter updates
 
-Four messages are posted by the scheduled reporter-updates job, not by a model turn: received, owner assigned, fixed, and not fixed. Their wording is fixed in `agent/lib/reporter-updates/copy.ts`; change it there and keep these rules:
+Four messages are posted by the scheduled reporter-updates job, not by a model turn: received, owner assigned, fixed, and not fixed. Their wording is fixed in `agent/lib/reporter-updates/copy.ts`; change it there, keep the old text in `PAST_TEXTS` so earlier messages are still recognised, and keep these rules:
 
 - Under 50 words each, and longer only when explaining something.
 - The first sentence says whether the report is handled.
