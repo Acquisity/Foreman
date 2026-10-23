@@ -461,17 +461,26 @@ async function resolveLabelIds(
   ].filter(Boolean);
 }
 
+const finalLabelNames = (
+  issue: RouteIssue,
+  input: RouteTicketInput
+): string[] => {
+  const removed = new Set(
+    (input.removeLabels ?? []).map((name) => name.toLowerCase())
+  );
+  return [
+    ...issue.labels.nodes.map((label) => label.name),
+    ...(input.addLabels ?? []),
+  ].filter((name) => !removed.has(name.toLowerCase()));
+};
+
 async function chooseAssignee(
   gql: Gql,
   issue: RouteIssue,
   input: RouteTicketInput
 ): Promise<{ id?: string; warnings: string[] }> {
   const warnings: string[] = [];
-  const labels = [
-    ...issue.labels.nodes.map((label) => label.name),
-    ...(input.addLabels ?? []),
-  ];
-  const eligible = developerLabelsAllowed(labels);
+  const eligible = developerLabelsAllowed(finalLabelNames(issue, input));
   if (input.inheritAssigneeFrom !== undefined) {
     const source = await requireIssue(gql, input.inheritAssigneeFrom);
     const holder = source.assignee ? mappedOwner(source.assignee.name) : null;

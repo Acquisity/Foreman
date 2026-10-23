@@ -583,6 +583,51 @@ describe("routeTicket owner map", () => {
     assert.equal(linear.updates().length, 0);
   });
 
+  it("builds eligibility from the labels the ticket will have, not the ones it is losing", async () => {
+    const cases: { name: string; removeLabels: string[] }[] = [
+      { name: "Approved", removeLabels: ["Approved"] },
+      { name: "Feature Request", removeLabels: ["feature request"] },
+    ];
+    await Promise.all(
+      cases.map(async (item) => {
+        const linear = fakeLinear({
+          teamLabels: FEATURE_LABELS,
+          ticketLabels: [
+            { id: "l-fr", name: "Feature Request" },
+            { id: "l-ok", name: "Approved" },
+          ],
+        });
+        await assert.rejects(
+          routeTicket(
+            {
+              assignee: "Ebubeker Rexha",
+              issue: "ENG-1",
+              removeLabels: item.removeLabels,
+            },
+            { client: linear.fetchStub }
+          ),
+          A_DEVELOPER,
+          item.name
+        );
+        assert.equal(linear.updates().length, 0, item.name);
+      })
+    );
+    const added = fakeLinear({
+      teamLabels: FEATURE_LABELS,
+      ticketLabels: [{ id: "l-fr", name: "Feature Request" }],
+    });
+    await routeTicket(
+      {
+        addLabels: ["Approved"],
+        assignee: "Ebubeker Rexha",
+        issue: "ENG-1",
+        removeLabels: ["Needs approval"],
+      },
+      { client: added.fetchStub }
+    );
+    assert.equal(added.updates().length, 1);
+  });
+
   it("lets a support owner take any ticket", async () => {
     const linear = fakeLinear({ ticketLabels: [] });
     await routeTicket(
