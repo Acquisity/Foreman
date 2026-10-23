@@ -467,14 +467,33 @@ async function chooseAssignee(
   input: RouteTicketInput
 ): Promise<{ id?: string; warnings: string[] }> {
   const warnings: string[] = [];
+  const labels = [
+    ...issue.labels.nodes.map((label) => label.name),
+    ...(input.addLabels ?? []),
+  ];
+  const eligible = developerLabelsAllowed(labels);
   if (input.inheritAssigneeFrom !== undefined) {
     const source = await requireIssue(gql, input.inheritAssigneeFrom);
-    if (source.assignee && mappedOwner(source.assignee.name)) {
+    const holder = source.assignee ? mappedOwner(source.assignee.name) : null;
+    if (
+      source.assignee &&
+      holder &&
+      (holder.lane !== "developer" || eligible)
+    ) {
       return { id: source.assignee.id, warnings };
     }
-    if (source.assignee) {
+    if (source.assignee && !holder) {
+      if (input.parent === input.inheritAssigneeFrom) {
+        throw new Error(
+          `${input.inheritAssigneeFrom} is held by ${source.assignee.name}, who is not in the owner map, so nothing was written. Move that master to its area owner first, so the report and its master keep one owner.`
+        );
+      }
       warnings.push(
         `${input.inheritAssigneeFrom} is held by ${source.assignee.name}, who is not in the owner map, so the assignee was not inherited.`
+      );
+    } else if (source.assignee) {
+      warnings.push(
+        `${input.inheritAssigneeFrom} is held by ${source.assignee.name}, a developer, and this ticket is neither a ${BUG_LABEL} nor an approved ${FEATURE_REQUEST_LABEL}, so the assignee was not inherited.`
       );
     }
   }
@@ -487,11 +506,7 @@ async function chooseAssignee(
       `"${input.assignee}" is not in the owner map, so nothing was assigned. Use one of: ${ownerNames().join(", ")}.`
     );
   }
-  const labels = [
-    ...issue.labels.nodes.map((label) => label.name),
-    ...(input.addLabels ?? []),
-  ];
-  if (owner.lane === "developer" && !developerLabelsAllowed(labels)) {
+  if (owner.lane === "developer" && !eligible) {
     throw new Error(
       `${owner.name} is a developer. A ticket goes to a developer only when it is labelled ${BUG_LABEL}, or ${FEATURE_REQUEST_LABEL} and ${APPROVED_LABEL}. Add the label or leave the assignee unchanged.`
     );

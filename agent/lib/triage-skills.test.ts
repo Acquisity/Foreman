@@ -1210,3 +1210,11 @@ test("the engineering hand-off admits an approved feature request", () => {
   assert.ok(preconditions.includes("`Engineering Todo` path"));
   assert.ok(preconditions.includes("`Feature Request` type label"));
 });
+
+test("the engineering hand-off stops when the master's owner is outside the roster", () => {
+  assert.ok(
+    handoffSkill.includes(
+      "When the tool refuses because the master's owner is not in the roster, write nothing else"
+    )
+  );
+});

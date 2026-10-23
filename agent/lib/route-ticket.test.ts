@@ -345,6 +345,8 @@ const FEATURE_LABELS = [
 ];
 const NOT_IN_MAP = /"Pieter Venter" is not in the owner map/u;
 const OTHER_NOT_IN_MAP = /"Jil Patel" is not in the owner map/u;
+const MASTER_OUTSIDE_MAP =
+  /ENG-9 is held by Pieter Venter, who is not in the owner map, so nothing was written/u;
 const A_DEVELOPER = /Ebubeker Rexha is a developer/u;
 const NOT_INHERITED =
   /not in the owner map, so the assignee was not inherited/u;
@@ -508,6 +510,77 @@ describe("routeTicket owner map", () => {
     assert.deepEqual(replaced.updates()[0]?.variables.input, {
       assigneeId: "u-ebu",
     });
+  });
+
+  it("applies the developer gate to an inherited owner, warning instead of failing", async () => {
+    const cases = [
+      { allowed: false, labels: [] as { id: string; name: string }[] },
+      { allowed: false, labels: [{ id: "l-fr", name: "Feature Request" }] },
+      { allowed: true, labels: [{ id: "l-bug", name: "Bug" }] },
+      {
+        allowed: true,
+        labels: [
+          { id: "l-fr", name: "Feature Request" },
+          { id: "l-ok", name: "Approved" },
+        ],
+      },
+    ];
+    await Promise.all(
+      cases.map(async (item) => {
+        const linear = fakeLinear({
+          teamLabels: FEATURE_LABELS,
+          ticketLabels: item.labels,
+        });
+        const result = await routeTicket(
+          {
+            duplicateOf: "ENG-9",
+            inheritAssigneeFrom: "ENG-9",
+            issue: "ENG-1",
+            state: "Done",
+          },
+          { client: linear.fetchStub }
+        );
+        const input = linear.updates()[0]?.variables.input as Record<
+          string,
+          unknown
+        >;
+        assert.equal(input.assigneeId, item.allowed ? "u-anuj" : undefined);
+        assert.equal(result.warnings.length > 0, !item.allowed);
+      })
+    );
+  });
+
+  it("lets a support owner be inherited by any ticket", async () => {
+    const linear = fakeLinear({
+      masterAssignee: { id: "u-aaron", name: "Aaron Fraga" },
+      ticketLabels: [],
+    });
+    await routeTicket(
+      { inheritAssigneeFrom: "ENG-9", issue: "ENG-1" },
+      { client: linear.fetchStub }
+    );
+    assert.deepEqual(linear.updates()[0]?.variables.input, {
+      assigneeId: "u-aaron",
+    });
+  });
+
+  it("refuses before any write to parent a report under a master held outside the map", async () => {
+    const linear = fakeLinear({
+      masterAssignee: { id: "u-gone", name: "Pieter Venter" },
+    });
+    await assert.rejects(
+      routeTicket(
+        {
+          assignee: "Ebubeker Rexha",
+          inheritAssigneeFrom: "ENG-9",
+          issue: "ENG-1",
+          parent: "ENG-9",
+        },
+        { client: linear.fetchStub }
+      ),
+      MASTER_OUTSIDE_MAP
+    );
+    assert.equal(linear.updates().length, 0);
   });
 
   it("lets a support owner take any ticket", async () => {
