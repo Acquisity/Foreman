@@ -89,6 +89,9 @@ const train = triageLabelSchema
   .array()
   .parse(JSON.parse(read("labels/train.json")));
 
+const STATED_CAUSE =
+  /\b(?:staff|requester) (?:said|found|confirmed|explained|saw|removed)\b(?! it was (?:fixed|resolved))/iu;
+
 describe("frozen triage cohort", () => {
   it("matches its frozen hash, so a changed case or frozen list is a new cohort", () => {
     const frozen = JSON.parse(read("cohort.json")) as {
@@ -168,6 +171,29 @@ describe("frozen triage cohort", () => {
       functions: [],
       text: "Staff confirmed they had cancelled the domain.",
     });
+  });
+
+  it("gives every confirmed non-bug closure whose notes record a person's stated cause that cause", () => {
+    const missing = train.filter(
+      (label) =>
+        !label.insufficient &&
+        label.verdict === "route" &&
+        label.classification !== "Bug" &&
+        label.fixPr === null &&
+        STATED_CAUSE.test(label.notes) &&
+        label.rootCause === null
+    );
+    assert.deepEqual(
+      missing.map((label) => label.id),
+      []
+    );
+    const cancelled = train.find((label) => label.id === "ENG-14523");
+    assert.deepEqual(cancelled?.rootCause, {
+      files: [],
+      functions: [],
+      text: "Staff said the errored inboxes had been cancelled by the user.",
+    });
+    assert.ok(cancelled?.labelSource.includes("human_comment"));
   });
 
   it("splits every case once, and no incident group spans train and held-out", () => {

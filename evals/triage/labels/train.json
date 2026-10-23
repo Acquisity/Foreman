@@ -248,12 +248,16 @@
     "path": "Support/Financial",
     "duplicateOf": null,
     "master": null,
-    "rootCause": null,
+    "rootCause": {
+      "files": [],
+      "functions": [],
+      "text": "Staff said the errored inboxes had been cancelled by the user."
+    },
     "project": "Support",
     "owner": "Aaron Fraga",
     "fixCommit": null,
     "fixPr": null,
-    "labelSource": ["human_state"],
+    "labelSource": ["human_comment", "human_state"],
     "insufficient": false,
     "notes": "Correction case: staff said the errored inboxes had been cancelled by the user, which changed the figure. Staff closed it Done; no billing action text was relayed.",
     "outcomeAt": "2026-10-01T20:08:05.689Z"
