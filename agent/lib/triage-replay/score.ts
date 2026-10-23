@@ -101,7 +101,6 @@ export interface GroupScore {
 
 export const APART = [
   "edited_after_create",
-  "unsettled_outcome",
   "list_membership_unknown",
   "needs_production_data",
 ] as const;
@@ -111,16 +110,10 @@ const APART_TITLES: Record<Apart, string> = {
   edited_after_create: "description edited after filing",
   list_membership_unknown: "frozen list entry with no creation time",
   needs_production_data: "needs production data",
-  unsettled_outcome: "human outcome under 14 days before the cohort",
 };
-
-export const SETTLING_DAYS = 14;
-const DAY_MS = 24 * 60 * 60 * 1000;
 
 export function apartReason(
   triageCase: TriageCase | undefined,
-  label: Pick<TriageLabel, "outcomeAt">,
-  cohortBuiltAt: string,
   listMembershipUnknown = false
 ): Apart | null {
   if (!triageCase) {
@@ -128,13 +121,6 @@ export function apartReason(
   }
   if (triageCase.flags.descriptionEditedAfterCreate) {
     return "edited_after_create";
-  }
-  if (
-    label.outcomeAt !== null &&
-    Date.parse(label.outcomeAt) + SETTLING_DAYS * DAY_MS >
-      Date.parse(cohortBuiltAt)
-  ) {
-    return "unsettled_outcome";
   }
   if (listMembershipUnknown) {
     return "list_membership_unknown";
@@ -170,7 +156,6 @@ export interface ScoreReport {
 /** Everything the scorer needs, loaded by the CLI. */
 export interface ScoreInput {
   cases: readonly TriageCase[];
-  cohortBuiltAt: string;
   cohortSha256: string;
   heldoutLabels: readonly TriageLabel[];
   /** Leakage hits per row key; a row with any hit scores wrong on every field. */
@@ -468,12 +453,7 @@ export function scoreReplay(input: ScoreInput): ScoreReport {
       const triageCase = cases.get(id);
       const lane = triageCase?.lane ?? "unknown";
       const label = byId.get(id) as TriageLabel;
-      const reason = apartReason(
-        triageCase,
-        label,
-        input.cohortBuiltAt,
-        membershipUnknown.has(id)
-      );
+      const reason = apartReason(triageCase, membershipUnknown.has(id));
       if (!(reason || split.lanes[lane])) {
         split.lanes[lane] = emptyGroup(judged);
       }
@@ -608,7 +588,7 @@ export function renderScorecard(report: ScoreReport): string {
     "",
     ...leaks,
     "",
-    "Every cohort case counts once per run, in the main rows or in exactly one scored-apart group, taken in this order: a description edited after filing, a human outcome (the label's `outcomeAt`: a fix PR's merge, a person's state change, comment or billing action) less than 14 days before the cohort was built, however old the ticket, a case whose run answered from a frozen list entry with no creation time (so its case-time membership is unknown; any run of the case puts every run of it here), or a case that needs production data the replay can't reach. A missing, failed, cancelled, boundary-error or leaked row scores wrong on every field. Text fields match trimmed and case-folded; a field the label leaves null is unscored, so its total counts only labels that settle it. Owner compares the label owner with the assignee the store applied. Duplicates match as sets of issue ids, with null and empty equal (a null duplicate is scored: it means not a duplicate); the final `duplicateOf` is split on commas or spaces. Master compares the label's master with the parent the run set, and a master filed after the case means the run should have created a new one.",
+    "Every cohort case counts once per run, in the main rows or in exactly one scored-apart group, taken in this order: a description edited after filing, a case whose run answered from a frozen list entry with no creation time (so its case-time membership is unknown; any run of the case puts every run of it here), or a case that needs production data the replay can't reach. A missing, failed, cancelled, boundary-error or leaked row scores wrong on every field. Text fields match trimmed and case-folded; a field the label leaves null is unscored, so its total counts only labels that settle it. Owner compares the label owner with the assignee the store applied. Duplicates match as sets of issue ids, with null and empty equal (a null duplicate is scored: it means not a duplicate); the final `duplicateOf` is split on commas or spaces. Master compares the label's master with the parent the run set, and a master filed after the case means the run should have created a new one.",
     "",
   ].join("\n");
 }

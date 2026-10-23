@@ -163,8 +163,8 @@ function parseFile<T>(schema: z.ZodType<T>, path: string): T {
 function loadCohort(dir: string) {
   const files = readCohortFiles(dir);
   const sha = cohortSha256(files);
-  const { builtAt, sha256: frozen } = parseFile(
-    z.object({ builtAt: z.iso.datetime(), sha256: z.string() }),
+  const { sha256: frozen } = parseFile(
+    z.object({ sha256: z.string() }),
     join(dir, "cohort.json")
   );
   if (frozen !== sha) {
@@ -173,7 +173,6 @@ function loadCohort(dir: string) {
     );
   }
   return {
-    builtAt,
     cases: files
       .filter(({ name }) => name.startsWith("cases/"))
       .map(({ name }) => parseFile(triageCaseSchema, join(dir, name))),
@@ -308,7 +307,6 @@ async function main() {
   const results = loadResults(options.results);
   const input = {
     cases: cohort.cases,
-    cohortBuiltAt: cohort.builtAt,
     cohortSha256: cohort.sha,
     heldoutLabels,
     results,

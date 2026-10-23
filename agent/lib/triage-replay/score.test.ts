@@ -4,6 +4,7 @@ import { makeCase, makeLabel, makeResult, SHA } from "./fixtures.js";
 import type { LeakageHit } from "./leakage.js";
 import { NEW_MASTER, triageLabelSchema } from "./schema.js";
 import {
+  APART,
   checkScoreInput,
   cohortSha256,
   expectedMaster,
@@ -28,7 +29,6 @@ const RUNS_FLOOR = /--runs must be a whole number of at least 1/;
 const WRONG_SPLIT = /wrong split: ENG-3/;
 const NOT_JUDGED = /not judged/;
 const HELDOUT_HEADING = /## Held-out/;
-const BUILT_AT = "2026-10-23T00:00:00.000Z";
 const MEMBERSHIP_APART = /\| frozen list entry with no creation time \| 2 \|/;
 const OUTCOME_REQUIRED = /when its human outcome happened/;
 const APART_HEADING = /\| needs production data \| 1 \|/;
@@ -50,7 +50,6 @@ const base = (overrides: Partial<ScoreInput> = {}): ScoreInput => ({
     makeCase("ENG-5"),
     makeCase("ENG-6", { lane: "slack" }),
   ],
-  cohortBuiltAt: BUILT_AT,
   cohortSha256: SHA,
   heldoutLabels: [makeLabel("ENG-5"), makeLabel("ENG-6")],
   results: [
@@ -432,7 +431,7 @@ test("cases that need production data score apart, never in the main rows", () =
   assert.match(renderScorecard(scoreReplay(input)), APART_HEADING);
 });
 
-test("an edited description and a human outcome younger than the settling window score apart, once each, in that order", () => {
+test("an edited description scores apart before the production-data group, and a young human outcome stays in the main rows", () => {
   const input = base();
   input.cases = input.cases.map((item) =>
     item.id === "ENG-1"
@@ -446,33 +445,23 @@ test("an edited description and a human outcome younger than the settling window
         }
       : item
   );
-  input.trainLabels = input.trainLabels.map((label) => {
-    if (label.id === "ENG-2") {
-      return { ...label, outcomeAt: "2026-10-20T09:00:00.000Z" };
-    }
-    if (label.id === "ENG-3") {
-      return { ...label, outcomeAt: "2026-10-08T23:00:00.000Z" };
-    }
-    return label;
-  });
-  const { train } = scoreReplay(input).splits;
-  assert.equal(train.apart.edited_after_create.rows, 1);
-  assert.equal(train.apart.needs_production_data.rows, 0);
-  assert.equal(train.apart.unsettled_outcome.rows, 1);
-  assert.equal(train.all.rows, 2);
-  assert.deepEqual(train.all.fields.verdict, { correct: 2, total: 2 });
-});
-
-test("the settling window runs from the human outcome, not from when the ticket was filed", () => {
-  const input = base();
   input.trainLabels = input.trainLabels.map((label) =>
-    label.id === "ENG-1"
-      ? { ...label, outcomeAt: "2026-10-15T12:00:00.000Z" }
+    label.id === "ENG-2" || label.id === "ENG-3"
+      ? { ...label, outcomeAt: "2026-10-22T09:00:00.000Z" }
       : label
   );
   const { train } = scoreReplay(input).splits;
-  assert.equal(train.apart.unsettled_outcome.rows, 1);
+  assert.deepEqual(
+    [...APART],
+    ["edited_after_create", "list_membership_unknown", "needs_production_data"]
+  );
+  assert.equal(train.apart.edited_after_create.rows, 1);
+  assert.equal(train.apart.needs_production_data.rows, 0);
   assert.equal(train.all.rows, 3);
+  assert.deepEqual(train.all.fields.verdict, { correct: 3, total: 3 });
+});
+
+test("a label with ground truth says when its human outcome happened", () => {
   assert.throws(
     () => triageLabelSchema.parse({ ...makeLabel("ENG-9"), outcomeAt: null }),
     OUTCOME_REQUIRED
