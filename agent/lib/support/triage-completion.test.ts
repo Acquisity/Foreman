@@ -606,3 +606,37 @@ test("an open non-Bug outcome needs an owner, a closed one does not", () => {
     assertTriageOutputs({ ...followUp, status: "Done" }, content, comments)
   );
 });
+
+test("a Bug that routing left unassigned on purpose finishes with its Area label as the owner record", () => {
+  const parked = {
+    ...report,
+    assignee: null,
+    labels: ["intercom-sourced", "Customer reported", "Bug", "Area: AI SDR"],
+    parentId: null,
+    project: null,
+  };
+  for (const status of ["Backlog", "Done"]) {
+    assert.doesNotThrow(
+      () => assertTriageOutputs({ ...parked, status }, document, comments),
+      status
+    );
+  }
+  assert.throws(
+    () =>
+      assertTriageOutputs({ ...parked, status: "Todo" }, document, comments),
+    SupportRefusal
+  );
+  assert.throws(
+    () =>
+      assertTriageOutputs(
+        {
+          ...parked,
+          labels: ["intercom-sourced", "Customer reported", "Bug"],
+          status: "Backlog",
+        },
+        document,
+        comments
+      ),
+    SupportRefusal
+  );
+});

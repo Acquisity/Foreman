@@ -11,6 +11,7 @@ import { writtenIssueId } from "./linear-state.js";
 import type { supportOperations } from "./store.js";
 
 const CLOSED_STATES = ["Done", "Duplicate", "Canceled"];
+const UNASSIGNED_BUG_STATES = ["Backlog", ...CLOSED_STATES];
 
 const documentSchema = z.object({
   content: z.string().min(1),
@@ -37,12 +38,15 @@ const ownerRecordMissing = (
   if (classification !== "Bug") {
     return !(issue.assignee || CLOSED_STATES.includes(issue.status));
   }
+  const hasArea = issue.labels.some((label) => areaLabels().includes(label));
+  if (!issue.assignee) {
+    return !(hasArea && UNASSIGNED_BUG_STATES.includes(issue.status));
+  }
   return !(
-    issue.assignee &&
-    (issue.project ||
-      issue.labels.some((label) => areaLabels().includes(label)) ||
-      issue.assignee === SUPPORT_OWNER ||
-      issue.assignee === FALLBACK_OWNER)
+    issue.project ||
+    hasArea ||
+    issue.assignee === SUPPORT_OWNER ||
+    issue.assignee === FALLBACK_OWNER
   );
 };
 
