@@ -6,7 +6,7 @@ description: "Investigate product reports and feedback from one live Intercom co
 
 Use this procedure for product reports and feedback arriving through the mapped Intercom Slack intake. The source is one live Intercom conversation. There is no Linear issue at the start.
 
-The goal is to explain what happened, find an unblock, and create durable Linear work only when the evidence requires it. Only a confirmed `Bug` leaves this skill: Step 6 creates its customer-report issue and hands it to `triage-handling` for review and routing. Every other outcome stays here for Steps 7–9, without `triage-handling`.
+The goal is to explain what happened, find an unblock, and create durable Linear work only when the evidence requires it. Only a confirmed `Bug` or a feature request leaves this skill: Step 6 creates its customer-report issue and hands it to `triage-handling` for review and routing. Every other outcome stays here for Steps 7–9, without it.
 
 ## Boundaries
 
@@ -41,9 +41,9 @@ Write one testable sentence: what the customer says happened, what they expected
 
 Immediately after the claim is written, call `search_investigation_memory`. Do not read or create a Linear issue first. The tool accepts no Linear project metadata.
 
-Pass the claim and visible error in `text`, plus the component, provider, and known dependency keys. This is the same project-independent retrieval used by every authorized attended triage surface. It searches the server-owned live areas: Cold Email, Domains & Inboxes, AI SDR, CRM, Website Builder, Core Platform, and Support. It excludes the planned Acquisity Agent area.
+Pass the claim and visible error in `text`, plus the component, provider, and known dependency keys. It searches the server-owned live areas: Cold Email, Domains & Inboxes, AI SDR, CRM, Website Builder, Core Platform, and Support. It excludes the planned Acquisity Agent area.
 
-Every returned case identifies its `primaryFeatureKey`. Treat it as a historical analogy, never current truth and never proof of the current product area. For each plausible case, record why it resembles the claim and what current evidence would disconfirm it, then check that evidence. Historical affected counts are dated figures, never the current blast radius.
+Every returned case identifies its `primaryFeatureKey`. Treat it as a historical analogy, never current truth and never proof of the current product area. For each plausible case, record why it resembles the claim and what current evidence would disconfirm it, then check that evidence.
 
 Project-free cluster signals are returned per product area. A signal from one area says nothing about another area, and reports from different areas must never be added together. A `possibleWiderIncident` value is only a reason to check current telemetry. It cannot declare an incident, select a project, set priority, mark a duplicate, or create a master.
 
@@ -97,15 +97,17 @@ Missing any item means the claim is not a confirmed Bug yet.
 
 The report must exist before the handoff: the shared review needs its id for its document and critic. Create it with one linear `save_issue` with team `8eaf95ab-56ac-4490-8253-f6a96793dc40`: the conversation URL, bounded conversation context, and testable claim in the description, `labels: ["intercom-sourced", "Customer reported"]`, and `links: [{ url: <canonical conversation URL>, title: "Intercom conversation" }]`, so the Intercom and Linear integration can show the ticket's progress. Attach it to the customer report, never the shared root-cause master. Leave state, priority, project, parent, and assignee to the shared stages.
 
-Then write `STAGE 4 COMPLETE: evidence record ready` in working context and load `triage-handling` with that report as the source ticket. Run Stages 5 to 7: exactly one critic pass, documentation, routing and `engineering-handoff`. Schedules skip all memory and use `support_investigation` reporting instead of Slack. Attended runs include memory. Steps 7 and 8 below are not for a Bug; its Slack reply is Step 9.
+A feature request takes this path too: `triage-handling` parks it in Backlog with `Needs approval` until the report carries `Approved`.
+
+Then write `STAGE 4 COMPLETE: evidence record ready` in working context and load `triage-handling` with that report as the source ticket. Run Stages 5 to 7: exactly one critic pass, documentation, routing and `engineering-handoff`. Schedules skip all memory and use `support_investigation` reporting instead of Slack. Attended runs include memory. Steps 7 and 8 below are not for these; their Slack reply is Step 9.
 
 ## Step 7: Decide whether a follow-up is warranted
 
-For User Error, Platform Limitation, ordinary feedback, or an unproven claim, do not manufacture engineering work. Give the finding, unblock, and reopen condition in Slack. Create a Support/Product follow-up only when a real human action needs a durable record: one linear `save_issue` with team `8eaf95ab-56ac-4490-8253-f6a96793dc40`: the conversation URL, bounded context, and finding in the description, then one `route_ticket` call with `state: "Todo"`, the `Support` project, Aaron Fraga as assignee, the same `links` attachment, and `addLabels` `intercom-sourced` and `Customer reported`. Label and route it as support or feedback, never as a Bug or an engineering master.
+For User Error, a Platform Limitation nobody wants lifted, ordinary feedback, or an unproven claim, do not manufacture engineering work. Give the finding, unblock, and reopen condition in Slack. Create a Support/Product follow-up only when a real human action needs a durable record: one linear `save_issue` with team `8eaf95ab-56ac-4490-8253-f6a96793dc40`: the conversation URL, bounded context, and finding in the description, then one `route_ticket` call with `state: "Todo"`, the `Support` project, Aaron Fraga as assignee, the same `links` attachment, and `addLabels` `intercom-sourced` and `Customer reported`. Label and route it as support or feedback, never as a Bug or an engineering master.
 
 ## Step 8: Record the case
 
-Every settled verdict is recorded exactly once, with or without a Linear issue. A Bug is recorded by `triage-handling` Stage 7 under its ticket identifier once its review has settled; skip this step for it.
+Every settled verdict is recorded exactly once, with or without a Linear issue. A Bug or feature request is recorded by `triage-handling` Stage 7 under its ticket identifier; skip this step for it.
 
 For a User Error, Platform Limitation, or unproven verdict, call `record_investigation_case` with `sourceIssueId` set to `intercom:<conversation id>`, the canonical conversation URL as `sourceIssueUrl`, no project id, and the live product area the verified evidence points at in `primaryFeatureKey`. A Support/Product follow-up is a human action, not the case; the key stays the conversation. Put the unblock in `resolution` in the product's own words. Ordinary feedback with no finding is not recorded.
 

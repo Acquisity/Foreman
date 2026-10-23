@@ -1300,3 +1300,42 @@ test("the unblock never replaces the root cause or the master ticket", () => {
 test("the investigation document template records the handling path completion reads", () => {
   assert.ok(triageReportingReference.includes("**Handling path**:"));
 });
+
+test("the Intercom skill sends a feature request through the report and hand-off branch", () => {
+  const opening = intercomTriageSkill.slice(
+    intercomTriageSkill.indexOf("Only a confirmed `Bug`"),
+    intercomTriageSkill.indexOf("## Boundaries")
+  );
+  assert.ok(
+    opening.includes(
+      "Only a confirmed `Bug` or a feature request leaves this skill"
+    )
+  );
+  const handoff = extractInstruction(
+    intercomTriageSkill,
+    "### A confirmed Bug: create the report, then hand off",
+    "## Step 7:"
+  );
+  assert.ok(handoff.includes("A feature request takes this path too"));
+  assert.ok(
+    handoff.includes(
+      "Backlog with `Needs approval` until the report carries `Approved`"
+    )
+  );
+  const followUp = extractInstruction(
+    intercomTriageSkill,
+    "## Step 7:",
+    "## Step 8:"
+  );
+  assert.ok(followUp.includes("a Platform Limitation nobody wants lifted"));
+  const record = extractInstruction(
+    intercomTriageSkill,
+    "## Step 8:",
+    "Store only the sanitized pattern"
+  );
+  assert.ok(
+    record.includes(
+      "A Bug or feature request is recorded by `triage-handling` Stage 7"
+    )
+  );
+});
