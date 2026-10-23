@@ -280,5 +280,7 @@ const { ContextContainer, contextStorage } = (await import(
   new URL("./dist/src/context/container.js", evePackageUrl()).href
 )) as EveContextModule;
 
+const enterContext = contextStorage.run.bind(contextStorage);
+
 export const inSession = <T>(body: () => T): T =>
-  contextStorage.run(new ContextContainer(), body);
+  enterContext(new ContextContainer(), body);
