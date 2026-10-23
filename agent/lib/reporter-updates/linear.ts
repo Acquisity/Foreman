@@ -123,17 +123,22 @@ const recentSchema = z.object({
     }),
   }),
 });
-const channelOf = (
+const threadChannel = (
   asks: readonly { title: string; url: string }[],
-  anchorBody: string
+  anchors: readonly { body: string }[]
 ): string | null => {
-  const ask = asks.find((node) => ASK_FROM.test(node.title.trim()));
-  const fromAsk = ask ? slackChannelOf(ask.url) : null;
-  if (fromAsk) {
-    return fromAsk;
-  }
-  const link = ANCHOR_LINK.exec(anchorBody)?.[1];
-  return link ? slackChannelOf(link) : null;
+  const channels = [
+    ...asks
+      .filter((node) => ASK_FROM.test(node.title.trim()))
+      .map((node) => slackChannelOf(node.url))
+      .filter((channel) => channel !== null),
+    ...anchors.map((anchor) => {
+      const link = ANCHOR_LINK.exec(anchor.body)?.[1];
+      return link ? slackChannelOf(link) : undefined;
+    }),
+  ];
+  const [first] = channels;
+  return first && channels.every((channel) => channel === first) ? first : null;
 };
 
 export const linearPort = (
@@ -169,13 +174,13 @@ export const linearPort = (
       }
       assertThreadComplete(identifier, issue.comments.pageInfo.hasNextPage);
       const comments = issue.comments.nodes;
-      const anchor = comments
+      const anchors = comments
         .filter(
           (comment) =>
             !comment.parent && SLACK_ANCHOR_PATTERN.test(comment.body.trim())
         )
-        .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
-        .at(0);
+        .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+      const anchor = anchors.at(0);
       const pullUrls = [
         ...issue.attachments.nodes,
         ...(issue.parent?.attachments.nodes ?? []),
@@ -186,7 +191,9 @@ export const linearPort = (
         anchorId: anchor?.id ?? null,
         facts: {
           assignee: issue.assignee?.name ?? null,
-          channel: channelOf(issue.attachments.nodes, anchor?.body ?? ""),
+          channel: anchor
+            ? threadChannel(issue.attachments.nodes, anchors)
+            : null,
           createdAt: issue.createdAt,
           identifier: issue.identifier,
           labels: issue.labels.nodes.map((label) => label.name),

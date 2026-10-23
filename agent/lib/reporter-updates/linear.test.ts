@@ -41,7 +41,7 @@ const issue = (over: Record<string, unknown> = {}) => ({
     nodes: [
       comment(
         "c-anchor",
-        "Slack thread connected in [#sandbox](https://x.slack.com/archives/C0ZZZZZZZZZ/p1)"
+        `Slack thread connected in [#sandbox](https://x.slack.com/archives/${SANDBOX}/p1)`
       ),
       comment("c-1", "We've received your report", {
         parent: "c-anchor",
@@ -120,7 +120,98 @@ describe("readTicket", () => {
       })
     );
     const view = await port.readTicket("ENG-1");
-    assert.equal(view?.facts.channel, "C0ZZZZZZZZZ");
+    assert.equal(view?.facts.channel, SANDBOX);
+  });
+
+  it("refuses a thread when the Ask link and the anchor name different channels", async () => {
+    const { port } = portWith(() =>
+      ok({
+        issue: issue({
+          comments: {
+            nodes: [
+              comment(
+                "c-anchor",
+                "Slack thread connected in [#other](https://x.slack.com/archives/C0ZZZZZZZZZ/p1)"
+              ),
+            ],
+            pageInfo: { hasNextPage: false },
+          },
+        }),
+        viewer: { id: "viewer" },
+      })
+    );
+    assert.equal((await port.readTicket("ENG-1"))?.facts.channel, null);
+  });
+
+  it("refuses a ticket whose Slack threads sit in two channels", async () => {
+    const { port } = portWith(() =>
+      ok({
+        issue: issue({
+          attachments: { nodes: [] },
+          comments: {
+            nodes: [
+              comment(
+                "a1",
+                `Slack thread connected in [#a](https://x.slack.com/archives/${SANDBOX}/p1)`,
+                { createdAt: "2026-10-10T10:00:00Z" }
+              ),
+              comment(
+                "a2",
+                "Slack thread connected in [#b](https://x.slack.com/archives/C0ZZZZZZZZZ/p2)",
+                { createdAt: "2026-10-11T10:00:00Z" }
+              ),
+            ],
+            pageInfo: { hasNextPage: false },
+          },
+        }),
+        viewer: { id: "viewer" },
+      })
+    );
+    assert.equal((await port.readTicket("ENG-1"))?.facts.channel, null);
+  });
+
+  it("names the channel when the Ask link and the anchor agree, and when a duplicate has lost its Ask link", async () => {
+    const agree = portWith(() =>
+      ok({
+        issue: issue({
+          comments: {
+            nodes: [
+              comment(
+                "c-anchor",
+                `Slack thread connected in [#a](https://x.slack.com/archives/${SANDBOX}/p1)`
+              ),
+            ],
+            pageInfo: { hasNextPage: false },
+          },
+        }),
+        viewer: { id: "viewer" },
+      })
+    );
+    const duplicate = portWith(() =>
+      ok({
+        issue: issue({
+          attachments: { nodes: [] },
+          comments: {
+            nodes: [
+              comment(
+                "c-anchor",
+                `Slack thread connected in [#a](https://x.slack.com/archives/${SANDBOX}/p1)`
+              ),
+            ],
+            pageInfo: { hasNextPage: false },
+          },
+        }),
+        viewer: { id: "viewer" },
+      })
+    );
+    assert.equal(
+      (await agree.port.readTicket("ENG-1"))?.facts.channel,
+      SANDBOX
+    );
+    assert.equal(
+      (await duplicate.port.readTicket("ENG-1"))?.facts.channel,
+      SANDBOX
+    );
   });
 
   it("does not treat a support inbox note as a reporter thread", async () => {
