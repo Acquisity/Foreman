@@ -1415,3 +1415,12 @@ test("a correction to a feature request supersedes its case because both use the
     )
   );
 });
+
+test("the Intercom skill never asks the requester for a Linear identifier", () => {
+  const boundaries = extractInstruction(
+    intercomTriageSkill,
+    "## Boundaries",
+    "## Step 1:"
+  );
+  assert.ok(boundaries.includes("Never ask for a Linear identifier."));
+});

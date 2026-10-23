@@ -14,6 +14,7 @@ The goal is to explain what happened, find an unblock, and create durable Linear
 - Conversation, investigation, clarification, and Linear writes are allowed. Repository edits, commits, pushes, and pull requests are not.
 - Intercom is read-only here. Reply to the internal requester in Slack, never directly to the customer.
 - Do not create a placeholder issue before the investigation.
+- Never ask for a Linear identifier.
 
 ## Step 1: Read one Intercom conversation
 
