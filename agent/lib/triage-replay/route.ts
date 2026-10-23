@@ -135,7 +135,6 @@ export const blobLedger: AdmissionLedger = {
 };
 
 const ADMISSION_ATTEMPTS = 8;
-/** How long a reservation blocks a second start of the same case and run. */
 export const RESERVATION_LEASE_MS = 120_000;
 
 interface Allowance {
@@ -183,13 +182,6 @@ function allowanceOf(env: NodeJS.ProcessEnv): Allowance | string {
   };
 }
 
-/**
- * Reserves one start for the approved run, or says why not. A reservation
- * holds a slot and its estimated spend until `confirm` or `release`; a lost
- * race rereads the ledger. A second start of the same case and run is refused
- * while the first holds a fresh reservation, and may reuse one that has gone
- * stale without charging again.
- */
 export function reserve(
   request: StartRequest,
   ledger: AdmissionLedger,
@@ -252,7 +244,6 @@ const withoutReservation = (entries: LedgerEntries, entry: string) => {
   return reserved;
 };
 
-/** Turns a reservation into an admitted start once its session has been dispatched. */
 export const confirm = (request: StartRequest, ledger: AdmissionLedger) =>
   settle(request, ledger, (entries, entry) => ({
     admitted: entries.admitted.includes(entry)
@@ -262,7 +253,6 @@ export const confirm = (request: StartRequest, ledger: AdmissionLedger) =>
     reserved: withoutReservation(entries, entry),
   }));
 
-/** Gives a reservation's slot and estimated spend back when its start failed before dispatch. */
 export const release = (
   request: StartRequest,
   ledger: AdmissionLedger,
@@ -313,7 +303,6 @@ export function replayMessage(request: StartRequest): string {
 export const caseKeyOf = (request: { case: { id: string }; run: number }) =>
   `${request.case.id}#${request.run}`;
 
-/** What a replay's result records about the server that ran it. */
 export const replayStamp = (
   env: NodeJS.ProcessEnv = process.env,
   now: Date = new Date()

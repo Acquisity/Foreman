@@ -114,6 +114,5 @@ export function replayMayCall(toolName: string): boolean {
   return REPLAY_TOOL_POLICY[toolName]?.mode === "allow";
 }
 
-/** Whether a tool's result is this replay's own work, which the leakage scan skips. */
 export const replayOutputIsGenerated = (toolName: string): boolean =>
   REPLAY_TOOL_POLICY[toolName]?.generated === true;

@@ -121,7 +121,6 @@ export interface ReplayState {
   routeResults: { issue: string | null; routed: boolean }[];
   /** Every RouteIssueUpdate the store applied to the case ticket. */
   routes: { input: Record<string, unknown>; seq: number }[];
-  /** What the server stamps on this replay's result: its commit, start time and charged cost. */
   stamp: ReplayStamp;
   steps: number;
   writes: { operation: string; seq: number; variables: unknown }[];

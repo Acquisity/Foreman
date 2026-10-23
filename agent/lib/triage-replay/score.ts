@@ -138,7 +138,6 @@ export interface SplitScore {
 /** The whole scorer output, written as `scores.json`. */
 export interface ScoreReport {
   cohortSha256: string;
-  /** Which Foreman the results came from, when the replays began, and what they were charged. */
   foreman: {
     commit: string | null;
     estimatedUsd: number;

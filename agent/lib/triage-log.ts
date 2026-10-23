@@ -28,7 +28,6 @@ export const triageDecisions = defineState<
 
 export const BILLING_PATH = "Support/Financial";
 
-/** The Support route the latest `decide_billing` returned, which `route_ticket` is told to apply unchanged. */
 export interface BillingRoute {
   assignee: string;
   project: string;

@@ -21,10 +21,6 @@ export const relatedIssueSchema = z.strictObject({
   title: asOf(z.string()),
 });
 
-/**
- * The source ticket's fields as first filed. A case that records none seeds
- * the ticket cleared, which a closure that preserves the owner can't match.
- */
 export const asFiledSchema = z.strictObject({
   assignee: z.string().nullable(),
   labels: z.array(z.string()),
@@ -130,7 +126,6 @@ export const triageResultSchema = z.strictObject({
   document: z
     .strictObject({ text: z.string(), updatedAt: z.string() })
     .nullable(),
-  /** The model spend charged to this replay, an estimate: a replay can't meter most of its cost. */
   estimatedUsd: z.number().nonnegative(),
   evidenceMisses: z.array(z.string()),
   /** The last decision for the case, with what the store applied to the case ticket. */
@@ -145,7 +140,6 @@ export const triageResultSchema = z.strictObject({
       project: z.string().nullable(),
     })
     .nullable(),
-  /** The Foreman commit the replay server ran, or `unknown` when its deployment names none. */
   foremanCommit: z.string().min(1),
   /** Every input the run saw, whole, with provenance and, for evidence as of the case, the case's creation time. */
   inputs: z.array(
@@ -161,7 +155,6 @@ export const triageResultSchema = z.strictObject({
   ),
   run: z.int().positive(),
   runId: z.string().min(1),
-  /** When the server started this replay. */
   startedAt: z.iso.datetime(),
   status: z.enum(RESULT_STATUSES),
 });

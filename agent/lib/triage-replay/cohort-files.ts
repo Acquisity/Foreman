@@ -22,12 +22,6 @@ export function readCohortFiles(dir: string) {
 
 const REPOSITORY_ROOT = fileURLToPath(new URL("../../../", import.meta.url));
 
-/**
- * The real path of a file that must live outside this repository. Both paths
- * are resolved through symlinks first, so a link, a relative path or a name
- * such as `..x.json` can't pass for an outside file. Throws when the file is
- * missing or inside the repository.
- */
 export function outsideRepositoryPath(
   path: string,
   what: string,
