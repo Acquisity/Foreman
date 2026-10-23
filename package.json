@@ -19,6 +19,7 @@
     "executor:readiness": "tsx scripts/executor-readiness.ts",
     "executor:specs": "tsx scripts/executor-linear-specs.ts && biome format --write .github/executor/specs/linear-read.json .github/executor/specs/linear-write.json",
     "fix": "ultracite fix",
+    "routing:eval": "tsx scripts/routing-eval.ts",
     "roster": "tsx scripts/render-roster.ts",
     "roster:check": "tsx scripts/render-roster.ts --check",
     "report:capabilities": "tsx --env-file-if-exists=.env --env-file-if-exists=.env.local scripts/capability-budget.ts",

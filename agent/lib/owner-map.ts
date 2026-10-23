@@ -322,3 +322,10 @@ export const developerLabelsAllowed = (labels: readonly string[]): boolean => {
 
 export const hasLabel = (labels: readonly string[], wanted: string): boolean =>
   labels.some((label) => normalize(label) === normalize(wanted));
+
+export const specificAreaForFiles = (
+  files: readonly string[]
+): AreaKey | null =>
+  SPECIFIC_CRM_ORDER.find((key) =>
+    files.some((file) => pathMatches([key], file) === key)
+  ) ?? null;
