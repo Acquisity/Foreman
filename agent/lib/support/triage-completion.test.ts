@@ -720,3 +720,58 @@ test("only a Bug on a Support path is exempt from needing a master, even when Aa
     )
   );
 });
+
+test("a report whose recorded path is Engineering Todo needs its master whatever its type", () => {
+  const approvedRequest = {
+    ...report,
+    assignee: "Koppany Kondricz",
+    labels: [
+      "intercom-sourced",
+      "Customer reported",
+      "Feature Request",
+      "Approved",
+      "Area: AI SDR",
+    ],
+    parentId: null,
+    status: "Todo",
+  };
+  const requestDocument = {
+    ...document,
+    content:
+      "# Triage investigation\n**Classification**: Platform Limitation\n**Handling path**: Engineering Todo\n**Review**: Not required",
+  };
+  assert.throws(
+    () => assertTriageOutputs(approvedRequest, requestDocument, comments),
+    SupportRefusal
+  );
+  assert.doesNotThrow(() =>
+    assertTriageOutputs(
+      { ...approvedRequest, parentId: "ENG-13136" },
+      requestDocument,
+      comments
+    )
+  );
+  for (const labels of [
+    ["intercom-sourced", "Customer reported", "Area: AI SDR"],
+    ["intercom-sourced", "Customer reported", "Feature Request"],
+  ]) {
+    assert.throws(
+      () =>
+        assertTriageOutputs(
+          { ...approvedRequest, labels, parentId: "ENG-13136" },
+          requestDocument,
+          comments
+        ),
+      SupportRefusal
+    );
+  }
+  assert.throws(
+    () =>
+      assertTriageOutputs(
+        { ...approvedRequest, assignee: null, parentId: "ENG-13136" },
+        requestDocument,
+        comments
+      ),
+    SupportRefusal
+  );
+});

@@ -32,11 +32,19 @@ const REVIEW = /^\*\*Review\*\*:\s*([^\r\n]+)/m;
 const SETTLED_REVIEW =
   /^(?:Approved \S+ at [a-f0-9]{40}|Adjudicated \S+ at [a-f0-9]{40}: (?:CHALLENGE|INSUFFICIENT_EVIDENCE|review failure)[;:,]?[ \t]+\S.*)$/;
 
+const ENGINEERING_PATH = "Engineering Todo";
+
+const isEngineering = (
+  classification: string | undefined,
+  handlingPath: string | undefined
+): boolean => classification === "Bug" || handlingPath === ENGINEERING_PATH;
+
 const ownerRecordMissing = (
   issue: z.infer<typeof issueSchema>,
-  classification: string | undefined
+  classification: string | undefined,
+  handlingPath: string | undefined
 ): boolean => {
-  if (classification !== "Bug") {
+  if (!isEngineering(classification, handlingPath)) {
     return !(issue.assignee || CLOSED_STATES.includes(issue.status));
   }
   const hasArea = issue.labels.some((label) => areaLabels().includes(label));
@@ -57,6 +65,36 @@ const isSupportFollowUp = (
 ): boolean =>
   issue.assignee === SUPPORT_OWNER &&
   Boolean(handlingPath?.startsWith("Support/"));
+
+const needsMaster = (
+  issue: z.infer<typeof issueSchema>,
+  classification: string | undefined,
+  handlingPath: string | undefined
+): boolean => {
+  if (issue.status !== "Todo" || issue.parentId) {
+    return false;
+  }
+  if (handlingPath === ENGINEERING_PATH) {
+    return true;
+  }
+  return classification === "Bug" && !isSupportFollowUp(issue, handlingPath);
+};
+
+const missesTypeLabels = (
+  issue: z.infer<typeof issueSchema>,
+  classification: string | undefined,
+  handlingPath: string | undefined
+): boolean => {
+  if (classification === "Bug") {
+    return !issue.labels.includes("Bug");
+  }
+  return (
+    handlingPath === ENGINEERING_PATH &&
+    !["Feature Request", "Approved"].every((label) =>
+      issue.labels.includes(label)
+    )
+  );
+};
 
 /** Check durable outputs, not whether a model says it loaded the workflow. */
 export function assertTriageOutputs(
@@ -110,7 +148,7 @@ export function assertTriageOutputs(
   }
   if (
     !issue.priority ||
-    ownerRecordMissing(issue, classification) ||
+    ownerRecordMissing(issue, classification, handlingPath) ||
     issue.priority.value < 1 ||
     issue.priority.value > 4 ||
     !issue.status.trim() ||
@@ -118,11 +156,8 @@ export function assertTriageOutputs(
     !["intercom-sourced", "Customer reported"].every((label) =>
       issue.labels.includes(label)
     ) ||
-    (classification === "Bug" && !issue.labels.includes("Bug")) ||
-    (classification === "Bug" &&
-      issue.status === "Todo" &&
-      !issue.parentId &&
-      !isSupportFollowUp(issue, handlingPath)) ||
+    missesTypeLabels(issue, classification, handlingPath) ||
+    needsMaster(issue, classification, handlingPath) ||
     (duplicate && !issue.relations?.duplicateOf)
   ) {
     throw new SupportRefusal(
