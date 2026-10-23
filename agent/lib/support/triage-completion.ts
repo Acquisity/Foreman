@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { ProviderContext } from "../executor/dispatch.js";
+import { areaLabels, FALLBACK_OWNER, SUPPORT_OWNER } from "../owner-map.js";
 import { SupportRefusal } from "./errors.js";
 import {
   readLinkedIssue,
@@ -52,7 +53,7 @@ export function assertTriageOutputs(
       "Complete the required minimal Linear comment before finishing triage."
     );
   }
-  if (urgent && issue.assignee === "Aaron Fraga") {
+  if (urgent && issue.assignee === SUPPORT_OWNER) {
     return;
   }
   if (classification === "Not settled" && review === "Not required") {
@@ -79,7 +80,10 @@ export function assertTriageOutputs(
   if (
     !(
       issue.assignee &&
-      (issue.project || issue.assignee === "Aaron Fraga") &&
+      (issue.project ||
+        issue.labels.some((label) => areaLabels().includes(label)) ||
+        issue.assignee === SUPPORT_OWNER ||
+        issue.assignee === FALLBACK_OWNER) &&
       issue.priority
     ) ||
     issue.priority.value < 1 ||
@@ -94,7 +98,7 @@ export function assertTriageOutputs(
     (duplicate && !issue.relations?.duplicateOf)
   ) {
     throw new SupportRefusal(
-      "Complete and read back the report's state, priority, labels, project, assignment and applicable master/duplicate relation. Tracking an issue is not Linear routing. Aaron is only the documented ownership fallback."
+      "Complete and read back the report's state, priority, labels, project, assignment and applicable master/duplicate relation. Tracking an issue is not Linear routing. James is the documented ownership fallback."
     );
   }
 }
@@ -126,7 +130,7 @@ export async function requireCompletedSupportTriage(
   if (
     matches.length === 0 &&
     issue.project === "Support" &&
-    issue.assignee === "Aaron Fraga" &&
+    issue.assignee === SUPPORT_OWNER &&
     issue.status === "Todo" &&
     Array.isArray(issue.labels) &&
     !issue.labels.includes("Bug") &&

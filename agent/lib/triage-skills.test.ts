@@ -680,7 +680,7 @@ test("ENG-13108-shaped Support intake neither gates memory nor triggers fallback
   );
   assert.ok(
     triageHandlingSkill.includes(
-      "Missing or unmapped intake metadata by itself is never that evidence gap and never triggers Aaron routing"
+      "Missing or unmapped intake metadata by itself is never that gap"
     )
   );
   assert.ok(

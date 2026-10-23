@@ -6,6 +6,22 @@ import {
   type JevQuestion,
   probabilityOf,
 } from "./jev.js";
+import {
+  APPROVED_LABEL,
+  AREA_KEYS,
+  AREAS,
+  type AreaKey,
+  areaForPath,
+  areaForProject,
+  FALLBACK_AREA,
+  FALLBACK_OWNER,
+  hasLabel,
+  isAreaKey,
+  isCrmArea,
+  NEEDS_APPROVAL_LABEL,
+  ownerForArea,
+  SUPPORT_OWNER,
+} from "./owner-map.js";
 
 /**
  * Every triage and billing decision Foreman used to make in prose, as Jev
@@ -38,7 +54,7 @@ export const BARS = {
   incident: 0.6,
   /** Below this, the priority band takes the higher neighbour. */
   priorityBand: 0.6,
-  /** Below this, the project is left unset and Aaron routes it. */
+  /** Below this, the project is left unset and the area decides the owner. */
   project: 0.6,
   /** A root cause label is only added when the match is clear. */
   rootCauseLabel: 0.6,
@@ -213,6 +229,7 @@ export interface TriageInput {
   projects: { description?: string; name: string }[];
   rootCauseLabels: string[];
   sourceLabels: string[];
+  ticketLabels?: string[];
 }
 
 export interface TriageRoute {
@@ -233,7 +250,9 @@ export type TriageDecision =
       verdict: { confidence: number; value: string };
     }
   | {
-      assignee: "Aaron Fraga" | "area owner";
+      approval: "approved" | "needed" | "not-applicable";
+      area: { key: AreaKey; label: string; matched: boolean } | null;
+      assignee: string | null;
       classification: TriageClassification;
       /** The incident-hotlane route, only for a Bug that is not a Duplicate. */
       hotlane?: HotlaneDecision;
@@ -329,6 +348,22 @@ export function triageQuestions(
   input: TriageInput
 ): Record<string, JevQuestion> {
   const questions: Record<string, JevQuestion> = {
+    area: {
+      criteria: {
+        ...Object.fromEntries(
+          AREA_KEYS.filter((key) => key !== FALLBACK_AREA).map((key) => [
+            key,
+            AREAS[key].description,
+          ])
+        ),
+        [FALLBACK_AREA]: AREAS[FALLBACK_AREA].description,
+        [UNDETERMINED]:
+          "the evidence does not establish which area owns the root cause",
+      },
+      instructions:
+        "Which product area owns the confirmed root cause and the code path it runs through? Judge from the evidence, never from the ticket title or its incoming project.",
+      type: "choice",
+    },
     classification: {
       criteria: { ...CLASSIFICATIONS },
       instructions:
@@ -577,12 +612,22 @@ export function resolveTriage(
       "The evidence does not settle the owning project; say which evidence is missing in the document."
     );
   }
-  const aaron =
-    !projectSettled || input.identifier.toUpperCase().startsWith("SAN-");
   const needsCriticReview = classification === "Bug" && path !== "Duplicate";
+  const ownership = resolveOwnership({
+    answers,
+    classification,
+    duplicate: duplicate !== undefined,
+    input,
+    notes,
+    path,
+    project: projectSettled ? project.choice : null,
+  });
+  const labels = resolveLabels(input, classification, answers);
 
   return {
-    assignee: aaron ? "Aaron Fraga" : "area owner",
+    approval: ownership.approval,
+    area: ownership.area,
+    assignee: ownership.assignee,
     classification,
     ...(needsCriticReview ? { hotlane: resolveHotlane(answers) } : {}),
     needsCriticReview,
@@ -590,11 +635,17 @@ export function resolveTriage(
     outcome: "route",
     path,
     route: {
-      addLabels: resolveLabels(input, classification, answers),
+      addLabels: [
+        ...new Set([
+          ...labels,
+          ...(ownership.area ? [ownership.area.label] : []),
+          ...(ownership.approval === "needed" ? [NEEDS_APPROVAL_LABEL] : []),
+        ]),
+      ],
       priority,
-      state: PATH_STATE[path],
+      state: ownership.approval === "approved" ? "Todo" : PATH_STATE[path],
       ...(projectSettled ? { project: project.choice } : {}),
-      ...(aaron ? { assignee: "Aaron Fraga" } : {}),
+      ...(ownership.assignee ? { assignee: ownership.assignee } : {}),
       ...(duplicate
         ? {
             duplicateOf: duplicate.candidate.identifier,
@@ -603,6 +654,103 @@ export function resolveTriage(
         : {}),
     },
     verdict,
+  };
+}
+
+interface Ownership {
+  approval: "approved" | "needed" | "not-applicable";
+  area: { key: AreaKey; label: string; matched: boolean } | null;
+  assignee: string | null;
+}
+
+const settledArea = (
+  answers: Answers,
+  project: string | null,
+  codePath: TriageInput["codePath"]
+): { key: AreaKey; matched: boolean } => {
+  const answer = answers.area ? choiceOf(answers.area) : null;
+  let key: AreaKey | null =
+    answer &&
+    answer.choice !== UNDETERMINED &&
+    isAreaKey(answer.choice) &&
+    answer.confidence >= BARS.project
+      ? answer.choice
+      : null;
+  if (!key && project) {
+    key = areaForProject(project);
+  }
+  if (key && isCrmArea(key) && codePath) {
+    key = areaForPath(codePath.file) ?? key;
+  }
+  return key
+    ? { key, matched: !(key === FALLBACK_AREA) }
+    : { key: FALLBACK_AREA, matched: false };
+};
+
+const developerEligibility = (
+  classification: TriageClassification,
+  path: HandlingPath,
+  duplicate: boolean,
+  input: TriageInput,
+  answers: Answers
+): "approved" | "bug" | "needed" | "none" => {
+  if (classification === "Bug" && (duplicate || path === "Engineering Todo")) {
+    return "bug";
+  }
+  const featureRequest =
+    classification === "Platform Limitation" &&
+    probabilityOf(answers.wants_limit_lifted) >= BARS.signal;
+  if (!featureRequest) {
+    return "none";
+  }
+  return hasLabel(input.ticketLabels ?? [], APPROVED_LABEL)
+    ? "approved"
+    : "needed";
+};
+
+function resolveOwnership(context: {
+  answers: Answers;
+  classification: TriageClassification;
+  duplicate: boolean;
+  input: TriageInput;
+  notes: string[];
+  path: HandlingPath;
+  project: string | null;
+}): Ownership {
+  const { answers, classification, duplicate, input, notes, path } = context;
+  if (input.identifier.toUpperCase().startsWith("SAN-")) {
+    return { approval: "not-applicable", area: null, assignee: SUPPORT_OWNER };
+  }
+  const eligibility = developerEligibility(
+    classification,
+    path,
+    duplicate,
+    input,
+    answers
+  );
+  if (eligibility === "needed") {
+    notes.push(
+      `A feature request that nobody has approved gets no developer. It is labelled "${NEEDS_APPROVAL_LABEL}" for James to approve; add the "${APPROVED_LABEL}" label to release it.`
+    );
+    return { approval: "needed", area: null, assignee: null };
+  }
+  if (eligibility === "none") {
+    return { approval: "not-applicable", area: null, assignee: null };
+  }
+  const { key, matched } = settledArea(
+    answers,
+    context.project,
+    input.codePath
+  );
+  if (!matched) {
+    notes.push(
+      `The evidence does not place this in a mapped area, so it goes to ${FALLBACK_OWNER}; say which evidence is missing in the document.`
+    );
+  }
+  return {
+    approval: eligibility === "approved" ? "approved" : "not-applicable",
+    area: { key, label: AREAS[key].label, matched },
+    assignee: ownerForArea(key),
   };
 }
 
@@ -783,7 +931,7 @@ export interface BillingDecision {
   notes: string[];
   route: {
     addLabels: string[];
-    assignee: "Aaron Fraga";
+    assignee: typeof SUPPORT_OWNER;
     priority: number;
     project: "Support";
     state: "Todo";
@@ -856,7 +1004,7 @@ export function resolveBilling(
       addLabels: [
         ...new Set([BUCKET_LABELS[input.bucket], ...input.sourceLabels]),
       ],
-      assignee: "Aaron Fraga",
+      assignee: SUPPORT_OWNER,
       priority:
         probabilityOf(answers.active_blocker) >= BARS.signal
           ? PRIORITY.high

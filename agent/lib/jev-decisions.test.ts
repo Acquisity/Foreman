@@ -82,9 +82,15 @@ test("a supported Bug with the full bar routes to the project and asks for revie
   assert.ok(decision.outcome === "route");
   assert.equal(decision.classification, "Bug");
   assert.equal(decision.needsCriticReview, true);
-  assert.equal(decision.assignee, "area owner");
+  assert.equal(decision.assignee, "Koppany Kondricz");
+  assert.deepEqual(decision.area, {
+    key: "ai_sdr",
+    label: "Area: AI SDR",
+    matched: true,
+  });
   assert.deepEqual(decision.route, {
-    addLabels: ["Customer reported", "Bug"],
+    addLabels: ["Customer reported", "Bug", "Area: AI SDR"],
+    assignee: "Koppany Kondricz",
     priority: 3,
     project: "AI SDR Core",
     state: "Todo",
@@ -169,15 +175,18 @@ test("between adjacent bands the higher one wins and is flagged", () => {
   assert.equal(decision.notes.length, 1);
 });
 
-test("an unsettled project leaves it unset and routes to Aaron", () => {
+test("an unsettled project and area leave the project unset and route to James", () => {
   const decision = resolveTriage(
     triageInput(),
-    bugAnswers({ project: pick("undetermined") })
+    bugAnswers({ area: pick("undetermined"), project: pick("undetermined") })
   );
   assert.ok(decision.outcome === "route");
-  assert.equal(decision.assignee, "Aaron Fraga");
+  assert.equal(decision.assignee, "James Keeble");
+  assert.equal(decision.area?.key, "other");
+  assert.equal(decision.area?.matched, false);
   assert.equal(decision.route.project, undefined);
-  assert.equal(decision.route.assignee, "Aaron Fraga");
+  assert.equal(decision.route.assignee, "James Keeble");
+  assert.ok(decision.route.addLabels.includes("Area: Other"));
 });
 
 test("a sandbox ticket always routes to Aaron", () => {
@@ -187,7 +196,12 @@ test("a sandbox ticket always routes to Aaron", () => {
   );
   assert.ok(decision.outcome === "route");
   assert.equal(decision.route.assignee, "Aaron Fraga");
+  assert.equal(decision.area, null);
   assert.equal(decision.route.project, "AI SDR Core");
+  assert.equal(
+    decision.route.addLabels.some((label) => label.startsWith("Area:")),
+    false
+  );
 });
 
 test("a platform limitation the customer wants lifted is a Low feature request", () => {
@@ -205,7 +219,11 @@ test("a platform limitation the customer wants lifted is a Low feature request",
     "Customer reported",
     "Feature Request",
     "Provider limit",
+    "Needs approval",
   ]);
+  assert.equal(decision.assignee, null);
+  assert.equal(decision.approval, "needed");
+  assert.equal(decision.route.assignee, undefined);
   assert.equal(decision.route.priority, 4);
   assert.equal(decision.route.state, "Done");
 });

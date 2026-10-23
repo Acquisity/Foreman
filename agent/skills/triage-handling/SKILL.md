@@ -104,21 +104,23 @@ Write the report comment from [references/reporting.md](references/reporting.md)
 
 ### Choose the product project from completed evidence
 
-`decide_triage` chose it from the confirmed root cause and owning code path. A memory analogy, symptom, title, repository name, incoming `null`, or incoming `Support` project cannot make this decision. Pass the evidence-backed project to the ticket's one `route_ticket` call as `route.project`, unchanged; its returned `projectId` is what memory recording uses. When `route` has no project, it already assigns Aaron Fraga: say in the document which evidence is still missing. Missing or unmapped intake metadata by itself is never that evidence gap and never triggers Aaron routing. On `decided: false`, choose the project the same way.
+`decide_triage` chose it from the confirmed root cause and owning code path. A memory analogy, symptom, title, repository name, incoming `null`, or incoming `Support` project cannot make this decision. Pass the evidence-backed project to the ticket's one `route_ticket` call as `route.project`, unchanged; its returned `projectId` is what memory recording uses. When `route` has no project, the area alone chose the owner: name the missing evidence in the document. Missing or unmapped intake metadata by itself is never that gap. On `decided: false`, choose the project the same way.
 
 When Aaron explicitly requests read-only validation during an attended manual test, still search memory and complete the evidence work normally. Recommend the evidence-backed project in the result, but apply no Linear mutation and do not record investigation memory. This is an operator instruction for that test, not a runtime authorization mode. Do not require or invent a session marker for it.
 
 ### Area-routing roster
 
-Take the product area from the evidence-backed project, never from the incoming project, title, symptom, repository name, or memory. Read the roster in [references/roster.md](references/roster.md) and use the emails verbatim; the routing map accepts only allowlisted assignees.
+Take the product area from the evidence, never from the incoming project, title, symptom, repository name, or memory. `decide_triage` used the owner map in [references/roster.md](references/roster.md): `route` carries the `Area:` label and `assignee`, so pass it unchanged.
 
-The roster exists on the production ENG team only; SAN sandbox tickets always route to Aaron Fraga. If the area is ambiguous, the project has no lead set, or the roster is unavailable, assign Aaron Fraga and say why in the report. Never route to retired or legacy projects.
+A developer gets only a confirmed Bug or a feature request labelled `Approved`. An unapproved feature request gets `Needs approval` and no developer; questions, user errors, platform limits, billing and support get none.
+
+SAN sandbox tickets always route to Aaron Fraga. When no area fits, `decide_triage` assigns James Keeble; repeat its reason in the report. Never route to retired or legacy projects.
 
 ### When the ticket is not engineering actionable
 
 `User Error`, `Platform Limitation`, `Resolved by triage`, `Duplicate`, `Backlog/low-impact`, and the `Support/` paths end here: call `route_ticket` once with the decision's `route` unchanged. Add no assignee: the ticket keeps its current one. The ticket carries the explanation and moves to the Stage 5 state; nothing goes to engineering. `User Error`, `Platform Limitation`, and `Resolved by triage` close as `Done`; the `Support/` paths stay `Todo` for a person.
 
-A `Duplicate` still inherits: `route` already carries `duplicateOf` and `inheritAssigneeFrom`. Add only `assignee`, the area owner from the roster, when `route` names none, so the root cause's owner owns its reports. The tool inherits the parent's assignee when it has one and uses the fallback otherwise; say in the document when the parent was unassigned. That fallback is ownership of record, not a work assignment.
+A `Duplicate` still inherits: `route` already carries `duplicateOf` and `inheritAssigneeFrom`. Add only `assignee`, the area owner from the roster, when `route` names none (a confirmed Bug only), so the root cause's owner owns its reports. The tool inherits the parent's assignee when it is in the roster and uses the fallback otherwise.
 
 ### When the root cause warrants action
 
