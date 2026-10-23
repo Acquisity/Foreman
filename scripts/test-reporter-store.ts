@@ -187,6 +187,61 @@ assert.ok(
 );
 
 await pool.query("TRUNCATE reporter_updates, reporter_pending");
+await store.markWaiting("ENG-7", null);
+await store.enqueue([{ issue: "ENG-7", version: 1 }]);
+await pool.query(
+  "UPDATE reporter_updates SET attempts = 1, retry_after = now() - interval '1 minute' WHERE issue = 'ENG-7'"
+);
+const raced = await Promise.all([
+  store.claim("ENG-7", "fixed", "msg", null),
+  store.claim("ENG-7", "fixed", "msg", null),
+]);
+const winner = raced.find((claim) => claim.ok);
+const loser = raced.find((claim) => !claim.ok);
+assert.ok(winner?.ok && loser && !loser.ok, "one racing claim wins, one loses");
+assert.equal(loser.reason, "busy");
+assert.ok(
+  Math.abs(loser.retryAfter - (Date.now() + 600_000)) < 20_000,
+  "the loser is told when the winner's claim lapses, not the stale deadline"
+);
+await store.release("ENG-7", "fixed", winner.token);
+const [stored] = await pool
+  .query(
+    "SELECT extract(epoch FROM retry_after - now()) AS seconds FROM reporter_updates WHERE issue = 'ENG-7'"
+  )
+  .then((result) => result.rows);
+assert.ok(
+  Number(stored?.seconds) > 590 && Number(stored?.seconds) <= 600,
+  "the winner's failure sets the second backoff"
+);
+await store.deferPending("ENG-7", loser.retryAfter);
+assert.equal(
+  (await store.nextPending(10)).includes("ENG-7"),
+  false,
+  "the loser's deferral does not make the ticket due early"
+);
+await store.deferPending("ENG-7", Date.now() + 60_000);
+const [pendingWait] = await pool
+  .query(
+    "SELECT extract(epoch FROM retry_after - now()) AS seconds FROM reporter_pending WHERE issue = 'ENG-7'"
+  )
+  .then((result) => result.rows);
+assert.ok(
+  Number(pendingWait?.seconds) > 500,
+  "an earlier deadline never replaces a later one"
+);
+await store.failPending("ENG-7");
+const [afterFail] = await pool
+  .query(
+    "SELECT extract(epoch FROM retry_after - now()) AS seconds FROM reporter_pending WHERE issue = 'ENG-7'"
+  )
+  .then((result) => result.rows);
+assert.ok(
+  Number(afterFail?.seconds) > 500,
+  "a failure never shortens a deadline that is already further out"
+);
+
+await pool.query("TRUNCATE reporter_updates, reporter_pending");
 await pool.query(
   `INSERT INTO reporter_updates (issue, stage, status, checked_sha)
    SELECT 'ENG-' || n, 'fixed', 'waiting', 'live-sha' FROM generate_series(1000, 1249) AS n`

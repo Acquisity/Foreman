@@ -140,6 +140,7 @@ export const memoryStore = () => {
         attempts: (existing?.attempts ?? 0) + 1,
         claimedAt: state.now,
         message,
+        retryAfter: 0,
         status: "claimed",
         token,
       });
@@ -164,7 +165,7 @@ export const memoryStore = () => {
         pending.set(issue, {
           ...entry,
           lastTry: state.tokens,
-          retryAfter: untilMs,
+          retryAfter: Math.max(entry.retryAfter, untilMs),
         });
       }
       return Promise.resolve();
@@ -200,7 +201,10 @@ export const memoryStore = () => {
         pending.set(issue, {
           attempts: entry.attempts + 1,
           lastTry: state.tokens,
-          retryAfter: state.now + backoffMs(entry.attempts),
+          retryAfter: Math.max(
+            entry.retryAfter,
+            state.now + backoffMs(entry.attempts)
+          ),
           version: entry.version,
         });
       }
@@ -253,7 +257,10 @@ export const memoryStore = () => {
       if (existing?.status === "claimed" && existing.token === token) {
         table.set(key(issue, stage), {
           ...existing,
-          retryAfter: state.now + backoffMs(existing.attempts - 1),
+          retryAfter: Math.max(
+            existing.retryAfter,
+            state.now + backoffMs(existing.attempts - 1)
+          ),
           status: "waiting",
           token: null,
         });

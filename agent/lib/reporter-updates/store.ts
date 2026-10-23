@@ -121,7 +121,8 @@ export const createReporterStore = (query: Query): ReporterStore => {
        ON CONFLICT (issue, stage) DO UPDATE
          SET status = 'claimed', message = EXCLUDED.message,
              slack_channel = EXCLUDED.slack_channel, claim_token = EXCLUDED.claim_token,
-             claimed_at = now(), attempts = reporter_updates.attempts + 1, updated_at = now()
+             claimed_at = now(), retry_after = NULL,
+             attempts = reporter_updates.attempts + 1, updated_at = now()
          WHERE (reporter_updates.status = 'waiting'
                 AND (reporter_updates.retry_after IS NULL OR reporter_updates.retry_after <= now()))
             OR (reporter_updates.status = 'claimed'
@@ -134,7 +135,9 @@ export const createReporterStore = (query: Query): ReporterStore => {
       }
       const [current] = await query(
         `SELECT status,
-                (extract(epoch FROM COALESCE(retry_after, claimed_at + interval '${STALE_CLAIM}', now())) * 1000)::bigint::text AS at
+                (extract(epoch FROM CASE WHEN status = 'claimed'
+                    THEN claimed_at + interval '${STALE_CLAIM}'
+                    ELSE COALESCE(retry_after, now()) END) * 1000)::bigint::text AS at
          FROM reporter_updates WHERE issue = $1 AND stage = $2`,
         [issue, stage]
       );
@@ -165,7 +168,9 @@ export const createReporterStore = (query: Query): ReporterStore => {
     async deferPending(issue, untilMs) {
       await query(
         `UPDATE reporter_pending
-         SET last_try = now(), retry_after = to_timestamp($2::double precision / 1000)
+         SET last_try = now(),
+             retry_after = GREATEST(COALESCE(retry_after, to_timestamp($2::double precision / 1000)),
+                                    to_timestamp($2::double precision / 1000))
          WHERE issue = $1`,
         [issue, untilMs]
       );
@@ -196,7 +201,8 @@ export const createReporterStore = (query: Query): ReporterStore => {
     async failPending(issue) {
       await query(
         `UPDATE reporter_pending
-         SET attempts = attempts + 1, last_try = now(), retry_after = now() + ${BACKOFF("attempts")}
+         SET attempts = attempts + 1, last_try = now(),
+             retry_after = GREATEST(COALESCE(retry_after, now() + ${BACKOFF("attempts")}), now() + ${BACKOFF("attempts")})
          WHERE issue = $1`,
         [issue]
       );
@@ -268,7 +274,8 @@ export const createReporterStore = (query: Query): ReporterStore => {
       await query(
         `UPDATE reporter_updates
        SET status = 'waiting', claim_token = NULL, claimed_at = NULL, updated_at = now(),
-           retry_after = now() + ${BACKOFF("GREATEST(attempts - 1, 0)")}
+           retry_after = GREATEST(COALESCE(retry_after, now() + ${BACKOFF("GREATEST(attempts - 1, 0)")}),
+                                  now() + ${BACKOFF("GREATEST(attempts - 1, 0)")})
        WHERE issue = $1 AND stage = $2 AND claim_token = $3 AND status = 'claimed'`,
         [issue, stage, token]
       );
