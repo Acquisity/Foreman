@@ -1235,3 +1235,18 @@ test("a new engineering master carries the Area label and the read-back checks i
   );
   assert.ok(readBack.includes("including the `Area:` label"));
 });
+
+test("a master built for an approved feature request carries Feature Request and Approved", () => {
+  const create = extractInstruction(
+    handoffSkill,
+    "## Create one master",
+    "## Read back before finishing"
+  );
+  assert.ok(create.includes("`Feature Request` and `Approved` together"));
+  const reuse = extractInstruction(
+    handoffSkill,
+    "## Reuse an existing master",
+    "## Create one master"
+  );
+  assert.ok(reuse.includes("add `Feature Request` and `Approved` too"));
+});
