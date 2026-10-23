@@ -17,7 +17,7 @@
 // Writes scorecard.md and scores.json into <resultsDir>; exits 1 on any leak.
 import { execFile } from "node:child_process";
 import { readdirSync, readFileSync, writeFileSync } from "node:fs";
-import { join, relative, resolve } from "node:path";
+import { join } from "node:path";
 import { promisify } from "node:util";
 import { z } from "zod";
 import {
@@ -25,7 +25,10 @@ import {
   handLabelsSchema,
   renderCalibration,
 } from "../agent/lib/triage-replay/calibration.js";
-import { readCohortFiles } from "../agent/lib/triage-replay/cohort-files.js";
+import {
+  outsideRepositoryPath,
+  readCohortFiles,
+} from "../agent/lib/triage-replay/cohort-files.js";
 import {
   JUDGE_MODEL,
   rootCauseJudge,
@@ -185,13 +188,7 @@ function outsideRepository<T>(
   path: string,
   what: string
 ) {
-  const inside = relative(process.cwd(), resolve(path));
-  if (!inside.startsWith("..")) {
-    throw new Error(
-      `${what} must live outside this repository; ${path} is inside it.`
-    );
-  }
-  return parseFile(schema, path);
+  return parseFile(schema, outsideRepositoryPath(path, what));
 }
 
 const loadHeldoutLabels = (path: string) =>
