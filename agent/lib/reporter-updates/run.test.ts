@@ -371,7 +371,7 @@ describe("once only, and never lost", () => {
     s.linear.state.failNextPost = true;
     await assert.rejects(reconcile(s), { message: "Linear is unavailable" });
     assert.equal(s.linear.posts.length, 0);
-    assert.deepEqual(await reconcile(s), {
+    assert.partialDeepStrictEqual(await reconcile(s), {
       kind: "skipped",
       why: "backing_off",
     });
@@ -401,7 +401,7 @@ describe("once only, and never lost", () => {
       ticket({ stateName: "Duplicate", stateType: "canceled" }),
     ]);
     await s.memory.store.claim("ENG-1", "not_fixed", "x", null);
-    assert.deepEqual(await reconcile(s), {
+    assert.partialDeepStrictEqual(await reconcile(s), {
       kind: "skipped",
       why: "busy",
     });
@@ -519,7 +519,7 @@ describe("claims and recovery", () => {
     assert.ok(logged.length >= 2);
     assert.equal(logged[0]?.event, "reporter.update.backing_off");
     assert.equal(logged[0]?.fields.decision, "not_fixed");
-    assert.deepEqual(await reconcile(s), {
+    assert.partialDeepStrictEqual(await reconcile(s), {
       kind: "skipped",
       why: "backing_off",
     });
@@ -869,6 +869,45 @@ describe("discovery", () => {
     await run(s);
     t.parentUpdatedAt = new Date(NOW + 100_000).toISOString();
     await run(s, NOW + 300_000);
+    assert.equal(s.linear.posts.length, 1);
+  });
+
+  it("makes the first retry after a failed post at the configured five minutes, and the next at ten", async () => {
+    const t = old(1, { stateName: "Duplicate", stateType: "canceled" });
+    const s = setup([t]);
+    const MIN = 60_000;
+    s.linear.state.failNextPost = true;
+    await run(s);
+    s.memory.state.now += 4 * MIN;
+    await run(s, NOW + 4 * MIN);
+    assert.equal(s.linear.posts.length, 0, "not before five minutes");
+    s.linear.state.failNextPost = true;
+    s.memory.state.now += 1 * MIN;
+    const retry = await run(s, NOW + 5 * MIN);
+    assert.equal(retry.errors.length, 1, "tried again at five minutes");
+    s.memory.state.now += 9 * MIN;
+    await run(s, NOW + 14 * MIN);
+    assert.equal(s.linear.posts.length, 0, "not before ten more");
+    s.memory.state.now += 1 * MIN;
+    await run(s, NOW + 15 * MIN);
+    assert.equal(
+      s.linear.posts.length,
+      1,
+      "delivered ten minutes after the second failure"
+    );
+  });
+
+  it("lines a busy ticket up with the moment its claim lapses, without counting a failure", async () => {
+    const s = setup([
+      old(1, { stateName: "Duplicate", stateType: "canceled" }),
+    ]);
+    await s.memory.store.claim("ENG-1", "not_fixed", "x", null);
+    await s.memory.store.enqueue([{ issue: "ENG-1", version: 1 }]);
+    await run(s);
+    assert.equal(s.memory.pending.get("ENG-1")?.attempts, 0);
+    assert.equal(s.memory.pending.get("ENG-1")?.retryAfter, 600_000);
+    s.memory.state.now = 600_001;
+    await run(s, NOW + 600_001);
     assert.equal(s.linear.posts.length, 1);
   });
 

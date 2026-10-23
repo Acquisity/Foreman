@@ -117,13 +117,21 @@ export const memoryStore = () => {
         existing?.status === "claimed" &&
         state.now - existing.claimedAt > 600_000;
       if (existing?.status === "sent") {
-        return Promise.resolve({ ok: false, reason: "busy" });
+        return Promise.resolve({ ok: false, reason: "busy", retryAfter: 0 });
       }
       if (existing?.status === "waiting" && existing.retryAfter > state.now) {
-        return Promise.resolve({ ok: false, reason: "backing_off" });
+        return Promise.resolve({
+          ok: false,
+          reason: "backing_off",
+          retryAfter: existing.retryAfter,
+        });
       }
       if (existing && existing.status !== "waiting" && !stale) {
-        return Promise.resolve({ ok: false, reason: "busy" });
+        return Promise.resolve({
+          ok: false,
+          reason: "busy",
+          retryAfter: existing.claimedAt + 600_000,
+        });
       }
       state.tokens += 1;
       const token = `token-${state.tokens}`;
@@ -148,6 +156,18 @@ export const memoryStore = () => {
       }
       await markSent(issue, covers, message, channel, commentId);
       return true;
+    },
+    deferPending(issue, untilMs) {
+      const entry = pending.get(issue);
+      if (entry) {
+        state.tokens += 1;
+        pending.set(issue, {
+          ...entry,
+          lastTry: state.tokens,
+          retryAfter: untilMs,
+        });
+      }
+      return Promise.resolve();
     },
     enqueue(tickets) {
       if (state.failNextEnqueue) {
@@ -233,7 +253,7 @@ export const memoryStore = () => {
       if (existing?.status === "claimed" && existing.token === token) {
         table.set(key(issue, stage), {
           ...existing,
-          retryAfter: state.now + backoffMs(existing.attempts),
+          retryAfter: state.now + backoffMs(existing.attempts - 1),
           status: "waiting",
           token: null,
         });

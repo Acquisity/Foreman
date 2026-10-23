@@ -32,10 +32,13 @@ const [first] = winners;
 assert.ok(first?.ok);
 const firstToken = first.token;
 
-assert.deepEqual(await store.claim("ENG-1", "fixed", "again", null), {
-  ok: false,
-  reason: "busy",
-});
+assert.partialDeepStrictEqual(
+  await store.claim("ENG-1", "fixed", "again", null),
+  {
+    ok: false,
+    reason: "busy",
+  }
+);
 
 await pool.query(
   "UPDATE reporter_updates SET claimed_at = now() - interval '11 minutes' WHERE issue = 'ENG-1'"
@@ -74,10 +77,13 @@ assert.equal(
   ),
   true
 );
-assert.deepEqual(await store.claim("ENG-1", "fixed", "again", null), {
-  ok: false,
-  reason: "busy",
-});
+assert.partialDeepStrictEqual(
+  await store.claim("ENG-1", "fixed", "again", null),
+  {
+    ok: false,
+    reason: "busy",
+  }
+);
 await store.markWaiting("ENG-1", "abc1234");
 assert.deepEqual(
   (await store.rows("ENG-1")).map((row) => [
@@ -132,9 +138,12 @@ await [1, 2, 3, 4].reduce(async (previous) => {
   assert.ok(claim.ok);
   await store.release("ENG-3", "fixed", claim.token);
 }, Promise.resolve());
-assert.deepEqual(
+assert.partialDeepStrictEqual(
   await store.claim("ENG-3", "fixed", "msg", null),
-  { ok: false, reason: "backing_off" },
+  {
+    ok: false,
+    reason: "backing_off",
+  },
   "a released claim waits out its backoff"
 );
 await pool.query(
@@ -157,6 +166,25 @@ await store.enqueue([{ issue: "ENG-3", version: 100 }]);
 const reset = await store.claim("ENG-3", "fixed", "msg", null);
 assert.ok(reset.ok, "new ticket activity clears the backoff");
 assert.equal(reset.attempts, 1);
+
+const fresh = await store.claim("ENG-9", "received", "msg", null);
+assert.ok(fresh.ok);
+await store.release("ENG-9", "received", fresh.token);
+const [freshWait] = await pool
+  .query(
+    "SELECT extract(epoch FROM retry_after - now()) AS seconds FROM reporter_updates WHERE issue = 'ENG-9'"
+  )
+  .then((result) => result.rows);
+assert.ok(
+  Number(freshWait?.seconds) > 290 && Number(freshWait?.seconds) <= 300,
+  "the fresh retry is five minutes away"
+);
+const blocked = await store.claim("ENG-9", "received", "msg", null);
+assert.ok(!blocked.ok);
+assert.ok(
+  Math.abs(blocked.retryAfter - (Date.now() + 300_000)) < 10_000,
+  "a refused claim says when it will be claimable"
+);
 
 await pool.query("TRUNCATE reporter_updates, reporter_pending");
 await pool.query(

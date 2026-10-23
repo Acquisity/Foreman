@@ -17,7 +17,7 @@ export interface LedgerRow {
 
 export type ClaimResult =
   | { attempts: number; ok: true; token: string }
-  | { ok: false; reason: "backing_off" | "busy" };
+  | { ok: false; reason: "backing_off" | "busy"; retryAfter: number };
 
 export interface DiscoveredTicket {
   issue: string;
@@ -52,6 +52,7 @@ export interface ReporterStore {
     commentId: string,
     token: string
   ) => Promise<boolean>;
+  deferPending: (issue: string, untilMs: number) => Promise<void>;
   enqueue: (tickets: DiscoveredTicket[]) => Promise<void>;
   failPending: (issue: string) => Promise<void>;
   markSent: (
@@ -132,12 +133,15 @@ export const createReporterStore = (query: Query): ReporterStore => {
         return { attempts: Number(rows[0]?.attempts), ok: true, token };
       }
       const [current] = await query(
-        "SELECT status FROM reporter_updates WHERE issue = $1 AND stage = $2",
+        `SELECT status,
+                (extract(epoch FROM COALESCE(retry_after, claimed_at + interval '${STALE_CLAIM}', now())) * 1000)::bigint::text AS at
+         FROM reporter_updates WHERE issue = $1 AND stage = $2`,
         [issue, stage]
       );
       return {
         ok: false,
         reason: current?.status === "waiting" ? "backing_off" : "busy",
+        retryAfter: Number(current?.at ?? 0),
       };
     },
     async complete(issue, stage, covers, message, channel, commentId, token) {
@@ -157,6 +161,14 @@ export const createReporterStore = (query: Query): ReporterStore => {
         await store.markSent(issue, others, message, channel, commentId);
       }
       return true;
+    },
+    async deferPending(issue, untilMs) {
+      await query(
+        `UPDATE reporter_pending
+         SET last_try = now(), retry_after = to_timestamp($2::double precision / 1000)
+         WHERE issue = $1`,
+        [issue, untilMs]
+      );
     },
     async enqueue(tickets) {
       const latest = new Map<string, number>();
@@ -256,7 +268,7 @@ export const createReporterStore = (query: Query): ReporterStore => {
       await query(
         `UPDATE reporter_updates
        SET status = 'waiting', claim_token = NULL, claimed_at = NULL, updated_at = now(),
-           retry_after = now() + ${BACKOFF("attempts")}
+           retry_after = now() + ${BACKOFF("GREATEST(attempts - 1, 0)")}
        WHERE issue = $1 AND stage = $2 AND claim_token = $3 AND status = 'claimed'`,
         [issue, stage, token]
       );

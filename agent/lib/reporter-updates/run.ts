@@ -37,7 +37,7 @@ export type Outcome =
   | { kind: "recorded"; stage: Stage }
   | { kind: "waiting" }
   | { kind: "held"; why: string }
-  | { kind: "skipped"; why: string };
+  | { kind: "skipped"; retryAfter?: number; why: string };
 
 export interface RunReport {
   errors: string[];
@@ -128,7 +128,7 @@ const deliver = async (
     channel
   );
   if (!claim.ok) {
-    return skipped(claim.reason);
+    return { kind: "skipped", retryAfter: claim.retryAfter, why: claim.reason };
   }
   let commentId: string;
   try {
@@ -358,6 +358,11 @@ export const runReporterUpdates = async (
     report.outcomes.push({ identifier, outcome: result.outcome });
     posts += result.outcome.kind === "posted" ? 1 : 0;
     if (
+      result.outcome.kind === "skipped" &&
+      result.outcome.retryAfter !== undefined
+    ) {
+      await deps.store.deferPending(identifier, result.outcome.retryAfter);
+    } else if (
       result.outcome.kind === "skipped" &&
       KEEP_PENDING.has(result.outcome.why)
     ) {
