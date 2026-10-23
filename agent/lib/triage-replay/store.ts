@@ -107,6 +107,7 @@ export interface ReplayState {
   } | null;
   /** Every settled decide_triage and decide_billing result, in order; the last one is the final decision. */
   decisions: ReplayDecision[];
+  dispatchedSession: string | null;
   documents: StoredDocument[];
   evidenceMisses: string[];
   inputs: ReplayInput[];
@@ -150,6 +151,7 @@ export function seedReplayState(
     created: [],
     critic: null,
     decisions: [],
+    dispatchedSession: null,
     documents: [],
     evidenceMisses: [],
     inputs: [

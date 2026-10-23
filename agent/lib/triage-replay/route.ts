@@ -7,11 +7,11 @@ import { BILLING_PATH } from "../triage-log.js";
 import { stampTriageIntake, stampUnattended } from "../trust.js";
 import {
   loadReplayState,
-  ReplayStateConflictError,
   replayBackend,
   replayKeyDigest,
   replayStateKey,
   seedReplayStore,
+  withReplayState,
 } from "./backend.js";
 import { UNSEEDED_IMAGE } from "./hook.js";
 import {
@@ -313,7 +313,33 @@ export const replayStamp = (
 });
 
 const neverDispatched = (state: ReplayState) =>
-  state.steps === 0 && state.rootTurn === null && state.cancelled === null;
+  !state.dispatchedSession &&
+  state.steps === 0 &&
+  state.rootTurn === null &&
+  state.cancelled === null;
+
+export class ReplayAlreadyStartedError extends Error {
+  constructor(key: string) {
+    super(`Triage replay ${key} was already dispatched.`);
+    this.name = "ReplayAlreadyStartedError";
+  }
+}
+
+const SETTLE_ATTEMPTS = 3;
+
+async function persistently(work: () => Promise<unknown>) {
+  let failure: unknown = null;
+  for (let attempt = 0; attempt < SETTLE_ATTEMPTS; attempt += 1) {
+    try {
+      // biome-ignore lint/performance/noAwaitInLoops: each attempt waits for the one before it.
+      await work();
+      return null;
+    } catch (error) {
+      failure = error;
+    }
+  }
+  return failure;
+}
 
 /**
  * Seeds the case's store. A store left by a start that failed before its
@@ -336,7 +362,7 @@ export async function seedStore(request: StartRequest, stamp: ReplayStamp) {
     return;
   }
   if (!neverDispatched(stored.state)) {
-    throw new ReplayStateConflictError(key);
+    throw new ReplayAlreadyStartedError(key);
   }
   if ((await backend.listInputs(key)).length === 0) {
     await backend.appendInputs(key, seed.inputs);
@@ -401,6 +427,10 @@ export async function startReplay(
       .from(`triage-replay:${start.runId}:${key}`)
       .send(replayMessage(start), { auth: replayAuth(start.runId, key) });
   } catch (error) {
+    if (error instanceof ReplayAlreadyStartedError) {
+      await confirm(start, ledger);
+      return json({ error: `${key} was already started in this run.` }, 409);
+    }
     try {
       await release(start, ledger);
     } catch (releaseError) {
@@ -411,10 +441,15 @@ export async function startReplay(
     }
     throw error;
   }
-  try {
-    await confirm(start, ledger);
-  } catch {
+  const unrecorded = await persistently(() =>
+    withReplayState(start.runId, key, (state) => {
+      state.dispatchedSession = session.id;
+    })
+  );
+  const unconfirmed = await persistently(() => confirm(start, ledger));
+  if (unrecorded || unconfirmed) {
     logOpsEvent("triage_replay.ledger_unconfirmed", {
+      code: unrecorded ? "dispatch_unrecorded" : "ledger_unconfirmed",
       sessionId: session.id,
     });
   }

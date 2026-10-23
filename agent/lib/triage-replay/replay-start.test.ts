@@ -6,6 +6,7 @@ import {
   type ReplayBackend,
   replayStateKey,
   setReplayBackend,
+  withReplayState,
 } from "./backend.js";
 import {
   ARCHIVE_URL,
@@ -17,7 +18,9 @@ import {
   triageCase,
 } from "./fixtures.js";
 import {
+  type AdmissionLedger,
   REPLAY_SECRET_HEADER,
+  RESERVATION_LEASE_MS,
   readReplayResult,
   replayStamp,
   startReplay,
@@ -174,6 +177,80 @@ describe("starting a replay", () => {
       charged: 4,
       inputs: 1,
       reserved: [],
+    });
+  });
+
+  describe("when the ledger can't confirm a dispatched start", () => {
+    const dispatchedWithoutConfirm = async (t: TestContext) => {
+      const backend = memoryBackend();
+      const shared = sharedLedger();
+      let ledgerDown = false;
+      const ledger = (): AdmissionLedger => {
+        const inner = shared();
+        return {
+          read: inner.read,
+          write: (run, entries, etag) =>
+            ledgerDown
+              ? Promise.reject(new Error("ledger down"))
+              : inner.write(run, entries, etag),
+        };
+      };
+      const { args, sent } = server(t, backend);
+      const dispatching = {
+        from: (address: string) => ({
+          send: (message: string, options: unknown) => {
+            ledgerDown = true;
+            return args.from(address).send(message, options);
+          },
+        }),
+      };
+      const first = await startReplay(start(), dispatching, ledger());
+      ledgerDown = false;
+      const later = Date.now() + RESERVATION_LEASE_MS + 1;
+      t.mock.method(Date, "now", () => later);
+      return { args, first, ledger: shared, sent };
+    };
+
+    const settled = async (ledger: ReturnType<typeof sharedLedger>) => {
+      const entries = await ledger().read(RUN);
+      return {
+        admitted: entries.admitted,
+        charged: entries.chargedUsd,
+        reserved: Object.keys(entries.reserved),
+      };
+    };
+
+    it("keeps the dispatched run and its charge, and never starts it twice on a retry", async (t) => {
+      const { args, first, ledger, sent } = await dispatchedWithoutConfirm(t);
+      assert.equal(first.status, 200);
+      assert.deepEqual(await settled(ledger), {
+        admitted: [],
+        charged: 4,
+        reserved: [KEY],
+      });
+      const retry = await startReplay(start(), args, ledger());
+      assert.equal(retry.status, 409);
+      assert.equal(sent.length, 1);
+      assert.deepEqual(await settled(ledger), {
+        admitted: [KEY],
+        charged: 4,
+        reserved: [],
+      });
+    });
+
+    it("never refunds a run whose session has already stepped", async (t) => {
+      const { args, ledger, sent } = await dispatchedWithoutConfirm(t);
+      await withReplayState(RUN, KEY, (state) => {
+        state.steps = 3;
+      });
+      const retry = await startReplay(start(), args, ledger());
+      assert.equal(retry.status, 409);
+      assert.equal(sent.length, 1);
+      assert.deepEqual(await settled(ledger), {
+        admitted: [KEY],
+        charged: 4,
+        reserved: [],
+      });
     });
   });
 
