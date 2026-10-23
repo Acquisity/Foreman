@@ -20,7 +20,7 @@ The goal is to explain what happened, find an unblock, and create durable Linear
 
 Require exactly one conversation URL or reference in the supplied Slack context. If it is missing or more than one conversation could be the source, ask one focused question and stop.
 
-Pass a conversation URL directly to intercom `fetch`, or resolve a known id with intercom `get_conversation`. Read the full conversation, contact, company, visible attachments, and available history. Retain the canonical conversation URL and a bounded summary. They must be copied into the later customer-report issue and investigation document so another session can resume without the Slack transcript.
+Pass a conversation URL directly to intercom `fetch`, or resolve a known id with intercom `get_conversation`. Read the full conversation, contact, company, visible attachments, and available history. Retain the canonical conversation URL and a bounded summary. Copy them into the later customer-report issue and investigation document.
 
 When the conversation carries screenshots, route each to the `vision` subagent to read it. Intercom lists attachments but does not interpret images, so a screenshot left unread is an evidence lane skipped. Hand the image and a specific question, and take the answer back as evidence rather than the filename or alt text.
 
@@ -43,7 +43,7 @@ Immediately after the claim is written, call `search_investigation_memory`. Do n
 
 Pass the claim and visible error in `text`, plus the component, provider, and known dependency keys. It searches the server-owned live areas: Cold Email, Domains & Inboxes, AI SDR, CRM, Website Builder, Core Platform, and Support. It excludes the planned Acquisity Agent area.
 
-Every returned case identifies its `primaryFeatureKey`. Treat it as a historical analogy, never current truth and never proof of the current product area. For each plausible case, record why it resembles the claim and what current evidence would disconfirm it, then check that evidence.
+Every returned case identifies its `primaryFeatureKey`. Treat it as a historical analogy, never current truth and never proof of the current product area. For each plausible case, record why it resembles the claim and what current evidence would disconfirm it, then check that evidence. Historical affected counts are dated figures, never the current blast radius.
 
 Project-free cluster signals are returned per product area. A signal from one area says nothing about another area, and reports from different areas must never be added together. A `possibleWiderIncident` value is only a reason to check current telemetry. It cannot declare an incident, select a project, set priority, mark a duplicate, or create a master.
 

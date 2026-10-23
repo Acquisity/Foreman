@@ -1339,3 +1339,16 @@ test("the Intercom skill sends a feature request through the report and hand-off
     )
   );
 });
+
+test("the Intercom skill keeps historical counts from being reported as today's impact", () => {
+  const memory = extractInstruction(
+    intercomTriageSkill,
+    "## Step 3A: Search investigation memory",
+    "## Step 4:"
+  );
+  assert.ok(
+    memory.includes(
+      "Historical affected counts are dated figures, never the current blast radius."
+    )
+  );
+});
