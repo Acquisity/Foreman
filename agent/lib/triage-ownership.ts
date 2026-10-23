@@ -141,7 +141,7 @@ export function resolveOwnership(context: {
     );
     return { ...none, approval: "needed" };
   }
-  if (path !== "Platform Limitation") {
+  if (path !== "Platform Limitation" && path !== "Engineering Todo") {
     return { ...none, approval: "approved" };
   }
   const area = place();

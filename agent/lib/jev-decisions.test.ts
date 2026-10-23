@@ -939,3 +939,21 @@ test("an outcome that is not for a developer releases the one holding the ticket
     assert.equal(bug.route.releaseDeveloper, undefined);
   }
 });
+
+test("an approved feature request that Jev already put on the engineering path gets its owner and Area label", () => {
+  const decision = resolveTriage(
+    triageInput({ ticketLabels: ["Approved", "Feature Request"] }),
+    bugAnswers({
+      area: pick("ai_sdr"),
+      classification: pick("platform_limitation"),
+      path: pick("Engineering Todo"),
+      wants_limit_lifted: yes(),
+    })
+  );
+  assert.ok(decision.outcome === "route");
+  assert.equal(decision.path, "Engineering Todo");
+  assert.equal(decision.route.state, "Todo");
+  assert.equal(decision.assignee, "Koppany Kondricz");
+  assert.equal(decision.route.assignee, "Koppany Kondricz");
+  assert.ok(decision.route.addLabels.includes("Area: AI SDR"));
+});
