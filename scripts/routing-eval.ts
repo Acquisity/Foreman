@@ -13,7 +13,10 @@ console.log(formatSummary(summary));
 
 const targetFlag = process.argv.indexOf("--target");
 const target = targetFlag === -1 ? null : Number(process.argv[targetFlag + 1]);
-if (target !== null && summary.correct / summary.cases < target) {
+if (
+  target !== null &&
+  summary.overall.correct / summary.overall.total < target
+) {
   console.log(`below the ${target * 100}% target`);
   process.exitCode = 1;
 }
