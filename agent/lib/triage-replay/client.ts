@@ -4,6 +4,7 @@ import type { LinearOperation } from "../linear-operations.js";
 import { withReplayState } from "./backend.js";
 import { answerLinear } from "./linear-simulation.js";
 import { replaySessionOf } from "./mode.js";
+import { urlOf } from "./store.js";
 
 /**
  * The typed Executor client inside a replay session: authored Linear
@@ -78,7 +79,7 @@ export async function recordReplayReply(
   return {
     commentId: `replay-reply-${issue}`,
     posted: true as const,
-    url: `https://linear.app/acquisity/issue/${issue}/replay`,
+    url: urlOf(issue),
   };
 }
 

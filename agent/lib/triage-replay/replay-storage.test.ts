@@ -3,10 +3,12 @@ import { describe, it } from "node:test";
 import { executorClient } from "../executor/client.js";
 import { executorTransport } from "../executor/transport.js";
 import {
+  ENGINEERING_TEAM_ID,
   findRelatedIssues,
   routeTicket,
   saveInvestigationDocument,
 } from "../linear-api.js";
+import { ticketUrl } from "../ticket-links.js";
 import {
   ReplayStateConflictError,
   replayStateKey,
@@ -33,7 +35,7 @@ import {
 import { answerLinear } from "./linear-simulation.js";
 import { readReplayResult } from "./route.js";
 import { fieldMatches } from "./score.js";
-import { seedReplayState } from "./store.js";
+import { seedReplayState, urlOf } from "./store.js";
 import { appliedRoute, replayDocumentText } from "./views.js";
 
 const NEEDS_SECRET = /needs FOREMAN_DIAGNOSTICS_SECRET/u;
@@ -95,6 +97,21 @@ describe("simulated store", () => {
       result.issues.find((i) => i.identifier === "ENG-90")?.assignee,
       "Ada Lovelace"
     );
+  });
+});
+
+describe("replay links", () => {
+  it("builds replay issue URLs from the shared ticket link, and the team from the shared Engineering id", async (t) => {
+    await replayProcess(t);
+    assert.equal(urlOf("ENG-100"), `${ticketUrl("ENG-100")}/replay`);
+    const answer = answerLinear(await state(), "RouteIssue", {
+      id: "replay-case",
+    });
+    const { issue } = answer.data as {
+      issue: { team: { id: string }; url: string };
+    };
+    assert.equal(issue.team.id, ENGINEERING_TEAM_ID);
+    assert.equal(issue.url, urlOf("ENG-100"));
   });
 });
 

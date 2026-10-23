@@ -13,7 +13,7 @@ import {
   isCase,
   issueIdOf,
   type ReplayState,
-  TEAM,
+  team,
   tick,
   urlOf,
   usersMatching,
@@ -41,7 +41,7 @@ function renderIssue(
     priority: fields.priority,
     project: project ? { id: project.id, name: project.name } : null,
     state: { name: fields.state },
-    team: TEAM,
+    team: team(),
     url: urlOf(identifier),
   };
 }
@@ -81,7 +81,7 @@ function routeIssue(state: ReplayState, id: unknown) {
     priority: 0,
     project: null,
     state: { name: related.state },
-    team: TEAM,
+    team: team(),
     url: urlOf(related.id),
   };
 }

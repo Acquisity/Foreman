@@ -1,4 +1,6 @@
 import { z } from "zod";
+import { ENGINEERING_TEAM_ID } from "../linear-api.js";
+import { ticketUrl } from "../ticket-links.js";
 import type { TriageCase } from "./schema.js";
 
 /**
@@ -127,8 +129,7 @@ export interface ReplayState {
 
 export const CASE_ISSUE_ID = "replay-case";
 export const issueIdOf = (identifier: string) => `replay-${identifier}`;
-export const urlOf = (identifier: string) =>
-  `https://linear.app/acquisity/issue/${identifier}/replay`;
+export const urlOf = (identifier: string) => `${ticketUrl(identifier)}/replay`;
 
 /** A fresh store for one case: the ticket as created, no comments, no documents. */
 export function seedReplayState(
@@ -200,7 +201,7 @@ export const asOfList = (value: string[] | "unknown"): string[] =>
 export const isCase = (state: ReplayState, id: unknown) =>
   id === CASE_ISSUE_ID || id === state.case.id;
 
-export const TEAM = { id: "8eaf95ab-56ac-4490-8253-f6a96793dc40" };
+export const team = () => ({ id: ENGINEERING_TEAM_ID });
 export const createdIssue = (state: ReplayState, id: unknown) =>
   state.created.find(
     (issue) => issue.identifier === id || issueIdOf(issue.identifier) === id
