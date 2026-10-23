@@ -1,5 +1,8 @@
 import type { LinearAgentSessionEvent } from "eve/channels/linear";
-import { RECEIVER_ONLY_CHANNELS } from "./slack-intake.js";
+import {
+  QUESTIONS_ONLY_CHANNELS,
+  RECEIVER_ONLY_CHANNELS,
+} from "./slack-intake.js";
 
 // Kept in its own module so linear-context.test.ts can import it without
 // pulling in @vercel/connect (channels/linear.ts wires the Connect channel).
@@ -28,28 +31,33 @@ export const askFromName = (titles: readonly string[]): string | null => {
 const SLACK_ARCHIVE =
   /^https:\/\/[a-z0-9-]{1,63}\.slack\.com\/archives\/([A-Z0-9]{1,20})\//u;
 
-// The triage intake channels (feedback, refunds) plus #aqcuisity-migration,
-// whose migration form files CRM tickets to Foreman in Linear.
+// The triage intake channels (feedback, refunds) plus every questions-only
+// channel, whose migration form files tickets to Foreman in Linear
+// (#aqcuisity-migration and its sandbox, #app-acquisity-crm).
 const TRIAGE_ASK_CHANNELS: ReadonlySet<string> = new Set([
   ...RECEIVER_ONLY_CHANNELS,
-  "C0BQM9V6P47",
+  ...QUESTIONS_ONLY_CHANNELS,
 ]);
 
 export const slackChannelOf = (url: string): string | null =>
   url.length <= 2048 ? (SLACK_ARCHIVE.exec(url)?.[1] ?? null) : null;
 
+const SUPPORT_CONVERSATION = "Support conversation";
+
 /**
- * Whether an 'Ask from' attachment links a thread in a triage ask channel,
- * which puts the session on the triage models (ENG-15226).
+ * Whether an 'Ask from' attachment links a thread in a triage ask channel, or
+ * the ticket links the support conversation it came from. Either puts the
+ * session on the triage models (ENG-15226).
  */
 export const isTriageIntakeAsk = (
   attachments: readonly { title: string; url: string }[]
 ): boolean =>
   attachments.some(
     ({ title, url }) =>
-      ASK_FROM.test(title.trim()) &&
-      url.length <= 2048 &&
-      TRIAGE_ASK_CHANNELS.has(SLACK_ARCHIVE.exec(url)?.[1] ?? "")
+      title.trim() === SUPPORT_CONVERSATION ||
+      (ASK_FROM.test(title.trim()) &&
+        url.length <= 2048 &&
+        TRIAGE_ASK_CHANNELS.has(SLACK_ARCHIVE.exec(url)?.[1] ?? ""))
   );
 
 /**

@@ -41,9 +41,10 @@ export const MODELS = {
   // and schedules. Moved off DeepSeek to Sonnet 5.5 on the CLI Proxy
   // (ENG-16434); it reads images itself.
   orchestrator: "anthropic/claude-sonnet-5.5",
-  // Root model for sessions from the two Asks-receiver triage intake channels
-  // (ENG-15226) and Linear tickets from #aqcuisity-migration's form; every
-  // other session stays on the orchestrator.
+  // Root model for every triage intake session (ENG-15226, ENG-16055): the two
+  // Asks-receiver channels, the Intercom intake channels, Linear tickets from
+  // a migration form channel, from the widget or from a support conversation.
+  // Every other session stays on the orchestrator.
   triage: "anthropic/claude-opus-5.5",
   // Support widget screenshot reader (widget-screenshot.ts). Not the root.
   vision: "google/gemini-3.5-flash",

@@ -1,5 +1,6 @@
 import {
   callLinearGraphQL,
+  type LinearApiOptions,
   type LinearChannelCredentials,
 } from "eve/channels/linear";
 import {
@@ -12,6 +13,7 @@ import {
 import { askFromName, isTriageIntakeAsk } from "./linear-context.js";
 import { withoutReporterUpdates } from "./reporter-updates/copy.js";
 import { WIDGET_FEEDBACK_PROJECT_ID } from "./widget-feedback.js";
+import { isWidgetFiledDescription } from "./widget-ticket-marker.js";
 
 /**
  * Replies to the requester in their Slack thread, as Foreman.
@@ -125,20 +127,27 @@ const THREAD_QUERY = `query RequesterThread($id: String!) {
 }`;
 
 const ASK_FROM_QUERY = `query AskFrom($id: String!) {
-  issue(id: $id) { attachments(first: 50) { nodes { title url } } }
+  issue(id: $id) { description attachments(first: 50) { nodes { title url } } }
 }`;
 
 /**
  * The intake requester from the issue's 'Ask from <name>' attachment, or null,
- * and whether that attachment links a triage intake channel.
+ * and whether the ticket is a triage intake ticket: its 'Ask from' link points
+ * at a triage ask channel, it carries a 'Support conversation' link, or the
+ * widget filed it.
  */
 export async function readAskFrom(
   issue: string,
-  credentials: LinearChannelCredentials
+  credentials: LinearChannelCredentials,
+  api?: LinearApiOptions
 ): Promise<{ requester: string | null; triageIntake: boolean }> {
   const result = await callLinearGraphQL<{
-    issue: { attachments: { nodes: { title: string; url: string }[] } } | null;
+    issue: {
+      attachments: { nodes: { title: string; url: string }[] };
+      description: string | null;
+    } | null;
   }>({
+    api,
     credentials,
     query: ASK_FROM_QUERY,
     queryName: "AskFrom",
@@ -147,7 +156,9 @@ export async function readAskFrom(
   const attachments = result.issue?.attachments.nodes ?? [];
   return {
     requester: askFromName(attachments.map((node) => node.title)),
-    triageIntake: isTriageIntakeAsk(attachments),
+    triageIntake:
+      isTriageIntakeAsk(attachments) ||
+      isWidgetFiledDescription(result.issue?.description ?? null),
   };
 }
 

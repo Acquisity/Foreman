@@ -124,9 +124,28 @@ describe("isTriageIntakeAsk", () => {
     `https://fegrowthpartner.slack.com/archives/${channel}/p1791000000000100`;
 
   it("accepts an 'Ask from' link into a triage intake or migration channel", () => {
-    assert.equal(isTriageIntakeAsk(ask(thread("C0BBPVC3N2X"))), true);
-    assert.equal(isTriageIntakeAsk(ask(thread("C0BC011NAQL"))), true);
-    assert.equal(isTriageIntakeAsk(ask(thread("C0BQM9V6P47"))), true);
+    for (const channel of [
+      "C0BBPVC3N2X",
+      "C0BC011NAQL",
+      "C0BQM9V6P47",
+      "C0C6DM2MB39",
+      "C0C8XP8HAFL",
+    ]) {
+      assert.equal(isTriageIntakeAsk(ask(thread(channel))), true, channel);
+    }
+  });
+
+  it("accepts a ticket that links the support conversation it came from", () => {
+    assert.equal(
+      isTriageIntakeAsk([
+        { title: "Support conversation", url: "https://app.example/c/1" },
+      ]),
+      true
+    );
+    assert.equal(
+      isTriageIntakeAsk([{ title: "Support conversations", url: "https://x" }]),
+      false
+    );
   });
 
   it("rejects other channels, other titles, and malformed URLs", () => {
