@@ -2,12 +2,10 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import pg from "pg";
+import { disposableDatabaseUrl } from "../agent/lib/reporter-updates/disposable-database.js";
 import { createReporterStore } from "../agent/lib/reporter-updates/store.js";
 
-const url = process.env.REPORTER_STORE_TEST_URL;
-if (!url) {
-  throw new Error("REPORTER_STORE_TEST_URL is not set.");
-}
+const url = disposableDatabaseUrl(process.env.REPORTER_STORE_TEST_URL);
 
 const pool = new pg.Pool({ connectionString: url, max: 8 });
 const store = createReporterStore(
@@ -19,15 +17,7 @@ const migration = await readFile(
   "utf8"
 );
 await pool.query("DROP TABLE IF EXISTS reporter_updates");
-const COMMENT_ONLY = /^(?:--[^\n]*\n?)+$/;
-const statements = migration
-  .split(/;\s*$/m)
-  .map((statement) => statement.trim())
-  .filter((statement) => statement && !COMMENT_ONLY.test(statement));
-await statements.reduce(
-  (previous, statement) => previous.then(() => pool.query(statement)),
-  Promise.resolve<unknown>(undefined)
-);
+await pool.query(migration);
 
 const claims = await Promise.all(
   Array.from({ length: 8 }, () =>
