@@ -1218,3 +1218,20 @@ test("the engineering hand-off stops when the master's owner is outside the rost
     )
   );
 });
+
+test("a new engineering master carries the Area label and the read-back checks it", () => {
+  const create = extractInstruction(
+    handoffSkill,
+    "## Create one master",
+    "## Read back before finishing"
+  );
+  assert.ok(
+    create.includes("the `Area:` label that `route.addLabels` carries")
+  );
+  const readBack = extractInstruction(
+    handoffSkill,
+    "## Read back before finishing",
+    "Hand back the master id"
+  );
+  assert.ok(readBack.includes("including the `Area:` label"));
+});
