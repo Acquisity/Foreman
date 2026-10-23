@@ -28,6 +28,12 @@ import {
 
 type Answers = Record<string, JevAnswer>;
 
+const PARKABLE_PATHS: readonly HandlingPath[] = [
+  "Backlog/low-impact",
+  "Engineering Todo",
+  "Platform Limitation",
+];
+
 const UNDETERMINED = "undetermined";
 const SIGNAL_BAR = 0.5;
 
@@ -88,6 +94,32 @@ const isFeatureRequest = (
   classification === "Platform Limitation" &&
   probabilityOf(answers.wants_limit_lifted) >= SIGNAL_BAR;
 
+const awaitingApproval = (none: Ownership, notes: string[]): Ownership => {
+  notes.push(
+    `A feature request that nobody has approved gets no developer. It is labelled "${NEEDS_APPROVAL_LABEL}" for James to approve; add the "${APPROVED_LABEL}" label to release it.`
+  );
+  const parked = PARKABLE_PATHS.includes(none.path);
+  return {
+    ...none,
+    approval: "needed",
+    assignee: parked ? SUPPORT_OWNER : none.assignee,
+    path: parked ? "Backlog/low-impact" : none.path,
+    releaseDeveloper: parked ? false : none.releaseDeveloper,
+  };
+};
+
+const bugAssignee = (
+  area: AreaKey,
+  path: HandlingPath,
+  duplicate: boolean,
+  closed: boolean
+): string | null => {
+  if (duplicate || path === "Engineering Todo") {
+    return ownerForArea(area);
+  }
+  return path.startsWith("Support/") && !closed ? SUPPORT_OWNER : null;
+};
+
 export function resolveOwnership(context: {
   answers: Answers;
   bar: number;
@@ -123,29 +155,19 @@ export function resolveOwnership(context: {
   };
   if (classification === "Bug") {
     const area = place();
-    const developer = duplicate || path === "Engineering Todo";
-    const supportFollowUp = path.startsWith("Support/") && !context.closed;
-    if (developer && !area.matched) {
+    const assignee = bugAssignee(area.key, path, duplicate, context.closed);
+    if (assignee && !area.matched && assignee !== SUPPORT_OWNER) {
       notes.push(
         `The evidence does not place this in a mapped area, so it goes to ${FALLBACK_OWNER}; say which evidence is missing in the document.`
       );
     }
-    return {
-      ...none,
-      area,
-      assignee: developer
-        ? ownerForArea(area.key)
-        : (supportFollowUp && SUPPORT_OWNER) || null,
-    };
+    return { ...none, area, assignee };
   }
   if (!isFeatureRequest(classification, answers)) {
     return none;
   }
   if (!hasLabel(input.ticketLabels ?? [], APPROVED_LABEL)) {
-    notes.push(
-      `A feature request that nobody has approved gets no developer. It is labelled "${NEEDS_APPROVAL_LABEL}" for James to approve; add the "${APPROVED_LABEL}" label to release it.`
-    );
-    return { ...none, approval: "needed" };
+    return awaitingApproval(none, notes);
   }
   if (path !== "Platform Limitation" && path !== "Engineering Todo") {
     return { ...none, approval: "approved" };

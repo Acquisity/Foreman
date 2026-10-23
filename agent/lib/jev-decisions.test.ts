@@ -221,11 +221,12 @@ test("a platform limitation the customer wants lifted is a Low feature request",
     "Provider limit",
     "Needs approval",
   ]);
-  assert.equal(decision.assignee, null);
+  assert.equal(decision.assignee, "Aaron Fraga");
   assert.equal(decision.approval, "needed");
-  assert.equal(decision.route.assignee, undefined);
+  assert.equal(decision.route.assignee, "Aaron Fraga");
   assert.equal(decision.route.priority, 4);
-  assert.equal(decision.route.state, "Done");
+  assert.equal(decision.route.state, "Backlog");
+  assert.equal(decision.path, "Backlog/low-impact");
 });
 
 test("triage asks every question, including one per duplicate candidate", () => {
@@ -933,7 +934,8 @@ test("an outcome that is not for a developer releases the one holding the ticket
     })
   );
   assert.ok(unapproved.outcome === "route");
-  assert.equal(unapproved.route.releaseDeveloper, true);
+  assert.equal(unapproved.route.releaseDeveloper, undefined);
+  assert.equal(unapproved.route.assignee, "Aaron Fraga");
   for (const kept of [
     bugAnswers(),
     bugAnswers({ path: pick("Backlog/low-impact") }),
@@ -1021,5 +1023,34 @@ test("a Bug on a Support path is an open follow-up and goes to Aaron, keeping it
     assert.equal(decision.route.assignee, "Aaron Fraga", path);
     assert.equal(decision.route.releaseDeveloper, undefined, path);
     assert.ok(decision.route.addLabels.includes("Area: AI SDR"), path);
+  }
+});
+
+test("an unapproved feature request never keeps an engineering path", () => {
+  for (const path of [
+    "Engineering Todo",
+    "Platform Limitation",
+    "Backlog/low-impact",
+  ]) {
+    const decision = resolveTriage(
+      triageInput(),
+      bugAnswers({
+        area: pick("ai_sdr"),
+        classification: pick("platform_limitation"),
+        path: pick(path),
+        wants_limit_lifted: yes(),
+      })
+    );
+    assert.ok(decision.outcome === "route", path);
+    assert.equal(decision.approval, "needed", path);
+    assert.equal(decision.path, "Backlog/low-impact", path);
+    assert.equal(decision.route.state, "Backlog", path);
+    assert.equal(decision.route.assignee, "Aaron Fraga", path);
+    assert.ok(decision.route.addLabels.includes("Needs approval"), path);
+    assert.equal(
+      decision.route.addLabels.some((label) => label.startsWith("Area:")),
+      false,
+      path
+    );
   }
 });

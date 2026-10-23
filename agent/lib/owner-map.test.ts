@@ -303,14 +303,15 @@ describe("who may be assigned to a developer", () => {
     assert.equal(decision.route.addLabels.includes("Needs approval"), false);
   });
 
-  it("holds an unapproved feature request for James and gives it no developer", () => {
+  it("parks an unapproved feature request in Backlog with Aaron, for James to approve", () => {
     const decision = route(
       resolveTriage(input(), platformLimit({ area: pick("ai_sdr") }))
     );
     assert.equal(decision.approval, "needed");
-    assert.equal(decision.assignee, null);
+    assert.equal(decision.assignee, "Aaron Fraga");
     assert.equal(decision.area, null);
-    assert.equal(decision.route.assignee, undefined);
+    assert.equal(decision.route.assignee, "Aaron Fraga");
+    assert.equal(decision.route.state, "Backlog");
     assert.ok(decision.route.addLabels.includes("Needs approval"));
     assert.equal(
       decision.route.addLabels.some((label) => label.startsWith("Area:")),

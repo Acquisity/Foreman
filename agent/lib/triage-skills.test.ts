@@ -1267,3 +1267,21 @@ test("Stage 5 hands decide_triage the ticket's own labels so an approved request
   const field = tool.slice(tool.indexOf("ticketLabels: z"));
   assert.equal(field.includes(".optional()"), false);
 });
+
+test("the not-engineering branch covers an unapproved feature request waiting in Backlog", () => {
+  const roster = extractInstruction(
+    triageHandlingSkill,
+    "### Area-routing roster",
+    "### When the ticket is not engineering actionable"
+  );
+  assert.ok(
+    roster.includes("waits in Backlog with `Needs approval` and Aaron")
+  );
+  const branch = extractInstruction(
+    triageHandlingSkill,
+    "### When the ticket is not engineering actionable",
+    "### When the root cause warrants action"
+  );
+  assert.ok(branch.includes("`Backlog/low-impact`"));
+  assert.ok(branch.includes("unless a lift is wanted"));
+});

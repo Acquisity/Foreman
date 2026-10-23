@@ -26,8 +26,6 @@ The verdict says what is wrong, not what the customer does tomorrow morning. Ans
 
 When there is one, name it, say who performs it and whether it is already done, and confirm it costs the customer neither data nor money. Never invent a workaround that writes to production or changes billing on your own judgment; propose those and let a person run them. An unblock someone at Acquisity would perform is real only once the evidence shows the procedure exists, works for this case, is safe, and names who is authorized to run it; without all four, record that none was confirmed and what evidence is missing. When there is none, say so explicitly: a silently absent unblock reads as one nobody looked for.
 
-The unblock never replaces the root cause or the master ticket.
-
 ### Jev decides, Foreman acts
 
 Then call `decide_triage` once with the evidence record and that unblock, the Stage 3 duplicate candidates, the team's active projects and Root Cause labels read from Linear now, `classify_ask`'s `sourceLabels`, and the ticket's own labels from Linear now as `ticketLabels`. Its decision is the verdict, classification, path, state, priority, labels, and project; record its notes and never hand-edit them. Call it again whenever the evidence changes: after adjudication, or a correction. A `NEEDS_HUMAN_URGENT` hotlane stop suspends its route. `unproven` takes the unproven branch with its `missing` list:
@@ -112,13 +110,13 @@ When Aaron explicitly requests read-only validation during an attended manual te
 
 Take the product area from the evidence, never from the incoming project, title, symptom, repository name, or memory. `route` carries the `Area:` label and `assignee` from the owner map in [references/roster.md](references/roster.md); pass it unchanged.
 
-A developer gets only a confirmed Bug or a feature request labelled `Approved`; an unapproved one gets `Needs approval`. Questions, user errors, platform limits, billing and support get none.
+A developer gets only a confirmed Bug or a feature request labelled `Approved`; an unapproved one waits in Backlog with `Needs approval` and Aaron. Questions, user errors, platform limits, billing and support get none.
 
 SAN sandbox tickets route to Aaron Fraga. No fitting area means James Keeble; repeat the reason in the report. Never route to retired or legacy projects.
 
 ### When the ticket is not engineering actionable
 
-`User Error`, `Platform Limitation`, `Resolved by triage`, `Duplicate`, `Backlog/low-impact`, and the `Support/` paths end here: call `route_ticket` once with the decision's `route` unchanged. `route` names Aaron Fraga for an open follow-up, no one for a closed outcome. The ticket carries the explanation and moves to the Stage 5 state; nothing goes to engineering. `User Error`, `Platform Limitation`, and `Resolved by triage` close as `Done`; the `Support/` paths stay `Todo` for a person.
+`User Error`, `Platform Limitation`, `Resolved by triage`, `Duplicate`, `Backlog/low-impact`, and the `Support/` paths end here: call `route_ticket` once with the decision's `route` unchanged. `route` names Aaron Fraga for an open follow-up, no one for a closed outcome. The ticket carries the explanation and moves to the Stage 5 state; nothing goes to engineering. `User Error`, `Platform Limitation` (unless a lift is wanted), and `Resolved by triage` close as `Done`; the `Support/` paths stay `Todo` for a person.
 
 A `Duplicate` still inherits: `route` already carries `duplicateOf` and `inheritAssigneeFrom`. Add only `assignee`, the area owner from the roster, when `route` names none (a confirmed Bug only), so the root cause's owner owns its reports. The tool inherits the parent's assignee when it is in the roster and uses the fallback otherwise.
 
