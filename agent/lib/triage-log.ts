@@ -11,7 +11,10 @@ import type { TriageDecision } from "./jev-decisions.js";
  * keeps the latest decision per issue; `route_ticket` logs a `route` line for
  * every routed issue, with `code` `skill_fallback` when no Jev decision
  * exists for it (the skill decided after a Jev failure) and `billing` for a
- * `decide_billing` route; and the root's hook logs `critic.verdict` against
+ * `decide_billing` route. `decide_billing` keeps its decision per issue beside
+ * the triage ones, so the later of the two for an issue wins; one made before
+ * its ticket exists waits and binds to the first ticket routed to match it.
+ * The root's hook logs `critic.verdict` against
  * the issue named on the dispatch's first line, and logs nothing for a
  * critic call that named none.
  */
@@ -20,6 +23,7 @@ export interface LatestTriageDecision {
   issue: string;
   outcome: "route" | "unproven";
   path: string | null;
+  route?: BillingRoute;
 }
 
 export const triageDecisions = defineState<
@@ -49,8 +53,24 @@ export function settleDecision(
 ) {
   return {
     decisions: { ...decisions, [decision.issue]: decision },
-    stage: decision.issue in decisions ? "adjudicate" : "decide",
+    stage:
+      decisions[decision.issue] && !decisions[decision.issue].route
+        ? "adjudicate"
+        : "decide",
   } as const;
+}
+
+export function billingDecisionFields(
+  issue: string,
+  route: BillingRoute
+): LatestTriageDecision {
+  return {
+    classification: null,
+    issue,
+    outcome: "route",
+    path: BILLING_PATH,
+    route,
+  };
 }
 
 const SOURCE_LINE = /^\**Source issue:\**\s*`?([A-Z]{2,10}-\d{1,9})`?\.?\**$/u;
@@ -128,41 +148,68 @@ export function criticVerdictFields(
   };
 }
 
+interface RouteInput {
+  assignee?: string;
+  duplicateOf?: string;
+  inheritAssigneeFrom?: string;
+  issue: string;
+  project?: string;
+}
+
 export function routeDecisionEvent(
   decisions: Readonly<Record<string, LatestTriageDecision>>,
-  input: {
-    assignee?: string;
-    duplicateOf?: string;
-    inheritAssigneeFrom?: string;
-    issue: string;
-    project?: string;
-  },
-  billing: BillingRoute | null = null
+  input: RouteInput,
+  pendingBilling: BillingRoute | null = null
 ) {
   const decision = decisions[input.issue];
+  const triage = decision && !decision.route ? decision : undefined;
+  const billing = decision ? decision.route : pendingBilling;
   const billed =
-    !decision &&
+    !triage &&
+    billing !== undefined &&
     billing !== null &&
     input.project === billing.project &&
     input.assignee === billing.assignee;
   let code: string | null = null;
-  if (!decision) {
+  if (!triage) {
     code = billed ? "billing" : "skill_fallback";
   }
-  let outcome = decision?.outcome ?? "skill";
+  let outcome = triage?.outcome ?? "skill";
   if (billed) {
     outcome = "route";
   }
   return {
     assigneeKind: assigneeKind(input),
-    classification: decision?.classification ?? null,
+    classification: triage?.classification ?? null,
     code,
     decision: "route",
     duplicateOf: input.duplicateOf ?? null,
     issue: input.issue,
     outcome,
-    path: decision?.path ?? (billed ? BILLING_PATH : null),
+    path: triage?.path ?? (billed ? BILLING_PATH : null),
     project: input.project ?? null,
+  };
+}
+
+export function settleRoute(
+  decisions: Readonly<Record<string, LatestTriageDecision>>,
+  input: RouteInput,
+  pendingBilling: BillingRoute | null
+) {
+  const event = routeDecisionEvent(decisions, input, pendingBilling);
+  const binds =
+    event.code === "billing" &&
+    pendingBilling !== null &&
+    !decisions[input.issue];
+  return {
+    decisions: binds
+      ? {
+          ...decisions,
+          [input.issue]: billingDecisionFields(input.issue, pendingBilling),
+        }
+      : decisions,
+    event,
+    pendingBilling: binds ? null : pendingBilling,
   };
 }
 

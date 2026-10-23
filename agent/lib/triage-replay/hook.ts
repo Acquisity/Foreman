@@ -90,7 +90,7 @@ function settleCall(
     });
   } else if (result.toolName === "decide_billing") {
     state.decisions.push({
-      issue: null,
+      issue: textField(call?.input, "issue"),
       kind: "billing",
       output: result.output,
     });

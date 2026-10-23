@@ -154,6 +154,54 @@ describe("replay result", () => {
     assert.equal(result.status, "failed");
   });
 
+  const billingOutput = {
+    decided: true,
+    decision: {
+      discretion: "needs-human",
+      notes: [],
+      route: {
+        addLabels: [],
+        assignee: "Aaron Fraga",
+        priority: 3,
+        project: "Support",
+        state: "Todo",
+      },
+      unconfirmed: [],
+    },
+  };
+
+  it("keeps a billing decision for another issue, or one with no issue, out of the case's final", async (t) => {
+    await replayProcess(t);
+    await callTool("decide_billing", { bucket: "refund" }, billingOutput);
+    await callTool(
+      "decide_billing",
+      { bucket: "refund", issue: "ENG-90" },
+      billingOutput
+    );
+    await handler("turn.completed")({ data: {} }, rootCtx);
+    assert.equal(buildReplayResult(await state(), META).final, null);
+  });
+
+  it("lets the later of a triage and a billing decision for the case decide its final, in either order", async (t) => {
+    await replayProcess(t);
+    await callTool("decide_triage", { identifier: "ENG-100" }, routeDecision());
+    await callTool(
+      "decide_billing",
+      { bucket: "refund", issue: "ENG-100" },
+      billingOutput
+    );
+    await handler("turn.completed")({ data: {} }, rootCtx);
+    assert.equal(
+      buildReplayResult(await state(), META).final?.path,
+      "Support/Financial"
+    );
+    await callTool("decide_triage", { identifier: "ENG-100" }, routeDecision());
+    assert.equal(
+      buildReplayResult(await state(), META).final?.path,
+      "Duplicate"
+    );
+  });
+
   it("scores a billing decision once its route is applied", async (t) => {
     await replayProcess(t);
     t.mock.method(executorTransport, "call", () => {
@@ -161,7 +209,7 @@ describe("replay result", () => {
     });
     await callTool(
       "decide_billing",
-      { bucket: "refund" },
+      { bucket: "refund", issue: "ENG-100" },
       {
         decided: true,
         decision: {

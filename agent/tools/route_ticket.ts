@@ -7,7 +7,7 @@ import { routeTicket } from "#lib/linear-api.js";
 import { logOpsEvent } from "#lib/ops-log.js";
 import {
   billingRoutes,
-  routeDecisionEvent,
+  settleRoute,
   triageDecisions,
 } from "#lib/triage-log.js";
 
@@ -29,12 +29,15 @@ export default defineTool({
         client: executorClient(ctx),
         signal: ctx.abortSignal,
       });
+      const settled = settleRoute(
+        triageDecisions.get(),
+        input,
+        billingRoutes.get()
+      );
+      triageDecisions.update(() => settled.decisions);
+      billingRoutes.update(() => settled.pendingBilling);
       logOpsEvent("triage.decision", {
-        ...routeDecisionEvent(
-          triageDecisions.get(),
-          input,
-          billingRoutes.get()
-        ),
+        ...settled.event,
         sessionId: ctx.session.id,
       });
       return { routed: true as const, ...ticket };

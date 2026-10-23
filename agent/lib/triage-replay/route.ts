@@ -512,7 +512,10 @@ type FinalDecision =
 function finalDecision(state: ReplayState): FinalDecision | null {
   for (const entry of [...state.decisions].reverse()) {
     if (entry.kind === "billing") {
-      if (billingDecisionSchema.safeParse(entry.output).success) {
+      if (
+        entry.issue === state.case.id &&
+        billingDecisionSchema.safeParse(entry.output).success
+      ) {
         return { kind: "billing" };
       }
       continue;

@@ -97,7 +97,7 @@ Load `clarify-with-requester`. Ask one batched set before the verdict, within it
 
 ## Step 7: Produce the proposal
 
-Call `decide_billing` with the completed evidence, the bucket, the approval quote or null, and the source labels. It settles the discretion note and the seven checks; record them as returned, with its notes. Only on `decided: false` settle them yourself, and say so. Every verdict includes the taxonomy bucket and one discretion note:
+Call `decide_billing` with the completed evidence, the bucket, the approval quote or null, and the source labels. Leave `issue` out here, because the ticket does not exist yet; the `route_ticket` call in step 8 binds the decision to the new ticket. It settles the discretion note and the seven checks; record them as returned, with its notes. Only on `decided: false` settle them yourself, and say so. Every verdict includes the taxonomy bucket and one discretion note:
 
 - `justified`: current evidence supports the refund or credit proposal.
 - `not justified`: current evidence does not support it.
