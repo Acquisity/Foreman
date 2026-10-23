@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { withDeadline } from "./deadline.js";
+import { DeadlineError, withDeadline } from "./deadline.js";
 import { DEPLOY_REPOSITORY, type PullFacts } from "./plan.js";
 
 export interface DeployProbe {
@@ -12,6 +12,7 @@ type Fetch = typeof fetch;
 
 const API = "https://api.github.com";
 const TIMEOUT_MS = 15_000;
+export const SCAN_TIMEOUT_MS = 45_000;
 const DEPLOYMENTS_SCANNED = 30;
 const REPOSITORY = /^[\w.-]+\/[\w.-]+$/u;
 const SHA = /^[0-9a-f]{7,40}$/iu;
@@ -76,10 +77,43 @@ const read = (
     return response.json();
   }, timeoutMs);
 
+const scanDeployments = async (
+  token: () => Promise<string>,
+  fetchImpl: Fetch,
+  timeoutMs: number,
+  signal: AbortSignal
+): Promise<string | null> => {
+  const deployments = deploymentsSchema.parse(
+    await read(
+      token,
+      fetchImpl,
+      `/repos/${DEPLOY_REPOSITORY}/deployments?environment=production&per_page=${DEPLOYMENTS_SCANNED}`,
+      timeoutMs
+    )
+  );
+  const firstLive = async (index: number): Promise<string | null> => {
+    const deployment = deployments[index];
+    if (!deployment || signal.aborted) {
+      return null;
+    }
+    const statuses = statusesSchema.parse(
+      await read(
+        token,
+        fetchImpl,
+        `/repos/${DEPLOY_REPOSITORY}/deployments/${deployment.id}/statuses?per_page=${STATUSES_READ}`,
+        timeoutMs
+      )
+    );
+    return isLive(statuses) ? deployment.sha : firstLive(index + 1);
+  };
+  return firstLive(0);
+};
+
 export const githubDeployProbe = (
   token: () => Promise<string>,
   fetchImpl: Fetch = fetch,
-  timeoutMs: number = TIMEOUT_MS
+  timeoutMs: number = TIMEOUT_MS,
+  scanTimeoutMs: number = SCAN_TIMEOUT_MS
 ): DeployProbe => ({
   async isAncestor(repo, base, head) {
     if (!(REPOSITORY.test(repo) && SHA.test(base) && SHA.test(head))) {
@@ -96,30 +130,16 @@ export const githubDeployProbe = (
     return status === "identical" || status === "ahead";
   },
   async liveSha() {
-    const deployments = deploymentsSchema.parse(
-      await read(
-        token,
-        fetchImpl,
-        `/repos/${DEPLOY_REPOSITORY}/deployments?environment=production&per_page=${DEPLOYMENTS_SCANNED}`,
-        timeoutMs
-      )
-    );
-    const firstLive = async (index: number): Promise<string | null> => {
-      const deployment = deployments[index];
-      if (!deployment) {
+    const scan = (signal: AbortSignal): Promise<string | null> =>
+      scanDeployments(token, fetchImpl, timeoutMs, signal);
+    try {
+      return await withDeadline(scan, scanTimeoutMs);
+    } catch (error) {
+      if (error instanceof DeadlineError && error.ms === scanTimeoutMs) {
         return null;
       }
-      const statuses = statusesSchema.parse(
-        await read(
-          token,
-          fetchImpl,
-          `/repos/${DEPLOY_REPOSITORY}/deployments/${deployment.id}/statuses?per_page=${STATUSES_READ}`,
-          timeoutMs
-        )
-      );
-      return isLive(statuses) ? deployment.sha : firstLive(index + 1);
-    };
-    return firstLive(0);
+      throw error;
+    }
   },
   async pull(repo, number) {
     if (!REPOSITORY.test(repo)) {

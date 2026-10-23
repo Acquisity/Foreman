@@ -1,7 +1,10 @@
 export class DeadlineError extends Error {
+  readonly ms: number;
+
   constructor(ms: number) {
     super(`Reporter updates step exceeded ${ms} ms.`);
     this.name = "DeadlineError";
+    this.ms = ms;
   }
 }
 

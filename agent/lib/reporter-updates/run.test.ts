@@ -11,6 +11,7 @@ import {
   receivedText,
   wordCount,
 } from "./copy.js";
+import { githubDeployProbe } from "./deploy.js";
 import {
   depsOf,
   fakeDeploy,
@@ -1078,6 +1079,88 @@ describe("a deploy wait that is no longer needed", () => {
     await runReporterUpdates(s.deps, NOW + MIN, () => NOW + MIN);
     assert.equal(waitingIssues(s.memory).length, 1);
     assert.equal(waitingIssues(s.memory)[0]?.checkedSha, NEW_SHA);
+  });
+});
+
+describe("a slow deployment scan", () => {
+  it("leaves the received, owner and closed messages delivered in the same run, and makes fixed wait", async () => {
+    const waiting = ticket({
+      identifier: "ENG-1",
+      pullUrls: [PR_URL],
+      stateType: "completed",
+    });
+    const fresh = ticket({ identifier: "ENG-2" });
+    const duplicate = ticket({
+      identifier: "ENG-3",
+      stateName: "Canceled",
+      stateType: "canceled",
+    });
+    const named = ticket({ identifier: "ENG-4" });
+    const tickets = [waiting, fresh, duplicate, named];
+    for (const t of tickets) {
+      t.updatedAt = "2026-10-11T10:00:00.000Z";
+    }
+    const linear = fakeLinear(tickets);
+    const memory = memoryStore();
+    memory.table.set("ENG-4|received", {
+      attempts: 1,
+      checkedSha: null,
+      claimedAt: 0,
+      commentId: "c",
+      message: "",
+      retryAfter: 0,
+      stage: "received",
+      status: "sent",
+      token: null,
+    });
+    const fake = fakeDeploy({
+      liveSha: OLD_SHA,
+      pulls: { [pullKey(7)]: merged() },
+    });
+    const slowReads = githubDeployProbe(
+      () => Promise.resolve("token"),
+      async (input: string | URL | Request) => {
+        await new Promise((resolve) => setTimeout(resolve, 40));
+        const url = String(input);
+        return url.includes("/statuses")
+          ? Response.json([{ creator: { login: "actor" }, state: "success" }])
+          : Response.json(
+              Array.from({ length: 30 }, (_, i) => ({
+                id: 100 - i,
+                sha: NEW_SHA,
+              }))
+            );
+      },
+      1000,
+      120
+    );
+    const deps = depsOf(
+      linear.port,
+      { ...fake.probe, liveSha: slowReads.liveSha },
+      memory.store,
+      {
+        runDeadlineMs: 600,
+      }
+    );
+    const started = Date.now();
+    const report = await runReporterUpdates(deps, started);
+    assert.equal(report.errors.length, 0);
+    assert.deepEqual(
+      linear.posts
+        .map((p) => `${p.identifier} ${p.body}`)
+        .sort((a, b) => a.localeCompare(b)),
+      [
+        `ENG-2 ${receivedText("Sam")}`,
+        `ENG-3 ${notFixedText("closed")}`,
+        `ENG-4 ${ownerText("Sam")}`,
+      ].sort((a, b) => a.localeCompare(b))
+    );
+    assert.equal(
+      waitingIssues(memory).length,
+      1,
+      "fixed waits for a known live commit"
+    );
+    assert.ok(Date.now() - started < 600);
   });
 });
 

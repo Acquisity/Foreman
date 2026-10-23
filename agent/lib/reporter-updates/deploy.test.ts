@@ -249,3 +249,53 @@ describe("deadline", () => {
     await assert.rejects(probe.liveSha(), DeadlineError);
   });
 });
+
+describe("overall scan deadline", () => {
+  const slowProbe = (delayMs: number, scanMs: number, live?: number) => {
+    const reads: string[] = [];
+    const deployments = Array.from({ length: 30 }, (_, i) => ({
+      id: 100 - i,
+      sha: NEW_SHA,
+    }));
+    const probe = githubDeployProbe(
+      () => Promise.resolve("token"),
+      async (input: string | URL | Request) => {
+        const url = String(input).replace("https://api.github.com", "");
+        reads.push(url);
+        await new Promise((resolve) => setTimeout(resolve, delayMs));
+        if (url.includes("/statuses")) {
+          return json(url.includes(`/${live}/`) ? DEPLOY_DONE : MIGRATE_ONLY);
+        }
+        return json(deployments);
+      },
+      1000,
+      scanMs
+    );
+    return { probe, reads };
+  };
+
+  it("treats the live commit as unknown when slow reads use up the scan's time", async () => {
+    const { probe, reads } = slowProbe(30, 120);
+    assert.equal(await probe.liveSha(), null);
+    await new Promise((resolve) => setTimeout(resolve, 150));
+    assert.ok(
+      reads.filter((path) => path.includes("/statuses")).length <= 6,
+      "the scan stops reading once its deadline has passed"
+    );
+  });
+
+  it("still returns a live commit found inside the deadline", async () => {
+    const { probe } = slowProbe(10, 1000, 99);
+    assert.equal(await probe.liveSha(), NEW_SHA);
+  });
+
+  it("still fails when a single read hangs, because that is not the scan running out of time", async () => {
+    const probe = githubDeployProbe(
+      () => Promise.resolve("token"),
+      () => new Promise<never>(() => undefined),
+      40,
+      500
+    );
+    await assert.rejects(probe.liveSha(), DeadlineError);
+  });
+});
