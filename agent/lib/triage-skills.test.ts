@@ -1250,3 +1250,20 @@ test("a master built for an approved feature request carries Feature Request and
   );
   assert.ok(reuse.includes("add `Feature Request` and `Approved` too"));
 });
+
+test("Stage 5 hands decide_triage the ticket's own labels so an approved request is seen", () => {
+  const stage = extractInstruction(
+    triageHandlingSkill,
+    "### Jev decides, Foreman acts",
+    "### Fallback: only when `decided: false`"
+  );
+  assert.ok(
+    stage.includes("the ticket's own labels from Linear now as `ticketLabels`")
+  );
+  const tool = readFileSync(
+    new URL("../tools/decide_triage.ts", import.meta.url),
+    "utf8"
+  );
+  const field = tool.slice(tool.indexOf("ticketLabels: z"));
+  assert.equal(field.includes(".optional()"), false);
+});

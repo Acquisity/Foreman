@@ -30,7 +30,7 @@ The unblock never replaces the root cause or the master ticket.
 
 ### Jev decides, Foreman acts
 
-Then call `decide_triage` once with the evidence record and that unblock, the Stage 3 duplicate candidates, the team's active projects and Root Cause labels read from Linear now, and `classify_ask`'s `sourceLabels`. Its decision is the verdict, classification, path, state, priority, labels, and project; record its notes and never hand-edit them. Call it again whenever the evidence changes: after adjudication, or a correction. A `NEEDS_HUMAN_URGENT` hotlane stop suspends its route. `unproven` takes the unproven branch with its `missing` list:
+Then call `decide_triage` once with the evidence record and that unblock, the Stage 3 duplicate candidates, the team's active projects and Root Cause labels read from Linear now, `classify_ask`'s `sourceLabels`, and the ticket's own labels from Linear now as `ticketLabels`. Its decision is the verdict, classification, path, state, priority, labels, and project; record its notes and never hand-edit them. Call it again whenever the evidence changes: after adjudication, or a correction. A `NEEDS_HUMAN_URGENT` hotlane stop suspends its route. `unproven` takes the unproven branch with its `missing` list:
 
 When the deciding confirmation is still missing, take the unproven branch and stop before classification. Before stopping, record any safe unblock supported by the completed evidence: the action, owner, current status, and confirmation that it costs the customer neither data nor money, or `None found: <reason>`. Preserve the source ticket's current state, priority, and labels, even an empty priority; read the unproven reporting exception in [references/reporting.md](references/reporting.md); attach or update the investigation document with the known facts, missing confirmation, and reopen condition; and give the requester that same reopen condition in the short comment or attended reply. Do not create or attach a master, route engineering work, or record investigation memory.
 
@@ -112,9 +112,9 @@ When Aaron explicitly requests read-only validation during an attended manual te
 
 Take the product area from the evidence, never from the incoming project, title, symptom, repository name, or memory. `route` carries the `Area:` label and `assignee` from the owner map in [references/roster.md](references/roster.md); pass it unchanged.
 
-A developer gets only a confirmed Bug or a feature request labelled `Approved`. An unapproved feature request gets `Needs approval` and no developer; questions, user errors, platform limits, billing and support get none.
+A developer gets only a confirmed Bug or a feature request labelled `Approved`; an unapproved one gets `Needs approval`. Questions, user errors, platform limits, billing and support get none.
 
-SAN sandbox tickets always route to Aaron Fraga. When no area fits, `decide_triage` assigns James Keeble; repeat its reason in the report. Never route to retired or legacy projects.
+SAN sandbox tickets route to Aaron Fraga. No fitting area means James Keeble; repeat the reason in the report. Never route to retired or legacy projects.
 
 ### When the ticket is not engineering actionable
 

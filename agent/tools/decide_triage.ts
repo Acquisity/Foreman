@@ -98,9 +98,8 @@ export default defineTool({
     ticketLabels: z
       .array(text(120))
       .max(60)
-      .optional()
       .describe(
-        "The labels already on the ticket, read from Linear now; the Approved label releases a feature request to a developer."
+        "Every label already on the ticket, read from Linear now (an empty list when it has none), not the sourceLabels; the Approved label releases a feature request to a developer."
       ),
   }),
 });
