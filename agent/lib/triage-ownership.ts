@@ -124,6 +124,7 @@ export function resolveOwnership(context: {
   if (classification === "Bug") {
     const area = place();
     const developer = duplicate || path === "Engineering Todo";
+    const supportFollowUp = path.startsWith("Support/") && !context.closed;
     if (developer && !area.matched) {
       notes.push(
         `The evidence does not place this in a mapped area, so it goes to ${FALLBACK_OWNER}; say which evidence is missing in the document.`
@@ -132,7 +133,9 @@ export function resolveOwnership(context: {
     return {
       ...none,
       area,
-      assignee: developer ? ownerForArea(area.key) : null,
+      assignee: developer
+        ? ownerForArea(area.key)
+        : (supportFollowUp && SUPPORT_OWNER) || null,
     };
   }
   if (!isFeatureRequest(classification, answers)) {

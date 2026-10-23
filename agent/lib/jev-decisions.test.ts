@@ -1008,3 +1008,18 @@ test("an open follow-up a person owes goes to Aaron instead of being left with n
   assert.equal(closed.route.assignee, undefined);
   assert.equal(closed.route.releaseDeveloper, true);
 });
+
+test("a Bug on a Support path is an open follow-up and goes to Aaron, keeping its Area label", () => {
+  for (const path of ["Support/Product follow-up", "Support/Financial"]) {
+    const decision = resolveTriage(
+      triageInput(),
+      bugAnswers({ area: pick("ai_sdr"), path: pick(path) })
+    );
+    assert.ok(decision.outcome === "route", path);
+    assert.equal(decision.classification, "Bug", path);
+    assert.equal(decision.route.state, "Todo", path);
+    assert.equal(decision.route.assignee, "Aaron Fraga", path);
+    assert.equal(decision.route.releaseDeveloper, undefined, path);
+    assert.ok(decision.route.addLabels.includes("Area: AI SDR"), path);
+  }
+});

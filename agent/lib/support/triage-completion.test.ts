@@ -640,3 +640,29 @@ test("a Bug that routing left unassigned on purpose finishes with its Area label
     SupportRefusal
   );
 });
+
+test("a Bug on a Support path finishes with Aaron as its owner and no master", () => {
+  const followUp = {
+    ...report,
+    assignee: "Aaron Fraga",
+    labels: ["intercom-sourced", "Customer reported", "Bug", "Area: AI SDR"],
+    parentId: null,
+    project: null,
+    status: "Todo",
+  };
+  assert.doesNotThrow(() => assertTriageOutputs(followUp, document, comments));
+  assert.throws(
+    () =>
+      assertTriageOutputs({ ...followUp, assignee: null }, document, comments),
+    SupportRefusal
+  );
+  assert.throws(
+    () =>
+      assertTriageOutputs(
+        { ...followUp, assignee: "Area Owner" },
+        document,
+        comments
+      ),
+    SupportRefusal
+  );
+});

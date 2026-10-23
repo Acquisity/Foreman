@@ -110,7 +110,10 @@ export function assertTriageOutputs(
       issue.labels.includes(label)
     ) ||
     (classification === "Bug" && !issue.labels.includes("Bug")) ||
-    (classification === "Bug" && issue.status === "Todo" && !issue.parentId) ||
+    (classification === "Bug" &&
+      issue.status === "Todo" &&
+      !issue.parentId &&
+      issue.assignee !== SUPPORT_OWNER) ||
     (duplicate && !issue.relations?.duplicateOf)
   ) {
     throw new SupportRefusal(
