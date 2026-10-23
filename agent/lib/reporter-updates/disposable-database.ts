@@ -1,6 +1,17 @@
+import pg from "pg";
+
 export const DISPOSABLE_DATABASE = "foreman_reporter_test";
 
-const LOOPBACK_HOSTS = new Set(["127.0.0.1", "localhost", "[::1]"]);
+const LOOPBACK_HOSTS = new Set(["127.0.0.1", "localhost", "::1", "[::1]"]);
+const OVERRIDE_PARAMETERS = [
+  "host",
+  "hostaddr",
+  "dbname",
+  "database",
+  "port",
+  "service",
+  "options",
+];
 
 export const disposableDatabaseUrl = (raw: string | undefined): string => {
   if (!raw) {
@@ -16,9 +27,15 @@ export const disposableDatabaseUrl = (raw: string | undefined): string => {
       cause: error,
     });
   }
+  if (OVERRIDE_PARAMETERS.some((name) => url.searchParams.has(name))) {
+    throw new Error(
+      "REPORTER_STORE_TEST_URL may not override the host or database in its query."
+    );
+  }
+  const effective = new pg.Client({ connectionString: raw });
   if (
-    !LOOPBACK_HOSTS.has(url.hostname) ||
-    url.pathname !== `/${DISPOSABLE_DATABASE}`
+    !(effective.host && LOOPBACK_HOSTS.has(effective.host)) ||
+    effective.database !== DISPOSABLE_DATABASE
   ) {
     throw new Error(
       `Reporter store tests only run against a local ${DISPOSABLE_DATABASE} database.`
