@@ -171,8 +171,7 @@ export const onAgentSession = async (
   const trusted = stampInvestigationMemory(
     stampTrusted(defaultLinearAuth(event))
   );
-  const auth =
-    ask?.triageIntake && !route ? stampTriageIntake(trusted) : trusted;
+  const auth = ask?.triageIntake ? stampTriageIntake(trusted) : trusted;
   const [repository] = repositories;
   const withRepository =
     repositories.length === 1 && repository

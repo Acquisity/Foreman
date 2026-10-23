@@ -135,19 +135,6 @@ describe("isTriageIntakeAsk", () => {
     }
   });
 
-  it("accepts a ticket that links the support conversation it came from", () => {
-    assert.equal(
-      isTriageIntakeAsk([
-        { title: "Support conversation", url: "https://app.example/c/1" },
-      ]),
-      true
-    );
-    assert.equal(
-      isTriageIntakeAsk([{ title: "Support conversations", url: "https://x" }]),
-      false
-    );
-  });
-
   it("rejects other channels, other titles, and malformed URLs", () => {
     assert.equal(isTriageIntakeAsk(ask(thread("C0BLFDUN6Q7"))), false);
     assert.equal(

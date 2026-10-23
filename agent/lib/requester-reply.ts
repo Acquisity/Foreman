@@ -133,8 +133,7 @@ const ASK_FROM_QUERY = `query AskFrom($id: String!) {
 /**
  * The intake requester from the issue's 'Ask from <name>' attachment, or null,
  * and whether the ticket is a triage intake ticket: its 'Ask from' link points
- * at a triage ask channel, it carries a 'Support conversation' link, or the
- * widget filed it.
+ * at a triage ask channel, or the widget filed it.
  */
 export async function readAskFrom(
   issue: string,

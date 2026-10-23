@@ -6,6 +6,7 @@ import {
   assigneeKind,
   BILLING_PATH,
   billingDecisionFields,
+  blockedDecision,
   confidenceFields,
   criticBlocked,
   criticTaskIssue,
@@ -424,6 +425,28 @@ describe("the critic's second check", () => {
       criticBlocked(settleCriticRound(failed, "ENG-1", "CHALLENGE"), "ENG-1"),
       true
     );
+  });
+
+  it("records a blocked ticket as unproven in the live log, with the owner assignment logged as such", () => {
+    const decisions = { "ENG-1": duplicate, "ENG-2": bug };
+    const once = settleCriticRound({}, "ENG-1", "CHALLENGE");
+    assert.equal(blockedDecision(decisions, once, "ENG-1")["ENG-1"], duplicate);
+    const twice = settleCriticRound(once, "ENG-1", "CHALLENGE");
+    const blocked = blockedDecision(decisions, twice, "ENG-1");
+    assert.deepEqual(blocked["ENG-1"], {
+      classification: null,
+      issue: "ENG-1",
+      outcome: "unproven",
+      path: null,
+    });
+    assert.equal(blocked["ENG-2"], bug);
+    const event = routeDecisionEvent(blocked, {
+      assignee: "Ada",
+      issue: "ENG-1",
+    });
+    assert.equal(event.outcome, "unproven");
+    assert.equal(event.path, null);
+    assert.equal(event.classification, null);
   });
 
   it("keeps each issue's objections apart", () => {

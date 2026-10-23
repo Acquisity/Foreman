@@ -17,12 +17,14 @@
 import { defineHook } from "eve/hooks";
 import { logOpsEvent } from "../lib/ops-log.js";
 import {
+  blockedDecision,
   criticRounds,
   criticTaskIssue,
   criticTaskIssues,
   criticVerdictFields,
   criticVerdictIssue,
   settleCriticRound,
+  triageDecisions,
 } from "../lib/triage-log.js";
 
 /**
@@ -134,8 +136,14 @@ export default defineHook({
         data.status,
         data.status === "completed" ? data.output : undefined
       );
-      criticRounds.update((rounds) =>
-        settleCriticRound(rounds, issue, verdict.verdict)
+      const rounds = settleCriticRound(
+        criticRounds.get(),
+        issue,
+        verdict.verdict
+      );
+      criticRounds.update(() => rounds);
+      triageDecisions.update((decisions) =>
+        blockedDecision(decisions, rounds, issue)
       );
       logOpsEvent("critic.verdict", {
         ...verdict,

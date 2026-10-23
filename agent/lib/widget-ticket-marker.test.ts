@@ -22,6 +22,18 @@ test("a ticket ending in the widget's verified scope block is widget-filed", () 
   assert.equal(isWidgetFiledDescription(widgetScopeBlock(scope)), true);
 });
 
+test("the description Linear returns, with its bullets rewritten, still counts", () => {
+  const stored = filed.replaceAll("\n- ", "\n* ");
+  assert.notEqual(stored, filed);
+  assert.equal(isWidgetFiledDescription(stored), true);
+  assert.equal(
+    isWidgetFiledDescription(
+      stored.replace("Support conversation", "Intercom conversation")
+    ),
+    true
+  );
+});
+
 test("an ordinary ticket, a quoted notice or a block with text after it is not", () => {
   assert.equal(isWidgetFiledDescription(null), false);
   assert.equal(
@@ -67,12 +79,6 @@ test("the intake read marks widget-filed, support-conversation and migration-for
     { title: string; url: string }[],
   ][] = [
     ["widget-filed", true, filed, []],
-    [
-      "support conversation",
-      true,
-      "A report",
-      [{ title: "Support conversation", url: "https://app.example/c/1" }],
-    ],
     [
       "CRM form",
       true,

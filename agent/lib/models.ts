@@ -43,7 +43,7 @@ export const MODELS = {
   orchestrator: "anthropic/claude-sonnet-5.5",
   // Root model for every triage intake session (ENG-15226, ENG-16055): the two
   // Asks-receiver channels, the Intercom intake channels, Linear tickets from
-  // a migration form channel, from the widget or from a support conversation.
+  // a migration form channel or from the widget.
   // Every other session stays on the orchestrator.
   triage: "anthropic/claude-opus-5.5",
   // Support widget screenshot reader (widget-screenshot.ts). Not the root.

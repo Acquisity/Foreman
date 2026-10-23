@@ -1,5 +1,5 @@
 ---
-description: "Turn a settled, engineering-actionable triage investigation into exactly one causal Linear master with the customer report parented to it: search, match by cause, reuse or create, apply the approved priority and fast-lane state, and read every write back. Load from triage Stage 6 only for that branch."
+description: "Turn a settled, engineering-actionable triage investigation into exactly one causal Linear master with the customer report parented to it: search, match by cause, reuse or create, apply the approved priority and fast-lane state, and read every write back. Load from triage Stage 6 only for that branch; Stage 5 loads it only to run the master search before the critic review."
 ---
 
 # Engineering handoff

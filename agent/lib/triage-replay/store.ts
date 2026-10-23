@@ -59,6 +59,7 @@ export interface ReplayState {
   comments: { body: string; issue: string }[];
   created: CreatedIssue[];
   critic: CriticVerdictFields | null;
+  criticObjections?: number;
   decisions: { kind: "billing" | "triage"; output: unknown }[];
   documents: StoredDocument[];
   evidenceMisses: string[];

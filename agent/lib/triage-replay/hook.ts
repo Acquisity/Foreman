@@ -1,5 +1,5 @@
 import { defineHook } from "eve/hooks";
-import { criticVerdictFields } from "../triage-log.js";
+import { criticVerdictFields, nextObjections } from "../triage-log.js";
 import { withReplayState } from "./backend.js";
 import { replaySessionOf } from "./mode.js";
 import type { ReplayState } from "./store.js";
@@ -57,6 +57,10 @@ export const triageReplayHook = defineHook({
       );
       await withReplayState(session.runId, session.caseKey, (state) => {
         state.critic = critic;
+        state.criticObjections = nextObjections(
+          state.criticObjections ?? 0,
+          critic.verdict
+        );
       });
     },
     "turn.cancelled": endRootTurn("cancelled"),

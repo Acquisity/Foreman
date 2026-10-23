@@ -1000,7 +1000,7 @@ test("triage reviews bugs and closures with the critic before routing them", () 
     "a `User Error` closing with a lane that could not run or a failure the customer saw",
     "an inbox error set aside as billing",
     "The critic reviews a ticket at most twice",
-    "A second objection sends the ticket to the area owner as unproven",
+    "A second objection sends it to the area owner, unproven",
     "run the `engineering-handoff` master search first so the critic can check the master",
     "[references/critic-review.md](references/critic-review.md)",
   ]) {
@@ -1181,6 +1181,14 @@ test("a sending-inbox report is billing-checked before it can be a bug or a dupl
   ]) {
     assert.ok(billingCheck.includes(rule), rule);
   }
+  assert.ok(
+    triageHandlingSkill.includes(
+      "if `unproven` lists the billing check as missing, run it and call again"
+    )
+  );
+  assert.ok(
+    handoffSkill.includes("Stage 5 loads it only to run the master search")
+  );
   assert.ok(
     triageCriticSkill.includes(
       "`billing_inbox`: an inbox error was set aside as billing"

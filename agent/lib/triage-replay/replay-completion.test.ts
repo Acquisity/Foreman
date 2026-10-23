@@ -168,6 +168,52 @@ describe("replay result", () => {
     assert.equal(buildReplayResult(await state(), RUN).status, "completed");
   });
 
+  it("scores a ticket the critic objected to twice as unproven with its owner assigned, not as routed", async (t) => {
+    await replayProcess(t);
+    noTransport(t);
+    const client = executorClient(ctx);
+    await toolResult(
+      "decide_triage",
+      routeDecision({
+        needsCriticReview: true,
+        review: { kind: "duplicate", reason: "r", required: true },
+      })
+    );
+    const objection = () =>
+      replayHandler("task.settled")(
+        {
+          data: {
+            kind: "agent",
+            name: "critic",
+            output: {
+              blocking_findings: [{ claim: "c" }],
+              criteria_results: [],
+              verdict: "CHALLENGE",
+            },
+            status: "completed",
+          },
+        },
+        rootCtx
+      );
+    await objection();
+    await objection();
+    await saveInvestigationDocument(
+      { content: "Blocked.", issue: "ENG-100", lane: "triage" },
+      { client }
+    );
+    await routeTicket(
+      { addLabels: ["Bug"], assignee: "James Keeble", issue: "ENG-100" },
+      { client }
+    );
+    await endTurn();
+    const result = buildReplayResult(await state(), RUN);
+    assert.equal(result.status, "completed");
+    assert.equal(result.final?.outcome, "unproven");
+    assert.equal(result.final?.path, null);
+    assert.equal(result.final?.assignee, "James Keeble");
+    assert.equal(result.final?.master, null);
+  });
+
   it("waits for the critic when the decision needs review", async (t) => {
     await replayProcess(t);
     noTransport(t);

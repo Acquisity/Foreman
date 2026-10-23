@@ -40,24 +40,52 @@ export const criticRounds = defineState<Record<string, CriticRounds>>(
 
 export const CRITIC_OBJECTION_LIMIT = 2;
 
+export function nextObjections(
+  before: number,
+  verdict: CriticVerdictFields["verdict"]
+): number {
+  if (verdict === "APPROVE") {
+    return 0;
+  }
+  return verdict === "failed" ? before : before + 1;
+}
+
 export function settleCriticRound(
   rounds: Readonly<Record<string, CriticRounds>>,
   issue: string,
   verdict: CriticVerdictFields["verdict"]
 ): Record<string, CriticRounds> {
-  let { objections } = rounds[issue] ?? { objections: 0 };
-  if (verdict === "APPROVE") {
-    objections = 0;
-  } else if (verdict !== "failed") {
-    objections += 1;
-  }
-  return { ...rounds, [issue]: { objections, ran: true } };
+  return {
+    ...rounds,
+    [issue]: {
+      objections: nextObjections(rounds[issue]?.objections ?? 0, verdict),
+      ran: true,
+    },
+  };
 }
 
 export const criticBlocked = (
   rounds: Readonly<Record<string, CriticRounds>>,
   issue: string
 ): boolean => (rounds[issue]?.objections ?? 0) >= CRITIC_OBJECTION_LIMIT;
+
+export function blockedDecision(
+  decisions: Readonly<Record<string, LatestTriageDecision>>,
+  rounds: Readonly<Record<string, CriticRounds>>,
+  issue: string
+): Record<string, LatestTriageDecision> {
+  return criticBlocked(rounds, issue)
+    ? {
+        ...decisions,
+        [issue]: {
+          classification: null,
+          issue,
+          outcome: "unproven",
+          path: null,
+        },
+      }
+    : { ...decisions };
+}
 
 const ownerOnly = (input: RouteInput & Record<string, unknown>): boolean =>
   Object.entries(input).every(

@@ -42,22 +42,18 @@ const TRIAGE_ASK_CHANNELS: ReadonlySet<string> = new Set([
 export const slackChannelOf = (url: string): string | null =>
   url.length <= 2048 ? (SLACK_ARCHIVE.exec(url)?.[1] ?? null) : null;
 
-const SUPPORT_CONVERSATION = "Support conversation";
-
 /**
- * Whether an 'Ask from' attachment links a thread in a triage ask channel, or
- * the ticket links the support conversation it came from. Either puts the
- * session on the triage models (ENG-15226).
+ * Whether an 'Ask from' attachment links a thread in a triage ask channel,
+ * which puts the session on the triage models (ENG-15226).
  */
 export const isTriageIntakeAsk = (
   attachments: readonly { title: string; url: string }[]
 ): boolean =>
   attachments.some(
     ({ title, url }) =>
-      title.trim() === SUPPORT_CONVERSATION ||
-      (ASK_FROM.test(title.trim()) &&
-        url.length <= 2048 &&
-        TRIAGE_ASK_CHANNELS.has(SLACK_ARCHIVE.exec(url)?.[1] ?? ""))
+      ASK_FROM.test(title.trim()) &&
+      url.length <= 2048 &&
+      TRIAGE_ASK_CHANNELS.has(SLACK_ARCHIVE.exec(url)?.[1] ?? "")
   );
 
 /**

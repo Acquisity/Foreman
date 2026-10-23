@@ -3,7 +3,7 @@ export const WIDGET_SCOPE_NOTICE =
 
 const SCOPE_TAIL_CHARS = 2048;
 const SCOPE_BLOCK =
-  /(?:^|\n)## Verified scope\n\n- Workspace: [^\n]{1,400}\n- Organization ID: [^\n]{1,100}\n- Support conversation: [^\n]{1,100}\n\n$/u;
+  /(?:^|\n)## Verified scope\n\n[-*] Workspace: [^\n]{1,400}\n[-*] Organization ID: [^\n]{1,100}\n[-*] (?:Support|Intercom) conversation: [^\n]{1,100}\n\n$/u;
 
 export const isWidgetFiledDescription = (
   description: string | null
