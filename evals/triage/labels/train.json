@@ -6,7 +6,11 @@
     "path": "Platform Limitation",
     "duplicateOf": null,
     "master": null,
-    "rootCause": null,
+    "rootCause": {
+      "files": [],
+      "functions": [],
+      "text": "Staff confirmed they had cancelled the domain."
+    },
     "project": "Domains & Inboxes",
     "owner": "Aaron Fraga",
     "fixCommit": null,
@@ -278,7 +282,11 @@
     "path": "Platform Limitation",
     "duplicateOf": null,
     "master": null,
-    "rootCause": null,
+    "rootCause": {
+      "files": [],
+      "functions": [],
+      "text": "Staff saw nothing pointing at a defect beyond the AI sometimes ignoring an instruction, and closed it."
+    },
     "project": "Support",
     "owner": "Aaron Fraga",
     "fixCommit": null,
@@ -431,7 +439,11 @@
     "path": null,
     "duplicateOf": null,
     "master": null,
-    "rootCause": null,
+    "rootCause": {
+      "files": [],
+      "functions": [],
+      "text": "Staff said in the thread that every inbox erroring at once means non-payment, and the same workspace's later ticket was confirmed unpaid."
+    },
     "project": "Domains & Inboxes",
     "owner": "Anthony Adewale",
     "fixCommit": null,
@@ -448,7 +460,11 @@
     "path": "User Error",
     "duplicateOf": null,
     "master": null,
-    "rootCause": null,
+    "rootCause": {
+      "files": [],
+      "functions": [],
+      "text": "Staff found campaigns booked through a second login with no meeting link."
+    },
     "project": "AI SDR Core",
     "owner": "Koppany Kondricz",
     "fixCommit": null,
@@ -550,7 +566,11 @@
     "path": null,
     "duplicateOf": null,
     "master": null,
-    "rootCause": null,
+    "rootCause": {
+      "files": [],
+      "functions": [],
+      "text": "Staff said the inboxes were not burned but unpaid."
+    },
     "project": "Billing",
     "owner": "Anthony Adewale",
     "fixCommit": null,
@@ -567,7 +587,11 @@
     "path": "Support/Product follow-up",
     "duplicateOf": null,
     "master": null,
-    "rootCause": null,
+    "rootCause": {
+      "files": [],
+      "functions": [],
+      "text": "Staff confirmed the email-address difference and sent a password reset."
+    },
     "project": "Support",
     "owner": "Aaron Fraga",
     "fixCommit": null,
@@ -618,7 +642,11 @@
     "path": "User Error",
     "duplicateOf": null,
     "master": null,
-    "rootCause": null,
+    "rootCause": {
+      "files": [],
+      "functions": [],
+      "text": "Staff found the closer was not assigned to the live campaigns and had no free time."
+    },
     "project": "AI SDR Core",
     "owner": "Aaron Fraga",
     "fixCommit": null,
@@ -800,7 +828,11 @@
     "path": "Platform Limitation",
     "duplicateOf": null,
     "master": null,
-    "rootCause": null,
+    "rootCause": {
+      "files": [],
+      "functions": [],
+      "text": "Staff explained the email sync settings and the requester reported it works as designed."
+    },
     "project": "CRM",
     "owner": "Aaron Fraga",
     "fixCommit": null,
@@ -834,7 +866,11 @@
     "path": null,
     "duplicateOf": null,
     "master": null,
-    "rootCause": null,
+    "rootCause": {
+      "files": [],
+      "functions": [],
+      "text": "Staff said the domains had expired."
+    },
     "project": "Billing",
     "owner": "Anthony Adewale",
     "fixCommit": null,
@@ -1505,7 +1541,11 @@
     "path": "User Error",
     "duplicateOf": null,
     "master": null,
-    "rootCause": null,
+    "rootCause": {
+      "files": [],
+      "functions": [],
+      "text": "Staff found the owner was looking at her own calendar list, not the client's."
+    },
     "project": "Support",
     "owner": "Aaron Fraga",
     "fixCommit": null,
@@ -1539,7 +1579,11 @@
     "path": "User Error",
     "duplicateOf": null,
     "master": null,
-    "rootCause": null,
+    "rootCause": {
+      "files": [],
+      "functions": [],
+      "text": "Requester removed the number and set do-not-contact themselves."
+    },
     "project": "CRM",
     "owner": "James Keeble",
     "fixCommit": null,
@@ -2015,7 +2059,11 @@
     "path": "Support/Financial",
     "duplicateOf": null,
     "master": null,
-    "rootCause": null,
+    "rootCause": {
+      "files": [],
+      "functions": [],
+      "text": "Staff found the inbox subscription had gone unpaid for months, voided old invoices and closed it."
+    },
     "project": "Domains & Inboxes",
     "owner": "Aaron Fraga",
     "fixCommit": null,
@@ -2072,7 +2120,11 @@
     "path": "Platform Limitation",
     "duplicateOf": null,
     "master": null,
-    "rootCause": null,
+    "rootCause": {
+      "files": [],
+      "functions": [],
+      "text": "Staff said it would be very hard to build and gave a workaround."
+    },
     "project": "Core Platform",
     "owner": "James Keeble",
     "fixCommit": null,

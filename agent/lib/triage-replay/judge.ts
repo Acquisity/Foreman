@@ -30,16 +30,18 @@ const { $schema: _draft, ...verdictJsonSchema } = z.toJSONSchema(
 );
 const VERDICT_JSON_SCHEMA = JSON.stringify(verdictJsonSchema);
 
-/** The judge's system prompt: where first, then why. */
-export const ROOT_CAUSE_PROMPT = `You grade whether a triage run found the real root cause of one bug ticket.
+/** The judge's system prompt: for a code fix, where first, then why; for a non-bug closure, the person's explanation. */
+export const ROOT_CAUSE_PROMPT = `You grade whether a triage run found the real root cause of one ticket.
 
-The input is JSON. "label" is the human-settled root cause: the files and functions the merged fix changed, then a short text. "run" is what the triage run wrote: its investigation document and its final routing decision.
+The input is JSON. "label" is the human-settled cause. Its "kind" is "code_fix" when a merged fix settled it: the files and functions the fix changed, then a short text. Its "kind" is "non_bug" when a person confirmed the ticket was not a bug (a user error, a platform limit, an unpaid or expired account): "files" and "functions" are empty and "text" is the person's explanation. "run" is what the triage run wrote: its investigation document and its final routing decision.
 
-Judge where first, then why. The run must name the same place in the code as the label's files and functions (a caller or the same module counts as the same place only when the document ties it to the same defect), and the same mechanism as the label's text.
+For a code_fix, judge where first, then why. The run must name the same place in the code as the label's files and functions (a caller or the same module counts as the same place only when the document ties it to the same defect), and the same mechanism as the label's text.
 
-- match: same place and same mechanism.
-- partial: the right place with a wrong or missing mechanism, or the right mechanism placed in the wrong code.
-- wrong: neither, a different defect, or no root cause stated.
+For a non_bug, there is no place in the code. The run must give the same explanation as the label's text: the same user action, account state or platform limit. A run that calls it a bug and names a code defect is wrong, even if the ticket's symptom is described correctly.
+
+- match: same place and same mechanism for a code_fix; the same explanation for a non_bug.
+- partial: for a code_fix, the right place with a wrong or missing mechanism, or the right mechanism placed in the wrong code; for a non_bug, the right kind of explanation (such as non-payment) without the specific fact the label names.
+- wrong: neither, a different defect or explanation, or no cause stated.
 
 Grade only what the document says, not what it could have meant. Reply with the grade and one short sentence of reason.`;
 
@@ -51,11 +53,14 @@ export function rootCausePrompt(
   if (!label.rootCause) {
     throw new Error(`${label.id} has no labelled root cause to judge.`);
   }
+  const { files, functions, text } = label.rootCause;
   return JSON.stringify({
     label: {
-      files: label.rootCause.files,
-      functions: label.rootCause.functions,
-      text: label.rootCause.text,
+      files,
+      functions,
+      kind:
+        files.length === 0 && functions.length === 0 ? "non_bug" : "code_fix",
+      text,
     },
     run: {
       document: result.document?.text.slice(0, MAX_DOCUMENT) ?? null,

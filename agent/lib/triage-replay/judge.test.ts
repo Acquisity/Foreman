@@ -24,6 +24,7 @@ test("the prompt carries the label's root cause, files and functions against the
     label: {
       files: ["src/panel.ts"],
       functions: ["renderPanel"],
+      kind: "code_fix",
       text: label.rootCause?.text,
     },
     run: { document: "Root cause: renderPanel.", final: result.final },
@@ -36,6 +37,25 @@ test("the prompt carries the label's root cause, files and functions against the
     () => rootCausePrompt(makeLabel("ENG-2", { rootCause: null }), result),
     NO_ROOT_CAUSE
   );
+});
+
+test("a confirmed non-bug closure goes to the judge as a person's explanation, with no code place", () => {
+  const nonBug = makeLabel("ENG-4", {
+    classification: "User Error",
+    rootCause: {
+      files: [],
+      functions: [],
+      text: "The domains had expired.",
+    },
+  });
+  assert.deepEqual(JSON.parse(rootCausePrompt(nonBug, result)).label, {
+    files: [],
+    functions: [],
+    kind: "non_bug",
+    text: "The domains had expired.",
+  });
+  assert.ok(ROOT_CAUSE_PROMPT.includes('"kind" is "non_bug"'));
+  assert.ok(ROOT_CAUSE_PROMPT.includes("there is no place in the code"));
 });
 
 test("the verdict parses strictly and keeps a one-line reason", () => {

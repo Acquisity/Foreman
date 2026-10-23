@@ -153,6 +153,23 @@ describe("frozen triage cohort", () => {
     assert.ok(confirmedClosures.length >= 5);
   });
 
+  it("keeps a person's explanation of a confirmed non-bug closure as its cause", () => {
+    const explained = train.filter(
+      (label) => label.rootCause && label.rootCause.files.length === 0
+    );
+    assert.ok(explained.length >= 5);
+    for (const label of explained) {
+      assert.ok(label.labelSource.includes("human_comment"), label.id);
+      assert.equal(label.fixPr, null, label.id);
+    }
+    const cancelled = train.find((label) => label.id === "ENG-14286");
+    assert.deepEqual(cancelled?.rootCause, {
+      files: [],
+      functions: [],
+      text: "Staff confirmed they had cancelled the domain.",
+    });
+  });
+
   it("splits every case once, and no incident group spans train and held-out", () => {
     const ids = cases.map((c) => c.id).sort();
     assert.deepEqual([...split.train, ...split.heldout].sort(), ids);
