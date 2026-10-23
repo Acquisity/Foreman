@@ -7,6 +7,7 @@ import { routeTicket } from "#lib/linear-api.js";
 import { logOpsEvent } from "#lib/ops-log.js";
 import {
   billingRoutes,
+  bindBilling,
   routeDecisionEvent,
   triageDecisions,
 } from "#lib/triage-log.js";
@@ -25,12 +26,20 @@ export default defineTool({
     "routed true with warnings means the ticket was updated but a relation or link after it failed; read the warning before retrying only that part.",
   async execute(input, ctx) {
     try {
-      const ticket = await routeTicket(input, {
+      const { billingDecision, ...routing } = input;
+      const ticket = await routeTicket(routing, {
         client: executorClient(ctx),
         signal: ctx.abortSignal,
       });
-      const event = routeDecisionEvent(triageDecisions.get(), input);
-      billingRoutes.update(() => null);
+      const bound = bindBilling(
+        triageDecisions.get(),
+        billingRoutes.get(),
+        input.issue,
+        billingDecision
+      );
+      triageDecisions.update(() => bound.decisions);
+      billingRoutes.update(() => bound.pendingBilling);
+      const event = routeDecisionEvent(bound.decisions, input);
       logOpsEvent("triage.decision", { ...event, sessionId: ctx.session.id });
       return { routed: true as const, ...ticket };
     } catch (error) {
@@ -53,6 +62,15 @@ export default defineTool({
       .optional()
       .describe(
         "User name or email; with inheritAssigneeFrom, the fallback for an unassigned source."
+      ),
+    billingDecision: z
+      .string()
+      .trim()
+      .min(1)
+      .max(100)
+      .optional()
+      .describe(
+        "The decisionId decide_billing returned when it ran before this ticket existed. Pass it only on the call that routes the ticket that decision is about."
       ),
     duplicateOf: identifier
       .optional()

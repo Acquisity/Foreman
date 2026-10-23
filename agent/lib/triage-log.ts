@@ -37,7 +37,12 @@ export interface BillingRoute {
   project: string;
 }
 
-export const billingRoutes = defineState<BillingRoute | null>(
+export interface PendingBilling {
+  id: string;
+  route: BillingRoute;
+}
+
+export const billingRoutes = defineState<PendingBilling | null>(
   "foreman.billingRoute",
   () => null
 );
@@ -190,20 +195,18 @@ export function routeDecisionEvent(
   };
 }
 
-export function settleCreation(
+export function bindBilling(
   decisions: Readonly<Record<string, LatestTriageDecision>>,
-  pendingBilling: BillingRoute | null,
-  created: string | null
+  pending: PendingBilling | null,
+  issue: string,
+  decisionId: string | undefined
 ) {
+  const binds = pending !== null && decisionId === pending.id;
   return {
-    decisions:
-      pendingBilling !== null && created !== null
-        ? {
-            ...decisions,
-            [created]: billingDecisionFields(created, pendingBilling),
-          }
-        : decisions,
-    pendingBilling: null,
+    decisions: binds
+      ? { ...decisions, [issue]: billingDecisionFields(issue, pending.route) }
+      : decisions,
+    pendingBilling: binds ? null : pending,
   };
 }
 

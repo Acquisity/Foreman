@@ -2,11 +2,6 @@ import { defineDynamic } from "eve";
 import { defineTool } from "eve/tools";
 import { z } from "zod";
 import { LINEAR_ISSUE_ID_PATTERN } from "#lib/investigation-memory/scope.js";
-import {
-  billingRoutes,
-  settleCreation,
-  triageDecisions,
-} from "#lib/triage-log.js";
 import { withReplayState } from "#lib/triage-replay/backend.js";
 import { replaySessionOf } from "#lib/triage-replay/mode.js";
 import { createReplayIssue } from "#lib/triage-replay/views.js";
@@ -25,27 +20,11 @@ export const tool = defineTool({
     if (!session) {
       throw new Error("Triage replay session required.");
     }
-    const settle = (created: string | null) => {
-      const settled = settleCreation(
-        triageDecisions.get(),
-        billingRoutes.get(),
-        created
-      );
-      triageDecisions.update(() => settled.decisions);
-      billingRoutes.update(() => settled.pendingBilling);
-    };
-    let identifier: string;
-    try {
-      identifier = await withReplayState(
-        session.runId,
-        session.caseId,
-        (state) => createReplayIssue(state, input)
-      );
-    } catch (error) {
-      settle(null);
-      throw error;
-    }
-    settle(identifier);
+    const identifier = await withReplayState(
+      session.runId,
+      session.caseId,
+      (state) => createReplayIssue(state, input)
+    );
     return { created: true as const, identifier };
   },
   inputSchema: z.strictObject({

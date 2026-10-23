@@ -1,82 +1,141 @@
 import assert from "node:assert/strict";
 import { describe, it, type TestContext } from "node:test";
 import { tool as createIssueTool } from "../../tools/create_triage_replay_issue.js";
+import decideBillingTool from "../../tools/decide_billing.js";
 import routeTicketTool from "../../tools/route_ticket.js";
-import { billingRoutes, triageDecisions } from "../triage-log.js";
-import { setReplayBackend } from "./backend.js";
+import { billingQuestions } from "../jev-decisions.js";
+import { withReplayState } from "./backend.js";
 import { ctx, inSession, outputOf, replayProcess } from "./fixtures.js";
 
-const BLOB_DOWN = /blob down/u;
-const ROUTE = { assignee: "Ada Lovelace", project: "Cold Email Core" };
 const toolCtx = {
   ...ctx,
   getToken: () => Promise.reject(new Error("no Linear token in a replay")),
   session: { ...ctx.session, id: "sess-1" },
 } as never;
 
-const create = () =>
-  outputOf(
-    createIssueTool.execute(
-      { description: "Refund follow-up.", title: "Refund follow-up" },
-      toolCtx
-    )
-  );
+const LISTED = "2026-01-01T00:00:00.000Z";
+const ROUTE = {
+  assignee: "Aaron Fraga",
+  priority: 3,
+  project: "Support",
+  state: "Todo",
+};
 
-const route = (t: TestContext) => {
+async function liveIntercomSession(t: TestContext) {
+  await replayProcess(t);
+  await withReplayState("run-test-1", "ENG-100#1", (state) => {
+    state.lists.projects.push({
+      createdAt: LISTED,
+      id: "p-support",
+      name: "Support",
+    });
+    state.lists.users.push({
+      createdAt: LISTED,
+      id: "u-aaron",
+      name: "Aaron Fraga",
+    });
+  });
+  process.env.AI_GATEWAY_API_KEY = "test-key";
+  t.mock.method(globalThis, "fetch", () => {
+    const answers = Object.fromEntries(
+      Object.entries(billingQuestions()).map(([key, question]) => [
+        key,
+        question.type === "choice"
+          ? {
+              choice: "justified",
+              probabilities: { justified: 0.9 },
+              type: "choice",
+            }
+          : { probability: 0.9, type: "boolean" },
+      ])
+    );
+    return Promise.resolve(
+      Response.json({ answers, model: "typesafe-ai/jev" })
+    );
+  });
   const lines: string[] = [];
   t.mock.method(console, "info", (line: string) => {
     lines.push(line);
   });
-  return async (issue: string) => {
-    await outputOf(routeTicketTool.execute({ ...ROUTE, issue }, toolCtx));
-    const event = lines
-      .map((line) => JSON.parse(line) as { code?: string; issue?: string })
-      .filter((parsed) => parsed.issue === issue)
-      .at(-1);
-    return event?.code;
+  const decide = async () => {
+    const decided = await outputOf(
+      decideBillingTool.execute(
+        {
+          approvalQuote: null,
+          bucket: "refund",
+          evidence: "The charge matches the invoice.",
+          sourceLabels: [],
+        },
+        toolCtx
+      )
+    );
+    assert.equal(decided.decided, true);
+    return (decided as { decisionId: string }).decisionId;
   };
-};
+  const createTicket = async () =>
+    (
+      await outputOf(
+        createIssueTool.execute(
+          { description: "Refund proposal.", title: "Refund proposal" },
+          toolCtx
+        )
+      )
+    ).identifier;
+  const route = async (issue: string, billingDecision?: string) => {
+    const routed = await outputOf(
+      routeTicketTool.execute({ ...ROUTE, billingDecision, issue }, toolCtx)
+    );
+    assert.equal(routed.routed, true);
+    return lines
+      .map(
+        (line) =>
+          JSON.parse(line) as { code?: string; issue?: string; path?: string }
+      )
+      .filter((event) => event.issue === issue)
+      .at(-1);
+  };
+  return { createTicket, decide, route };
+}
 
-describe("a billing decision made before its ticket exists", () => {
-  it("binds to the issue this session creates next, so routing it logs billing", async (t) => {
-    await replayProcess(t);
-    const routed = route(t);
+describe("the live Intercom billing order", () => {
+  it("logs the billing path against the ticket created after the decision", async (t) => {
+    const { createTicket, decide, route } = await liveIntercomSession(t);
     await inSession(async () => {
-      billingRoutes.update(() => ROUTE);
-      const { identifier } = await create();
-      assert.deepEqual(triageDecisions.get()[identifier]?.route, ROUTE);
-      assert.equal(billingRoutes.get(), null);
-      assert.equal(await routed(identifier), "billing");
+      const decisionId = await decide();
+      const issue = await createTicket();
+      const event = await route(issue, decisionId);
+      assert.equal(event?.issue, issue);
+      assert.equal(event?.code, "billing");
+      assert.equal(event?.path, "Support/Financial");
     });
   });
 
-  it("is dropped when the creation fails, so a later matching route logs a fallback", async (t) => {
-    const backend = await replayProcess(t);
-    const routed = route(t);
+  it("logs a fallback for a matching route that doesn't carry the decision's id, and still binds the right ticket after it", async (t) => {
+    const { createTicket, decide, route } = await liveIntercomSession(t);
     await inSession(async () => {
-      billingRoutes.update(() => ROUTE);
-      setReplayBackend({
-        ...backend,
-        read: () => Promise.reject(new Error("blob down")),
-      });
-      await assert.rejects(create(), BLOB_DOWN);
-      setReplayBackend(backend);
-      assert.equal(billingRoutes.get(), null);
-      assert.deepEqual(triageDecisions.get(), {});
-      assert.equal(await routed("ENG-100"), "skill_fallback");
+      const decisionId = await decide();
+      const unrelated = await route("ENG-100");
+      assert.equal(unrelated?.code, "skill_fallback");
+      assert.equal(unrelated?.path, null);
+      const issue = await createTicket();
+      assert.equal(
+        (await route(issue, "someone-elses-id"))?.code,
+        "skill_fallback"
+      );
+      const event = await route(issue, decisionId);
+      assert.equal(event?.code, "billing");
+      assert.equal(event?.path, "Support/Financial");
     });
   });
 
-  it("is dropped when another ticket is routed first, so a later creation binds nothing", async (t) => {
-    await replayProcess(t);
-    const routed = route(t);
+  it("binds the decision once, so a second ticket with the same id logs a fallback", async (t) => {
+    const { createTicket, decide, route } = await liveIntercomSession(t);
     await inSession(async () => {
-      billingRoutes.update(() => ROUTE);
-      assert.equal(await routed("ENG-100"), "skill_fallback");
-      assert.equal(billingRoutes.get(), null);
-      const { identifier } = await create();
-      assert.equal(triageDecisions.get()[identifier], undefined);
-      assert.equal(await routed(identifier), "skill_fallback");
+      const decisionId = await decide();
+      const first = await createTicket();
+      assert.equal((await route(first, decisionId))?.code, "billing");
+      const second = await createTicket();
+      assert.equal((await route(second, decisionId))?.code, "skill_fallback");
     });
   });
 });

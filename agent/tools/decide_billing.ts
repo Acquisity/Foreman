@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { defineTool } from "eve/tools";
 import { z } from "zod";
 import { LINEAR_ISSUE_ID_PATTERN } from "#lib/investigation-memory/scope.js";
@@ -30,10 +31,11 @@ export default defineTool({
           ...decisions,
           [issue]: billingDecisionFields(issue, route),
         }));
-      } else {
-        billingRoutes.update(() => route);
+        return { decided: true as const, decision };
       }
-      return { decided: true as const, decision };
+      const decisionId = randomUUID();
+      billingRoutes.update(() => ({ id: decisionId, route }));
+      return { decided: true as const, decision, decisionId };
     } catch (error) {
       if (ctx.abortSignal.aborted) {
         throw error;
@@ -70,7 +72,7 @@ export default defineTool({
       .regex(LINEAR_ISSUE_ID_PATTERN)
       .optional()
       .describe(
-        "The ticket's issue id, such as ENG-123, when the ticket exists. Leave it out only when the ticket does not exist yet; the decision then waits for the next ticket this session creates, and is dropped if that creation fails or another ticket is routed first."
+        "The ticket's issue id, such as ENG-123, when the ticket exists. Leave it out only when you create the ticket after this decision; the result then carries a decisionId, and the route_ticket call for the new ticket passes it as billingDecision."
       ),
     sourceLabels: z
       .array(z.string().trim().min(1).max(120))

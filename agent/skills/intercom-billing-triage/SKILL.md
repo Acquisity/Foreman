@@ -97,7 +97,7 @@ Load `clarify-with-requester`. Ask one batched set before the verdict, within it
 
 ## Step 7: Produce the proposal
 
-Call `decide_billing` with the completed evidence, the bucket, the approval quote or null, and the source labels. Leave `issue` out here, because the ticket does not exist yet. It settles the discretion note and the seven checks; record them as returned, with its notes. Only on `decided: false` settle them yourself, and say so. Every verdict includes the taxonomy bucket and one discretion note:
+Call `decide_billing` with the completed evidence, the bucket, the approval quote or null, and the source labels. Leave `issue` out here, because the ticket does not exist yet, and keep the `decisionId` it returns for step 8. It settles the discretion note and the seven checks; record them as returned, with its notes. Only on `decided: false` settle them yourself, and say so. Every verdict includes the taxonomy bucket and one discretion note:
 
 - `justified`: current evidence supports the refund or credit proposal.
 - `not justified`: current evidence does not support it.
@@ -119,7 +119,7 @@ The proposal states what a human should do and which charge, subscription, invoi
 
 Create the Linear record only when the evidence, proposal, and open human decision are sufficient for someone to act. Do not create a generic placeholder while the investigation is still empty.
 
-Use linear `save_issue` with team `8eaf95ab-56ac-4490-8253-f6a96793dc40` to create one Support/Financial ticket carrying the Intercom conversation URL, bounded context, taxonomy bucket, current finding, exposure, and proposed human action. Then call `route_ticket` once with the created ticket's identifier as `issue` and `decide_billing`'s `route` unchanged (project Support, assignee Aaron Fraga, state Todo, and its priority and labels: High for an active billing or refund blocker, Medium otherwise), plus `links: [{ url: <canonical conversation URL>, title: "Intercom conversation" }]`.
+Use linear `save_issue` with team `8eaf95ab-56ac-4490-8253-f6a96793dc40` to create one Support/Financial ticket carrying the Intercom conversation URL, bounded context, taxonomy bucket, current finding, exposure, and proposed human action. Then call `route_ticket` once with the created ticket's identifier as `issue`, `decide_billing`'s `decisionId` as `billingDecision` and its `route` unchanged (project Support, assignee Aaron Fraga, state Todo, and its priority and labels: High for an active billing or refund blocker, Medium otherwise), plus `links: [{ url: <canonical conversation URL>, title: "Intercom conversation" }]`.
 
 The `links` field attaches the conversation to the Linear ticket as a resource so the Intercom and Linear integration can show the ticket's progress. Keeping the URL only in the description or investigation document does not create that relationship.
 

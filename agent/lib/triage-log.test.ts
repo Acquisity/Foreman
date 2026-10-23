@@ -6,12 +6,12 @@ import {
   assigneeKind,
   BILLING_PATH,
   billingDecisionFields,
+  bindBilling,
   criticTaskIssue,
   criticVerdictFields,
   criticVerdictIssue,
   decisionFields,
   routeDecisionEvent,
-  settleCreation,
   settleDecision,
 } from "./triage-log.js";
 import { prepareReplayArchive } from "./triage-replay/archive.js";
@@ -235,33 +235,28 @@ describe("issue-bound decisions", () => {
     );
   });
 
-  it("binds a billing decision made before its ticket exists to the issue the session creates next, and only that one", () => {
-    const pending = { assignee: "Aaron Fraga", project: "Support" };
-    const settled = settleCreation({}, pending, "ENG-20");
-    assert.equal(settled.pendingBilling, null);
-    assert.equal(settled.decisions["ENG-20"].route?.project, "Support");
-    const own = routeDecisionEvent(settled.decisions, {
-      ...pending,
-      issue: "ENG-20",
-    });
-    assert.equal(own.code, "billing");
-    const other = routeDecisionEvent(settled.decisions, {
-      ...pending,
-      issue: "ENG-21",
-    });
-    assert.equal(other.code, "skill_fallback");
-  });
-
-  it("drops a billing decision whose creation failed, so a later matching route is a fallback", () => {
-    const pending = { assignee: "Aaron Fraga", project: "Support" };
-    const settled = settleCreation({}, pending, null);
-    assert.equal(settled.pendingBilling, null);
-    assert.deepEqual(settled.decisions, {});
-    const later = routeDecisionEvent(settled.decisions, {
-      ...pending,
-      issue: "ENG-22",
-    });
-    assert.equal(later.code, "skill_fallback");
+  it("binds a billing decision made before its ticket exists only to the ticket that passes its id", () => {
+    const route = { assignee: "Aaron Fraga", project: "Support" };
+    const pending = { id: "d1", route };
+    const wrongId = bindBilling({}, pending, "ENG-20", "d2");
+    assert.deepEqual(wrongId, { decisions: {}, pendingBilling: pending });
+    const noId = bindBilling({}, pending, "ENG-20", undefined);
+    assert.deepEqual(noId, { decisions: {}, pendingBilling: pending });
+    assert.equal(
+      routeDecisionEvent(noId.decisions, { ...route, issue: "ENG-20" }).code,
+      "skill_fallback"
+    );
+    const bound = bindBilling({}, pending, "ENG-21", "d1");
+    assert.equal(bound.pendingBilling, null);
+    assert.equal(bound.decisions["ENG-21"].route?.project, "Support");
+    assert.equal(
+      routeDecisionEvent(bound.decisions, { ...route, issue: "ENG-21" }).code,
+      "billing"
+    );
+    assert.equal(
+      routeDecisionEvent(bound.decisions, { ...route, issue: "ENG-22" }).code,
+      "skill_fallback"
+    );
   });
 
   it("binds a critic task to the source issue named on its dispatch's first line, never to a candidate it mentions", () => {
