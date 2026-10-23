@@ -171,7 +171,7 @@ export interface ScoreInput {
   results: readonly TriageResult[];
   /** Judge grades per row key; omit to report root cause as not judged. */
   rootCauseGrades?: ReadonlyMap<string, RootCauseGrade>;
-  /** Runs per case; defaults to the highest run number in the results, at least 1. */
+  /** Runs per case, at least 1 and no lower than a run in the results; defaults to the highest run number in the results. */
   runs?: number;
   split: Split;
   trainLabels: readonly TriageLabel[];
@@ -303,11 +303,12 @@ function labelsFor(ids: readonly string[], labels: readonly TriageLabel[]) {
  * Everything `scoreReplay` refuses on, callable before any leakage fetch or
  * judge spend: another cohort hash on any result, a split that disagrees with
  * the cohort, results outside the cohort, mixed run ids, a repeated case and
- * run, a label filed under the wrong split, or a split case with no label.
+ * run, a run count under 1 or under a run the results hold, a label filed under
+ * the wrong split, or a split case with no label.
  * Returns the results' run id.
  */
 export function checkScoreInput(
-  input: Omit<ScoreInput, "leakage" | "rootCauseGrades" | "runs">
+  input: Omit<ScoreInput, "leakage" | "rootCauseGrades">
 ): string | null {
   const caseIds = new Set(input.cases.map(({ id }) => id));
   const mismatched = input.results.filter(
@@ -341,6 +342,19 @@ export function checkScoreInput(
       "Results for cases outside the cohort",
       strays.map(({ caseId }) => caseId)
     );
+  }
+  const { runs } = input;
+  if (runs !== undefined) {
+    if (!(Number.isInteger(runs) && runs >= 1)) {
+      fail(`--runs must be a whole number of at least 1, got ${runs}`);
+    }
+    const beyond = input.results.filter((result) => result.run > runs);
+    if (beyond.length) {
+      fail(
+        `Results for runs above --runs ${runs}`,
+        beyond.map(({ caseId, run }) => rowKey(caseId, run))
+      );
+    }
   }
   const runIds = new Set(input.results.map(({ runId }) => runId));
   if (runIds.size > 1) {

@@ -22,6 +22,8 @@ const NO_LABEL = /no label: ENG-4/;
 const TWO_RUN_IDS = /more than one run id/;
 const REPEATED = /same case and run: ENG-1#1/;
 const OUTSIDE = /outside the cohort: ENG-99/;
+const ABOVE_RUNS = /runs above --runs 1: ENG-1#2/;
+const RUNS_FLOOR = /--runs must be a whole number of at least 1/;
 const WRONG_SPLIT = /wrong split: ENG-3/;
 const NOT_JUDGED = /not judged/;
 const HELDOUT_HEADING = /## Held-out/;
@@ -125,6 +127,23 @@ test("every run of every case is a row, so a missing second run counts", () => {
   assert.equal(train.all.completion.missing, 2);
   assert.deepEqual(train.all.fields.verdict, { correct: 6, total: 8 });
   assert.equal(scoreReplay({ ...base(), runs: 3 }).splits.train.all.rows, 12);
+});
+
+test("scores every run number the results hold, and refuses a run count that would drop one", () => {
+  const input = base({
+    results: [
+      ...base().results,
+      makeResult("ENG-1", { run: 2, status: "failed" }),
+    ],
+  });
+  const inferred = scoreReplay(input);
+  assert.equal(inferred.runs, 2);
+  assert.equal(inferred.splits.train.all.completion.failed, 1);
+  assert.equal(scoreReplay({ ...input, runs: 2 }).splits.train.all.rows, 8);
+  assert.throws(() => scoreReplay({ ...input, runs: 1 }), ABOVE_RUNS);
+  assert.throws(() => checkScoreInput({ ...input, runs: 1 }), ABOVE_RUNS);
+  assert.throws(() => scoreReplay({ ...base(), runs: 0 }), RUNS_FLOOR);
+  assert.throws(() => checkScoreInput({ ...base(), runs: 1.5 }), RUNS_FLOOR);
 });
 
 test("insufficient labels are counted apart and left out of every score", () => {

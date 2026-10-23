@@ -97,10 +97,10 @@ function parseArgs(argv: string[]): Options {
     }
     return next;
   };
-  const count = (flag: string) => {
+  const count = (flag: string, least = 0) => {
     const parsed = Number(value(flag));
-    if (!Number.isInteger(parsed) || parsed < 0) {
-      throw new Error(`${flag} needs a whole number.`);
+    if (!Number.isInteger(parsed) || parsed < least) {
+      throw new Error(`${flag} needs a whole number of at least ${least}.`);
     }
     return parsed;
   };
@@ -127,7 +127,7 @@ function parseArgs(argv: string[]): Options {
       options.rerun = true;
     },
     "--runs": (flag) => {
-      options.runs = count(flag);
+      options.runs = count(flag, 1);
     },
   };
   while (rest.length) {
@@ -312,6 +312,7 @@ async function main() {
     cohortSha256: cohort.sha,
     heldoutLabels,
     results,
+    runs: options.runs,
     split: cohort.split,
     trainLabels: cohort.trainLabels,
   };
@@ -356,7 +357,6 @@ async function main() {
     ...input,
     leakage,
     rootCauseGrades,
-    runs: options.runs,
   });
   const scorecard = `${renderScorecard(report)}${calibration ? renderCalibration(calibration) : ""}`;
   writeFileSync(join(options.results, "scorecard.md"), scorecard);
