@@ -215,6 +215,74 @@ describe("readTicket", () => {
     );
   });
 
+  it("posts into the owned thread when a duplicate's Ask link has moved onto this ticket from another channel", async () => {
+    const withMoved = (movedFirst: boolean) => {
+      const own = {
+        title: "Ask from A. Reporter",
+        url: `https://x.slack.com/archives/${SANDBOX}/p1`,
+      };
+      const moved = {
+        title: "Ask from B. Reporter",
+        url: "https://x.slack.com/archives/C0YYYYYYYYY/p9",
+      };
+      return portWith(() =>
+        ok({
+          issue: issue({
+            attachments: { nodes: movedFirst ? [moved, own] : [own, moved] },
+          }),
+          viewer: { id: "viewer" },
+        })
+      );
+    };
+    assert.equal(
+      (await withMoved(false).port.readTicket("ENG-1"))?.facts.channel,
+      SANDBOX
+    );
+    assert.equal(
+      (await withMoved(true).port.readTicket("ENG-1"))?.facts.channel,
+      SANDBOX
+    );
+  });
+
+  it("refuses a ticket whose only Ask links belong to threads it does not own", async () => {
+    const { port } = portWith(() =>
+      ok({
+        issue: issue({
+          attachments: {
+            nodes: [
+              {
+                title: "Ask from B. Reporter",
+                url: `https://x.slack.com/archives/${SANDBOX}/p9`,
+              },
+            ],
+          },
+        }),
+        viewer: { id: "viewer" },
+      })
+    );
+    assert.equal((await port.readTicket("ENG-1"))?.facts.channel, null);
+  });
+
+  it("matches an owned thread to its Ask link even when the anchor link carries a query string", async () => {
+    const { port } = portWith(() =>
+      ok({
+        issue: issue({
+          comments: {
+            nodes: [
+              comment(
+                "c-anchor",
+                `Slack thread connected in [#a](https://x.slack.com/archives/${SANDBOX}/p1?thread_ts=1.2&cid=${SANDBOX})`
+              ),
+            ],
+            pageInfo: { hasNextPage: false },
+          },
+        }),
+        viewer: { id: "viewer" },
+      })
+    );
+    assert.equal((await port.readTicket("ENG-1"))?.facts.channel, SANDBOX);
+  });
+
   it("does not treat a support inbox note as a reporter thread", async () => {
     const { port } = portWith(() =>
       ok({

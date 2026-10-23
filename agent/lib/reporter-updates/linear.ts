@@ -134,22 +134,38 @@ const recentSchema = z.object({
     }),
   }),
 });
+const QUERY_START = /\?.*$/u;
+
+const threadKey = (url: string): string => url.replace(QUERY_START, "");
+
 const threadChannel = (
   asks: readonly { title: string; url: string }[],
   anchors: readonly { body: string }[]
 ): string | null => {
-  const channels = [
-    ...asks
-      .filter((node) => ASK_FROM.test(node.title.trim()))
-      .map((node) => slackChannelOf(node.url))
-      .filter((channel) => channel !== null),
-    ...anchors.map((anchor) => {
-      const link = ANCHOR_LINK.exec(anchor.body)?.[1];
-      return link ? slackChannelOf(link) : undefined;
-    }),
-  ];
-  const [first] = channels;
-  return first && channels.every((channel) => channel === first) ? first : null;
+  const owned = anchors.map((anchor) => {
+    const link = ANCHOR_LINK.exec(anchor.body)?.[1];
+    return {
+      channel: link ? slackChannelOf(link) : null,
+      thread: link ? threadKey(link) : null,
+    };
+  });
+  const askThreads = asks
+    .filter(
+      (node) =>
+        ASK_FROM.test(node.title.trim()) && slackChannelOf(node.url) !== null
+    )
+    .map((node) => threadKey(node.url));
+  const destinations =
+    askThreads.length === 0
+      ? owned
+      : owned.filter(
+          (anchor) => anchor.thread && askThreads.includes(anchor.thread)
+        );
+  const [first] = destinations;
+  return first?.channel &&
+    destinations.every((destination) => destination.channel === first.channel)
+    ? first.channel
+    : null;
 };
 
 const REQUEST_TIMEOUT_MS = 20_000;
