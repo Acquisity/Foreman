@@ -299,6 +299,46 @@ describe("frozen triage cohort", () => {
     );
   });
 
+  it("seeds each case's filed assignee, project and priority from the frozen lists", () => {
+    const lists = frozenListsSchema.parse(
+      Object.fromEntries(
+        FROZEN_LISTS.map((name) => [
+          name,
+          JSON.parse(read(`frozen/${name}.json`)),
+        ])
+      )
+    );
+    const staff = new Set(lists.users.map((user) => user.name));
+    const projects = new Set(lists.projects.map((project) => project.name));
+    const labels = new Set(lists.labels.map((label) => label.name));
+    const refused = cases.flatMap((c) => {
+      const filed = c.asFiled;
+      if (filed === undefined) {
+        return [`${c.id}: no asFiled`];
+      }
+      const { issue } = seedReplayState(c, lists, "");
+      return [
+        ...(filed.assignee === null || staff.has(filed.assignee)
+          ? []
+          : [`${c.id}: assignee`]),
+        ...(filed.project === null || projects.has(filed.project)
+          ? []
+          : [`${c.id}: project`]),
+        ...(filed.labels.every((name) => labels.has(name))
+          ? []
+          : [`${c.id}: labels`]),
+        ...(issue.assignee === filed.assignee &&
+        issue.project === filed.project &&
+        issue.priority === filed.priority &&
+        issue.parent === filed.parent
+          ? []
+          : [`${c.id}: not seeded`]),
+      ];
+    });
+    assert.deepEqual(refused, []);
+    assert.ok(cases.some((c) => c.asFiled?.assignee));
+  });
+
   it("keeps every snapshot issue older than its case", () => {
     const later = cases.flatMap((c) =>
       c.relatedSnapshot

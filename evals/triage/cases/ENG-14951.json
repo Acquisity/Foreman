@@ -15,6 +15,13 @@
     "needsProductionData": true,
     "alreadyFixedAtTriage": false
   },
+  "asFiled": {
+    "assignee": "Aaron Fraga",
+    "labels": [],
+    "parent": null,
+    "priority": 1,
+    "project": "CRM"
+  },
   "relatedSnapshot": [
     {
       "id": "ENG-12494",

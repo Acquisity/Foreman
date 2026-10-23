@@ -15,6 +15,13 @@
     "needsProductionData": true,
     "alreadyFixedAtTriage": false
   },
+  "asFiled": {
+    "assignee": "Aaron Fraga",
+    "labels": [],
+    "parent": null,
+    "priority": 2,
+    "project": "Support"
+  },
   "relatedSnapshot": [
     {
       "id": "ENG-5207",

@@ -15,6 +15,13 @@
     "needsProductionData": false,
     "alreadyFixedAtTriage": false
   },
+  "asFiled": {
+    "assignee": "James Keeble",
+    "labels": [],
+    "parent": null,
+    "priority": 3,
+    "project": "CRM"
+  },
   "relatedSnapshot": [
     {
       "id": "ENG-9142",
