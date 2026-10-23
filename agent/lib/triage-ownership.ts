@@ -127,7 +127,7 @@ export function resolveOwnership(context: {
     );
     return { approval: "needed", area: null, assignee: null };
   }
-  if (eligibility === "none") {
+  if (eligibility === "none" && classification !== "Bug") {
     return { approval: "not-applicable", area: null, assignee: null };
   }
   const { key, matched } = settledArea(
@@ -136,7 +136,7 @@ export function resolveOwnership(context: {
     input.codePath,
     context.bar
   );
-  if (!matched) {
+  if (!matched && eligibility !== "none") {
     notes.push(
       `The evidence does not place this in a mapped area, so it goes to ${FALLBACK_OWNER}; say which evidence is missing in the document.`
     );
@@ -144,7 +144,7 @@ export function resolveOwnership(context: {
   return {
     approval: eligibility === "approved" ? "approved" : "not-applicable",
     area: { key, label: AREAS[key].label, matched },
-    assignee: ownerForArea(key),
+    assignee: eligibility === "none" ? null : ownerForArea(key),
   };
 }
 

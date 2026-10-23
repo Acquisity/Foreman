@@ -787,3 +787,18 @@ test("a reply at the claim limit is still checked in full", async () => {
     `${"Confirmed.\n".repeat(39)}Everything is deployed (unconfirmed).`
   );
 });
+
+test("a confirmed Bug that needs no developer still carries its Area label", () => {
+  for (const path of ["Backlog/low-impact", "Resolved by triage"]) {
+    const decision = resolveTriage(
+      triageInput(),
+      bugAnswers({ area: pick("ai_sdr"), path: pick(path) })
+    );
+    assert.ok(decision.outcome === "route");
+    assert.equal(decision.classification, "Bug", path);
+    assert.equal(decision.area?.key, "ai_sdr", path);
+    assert.ok(decision.route.addLabels.includes("Area: AI SDR"), path);
+    assert.equal(decision.assignee, null, path);
+    assert.equal(decision.route.assignee, undefined, path);
+  }
+});
