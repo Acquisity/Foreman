@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
+import { fileURLToPath } from "node:url";
 import { WIDGET_TICKET_OWNER } from "./executor/dispatch.js";
 import type { JevAnswer } from "./jev.js";
 import {
@@ -24,9 +26,7 @@ import {
   ownerNames,
   SUPPORT_OWNER,
 } from "./owner-map.js";
-
-const ROSTER_ROW =
-  /^- (.+?) \(`([a-z_]+)`, label `([^`]+)`\): (.+?)( \(support\))?$/u;
+import { renderRoster } from "./owner-roster.js";
 
 const yes = (): JevAnswer => ({ probability: 0.9, type: "boolean" });
 const no = (): JevAnswer => ({ probability: 0.1, type: "boolean" });
@@ -122,7 +122,7 @@ describe("the owner map", () => {
     assert.equal(AREAS.refunds.lane, "support");
   });
 
-  it("reads the same rows as the roster the agent is shown", () => {
+  it("renders the roster the agent reads from the map, byte for byte", () => {
     const roster = readFileSync(
       new URL(
         "../skills/triage-handling/references/roster.md",
@@ -130,26 +130,23 @@ describe("the owner map", () => {
       ),
       "utf8"
     );
-    const rows = roster
-      .split("\n")
-      .filter((line) => line.startsWith("- "))
-      .map((line) => {
-        const match = ROSTER_ROW.exec(line);
-        assert.ok(match, line);
-        return {
-          key: match[2],
-          label: match[3],
-          lane: match[5] ? "support" : "developer",
-          owner: match[4],
-        };
-      });
-    assert.deepEqual(rows.map((row) => row.key).sort(), [...AREA_KEYS].sort());
-    for (const row of rows) {
-      const area = AREAS[row.key as AreaKey];
-      assert.equal(row.label, area.label, row.key);
-      assert.equal(row.owner, area.owner, row.key);
-      assert.equal(row.lane, area.lane, row.key);
+    assert.equal(roster, renderRoster());
+    for (const key of AREA_KEYS) {
+      assert.ok(roster.includes(`\`${key}\``), key);
+      assert.ok(roster.includes(AREAS[key].label), key);
+      assert.ok(roster.includes(AREAS[key].owner), key);
     }
+  });
+
+  it("passes the roster check script that guards drift", () => {
+    const root = fileURLToPath(new URL("../../", import.meta.url));
+    const run = () =>
+      execFileSync(
+        process.execPath,
+        ["--import", "tsx", "scripts/render-roster.ts", "--check"],
+        { cwd: root, stdio: "pipe" }
+      );
+    assert.doesNotThrow(run);
   });
 
   it("maps each known Linear project to one area", () => {
