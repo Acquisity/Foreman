@@ -201,6 +201,30 @@ const fixedPlan = async (
 const isPlanned = (value: Planned | Outcome): value is Planned =>
   "stage" in value && "text" in value;
 
+const gate = (view: TicketView, deps: Deps): Outcome | null => {
+  const { facts } = view;
+  if (Date.parse(facts.createdAt) < Date.parse(deps.config.since)) {
+    return skipped("before_cutoff");
+  }
+  if (view.undeliverable) {
+    if (
+      view.undeliverable.some((channel) => deps.config.channels.has(channel))
+    ) {
+      (deps.log ?? logOpsEvent)("reporter.update.undeliverable", {
+        code: "foreign_thread",
+        message: `${facts.identifier} first Ask thread belongs to another ticket, so the receiver would deliver nowhere.`,
+        outcome: "skipped",
+      });
+      return skipped("undeliverable");
+    }
+    return skipped("channel_not_enabled");
+  }
+  if (!(facts.channel && deps.config.channels.has(facts.channel))) {
+    return skipped("channel_not_enabled");
+  }
+  return null;
+};
+
 export const reconcileTicket = async (
   identifier: string,
   deps: Deps,
@@ -214,11 +238,9 @@ export const reconcileTicket = async (
   if (!view.anchorId) {
     return skipped("no_thread");
   }
-  if (!(facts.channel && deps.config.channels.has(facts.channel))) {
-    return skipped("channel_not_enabled");
-  }
-  if (Date.parse(facts.createdAt) < Date.parse(deps.config.since)) {
-    return skipped("before_cutoff");
+  const refusal = gate(view, deps);
+  if (refusal) {
+    return refusal;
   }
   const rows = await deps.store.rows(identifier);
   const inThread = stagesInThread(view);
@@ -274,7 +296,7 @@ const settle = async (
   }
 };
 
-const KEEP_PENDING = new Set(["backing_off", "busy"]);
+const KEEP_PENDING = new Set(["backing_off", "busy", "undeliverable"]);
 
 const SWEEP_MAX_AGE_MS = 86_400_000;
 

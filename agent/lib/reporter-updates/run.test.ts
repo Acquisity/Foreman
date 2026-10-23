@@ -19,6 +19,7 @@ import {
   memoryStore,
   NEW_SHA,
   OLD_SHA,
+  SANDBOX,
   ticket,
   waitingIssues,
 } from "./fakes.js";
@@ -923,6 +924,57 @@ describe("discovery", () => {
       s.linear.posts.map((p) => p.identifier),
       ["ENG-1"]
     );
+  });
+});
+
+describe("a thread the receiver would not deliver to", () => {
+  const SINCE_NOW = NOW;
+  const stuck = () => {
+    const t = ticket({ stateName: "Duplicate", stateType: "canceled" });
+    t.updatedAt = new Date(NOW - 60_000).toISOString();
+    t.undeliverable = [SANDBOX, "C0YYYYYYYYY"];
+    return t;
+  };
+
+  it("posts nothing, records nothing as sent, logs it, and keeps the ticket pending", async () => {
+    const t = stuck();
+    const s = setup([t]);
+    const logged: { event: string; fields: Record<string, unknown> }[] = [];
+    s.deps.log = (event, fields) => logged.push({ event, fields });
+    const report = await runReporterUpdates(s.deps, SINCE_NOW, () => SINCE_NOW);
+    assert.equal(s.linear.posts.length, 0);
+    assert.deepEqual(await s.memory.store.rows("ENG-1"), []);
+    assert.equal(s.memory.pending.has("ENG-1"), true);
+    assert.equal(report.errors.length, 0);
+    assert.deepEqual(
+      report.outcomes.map((o) => o.outcome),
+      [{ kind: "skipped", why: "undeliverable" }]
+    );
+    assert.equal(logged[0]?.event, "reporter.update.undeliverable");
+  });
+
+  it("delivers once the ticket's Ask link points at its own thread again", async () => {
+    const t = stuck();
+    const s = setup([t]);
+    await runReporterUpdates(s.deps, SINCE_NOW, () => SINCE_NOW);
+    t.undeliverable = null;
+    t.updatedAt = new Date(NOW + 200_000).toISOString();
+    await runReporterUpdates(s.deps, NOW + 300_000, () => NOW + 300_000);
+    assert.deepEqual(
+      s.linear.posts.map((p) => p.identifier),
+      ["ENG-1"]
+    );
+  });
+
+  it("stays quiet about a ticket none of whose threads are in an enabled channel", async () => {
+    const t = stuck();
+    t.undeliverable = ["C0XXXXXXXXX"];
+    const s = setup([t]);
+    const logged: string[] = [];
+    s.deps.log = (event) => logged.push(event);
+    await runReporterUpdates(s.deps, SINCE_NOW, () => SINCE_NOW);
+    assert.deepEqual(logged, []);
+    assert.equal(s.linear.posts.length, 0);
   });
 });
 

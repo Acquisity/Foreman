@@ -3,6 +3,7 @@ import { describe, it } from "node:test";
 import { linearPort } from "./linear.js";
 
 const SANDBOX = "C0AAAAAAAAA";
+const ASKS = { source: "linear-asks-bot" };
 const COMMENT_ID = "00000000-0000-4000-8000-000000000001";
 const PR = "https://github.com/Acquisity/Acquisity/pull/7";
 
@@ -31,8 +32,9 @@ const issue = (over: Record<string, unknown> = {}) => ({
   attachments: {
     nodes: [
       {
+        metadata: ASKS,
         title: "Ask from A. Reporter",
-        url: `https://x.slack.com/archives/${SANDBOX}/p1`,
+        url: `https://x.slack.com/archives/${SANDBOX}/p1700000000000001`,
       },
       { title: "Fix", url: PR },
       { title: "Notes", url: "https://example.com/notes" },
@@ -42,7 +44,7 @@ const issue = (over: Record<string, unknown> = {}) => ({
     nodes: [
       comment(
         "c-anchor",
-        `Slack thread connected in [#sandbox](https://x.slack.com/archives/${SANDBOX}/p1)`
+        `Slack thread connected in [#sandbox](https://x.slack.com/archives/${SANDBOX}/p1700000000000001)`
       ),
       comment("c-1", "We've received your report", {
         parent: "c-anchor",
@@ -132,7 +134,7 @@ describe("readTicket", () => {
             nodes: [
               comment(
                 "c-anchor",
-                "Slack thread connected in [#other](https://x.slack.com/archives/C0ZZZZZZZZZ/p1)"
+                "Slack thread connected in [#other](https://x.slack.com/archives/C0ZZZZZZZZZ/p1700000000000001)"
               ),
             ],
             pageInfo: { hasNextPage: false },
@@ -153,12 +155,12 @@ describe("readTicket", () => {
             nodes: [
               comment(
                 "a1",
-                `Slack thread connected in [#a](https://x.slack.com/archives/${SANDBOX}/p1)`,
+                `Slack thread connected in [#a](https://x.slack.com/archives/${SANDBOX}/p1700000000000001)`,
                 { createdAt: "2026-10-10T10:00:00Z" }
               ),
               comment(
                 "a2",
-                "Slack thread connected in [#b](https://x.slack.com/archives/C0ZZZZZZZZZ/p2)",
+                "Slack thread connected in [#b](https://x.slack.com/archives/C0ZZZZZZZZZ/p1700000000000002)",
                 { createdAt: "2026-10-11T10:00:00Z" }
               ),
             ],
@@ -179,7 +181,7 @@ describe("readTicket", () => {
             nodes: [
               comment(
                 "c-anchor",
-                `Slack thread connected in [#a](https://x.slack.com/archives/${SANDBOX}/p1)`
+                `Slack thread connected in [#a](https://x.slack.com/archives/${SANDBOX}/p1700000000000001)`
               ),
             ],
             pageInfo: { hasNextPage: false },
@@ -196,7 +198,7 @@ describe("readTicket", () => {
             nodes: [
               comment(
                 "c-anchor",
-                `Slack thread connected in [#a](https://x.slack.com/archives/${SANDBOX}/p1)`
+                `Slack thread connected in [#a](https://x.slack.com/archives/${SANDBOX}/p1700000000000001)`
               ),
             ],
             pageInfo: { hasNextPage: false },
@@ -215,33 +217,59 @@ describe("readTicket", () => {
     );
   });
 
-  it("posts into the owned thread when a duplicate's Ask link has moved onto this ticket from another channel", async () => {
-    const withMoved = (movedFirst: boolean) => {
-      const own = {
-        title: "Ask from A. Reporter",
-        url: `https://x.slack.com/archives/${SANDBOX}/p1`,
-      };
-      const moved = {
-        title: "Ask from B. Reporter",
-        url: "https://x.slack.com/archives/C0YYYYYYYYY/p9",
-      };
-      return portWith(() =>
+  describe("where the receiver would deliver", () => {
+    const own = {
+      metadata: ASKS,
+      title: "Ask from A. Reporter",
+      url: `https://x.slack.com/archives/${SANDBOX}/p1700000000000001`,
+    };
+    const moved = {
+      metadata: ASKS,
+      title: "Ask from B. Reporter",
+      url: "https://x.slack.com/archives/C0YYYYYYYYY/p1700000000000009",
+    };
+    const readWith = (nodes: unknown[]) =>
+      portWith(() =>
         ok({
-          issue: issue({
-            attachments: { nodes: movedFirst ? [moved, own] : [own, moved] },
-          }),
+          issue: issue({ attachments: { nodes } }),
           viewer: { id: "viewer" },
         })
-      );
-    };
-    assert.equal(
-      (await withMoved(false).port.readTicket("ENG-1"))?.facts.channel,
-      SANDBOX
-    );
-    assert.equal(
-      (await withMoved(true).port.readTicket("ENG-1"))?.facts.channel,
-      SANDBOX
-    );
+      ).port.readTicket("ENG-1");
+
+    it("delivers to the owned thread when the owned Ask link comes first, whatever follows it", async () => {
+      const view = await readWith([own, moved]);
+      assert.equal(view?.facts.channel, SANDBOX);
+      assert.equal(view?.undeliverable, null);
+    });
+
+    it("delivers nowhere when the first Ask link is a thread moved in from another ticket", async () => {
+      const view = await readWith([moved, own]);
+      assert.equal(view?.facts.channel, null);
+      assert.deepEqual(view?.undeliverable, ["C0YYYYYYYYY", SANDBOX]);
+    });
+
+    it("delivers nowhere when the only Ask link belongs to a thread this ticket does not own", async () => {
+      const view = await readWith([moved]);
+      assert.equal(view?.facts.channel, null);
+      assert.ok(view?.undeliverable);
+    });
+
+    it("ignores an attachment the Asks bot did not create", async () => {
+      const view = await readWith([
+        { ...moved, metadata: { source: "someone-else" } },
+        own,
+      ]);
+      assert.equal(view?.facts.channel, SANDBOX);
+      assert.equal(view?.undeliverable, null);
+    });
+
+    it("skips an Ask link that is not a Slack thread and uses the next one", async () => {
+      const view = await readWith([
+        { ...moved, url: "https://example.com/not-slack" },
+        own,
+      ]);
+      assert.equal(view?.facts.channel, SANDBOX);
+    });
   });
 
   it("writes under the exact anchor whose channel was checked, not under an older one", async () => {
@@ -251,8 +279,9 @@ describe("readTicket", () => {
           attachments: {
             nodes: [
               {
+                metadata: ASKS,
                 title: "Ask from B. Reporter",
-                url: "https://x.slack.com/archives/C0YYYYYYYYY/p9",
+                url: "https://x.slack.com/archives/C0YYYYYYYYY/p1700000000000009",
               },
             ],
           },
@@ -260,12 +289,12 @@ describe("readTicket", () => {
             nodes: [
               comment(
                 "anchor-a",
-                `Slack thread connected in [#a](https://x.slack.com/archives/${SANDBOX}/p1)`,
+                `Slack thread connected in [#a](https://x.slack.com/archives/${SANDBOX}/p1700000000000001)`,
                 { createdAt: "2026-10-10T10:00:00Z" }
               ),
               comment(
                 "anchor-b",
-                "Slack thread connected in [#b](https://x.slack.com/archives/C0YYYYYYYYY/p9)",
+                "Slack thread connected in [#b](https://x.slack.com/archives/C0YYYYYYYYY/p1700000000000009)",
                 { createdAt: "2026-10-11T10:00:00Z" }
               ),
               comment("f1", "We looked into this", {
@@ -295,8 +324,9 @@ describe("readTicket", () => {
           attachments: {
             nodes: [
               {
+                metadata: ASKS,
                 title: "Ask from B. Reporter",
-                url: `https://x.slack.com/archives/${SANDBOX}/p9`,
+                url: `https://x.slack.com/archives/${SANDBOX}/p1700000000000009`,
               },
             ],
           },
@@ -315,7 +345,7 @@ describe("readTicket", () => {
             nodes: [
               comment(
                 "c-anchor",
-                `Slack thread connected in [#a](https://x.slack.com/archives/${SANDBOX}/p1?thread_ts=1.2&cid=${SANDBOX})`
+                `Slack thread connected in [#a](https://x.slack.com/archives/${SANDBOX}/p1700000000000001?thread_ts=1.2&cid=${SANDBOX})`
               ),
             ],
             pageInfo: { hasNextPage: false },
@@ -355,12 +385,12 @@ describe("readTicket", () => {
             nodes: [
               comment(
                 "late",
-                "Slack thread connected in [#a](https://x.slack.com/archives/C0YYYYYYYYY/p2)",
+                "Slack thread connected in [#a](https://x.slack.com/archives/C0YYYYYYYYY/p1700000000000002)",
                 { createdAt: "2026-10-12T10:00:00Z" }
               ),
               comment(
                 "early",
-                "Slack thread connected in [#a](https://x.slack.com/archives/C0YYYYYYYYY/p1)",
+                "Slack thread connected in [#a](https://x.slack.com/archives/C0YYYYYYYYY/p1700000000000001)",
                 { createdAt: "2026-10-11T10:00:00Z" }
               ),
             ],

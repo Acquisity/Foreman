@@ -1,7 +1,6 @@
 import { callLinearGraphQL } from "eve/channels/linear";
 import { z } from "zod";
 import { ENGINEERING_TEAM_ID } from "../linear-api.js";
-import { slackChannelOf } from "../linear-context.js";
 import {
   assertThreadComplete,
   createThreadComment,
@@ -20,6 +19,7 @@ export interface TicketView {
   facts: TicketFacts;
   foremanComments: ThreadComment[];
   issueId: string;
+  undeliverable: string[] | null;
 }
 
 export interface LinearPort {
@@ -43,7 +43,9 @@ type Variables = NonNullable<
   Parameters<typeof callLinearGraphQL>[0]["variables"]
 >;
 
-const ASK_FROM = /^Ask from /u;
+const ASKS_SOURCE = "linear-asks-bot";
+const SLACK_THREAD =
+  /^https:\/\/([a-z0-9-]+)\.slack\.com\/archives\/([A-Z0-9]+)\/p(\d{10})(\d{6})(?:[/?#]|$)/iu;
 const ANCHOR_PREFIX = "Slack thread connected in ";
 const DISCOVER_PAGES = 20;
 const ANCHOR_LINK = /\]\((https:\/\/[^\s)]+)\)/u;
@@ -57,7 +59,7 @@ const TICKET_QUERY = `query ReporterTicket($id: String!) {
     state { name type }
     assignee { name }
     labels(first: 50) { nodes { name } }
-    attachments(first: 50) { nodes { title url } }
+    attachments(first: 50) { nodes { title url metadata } }
     parent {
       identifier
       state { type }
@@ -87,7 +89,13 @@ const DISCOVER_QUERY = `query ReporterDiscover($team: ID!, $since: DateTimeOrDur
 }`;
 
 const attachments = z.object({
-  nodes: z.array(z.object({ title: z.string(), url: z.string() })),
+  nodes: z.array(
+    z.object({
+      metadata: z.record(z.string(), z.unknown()).nullish(),
+      title: z.string(),
+      url: z.string(),
+    })
+  ),
 });
 const ticketSchema = z.object({
   issue: z
@@ -142,41 +150,63 @@ const recentSchema = z.object({
     }),
   }),
 });
-const QUERY_START = /\?.*$/u;
+interface SlackThread {
+  channel: string;
+  permalink: string;
+}
 
-const threadKey = (url: string): string => url.replace(QUERY_START, "");
+const parseThread = (url: string): SlackThread | null => {
+  const match = SLACK_THREAD.exec(url);
+  return match
+    ? {
+        channel: match[2] as string,
+        permalink:
+          `https://${match[1]}.slack.com/archives/${match[2]}/p${match[3]}${match[4]}`.toLowerCase(),
+      }
+    : null;
+};
 
-const threadChannel = (
-  asks: readonly { title: string; url: string }[],
+type Delivery =
+  | { anchorId: string; channel: string | null; undeliverable: null }
+  | { anchorId: string; channel: null; undeliverable: string[] };
+
+const deliveryOf = (
+  attachmentNodes: readonly {
+    metadata?: Record<string, unknown> | null;
+    url: string;
+  }[],
   anchors: readonly { body: string; id: string }[]
-): { anchorId: string; channel: string | null } => {
+): Delivery => {
   const owned = anchors.map((anchor) => {
     const link = ANCHOR_LINK.exec(anchor.body)?.[1];
-    return {
-      channel: link ? slackChannelOf(link) : null,
-      id: anchor.id,
-      thread: link ? threadKey(link) : null,
-    };
+    return { id: anchor.id, thread: link ? parseThread(link) : null };
   });
-  const askThreads = asks
-    .filter(
-      (node) =>
-        ASK_FROM.test(node.title.trim()) && slackChannelOf(node.url) !== null
-    )
-    .map((node) => threadKey(node.url));
-  const destinations =
-    askThreads.length === 0
-      ? owned
-      : owned.filter(
-          (anchor) => anchor.thread && askThreads.includes(anchor.thread)
-        );
-  const [first] = destinations;
-  const agreed =
-    first?.channel &&
-    destinations.every((destination) => destination.channel === first.channel);
+  const fallback = owned[0]?.id ?? "";
+  const target = attachmentNodes
+    .filter((node) => node.metadata?.source === ASKS_SOURCE)
+    .map((node) => parseThread(node.url))
+    .find((thread) => thread !== null);
+  if (target) {
+    const match = owned.find(
+      (anchor) => anchor.thread?.permalink === target.permalink
+    );
+    return match
+      ? { anchorId: match.id, channel: target.channel, undeliverable: null }
+      : {
+          anchorId: fallback,
+          channel: null,
+          undeliverable: [
+            target.channel,
+            ...owned.flatMap((anchor) => anchor.thread?.channel ?? []),
+          ],
+        };
+  }
+  const channels = new Set(owned.map((anchor) => anchor.thread?.channel));
+  const [only] = channels;
   return {
-    anchorId: first?.id ?? owned[0]?.id ?? "",
-    channel: agreed ? first.channel : null,
+    anchorId: fallback,
+    channel: channels.size === 1 && only ? only : null,
+    undeliverable: null,
   };
 };
 
@@ -271,7 +301,7 @@ export const linearPort = (
         )
         .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
       const anchor = anchors.at(0);
-      const thread = threadChannel(issue.attachments.nodes, anchors);
+      const delivery = deliveryOf(issue.attachments.nodes, anchors);
       const pullUrls = [
         ...issue.attachments.nodes,
         ...(issue.parent?.attachments.nodes ?? []),
@@ -279,10 +309,10 @@ export const linearPort = (
         .map((node) => node.url.trim())
         .filter((url) => parsePullUrl(url) !== null);
       return {
-        anchorId: anchor ? thread.anchorId : null,
+        anchorId: anchor ? delivery.anchorId : null,
         facts: {
           assignee: issue.assignee?.name ?? null,
-          channel: thread.channel,
+          channel: delivery.channel,
           createdAt: issue.createdAt,
           identifier: issue.identifier,
           labels: issue.labels.nodes.map((label) => label.name),
@@ -305,6 +335,7 @@ export const linearPort = (
           )
           .map((comment) => ({ body: comment.body, id: comment.id })),
         issueId: issue.id,
+        undeliverable: delivery.undeliverable,
       };
     },
   };

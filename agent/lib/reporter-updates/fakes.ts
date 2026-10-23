@@ -291,6 +291,7 @@ export interface FakeTicket {
   foremanComments: { body: string; id: string }[];
   issueId: string;
   parentUpdatedAt: string | null;
+  undeliverable: string[] | null;
   updatedAt: string;
 }
 
@@ -302,6 +303,7 @@ export const ticket = (over: Partial<TicketFacts> = {}): FakeTicket => {
     foremanComments: [],
     issueId: `uuid-${made.identifier}`,
     parentUpdatedAt: null,
+    undeliverable: null,
     updatedAt: made.createdAt,
   };
 };
