@@ -85,9 +85,9 @@ export interface ReplayState {
   /** Why the replay hook cancelled the run, or null. */
   cancelled: string | null;
   case: TriageCase;
+  clock: number;
   /** The cohort hash the runner verified when it started this replay; every result carries it. */
   cohortSha256: string;
-  clock: number;
   comments: { body: string; issue: string }[];
   created: CreatedIssue[];
   critic: {
@@ -132,8 +132,8 @@ export function seedReplayState(
     calls: {},
     cancelled: null,
     case: triageCase,
-    cohortSha256,
     clock: 0,
+    cohortSha256,
     comments: [],
     created: [],
     critic: null,
