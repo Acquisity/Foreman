@@ -676,7 +676,7 @@ describe("discovery", () => {
       old(1, { stateName: "Duplicate", stateType: "canceled" }),
     ]);
     await s.memory.store.claim("ENG-1", "not_fixed", "x", null);
-    await s.memory.store.enqueue(["ENG-1"]);
+    await s.memory.store.enqueue([{ issue: "ENG-1", version: 1 }]);
     await run(s);
     assert.equal(s.linear.posts.length, 0);
     assert.equal(s.memory.pending.has("ENG-1"), true);
