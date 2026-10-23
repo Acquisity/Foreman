@@ -244,6 +244,50 @@ describe("readTicket", () => {
     );
   });
 
+  it("writes under the exact anchor whose channel was checked, not under an older one", async () => {
+    const { port } = portWith(() =>
+      ok({
+        issue: issue({
+          attachments: {
+            nodes: [
+              {
+                title: "Ask from B. Reporter",
+                url: "https://x.slack.com/archives/C0YYYYYYYYY/p9",
+              },
+            ],
+          },
+          comments: {
+            nodes: [
+              comment(
+                "anchor-a",
+                `Slack thread connected in [#a](https://x.slack.com/archives/${SANDBOX}/p1)`,
+                { createdAt: "2026-10-10T10:00:00Z" }
+              ),
+              comment(
+                "anchor-b",
+                "Slack thread connected in [#b](https://x.slack.com/archives/C0YYYYYYYYY/p9)",
+                { createdAt: "2026-10-11T10:00:00Z" }
+              ),
+              comment("f1", "We looked into this", {
+                parent: "anchor-b",
+                user: "viewer",
+              }),
+            ],
+            pageInfo: { hasNextPage: false },
+          },
+        }),
+        viewer: { id: "viewer" },
+      })
+    );
+    const view = await port.readTicket("ENG-1");
+    assert.equal(view?.facts.channel, "C0YYYYYYYYY");
+    assert.equal(view?.anchorId, "anchor-b");
+    assert.deepEqual(
+      view?.foremanComments.map((c) => c.id),
+      ["f1"]
+    );
+  });
+
   it("refuses a ticket whose only Ask links belong to threads it does not own", async () => {
     const { port } = portWith(() =>
       ok({

@@ -148,12 +148,13 @@ const threadKey = (url: string): string => url.replace(QUERY_START, "");
 
 const threadChannel = (
   asks: readonly { title: string; url: string }[],
-  anchors: readonly { body: string }[]
-): string | null => {
+  anchors: readonly { body: string; id: string }[]
+): { anchorId: string; channel: string | null } => {
   const owned = anchors.map((anchor) => {
     const link = ANCHOR_LINK.exec(anchor.body)?.[1];
     return {
       channel: link ? slackChannelOf(link) : null,
+      id: anchor.id,
       thread: link ? threadKey(link) : null,
     };
   });
@@ -170,10 +171,13 @@ const threadChannel = (
           (anchor) => anchor.thread && askThreads.includes(anchor.thread)
         );
   const [first] = destinations;
-  return first?.channel &&
-    destinations.every((destination) => destination.channel === first.channel)
-    ? first.channel
-    : null;
+  const agreed =
+    first?.channel &&
+    destinations.every((destination) => destination.channel === first.channel);
+  return {
+    anchorId: first?.id ?? owned[0]?.id ?? "",
+    channel: agreed ? first.channel : null,
+  };
 };
 
 const REQUEST_TIMEOUT_MS = 20_000;
@@ -267,6 +271,7 @@ export const linearPort = (
         )
         .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
       const anchor = anchors.at(0);
+      const thread = threadChannel(issue.attachments.nodes, anchors);
       const pullUrls = [
         ...issue.attachments.nodes,
         ...(issue.parent?.attachments.nodes ?? []),
@@ -274,12 +279,10 @@ export const linearPort = (
         .map((node) => node.url.trim())
         .filter((url) => parsePullUrl(url) !== null);
       return {
-        anchorId: anchor?.id ?? null,
+        anchorId: anchor ? thread.anchorId : null,
         facts: {
           assignee: issue.assignee?.name ?? null,
-          channel: anchor
-            ? threadChannel(issue.attachments.nodes, anchors)
-            : null,
+          channel: thread.channel,
           createdAt: issue.createdAt,
           identifier: issue.identifier,
           labels: issue.labels.nodes.map((label) => label.name),
@@ -296,9 +299,9 @@ export const linearPort = (
         foremanComments: comments
           .filter(
             (comment) =>
-              anchor &&
-              comment.parent?.id === anchor.id &&
-              comment.user?.id === data.viewer.id
+              anchors.some(
+                (candidate) => candidate.id === comment.parent?.id
+              ) && comment.user?.id === data.viewer.id
           )
           .map((comment) => ({ body: comment.body, id: comment.id })),
         issueId: issue.id,
