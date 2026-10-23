@@ -1,9 +1,9 @@
 import { createHmac, randomUUID } from "node:crypto";
 import {
   listPrivateDocuments,
-  readPrivateDocument,
+  readDocument,
   TRIAGE_REPLAY_PREFIX,
-  writePrivateDocument,
+  writeDocument,
 } from "../blob.js";
 import type { ReplayInput, ReplayState } from "./store.js";
 
@@ -102,10 +102,10 @@ export const blobBackend: ReplayBackend = {
     const stamp = String(Date.now()).padStart(15, "0");
     const written = await Promise.all(
       added.map((input, index) =>
-        writePrivateDocument(
+        writeDocument(
           `${inputsPrefix(key)}${stamp}-${String(index).padStart(4, "0")}-${randomUUID()}.json`,
           JSON.stringify(input),
-          { contentType: "application/json", ifMatch: null }
+          { access: "private", contentType: "application/json", ifMatch: null }
         )
       )
     );
@@ -118,20 +118,21 @@ export const blobBackend: ReplayBackend = {
     const documents = await Promise.all(
       keys
         .sort((a, b) => a.localeCompare(b))
-        .map((inputKey) => readPrivateDocument(inputKey))
+        .map((inputKey) => readDocument(inputKey, { access: "private" }))
     );
     return documents.flatMap((document) =>
       document.found ? [JSON.parse(document.content) as ReplayInput] : []
     );
   },
   async read(key) {
-    const result = await readPrivateDocument(key);
+    const result = await readDocument(key, { access: "private" });
     return result.found
       ? { etag: result.etag, state: JSON.parse(result.content) as ReplayState }
       : null;
   },
   write: (key, state, etag) =>
-    writePrivateDocument(key, JSON.stringify(withoutInputs(state)), {
+    writeDocument(key, JSON.stringify(withoutInputs(state)), {
+      access: "private",
       contentType: "application/json",
       ifMatch: etag,
     }),

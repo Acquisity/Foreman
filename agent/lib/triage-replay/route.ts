@@ -1,11 +1,7 @@
 import { createHash, timingSafeEqual } from "node:crypto";
 import type { SessionAuthContext } from "eve/context";
 import { z } from "zod";
-import {
-  readPrivateDocument,
-  TRIAGE_REPLAY_PREFIX,
-  writePrivateDocument,
-} from "../blob.js";
+import { readDocument, TRIAGE_REPLAY_PREFIX, writeDocument } from "../blob.js";
 import { logOpsEvent } from "../ops-log.js";
 import { BILLING_PATH } from "../triage-log.js";
 import { stampTriageIntake, stampUnattended } from "../trust.js";
@@ -125,13 +121,14 @@ const ledgerSchema = z.strictObject({
 
 export const blobLedger: AdmissionLedger = {
   async read(runId) {
-    const result = await readPrivateDocument(ledgerKey(runId));
+    const result = await readDocument(ledgerKey(runId), { access: "private" });
     return result.found
       ? { ...ledgerSchema.parse(JSON.parse(result.content)), etag: result.etag }
       : { admitted: [], chargedUsd: 0, etag: null, reserved: {} };
   },
   write: (runId, entries, etag) =>
-    writePrivateDocument(ledgerKey(runId), JSON.stringify(entries), {
+    writeDocument(ledgerKey(runId), JSON.stringify(entries), {
+      access: "private",
       contentType: "application/json",
       ifMatch: etag,
     }),

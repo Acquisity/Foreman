@@ -189,22 +189,29 @@ export const reservedReadMessage = (namespace: ReservedNamespace): string =>
  * output shape.
  *
  * @param key - The exact Blob pathname, derived by the owning feature module.
- * @returns The document `content` and `uploadedAt` (ISO string) when found.
+ * @param options - `access: "private"` reads a private object uncached, so a conditional write
+ * can use the `etag` it returns; the default is the store's public read.
+ * @returns The document `content`, `etag` and `uploadedAt` (ISO string) when found.
  */
 export const readDocument = async (
-  key: string
+  key: string,
+  options: { access?: "private" | "public" } = {}
 ): Promise<
-  { found: false } | { content: string; found: true; uploadedAt: string }
+  | { found: false }
+  | { content: string; etag: string; found: true; uploadedAt: string }
 > => {
   const result = await get(key, {
     abortSignal: AbortSignal.timeout(BLOB_TIMEOUT_MS),
-    access: "public",
+    ...(options.access === "private"
+      ? { access: "private", useCache: false }
+      : { access: "public" }),
   });
   if (!result?.stream) {
     return { found: false };
   }
   return {
     content: await new Response(result.stream).text(),
+    etag: result.blob.etag,
     found: true,
     uploadedAt: result.blob.uploadedAt.toISOString(),
   };
@@ -222,21 +229,70 @@ export const readDocument = async (
  * @param key - The exact Blob pathname, derived by the owning feature module.
  * @param contents - The full document (Markdown unless `contentType` says otherwise).
  * @param options - Whether an existing document at the key may be replaced, and an optional
- * content type for the rare non-Markdown document (the model overrides are JSON).
- * @returns The stored blob's metadata (callers report `pathname`).
+ * content type for the rare non-Markdown document (the model overrides are JSON). With
+ * `access: "private"` the write is conditional on `ifMatch`, the `etag` a private read returned
+ * (`null` creates the key and refuses to replace one), and the result is `written` or `conflict`
+ * instead of the stored blob's metadata.
+ * @returns The stored blob's metadata (callers report `pathname`), or `written` / `conflict`
+ * for a conditional write.
  */
-export const writeDocument = (
+export function writeDocument(
   key: string,
   contents: string,
   options: { allowOverwrite: boolean; contentType?: string }
-) =>
-  put(key, contents, {
-    abortSignal: AbortSignal.timeout(BLOB_TIMEOUT_MS),
-    access: "public",
-    addRandomSuffix: false,
-    allowOverwrite: options.allowOverwrite,
-    contentType: options.contentType ?? "text/markdown",
-  });
+): ReturnType<typeof put>;
+export function writeDocument(
+  key: string,
+  contents: string,
+  options: { access: "private"; contentType: string; ifMatch: string | null }
+): Promise<"conflict" | "written">;
+export function writeDocument(
+  key: string,
+  contents: string,
+  options:
+    | { allowOverwrite: boolean; contentType?: string }
+    | { access: "private"; contentType: string; ifMatch: string | null }
+) {
+  if (!("ifMatch" in options)) {
+    return put(key, contents, {
+      abortSignal: AbortSignal.timeout(BLOB_TIMEOUT_MS),
+      access: "public",
+      addRandomSuffix: false,
+      allowOverwrite: options.allowOverwrite,
+      contentType: options.contentType ?? "text/markdown",
+    });
+  }
+  return writeConditionally(key, contents, options);
+}
+
+async function writeConditionally(
+  key: string,
+  contents: string,
+  options: { contentType: string; ifMatch: string | null }
+): Promise<"conflict" | "written"> {
+  try {
+    await put(key, contents, {
+      abortSignal: AbortSignal.timeout(BLOB_TIMEOUT_MS),
+      access: "private",
+      addRandomSuffix: false,
+      allowOverwrite: options.ifMatch !== null,
+      contentType: options.contentType,
+      ...(options.ifMatch === null ? {} : { ifMatch: options.ifMatch }),
+    });
+    return "written";
+  } catch (error) {
+    if (error instanceof BlobPreconditionFailedError) {
+      return "conflict";
+    }
+    if (
+      options.ifMatch === null &&
+      (await readDocument(key, { access: "private" })).found
+    ) {
+      return "conflict";
+    }
+    throw error;
+  }
+}
 
 /**
  * Delete a document from the store by its exact key.
@@ -263,26 +319,6 @@ export const deleteDocument = async (
   return { existed: true };
 };
 
-export const readPrivateDocument = async (
-  key: string
-): Promise<
-  { found: false } | { content: string; etag: string; found: true }
-> => {
-  const result = await get(key, {
-    abortSignal: AbortSignal.timeout(BLOB_TIMEOUT_MS),
-    access: "private",
-    useCache: false,
-  });
-  if (!result?.stream) {
-    return { found: false };
-  }
-  return {
-    content: await new Response(result.stream).text(),
-    etag: result.blob.etag,
-    found: true,
-  };
-};
-
 export const readPrivateBytes = async (
   urlOrKey: string,
   timeoutMs: number
@@ -295,32 +331,6 @@ export const readPrivateBytes = async (
     throw new BlobNotFoundError();
   }
   return new Uint8Array(await new Response(result.stream).arrayBuffer());
-};
-
-export const writePrivateDocument = async (
-  key: string,
-  contents: string,
-  options: { contentType: string; ifMatch: string | null }
-): Promise<"conflict" | "written"> => {
-  try {
-    await put(key, contents, {
-      abortSignal: AbortSignal.timeout(BLOB_TIMEOUT_MS),
-      access: "private",
-      addRandomSuffix: false,
-      allowOverwrite: options.ifMatch !== null,
-      contentType: options.contentType,
-      ...(options.ifMatch === null ? {} : { ifMatch: options.ifMatch }),
-    });
-    return "written";
-  } catch (error) {
-    if (error instanceof BlobPreconditionFailedError) {
-      return "conflict";
-    }
-    if (options.ifMatch === null && (await readPrivateDocument(key)).found) {
-      return "conflict";
-    }
-    throw error;
-  }
 };
 
 export const listPrivateDocuments = async (
