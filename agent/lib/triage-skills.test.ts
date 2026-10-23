@@ -1273,7 +1273,7 @@ test("the not-engineering branch covers an unapproved feature request waiting in
     "### When the ticket is not engineering actionable"
   );
   assert.ok(
-    roster.includes("waits in Backlog with `Needs approval` and Aaron")
+    roster.includes("waits in Backlog with `Needs approval` and James")
   );
   const branch = extractInstruction(
     triageHandlingSkill,
@@ -1323,7 +1323,7 @@ test("the Intercom skill sends a feature request through the report and hand-off
   );
   assert.ok(
     handoff.includes(
-      "an unapproved one stops at `triage-handling`'s Backlog with `Needs approval`"
+      "an unapproved one stops at `triage-handling`'s Backlog with `Needs approval` for James"
     )
   );
   const followUp = extractInstruction(

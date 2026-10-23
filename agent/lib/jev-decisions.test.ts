@@ -221,9 +221,9 @@ test("a platform limitation the customer wants lifted is a Low feature request",
     "Provider limit",
     "Needs approval",
   ]);
-  assert.equal(decision.assignee, "Aaron Fraga");
+  assert.equal(decision.assignee, "James Keeble");
   assert.equal(decision.approval, "needed");
-  assert.equal(decision.route.assignee, "Aaron Fraga");
+  assert.equal(decision.route.assignee, "James Keeble");
   assert.equal(decision.route.priority, 4);
   assert.equal(decision.route.state, "Backlog");
   assert.equal(decision.path, "Backlog/low-impact");
@@ -935,7 +935,7 @@ test("an outcome that is not for a developer releases the one holding the ticket
   );
   assert.ok(unapproved.outcome === "route");
   assert.equal(unapproved.route.releaseDeveloper, undefined);
-  assert.equal(unapproved.route.assignee, "Aaron Fraga");
+  assert.equal(unapproved.route.assignee, "James Keeble");
   for (const kept of [
     bugAnswers(),
     bugAnswers({ path: pick("Backlog/low-impact") }),
@@ -996,7 +996,11 @@ test("an open follow-up a person owes goes to Aaron instead of being left with n
   for (const [name, over] of cases) {
     const decision = resolveTriage(triageInput(), bugAnswers(over));
     assert.ok(decision.outcome === "route", name);
-    assert.equal(decision.route.assignee, "Aaron Fraga", name);
+    assert.equal(
+      decision.route.assignee,
+      name.startsWith("unapproved") ? "James Keeble" : "Aaron Fraga",
+      name
+    );
     assert.equal(decision.route.releaseDeveloper, undefined, name);
   }
   const closed = resolveTriage(
@@ -1045,7 +1049,7 @@ test("an unapproved feature request never keeps an engineering path", () => {
     assert.equal(decision.approval, "needed", path);
     assert.equal(decision.path, "Backlog/low-impact", path);
     assert.equal(decision.route.state, "Backlog", path);
-    assert.equal(decision.route.assignee, "Aaron Fraga", path);
+    assert.equal(decision.route.assignee, "James Keeble", path);
     assert.ok(decision.route.addLabels.includes("Needs approval"), path);
     assert.equal(
       decision.route.addLabels.some((label) => label.startsWith("Area:")),
@@ -1087,4 +1091,32 @@ test("a request parked in Backlog gets the Backlog priority, not the engineering
   );
   assert.ok(engineering.outcome === "route");
   assert.equal(engineering.route.priority, 2);
+});
+
+test("James owns an unapproved feature request waiting in Backlog, and Aaron keeps open support follow-ups", () => {
+  const request = resolveTriage(
+    triageInput(),
+    bugAnswers({
+      classification: pick("platform_limitation"),
+      path: pick("Engineering Todo"),
+      wants_limit_lifted: yes(),
+    })
+  );
+  assert.ok(request.outcome === "route");
+  assert.equal(request.assignee, "James Keeble");
+  assert.equal(request.route.assignee, "James Keeble");
+  assert.equal(request.route.state, "Backlog");
+  assert.ok(request.route.addLabels.includes("Needs approval"));
+  for (const path of ["Support/Product follow-up", "Support/Financial"]) {
+    const followUp = resolveTriage(
+      triageInput(),
+      bugAnswers({
+        classification: pick("platform_limitation"),
+        path: pick(path),
+        wants_limit_lifted: yes(),
+      })
+    );
+    assert.ok(followUp.outcome === "route", path);
+    assert.equal(followUp.route.assignee, "Aaron Fraga", path);
+  }
 });

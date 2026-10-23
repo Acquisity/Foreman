@@ -347,6 +347,7 @@ const NOT_IN_MAP = /"Pieter Venter" is not in the owner map/u;
 const OTHER_NOT_IN_MAP = /"Jil Patel" is not in the owner map/u;
 const MASTER_OUTSIDE_MAP =
   /ENG-9 is held by Pieter Venter, who is not in the owner map, so nothing was written/u;
+const JAMES_IS_A_DEVELOPER = /James Keeble is a developer/u;
 const A_DEVELOPER = /Ebubeker Rexha is a developer/u;
 const NOT_INHERITED =
   /not in the owner map, so the assignee was not inherited/u;
@@ -649,6 +650,37 @@ describe("routeTicket owner map", () => {
       assigneeId: "u-ebu",
       labelIds: ["l-fr", "l-ok"],
     });
+  });
+
+  it("lets James, and only James, hold a feature request that is waiting for approval", async () => {
+    const waiting = [
+      { id: "l-fr", name: "Feature Request" },
+      { id: "l-need", name: "Needs approval" },
+    ];
+    const james = fakeLinear({ ticketLabels: waiting });
+    await routeTicket(
+      { assignee: "James Keeble", issue: "ENG-1" },
+      { client: james.fetchStub }
+    );
+    assert.equal(james.updates().length, 1);
+    const other = fakeLinear({ ticketLabels: waiting });
+    await assert.rejects(
+      routeTicket(
+        { assignee: "Ebubeker Rexha", issue: "ENG-1" },
+        { client: other.fetchStub }
+      ),
+      A_DEVELOPER
+    );
+    const bare = fakeLinear({
+      ticketLabels: [{ id: "l-fr", name: "Feature Request" }],
+    });
+    await assert.rejects(
+      routeTicket(
+        { assignee: "James Keeble", issue: "ENG-1" },
+        { client: bare.fetchStub }
+      ),
+      JAMES_IS_A_DEVELOPER
+    );
   });
 
   it("lets a support owner take any ticket", async () => {

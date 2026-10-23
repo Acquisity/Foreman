@@ -4,10 +4,11 @@ import { parseLinearResponse } from "./linear-response.js";
 import {
   APPROVED_LABEL,
   BUG_LABEL,
-  developerLabelsAllowed,
   FALLBACK_OWNER,
   FEATURE_REQUEST_LABEL,
   mappedOwner,
+  mayHoldTicket,
+  NEEDS_APPROVAL_LABEL,
   ownerNames,
 } from "./owner-map.js";
 
@@ -482,15 +483,11 @@ async function chooseAssignee(
   input: RouteTicketInput
 ): Promise<{ id?: string; warnings: string[] }> {
   const warnings: string[] = [];
-  const eligible = developerLabelsAllowed(finalLabelNames(issue, input));
+  const labels = finalLabelNames(issue, input);
   if (input.inheritAssigneeFrom !== undefined) {
     const source = await requireIssue(gql, input.inheritAssigneeFrom);
     const holder = source.assignee ? mappedOwner(source.assignee.name) : null;
-    if (
-      source.assignee &&
-      holder &&
-      (holder.lane !== "developer" || eligible)
-    ) {
+    if (source.assignee && holder && mayHoldTicket(holder, labels)) {
       return { id: source.assignee.id, warnings };
     }
     if (source.assignee && !holder) {
@@ -504,7 +501,7 @@ async function chooseAssignee(
       );
     } else if (source.assignee) {
       warnings.push(
-        `${input.inheritAssigneeFrom} is held by ${source.assignee.name}, a developer, and this ticket is neither a ${BUG_LABEL} nor an approved ${FEATURE_REQUEST_LABEL}, so the assignee was not inherited.`
+        `${input.inheritAssigneeFrom} is held by ${source.assignee.name}, a developer, and this ticket is neither a ${BUG_LABEL}, an approved ${FEATURE_REQUEST_LABEL} nor one waiting for approval, so the assignee was not inherited.`
       );
     }
   }
@@ -517,9 +514,9 @@ async function chooseAssignee(
       `"${input.assignee}" is not in the owner map, so nothing was assigned. Use one of: ${ownerNames().join(", ")}.`
     );
   }
-  if (owner.lane === "developer" && !eligible) {
+  if (!mayHoldTicket(owner, labels)) {
     throw new Error(
-      `${owner.name} is a developer. A ticket goes to a developer only when it is labelled ${BUG_LABEL}, or ${FEATURE_REQUEST_LABEL} and ${APPROVED_LABEL}. Add the label or leave the assignee unchanged.`
+      `${owner.name} is a developer. A ticket goes to a developer only when it is labelled ${BUG_LABEL}, or ${FEATURE_REQUEST_LABEL} and ${APPROVED_LABEL}; only ${FALLBACK_OWNER} may hold a ${FEATURE_REQUEST_LABEL} marked ${NEEDS_APPROVAL_LABEL}. Add the label or leave the assignee unchanged.`
     );
   }
   const { users } = await gql<{ users: { nodes: Named[] } }>("Users", {

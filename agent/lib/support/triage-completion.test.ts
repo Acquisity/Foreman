@@ -775,3 +775,29 @@ test("a report whose recorded path is Engineering Todo needs its master whatever
     SupportRefusal
   );
 });
+
+test("completion accepts James as the owner of a request waiting in Backlog for approval", () => {
+  const parked = {
+    ...report,
+    assignee: "James Keeble",
+    labels: [
+      "intercom-sourced",
+      "Customer reported",
+      "Feature Request",
+      "Needs approval",
+    ],
+    parentId: null,
+    project: null,
+    status: "Backlog",
+  };
+  const content = {
+    ...document,
+    content:
+      "# Triage investigation\n**Classification**: Platform Limitation\n**Handling path**: Backlog/low-impact\n**Review**: Not required",
+  };
+  assert.doesNotThrow(() => assertTriageOutputs(parked, content, comments));
+  assert.throws(
+    () => assertTriageOutputs({ ...parked, assignee: null }, content, comments),
+    SupportRefusal
+  );
+});

@@ -102,7 +102,7 @@ const awaitingApproval = (none: Ownership, notes: string[]): Ownership => {
   return {
     ...none,
     approval: "needed",
-    assignee: parked ? SUPPORT_OWNER : none.assignee,
+    assignee: parked ? FALLBACK_OWNER : none.assignee,
     path: parked ? "Backlog/low-impact" : none.path,
     releaseDeveloper: parked ? false : none.releaseDeveloper,
   };

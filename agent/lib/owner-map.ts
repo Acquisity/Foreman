@@ -329,3 +329,13 @@ export const specificAreaForFiles = (
   SPECIFIC_CRM_ORDER.find((key) =>
     files.some((file) => pathMatches([key], file) === key)
   ) ?? null;
+
+export const mayHoldTicket = (
+  owner: { lane: Lane; name: string },
+  labels: readonly string[]
+): boolean =>
+  owner.lane !== "developer" ||
+  developerLabelsAllowed(labels) ||
+  (normalize(owner.name) === normalize(FALLBACK_OWNER) &&
+    hasLabel(labels, NEEDS_APPROVAL_LABEL) &&
+    hasLabel(labels, FEATURE_REQUEST_LABEL));

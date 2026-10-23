@@ -112,7 +112,7 @@ When Aaron explicitly requests read-only validation during an attended manual te
 
 Take the product area from the evidence, never from the incoming project, title, symptom, repository name, or memory. `route` carries the `Area:` label and `assignee` from the owner map in [references/roster.md](references/roster.md); pass it unchanged.
 
-A developer gets only a confirmed Bug or a feature request labelled `Approved`; an unapproved one waits in Backlog with `Needs approval` and Aaron. Questions, user errors, platform limits, billing and support get none.
+A developer gets only a confirmed Bug or a feature request labelled `Approved`; an unapproved one waits in Backlog with `Needs approval` and James. Questions, user errors, platform limits, billing and support get none.
 
 SAN sandbox tickets route to Aaron Fraga. No fitting area means James Keeble; repeat the reason in the report. Never route to retired or legacy projects.
 
