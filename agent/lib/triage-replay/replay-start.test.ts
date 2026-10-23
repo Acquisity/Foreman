@@ -270,6 +270,28 @@ describe("starting a replay", () => {
     assert.ok(Date.now() - Date.parse(read?.result.startedAt ?? "") < 60_000);
   });
 
+  it("restamps a store left by a failed send with the deployment that retries it", async (t) => {
+    const backend = memoryBackend();
+    const { args, failSendOnce } = server(t, backend);
+    const ledger = sharedLedger();
+    process.env.VERCEL_GIT_COMMIT_SHA = "a".repeat(40);
+    const restore = failSendOnce();
+    await assert.rejects(startReplay(start(), args, ledger()), SESSION_DOWN);
+    restore();
+    const redeployedAt = Date.now();
+    process.env.VERCEL_GIT_COMMIT_SHA = "b".repeat(40);
+    process.env.TRIAGE_REPLAY_EST_USD_PER_CASE = "6";
+    assert.equal((await startReplay(start(), args, ledger())).status, 200);
+    const read = await readReplayResult({
+      caseKey: KEY,
+      cohortSha256: "0".repeat(64),
+      runId: RUN,
+    });
+    assert.equal(read?.result.foremanCommit, "b".repeat(40));
+    assert.equal(read?.result.estimatedUsd, 6);
+    assert.ok(Date.parse(read?.result.startedAt ?? "") >= redeployedAt);
+  });
+
   it("records the commit as unknown when the deployment names none", () => {
     assert.deepEqual(
       replayStamp({ TRIAGE_REPLAY_EST_USD_PER_CASE: "2.5" }, new Date(0)),

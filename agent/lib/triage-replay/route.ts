@@ -11,6 +11,7 @@ import {
   replayKeyDigest,
   replayStateKey,
   seedReplayStore,
+  updateReplayState,
   withReplayState,
 } from "./backend.js";
 import { UNSEEDED_IMAGE } from "./hook.js";
@@ -364,6 +365,12 @@ export async function seedStore(request: StartRequest, stamp: ReplayStamp) {
   if (!neverDispatched(stored.state)) {
     throw new ReplayAlreadyStartedError(key);
   }
+  await updateReplayState(key, (state) => {
+    if (!neverDispatched(state)) {
+      throw new ReplayAlreadyStartedError(key);
+    }
+    state.stamp = stamp;
+  });
   if ((await backend.listInputs(key)).length === 0) {
     await backend.appendInputs(key, seed.inputs);
   }
