@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
+import { ThreadIncompleteError } from "../requester-reply.js";
 import { commentIdFor } from "./comment-id.js";
 import {
   bannedWordsIn,
@@ -18,6 +19,7 @@ import {
   NEW_SHA,
   OLD_SHA,
   ticket,
+  waitingIssues,
 } from "./fakes.js";
 import { DEPLOY_REPOSITORY, type PullFacts } from "./plan.js";
 import { reconcileTicket, runReporterUpdates } from "./run.js";
@@ -135,7 +137,7 @@ describe("fixed message waits for the deploy", () => {
     assert.equal(s.linear.posts.length, 0);
     assert.deepEqual(await reconcile(s), { kind: "waiting" });
     assert.equal(s.linear.posts.length, 0);
-    assert.deepEqual(await s.memory.store.listWaiting(), [
+    assert.deepEqual(waitingIssues(s.memory), [
       { checkedSha: OLD_SHA, issue: "ENG-1" },
     ]);
 
@@ -151,7 +153,7 @@ describe("fixed message waits for the deploy", () => {
       why: "nothing_due",
     });
     assert.equal(s.linear.posts.length, 1);
-    assert.deepEqual(await s.memory.store.listWaiting(), []);
+    assert.deepEqual(waitingIssues(s.memory), []);
   });
 
   it("asks GitHub whether the merge commit is an ancestor of the live commit", async () => {
@@ -498,6 +500,184 @@ describe("claims and recovery", () => {
   });
 });
 
+describe("discovery", () => {
+  const SINCE = "2026-10-01T00:00:00.000Z";
+  const old = (n: number, over: Parameters<typeof ticket>[0] = {}) => {
+    const t = ticket({ identifier: `ENG-${n}`, ...over });
+    t.updatedAt = "2026-10-11T10:00:00.000Z";
+    return t;
+  };
+  const run = (s: ReturnType<typeof setup>, at = NOW) =>
+    runReporterUpdates(s.deps, at, () => at);
+
+  it("finds an eligible ticket that was last changed long before the schedule was switched on", async () => {
+    const s = setup([old(1)]);
+    const report = await run(s);
+    assert.equal(s.linear.state.discoveries[0]?.updatedSince, SINCE);
+    assert.equal(s.linear.state.discoveries[0]?.createdAfter, SINCE);
+    assert.equal(report.errors.length, 0);
+    assert.deepEqual(
+      s.linear.posts.map((p) => p.identifier),
+      ["ENG-1"]
+    );
+  });
+
+  it("looks only at changes since the last complete listing, less a safety overlap", async () => {
+    const s = setup([old(1)]);
+    await run(s);
+    assert.equal(s.memory.state.cursor, NOW - 600_000);
+    await run(s, NOW + 300_000);
+    assert.equal(
+      s.linear.state.discoveries[1]?.updatedSince,
+      new Date(NOW - 600_000).toISOString()
+    );
+  });
+
+  it("finds a report whose master was completed even though the report itself did not change", async () => {
+    const child = old(1, {
+      parent: { identifier: "ENG-9", stateType: "completed" },
+      pullUrls: [PR_URL],
+      stateType: "started",
+    });
+    child.parentUpdatedAt = new Date(NOW - 60_000).toISOString();
+    const s = setup([child], {
+      ancestors: { [`${MERGE_SHA}>${NEW_SHA}`]: true },
+      liveSha: NEW_SHA,
+      pulls: { [pullKey(7)]: merged() },
+    });
+    s.memory.state.cursor = NOW - 3_600_000;
+    s.memory.table.set("ENG-1|received", {
+      attempts: 1,
+      checkedSha: null,
+      claimedAt: 0,
+      commentId: "c",
+      message: "",
+      stage: "received",
+      status: "sent",
+      token: null,
+    });
+    await run(s);
+    assert.deepEqual(
+      s.linear.posts.map((p) => p.body),
+      [fixedText()]
+    );
+  });
+
+  it("does not rediscover an unchanged report whose master is also unchanged", async () => {
+    const child = old(1, {
+      parent: { identifier: "ENG-9", stateType: "completed" },
+    });
+    child.parentUpdatedAt = "2026-10-05T00:00:00.000Z";
+    const s = setup([child]);
+    s.memory.state.cursor = NOW - 3_600_000;
+    await run(s);
+    assert.equal(s.linear.posts.length, 0);
+  });
+
+  it("keeps a failed delivery until it succeeds, even when the ticket is never listed again", async () => {
+    const s = setup([
+      old(1, { stateName: "Duplicate", stateType: "canceled" }),
+    ]);
+    s.linear.state.failNextPost = true;
+    const first = await run(s);
+    assert.equal(first.errors.length, 1);
+    assert.equal(s.linear.posts.length, 0);
+    const second = await run(s, NOW + 300_000);
+    assert.equal(second.errors.length, 0);
+    assert.equal(
+      s.linear.state.discoveries[1]?.updatedSince,
+      new Date(NOW - 600_000).toISOString()
+    );
+    assert.deepEqual(
+      s.linear.posts.map((p) => p.identifier),
+      ["ENG-1"]
+    );
+    assert.equal(s.memory.pending.size, 0);
+  });
+
+  it("retries a ticket whose claim expired after a crash, once the claim has lapsed", async () => {
+    const s = setup([
+      old(1, { stateName: "Duplicate", stateType: "canceled" }),
+    ]);
+    await s.memory.store.claim("ENG-1", "not_fixed", "x", null);
+    await s.memory.store.enqueue(["ENG-1"]);
+    await run(s);
+    assert.equal(s.linear.posts.length, 0);
+    assert.equal(s.memory.pending.has("ENG-1"), true);
+    s.memory.state.now += 11 * 60_000;
+    await run(s, NOW + 300_000);
+    assert.equal(s.linear.posts.length, 1);
+    assert.equal(s.memory.pending.size, 0);
+  });
+
+  it("keeps tickets over the post cap for the next run instead of dropping them", async () => {
+    const tickets = [1, 2, 3, 4].map((n) =>
+      old(n, { stateName: "Duplicate", stateType: "canceled" })
+    );
+    const s = setup(tickets, { liveSha: OLD_SHA, pulls: {} }, { maxPosts: 2 });
+    await run(s);
+    assert.equal(s.linear.posts.length, 2);
+    assert.equal(s.memory.pending.size, 2);
+    await run(s, NOW + 300_000);
+    assert.equal(s.linear.posts.length, 4);
+    assert.equal(s.memory.pending.size, 0);
+  });
+
+  it("does not move the cursor when the listing was cut short or could not be saved", async () => {
+    const cut = setup([old(1)]);
+    cut.linear.state.discoverTruncated = true;
+    const report = await run(cut);
+    assert.equal(cut.memory.state.cursor, null);
+    assert.ok(report.errors.some((e) => e.startsWith("discovery:")));
+    assert.equal(cut.linear.posts.length, 1);
+
+    const unsaved = setup([old(1)]);
+    unsaved.memory.state.failNextEnqueue = true;
+    const failed = await run(unsaved);
+    assert.equal(unsaved.memory.state.cursor, null);
+    assert.ok(failed.errors.some((e) => e.startsWith("discovery:")));
+
+    const down = setup([old(1)]);
+    down.linear.state.discoverFails = true;
+    await run(down);
+    assert.equal(down.memory.state.cursor, null);
+  });
+
+  it("treats a thread too long to read as a skip, not as an error that blocks the queue", async () => {
+    const s = setup([
+      old(1),
+      old(2, { stateName: "Duplicate", stateType: "canceled" }),
+    ]);
+    const original = s.linear.port.readTicket;
+    s.linear.port.readTicket = (identifier) =>
+      identifier === "ENG-1"
+        ? Promise.reject(new ThreadIncompleteError("ENG-1"))
+        : original(identifier);
+    const report = await run(s);
+    assert.equal(report.errors.length, 0);
+    assert.deepEqual(
+      report.outcomes.find((o) => o.identifier === "ENG-1")?.outcome,
+      { kind: "skipped", why: "thread_incomplete" }
+    );
+    assert.equal(s.memory.pending.size, 0);
+    assert.deepEqual(
+      s.linear.posts.map((p) => p.identifier),
+      ["ENG-2"]
+    );
+  });
+
+  it("stops retrying a ticket that keeps failing after twenty attempts", async () => {
+    const s = setup([old(1)]);
+    s.linear.port.readTicket = () =>
+      Promise.reject(new Error("Linear is unavailable"));
+    await Array.from({ length: 22 }).reduce<Promise<unknown>>(
+      (previous, _, i) => previous.then(() => run(s, NOW + i * 300_000)),
+      Promise.resolve()
+    );
+    assert.equal(s.memory.pending.get("ENG-1")?.attempts, 20);
+  });
+});
+
 describe("run over several tickets", () => {
   const five = () =>
     [1, 2, 3, 4, 5].map((n) =>
@@ -528,7 +708,7 @@ describe("run over several tickets", () => {
     const before = await runReporterUpdates(s.deps, NOW, () => NOW);
     assert.equal(before.errors.length, 0);
     assert.equal(s.linear.posts.length, 0);
-    assert.equal((await s.memory.store.listWaiting()).length, 5);
+    assert.equal(waitingIssues(s.memory).length, 5);
 
     const unchanged = await runReporterUpdates(
       s.deps,
@@ -581,7 +761,8 @@ describe("run over several tickets", () => {
     const tickets = five().slice(0, 1);
     const s = setup(tickets, fiveDeploy(OLD_SHA, false));
     await runReporterUpdates(s.deps, NOW, () => NOW);
-    s.linear.port.recentIdentifiers = () => Promise.resolve([]);
+    s.linear.port.discover = () =>
+      Promise.resolve({ complete: true, identifiers: [] });
     const readsBefore = s.linear.state.reads;
     await runReporterUpdates(s.deps, NOW + 300_000, () => NOW + 300_000);
     assert.equal(s.linear.state.reads, readsBefore);

@@ -303,39 +303,63 @@ describe("postUnderAnchor", () => {
   });
 });
 
-describe("recentIdentifiers", () => {
-  it("follows the cursor across pages", async () => {
+describe("discover", () => {
+  const page = (identifier: string, next: string | null) =>
+    ok({
+      issues: {
+        nodes: [{ identifier }],
+        pageInfo: { endCursor: next, hasNextPage: next !== null },
+      },
+    });
+
+  it("follows the cursor across pages and reports the list as complete", async () => {
     const { port, requests } = portWith((_query, variables) =>
-      variables.after === null
-        ? ok({
-            issues: {
-              nodes: [{ identifier: "ENG-1" }],
-              pageInfo: { endCursor: "next", hasNextPage: true },
-            },
-          })
-        : ok({
-            issues: {
-              nodes: [{ identifier: "ENG-2" }],
-              pageInfo: { endCursor: null, hasNextPage: false },
-            },
-          })
+      variables.after === null ? page("ENG-1", "next") : page("ENG-2", null)
     );
     assert.deepEqual(
-      await port.recentIdentifiers(
+      await port.discover(
         "2026-10-10T00:00:00.000Z",
         "2026-10-01T00:00:00.000Z"
       ),
-      ["ENG-1", "ENG-2"]
+      { complete: true, identifiers: ["ENG-1", "ENG-2"] }
     );
     assert.equal(requests.length, 2);
     assert.equal(requests[0]?.variables.since, "2026-10-10T00:00:00.000Z");
     assert.equal(requests[0]?.variables.created, "2026-10-01T00:00:00.000Z");
-    assert.equal(requests[0]?.variables.ask, "Ask from ");
+  });
+
+  it("asks for tickets with a Slack thread anchor, never for an Ask link", async () => {
+    const { port, requests } = portWith(() => page("ENG-1", null));
+    await port.discover("2026-10-10T00:00:00.000Z", "2026-10-01T00:00:00.000Z");
+    const query = requests[0]?.query ?? "";
+    assert.equal(requests[0]?.variables.anchor, "Slack thread connected in ");
     assert.ok(
-      requests[0]?.query.includes(
-        "attachments: { some: { title: { startsWith: $ask } } }"
-      )
+      query.includes("comments: { some: { body: { startsWith: $anchor } } }")
     );
+    assert.ok(!query.includes("attachments"));
+    assert.ok(!query.includes("Ask from"));
+  });
+
+  it("also asks for tickets whose master changed, so a master closing finds its unchanged reports", async () => {
+    const { port, requests } = portWith(() => page("ENG-1", null));
+    await port.discover("2026-10-10T00:00:00.000Z", "2026-10-01T00:00:00.000Z");
+    const query = requests[0]?.query ?? "";
+    assert.ok(query.includes("{ parent: { updatedAt: { gt: $since } } }"));
+    assert.ok(query.includes("createdAt: { gt: $created }"));
+  });
+
+  it("says so when there are more tickets than it will list", async () => {
+    let n = 0;
+    const { port } = portWith(() => {
+      n += 1;
+      return page(`ENG-${n}`, `cursor-${n}`);
+    });
+    const found = await port.discover(
+      "2026-10-10T00:00:00.000Z",
+      "2026-10-01T00:00:00.000Z"
+    );
+    assert.equal(found.complete, false);
+    assert.equal(found.identifiers.length, 20);
   });
 });
 

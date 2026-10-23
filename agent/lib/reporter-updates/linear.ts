@@ -22,6 +22,10 @@ export interface TicketView {
 }
 
 export interface LinearPort {
+  discover: (
+    updatedSince: string,
+    createdAfter: string
+  ) => Promise<{ complete: boolean; identifiers: string[] }>;
   findComment: (id: string) => Promise<{ parentId: string | null } | null>;
   postUnderAnchor: (
     issueId: string,
@@ -30,10 +34,6 @@ export interface LinearPort {
     id: string
   ) => Promise<string>;
   readTicket: (identifier: string) => Promise<TicketView | null>;
-  recentIdentifiers: (
-    updatedSince: string,
-    createdAfter: string
-  ) => Promise<string[]>;
 }
 
 type Fetch = typeof fetch;
@@ -42,9 +42,9 @@ type Variables = NonNullable<
 >;
 
 const ASK_FROM = /^Ask from /u;
-const ASK_FROM_TITLE = "Ask from ";
+const ANCHOR_PREFIX = "Slack thread connected in ";
+const DISCOVER_PAGES = 20;
 const ANCHOR_LINK = /\]\((https:\/\/[^\s)]+)\)/u;
-const RECENT_PAGES = 5;
 
 const TICKET_QUERY = `query ReporterTicket($id: String!) {
   viewer { id }
@@ -72,12 +72,12 @@ const COMMENT_QUERY = `query ReporterComment($id: String!) {
   comment(id: $id) { id parent { id } }
 }`;
 
-const RECENT_QUERY = `query ReporterRecent($team: ID!, $since: DateTimeOrDuration!, $created: DateTimeOrDuration!, $ask: String!, $after: String) {
+const DISCOVER_QUERY = `query ReporterDiscover($team: ID!, $since: DateTimeOrDuration!, $created: DateTimeOrDuration!, $anchor: String!, $after: String) {
   issues(first: 100, after: $after, filter: {
     team: { id: { eq: $team } }
-    updatedAt: { gt: $since }
     createdAt: { gt: $created }
-    attachments: { some: { title: { startsWith: $ask } } }
+    comments: { some: { body: { startsWith: $anchor } } }
+    or: [{ updatedAt: { gt: $since } }, { parent: { updatedAt: { gt: $since } } }]
   }) {
     pageInfo { hasNextPage endCursor }
     nodes { identifier }
@@ -170,6 +170,32 @@ export const linearPort = (
       variables,
     });
   return {
+    async discover(updatedSince, createdAfter) {
+      const identifiers: string[] = [];
+      const page = async (
+        after: string | null,
+        remaining: number
+      ): Promise<boolean> => {
+        const data = recentSchema.parse(
+          await call(DISCOVER_QUERY, "ReporterDiscover", {
+            after,
+            anchor: ANCHOR_PREFIX,
+            created: createdAfter,
+            since: updatedSince,
+            team: ENGINEERING_TEAM_ID,
+          })
+        );
+        identifiers.push(...data.issues.nodes.map((node) => node.identifier));
+        const { endCursor, hasNextPage } = data.issues.pageInfo;
+        if (!hasNextPage) {
+          return true;
+        }
+        return endCursor && remaining > 1
+          ? page(endCursor, remaining - 1)
+          : false;
+      };
+      return { complete: await page(null, DISCOVER_PAGES), identifiers };
+    },
     async findComment(id) {
       try {
         const data = commentSchema.parse(
@@ -246,28 +272,6 @@ export const linearPort = (
           .map((comment) => ({ body: comment.body, id: comment.id })),
         issueId: issue.id,
       };
-    },
-    recentIdentifiers(updatedSince, createdAfter) {
-      const page = async (
-        after: string | null,
-        remaining: number
-      ): Promise<string[]> => {
-        const data = recentSchema.parse(
-          await call(RECENT_QUERY, "ReporterRecent", {
-            after,
-            ask: ASK_FROM_TITLE,
-            created: createdAfter,
-            since: updatedSince,
-            team: ENGINEERING_TEAM_ID,
-          })
-        );
-        const here = data.issues.nodes.map((node) => node.identifier);
-        const { endCursor, hasNextPage } = data.issues.pageInfo;
-        return hasNextPage && endCursor && remaining > 1
-          ? [...here, ...(await page(endCursor, remaining - 1))]
-          : here;
-      };
-      return page(null, RECENT_PAGES);
     },
   };
 };

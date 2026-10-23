@@ -1,3 +1,4 @@
+import { ThreadIncompleteError } from "../requester-reply.js";
 import { commentIdFor } from "./comment-id.js";
 import { coversOf, STAGES, type Stage } from "./copy.js";
 import type { DeployProbe } from "./deploy.js";
@@ -17,7 +18,6 @@ import type { ReporterStore } from "./store.js";
 
 export interface RunConfig {
   channels: ReadonlySet<string>;
-  lookbackMs: number;
   maxPosts: number;
   nameOwner: boolean;
   runDeadlineMs: number;
@@ -247,6 +247,9 @@ export const reconcileTicket = async (
   return deliver(view, planned, deps);
 };
 
+const CURSOR_OVERLAP_MS = 600_000;
+const PENDING_BATCH = 100;
+
 const settle = async (
   identifier: string,
   deps: Deps,
@@ -258,10 +261,41 @@ const settle = async (
       outcome: await reconcileTicket(identifier, deps, liveSha),
     };
   } catch (error) {
+    if (error instanceof ThreadIncompleteError) {
+      return { identifier, outcome: skipped("thread_incomplete") };
+    }
     return {
       error: error instanceof Error ? error.message : "Unknown failure.",
       identifier,
     };
+  }
+};
+
+const KEEP_PENDING = new Set(["claimed_elsewhere"]);
+
+const discoverTickets = async (
+  deps: Deps,
+  nowMs: number,
+  report: RunReport
+): Promise<void> => {
+  try {
+    const cursor = await deps.store.readCursor();
+    const created = Date.parse(deps.config.since);
+    const updatedSince = new Date(Math.max(cursor ?? created, created));
+    const found = await deps.linear.discover(
+      updatedSince.toISOString(),
+      deps.config.since
+    );
+    await deps.store.enqueue(found.identifiers);
+    if (found.complete) {
+      await deps.store.saveCursor(nowMs - CURSOR_OVERLAP_MS);
+    } else {
+      report.errors.push("discovery: more tickets than one run can list.");
+    }
+  } catch (error) {
+    report.errors.push(
+      `discovery: ${error instanceof Error ? error.message : "Unknown failure."}`
+    );
   }
 };
 
@@ -270,27 +304,22 @@ export const runReporterUpdates = async (
   nowMs: number,
   clock: () => number = Date.now
 ): Promise<RunReport> => {
-  const sinceIso = new Date(nowMs - deps.config.lookbackMs).toISOString();
-  const [recent, waiting] = await Promise.all([
-    deps.linear.recentIdentifiers(sinceIso, deps.config.since),
-    deps.store.listWaiting(),
-  ]);
-  const liveSha = memoize(() => deps.deploy.liveSha());
-  const live = waiting.length > 0 ? await liveSha().catch(() => null) : null;
-  const recentSet = new Set(recent);
-  const todo = [
-    ...recentSet,
-    ...waiting
-      .filter(
-        (ticket) =>
-          !(
-            recentSet.has(ticket.issue) ||
-            (ticket.checkedSha && ticket.checkedSha === live)
-          )
-      )
-      .map((ticket) => ticket.issue),
-  ];
   const report: RunReport = { errors: [], outcomes: [] };
+  const liveSha = memoize(() => deps.deploy.liveSha());
+  await discoverTickets(deps, nowMs, report);
+  try {
+    if (await deps.store.anyWaiting()) {
+      const live = await liveSha().catch(() => null);
+      if (live) {
+        await deps.store.queueWaiting(live);
+      }
+    }
+  } catch (error) {
+    report.errors.push(
+      `waiting: ${error instanceof Error ? error.message : "Unknown failure."}`
+    );
+  }
+  const todo = await deps.store.nextPending(PENDING_BATCH);
   let posts = 0;
   await todo.reduce(async (previous, identifier) => {
     await previous;
@@ -303,12 +332,21 @@ export const runReporterUpdates = async (
     const result = await settle(identifier, deps, liveSha);
     if (result.error) {
       report.errors.push(`${result.identifier}: ${result.error}`);
-    } else if (result.outcome) {
-      report.outcomes.push({
-        identifier: result.identifier,
-        outcome: result.outcome,
-      });
-      posts += result.outcome.kind === "posted" ? 1 : 0;
+      await deps.store.failPending(identifier);
+      return;
+    }
+    if (!result.outcome) {
+      return;
+    }
+    report.outcomes.push({ identifier, outcome: result.outcome });
+    posts += result.outcome.kind === "posted" ? 1 : 0;
+    if (
+      result.outcome.kind === "skipped" &&
+      KEEP_PENDING.has(result.outcome.why)
+    ) {
+      await deps.store.failPending(identifier);
+    } else {
+      await deps.store.resolvePending(identifier);
     }
   }, Promise.resolve());
   return report;

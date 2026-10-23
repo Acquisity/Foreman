@@ -15,3 +15,14 @@ CREATE TABLE reporter_updates (
   PRIMARY KEY (issue, stage)
 );
 CREATE INDEX reporter_updates_waiting ON reporter_updates (updated_at) WHERE status = 'waiting';
+CREATE TABLE reporter_pending (
+  issue text PRIMARY KEY,
+  attempts integer NOT NULL DEFAULT 0,
+  added_at timestamptz NOT NULL DEFAULT now(),
+  last_try timestamptz
+);
+CREATE TABLE reporter_cursor (
+  id boolean PRIMARY KEY DEFAULT true CHECK (id),
+  since timestamptz NOT NULL,
+  updated_at timestamptz NOT NULL DEFAULT now()
+);

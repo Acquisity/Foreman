@@ -15,16 +15,12 @@ export interface LedgerRow {
   status: "claimed" | "sent" | "waiting";
 }
 
-export interface WaitingTicket {
-  checkedSha: string | null;
-  issue: string;
-}
-
 export type ClaimResult =
   | { ok: true; token: string }
   | { ok: false; reason: "busy" | "exhausted" };
 
 export interface ReporterStore {
+  anyWaiting: () => Promise<boolean>;
   claim: (
     issue: string,
     stage: Stage,
@@ -40,7 +36,8 @@ export interface ReporterStore {
     commentId: string,
     token: string
   ) => Promise<boolean>;
-  listWaiting: () => Promise<WaitingTicket[]>;
+  enqueue: (issues: string[]) => Promise<void>;
+  failPending: (issue: string) => Promise<void>;
   markSent: (
     issue: string,
     stages: Stage[],
@@ -49,8 +46,13 @@ export interface ReporterStore {
     commentId: string
   ) => Promise<void>;
   markWaiting: (issue: string, checkedSha: string | null) => Promise<void>;
+  nextPending: (limit: number) => Promise<string[]>;
+  queueWaiting: (liveSha: string) => Promise<void>;
+  readCursor: () => Promise<number | null>;
   release: (issue: string, stage: Stage, token: string) => Promise<void>;
+  resolvePending: (issue: string) => Promise<void>;
   rows: (issue: string) => Promise<LedgerRow[]>;
+  saveCursor: (ms: number) => Promise<void>;
 }
 
 const ROW_STAGE = z.enum(STAGES as [Stage, ...Stage[]]);
@@ -60,16 +62,22 @@ const rowSchema = z.object({
   stage: ROW_STAGE,
   status: z.enum(["claimed", "sent", "waiting"]),
 });
-const waitingSchema = z.object({
-  checked_sha: z.string().nullable(),
-  issue: z.string(),
-});
+const issueSchema = z.object({ issue: z.string() });
+const cursorSchema = z.object({ ms: z.coerce.number() });
 
 const STALE_CLAIM = "10 minutes";
 export const MAX_ATTEMPTS = 5;
+export const MAX_PENDING_ATTEMPTS = 20;
 
 export const createReporterStore = (query: Query): ReporterStore => {
   const store: ReporterStore = {
+    async anyWaiting() {
+      const rows = await query(
+        "SELECT 1 FROM reporter_updates WHERE stage = 'fixed' AND status = 'waiting' LIMIT 1",
+        []
+      );
+      return rows.length > 0;
+    },
     async claim(issue, stage, message, channel) {
       const token = randomUUID();
       const rows = await query(
@@ -117,17 +125,20 @@ export const createReporterStore = (query: Query): ReporterStore => {
       }
       return true;
     },
-    async listWaiting() {
-      const rows = await query(
-        `SELECT issue, checked_sha FROM reporter_updates
-       WHERE stage = 'fixed' AND status = 'waiting'
-       ORDER BY updated_at LIMIT 200`,
-        []
+    async enqueue(issues) {
+      if (issues.length === 0) {
+        return;
+      }
+      await query(
+        "INSERT INTO reporter_pending (issue) SELECT unnest($1::text[]) ON CONFLICT (issue) DO NOTHING",
+        [issues]
       );
-      return rows.map((row) => {
-        const parsed = waitingSchema.parse(row);
-        return { checkedSha: parsed.checked_sha, issue: parsed.issue };
-      });
+    },
+    async failPending(issue) {
+      await query(
+        "UPDATE reporter_pending SET attempts = attempts + 1, last_try = now() WHERE issue = $1",
+        [issue]
+      );
     },
     async markSent(issue, stages, message, channel, commentId) {
       await query(
@@ -149,6 +160,31 @@ export const createReporterStore = (query: Query): ReporterStore => {
         [issue, checkedSha]
       );
     },
+    async nextPending(limit) {
+      const rows = await query(
+        `SELECT issue FROM reporter_pending
+         WHERE attempts < ${MAX_PENDING_ATTEMPTS}
+         ORDER BY last_try NULLS FIRST, added_at LIMIT $1`,
+        [limit]
+      );
+      return rows.map((row) => issueSchema.parse(row).issue);
+    },
+    async queueWaiting(liveSha) {
+      await query(
+        `INSERT INTO reporter_pending (issue)
+         SELECT issue FROM reporter_updates
+         WHERE stage = 'fixed' AND status = 'waiting' AND checked_sha IS DISTINCT FROM $1
+         ON CONFLICT (issue) DO NOTHING`,
+        [liveSha]
+      );
+    },
+    async readCursor() {
+      const rows = await query(
+        "SELECT (extract(epoch FROM since) * 1000)::bigint::text AS ms FROM reporter_cursor WHERE id",
+        []
+      );
+      return rows[0] ? cursorSchema.parse(rows[0]).ms : null;
+    },
     async release(issue, stage, token) {
       await query(
         `UPDATE reporter_updates
@@ -156,6 +192,9 @@ export const createReporterStore = (query: Query): ReporterStore => {
        WHERE issue = $1 AND stage = $2 AND claim_token = $3 AND status = 'claimed'`,
         [issue, stage, token]
       );
+    },
+    async resolvePending(issue) {
+      await query("DELETE FROM reporter_pending WHERE issue = $1", [issue]);
     },
     async rows(issue) {
       const rows = await query(
@@ -171,6 +210,14 @@ export const createReporterStore = (query: Query): ReporterStore => {
           status: parsed.status,
         };
       });
+    },
+    async saveCursor(ms) {
+      await query(
+        `INSERT INTO reporter_cursor (id, since) VALUES (true, to_timestamp($1::double precision / 1000))
+         ON CONFLICT (id) DO UPDATE
+           SET since = GREATEST(reporter_cursor.since, EXCLUDED.since), updated_at = now()`,
+        [ms]
+      );
     },
   };
   return store;

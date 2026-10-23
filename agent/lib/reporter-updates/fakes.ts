@@ -3,7 +3,12 @@ import type { DeployProbe } from "./deploy.js";
 import type { LinearPort, TicketView } from "./linear.js";
 import type { PullFacts, TicketFacts } from "./plan.js";
 import type { Deps, RunConfig } from "./run.js";
-import { type LedgerRow, MAX_ATTEMPTS, type ReporterStore } from "./store.js";
+import {
+  type LedgerRow,
+  MAX_ATTEMPTS,
+  MAX_PENDING_ATTEMPTS,
+  type ReporterStore,
+} from "./store.js";
 
 export const SANDBOX = "C0AAAAAAAAA";
 export const FOREMAN = "foreman-user";
@@ -13,7 +18,6 @@ export const MERGE_SHA = "3333333333333333333333333333333333333333";
 
 export const config = (over: Partial<RunConfig> = {}): RunConfig => ({
   channels: new Set([SANDBOX]),
-  lookbackMs: 3_600_000,
   maxPosts: 20,
   nameOwner: true,
   runDeadlineMs: 240_000,
@@ -44,7 +48,18 @@ interface StoredRow extends LedgerRow {
 export const memoryStore = () => {
   const table = new Map<string, StoredRow>();
   const key = (issue: string, stage: Stage) => `${issue}|${stage}`;
-  const state: { failNextMarkSent: boolean; now: number; tokens: number } = {
+  const pending = new Map<string, { attempts: number; lastTry: number }>();
+  const state: {
+    cursor: number | null;
+    cursorWrites: number[];
+    failNextEnqueue: boolean;
+    failNextMarkSent: boolean;
+    now: number;
+    tokens: number;
+  } = {
+    cursor: null,
+    cursorWrites: [],
+    failNextEnqueue: false,
     failNextMarkSent: false,
     now: 0,
     tokens: 0,
@@ -82,6 +97,13 @@ export const memoryStore = () => {
     return Promise.resolve();
   };
   const store: ReporterStore = {
+    anyWaiting() {
+      return Promise.resolve(
+        [...table.entries()].some(
+          ([k, row]) => k.endsWith("|fixed") && row.status === "waiting"
+        )
+      );
+    },
     claim(issue, stage, message) {
       const existing = table.get(key(issue, stage));
       const stale =
@@ -116,17 +138,28 @@ export const memoryStore = () => {
       await markSent(issue, covers, message, channel, commentId);
       return true;
     },
-    listWaiting() {
-      return Promise.resolve(
-        [...table.entries()]
-          .filter(
-            ([k, row]) => k.endsWith("|fixed") && row.status === "waiting"
-          )
-          .map(([k, row]) => ({
-            checkedSha: row.checkedSha,
-            issue: k.split("|")[0] ?? "",
-          }))
-      );
+    enqueue(issues) {
+      if (state.failNextEnqueue) {
+        state.failNextEnqueue = false;
+        return Promise.reject(new Error("database unavailable"));
+      }
+      for (const issue of issues) {
+        if (!pending.has(issue)) {
+          pending.set(issue, { attempts: 0, lastTry: 0 });
+        }
+      }
+      return Promise.resolve();
+    },
+    failPending(issue) {
+      const entry = pending.get(issue);
+      if (entry) {
+        state.tokens += 1;
+        pending.set(issue, {
+          attempts: entry.attempts + 1,
+          lastTry: state.tokens,
+        });
+      }
+      return Promise.resolve();
     },
     markSent,
     markWaiting(issue, checkedSha) {
@@ -140,6 +173,31 @@ export const memoryStore = () => {
       }
       return Promise.resolve();
     },
+    nextPending(limit) {
+      return Promise.resolve(
+        [...pending.entries()]
+          .filter(([, entry]) => entry.attempts < MAX_PENDING_ATTEMPTS)
+          .sort((a, b) => a[1].lastTry - b[1].lastTry)
+          .slice(0, limit)
+          .map(([issue]) => issue)
+      );
+    },
+    queueWaiting(liveSha) {
+      for (const [k, row] of table.entries()) {
+        if (
+          k.endsWith("|fixed") &&
+          row.status === "waiting" &&
+          row.checkedSha !== liveSha &&
+          !pending.has(k.split("|")[0] ?? "")
+        ) {
+          pending.set(k.split("|")[0] ?? "", { attempts: 0, lastTry: 0 });
+        }
+      }
+      return Promise.resolve();
+    },
+    readCursor() {
+      return Promise.resolve(state.cursor);
+    },
     release(issue, stage, token) {
       const existing = table.get(key(issue, stage));
       if (existing?.status === "claimed" && existing.token === token) {
@@ -151,6 +209,10 @@ export const memoryStore = () => {
       }
       return Promise.resolve();
     },
+    resolvePending(issue) {
+      pending.delete(issue);
+      return Promise.resolve();
+    },
     rows(issue) {
       return Promise.resolve(
         [...table.entries()]
@@ -158,8 +220,13 @@ export const memoryStore = () => {
           .map(([, row]) => row)
       );
     },
+    saveCursor(ms) {
+      state.cursor = Math.max(state.cursor ?? 0, ms);
+      state.cursorWrites.push(ms);
+      return Promise.resolve();
+    },
   };
-  return { state, store, table };
+  return { pending, state, store, table };
 };
 
 export interface FakeTicket {
@@ -167,6 +234,8 @@ export interface FakeTicket {
   facts: TicketFacts;
   foremanComments: { body: string; id: string }[];
   issueId: string;
+  parentUpdatedAt: string | null;
+  updatedAt: string;
 }
 
 export const ticket = (over: Partial<TicketFacts> = {}): FakeTicket => {
@@ -176,17 +245,25 @@ export const ticket = (over: Partial<TicketFacts> = {}): FakeTicket => {
     facts: made,
     foremanComments: [],
     issueId: `uuid-${made.identifier}`,
+    parentUpdatedAt: null,
+    updatedAt: made.createdAt,
   };
 };
 
 export const fakeLinear = (tickets: FakeTicket[]) => {
   const posts: { body: string; id: string; identifier: string }[] = [];
   const state: {
+    discoverFails: boolean;
+    discoverTruncated: boolean;
+    discoveries: { createdAfter: string; updatedSince: string }[];
     failAfterCreate: boolean;
     failNextPost: boolean;
     holdNextPost: Promise<void> | null;
     reads: number;
   } = {
+    discoverFails: false,
+    discoveries: [],
+    discoverTruncated: false,
     failAfterCreate: false,
     failNextPost: false,
     holdNextPost: null,
@@ -194,6 +271,27 @@ export const fakeLinear = (tickets: FakeTicket[]) => {
   };
   const created = new Map<string, { anchorId: string }>();
   const port: LinearPort = {
+    discover(updatedSince, createdAfter) {
+      state.discoveries.push({ createdAfter, updatedSince });
+      if (state.discoverFails) {
+        return Promise.reject(new Error("Linear is unavailable"));
+      }
+      const since = Date.parse(updatedSince);
+      const identifiers = tickets
+        .filter(
+          (entry) =>
+            entry.anchorId !== null &&
+            Date.parse(entry.facts.createdAt) > Date.parse(createdAfter) &&
+            (Date.parse(entry.updatedAt) > since ||
+              (entry.parentUpdatedAt !== null &&
+                Date.parse(entry.parentUpdatedAt) > since))
+        )
+        .map((entry) => entry.facts.identifier);
+      return Promise.resolve({
+        complete: !state.discoverTruncated,
+        identifiers,
+      });
+    },
     findComment(id) {
       const found = created.get(id);
       return Promise.resolve(found ? { parentId: found.anchorId } : null);
@@ -238,9 +336,6 @@ export const fakeLinear = (tickets: FakeTicket[]) => {
           : null
       );
     },
-    recentIdentifiers() {
-      return Promise.resolve(tickets.map((entry) => entry.facts.identifier));
-    },
   };
   return { port, posts, state, tickets };
 };
@@ -282,3 +377,11 @@ export const depsOf = (
   store: ReporterStore,
   over: Partial<RunConfig> = {}
 ): Deps => ({ config: config(over), deploy, linear, store });
+
+export const waitingIssues = (memory: ReturnType<typeof memoryStore>) =>
+  [...memory.table.entries()]
+    .filter(([k, row]) => k.endsWith("|fixed") && row.status === "waiting")
+    .map(([k, row]) => ({
+      checkedSha: row.checkedSha,
+      issue: k.split("|")[0],
+    }));

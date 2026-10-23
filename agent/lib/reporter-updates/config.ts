@@ -3,9 +3,6 @@ import type { RunConfig } from "./run.js";
 type Env = Record<string, string | undefined>;
 
 const CHANNEL = /^C[A-Z0-9]{8,12}$/u;
-const HOUR_MS = 3_600_000;
-const DEFAULT_LOOKBACK_HOURS = 12;
-const MAX_LOOKBACK_HOURS = 72;
 const DEFAULT_MAX_POSTS = 20;
 export const RUN_DEADLINE_MS = 240_000;
 const MAX_MAX_POSTS = 100;
@@ -37,12 +34,6 @@ export const reporterUpdatesConfig = (
   }
   return {
     channels: new Set(channels),
-    lookbackMs:
-      boundedInteger(
-        env.REPORTER_UPDATES_LOOKBACK_HOURS,
-        DEFAULT_LOOKBACK_HOURS,
-        MAX_LOOKBACK_HOURS
-      ) * HOUR_MS,
     maxPosts: boundedInteger(
       env.REPORTER_UPDATES_MAX_POSTS,
       DEFAULT_MAX_POSTS,
