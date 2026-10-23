@@ -1,5 +1,5 @@
 export type Stage = "received" | "owner" | "fixed" | "not_fixed";
-export type NotFixedReason = "duplicate" | "not_a_bug" | "no_change";
+export type NotFixedReason = "duplicate" | "not_a_bug" | "closed";
 
 export const STAGES: readonly Stage[] = [
   "received",
@@ -35,8 +35,8 @@ export const fixedText = (): string =>
   "Good news: this is fixed and live now. Please try it again. If it still doesn't work, reply here and we'll look straight away.";
 
 const NOT_FIXED_REASONS: Record<NotFixedReason, string> = {
+  closed: `We looked into this and have closed it. ${NOTHING_TO_DO}. If it still looks wrong, reply here and we'll look again.`,
   duplicate: `We looked into this. Someone had already reported the same thing, so we're tracking it under that report instead of this one. ${NOTHING_TO_DO}.`,
-  no_change: `We looked into this and closed it without a change to the product. ${NOTHING_TO_DO}. If it still looks wrong, reply here and we'll look again.`,
   not_a_bug: `We looked into this and nothing is broken: it works the way it's designed to right now. ${NOTHING_TO_DO}. If it doesn't match what you saw, reply here.`,
 };
 
@@ -47,7 +47,10 @@ const REASON_KEYS = Object.keys(NOT_FIXED_REASONS) as NotFixedReason[];
 
 export const PAST_TEXTS: Record<Stage, readonly string[]> = {
   fixed: [],
-  not_fixed: [],
+  not_fixed: [
+    "We looked into this and no change to the product was needed. Nothing for you to do. If it still looks wrong, reply here and we'll look again.",
+    "We looked into this and closed it without a change to the product. Nothing for you to do. If it still looks wrong, reply here and we'll look again.",
+  ],
   owner: [],
   received: [],
 };

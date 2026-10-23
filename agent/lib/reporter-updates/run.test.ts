@@ -4,6 +4,7 @@ import { ThreadIncompleteError } from "../requester-reply.js";
 import { commentIdFor } from "./comment-id.js";
 import {
   bannedWordsIn,
+  coversOf,
   fixedText,
   notFixedText,
   ownerText,
@@ -269,22 +270,61 @@ describe("not fixed message", () => {
 });
 
 describe("not fixed wording does not claim more than is known", () => {
-  it("tells a cancelled bug only that it was closed without a change, never that none was needed", async () => {
+  const claims = [
+    "without a change",
+    "no change",
+    "needed",
+    "nothing is broken",
+  ];
+
+  it("says only that a cancelled bug was closed", async () => {
     const s = setup([
       ticket({ labels: ["Bug"], stateName: "Canceled", stateType: "canceled" }),
     ]);
     await reconcile(s);
     const [post] = s.linear.posts;
-    assert.equal(post?.body, notFixedText("no_change"));
-    assert.ok(post?.body.includes("closed it without a change"));
-    assert.ok(!post?.body.includes("needed"));
-    assert.ok(!post?.body.includes("nothing is broken"));
+    assert.equal(post?.body, notFixedText("closed"));
+    for (const claim of claims) {
+      assert.ok(!post?.body.includes(claim), claim);
+    }
   });
 
-  it("uses the same neutral wording for a Done ticket with no code and no label", async () => {
+  it("says the same for a cancelled ticket whose linked fix did ship", async () => {
+    const s = setup(
+      [
+        ticket({
+          pullUrls: [PR_URL],
+          stateName: "Canceled",
+          stateType: "canceled",
+        }),
+      ],
+      {
+        ancestors: { [`${MERGE_SHA}>${NEW_SHA}`]: true },
+        liveSha: NEW_SHA,
+        pulls: { [pullKey(7)]: merged() },
+      }
+    );
+    await reconcile(s);
+    const [post] = s.linear.posts;
+    assert.equal(post?.body, notFixedText("closed"));
+    for (const claim of claims) {
+      assert.ok(!post?.body.includes(claim), claim);
+    }
+  });
+
+  it("uses the same wording for a Done ticket with no code and no label", async () => {
     const s = setup([ticket({ stateType: "completed" })]);
     await reconcile(s);
-    assert.equal(s.linear.posts[0]?.body, notFixedText("no_change"));
+    assert.equal(s.linear.posts[0]?.body, notFixedText("closed"));
+  });
+
+  it("still recognises the wording an earlier version posted", () => {
+    assert.deepEqual(
+      coversOf(
+        "We looked into this and closed it without a change to the product. Nothing for you to do. If it still looks wrong, reply here and we'll look again."
+      ),
+      ["not_fixed"]
+    );
   });
 });
 

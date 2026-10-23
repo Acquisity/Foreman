@@ -77,7 +77,7 @@ describe("closureOf", () => {
   it("gives a plain no-change answer to a Done ticket with no code and no label", () => {
     assert.deepEqual(closureOf(facts({ stateType: "completed" })), {
       kind: "not_fixed",
-      reason: "no_change",
+      reason: "closed",
     });
   });
 

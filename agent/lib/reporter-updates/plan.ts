@@ -62,7 +62,7 @@ export const isTerminal = (stateType: string): boolean =>
 const noCodeReason = (facts: TicketFacts): NotFixedReason =>
   facts.labels.some((label) => NO_CODE_LABELS.has(label))
     ? "not_a_bug"
-    : "no_change";
+    : "closed";
 
 export const closureOf = (facts: TicketFacts): Closure => {
   if (facts.stateType === "canceled") {

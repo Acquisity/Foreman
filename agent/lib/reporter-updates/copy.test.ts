@@ -18,7 +18,7 @@ import {
   wordCount,
 } from "./copy.js";
 
-const REASONS: NotFixedReason[] = ["duplicate", "not_a_bug", "no_change"];
+const REASONS: NotFixedReason[] = ["duplicate", "not_a_bug", "closed"];
 
 const allTexts = () => [
   receivedText(null),
