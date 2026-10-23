@@ -11,8 +11,8 @@ import {
   criticVerdictIssue,
   decisionFields,
   routeDecisionEvent,
+  settleCreation,
   settleDecision,
-  settleRoute,
 } from "./triage-log.js";
 import { prepareReplayArchive } from "./triage-replay/archive.js";
 
@@ -163,23 +163,27 @@ describe("issue-bound decisions", () => {
       ["ENG-9", "skill", "skill_fallback", null, null]
     );
     const billing = { assignee: "Aaron Fraga", project: "Support" };
-    const billed = routeDecisionEvent(
-      decisions,
-      { assignee: "Aaron Fraga", issue: "ENG-9", project: "Support" },
-      billing
-    );
+    const withBilling = {
+      ...decisions,
+      "ENG-9": billingDecisionFields("ENG-9", billing),
+    };
+    const billed = routeDecisionEvent(withBilling, {
+      assignee: "Aaron Fraga",
+      issue: "ENG-9",
+      project: "Support",
+    });
     assert.deepEqual(
       [billed.outcome, billed.code, billed.path],
       ["route", "billing", BILLING_PATH]
     );
-    const other = routeDecisionEvent(
-      decisions,
-      { assignee: "Ada", issue: "ENG-9", project: "CRM" },
-      billing
-    );
+    const other = routeDecisionEvent(withBilling, {
+      assignee: "Ada",
+      issue: "ENG-9",
+      project: "CRM",
+    });
     assert.equal(other.code, "skill_fallback");
     assert.equal(
-      routeDecisionEvent(decisions, { issue: "ENG-2" }, billing).code,
+      routeDecisionEvent(withBilling, { issue: "ENG-2" }).code,
       null
     );
     const line = JSON.parse(formatOpsEvent("triage.decision", billed));
@@ -231,31 +235,33 @@ describe("issue-bound decisions", () => {
     );
   });
 
-  it("binds a billing decision made before its ticket exists to the first matching route only", () => {
+  it("binds a billing decision made before its ticket exists to the issue the session creates next, and only that one", () => {
     const pending = { assignee: "Aaron Fraga", project: "Support" };
-    const first = settleRoute({}, { ...pending, issue: "ENG-20" }, pending);
-    assert.equal(first.event.code, "billing");
-    assert.equal(first.pendingBilling, null);
-    assert.equal(first.decisions["ENG-20"].route?.project, "Support");
-    const second = settleRoute(
-      first.decisions,
-      { ...pending, issue: "ENG-21" },
-      first.pendingBilling
-    );
-    assert.equal(second.event.code, "skill_fallback");
-    const again = settleRoute(
-      first.decisions,
-      { ...pending, issue: "ENG-20" },
-      first.pendingBilling
-    );
-    assert.equal(again.event.code, "billing");
-    const triaged = settleRoute(
-      settleDecision({}, routed).decisions,
-      { ...pending, issue: "ENG-2" },
-      pending
-    );
-    assert.equal(triaged.event.code, null);
-    assert.deepEqual(triaged.pendingBilling, pending);
+    const settled = settleCreation({}, pending, "ENG-20");
+    assert.equal(settled.pendingBilling, null);
+    assert.equal(settled.decisions["ENG-20"].route?.project, "Support");
+    const own = routeDecisionEvent(settled.decisions, {
+      ...pending,
+      issue: "ENG-20",
+    });
+    assert.equal(own.code, "billing");
+    const other = routeDecisionEvent(settled.decisions, {
+      ...pending,
+      issue: "ENG-21",
+    });
+    assert.equal(other.code, "skill_fallback");
+  });
+
+  it("drops a billing decision whose creation failed, so a later matching route is a fallback", () => {
+    const pending = { assignee: "Aaron Fraga", project: "Support" };
+    const settled = settleCreation({}, pending, null);
+    assert.equal(settled.pendingBilling, null);
+    assert.deepEqual(settled.decisions, {});
+    const later = routeDecisionEvent(settled.decisions, {
+      ...pending,
+      issue: "ENG-22",
+    });
+    assert.equal(later.code, "skill_fallback");
   });
 
   it("binds a critic task to the source issue named on its dispatch's first line, never to a candidate it mentions", () => {

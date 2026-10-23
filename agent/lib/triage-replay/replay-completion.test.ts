@@ -14,6 +14,7 @@ import {
   auth,
   CASE_CREATED,
   ctx,
+  inSession,
   KEY,
   outputOf,
   RUN,
@@ -384,14 +385,16 @@ describe("replay completion and Linear tools", () => {
     t.mock.method(executorTransport, "call", () => {
       throw new Error("transport reached");
     });
-    const { identifier } = await outputOf(
-      createIssueTool.execute(
-        {
-          assignee: "ada@example.test",
-          description: "Token refresh races the send.",
-          title: "Inbox token refresh race",
-        },
-        toolCtx
+    const { identifier } = await inSession(() =>
+      outputOf(
+        createIssueTool.execute(
+          {
+            assignee: "ada@example.test",
+            description: "Token refresh races the send.",
+            title: "Inbox token refresh race",
+          },
+          toolCtx
+        )
       )
     );
     await routeTicket(

@@ -70,7 +70,7 @@ export default defineTool({
       .regex(LINEAR_ISSUE_ID_PATTERN)
       .optional()
       .describe(
-        "The ticket's issue id, such as ENG-123, when the ticket exists. Leave it out only when you create the ticket after this decision; the first route_ticket that passes the returned route then binds it."
+        "The ticket's issue id, such as ENG-123, when the ticket exists. Leave it out only when the ticket does not exist yet; the decision then waits for the next ticket this session creates, and is dropped if that creation fails or another ticket is routed first."
       ),
     sourceLabels: z
       .array(z.string().trim().min(1).max(120))

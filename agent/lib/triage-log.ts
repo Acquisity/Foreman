@@ -158,12 +158,11 @@ interface RouteInput {
 
 export function routeDecisionEvent(
   decisions: Readonly<Record<string, LatestTriageDecision>>,
-  input: RouteInput,
-  pendingBilling: BillingRoute | null = null
+  input: RouteInput
 ) {
   const decision = decisions[input.issue];
   const triage = decision && !decision.route ? decision : undefined;
-  const billing = decision ? decision.route : pendingBilling;
+  const billing = decision?.route;
   const billed =
     !triage &&
     billing !== undefined &&
@@ -191,25 +190,20 @@ export function routeDecisionEvent(
   };
 }
 
-export function settleRoute(
+export function settleCreation(
   decisions: Readonly<Record<string, LatestTriageDecision>>,
-  input: RouteInput,
-  pendingBilling: BillingRoute | null
+  pendingBilling: BillingRoute | null,
+  created: string | null
 ) {
-  const event = routeDecisionEvent(decisions, input, pendingBilling);
-  const binds =
-    event.code === "billing" &&
-    pendingBilling !== null &&
-    !decisions[input.issue];
   return {
-    decisions: binds
-      ? {
-          ...decisions,
-          [input.issue]: billingDecisionFields(input.issue, pendingBilling),
-        }
-      : decisions,
-    event,
-    pendingBilling: binds ? null : pendingBilling,
+    decisions:
+      pendingBilling !== null && created !== null
+        ? {
+            ...decisions,
+            [created]: billingDecisionFields(created, pendingBilling),
+          }
+        : decisions,
+    pendingBilling: null,
   };
 }
 

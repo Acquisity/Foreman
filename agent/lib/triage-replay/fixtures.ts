@@ -1,4 +1,5 @@
 import type { TestContext } from "node:test";
+import { evePackageUrl } from "../eve-dynamic-tools.js";
 import type { executorClient } from "../executor/client.js";
 import {
   loadReplayState,
@@ -269,3 +270,15 @@ export const sharedLedger = () => {
     },
   });
 };
+
+interface EveContextModule {
+  ContextContainer: new () => unknown;
+  contextStorage: { run: <T>(store: unknown, run: () => T) => T };
+}
+
+const { ContextContainer, contextStorage } = (await import(
+  new URL("./dist/src/context/container.js", evePackageUrl()).href
+)) as EveContextModule;
+
+export const inSession = <T>(body: () => T): T =>
+  contextStorage.run(new ContextContainer(), body);
