@@ -80,10 +80,13 @@ export const closureOf = (facts: TicketFacts): Closure => {
   if (facts.pullUrls.length > 0) {
     return { kind: "needs_deploy", pullUrls: facts.pullUrls };
   }
+  if (facts.labels.some((label) => NO_CODE_LABELS.has(label))) {
+    return { kind: "not_fixed", reason: "not_a_bug" };
+  }
   if (facts.labels.includes("Bug") || facts.parent) {
     return { kind: "held", why: "no_linked_pull" };
   }
-  return { kind: "not_fixed", reason: noCodeReason(facts) };
+  return { kind: "not_fixed", reason: "closed" };
 };
 
 export const deployVerdict = (

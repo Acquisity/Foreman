@@ -81,6 +81,42 @@ describe("closureOf", () => {
     });
   });
 
+  it("answers a Done ticket that is labelled both Bug and User Error and has no code, instead of holding it", () => {
+    for (const label of ["User Error", "Platform Limitation"]) {
+      assert.deepEqual(
+        closureOf(facts({ labels: ["Bug", label], stateType: "completed" })),
+        { kind: "not_fixed", reason: "not_a_bug" },
+        label
+      );
+    }
+  });
+
+  it("answers a no-code label even when the ticket also has a master", () => {
+    assert.deepEqual(
+      closureOf(
+        facts({
+          labels: ["User Error"],
+          parent: { identifier: "ENG-9", stateType: "completed" },
+          stateType: "started",
+        })
+      ),
+      { kind: "not_fixed", reason: "not_a_bug" }
+    );
+  });
+
+  it("still deploys first when the ticket has a linked fix, whatever its labels", () => {
+    assert.equal(
+      closureOf(
+        facts({
+          labels: ["User Error"],
+          pullUrls: [PR],
+          stateType: "completed",
+        })
+      ).kind,
+      "needs_deploy"
+    );
+  });
+
   it("holds a Done bug that has no linked pull request instead of calling it not fixed", () => {
     assert.deepEqual(
       closureOf(facts({ labels: ["Bug"], stateType: "completed" })),
