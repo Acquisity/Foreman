@@ -524,13 +524,6 @@ export function resolveTriage(
   const path: HandlingPath = duplicate
     ? "Duplicate"
     : (choiceOf(answers.path).choice as HandlingPath);
-  const priority = resolvePriority(
-    path,
-    duplicate?.candidate.priority,
-    answers,
-    notes
-  );
-
   const project = choiceOf(answers.project);
   const projectSettled =
     project.choice !== UNDETERMINED && project.confidence >= BARS.project;
@@ -552,6 +545,12 @@ export function resolveTriage(
     project: projectSettled ? project.choice : null,
   });
   const labels = resolveLabels(input, classification, answers);
+  const priority = resolvePriority(
+    ownership.path,
+    duplicate?.candidate.priority,
+    answers,
+    notes
+  );
 
   return {
     approval: ownership.approval,

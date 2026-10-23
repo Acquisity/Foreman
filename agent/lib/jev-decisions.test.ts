@@ -1054,3 +1054,37 @@ test("an unapproved feature request never keeps an engineering path", () => {
     );
   }
 });
+
+test("a request parked in Backlog gets the Backlog priority, not the engineering one", () => {
+  const decision = resolveTriage(
+    triageInput(),
+    bugAnswers({
+      area: pick("ai_sdr"),
+      classification: pick("platform_limitation"),
+      impact: band({ "0": 0.02, "1": 0.02, "2": 0.9, "3": 0.06 }),
+      path: pick("Engineering Todo"),
+      wants_limit_lifted: yes(),
+    })
+  );
+  assert.ok(decision.outcome === "route");
+  assert.equal(decision.path, "Backlog/low-impact");
+  assert.equal(decision.route.priority, 4);
+  const withMoney = resolveTriage(
+    triageInput(),
+    bugAnswers({
+      classification: pick("platform_limitation"),
+      impact: band({ "0": 0.02, "1": 0.02, "2": 0.9, "3": 0.06 }),
+      money_blocker: yes(),
+      path: pick("Engineering Todo"),
+      wants_limit_lifted: yes(),
+    })
+  );
+  assert.ok(withMoney.outcome === "route");
+  assert.equal(withMoney.route.priority, 2);
+  const engineering = resolveTriage(
+    triageInput(),
+    bugAnswers({ impact: band({ "0": 0.02, "1": 0.02, "2": 0.9, "3": 0.06 }) })
+  );
+  assert.ok(engineering.outcome === "route");
+  assert.equal(engineering.route.priority, 2);
+});
