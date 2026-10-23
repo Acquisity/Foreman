@@ -8,6 +8,7 @@ import {
   DOCUMENT_MAX_CHARS,
   saveInvestigationDocument,
 } from "#lib/linear-api.js";
+import { triageDocumentGaps } from "#lib/triage-document.js";
 import { isTriageIntake } from "#lib/trust.js";
 
 /** 13 to 19 digits with optional separators; only a Luhn-valid run counts as a card number. */
@@ -61,16 +62,24 @@ export default defineTool({
     if (refuses(draft)) {
       return refusal;
     }
-    const input = isTriageIntake(ctx.session.auth.initiator ?? null)
-      ? {
-          ...draft,
-          content: await rewriteDraft(
-            draft.content,
-            DOCUMENT_MAX_CHARS,
-            ctx.abortSignal
-          ),
-        }
-      : draft;
+    const gaps =
+      draft.lane === "triage" ? triageDocumentGaps(draft.content) : [];
+    if (gaps.length > 0) {
+      return {
+        error: `The triage document needs ${gaps.join(" and ")}. Add it and save again.`,
+        saved: false as const,
+      };
+    }
+    const reworded = isTriageIntake(ctx.session.auth.initiator ?? null)
+      ? await rewriteDraft(draft.content, DOCUMENT_MAX_CHARS, ctx.abortSignal)
+      : draft.content;
+    const input = {
+      ...draft,
+      content:
+        draft.lane === "triage" && triageDocumentGaps(reworded).length > 0
+          ? draft.content
+          : reworded,
+    };
     if (refuses(input)) {
       return refusal;
     }

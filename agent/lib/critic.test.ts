@@ -95,9 +95,9 @@ describe("critic subagent", () => {
   });
 
   it("carries no attempt numbering or retry language anywhere", () => {
-    // P6.2: the critic runs exactly once per ticket. The description,
-    // instructions, and child skill must not revive the two-attempt
-    // contract P6.1 removed from the caller.
+    // The critic reviews a ticket at most twice (James, 22 Oct 2026): once, and
+    // once more after Foreman's one adjudication. The description,
+    // instructions, and child skill must not revive attempt counting.
     const agentSource = readFileSync(new URL("agent.ts", criticRoot), "utf8");
     for (const surface of [agentSource, instructions, skill]) {
       const lowered = surface.toLowerCase();
@@ -108,7 +108,6 @@ describe("critic subagent", () => {
         "attempt number",
         "attempt limit",
         "two-attempt",
-        "second review",
         "re-review",
         "review again",
         "prior approval",
@@ -119,8 +118,10 @@ describe("critic subagent", () => {
         assert.ok(!lowered.includes(excluded), excluded);
       }
     }
-    assert.ok(agentSource.includes("Called exactly once per ticket"));
-    assert.ok(skill.includes("Foreman calls you exactly once per ticket"));
+    assert.ok(agentSource.includes("Called once per ticket, and once more"));
+    assert.ok(
+      skill.includes("Foreman calls you once per ticket, and once more")
+    );
   });
 
   it("disables every write-capable default tool", () => {

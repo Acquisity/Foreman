@@ -18,7 +18,7 @@ Inputs: the completed Stage 4 evidence record. Historical memory is analogy only
 
 ### Rehash the claim against the evidence
 
-The lanes are recorded, so the evidence is complete. Say plainly whether the evidence supports the claim, contradicts it, or leaves it unproven. A missing deciding fact takes the unproven branch, never a question.
+A `Could not run` lane is a gap, not evidence: name each in `unavailableLanes`. Say plainly whether the evidence supports the claim, contradicts it, or leaves it unproven. A missing deciding fact takes the unproven branch, never a question.
 
 ### Find the unblock
 
@@ -30,11 +30,11 @@ The unblock never replaces the root cause or the master ticket.
 
 ### Jev decides, Foreman acts
 
-Then call `decide_triage` once with the evidence record and that unblock, the Stage 3 duplicate candidates, `classify_ask`'s `sourceLabels`, and, read from Linear now, the team's active projects and Root Cause labels and the ticket's own labels as `ticketLabels`. Its decision is the verdict, classification, path, state, priority, labels, and project; record its notes and never hand-edit them. Call it again whenever evidence changes, as after adjudication or a correction. A `NEEDS_HUMAN_URGENT` hotlane stop suspends its route. `unproven` takes the unproven branch with its `missing` list:
+Then call `decide_triage` once with the evidence record and that unblock, the Stage 3 duplicate candidates, `classify_ask`'s `sourceLabels`, and, read from Linear now, the team's active projects and Root Cause labels and the ticket's own labels as `ticketLabels`. For a sending-inbox report, first run [references/billing-check.md](references/billing-check.md) and pass its `billingFacts`. Its decision is the verdict (with a `confidence` for it, the classification and the path), classification, path, state, priority, labels, and project, plus a `review` saying whether the critic must check it; below 0.6 on the classification or path it is `unproven`. Record its notes and never hand-edit them. Call it again whenever evidence changes, as after adjudication or a correction. A `NEEDS_HUMAN_URGENT` hotlane stop suspends its route. `unproven` takes the unproven branch with its `missing` list:
 
 When the deciding confirmation is still missing, take the unproven branch and stop before classification. Before stopping, record any safe unblock supported by the completed evidence: the action, owner, current status, and confirmation that it costs the customer neither data nor money, or `None found: <reason>`. Preserve the source ticket's current state, priority, and labels, even an empty priority; read the unproven reporting exception in [references/reporting.md](references/reporting.md); attach or update the investigation document with the known facts, missing confirmation, and reopen condition; and give the requester that same reopen condition in the short comment or attended reply. Do not create or attach a master, route engineering work, or record investigation memory.
 
-Every decision above is provisional until the review below has settled the document that records it. Do not apply the state, priority, labels, or project to the ticket yet; Stage 6 does that, and only for a settled document version. Outcomes the review does not cover (`User Error`, `Platform Limitation`, a `Duplicate`, the unproven stop) are applied in Stage 6 without one.
+Every decision above is provisional until the review below has settled the document that records it. Do not apply the state, priority, labels, or project to the ticket yet; Stage 6 does that, and only for a settled document version. A decision with `review.required` false is applied in Stage 6 without one.
 
 ### Fallback: only when `decided: false`
 
@@ -77,13 +77,11 @@ Apply the fewest labels that place the ticket, as `addLabels` in Stage 6; never 
 - The source labels (`classify_ask` returns them): `intercom-sourced` when it came from an Intercom conversation, `Customer reported` when a customer raised it, `Internal reported` when AIA CS or another internal reporter did. More than one can be true.
 - One `Root Cause` label when the team has one that matches the cause found in Stage 4.
 
-### Review a Bug before routing it
+### Review before routing
 
-This review runs only when the classification is `Bug` and the handling path is not `Duplicate`. `User Error`, `Platform Limitation`, the unproven stop, and a `Duplicate` go straight to Stage 6: a duplicate routes nothing new to engineering, and the master it attaches to already carries the reviewed root cause.
+The review runs when `decide_triage` returns `review.required`: a `Bug` that is not a `Duplicate`, a `Duplicate`, a `Platform Limitation`, a `User Error` closing with a lane that could not run or a failure the customer saw, and an inbox error set aside as billing. The critic reviews a ticket at most twice: once, and again after Foreman's one adjudication. A second objection sends the ticket to the area owner as unproven. For a `Bug`, run the `engineering-handoff` master search first so the critic can check the master. Follow [references/critic-review.md](references/critic-review.md) before Stage 6.
 
-The critic runs exactly once per ticket. Foreman delegates once and adjudicates the result once. A challenge, an evidence gap, or a failed review never triggers a second delegation and never parks the ticket on a person: Foreman settles the findings against the Stage 4 evidence record and continues routing. Only the urgent-human hotlane in the protocol stops a reviewed ticket for a person. Read [references/critic-review.md](references/critic-review.md) and follow it before Stage 6.
-
-Completion: either the unproven branch has made the unblock explicit, preserved the ticket, documented the missing confirmation and reopen condition, and stopped before classification, engineering routing, or memory; or the decision is recorded, the unblock is explicit, and, for a `Bug` other than a `Duplicate`, the review has settled the document version that records it or the hotlane stopped the review and the ticket is with a person.
+Completion: the unproven branch has stopped before classification with the unblock, missing confirmation and reopen condition documented; or the decision is recorded and, when `review.required`, the review has settled the document or the ticket is with a person.
 
 ## Stage 6: Persist and route
 
@@ -93,7 +91,7 @@ Inputs: the Stage 5 decisions and completed investigation. When Stage 5 review r
 
 ### Attach the Triage investigation document
 
-When Stage 5 review ran, the document already exists at the settled version: do not call `save_investigation_document` before routing, even when adjudication changed the final classification or handling path. Only outcomes that never entered review (`User Error`, `Platform Limitation`, a `Duplicate`, or the unproven stop as originally classified) create or rewrite the ticket's one `Triage investigation` document here and keep its returned `documentId`, `updatedAt`, and `url`. An outcome reclassified during adjudication still entered review and keeps its settled document unchanged. After the handoff reads its writes back, save it once more with its final `**Review**` line (`Approved <the updatedAt the critic echoed> at <commit>` or `Adjudicated <the adjudicated-evidence updatedAt Stage 5 read back before the settling save> at <commit>: <CHALLENGE | INSUFFICIENT_EVIDENCE | review failure>` with its finding clauses) and routing result. A document created here for an unreviewed outcome is written once with `**Review**: Not required`. “Record in the report” means this document unless the comment is named.
+When Stage 5 review ran, the document already exists at the settled version: do not call `save_investigation_document` before routing, even when adjudication changed the final classification or handling path. Only outcomes that never entered review (`review.required` false, or the unproven stop as originally classified) create or rewrite the ticket's one `Triage investigation` document here and keep its returned `documentId`, `updatedAt`, and `url`. An outcome reclassified during adjudication still entered review and keeps its settled document unchanged. After the handoff reads its writes back, save it once more with its final `**Review**` line (`Approved <the updatedAt the critic echoed> at <commit>` or `Adjudicated <the adjudicated-evidence updatedAt Stage 5 read back before the settling save> at <commit>: <CHALLENGE | INSUFFICIENT_EVIDENCE | review failure>` with its finding clauses) and routing result. A document created here for an unreviewed outcome is written once with `**Review**: Not required: <review.reason>`; every triage document carries the decision's `**Confidence**` line. “Record in the report” means this document unless the comment is named.
 
 - A handoff, not a transcript: counts and the specific proving rows, not raw dumps, and never credential-shaped columns. Keep it under 20,000 characters; the tool rejects longer content.
 - The full document stays on the customer ticket: a Linear document inherits its issue's visibility, so a shared master would expose one customer's identity and rows. The master gets only aggregate evidence: root cause, blast radius figure, and code path, with no organization id, email, or customer rows.
@@ -118,7 +116,7 @@ SAN sandbox tickets route to Aaron Fraga. No fitting area means James Keeble; re
 
 ### When the ticket is not engineering actionable
 
-`User Error`, `Platform Limitation`, `Resolved by triage`, `Duplicate`, `Backlog/low-impact`, and the `Support/` paths end here: call `route_ticket` once with the decision's `route` unchanged. `route` names Aaron Fraga for an open follow-up, no one for a closed outcome. The ticket carries the explanation and moves to the Stage 5 state; nothing goes to engineering. `User Error`, `Platform Limitation` (unless a lift is wanted), and `Resolved by triage` close as `Done`; the `Support/` paths stay `Todo` for a person.
+`User Error`, `Platform Limitation`, `Resolved by triage`, `Duplicate`, `Backlog/low-impact`, and the `Support/` paths end here: call `route_ticket` once with the decision's `route` unchanged, after the critic settles when `review.required`. `route` names Aaron Fraga for an open follow-up, no one for a closed outcome. The ticket carries the explanation and moves to the Stage 5 state; nothing goes to engineering. `User Error`, `Platform Limitation` (unless a lift is wanted), and `Resolved by triage` close as `Done`; the `Support/` paths stay `Todo` for a person.
 
 A `Duplicate` still inherits: `route` already carries `duplicateOf` and `inheritAssigneeFrom`. Add only `assignee`, the area owner from the roster, when `route` names none (a confirmed Bug only), so the root cause's owner owns its reports. The tool inherits the parent's assignee when it is in the roster and uses the fallback otherwise.
 
@@ -142,7 +140,7 @@ Load slack-wording in C0BBPVC3N2X, C0BC011NAQL, and for every `reply_to_requeste
 
 ### Record the investigation in memory
 
-Before the reply, after the Triage investigation document is attached and the classification is final, call `record_investigation_case`. A reviewed `Bug` is final once its review has settled, approved or adjudicated; a hotlane-stopped review records nothing. A `Duplicate` is final once its master link is saved. Not before: a case from a half-finished investigation is a wrong answer the next ticket inherits.
+Before the reply, after the Triage investigation document is attached and the classification is final, call `record_investigation_case`. A reviewed `Bug` is final once its review has settled, approved or adjudicated; a hotlane-stopped or blocked review records nothing. A `Duplicate` is final once its master link is saved. Not before: a case from a half-finished investigation is a wrong answer the next ticket inherits.
 
 Send the pattern, not the customer: the claim, root cause, symptoms in the product's own words, identifier-stripped error signatures, the Stage 4 code path and commit, conclusions ruled out, stable evidence handles (Sentry issue ids, Inngest run ids, the document link), counts with the date counted, and links back to the ticket. Never an email address, organization or user id, production row, log, or anything credential-shaped; the tool refuses them and they stay in the document.
 

@@ -44,7 +44,7 @@ export const CRITIC_VERDICTS = [
 export default defineAgent({
   description:
     "Independently review a completed triage investigation before Foreman persists or routes it. " +
-    "Called exactly once per ticket. Pass the source issue id, the Triage investigation document id " +
+    "Called once per ticket, and once more after Foreman has adjudicated an objection. Pass the source issue id, the review kind, the Triage investigation document id " +
     "and its updatedAt, the repository commit the investigation read, and Foreman's proposed decisions " +
     "(classification, unblock, handling path, state, priority, labels, hotlane proposal, master candidate). " +
     "Returns APPROVE, CHALLENGE, or INSUFFICIENT_EVIDENCE with a result for each of twelve criteria. " +
