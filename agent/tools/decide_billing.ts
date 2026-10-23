@@ -1,20 +1,41 @@
+import { randomUUID } from "node:crypto";
 import { defineTool } from "eve/tools";
 import { z } from "zod";
+import { LINEAR_ISSUE_ID_PATTERN } from "#lib/investigation-memory/scope.js";
 import { BILLING_BUCKETS, decideBilling } from "#lib/jev-decisions.js";
+import {
+  billingDecisionFields,
+  billingRoutes,
+  triageDecisions,
+} from "#lib/triage-log.js";
 
 export default defineTool({
   approval: () => "not-applicable",
   description:
     "Jev decides a money ask's verdict from the completed investigation: the discretion note, the seven-item justification checklist, and whether it is an active blocker. " +
     "Code makes a missing approval trail or any unconfirmed checklist item needs-human, and builds the Support/Financial routing. " +
-    "Use discretion and unconfirmed in the document, and pass route to route_ticket unchanged with the ticket's issue id. " +
+    "Use discretion and unconfirmed in the document, pass the ticket's issue id here, and pass route to route_ticket unchanged with the same issue id. " +
     "decided false means Jev could not answer: decide by the skill's rules and say so in the document.",
   async execute(input, ctx) {
     try {
-      return {
-        decided: true as const,
-        decision: await decideBilling(input, { signal: ctx.abortSignal }),
+      const { issue, ...billing } = input;
+      const decision = await decideBilling(billing, {
+        signal: ctx.abortSignal,
+      });
+      const route = {
+        assignee: decision.route.assignee,
+        project: decision.route.project,
       };
+      if (issue) {
+        triageDecisions.update((decisions) => ({
+          ...decisions,
+          [issue]: billingDecisionFields(issue, route),
+        }));
+        return { decided: true as const, decision };
+      }
+      const decisionId = randomUUID();
+      billingRoutes.update(() => ({ id: decisionId, route }));
+      return { decided: true as const, decision, decisionId };
     } catch (error) {
       if (ctx.abortSignal.aborted) {
         throw error;
@@ -44,6 +65,14 @@ export default defineTool({
       .max(20_000)
       .describe(
         "The completed investigation: the three systems of record with ids and amounts, where they diverge, the requester's account, and any facts the requester volunteered."
+      ),
+    issue: z
+      .string()
+      .trim()
+      .regex(LINEAR_ISSUE_ID_PATTERN)
+      .optional()
+      .describe(
+        "The ticket's issue id, such as ENG-123, when the ticket exists. Leave it out only when you create the ticket after this decision; the result then carries a decisionId, and the route_ticket call for the new ticket passes it as billingDecision."
       ),
     sourceLabels: z
       .array(z.string().trim().min(1).max(120))

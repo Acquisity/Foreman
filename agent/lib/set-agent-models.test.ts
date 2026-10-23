@@ -7,6 +7,7 @@ import { gateway } from "ai";
 const blobStub = `data:text/javascript,${encodeURIComponent(`
 export const writes = [];
 export class BlobNotFoundError extends Error {}
+export class BlobPreconditionFailedError extends Error {}
 export const get = async () => ({
   stream: new Response('{"vision":"google/existing"}').body,
   blob: { uploadedAt: new Date(0) }
@@ -14,6 +15,7 @@ export const get = async () => ({
 export const put = async (key, content) => { writes.push({ key, content }); };
 export const head = async () => {};
 export const del = async () => {};
+export const list = async () => ({ blobs: [], hasMore: false });
 `)}`;
 const hooks = registerHooks({
   resolve(specifier, resolution, next) {

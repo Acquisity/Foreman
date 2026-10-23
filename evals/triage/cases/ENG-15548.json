@@ -1,0 +1,227 @@
+{
+  "id": "ENG-15548",
+  "provenance": "seeded",
+  "createdAt": "2026-10-15T22:04:36.663Z",
+  "lane": "triage",
+  "stratum": "duplicate",
+  "ticket": {
+    "title": "Would like to clearly see the time of the meeting and the prospect's time zone",
+    "description": "#### Customer Email\n\n<email>\n\n#### Workspace name\n\nAI Acquisition Sales Team\n\n#### Workspace ID\n\n<uuid>\n\n#### Which lead?\n\nAll leads\n\n#### What's wrong?\n\nTake a look at the screenshot. We can't see the time of the meeting in the prospect's time zone.\n\nAnybody working in a sales support role, like a show rate specialist or a sales development representative, can't easily call the lead and say, \"Your meeting is coming up. It's at X time on X day.\" We have to work it out separately.\n\nIt should be easily viewable in this screenshot, on any screen, and in any view that shows the meeting.\n\n#### Screenshot\n\n <image> \n\n#### Video link",
+    "attachmentKinds": ["image"]
+  },
+  "repoCommitAtCreate": "4df601fb2fd931ef4e002f5e4c6a7db93e9910c2",
+  "flags": {
+    "descriptionEditedAfterCreate": false,
+    "needsProductionData": false,
+    "alreadyFixedAtTriage": false
+  },
+  "asFiled": {
+    "assignee": "James Keeble",
+    "labels": [],
+    "parent": null,
+    "priority": 3,
+    "project": "CRM"
+  },
+  "relatedSnapshot": [
+    {
+      "id": "ENG-15490",
+      "createdAt": "2026-10-15T14:28:37.055Z",
+      "title": "Show the prospect's local time on CRM meeting cards",
+      "state": "In Progress",
+      "assignee": "Ebubeker Rexha",
+      "parent": null,
+      "labels": ["Customer reported", "Feature Request"],
+      "description": "#### Customer Email\n\n<email>\n\n#### Workspace name\n\nAI Acquisition Sales Team\n\n#### Workspace ID\n\n<uuid>\n\n#### Which lead?\n\nnone\n\n#### What's wrong?\n\nplease can you add the prospects timing that the call will be. see in the screenshot it says 2pm, which is my time in the UK, when i call the prospect its essential i tell them their call is at, for example, 9am (in their timezone: eastern, central, pacific).\n\nwould be super helpful if the time their call was could be visible in their timezone as well as my own\n\n#### Screenshot\n\n <image> \n\n#### Video link\n\n#### Scope\n\nThe meeting cards on the contact and deal Meetings tabs label the rep's time with their timezone and add the prospect's time, using the timezone the prospect booked in. The contact's timezone is not used as a fallback.\n\nDone when:\n\n* A UK rep sees their time labelled BST/GMT and the prospect's Eastern time on a Calendly booking.\n* No prospect time appears for a booking stored as UTC, or when the rep and prospect share the same clock.\n* It works on both the contact and deal Meetings tabs."
+    },
+    {
+      "id": "ENG-1507",
+      "createdAt": "2025-09-27T15:25:38.768Z",
+      "title": "Edit the prompt to always say what timezone it's suggesting the times in",
+      "state": "Done",
+      "assignee": "Blaise Gulaj",
+      "parent": null,
+      "labels": [],
+      "description": "* Use EST by default\n* Change from EST to something else if it can easily infer it from the email thread, eg. the prospect saying they're in Name 1 etc."
+    },
+    {
+      "id": "ENG-5122",
+      "createdAt": "2026-02-04T17:40:36.260Z",
+      "title": "AI SDR v2: Timezones",
+      "state": "Done",
+      "assignee": "Koppany Kondricz",
+      "parent": null,
+      "labels": [],
+      "description": "We need to investigate for potential issues around timezones and how the Agent decides to handle ambiguity around them.\n\nie: prospect says \"let's meet at 2pm\" -> it's unclear what timezone the user means. We need to make the AI agent intelligent enough to respond to the prospect looking for clarification and then handle scheduling correctly based on responses"
+    },
+    {
+      "id": "ENG-5556",
+      "createdAt": "2026-02-15T22:44:14.046Z",
+      "title": "Calendar meeting time shifted overnight across time zones",
+      "state": "Canceled",
+      "assignee": "Koppany Kondricz",
+      "parent": "ENG-5122",
+      "labels": ["Bug"],
+      "description": "user: <email>\n\nA scheduled meeting that was correctly shown as 1:00am (Name 4 time) for a 2:00pm UK meeting later switched overnight to 1:00pm (Name 4 time), which would be 3:00am UK. The client did not attend.\n\nProspect/client name: Name 2.\n\nAfter trying to reset the meeting in Name 3 Calendar, it was created at a strange time again."
+    },
+    {
+      "id": "ENG-3670",
+      "createdAt": "2025-12-11T14:35:43.360Z",
+      "title": "Fix AI SDR to adhere to timezone setting in replies",
+      "state": "Canceled",
+      "assignee": "Pieter Venter",
+      "parent": null,
+      "labels": ["Feature Request"],
+      "description": "The AI SDR currently ignores the timezone configured in Settings > Availability and instead always uses EST/EDT in responses.\n\nUpdate the AI SDR so that when composing replies and suggesting meeting times, it uses the timezone from the campaign timezone setting, rather than defaulting to EST.\n\nExamples from customers show cases where:\n\n* A GP set their timezone to GMT but prospects still see times in EST.\n* Users in Name 5 (AEDT) and the UK report the AI SDR continues to present times in EST despite their local timezone settings.\n\nRelevant screenshots:\n\n <image> \n\n <image> "
+    },
+    {
+      "id": "ENG-5654",
+      "createdAt": "2026-02-18T18:11:48.159Z",
+      "title": "Name 6/Dublin GMT options to timezone picklist",
+      "state": "Canceled",
+      "assignee": "Jared Stauffer",
+      "parent": null,
+      "labels": ["Improvement"],
+      "description": "user: <email>\n\nIn Cold Email Agent default campaign settings, the timezone dropdown does not show the standard (UTC+00:00) Name 7 option with cities like Name 8, Name 9, Name 10, or Name 11. Workaround used: selecting an equivalent UTC+00:00 entry (e.g., Isle of Man), but request is to include main cities in the list rather than obscure locations."
+    },
+    {
+      "id": "ENG-9676",
+      "createdAt": "2026-06-03T19:16:52.454Z",
+      "title": "AI SDR books meetings five hours ahead",
+      "state": "Todo",
+      "assignee": "Koppany Kondricz",
+      "parent": null,
+      "labels": [],
+      "description": "User details:\n\n* Name 12\n* <email>\n* Name 12's Workspace\n\nAI SDR is booking meetings 5 hours ahead of the intended time, and the customer has to correct them manually in Outlook.\n\nThe customer said the relevant settings were already aligned and then updated the Cold Email setting so all configured timezones matched, but another meeting was still booked 5 hours ahead afterward. They also noted this should not require a manual timezone change twice per year for daylight savings.\n\nExamples shared in the conversation:\n\n* A booking confirmation email showed a meeting with Name 13 on June 8, 2026 at 12:30 PM CDT.\n* The corresponding Outlook event for that meeting showed 5:30 PM to 6:00 PM and listed the invite timezone as America/Los_Angeles.\n* Another meeting example with Name 14 showed 6:00 PM to 6:30 PM and listed the invite timezone as America/New_York.\n\n <image> \n\n <image> \n\n <image> "
+    },
+    {
+      "id": "ENG-14760",
+      "createdAt": "2026-10-05T21:42:34.986Z",
+      "title": "AI SDR follow-ups offer live, code-filled meeting times",
+      "state": "Todo",
+      "assignee": "Koppany Kondricz",
+      "parent": "ENG-14756",
+      "labels": [],
+      "description": "## Overview\n\nFollow-ups can offer real, currently free meeting times again. The model never types a time: it leaves a placeholder, and code fills it with live slots from the host's calendar, in the prospect's time zone, right before sending. If the prospect then replies \"the first one works\", it books.\n\n## Problem\n\n* Since 11 Sep, follow-ups can't offer times. That ban came after follow-ups invented dates: 109 of 363 dated follow-ups named a date already in the past.\n* The times our earlier reply offered have usually passed by the time we follow up: in 72% of second follow-ups and 98% of third follow-ups, every offered time had gone.\n* Prospects who revive mostly propose a time or ask us to resend times, so a follow-up with fresh times removes a round trip.\n\n## User experience\n\n* A prospect who was offered times and went quiet gets a follow-up with 2 or 3 new, currently free times for the same call, in their own time zone, plus \"or tell me a day that suits\".\n* If they reply with one of those times, the AI books it exactly as it books times from a normal reply.\n* If the host has no free time, the follow-up is written without times (\"want me to send a couple of options?\"), never with made-up ones.\n* If the times we offered earlier are gone because the host's calendar filled up, the follow-up can say so truthfully (\"those filled up, here are a few new ones\"). If they're gone only because the dates passed, it just offers new times without giving a reason.\n\n## What's included\n\n1. **Live slot fetch** at send time, reusing the deterministic part of today's slot matching:\n   * the campaign's host calendar\n   * the call type\n   * free slots\n   * business hours\n   * 3 spread-out slots in the prospect's time zone\n2. **The** `{{TIMES}}` **placeholder.** It becomes allowed in the writer prompt (`fresh_times_available: yes` when at least 2 slots are free), and code replaces it with the formatted slots.\n3. **Record the offered slots** exactly as a normal reply does: a slot-matchmaking record with the proposed slots, and the thread moved to \"slots sent\". The next reply's booking then recognises \"the first one works\".\n4. **Final checks** on the rendered email:\n   * every time in it is one of the fetched slots;\n   * no slot starts within 12 hours.\n   * If fewer than 2 slots are free at render time, regenerate once with `fresh_times_available: no`. If that also fails the checks, skip the follow-up.\n5. **Ships as a new writer version (arm)** with the same prompt plus times, so its effect is measured on its own.\n6. **Taken or passed.** Before writing, code sorts each time we offered earlier into one of three groups:\n   * **passed:** it now starts less than 12 hours from now, so it can't be booked;\n   * **taken:** it's still in the future, but it's no longer in the host's free slots;\n   * **still open:** it's still free.\n\n   The writer gets `offered_times_taken: yes` only when nothing is still open and at least one time was taken. Only then may it say the earlier times filled up. A final check rejects \"filled up\", \"booked up\", \"snapped up\", \"got taken\" and similar wording in any other case, because that would be invented scarcity, which the prompt bans.\n\nNo calendar holds: the normal booking step already re-checks availability when the prospect picks a time.\n\n## Blocked by\n\n* ENG-14758: the new writer, placeholders and checks.\n\n## Done when\n\n- [ ] In preview, a follow-up on a thread whose offered times have all passed shows 3 new free times from the host calendar in the prospect's time zone.\n- [ ] Replying \"the first one works\" to that follow-up books the first slot (preview end to end).\n- [ ] With the host calendar fully blocked, the follow-up goes out without times, or is skipped, and never shows a made-up time.\n- [ ] When a time we offered earlier has since been taken on the host calendar, the follow-up may say those times filled up. When the times only passed, it gives no reason. Unit tests cover the passed, taken and still-open groups, and the check that rejects \"filled up\" wording unless `offered_times_taken` is yes.\n- [ ] Unit tests cover: slot formatting across time zones and daylight-saving, the 12-hour minimum notice, the \"fewer than 2 slots\" path, and the check that every rendered time is a fetched slot.\n- [ ] The times version runs as its own arm, and the weekly report shows it separately.\n\n## Implementation context\n\n* Plan and evidence: AI SDR Follow-ups v2\n* Related: ENG-14743 (scheduling context on replies) and ENG-13492 (the 11 Sep ban this replaces).\n* Exact functions to reuse and the tests are in this ticket's AI context.md."
+    },
+    {
+      "id": "ENG-15400",
+      "createdAt": "2026-10-14T15:19:55.188Z",
+      "title": "Chat widget: The prospect is asking for us to book a meeting through his appoin…",
+      "state": "Triage",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [],
+      "description": "## Report\n\nReported by: Customer\n\nWhat went wrong: The prospect is asking for us to book a meeting through his appointment setter, but we can't obtain the link. Need his calendar link.\n\n## Conversation\n\nWorkspace: <domain> (<uuid>)\n\nConversation: <url:app.acquisity.ai>\n\nReported reply: <uuid>\n\nForeman run: unknown\n\n### Transcript (oldest first, customer-visible turns only, last 12 turns max)\n\nCustomer: The AI SDR is sending time slots not based on the prospects time zone\n\nForeman: I haven't looked into your workspace for this yet. Tap the magnifying glass next to the message box and send your message again, and I'll dig in.\n\nCustomer: The AI SDR is sending time slots not based on the prospects time zone\n\nForeman: Looking at Name 16's thread, the saved prospect timezone is Asia/Calcutta, but in his last message he says he's on US Central time. The slot message offered times in the host's timezone rather than his, and the host's saved timezone is also Asia/Calcutta. That mismatch is the likely reason the times looked wrong for him. I can't tell yet whether the AI SDR or a person wrote that slot message (the thread is currently under human takeover), or how the saved timezone got set. I also can't tell whether every slot message is affected.\n\nHere's what to do:\n\n1. Name 15 thread in AI SDR Inbox, go to Contact details, then Edit timezone, and set it to his real timezone.\n2. Go to Settings, then Availability, and check that your timezone is right. Click Save.\n\nIf other threads still show the wrong prospect timezone after that, send me the prospect's name and the slot message that went out. You can attach up to three screenshots to a message here.\n\nCustomer: the prospect mentioned using a link in his email to book a meeting. How can I get this link?\n\nForeman: Sorry, I couldn't finish checking that. Please send your message again and I'll take another look.\n\n## Browser\n\nReported at: 2026-10-14T15:19:54.813Z\n\nPage: /dashboard/<workspace-slug>/ai-sdr\n\nBrowser: Chrome 154.0.0.0, macOS   Screen: 1920x1080   Name 17 version: 5b359d4fdc60\n\nSentry replay: none\n\nSentry errors: none\n\n### Console errors (last 30, newest last, each line max 300 chars)\n\n(none)\n\n### Failed network calls (last 30, newest last)\n\n```text\n15:12:36 POST /api/client/available 403 536ms\n15:12:36 POST /api/client/users 403 249ms\n15:12:40 POST /api/client/available 403 139ms\n15:12:45 POST /api/client/available 403 257ms\n```\n\n<!-- chat-widget-feedback conversation=<uuid> message=<uuid> run=none replay=none at=2026-10-14T15:19:54.813Z -->"
+    },
+    {
+      "id": "ENG-5758",
+      "createdAt": "2026-02-21T14:31:06.489Z",
+      "title": "AD SDR offering incorrect meeting times in GMT",
+      "state": "Duplicate",
+      "assignee": "Koppany Kondricz",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "#### Customer Name\n\nName 18\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nCompany One\n\n#### Screenshot\n\n <image> \n\n <image> \n\n <image> \n\n <image> \n\n <image> \n\n#### What are you trying to achieve?\n\nAD SDR getting confused and ruining prospect\n\n#### What are you doing to achieve it?\n\nProspects replied to set meeting and offered their calendly\n\n#### What is happening instead?\n\nAD SDR ignored prospects calandly, and continued to offer times, but switched to GMT, offering times in the middle of the night for the prospect.\n\n#### What is the expected outcome?\n\nBook a meeting"
+    },
+    {
+      "id": "ENG-11505",
+      "createdAt": "2026-07-11T16:23:39.109Z",
+      "title": "AI SDR offers overnight/pre-dawn meeting slots in prospect's timezone (no business-hours filter)",
+      "state": "Done",
+      "assignee": "Koppany Kondricz",
+      "parent": null,
+      "labels": ["Bug", "triaged-by-devin", "weekend-fastlane"],
+      "description": "Triaged by Name 19 from the Jul 11 2026 Raindrop Daily Summary. Raindrop confirmed CRITICAL issue.\n\n## Symptom\n\nBOOKING/scheduling replies offer prospects meeting slots that land at overnight/pre-dawn hours **in the prospect's local timezone** (midnight, 1:00am, 1:30am, 3:30am, 5:00am, 6:00am). The copywriter is instructed to relay the provided TIMES TO OFFER verbatim, so it faithfully sends them. Prospects flag them as middle-of-the-night; the times are unusable for a business call and are producing false 'that slot got snapped up' follow-ups.\n\n## Impact / evidence\n\n* Raindrop CRITICAL issue Overnight meeting times offered in booking emails: 146 events, 58 users, first seen Jul 7, still firing Jul 11. Affected agent: `copywriter` (anthropic/claude-sonnet-4.5).\n* Related stumbles: 1:00am–5:00am slots proposed; 3:30am slot; and a 2-hour-forward offset variant (11 AM → 1 PM MST).\n* Painful conversation 29e270fa shows an overnight slot offered, then apologised for, inside a 3.86-day scheduling loop with zero successful bookings.\n\n## Root cause (verified in code)\n\nSlots are generated from the **calendar owner's** work hours in the owner's timezone (`bookingService.getTimeSlots` → `schedulingRepository.getWorkHoursByUser`). In `apps/web/lib/ai-sdr-v2/workflow/steps/slot-matchmaking.ts` the only local-time filter applied before proposing slots is the **weekend** filter (`filterWeekendSlots`, prospect tz). There is **no filter that drops slots falling outside reasonable business hours in the prospect's timezone**. When the prospect is in a distant timezone from the calendar owner, the owner's business-hours slots convert to overnight prospect-local times and are offered as-is (`formatSlotForDisplay` renders them in `prospectTimezone`).\n\nSecondary bug: `selectDiverseSlots` in `apps/web/lib/ai-sdr-v2/workflow/helpers/time-slot-generator.ts` classifies morning/afternoon using `dayjs(s).utc().hour() < 12` — i.e. in **UTC**, not the prospect's (or owner's) timezone — so the AM/PM diversity logic is also timezone-incorrect.\n\nNote: prospect tz can also fall back to `locationTimezone ?? calendarUser?.timezone ?? 'America/New_York'` (`data-normalizer.ts`), so a mis-detected tz can compound the display error.\n\n## Suggested fix direction\n\nAdd a prospect-timezone business-hours guard (e.g. drop/deprioritise slots outside ~8am–6pm prospect-local) in slot-matchmaking before proposing, and fix `selectDiverseSlots` to bucket AM/PM in the prospect tz rather than UTC.\n\n## Name 20 / related\n\nSame timezone-handling domain as ENG-8998 (books appointments in wrong tz; the 2-hour-shift symptom matches), ENG-9676 (books meetings 5 hours ahead), and ENG-10063 (timezone normalization pass — likely the fix home). This ticket is the **offer-side** symptom (bad slots proposed) vs those booking-side wrong-time symptoms; linking rather than duplicating."
+    },
+    {
+      "id": "ENG-6446",
+      "createdAt": "2026-03-09T14:13:09.834Z",
+      "title": "AI SDR inbox not receiving new replies for days",
+      "state": "Done",
+      "assignee": "Beth Newton",
+      "parent": null,
+      "labels": [],
+      "description": "user: <email>\n\nAI SDR inbox stops showing new inbound replies (including expected out-of-office / do-not-contact responses) for multiple days while outbound campaigns continue sending. Email accounts show active.\n\nAuto Agent Run was found OFF per campaign and was turned back ON, but inbound volume still appears to be zero. A manual test reply to a campaign email did appear in the AI SDR inbox, yet normal inbound traffic is still missing; request is to investigate deeper (reply ingestion / campaign processing / account status)."
+    },
+    {
+      "id": "ENG-12050",
+      "createdAt": "2026-07-25T12:38:31.158Z",
+      "title": "AI SDR offers AEST times to US prospects and books the wrong slot when the prospect replies in a US timezone",
+      "state": "Done",
+      "assignee": "Koppany Kondricz",
+      "parent": null,
+      "labels": ["Bug", "Docs Gap", "intercom-sourced", "triaged-by-devin"],
+      "description": "Reported via Loom + #customer-support-investigations (no Intercom conversation for this one).\n\n#### Customer\n\nName 21 — <email> — workspace **Name 22 AI** (`<uuid>`), campaign \"Fractional Executive businesses | Name 23 approach\" (`<uuid>`).\n\nLoom: <loom>\nSlack: <url:acquisityworkspace.slack.com>\n\n#### Symptom\n\nAI SDR offers **AEST** times to US prospects, and when the prospect replies with a US time it confirms and books a completely different (usually overnight) time. Multiple threads in the same campaign; at least one real Zoom appointment was created at the wrong time.\n\n#### Two distinct defects\n\n**1. Prospect timezone silently falls back to the host's timezone.**\n\n`apps/web/lib/ai-sdr-v2/data-normalizer.ts` (thread creation):\n\n```ts\nconst defaultTimezone =\n  locationTimezone ?? calendarUser?.timezone ?? 'America/New_York';\n// ...\nprospectTimezone: defaultTimezone,\n```\n\nThis customer's leads carry no location data (`custom_fields` has no location/state/country) and the campaign has no `location`, so `getTimezoneFromLocation()` returns null and every US prospect's thread is stamped with the *host's* timezone (`Australia/Melbourne` at the time). The AI SDR then formats offered slots in the prospect's timezone — i.e. AEST — and the host's 9–5 Name 5 availability means the only bookable slots for a US prospect are overnight.\n\nThere is no signal that the timezone was guessed from the host rather than derived from the prospect. ENG-11716's review note already says \"Do not assume organization timezone equals prospect timezone for booking… record timezone source and confidence\"; this is the concrete production case for it.\n\n**2. The** `selected_offered_slot` **fast path ignores the timezone the prospect stated.**\n\n`apps/web/lib/ai-sdr-v2/workflow/steps/data-extraction.ts`: when the extractor sets `selected_offered_slot`, the workflow takes the \"FAST PATH\" and reuses the exact UTC instant of the previously offered slot, even when the same extractor output says the prospect's timezone is different from the one the slot was offered in.\n\nProduction evidence, thread `<uuid>` (<email>):\n\n* Run `<uuid>` — offered \"Tuesday at 10am, Wednesday at 1:30pm, or Thursday at 11:30am AEST\".\n* Prospect replied choosing **1:30 PM ET**.\n* Run `<uuid>` — data-extraction output: `{\"timezone\":\"America/New_York\",\"selected_offered_slot\":1}`, reasoning: *\"Prospect selected previously offered slot #2: Wednesday, July 29th at 1:30 PM AEST (2026-07-29T03:30:00.000Z)\"*. The stated `America/New_York` was discarded; slot-matchmaking took the AEST instant and booking created appointment `<uuid>` (Zoom `84370563861`), and the reply said \"Tuesday, July 28th at **11:30 PM EDT** is locked in.\"\n* The prospect had to correct it; only then did the thread timezone flip to `America/New_York`.\n\nSame pattern, thread for <email> (runs `<uuid>`, `<uuid>`): offered \"…10:30am AEST\", prospect asked for a CT time, AI confirmed \"Monday, July 27th at **7:00 PM CDT**\".\n\n#### Expected\n\n* When the prospect's timezone cannot be derived from lead/reply data, do not silently use the host's timezone as the prospect's — either ask, or clearly label offers in the host's timezone as such.\n* When a prospect picks an offered slot but states a timezone that differs from the one the slot was offered in, treat it as a timezone conflict: re-resolve the time in the stated timezone, or ask, rather than booking the original UTC instant.\n* Don't confirm/book slots that land outside business hours in the prospect's timezone (ENG-11505 covered the offering side; the booking/confirmation side still does it).\n\n#### Related\n\nENG-11716, ENG-10063, ENG-8998, ENG-9676, ENG-11505, ENG-7595.\n\n#### Docs gap\n\n`/docs/ai-sdr/faq/scheduling-calendar/how-do-i-set-the-correct-timezone-for-my-ai-sdr` says the AI SDR proposes times \"in the prospect's local timezone when it can determine it (from their location or their reply)\" but never states what happens when it *can't* — that it falls back to the call handler's timezone, and that leads imported without location fields will therefore be treated as being in the host's timezone. Worth documenting, plus a note that lead lists should include city/state/country for timezone inference."
+    },
+    {
+      "id": "ENG-2747",
+      "createdAt": "2025-11-16T15:08:47.166Z",
+      "title": "AI SDR proposes meeting times outside of prospect's stated future timeline",
+      "state": "Canceled",
+      "assignee": "Koppany Kondricz",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "## Found Problem\n\nThe AI SDR is not recognizing when a prospect provides a **general future timeline** for availability and instead proposes meeting times that fall outside of the prospect's stated timeframe.\n\n## Reproduction Steps\n\n1. Prospect (Name 26) responds to podcast invitation expressing interest\n2. Prospect provides specific times for a **brief call** in the current week:\n   * Thursday, Nov 13 at 1:00 PM EST\n   * Friday, Nov 14 at 12:00 PM EST\n   * Monday, Nov 17 at 2:00 PM EST\n3. Prospect states: \"I've suggested times in EST - please let me know if you're in a different timezone and I'll adjust accordingly\"\n4. Prospect (Name 25) responds indicating interest but provides a **future timeline**: \"The first week of December is somewhat open\"\n5. AI SDR **ignores the December timeline** and proposes times in the current week (November) instead\n6. This creates confusion as the prospect explicitly stated December availability\n\n## Expected Behavior\n\nThe AI SDR should:\n\n1. **Detect and recognize** when a prospect provides a general future timeline (e.g., \"first week of December\", \"early January\", \"sometime next month\")\n2. **Propose meeting times that align** with the stated future timeline\n3. **Not propose times outside** of the prospect's indicated availability window\n4. Understand the difference between:\n   * Specific times for the current week (brief call)\n   * General future availability for the main meeting (podcast recording)\n\n## User Information\n\n* **Reported by:** Name 24\n* **Prospect 1 (Name 26):** Provided specific times for current week\n* **Prospect 2 (Name 25):** Stated \"first week of December is somewhat open\"\n* **AI SDR:** Proposed November times despite December preference\n\n## Screenshots\n\nSee attached screenshots showing:\n\n1. Name 26's response with specific current week times\n2. Name 25's response mentioning \"first week of December\"\n3. AI SDR proposing times outside the stated December timeline\n\n <image> \n\n <image> \n\n## Related Issues\n\n* Similar to ENG-2642 but more specifically focused on the AI SDR not parsing/recognizing future timeline references like \"first week of December\""
+    },
+    {
+      "id": "ENG-6447",
+      "createdAt": "2026-03-09T14:13:09.786Z",
+      "title": "Meeting invite shows UTC timezone when booked",
+      "state": "Canceled",
+      "assignee": "Beth Newton",
+      "parent": null,
+      "labels": [],
+      "description": "user: <email>\n\nWhen booking a meeting from the CRM Appointments section, the meeting is booked correctly but the calendar invite displays the invitee time zone as UTC, which confuses attendees. Availability timezone is set to ET; reconnecting Name 3 Calendar was attempted.\n\n <image> "
+    },
+    {
+      "id": "ENG-4229",
+      "createdAt": "2026-01-06T20:04:53.203Z",
+      "title": "AI SDR books meetings at different time than confirmed",
+      "state": "Canceled",
+      "assignee": "Koppany Kondricz",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "AI SDR confirmed a meeting for 10:00 AM EST on the 8th with a lead, but the actual Name 3 Calendar event was created for 3:00 PM EST.\n\nThe user reports that all calendar and profile timezones appear to be configured correctly, so this looks like a bug in the AI SDR scheduling / timezone handling rather than a configuration issue.\n\nRelevant screenshots:\n\n <image> \n\n <image> "
+    },
+    {
+      "id": "ENG-6625",
+      "createdAt": "2026-03-11T17:35:57.841Z",
+      "title": "Email confirmation shows different meeting time than calendar",
+      "state": "Duplicate",
+      "assignee": "Jared Stauffer",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "A booked meeting appears with the correct day and time on the calendar, but the email confirmation shows a different time.\n\nIn the reported example, the AI agent scheduled the meeting for 3/16 at 11am in the email, while the calendar event came through at 3pm on 3/16. The calendar timezone was checked and is set to EST.\n\nRelevant screenshots are attached below.\n\n <image> \n\n <image> "
+    },
+    {
+      "id": "ENG-13875",
+      "createdAt": "2026-09-14T22:31:32.090Z",
+      "title": "Dynamic Zoom meetings are created with a start time shifted by the booking timezone offset",
+      "state": "Done",
+      "assignee": "Anuj Bhatt",
+      "parent": null,
+      "labels": ["Bug", "fast-lane"],
+      "description": "## Overview\n\nDynamic Zoom meetings created by Acquisity are scheduled at the wrong instant. The booked appointment, the Name 3 Calendar event and the CRM record all carry the right time; the Zoom meeting that Acquisity creates from them is shifted by the booking timezone's UTC offset, four hours late for a US Company Three workspace. Hosts and prospects who read the Zoom meeting rather than the calendar invite see the wrong time.\n\n## Problem\n\nWhen the AI SDR or a CRM booking creates a dynamic Zoom meeting, the meeting's start time in Zoom does not match the appointment. A booking stored at 2026-09-16T14:30:00Z (10:30 AM America/New_York) is created in Zoom as 2:30 PM Eastern. Directly created Zoom meetings and meetings on a static link are unaffected. Every dynamic Zoom booking made for a host whose booking timezone is not UTC carries the shift, equal to that zone's offset from UTC.\n\n## Root cause\n\n`translateEvent` in `apps/web/lib/integrations/conferencing/zoom-video-api-service.ts` (line 286) emits `start_time: dayjs(event.startTime).utc().toISOString()`, which serialises as `YYYY-MM-DDTHH:mm:ss.SSSZ` with milliseconds, while line 292 also sends `timezone: event.organizer.timeZone`. Zoom accepts only `yyyy-MM-ddTHH:mm:ssZ` for GMT or `yyyy-MM-ddTHH:mm:ss` plus a `timezone` ID. On the millisecond-bearing form Zoom ignores the `Z` and reads the clock digits as local time in the supplied zone, so 14:30Z becomes 14:30 New York. Both `createMeeting` (line 349) and `updateMeeting` (line 393) share `translateEvent`.\n\nZoom's own documentation states the two accepted formats, and Zoom Developer Forum reports for the identical `.000Z` input record the `Z` being ignored and the value treated as local time (devforum.zoom.us/t/create-meeting-endpoint-problems/134291 and devforum.zoom.us/t/meeting-api-is-parsing-start-time-in-the-wrong-timezone/84492). The same behaviour reproduced with no `timezone` field present, so the start-time format, not the field's presence, is the trigger.\n\n## Blast radius\n\nDynamic Zoom meetings created in the last 30 days: 2,603 appointments across 320 organizations, counted 2026-09-14 from the production database with\n\n`select count(*), count(distinct organization_id) from scheduling_appointment where deleted_at is null and meeting_id is not null and meeting_id <> 'static' and meeting_url ilike '%zoom.us%' and created_at > now() - interval '30 days'`\n\nPotentially exposed: 1,489 users hold a valid Zoom conferencing account and every one of them runs the same payload; 1,329 users were configured for dynamic links over the same 30-day window. Confirmed affected: one workspace so far, with two current appointments and direct evidence. Counting limitation: the Zoom request and response are not persisted, so affected meetings cannot be read back and are counted from appointment rows.\n\n## Proposed fix\n\nSend Zoom a start-time format it honours. Either the local wall-clock in the booking timezone with no `Z` plus the `timezone` field, or the UTC instant stripped of milliseconds. Keep the appointment instant authoritative; the change is serialisation only. Do not fix this by dropping the `timezone` field alone, which leaves the millisecond-bearing form and the same shift.\n\n## What's included\n\nConferencing payload serialisation for Zoom, used by the AI SDR and CRM booking paths. Excluded: Name 3 and Outlook calendar writes, which already carry the correct instant; the static-link path; and the Zoom free/busy read, which re-normalises with `dayjs.utc` and is unaffected. Related for history, not owned here: ACQ-3599 and ENG-5589 (both closed without a durable fix, same symptom with other zones' offsets) and the Zoom-shift half of ENG-9776 (still open, mixed availability and timezone report).\n\n## Regression seam\n\nCreating a dynamic Zoom meeting for an appointment in a non-UTC booking timezone, then reading the meeting back, must return a start instant equal to the appointment instant. Red before the change (offset by the zone's UTC difference) and green after. `updateMeeting` already reads `meetings/{id}` back and can host the assertion; it needs the Zoom response schema to keep `start_time` and `timezone`, which `zoomEventResultSchema` currently discards.\n\n## Done when\n\n* A dynamic Zoom meeting created for an appointment in a non-UTC timezone carries the same start instant as the appointment, verified by reading the meeting back from Zoom.\n* The same holds for a meeting updated through the reschedule path, which shares `translateEvent`.\n* A regression test proves the red-before, green-after behaviour at the create-time read-back seam.\n\n## Reports\n\nTo be linked: the customer report for the Company Three workspace (ENG-13874)."
+    },
+    {
+      "id": "ENG-15020",
+      "createdAt": "2026-10-09T08:04:08.727Z",
+      "title": "Name 27 - AI SDR booking in wrong timezone",
+      "state": "Duplicate",
+      "assignee": "Koppany Kondricz",
+      "parent": null,
+      "labels": ["Bug", "Customer reported"],
+      "description": "#### Customer Name\n\nName 27\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 27\n\n#### Screenshot\n\n#### What are you trying to achieve?\n\nRun campaigns and have AI SDR book calls\n\n#### What are you doing to achieve it?\n\nCampaigns are live, AI SDR KB is set up\n\n#### What is happening instead?\n\nA couple of issues going on with AI SDR:\n\nIt's started sending times in MDT only, leading to prospects showing up at the wrong time - 6 of my last 8 appointments have shown up at the wrong time in the last two days.\n\nI have reset my local timezone (which is MDT) but it typically would send the local timezone of the prospect and I am not sure what effects that decision for the SDR\n\nI have another instance where the agent received a confirmed time but did not book the appointment - the next day it asked the prospect if there were interested in an appointment\n\n#### What is the expected outcome?\n\nPlease investigate and fix the issue."
+    },
+    {
+      "id": "ENG-7715",
+      "createdAt": "2026-04-11T09:14:01.933Z",
+      "title": "Fix time discrepancies in SDR call scheduling",
+      "state": "Done",
+      "assignee": "Beth Newton",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "#### Customer Name\n\nName 28 & Name 29\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nCompany Two\n\n#### Screenshot\n\n <image> \n\n <image> \n\n#### What are you trying to achieve?\n\nGet the SDR to book calls in the right times\n\n#### What are you doing to achieve it?\n\nConfiguring UTC time zones in the email campaign settings. Configuring UTC time zones in user profiles and associated calendars. Adding strict instructions to the SDR agent, including :   Name 30 the Name 31 time format (24-hour format) Explicitly mentioning “Paris time” Prohibiting the use of any other time zones Requiring that all appointments be proposed and scheduled exclusively in Name 31 time.\n\n#### What is happening instead?\n\nDespite these adjustments, we are still experiencing significant discrepancies (up to several hours) between the time mentioned in emails and the one actually scheduled in Name 3 Meet.\n\n#### What is the expected outcome?\n\nThat it books the correct times"
+    }
+  ]
+}

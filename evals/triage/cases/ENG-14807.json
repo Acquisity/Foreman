@@ -1,0 +1,237 @@
+{
+  "id": "ENG-14807",
+  "provenance": "seeded",
+  "createdAt": "2026-10-06T14:39:27.553Z",
+  "lane": "triage",
+  "stratum": "bug_master",
+  "ticket": {
+    "title": "No claendar time available error",
+    "description": "#### Customer Name\n\nName 32\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 32's workspace\n\n#### Screenshot\n\n <image> \n\n#### What are you trying to achieve?\n\nSolving a complaint from Name 33 about no calendar time being available to book client calls with the DFY closing team\n\n#### What are you doing to achieve it?\n\nFiling a ticket\n\n#### What is happening instead?\n\nerror message is preventing cold email AI SDR from sending meeting times\n\n#### What is the expected outcome?\n\nAISDR sends meeting times",
+    "attachmentKinds": ["image", "slack"]
+  },
+  "repoCommitAtCreate": "edea63ce6a527a80e9011292977d754b9f71e7dc",
+  "flags": {
+    "descriptionEditedAfterCreate": false,
+    "needsProductionData": true,
+    "alreadyFixedAtTriage": false
+  },
+  "asFiled": {
+    "assignee": "Aaron Fraga",
+    "labels": [],
+    "parent": null,
+    "priority": 1,
+    "project": "Support"
+  },
+  "relatedSnapshot": [
+    {
+      "id": "ENG-14028",
+      "createdAt": "2026-09-18T13:44:44.457Z",
+      "title": "AI SDR pauses booking and escalates \"no calendar availability\" when the derived free-slot list is empty",
+      "state": "Todo",
+      "assignee": "Koppany Kondricz",
+      "parent": null,
+      "labels": ["Bug", "fast-lane"],
+      "description": "## Overview\n\nWhen the AI SDR's availability lookup returns no candidate slots, the workflow escalates to a human with \"the assigned call host has no available time slots within the configured booking window\" and pauses the conversation. The list can be empty while the calendar genuinely has room, so the SDR stops answering positively-responding prospects and the operator is sent to inspect a working calendar.\n\n## Problem\n\nThe operator sees an AI SDR paused with a \"No meeting times available\" banner instructing them to review the calendar and availability limits, on a calendar that already holds meetings the AI SDR itself booked. Affected prospects receive no reply at all after a positive response. Documented behaviour for this state is to ask the prospect for their preferred times.\n\n## Root cause\n\n`offer-alternatives.ts` treats a successful `getTimeSlots` call that returns zero rows as proof the calendar is unavailable and escalates with `ESCALATION_REASONS.NO_CALENDAR_AVAILABILITY`. Added by bbf62d99 (\"escalate when calendar has no slots\", ENG-11895). The availability fetch has its own failure codes (`CALENDAR_DISCONNECTED`, `CALENDAR_SYNC_FAILED`) which slot-matchmaking already escalates on, so an empty successful result is a different condition and is not distinguished from it.\n\nThe empty result itself is arithmetic. `BookingService.getTimeSlots` builds the candidate slot at meeting duration plus the host's before/after buffers, and every existing appointment is represented as busy with its own stored `buffer_before_in_minutes` / `buffer_after_in_minutes`. In short work windows a small number of buffered bookings tiles the window completely, so the candidate set empties while the calendar still has room outside the host's configured availability hours.\n\nThe escalation also pre-empts the shipped fallback: `reply-directive.ts` `hasNoCalendarAvailability` → `ASK_FOR_PREFERENCES`, and the help centre states that when no slot passes the filters the AI SDR asks the prospect for their times. `workflow.ts` short-circuits on `ctx.state.escalate` before copywriter and send, so no reply is produced.\n\n## Who's affected\n\nUp to 6 Oct 2026, the AI SDR paused 391 conversations in 65 workspaces this way, with 399 escalation messages. The first was on 7 Sep 2026 and the latest on 6 Oct 2026, so it's still happening. When this ticket was written on 18 Sep 2026, the count was 166 messages in 26 workspaces.\n\nThe attached list, `ENG-14028-affected-workspaces.md`, gives each workspace's name and slug, its count and dates, the call host whose calendar the AI SDR checked, and the workspace owners.\n\nWe don't know how many other workspaces could hit this. We only see the problem when a conversation is paused, because we don't log how many free slots each lookup finds.\n\nWe also haven't proved the cause in every workspace. Our reproduction showed that a buffer of 30 minutes or more before each meeting can fill a short working day, so no free slot is left. When the ticket was written, 9 of the 26 workspaces had a buffer like that. Another 5 had 15-minute buffers before and after each meeting and only 4 to 8 hours of availability a week. The other 12 had smaller buffers or really were busy. We haven't rebuilt each workspace's free slots to confirm this.\n\nCounted on the read-only production replica on 6 Oct 2026:\n\n```sql\nselect count(*) as messages, count(distinct thread_id) as threads, count(distinct organization_id) as workspaces\nfrom crm_message where escalation_reason like 'No calendar availability%'\n```\n\n## Proposed fix\n\nSeparate \"the availability computation returned nothing\" from \"the calendar is unavailable\". An empty result on a successful fetch should not escalate; it should take the documented fallback and ask the prospect for their times, leaving the existing failure codes as the only setup-failure escalations. Review at the same time whether availability should be defined as availability hours minus every buffered booking, since the current definition empties short windows quickly and the banner copy then misdirects the operator.\n\n## What's included\n\nIn scope: the escalation condition in `offer-alternatives.ts` and the product decision about how buffered existing bookings reduce future availability.\nNot included: the single-slot booking-time re-check (ENG-13720) and the conferencing / meeting-location fail-closed gate (ENG-13957), which are different gates.\nContainment for the current population: the settings workaround below, applied per workspace.\n\n## Regression seam\n\nBoundary: `offer-alternatives` step output and `ctx.state.escalate`. Trigger: a booking-route turn where `getTimeSlots` succeeds with zero rows. Red before: step output carries `escalate: true` with `ESCALATION_REASONS.NO_CALENDAR_AVAILABILITY` and the workflow returns before send. Green after: no escalation, the turn routes to `ASK_FOR_PREFERENCES` and a reply is produced. Existing assertion to update: `steps/__tests__/slot-alternatives.test.ts` asserts the current escalation.\n\n## Done when\n\n* A successful availability fetch returning zero rows no longer sets `escalate` and no longer produces the no-calendar-availability banner.\n* The affected turn produces an outbound reply asking the prospect for their preferred times.\n* Genuine setup failures (`CALENDAR_DISCONNECTED`, `CALENDAR_SYNC_FAILED`, meeting-location) still escalate with their own reasons.\n* A regression test proves the empty-successful-fetch path at the `offer-alternatives` / `ctx.state.escalate` seam.\n* The help-centre statement about the fully-booked fallback matches shipped behaviour.\n\n## Reports\n\n* ENG-14008"
+    },
+    {
+      "id": "ENG-4838",
+      "createdAt": "2026-01-26T13:57:53.138Z",
+      "title": "AI-SDR fails to confirm provided calendar time slots",
+      "state": "Canceled",
+      "assignee": "Koppany Kondricz",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "Customer reports a bug where the AI-SDR repeatedly says there is no availability even after the lead provides multiple concrete time options. This results in a loop where the AI keeps asking for availability again instead of confirming a suggested time.\n\nReference recording: Loom video of the issue"
+    },
+    {
+      "id": "ENG-4356",
+      "createdAt": "2026-01-09T21:34:05.716Z",
+      "title": "AI SDR reports calendar times unavailable when they are free",
+      "state": "Canceled",
+      "assignee": "Koppany Kondricz",
+      "parent": null,
+      "labels": [],
+      "description": "The AI SDR keeps telling prospects that proposed meeting times are taken, even though those times are actually free on the connected calendar.\n\nThe user reports that the calendar connection and availability settings were already fixed before the latest occurrence, but the AI SDR still responded that the times were taken multiple times, leading the prospect to lose interest.\n\nRelevant screenshot:\n\n <image> "
+    },
+    {
+      "id": "ENG-4473",
+      "createdAt": "2026-01-12T21:36:24.954Z",
+      "title": "AI SDR reports no timeslots despite calendar availability",
+      "state": "Done",
+      "assignee": "Koppany Kondricz",
+      "parent": null,
+      "labels": [],
+      "description": "AI SDR repeatedly told prospects that Name 1 had no available timeslots this week, despite his Name 2 Calendar showing plenty of openings and his availability being configured correctly.\n\nAffected workspace and contacts:\n\n* Workspace: Name 1's workspace\n* Client: <email>\n* Prospects: <email> and <email>\n\nScreenshot of Name 1's calendar for the relevant week is attached below.\n\n <image> "
+    },
+    {
+      "id": "ENG-4296",
+      "createdAt": "2026-01-08T13:04:25.615Z",
+      "title": "AI SDR reports no availability despite open calendar slots",
+      "state": "Canceled",
+      "assignee": "Koppany Kondricz",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "AI SDR is telling leads that there is no availability even though the connected Name 2 Calendar has open time.\n\nDetails shared:\n\n* Calendar ID and connection have been verified.\n* User has events on the calendar marked as \"Free\" (e.g. long \"executive drop session\" blocks covering significant portions of the day).\n* Despite this, the AI SDR responds to leads that the user is unavailable.\n* The user has disconnected and reconnected the Name 2 Calendar after verifying details.\n* Calendly using the same calendar correctly identifies free and busy times, but the AI SDR does not.\n* The issue has now happened with multiple leads, and the user is concerned it may be a broader cross‑platform issue.\n\nThe user has a meeting scheduled with the \"special ops\" team (Name 3) and is prepared to walk through or record the issue if needed."
+    },
+    {
+      "id": "ENG-4269",
+      "createdAt": "2026-01-07T21:14:54.746Z",
+      "title": "AI email replies show times then say no available slots",
+      "state": "Canceled",
+      "assignee": "Koppany Kondricz",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "AI SDR email responses for GP Name 4 are sometimes saying “Here are some available times” and then immediately “There are no available times.”\n\nThis occurred 3 times today when responding to prospects. His calendar connection and availability settings appear correct, and his calendar is effectively empty. There is KB content mentioning calendar availability that might be confusing the AI.\n\nScreenshot example:\n\n <image> "
+    },
+    {
+      "id": "ENG-14363",
+      "createdAt": "2026-09-28T11:20:10.354Z",
+      "title": "AI SDR pauses booking-intent threads when the call host has no availability hours or no calendar selected for conflict checks",
+      "state": "Todo",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": ["Customer reported", "intercom-sourced"],
+      "description": "## Source\n\nIntercom conversation: <url:app.intercom.com>\nContact: Name 5 <email> (owner of several workspaces; the affected one is Name 8 and Associates, org <uuid>)\nReported: 2026-09-25 to 2026-09-28\n\n## Bounded context\n\nName 100 runs the \"GovCon | September\" campaign (active since 2026-09-23) from the Name 8 and Associates workspace. The campaign's assigned salesperson, and the workspace's assigned call handler, is Name 100 himself. Two interested prospects replied asking for a call:\n\n* Name 6 (<email>), booked-intent reply 2026-09-25 05:13 UTC, thread paused with the \"Availability required\" banner.\n* Name 7 (<email>), booking-intent reply 2026-09-25 18:58 UTC, thread paused with the \"Calendar disconnected\" banner.\n\nHis earlier ask: he used to leave availability hours empty so the AI SDR would not propose dates or times on the thread and the lead would go straight to the calendar, and he wants that behaviour back now that bookings/appointments changed. He also reports that after following advice to disconnect the calendar he could not open the AI SDR inbox without one, so he reconnected it with syncing off, and the same error came back.\n\n## Finding\n\nBoth pauses come from the workspace's own call-host setup, not from a platform fault:\n\n1. The call host has no availability hours. His scheduling_work_hours rows exist for all seven days with zero scheduling_work_time_slot entries, so slot matchmaking fails with the internal \"WeeklyAvailability must have at least one schedule\" validation and the workflow escalates as \"no bookable hours\". This is the product's designed response to a host with no bookable hours; leaving availability empty is no longer a supported way to stop the SDR proposing times.\n2. The only live, valid Name 2 calendar connection for that user has no calendars selected under \"Check for conflicts\" (check_for is empty). With nothing to check, the availability read treats every connected calendar as unusable and the thread pauses as \"Calendar disconnected / no longer authorized\", so reconnecting the calendar, the action the banner prescribes, cannot clear it.\n\n## What a human needs to do\n\n* Set availability hours for the call host in Settings -> Availability (and for the campaign's assigned salesperson), which is what the \"Availability required\" pause is asking for.\n* In Settings -> Email & Calendar re-select at least one calendar under \"Check for conflicts\" so the AI SDR can read free/busy again.\n* Resume AI SDR on the two paused threads and follow up with Name 6 and Name 7 by hand, since both replied with clear booking intent days ago.\n* Reply to Name 100 with the two settings that need changing.\n\n## Observations for product\n\n* The \"Calendar disconnected\" escalation and its \"reconnect\" instructions are shown for a calendar that is connected and authorised but has no calendars selected for conflict checking. A count on 2026-09-28 found 15 AI SDR v2 workspaces whose booking host has only empty-selection calendar connections, so this wording can send operators round a loop that the suggested fix cannot close.\n* There is no setting that makes the AI SDR skip offering times while still acting on booking intent. The requested behaviour (\"never propose date and time, just send the invite\") needs a product decision; the closest supported behaviour is the documented fall-back that asks the prospect for their times."
+    },
+    {
+      "id": "ENG-4464",
+      "createdAt": "2026-01-12T16:36:47.488Z",
+      "title": "Scheduling calendar shows slots unavailable when they are available",
+      "state": "Duplicate",
+      "assignee": "Jared Stauffer",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "user: <email>\n\nCustomer reports ongoing issues with scheduling availability and calendar sync:\n\n* Invitees agree to a time slot, are told it is not available, but the slot is in fact available.\n* After they are added to the calendar, they receive an email saying the spot is not available.\n* A separate case where an SDR confirmed a Friday 9:00 AM slot, but it was never added to the calendar and the system then tried to book the same person again; by then, the time was no longer available.\n* Customer says this problem was previously reported as fixed but is still occurring.\n\nCustomer provided screen recordings demonstrating the issue:\n\n* Loom video 1\n* Loom video 2"
+    },
+    {
+      "id": "ENG-6902",
+      "createdAt": "2026-03-20T11:56:43.452Z",
+      "title": "AISDR marks available times as unavailable",
+      "state": "Canceled",
+      "assignee": "Koppany Kondricz",
+      "parent": "ENG-6737",
+      "labels": [],
+      "description": "Client: **Name 9** <email>\n\nAISDR is advising prospects that availability is blocked when there are open times on the calendar.\n\nThis has happened more than once. One reported example is from Name 10, who booked Wednesday at 10:00 AM being treated as unavailable even though there was only one meeting an hour earlier, so buffer time should not have blocked that slot.\n\nClient manually created the meeting you now see at 10MDT on the 25th. This is an Urgent issue and would appreciate a speedy fix and an update early next week.\n\nA screen recording was shared in Jam.\n\n <image> "
+    },
+    {
+      "id": "ENG-4681",
+      "createdAt": "2026-01-20T00:18:19.970Z",
+      "title": "SDRs report no available time slots after proposing times",
+      "state": "Done",
+      "assignee": "Beth Newton",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "#### Customer Name\n\nName 11 and Name 12\n\n#### Customer Email\n\n<email>\n\n#### Screenshot\n\n#### Clear description of what the problem is\n\nSDRs is saying there is no available time slot whilst it first proposed the exact time before. It Did this multiple times\n\nExample lead: Name 13\n\nChecked if it was a issue with old and new AI Sdr and if settings are incorrect, etc but everything looks ok.\n\nRegarding this thread: <url>>"
+    },
+    {
+      "id": "ENG-3504",
+      "createdAt": "2025-12-06T18:14:41.336Z",
+      "title": "Fix availability dropdown time slot rendering bug",
+      "state": "Canceled",
+      "assignee": "Anuj Bhatt",
+      "parent": null,
+      "labels": [],
+      "description": "## 🐛 Bug Report\n\nUser reported that the availability dropdown for time slots is displaying malformed values (`--:--`, `...00`) instead of proper time options (e.g., `09:00`, `09:15`, etc.)\n\n## 📸 Screenshot\n\nScreenshot provided by user shows dropdown displaying:\n\n* `09:00` (correct)\n* `--:--` (malformed)\n* `...00` (truncated/partial)\n\n## 🔍 Root Cause\n\nThe `TimeSlotOptions` component in `schedule-card.tsx` was wrapping `SelectItem` components in a `ScrollArea` component. This was interfering with Radix UI's `SelectContent` native viewport and scrolling behavior, causing the dropdown to render incorrectly.\n\n## ✅ Solution\n\n* Removed the `ScrollArea` wrapper from the `TimeSlotOptions` component\n* Removed unused `ScrollArea` import\n* Let `SelectContent` handle scrolling natively through Radix UI primitives\n\n## 📝 Implementation Details\n\n**File:** `components/user/schedule-card.tsx`\n\nThe fix allows the Select dropdown to use its built-in scrolling capabilities without external interference, ensuring all 96 time slots (00:00 - 23:45 in 15-minute intervals) render properly.\n\n## 🔗 Related PR\n\nPR #1788: <url:github.com>\n\n## 👤 Reported By\n\nName 14 (via Slack) - experiencing the issue when trying to set availability times\n\n## 🎯 Acceptance Criteria\n\n- [X] Code changes made\n- [ ] Dropdown displays all time slots correctly\n- [ ] Scrolling within dropdown works smoothly\n- [ ] No malformed time values (--:--, ...00)\n- [ ] Times display in proper format (HH:mm)"
+    },
+    {
+      "id": "ENG-2816",
+      "createdAt": "2025-11-19T23:21:42.141Z",
+      "title": "AI SDR Agent Offers Times Outside User Availability Instead of Escalating",
+      "state": "Done",
+      "assignee": "Mahmut Jomaa",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "## Found Problem\n\nThe AI SDR agent is offering meeting times that fall outside of the user's availability window when a prospect requests a time that doesn't match the user's schedule. Instead of escalating to a human when there's no overlap, the agent incorrectly prioritizes the prospect's convenience over the user's actual availability.\n\n## Reproduction Steps\n\n1 - Agent offers initial meeting time within user's availability\n\n <image> \n\n2 - Prospect responds they are only available in a specific time window OUTSIDE the user's availability\n\n <image> \n\n3 - Agent offers a time convenient to the prospect but outside the user's availability (instead of escalating)\n\n <image> \n\n## Expected Behavior\n\nWhen a prospect requests availability that falls outside the user's configured availability window, the agent should:\n\n* Recognize the conflict\n* Escalate to a human/user for manual handling\n* NOT offer times that the user cannot attend\n\n## Reported By\n\n* User: Name 15\n* AI SDR Conversation: Name 16\n\n---\n\n### **Additional Notes – Second Failure (Observed from user Name 17)**\n\n* Prospect accepted one of the agent’s offered times.\n* Agent **should** have confirmed, but instead tried to generate alternative options.\\*\n* The fallback options were **not grounded** in:\n  * the user’s availability (e.g., 09:00–17:00 GMT),\n  * the prospect’s stated constraints (“lunchtime,” “after 3pm”), or\n  * typical business hours.\n* Agent produced **arbitrary early-morning times** (4:00 AM, 7:00 AM, 7:30 AM EST) that had no relationship to prior logic.\n* Indicates a persistent issue in **fallback time generation**, separate from the previously fixed “slot taken” bug.\n* Same behavior occurred for another customer, confirming it’s not isolated.\n\n\\*note: there's another bug in this conversation where the agent claims a \"slot is taken\" after offering it. That's been handled in a separate ticket, so no need to investigate that aspect.\n\nLoom Video from Name 17: <loom>"
+    },
+    {
+      "id": "ENG-11199",
+      "createdAt": "2026-07-07T13:08:24.721Z",
+      "title": "AI SDR offers already-booked/past times and can't surface availability beyond 2 weeks",
+      "state": "Todo",
+      "assignee": "Koppany Kondricz",
+      "parent": null,
+      "labels": ["Bug", "intercom-sourced"],
+      "description": "## Problem\n\nAI SDR is offering meeting times that are in the past or already fully booked, and cannot surface any availability beyond a 2-week window. Name 18 (Name 22 AI) reports one prospect (Name 21) threatened to report the emails as spam to their provider after receiving invalid time offers.\n\n## Name 23 signal\n\n* Name 23 topic: `<uuid>` (calendar/booking cluster)\n* Severity: Urgent | Confidence: 0.85 | Track: Engineering\n* 2 conversations today.\n\n## Why new\n\nThis is a distinct symptom from the cross-workspace calendar bleed tracked in ENG-11162 (same Name 23 topic cluster). Prior tickets for offering unavailable/out-of-window times are all closed: ENG-4283 (proposes unavailable time then re-offers — Done), ENG-5657 (books outside availability window — marked Duplicate), ENG-3908 (24-hour booking limit — Canceled). The \"availability capped at 2 weeks\" + \"offers already-taken/past slots\" behavior has no open canonical ticket.\n\n## Source\n\n* Name 19\n* Reporter: Name 18 (Name 22 AI); prospect threatened spam report.\n\n## Name 20\n\n`modem-019dbb06-availability-2026-07-07`"
+    },
+    {
+      "id": "ENG-8085",
+      "createdAt": "2026-04-23T22:17:20.211Z",
+      "title": "AI SDR reports no available time slots",
+      "state": "Done",
+      "assignee": "Arthur Li",
+      "parent": null,
+      "labels": [],
+      "description": "User: <email>\nAI SDR told a prospect there were no open time slots in the next couple of weeks, but the calendar and availability settings appear to include some available slots.\n\nThe reported setup uses limited availability because the calendar is mostly blocked during a day job, with availability mainly around lunch and later in the day.\n\n <image> \n\n <image> \n\n <image> "
+    },
+    {
+      "id": "ENG-9776",
+      "createdAt": "2026-06-05T17:18:29.955Z",
+      "title": "AI scheduling ignores Friday-only availability and shifts Zoom time",
+      "state": "Todo",
+      "assignee": "Koppany Kondricz",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "User: <email>\n\n### AI SDR Scheduling & Availability Mismatch\n\nName 24’s workspace, we identified a potential scheduling issue involving availability rules and timezone handling.\n\n* Availability Constraint Not Being Followed\n\nThe user’s availability was set to Friday only, however the AI SDR is still offering time slots outside of the configured availability window.\n\n* Scheduling & Timezone Inconsistency\n\nAI SDR booked an appointment for Friday, June 5th at 1:00 PM EST with Name 25.\n\nThe AI SDR offered times in both 10:00 AM PDT / 1:00 PM EST.\n\nIn the appointments tab, the booking correctly shows 1:00 PM EST.\n\nHowever, when synced to Zoom, the appointment time shifted and appears as 5:00 PM EST.\n\nTimezone Validation Check\n\nWe verified Zoom’s timezone settings, and it is aligned with EST, consistent with the platform configuration.\n\n\n <image> \n\n <image> \n\n <image> \n\n <image> \n\n <image> "
+    },
+    {
+      "id": "ENG-1538",
+      "createdAt": "2025-09-30T07:06:51.211Z",
+      "title": "Fix Booking Availability Logic Inconsistency",
+      "state": "Done",
+      "assignee": "Mahmut Jomaa",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "## Issue Summary\n\nCritical bug in the booking system where availability checking logic is inconsistent between slot generation and booking validation, causing appointments to fail even when slots appear available.\n\n## Problem Details\n\n* **Slot Generation**: `getTimeSlots()` shows slots as available\n* **Booking Validation**: `isDateAvailable()` rejects the same slots as unavailable\n* **Result**: Users see available slots but get \"Date is no longer available\" errors when booking\n\n## Root Cause\n\nTwo different code paths with inconsistent calendar conflict checking:\n\n1. `/lib/scheduling/internal/get-time-slots.ts` - for slot generation\n2. `/lib/scheduling/helpers/is-date-available.ts` - for booking validation\n\nBoth use similar helper functions (`getEventBusyDates()`, `areIntervalsOverlappingWithInterval()`) but with different implementations.\n\n## Specific Example\n\n* Slot offered: `2025-09-29T10:15:00.000Z`\n* Booking attempt failed with 9 calendar conflicts detected\n* Same slot still shown as available after failure\n\n## Action Items\n\n1. Write comprehensive tests for booking logic\n2. Investigate how the booking system is being used\n3. Align the availability checking logic between both code paths\n4. Ensure consistent timezone handling and buffer calculations\n5. Address potential race conditions in calendar sync\n\n## Priority\n\n**High** - This affects user experience and booking conversion rates."
+    },
+    {
+      "id": "ENG-5657",
+      "createdAt": "2026-02-18T19:02:10.675Z",
+      "title": "AI SDR books meeting outside availability window",
+      "state": "Duplicate",
+      "assignee": "Koppany Kondricz",
+      "parent": "ENG-5122",
+      "labels": ["Bug"],
+      "description": "user: <email>\n\nAvailability was set to start at 8:00AM HST, but the AI SDR offered/booked 9:00AM EST (4:00AM HST) and the prospect accepted.\n\nAfter acceptance, the AI SDR told the prospect an invite was sent, but no calendar invite was sent; the meeting owner manually created and forwarded the invite.\n\nThis was the first time the out-of-bounds time booking happened; missing-invite behavior has occurred before and was previously reported."
+    },
+    {
+      "id": "ENG-13128",
+      "createdAt": "2026-08-25T20:41:50.085Z",
+      "title": "Booked slots offered as available, duplicate invite sent to same prospect",
+      "state": "Done",
+      "assignee": "Koppany Kondricz",
+      "parent": "ENG-13129",
+      "labels": ["Bug", "Customer reported"],
+      "description": "#### Customer Name\n\nName 26\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 27's workspace\n\n#### Screenshot\n\n <image> \n\n <image> \n\n#### What are you trying to achieve?\n\nAlready-booked times excluded from the slots AISDR offers\n\n#### What are you doing to achieve it?\n\nAISDR sends available times, prospect selects one, meeting is created against her connected calendar\n\n#### What is happening instead?\n\nA slot already booked by that prospect was offered back to him. The existing booking never registered as taken. He declined after the fact and raised confusion, requiring her to intervene. Screenshots attached to example the meeting that the AI SDR indicated was \"booked\" or not available but it was this exact same prospect who had been assigned that slot according to Name 26.\n\n#### What is the expected outcome?\n\nBooked times are excluded from offered availability and existing bookings register correctly."
+    },
+    {
+      "id": "ENG-5547",
+      "createdAt": "2026-02-14T21:56:53.410Z",
+      "title": "AI SDR not booking when lead proposes custom time",
+      "state": "Done",
+      "assignee": "Koppany Kondricz",
+      "parent": "ENG-5832",
+      "labels": [],
+      "description": "user: <email>\n\nAI SDR offered times in an initial email, but when the lead replied proposing a custom time (e.g., Tue 1pm ET) instead of selecting an offered slot, it did not book the meeting and instead replied with alternate times.\n\nWorkspace settings show Availability time zone set to New York while Cold Email Agent time zone is Name 28 (both ET). Cold Email Agent does not have a New York option. The proposed time was open on Name 2 Calendar and within availability hours.\n\n <image> \n\n <image> "
+    },
+    {
+      "id": "ENG-6838",
+      "createdAt": "2026-03-18T21:51:12.768Z",
+      "title": "Fix AISDR scheduling bug for next available date/time",
+      "state": "Canceled",
+      "assignee": "Koppany Kondricz",
+      "parent": "ENG-6737",
+      "labels": ["Bug"],
+      "description": "#### Customer Name\n\nName 29\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nCompany One\n\n#### Screenshot\n\n <image> \n\n#### What are you trying to achieve?\n\nAISDR bug needs to be fixed - didn't schedule for next available date, time for the prospect who requested a slight delay\n\n#### What are you doing to achieve it?\n\nConfirmed calendar linked (conferencing) inside AIA workspace and AISDR knowledgebase updated. Eu created TT through workspace\n\n#### What is happening instead?\n\nAISDR offered different date and time instead of next available (same day, later time)\n\n#### What is the expected outcome?\n\nAISDR offers and books next soonest available date/ time"
+    },
+    {
+      "id": "ENG-14008",
+      "createdAt": "2026-09-17T20:28:05.950Z",
+      "title": "Name 30 - AI SDR not booking",
+      "state": "Todo",
+      "assignee": "Koppany Kondricz",
+      "parent": "ENG-14028",
+      "labels": ["Bug", "Customer reported"],
+      "description": "#### Customer Name\n\nName 31\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 30\n\n#### Screenshot\n\n#### What are you trying to achieve?\n\nAI SDR is stopping because it states there is no availability for a meeting, I verified there are timeslots available, this is an error.  Please inspect and figure out why the SDR is ignoring available time slots.\n\n#### What are you doing to achieve it?\n\nAI SDR running and configured correctly\n\n#### What is happening instead?\n\nAI SDR stopping stating no available timeslots\n\n#### What is the expected outcome?\n\nAI SDR book calls normally"
+    }
+  ]
+}

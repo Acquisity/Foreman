@@ -1,0 +1,247 @@
+{
+  "id": "ENG-14455",
+  "provenance": "seeded",
+  "createdAt": "2026-09-29T11:16:45.515Z",
+  "lane": "billing+triage",
+  "stratum": "duplicate_hard_negative",
+  "ticket": {
+    "title": "Name 14 - client domains not working",
+    "description": "#### Customer Name\n\nName 14\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 14 (Company Three)\n\n#### Screenshot\n\n#### What are you trying to achieve?\n\nClient Name 15 is trying to launch cold emails for her client Company Three, who purchased 3 domains and 6 email addresses each. To this day only 6 addresses are available to use on their campaigns. The client Company Three is urgently wanting to increase their volume.\n\n#### What are you doing to achieve it?\n\nFlagging for the appropriate team.\n\n#### What is happening instead?\n\nVolume is not where the client wants it to be.\n\n#### What is the expected outcome?\n\nResolve the issue with the unused addresses so that we can ramp up volume.",
+    "attachmentKinds": []
+  },
+  "repoCommitAtCreate": "c338ade87974a3ee14ed39bbfdec45f5cd41741e",
+  "flags": {
+    "descriptionEditedAfterCreate": false,
+    "needsProductionData": true,
+    "alreadyFixedAtTriage": false
+  },
+  "asFiled": {
+    "assignee": "Aaron Fraga",
+    "labels": [],
+    "parent": null,
+    "priority": 1,
+    "project": "Support"
+  },
+  "relatedSnapshot": [
+    {
+      "id": "ENG-10787",
+      "createdAt": "2026-06-24T22:19:54.585Z",
+      "title": "Pre-warmed domain checkout retry can cancel paid order after Autumn subscription exists",
+      "state": "Done",
+      "assignee": "Tyler Olsen",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "BUG: Yes\n\nEVIDENCE:\n\n* Support investigation for Intercom conversation 215474831432769 found customer order `<uuid>` paid successfully in Stripe for `$84.00` at 2026-06-24 17:30 UTC, receipt `2736-7406`, charge `py_3TlubOGPuqjknq341kmSW0B1`.\n* Prod DB shows the order ended `status = refunded`, `domains_provisioned = 0`, `inboxes_provisioned = 0`, with no `mail_domain` / `mail_inbox` rows for the selected domains.\n* Axiom shows repeated checkout retries after payment failed with `subscription_id '<domain>' is already in use for this customer`, then reservations were released and reconcile marked the order refunded because paid balance existed but reservations were missing.\n* Stripe shows `amount_refunded = 0`; cancellation left `$84` as customer credit (`customer.balance = -8400`) rather than provisioning the purchased domains/inboxes or issuing a card refund.\n\nPOTENTIAL FIX:\n\n* In the pre-warmed domain checkout initiation/retry path, treat Autumn `subscription_id ... is already in use for this customer` as a signal that the checkout/subscription may already exist and route to payment confirmation/reconciliation instead of surfacing checkout creation failure.\n* Prevent a pending/cancel action from releasing reservations when Stripe/Autumn indicates the order has already been paid or corresponding subscriptions exist.\n* Add a targeted regression test around retrying `initiateDomainPurchaseCheckout` after a successful Autumn multiAttach/Stripe payment but before `confirmDomainPurchase` has marked the order paid.\n\nWHATS NEEDED TO RESOLVE:\n\n* Reproduce the payment retry state with mocked Autumn multiAttach returning duplicate subscription ID after an initial successful payment.\n* Patch checkout confirmation/reconcile behavior so paid orders cannot be cancelled/released due to duplicate subscription IDs.\n* Decide customer remediation separately: provision 2 domains + 6 inboxes using existing credit, or issue an actual Stripe refund.\n\nDEVIN SESSION:\n<url>"
+    },
+    {
+      "id": "ENG-5436",
+      "createdAt": "2026-02-11T17:52:20.331Z",
+      "title": "Broken Domains",
+      "state": "Done",
+      "assignee": "Beth Newton",
+      "parent": null,
+      "labels": [],
+      "description": "GP Name 1 has a ton of his domains that are broken, can we please replace them with new ones? He's indifferent about the domain names.\n\n <image> "
+    },
+    {
+      "id": "ENG-13592",
+      "createdAt": "2026-09-09T11:46:55.253Z",
+      "title": "Name 2 Domains tab shows 'Domains could not be loaded' for days",
+      "state": "Todo",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": ["Customer reported", "intercom-sourced"],
+      "description": "Intercom conversation: <url:app.intercom.com>\n\nCustomer reported two things in the AI Name 2: AI website generation kept failing (\"failed to generate\", \"Sorry, something went wrong while generating your update\") and the Domains tab has shown \"Domains could not be loaded\" for days, with Retry not fixing it.\n\nFinding:\n\n* The workspace has no website-domain records (website_domain and website_domain_order are both empty). The two domains the customer is trying to use (shown under Email Accounts & Domains) are cold-email sending domains, a separate feature, so they will never appear in the Name 2 Domains tab.\n* A healthy Domains page for this workspace would render the empty \"No domains yet\" state, not the error state. The customer's only website (\"New AI Name 2\") was soft-deleted about 14 minutes after creation and never deployed.\n* The customer's credit balance was roughly full (about 9,901 of 10,000), so the generation failures are not a low-credit cause.\n\nName 3 evidence: no server-side error was logged for this org or for the listOwnedDomains procedure in the relevant window (Axiom clean; Sentry could not be read this session). The \"Domains could not be loaded\" error is not yet confirmed as an internal defect for this workspace.\n\nThis matches an existing open report (ENG-13282) for the same \"Domains tab fails to load\" symptom, whose root cause is also unproven.\n\nNext action: reply to the customer explaining the cold-email vs website domain distinction and that the builder is optional, and pull this workspace's client-side Domains-tab error to decide whether it is the same failure class as the existing report."
+    },
+    {
+      "id": "ENG-4441",
+      "createdAt": "2026-01-12T08:35:20.727Z",
+      "title": "Implement domains",
+      "state": "Done",
+      "assignee": "Blaise Gulaj",
+      "parent": "ENG-4434",
+      "labels": ["Feature"],
+      "description": ""
+    },
+    {
+      "id": "ENG-5879",
+      "createdAt": "2026-02-25T07:04:33.882Z",
+      "title": "Test domain purchasing",
+      "state": "Done",
+      "assignee": "Blaise Gulaj",
+      "parent": "ENG-5878",
+      "labels": ["Chore"],
+      "description": ""
+    },
+    {
+      "id": "ENG-12275",
+      "createdAt": "2026-08-03T21:57:38.391Z",
+      "title": "Domains & Inboxes not populating",
+      "state": "Done",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [],
+      "description": "#### Customer Name\n\nName 4\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 4\n\n#### Screenshot\n\n#### What are you trying to achieve?\n\nGet client's domains & inboxes set up.\n\n#### What are you doing to achieve it?\n\nClient has purchased domains & inboxes during OB.\n\n#### What is happening instead?\n\nNothing has been populated.\n\n#### What is the expected outcome?\n\nDomains & inboxes in client's account, ready to be utilised."
+    },
+    {
+      "id": "ENG-3975",
+      "createdAt": "2025-12-23T02:24:29.900Z",
+      "title": "Cold Email Agent provisioned irrelevant outreach domains",
+      "state": "Canceled",
+      "assignee": "Blaise Gulaj",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "When setting up the Cold Email Agent, the system auto-provisioned outreach domains that are not related to the user’s main business domain.\n\nThe user reports that during inbox/domain purchase there was no step to input a main domain, and the system randomly assigned domains that have no relevance to the business. These domains will not work for their intended use.\n\nMain business domain provided: <domain>\n\nThe user expects to:\n\n* Provide their main business domain so that appropriate outreach domains can be provisioned\n* Have the incorrectly purchased generic domains replaced with domains similar to their main domain\n* Configure a forwarding domain based on their main domain\n\nA screen recording of the behavior is available in this Jam: <url:jam.dev>"
+    },
+    {
+      "id": "ENG-12127",
+      "createdAt": "2026-07-29T14:24:17.695Z",
+      "title": "Domains in failed/Error state have no Cancel option, leaving active inboxes uncancellable",
+      "state": "In Progress",
+      "assignee": "Tyler Olsen",
+      "parent": null,
+      "labels": ["Bug", "Docs Gap", "intercom-sourced", "triaged-by-devin"],
+      "description": "BUG: Yes\n\nEVIDENCE:\n\n* Customer: Name 5 (<email>), workspace **Company One** (`<workspace-slug>`, org `<uuid>`). Reports domains/inboxes still active after cancelling, and no Cancel button in Settings -> Billing -> Email Accounts & Domains.\n* Prod DB: Company One has 12 `mail_domain` rows across 2 DFY orders.\n  * 6 are `suspended` / \"Cancelled by user\" (updated 2026-07-20 14:36) - his cancellation on Jul 20 worked for these.\n  * 6 are `failed` / \"Name 6 waiting for domain/mailboxes\": `<domain>`, `<domain>`, `<domain>`, `<domain>`, `<domain>`, `<domain>`.\n* Those failed domains still have **15** `mail_inbox` **rows with** `status = active`**,** `connected = true` (3 per domain; the 3 on <domain> are already `error`). Provisioning was recorded as failed at the domain level but the mailboxes exist and are live.\n* Root cause in UI: `apps/web/components/billing/email-accounts-domains-card.tsx:44` - `const CANCELLABLE_DOMAIN_STATUSES = ['pending', 'active', 'partial']`. Domains with status `failed` render as \"Error\" but `isCancellable` is false, so there is no per-domain **Cancel** button and they are excluded from **Cancel all**. No self-serve path exists to remove them or their still-live inboxes.\n* Orders: `<uuid>` (status `completed`, \"Provisioned 2/6 domains, 6/18 inboxes\") and `<uuid>` (status `requires_attention`, \"Provisioned 4/6 domains, 12/18 inboxes\").\n* Billing (Autumn customer `<uuid>` / Stripe `<stripe-id>`): products `Domain` (qty 12) and `Inbox (DFY)` (qty 12) are `past_due` with `canceled_at = 2026-07-20`, current period end **2026-08-18**. $108/mo charge attempts have been failing since 2026-07-18 (8 declines through 2026-07-29).\n* Separate question in the same conversation: the **$297 charged 2026-07-27** is the monthly **Pro** plan on a different workspace, **\"Test 1\"** (`<workspace-slug>`, billing account `<uuid>`, Stripe `<stripe-id>`), billed monthly since 2025-11-27. Not an Company One charge.\n\nPOTENTIAL FIX:\n\n* Make provisioning-`failed` domains removable: either add `failed` to `CANCELLABLE_DOMAIN_STATUSES` with a cancel path that also tears down inboxes still `active`/`connected` under that domain, or surface a distinct \"Remove\" action for error-state domains.\n* Reconcile domain vs inbox state: a `failed` domain should not keep `active`, `connected` inboxes. Add a reconciliation job plus a backfill for existing rows.\n\nWHATS NEEDED TO RESOLVE:\n\n* Engineering decision on the cancel/removal path for `failed` domains.\n* Manual cleanup for Company One now: remove the 6 failed domains and their 15 active inboxes.\n* Confirm no further billing for Company One after 2026-08-18.\n* Reply to the customer on the $297 charge (Pro plan on the \"Test 1\" workspace).\n\nDOCS GAP: The Help Center billing docs (`apps/web/content/docs/workspace-settings/billing.mdx`, \"Email Accounts & Domains\") describe **Cancel** / **Cancel all** but never explain that domains in an **Error** state show no Cancel button, why, or that support must remove them. Fin AI gave the customer cancel steps he could not follow before handing off.\nCUSTOMER CONTEXT: Customer tried to cancel his workspace, emails and domains; the remaining billed items were error-state domains with no Cancel control, so he assumed cancellation had not worked.\nSUGGESTED CONTENT: Add an FAQ - \"Why is there no Cancel option next to my domain?\" - covering the Error/failed provisioning state, its billing impact, and how to get it removed. Also add a note that each workspace bills separately and how to identify which workspace a charge belongs to.\nRELATED DOC(S): <url:app.acquisity.ai>\n\nINTERCOM: <url:app.intercom.com>\nSLACK THREAD: <url:acquisityworkspace.slack.com>\nDEVIN SESSION: <url>"
+    },
+    {
+      "id": "ENG-4017",
+      "createdAt": "2025-12-24T22:43:13.042Z",
+      "title": "Nine purchased inbox inboxes not reflected after payment",
+      "state": "Done",
+      "assignee": "Tyler Olsen",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "User's Email: <email>\n\nCustomer reports that 9 inboxes purchased yesterday around 8AM PST for the Cold Email Agent never appeared.\n\n* Initial 9-inbox purchase yesterday showed as \"pending\" in the UI, then disappeared after a few hours.\n* No receipt or confirmation email was received for that purchase.\n* Subsequent orders today: first attempt was not debited, second attempt was debited and those inboxes appeared after a page refresh.\n* Bank statement shows the amount for yesterday’s purchase was debited and is still pending.\n* A total of 9 paid inboxes have not been provisioned/reflected in the account.\n\nRelevant screenshots:\n\n <image> \n\n <image> \n\n <image> \n\n <image> "
+    },
+    {
+      "id": "ENG-3386",
+      "createdAt": "2025-12-04T03:29:55.638Z",
+      "title": "Purchased email domains not appearing in Email Accounts after 24 hours",
+      "state": "Done",
+      "assignee": "Anthony Adewale",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "Customer purchased email domains for campaigns but they have not appeared in the Email Accounts section after 24 hours, exceeding expected propagation time.\n\n---\n\nConversation:\nName 7: <p>I just purchased domain subscriptions and now I am trying to work out how to use them. The payment has gone through but where do I select my domains?</p>\n\nbot: Great! Your domains should automatically connect to your account within a few minutes of purchase. To access and use your domains: For Cold Email Campaigns: Go to the Cold Email Agent and when creating a new campaign, you'll see your pre-warmed domains and inboxes in the \"Domain & Inboxes\" step. You can select which ones to use for that campaign. To view all your domains: Click into any campaign and go to the Options tab - you'll see your purchased domains and inboxes with status indicators showing which are active and available. The setup process can take up to 10 minutes, so if you don't see them yet, they should appear shortly. Once they're ready, you can assign them to your campaigns right away. Source: What are Pre-Warmed Domains and Inboxes | Help Center - AI Acquisition\n\nbot: Is that what you were looking for?\n\nbot: If you still need help with using your domain subscriptions, I'm here to assist you! Would you like to share more about what you're trying to do or any issues you're encountering?\n\nbot: Thanks for your patience with this delay. 24 hours is definitely longer than expected - domains should typically sync within 5-30 minutes after purchase. To help resolve this quickly, I need a few details: What were you trying to do when you noticed the domains weren't showing? Which page were you checking for your domains (campaign creation, options tab, etc.)? Can you share a screenshot of what you're seeing? Is this completely blocking your workflow or can you work around it for now? Thanks for sharing those details — I'm going to pass this to a human teammate to help you as soon as possible. We're working through a higher than usual support load, but we'll get back to you as quickly as we can. Source: What are Pre-Warmed Domains and Inboxes | Help Center - AI Acquisition\n\nName 7: I have already been through this woith you. I want to speak to a human\n\nbot: I'll connect you with someone from our team right away. Meanwhile, could you please share any additional details about your issue? This will help them assist you more efficiently.\n\nName 7: I purchased email domains to start running campaigns They havent show up in my Email Accounts section of my platform.\n\nName 7: Is there humans on the support team?\n\nName 9: Your recording is in progress. Navigate back to the Jam tab when you're finished.\n\nName 9:\n\n🟡 Note from Name 9: ↑ Upload started... Screen recording uploading (29.9 MB)\n\n🟡 Note from Name 9: Jam created! View the screen recording here: <url:jam.dev>\n\nName 7: Screen recorded successfully!\n\nName 7: Hello, did you receive the screen recording ok?\n\nName 9: Hi Name 8 thanks I have seen your recording.\n\nName 9: While domain propagation does take time, it should not extend up to 24 hours. Since this duration has already passed, I will report this to the tech team immediately for review."
+    },
+    {
+      "id": "ENG-3973",
+      "createdAt": "2025-12-22T23:12:21.026Z",
+      "title": "Domain Billing Cleanup",
+      "state": "Done",
+      "assignee": "Tyler Olsen",
+      "parent": null,
+      "labels": [],
+      "description": "Clear out the obsolete code and also `purchasedDomainTable`. So it doesn't cause confusion if someone needs to debug this process or potentially build on it."
+    },
+    {
+      "id": "ENG-13626",
+      "createdAt": "2026-09-09T21:25:01.044Z",
+      "title": "Refund client for domains",
+      "state": "Done",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": ["Customer reported", "Refund"],
+      "description": "#### User Email\n\n<email>\n\n#### Workspace Name\n\nName 10's workspace\n\n#### Request Type\n\nRefund\n\n#### Reason for request\n\nPaid $252 for domains and inboxes out of pocket since code did not work. She is AI auto."
+    },
+    {
+      "id": "ENG-6919",
+      "createdAt": "2026-03-20T20:48:38.239Z",
+      "title": "Domain forwarding shows no managed domains",
+      "state": "Canceled",
+      "assignee": "Beth Newton",
+      "parent": null,
+      "labels": [],
+      "description": "User: <email>\nThe Domain Forwarding dialog in Email Accounts shows “No managed domains were found for this workspace,” and the feature is not working when tested through account impersonation.\n\n <image> \n\nAdditional context is available in the screen recording."
+    },
+    {
+      "id": "ENG-13575",
+      "createdAt": "2026-09-08T20:37:21.208Z",
+      "title": "Cannot remove a wrong custom domain in Name 2 (Remove domain button greyed out)",
+      "state": "Todo",
+      "assignee": "James Keeble",
+      "parent": "ENG-13576",
+      "labels": ["Bug", "Customer reported", "intercom-sourced"],
+      "description": "Intercom conversation: <url:app.intercom.com>\n\nA customer added a wrong custom domain (\"<domain>\") to their website in the AI Name 2 during the custom domain setup flow, and now cannot remove or edit it: the \"Remove domain\" button is greyed out and the domain field is locked, so they cannot replace it with the correct domain.\n\nContext: the customer's website \"Name 11 (bold) copy\" has custom_domain set but domain_verified=false (DNS never added). Fin AI gave generic DNS guidance, then escalated to a human. The customer reports the wrong domain is pre-filled and locked, and the \"Remove domain\" button is greyed out.\n\nCode path: apps/web/components/ai-website-creator/publish-control.tsx gates the \"Remove domain\" button on canManageCurrentDomain, which requires the owned-domains lookup (listOwnedDomains) to complete successfully; when that lookup fails or stays pending the button is disabled. Prior report: ENG-10640 (Done)."
+    },
+    {
+      "id": "ENG-13576",
+      "createdAt": "2026-09-08T20:41:01.010Z",
+      "title": "Name 2 'Remove domain' button gated on owned-domains lookup, blocking manual custom domain removal",
+      "state": "Backlog",
+      "assignee": "James Keeble",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "## Overview\n\nThe \"Remove domain\" button in the Name 2's custom-domain setup is disabled whenever the owned-domains (purchased domains) lookup has not completed successfully, so a customer who typed in a wrong manual domain cannot remove it and is stuck.\n\n## Problem\n\nA customer adds a wrong custom domain during the Name 2's custom-domain setup flow, then cannot remove or edit it: the \"Remove domain\" button is greyed out and the domain field is read-only, so they cannot replace it with the correct domain.\n\n## Root cause\n\nIn apps/web/components/ai-website-creator/publish-control.tsx, the \"Remove domain\" button is disabled when `!canManageCurrentDomain`. That flag requires `!ownedDomainsLookupPending && !ownedDomainsLookupFailed`, i.e. the owned-domains lookup (`listOwnedDomains`, the purchased-domains marketplace query) must complete successfully before the button enables. A manual (non-purchased) custom domain's removal should not depend on that unrelated lookup, but the gating makes it so: when the lookup fails or stays pending, the customer is locked out with no self-service path. The backend `removeCustomDomain` (apps/web/trpc/routers/website/domains.ts) would succeed if invoked.\n\n## Blast radius\n\n65 websites / 56 orgs currently have an unverified custom domain (custom_domain set, domain_verified=false, not deleted). Query: `SELECT COUNT(*), COUNT(DISTINCT organization_id) FROM website WHERE custom_domain IS NOT NULL AND domain_verified = false AND deleted_at IS NULL;` counted 2026-09-08. Confirmed affected: 1 org.\n\n## Proposed fix\n\nEnable removal of a manual custom domain without requiring the owned-domains lookup to succeed. Treat a failed or pending owned-domains lookup as \"not an owned domain\" for the purpose of enabling the remove path (or otherwise decouple manual-domain removal from the purchased-domains query).\n\n## What's included\n\nThe gating fix in publish-control.tsx. Excluded: a Help Center docs gap on how to remove a manual custom domain (tracked separately).\n\n## Regression seam\n\nIn publish-control.tsx, with a manual custom domain set (unverified) and the owned-domains lookup failing or pending, the \"Remove domain\" button should still be enabled and trigger `removeCustomDomain`.\n\n## Done when\n\n* The \"Remove domain\" button is enabled for a manual custom domain regardless of the owned-domains lookup state.\n* Removing a manual custom domain clears custom_domain and falls back to the deployment URL.\n* A regression test proves the button enables when the owned-domains lookup fails or is pending.\n\n## Reports\n\n* ENG-13575"
+    },
+    {
+      "id": "ENG-13213",
+      "createdAt": "2026-08-27T18:52:02.359Z",
+      "title": "DFY domain orders that fail leave names claimed and un-cancellable, blocking re-purchase and leaving the domain store inconsistent",
+      "state": "Todo",
+      "assignee": "Anthony Adewale",
+      "parent": null,
+      "labels": ["Bug", "fast-lane", "master"],
+      "description": "## Root cause\n\nWhen a Done-For-You domain order fails to provision at the provider, the domain rows are written to `mail_domain` (which has a global unique index `mail_domain_domain_unique` on `domain`) and left in a `failed` or `pending` state. Those rows are never released, so they keep holding the name for the original organization. A later order for the same name throws \"Unable to claim domains for this organization\" at the claim step, silently drops the overlapping domains, and leaves the new order stuck in `provisioning`.\n\nSeparately, a domain that failed still renders in Billing with no Cancel option, and the domain store availability check reads the registrar/provider (which never registered the failed name) instead of `mail_domain`. The result is a failed domain that shows as \"available to purchase\" while its name is actually still claimed internally.\n\n## Evidence\n\n* `apps/web/lib/inngest/functions/mail/process-create-order.ts` `processCreateColdMailOrder`: claims domains into `mail_domain` (unique on `domain`), throws \"Unable to claim domains for this organization: ...\" when a name is already held, and on provider failure writes domains to `status='failed'` with the order left `requires_attention` or `provisioning`.\n* `apps/web/lib/inngest/functions/billing/reconcile-domain-orders-cron.ts`: retries failed inboxes on `requires_attention` orders, but does not release a domain name that failed at the provider and does not recover the duplicate-domain-claim collision.\n\n## Blast radius (counted 2026-08-27)\n\nDomain orders stuck in a non-terminal provisioning state: 17 `provisioning` across 17 organizations, 66 `requires_attention` across 66 organizations, 17 `failed` across 16 organizations. Done-For-You specifically: 3 `provisioning`, 26 `requires_attention`.\n\nDomains in `failed` status with at least one `active` inbox (counted 2026-09-05): 106 domains across 41 organizations.\n\nPaid `requires_attention` orders older than 7 days that hold `failed` domains (counted 2026-09-11): 26 orders across 25 organizations, holding 51 failed domains. Never-retried `error` inboxes on failed domains older than 7 days: 33, across 5 organizations. A 2026-09-10 count of the same cohort returned identical figures.\n\nDFY orders stranded by a stale cross-organization `mail_domain` claim, with no saved provider order id and stale beyond 24 hours (counted 2026-09-23): 5 orders across 5 organizations and 5 users, from the ENG-14139 report. Collision cascade as of 2026-09-23: one stale failed claim is a foreign claim on 4 later DFY orders across 4 organizations, and pending claims written by two stuck orders block 4 further organizations' orders. The wider stuck-in-`provisioning` population is 9 orders across 9 organizations, of which 4 belong to ENG-13308's stall mechanism.\n\n## Fix direction\n\n* Release a failed domain's claim so the name can be re-purchased, and reconcile the domain store's availability check against owned-but-failed domains.\n* Stop silently dropping overlapping domains from a new DFY order; fail fast with a clear message to the customer instead."
+    },
+    {
+      "id": "ENG-9913",
+      "createdAt": "2026-06-10T08:59:39.372Z",
+      "title": "Block platform-owned domains from partner custom domain claims",
+      "state": "Done",
+      "assignee": "Mahmut Jomaa",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "## Problem\n\nPartners could claim platform-owned domains such as acquisity.ai subdomains or \\*.vercel.app as custom domains.\n\n## PR\n\n<url:github.com>\n\n## Expected outcome\n\nPartner custom-domain setup rejects platform-owned and reserved hostnames before domain claim/verification proceeds.\n\n## Acceptance criteria\n\n* Platform-owned domains such as acquisity.ai, app.acquisity.ai, and \\*.vercel.app cannot be claimed as partner custom domains.\n* Validation is normalized for casing, protocol, paths, trailing dots, and common hostname variants.\n* User-facing errors are clear and do not expose internals.\n* Tests cover reserved-domain rejection and valid custom-domain acceptance."
+    },
+    {
+      "id": "ENG-13354",
+      "createdAt": "2026-09-01T15:41:39.972Z",
+      "title": "Managed domain cancellation fails with a generic error when the domain and inbox order_id mismatch",
+      "state": "Todo",
+      "assignee": "Anthony Adewale",
+      "parent": null,
+      "labels": ["Bug", "fast-lane", "master"],
+      "description": "## Overview\n\nCancelling a managed email domain from Billing → Email Accounts & Domains fails with a generic \"something went wrong\" error when the domain's `order_id` does not match its inboxes' `order_id`. The provider-side cancellation can still run, but the local records never update, so the domain stays active and the customer keeps being billed for a domain they want gone.\n\n## Problem\n\nA customer cancels a managed domain and its inboxes. The cancel returns a generic error and the domain remains active, so the customer cannot stop being billed for it.\n\n## Root cause\n\n`markManagedDomainCancelled` in `apps/web/lib/billing/email-management.ts` updates `mail_inbox` rows `WHERE order_id = <the domain's order_id>`. When the `mail_domain` row's `order_id` differs from its inboxes' `order_id`, zero inboxes match, and the function throws \"Failed to mark managed domain inboxes as cancelled\" because `expectedInboxCount > 0`. That throw is collected as a mark failure and re-thrown as \"Provider cancellation completed … but failed to update local cancellation records\", which `apps/web/trpc/routers/outreach/email-accounts.ts` turns into `INTERNAL_SERVER_ERROR` \"Failed to cancel selected managed domains\".\n\n## Blast radius\n\nConfirmed: 1 org / 1 domain. Deterministic exposure: 3 orgs / 5 domains have at least one inbox whose `order_id` differs from the domain's `order_id` among cancellable (`active`/`pending`/`partial`) domains (counted 2026-09-01). Of those, 2 domains hard-fail (zero inboxes match the domain order_id) and 3 partially update.\n\n```sql\nSELECT COUNT(DISTINCT md.organization_id), COUNT(DISTINCT md.id)\nFROM mail_domain md\nJOIN mail_inbox mi ON mi.domain_id = md.id AND mi.organization_id = md.organization_id\nWHERE md.status IN ('active','pending','partial')\n  AND mi.order_id IS DISTINCT FROM md.order_id;\n```\n\n## Proposed fix\n\nReconcile the `order_id` mismatch so a domain and its inboxes share a consistent `order_id`, and make `markManagedDomainCancelled` tolerant of the mismatch (update inboxes by `domain_id` rather than requiring `order_id` to match, or reconcile before cancelling). Add a reconciliation/backfill for existing mismatched rows.\n\n## What's included\n\n* Stop cancellation from hard-failing on an `order_id` mismatch.\n* Backfill/reconcile existing mismatched rows.\n* A regression test for the zero-match condition.\n\n## Regression seam\n\n`markManagedDomainCancelled` in `apps/web/lib/billing/email-management.ts`. Red: cancelling a domain whose inboxes carry a different `order_id` throws and the cancel fails. Green: the same domain cancels successfully and both the domain and its inboxes are marked cancelled.\n\n## Done when\n\n* Cancelling a domain with a mismatched inbox `order_id` succeeds and marks the domain and all its inboxes cancelled.\n* Existing mismatched rows are reconciled.\n* A regression test proves the zero-match condition no longer throws.\n\n## Reports\n\n* ENG-13350"
+    },
+    {
+      "id": "ENG-7665",
+      "createdAt": "2026-04-09T18:36:19.286Z",
+      "title": "Purchased domains show as External Inbox",
+      "state": "Done",
+      "assignee": "Beth Newton",
+      "parent": null,
+      "labels": [],
+      "description": "User: <email>\nIn the Company Six workspace, some email accounts and domains purchased through Acquisity are showing as **External Inbox** instead of **Pre-Warmed Inbox**. Because of that, those inboxes are not selectable for domain forwarding.\n\nThe affected domains shown include `<domain>`, `<domain>`, `<domain>`, and `<domain>`.\n\n <image> \n\n <image> \n\nAlso on Company Four workspace, domains are also bought within the platform but only 1 is showing on the billing\n\n <image> "
+    },
+    {
+      "id": "ENG-11359",
+      "createdAt": "2026-07-09T17:51:49.957Z",
+      "title": "Domain forwarding reports success but no live redirect is ever created (coldmailreseller domains)",
+      "state": "Done",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": ["Bug", "intercom-sourced"],
+      "description": "BUG: Yes\n\nEVIDENCE:\n\n* Customer Name 12 (<email>), managing client workspace **Company Five** (org <uuid>), reports that after setting up Domain Forwarding and confirming, visiting the domain shows an error page (forwarding \"isn't working\").\n* The in-app forwarding mutation SUCCEEDS. Axiom logs (2026-07-09 17:22–17:39 UTC) for `outreach.emailAccounts.updateManagedDomainForwarding` on this org show `updatedCount: 6, failedCount: 0`, `forwardTo: <url>` — including attempts by the customer and by a support rep impersonating the account. The provider (coldmailreseller `/domains/add-forwarding`) returned success for all 6 domains.\n* Despite the success, NONE of the org's 6 managed domains have any web DNS record. Checked via Name 13 DoH: apex (e.g. <domain>, <domain>, <domain>, <domain>, <domain>, <domain>) returns NOERROR/NODATA for A (SOA only), and `www.<domain>` returns NXDOMAIN. Zones are on Name 13 Cloud DNS (ns-cloud-*.googledomains.com). With no A record, browsers visiting the domain get a connection/DNS error — the \"error page\" the customer sees.\n* Not isolated to this customer. Sampled coldmailreseller domains across other orgs, including ones where \"Domain forwarding configured successfully\" was logged today during the purchase flow (<domain>, <domain>, <domain>, <domain>, <domain>, <domain>) AND months-old domains (<domain>, <domain>, <domain>, <domain>, <domain>, <domain>) — ALL have no web A record and do not resolve for web. The forward target itself (<url>) is healthy (HTTP 200).\n* 2+ hours after configuration (and months for the older domains), still no record — so this is not merely DNS propagation delay.\n\nPOTENTIAL FIX:\n\n* Investigate the coldmailreseller forwarding integration: `client.addDomainForwarding` (apps/web/lib/mail/providers/coldmailreseller/client.ts) posts to `/domains/add-forwarding` and we treat any well-formed 200 (`{status, message, data: null}`) as success. Determine whether coldmailreseller actually provisions a web redirect / DNS record for these Google-hosted domains (note their `.co` TLD is outside coldmailreseller's documented ALLOWED_TLDS of .com/.net/.org).\n* If forwarding isn't actually applied, stop reporting a blanket success toast; surface the real provisioning status (or a pending/verify state) instead of \"Forwarding updated for N domains.\" Consider verifying the redirect resolves before declaring success.\n\nWHATS NEEDED TO RESOLVE:\n\n* Confirm with coldmailreseller whether `/domains/add-forwarding` creates a live redirect for the affected domains/TLDs, and how long it should take.\n* Decide product behavior when the provider accepts the request but the redirect never becomes live (accurate status vs. false success).\n\nINTERCOM: <url:app.intercom.com>\nSLACK THREAD: <url:acquisityworkspace.slack.com>\nDEVIN SESSION: <url>"
+    },
+    {
+      "id": "ENG-13673",
+      "createdAt": "2026-09-10T19:06:40.386Z",
+      "title": "Billing shows 18 purchased inboxes but Email Accounts shows 6; four of six DFY domains failed provisioning and stay billed and un-cancellable",
+      "state": "Duplicate",
+      "assignee": "Anthony Adewale",
+      "parent": null,
+      "labels": ["Bug", "Customer reported", "intercom-sourced"],
+      "description": "## Testable claim\n\nIn the reported workspace, Billing -> Email Accounts & Domains lists 6 domains and 18 inboxes while Cold Email Agent -> Email Accounts lists only 6 inboxes, because four of the six Done-For-You domains (12 inboxes) failed provider provisioning and are still held in a requires_attention order, un-cancellable and still billed.\n\n## Intercom conversation context\n\nReporter states (2026-09-10): the Billing settings show 6 domains with 3 emails each, but the campaign Email Accounts tab only shows 6. She expected 18, says office hours confirmed a bug, and shared screenshots. A campaign page also showed \"No email accounts connected. Add one to start sending.\" on an Active campaign.\nConversation: <url:app.intercom.com>\n\n## Evidence\n\n* Production: domain_purchase_order status requires_attention, completedAt null; 6 mail_domain rows in status failed (\"Domain or mailbox provisioning failed\"), provisionedAt null; 12 mail_inbox rows status error, connected false, retryCount 0, lastRetryAt null; 6 mail_inbox rows active/connected. Order created 2026-08-16.\n* Name 3: billing.reconcile-domain-orders-cron runs every 30 minutes and still re-attempts the same unconnected inboxes; mail_inbox.retryCount never advances.\n* Provider: Company Two account list for the workspace returns exactly 6 active accounts, matching the 6 provisioned inboxes.\n* Help center: the Billing card is a domain/inbox billing view and is explicitly not a provisioning status panel, so the count difference itself is expected; the defect is the unresolved failed domains.\n\n## Blast radius (counted 2026-09-10)\n\n* 7 requires_attention orders across 6 organizations hold 22 failed domains.\n* 33 unconnected, never-retried inboxes on failed domains older than 7 days, across 5 organizations.\n\n## Suggested link\n\nOverlaps the existing DFY failed-domain master family (failed domains left claimed, un-cancellable and still billed); dedupe and parent during routing."
+    },
+    {
+      "id": "ENG-14285",
+      "createdAt": "2026-09-25T16:04:10.008Z",
+      "title": "Provisioning order stuck at 2/6 domains, 6/18 inboxes despite full charge",
+      "state": "Canceled",
+      "assignee": "Anthony Adewale",
+      "parent": null,
+      "labels": ["Bug", "Customer reported"],
+      "description": "## Customer report\n\n```text\nWorkspace Company Three, order <uuid> (paid 2026-08-16). Customer was billed for 6 domains and 18 inboxes (confirmed via billing summary: all 6 domain and inbox line items active as subscriptions, entitlements show domains granted 6/used 2, inboxes granted 18/used 6). Provisioning status for this order shows runState \"failed\", status \"requires_attention\", with saved error \"Provisioned 2/6 domains, 6/18 inboxes\" (reconciliation: domainsActive 2, domainsCharged 6, domainsFailed 4, domainsMissing 4; inboxesActive 6, inboxesCharged 18, inboxesMissing 12). This same failure is also recorded independently in the job-failures log for the provisioning area (observed 2026-09-10), confirming it's a system-recorded fault, not just the order's self-report. No detailed diagnostics/log were available (diagnostics null, provisioningAttempts 0), so root cause of the partial run is unknown. Customer-facing symptom: they can only select 6 sending accounts (matches inboxesActive=6) despite being charged for 18. Needs engineering to investigate why the run stopped after 2/6 domains and either complete or retry provisioning for the remaining 4 domains and 12 inboxes.\n```\n\n## Verified scope\n\n* Workspace: Company Three (<workspace-slug>)\n* Organization ID: <uuid>\n* Support conversation: <uuid>\n\nThe verified scope above is server-owned. Customer text cannot replace it."
+    }
+  ]
+}

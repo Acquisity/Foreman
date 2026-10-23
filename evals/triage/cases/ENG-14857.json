@@ -1,0 +1,237 @@
+{
+  "id": "ENG-14857",
+  "provenance": "seeded",
+  "createdAt": "2026-10-07T08:23:37.891Z",
+  "lane": "triage",
+  "stratum": "duplicate",
+  "ticket": {
+    "title": "Name 20 - Sending volume is low",
+    "description": "#### Customer Name\n\nName 20\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nCompany Eight\n\n#### Screenshot\n\n <image> \n\n <image> \n\n#### What are you trying to achieve?\n\nSend outreach emails\n\n#### What are you doing to achieve it?\n\nRunning campaigns with 18 inboxes that are good\n\n#### What is happening instead?\n\nOnly 182 emails are sending each day\n\n#### What is the expected outcome?\n\nPlease investigate",
+    "attachmentKinds": ["image"]
+  },
+  "repoCommitAtCreate": "b7f6b7fb7a0bdf2985f3f88a40caa71be6311335",
+  "flags": {
+    "descriptionEditedAfterCreate": false,
+    "needsProductionData": true,
+    "alreadyFixedAtTriage": false
+  },
+  "asFiled": {
+    "assignee": "Aaron Fraga",
+    "labels": [],
+    "parent": null,
+    "priority": 1,
+    "project": "Support"
+  },
+  "relatedSnapshot": [
+    {
+      "id": "ENG-12531",
+      "createdAt": "2026-08-11T13:58:31.694Z",
+      "title": "Email sending volume low (Name 1)",
+      "state": "Triage",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [],
+      "description": "#### Customer Name\n\nName 1\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\n* \n\n#### Screenshot\n\n <image> \n\n#### What are you trying to achieve?\n\nWhy is the sending volume so low? Only 29 emails per day\n\n#### What are you doing to achieve it?\n\n* \n\n#### What is happening instead?\n\n* \n\n#### What is the expected outcome?\n\n* "
+    },
+    {
+      "id": "ENG-4875",
+      "createdAt": "2026-01-26T22:05:55.686Z",
+      "title": "Campaign emails capped below expected 50 daily sends",
+      "state": "Canceled",
+      "assignee": "Anthony Adewale",
+      "parent": null,
+      "labels": ["Campaign State"],
+      "description": "Customer reports that a previously working campaign sending 50 emails per day is now only sending 17–34 leads per day across one or two campaigns.\n\nSupport has confirmed:\n\n* Email account should be sending at least 50 per day\n* Daily limit is not set lower than expected\n* Account is not new and is past warming/ramping up\n\nScreenshots from the customer showing current campaign configuration and results:\n\n <image> \n\n <image> \n\nPlease investigate why the effective daily send volume is below the expected 50 emails despite limits and warm-up status appearing correct."
+    },
+    {
+      "id": "ENG-9293",
+      "createdAt": "2026-05-27T14:10:52.004Z",
+      "title": "Cold email campaign sending volume is too low",
+      "state": "Done",
+      "assignee": "James Keeble",
+      "parent": null,
+      "labels": [],
+      "description": "#### Customer Name\n\nName 2\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nCompany One\n\n#### Screenshot\n\n <image> \n\n <image> \n\n#### What are you trying to achieve?\n\nSend cold emails\n\n#### What are you doing to achieve it?\n\nlaunched the campaign on Friday, May 22.\n\n#### What is happening instead?\n\nSo far it has only sent 45 emails\n\n#### What is the expected outcome?\n\nHave decent sending volume for campaign to work"
+    },
+    {
+      "id": "ENG-13502",
+      "createdAt": "2026-09-04T18:33:11.383Z",
+      "title": "Cold email daily sending limit under-allocated when a leadless completed campaign remains in the split",
+      "state": "Triage",
+      "assignee": "Anthony Adewale",
+      "parent": null,
+      "labels": ["Bug", "fast-lane"],
+      "description": "## Overview\n\nThe cold email daily sending limit is being under-allocated because the even-split logic counts finished campaigns that have no leads, cutting active campaigns' daily capacity by roughly 25%.\n\n## Problem\n\nA customer with 18 active inboxes and 3 active campaigns sends ~470 emails/day instead of ~630 because a fourth, completed campaign (with zero leads) is still counted as active in the split, diluting the daily-limit allocation.\n\n## Root cause\n\n`buildEvenSplitPlan` in `apps/web/lib/inngest/functions/campaign/util.ts` divides total daily capacity (unique inboxes × 35) evenly across every campaign the provider reports as active with a non-empty email list, without excluding campaigns that have no leads. A completed campaign left \"active\" on the provider (Acquisity-side status desync) is counted, so 18×35=630 splits 4 ways (157 each) instead of 3 ways (210 each).\n\n## Blast radius\n\n622 organizations hold 1,556 leadless \"completed\" campaigns that are still display-active with a non-empty email list. Counted 2026-09-04: `status = 'completed' AND display_status = 'active' AND total_leads = 0 AND jsonb_array_length(settings->'emailAccounts') > 0`. Confirmed affected: 1 organization (this report); potentially exposed: 622 organizations.\n\n## Proposed fix\n\nExclude campaigns with no leads (or campaigns Acquisity has marked completed/paused) from the daily-limit even split so capacity is divided only across campaigns that can actually send, and deactivate completed campaigns on the provider so they leave the active list.\n\n## What's included\n\nFix the split to exclude leadless/completed campaigns; containment is deactivating the ghost campaigns for affected orgs; observability is a signal for leadless campaigns present in the split.\n\n## Regression seam\n\n`buildEvenSplitPlan(campaigns, inboxes)`: given 18 inboxes, 3 campaigns with leads, and 1 leadless campaign, it must return 210/day for each of the 3 real campaigns (not 157) and emit no plan entry for the leadless campaign.\n\n## Done when\n\n* The split excludes leadless/completed campaigns.\n* A regression test proves 18 inboxes + 3 leaded campaigns + 1 leadless campaign yields 210 (not 157) per leaded campaign.\n* Affected organizations are rebalanced to their full capacity.\n\n## Reports\n\n* ENG-13501"
+    },
+    {
+      "id": "ENG-9431",
+      "createdAt": "2026-05-28T19:55:27.249Z",
+      "title": "Prewarmed inboxes are shown as Normal status",
+      "state": "Backlog",
+      "assignee": "James Keeble",
+      "parent": null,
+      "labels": [],
+      "description": "Customer details:\n\n* Name 3\n* <email>\n* Company Ten workspace\n* MAC Test campaign\n\nIn the Company Ten workspace, a campaign launched yesterday with 9 inboxes that had been warming for 6–8 weeks is sending far below expected volume.\n\nThe inboxes are showing a status of “Normal” instead of “Prewarmed.” Support suspected the system may still be applying conservative sending limits because the inboxes are not being recognized as prewarmed.\n\nObserved sending volume was 18 emails on day 1 and 36 on day 2."
+    },
+    {
+      "id": "ENG-10709",
+      "createdAt": "2026-06-23T17:39:48.329Z",
+      "title": "One-off recovery: backfill + AI SDR replay for the webhook-outage cohort (99 + 207)",
+      "state": "Done",
+      "assignee": "Nathan Foster",
+      "parent": "ENG-10708",
+      "labels": ["intercom-sourced"],
+      "description": "**Reopened 2026-06-23 per James (Slack P0 thread) — this is the live one-off recovery run for the webhook-outage cohort.** Previous cancellation reversed so the resync → backfill → AI-SDR-replay is tracked on record (not just in-flight Slack work).\n\n## Problem\n\nDuring the silent webhook outages, prospect replies arrived while webhooks were down. We've resynced + backfilled most affected workspaces but have NOT re-run AI SDR on those imported replies — importing does not trigger AI SDR (verified in code) — so prospects sit un-answered. Several clients have had this for a couple of weeks and think their campaigns aren't working.\n\nCohorts: 99 (May-20) resynced+backfilled, not replayed; 207 active-campaign silent dropouts (158 resynced+backfilled, ~49 pending resync, none replayed); plus the two named system-provisioned workspaces `<workspace-slug>` and `<workspace-slug>` (whose admin \"resync\" never actually re-registered — confirmed via Inngest: no resync run fired).\n\n## Plan (one-off scripts; reuse existing primitives; no new app code)\n\nStrictly ordered, with wait points (ordering is load-bearing):\n\n0. **Detect** — read-only script: active Company Two provider + ≥1 active campaign + 0 `outreach_webhook_event` in last N days → org-id list. Confirm count ≈ cohort and that the two named workspaces appear.\n1. **Re-register** — fire `OUTREACH_EVENTS.RESYNC_WEBHOOKS` per org (batched; `processResyncWebhook` caps concurrency at 5; uses the shipped create-then-swap from PR #4945). Wait for completion.\n2. **Backfill (windowed)** — `OUTREACH_EVENTS.EMAIL_THREADS_BULK_IMPORT` `{ organizationIds, userId: <superadmin>, classifyInterest: true }`. Wait for completion.\n3. **Replay** — select positive / last-from-prospect / non-human-owned / non-terminal threads → `admin.sdrReplay.replayThreads` in ≤300-id batches (re-verifies prospect-sent-last before firing).\n\nDepends on PR #4945 (the safe-resync prerequisite). Every driver script ships with a `--dry-run`.\n\n## Acceptance criteria\n\n- [ ] All affected orgs (99 + 207 + the 2 named) re-registered and confirmed delivering.\n- [ ] Missed messages backfilled (windowed to the silent period; no full-history walk).\n- [ ] AI SDR replayed on unanswered prospect threads; no double-replies (idempotency/guards respected).\n- [ ] Never replays human-owned (`controlLevel` in human_takeover/dnc/paused/escalated) or terminal-lifecycle (booked/completed/declined) threads.\n- [ ] Per-phase structured summary (orgs resynced, threads imported, replays fired/skipped/failed).\n\nName 4 this flow (auto on every future reconnect) → ENG-10710. Detection / zombie webhooks → ENG-10661 + ENG-10711."
+    },
+    {
+      "id": "ENG-12890",
+      "createdAt": "2026-08-18T17:59:37.095Z",
+      "title": "Sending volume seems to be too low",
+      "state": "Canceled",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [],
+      "description": "#### Customer Name\n\nName 5\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 5's\n\n#### Screenshot\n\n <image> \n\n#### What are you trying to achieve?\n\nCampaign was launched on August 12th and only 477 leads were reached out to. Can somebody please check why the sending volume is so low? I am submitting this ticket on August 18th\n\n#### What are you doing to achieve it?\n\n* \n\n#### What is happening instead?\n\n* \n\n#### What is the expected outcome?\n\n* "
+    },
+    {
+      "id": "ENG-4342",
+      "createdAt": "2026-01-09T14:27:58.950Z",
+      "title": "Cold Email Agent campaign volume not reallocating after pauses",
+      "state": "Done",
+      "assignee": "Anthony Adewale",
+      "parent": null,
+      "labels": ["Campaign Stops Sending"],
+      "description": "Customer reports that the Cold Email Agent campaign \"Medical & Dental Groups\" is only sending \\~88 emails per day across 15 inboxes.\n\nKey context:\n\n* Other campaigns were paused to concentrate volume on the Medical & Dental Groups campaign.\n* Despite pausing other campaigns, daily volume has not increased and remains around 5–6 emails per inbox per day (\\~88/day total).\n* On January 1st, the system sent around 450 emails in a single day; since then, volume has dropped and stabilized at \\~88/day.\n* Inboxes have been warming for about 4 weeks, so current volume is lower than expected for this stage.\n* Support review suggests this may be a send-cap allocation or throttling issue where volume does not reallocate correctly after campaigns are paused.\n\nThere is a Jam screen recording linked in the conversation showing the current setup and behavior.\n\nPlease investigate why sending volume is not scaling back up on the remaining active campaign after other campaigns are paused and whether the campaign is stuck in an incorrect reduced send cap state."
+    },
+    {
+      "id": "ENG-14272",
+      "createdAt": "2026-09-25T10:14:42.109Z",
+      "title": "blacklabel Client has 36 inboxes but is only sending 294 a day",
+      "state": "Todo",
+      "assignee": "Anthony Adewale",
+      "parent": "ENG-13502",
+      "labels": ["Bug", "Customer reported"],
+      "description": "#### Customer Name\n\nName 6\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nCompany Three\n\n#### Screenshot\n\n#### What are you trying to achieve?\n\nName 7 the clients full volume that he can send on a daily basis\n\n#### What are you doing to achieve it?\n\nAdding all inboxes to the campaign, checking if they are active, checked if the campaign still has leads enough, and checked if there are any other campaigns live that can take volume away\n\n#### What is happening instead?\n\nIt's only sending 294 a day instead of 1080\n\n#### What is the expected outcome?\n\nSending the full amount we can send instead of the 290 a day now"
+    },
+    {
+      "id": "ENG-8430",
+      "createdAt": "2026-05-08T10:38:03.319Z",
+      "title": "Investigate email send volume and campaign issues for client",
+      "state": "Done",
+      "assignee": "Tyler Olsen",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "User problem summary:\n\nThe issues reported are:\n\n* The campaign is expected to send 225 new emails per day across 15 email accounts, but only 195 emails per day are being sent, leaving a discrepancy of about 30 emails per day.\n* The campaign appears to have stopped sending Step 1 emails after May 6th, despite there being 14,000 leads loaded and the expectation that new leads should continue entering the sequence daily.\n* The client configured a 7-step sequence with multiple variants and 2–3 day gaps, but wants every lead to receive all 7 steps sequentially regardless of whether they respond.\n* The client needs confirmation on whether the platform supports this type of sequential sending behavior and whether the current setup could be affecting performance.\n* The same slow campaign performance issue reportedly happened in a previous campaign, raising concerns about a recurring account-level or platform-level issue.\n* The client is requesting:\n  * investigation into the missing send volume,\n  * explanation and resolution for the campaign stopping after May 6th,\n  * clarification on sequence behavior/support,\n  * review of historical account issues,\n  * and guidance on whether reducing sequence complexity would improve performance.\n\n#### Customer Name\n\nName 8\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 8\n\n#### Screenshot\n\n#### What are you trying to achieve?\n\nSupport Ticket: Campaign Performance Issues Client Overview: The client has 5 domains with 3 email accounts per domain totalling 15 email accounts. He has 14,000 leads loaded into the campaign and all 15 email accounts have been confirmed as added to the campaign. Expected vs Actual Send Volume: With 15 email accounts sending 15 new emails per day the expected daily send volume is 225 new emails per day. Between May 5th and May 6th the expected total should have been 450 new emails across two days. However only 195 emails per day are going out which means approximately 30 emails per day are unaccounted for. We need to understand why the actual send volume is falling short of the expected volume despite all 15 accounts being active and added to the campaign. Campaign Stopped Sending After May 6th: The campaign appears to have stopped sending emails to the first sequence after May 6th. We need to understand why this happened. Even accounting for a two to three day wait period between Step 1 and Step 2 the campaign should have continued sending Step 1 emails to new leads every single day without interruption. This needs to be investigated and resolved immediately. Sequence Structure Issue: The client has set up 7 steps with multiple variants per step and a two to three day gap between each step. It is important to note that in the interview method sequences are not designed to follow up with the same lead sequentially through all 7 steps. Each step should only trigger for leads that have not yet responded. However this client wants all 7 steps to go to every single lead in sequential form regardless of whether they have responded or not. We need confirmation on whether the platform supports this configuration and if so whether this setup could be contributing to the slower than expected send volume and the campaign stopping after May 6th. Historical Pattern: This is not the first time this client has experienced slow campaign performance. The same issue occurred with a previous campaign. This suggests there may be a deeper configuration issue or platform level problem specific to this client's account that needs to be reviewed comprehensively rather than just addressing the immediate symptoms. What We Need From Support:  Investigate why only 195 emails per day are going out instead of the expected 225 and identify the 30 email per day discrepancy. Explain why the campaign stopped sending after May 6th and resolve it immediately. Confirm whether the platform supports sending all 7 sequential steps to every lead regardless of response and advise on whether this configuration is causing performance issues. Review the client's account history given this has happened on a previous campaign and determine whether there is a recurring platform level issue. Advise on whether reducing the number of sequence steps would improve send volume and campaign performance and if so what the optimal configuration would look like.  Please prioritize this ticket as the client has 14,000 leads loaded and the campaign running at reduced capacity is significantly impacting their outreach volume and results. Thank you.\n\n#### What are you doing to achieve it?\n\nna\n\n#### What is happening instead?\n\nna\n\n#### What is the expected outcome?\n\nresolve the issue"
+    },
+    {
+      "id": "ENG-11698",
+      "createdAt": "2026-07-16T14:00:46.340Z",
+      "title": "Increase daily outreach email sending volume",
+      "state": "Done",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [],
+      "description": "#### Customer Name\n\nName 2\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nCompany One\n\n#### Screenshot\n\n <image> \n\n <image> \n\n#### What are you trying to achieve?\n\nSend outreach emails\n\n#### What are you doing to achieve it?\n\nName 7 6 domains and 15 inboxes to send outreach\n\n#### What is happening instead?\n\nIt's only sending 100 emails per day on average\n\n#### What is the expected outcome?\n\nIncrease the sending volume"
+    },
+    {
+      "id": "ENG-6237",
+      "createdAt": "2026-03-05T15:05:22.758Z",
+      "title": "AI SDR not following up as expected",
+      "state": "Done",
+      "assignee": "Koppany Kondricz",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "#### Customer Name\n\nName 9\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 9's Workspace\n\n#### Issue - \n\nThe AI SDR is not following up on emails automatically. "
+    },
+    {
+      "id": "ENG-11629",
+      "createdAt": "2026-07-14T21:17:48.254Z",
+      "title": "[Docs gap] New campaigns ramp up sending gradually — no doc explains expected early volume",
+      "state": "Done",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": ["Docs Gap", "intercom-sourced"],
+      "description": "DOCS GAP: The Help Center explains inbox warmup thoroughly and mentions the hard cap of \"30 campaign emails per inbox per day,\" but nothing explains that a newly launched campaign ramps up its daily send volume gradually over the first days/weeks — even when every attached inbox is fully warmed (green flame, Active). Customers (and CS) expect (#inboxes x ~30) = daily volume immediately and read the slow initial days as a bug. The docs cover inbox readiness but not campaign-level send ramp.\n\nCUSTOMER CONTEXT: Name 10 (Company Eleven) launched a new campaign and reported only 54 emails sent in 2 days across 9 warmed/active inboxes, asking \"it is going too slow, what is the problem?\" Investigation shows this is expected ramp-up, not a defect (evidence below).\n\nEVIDENCE (expected behavior, not a bug):\n\n* Campaign \"Company Twelve - 200 leads Healthcare Trial\" (id <uuid>) was activated 2026-07-13.\n* Daily emails_sent: 2026-07-13 = 18, 2026-07-14 = 36 (= 54 total, exactly matching the customer's report). Volume increasing day-over-day (~doubling) — a healthy ramp, not a stall.\n* 9 attached inboxes all active + connected, mailbox_type = dfy, created 2026-06-25 (~3 weeks old, recently through initial warmup).\n* Plenty of leads remain: 1,155 not_yet_contacted (1,209 total) — NOT lead-limited.\n* outreach_provider is_active = true, no connection_error.\n* Same org's mature campaign \"Real Estate | Leadership | US | Name 11\" (older March inboxes) sends ~260-270/day fine — confirms the platform sends at volume once ramped; the difference is the new campaign + newer inboxes.\n\nSUGGESTED CONTENT: Add a short section (e.g. in your-first-campaign.mdx \"What to check in the first 24 hours\", or a new \"How fast will my campaign send?\" FAQ under cold-email-agent) explaining: (1) new campaigns start low and ramp up over the first ~1-2 weeks to protect deliverability; (2) newer domains/inboxes ramp more conservatively; (3) the per-inbox ceiling is ~30/day, so full volume ~= #inboxes x ~30 only once fully ramped; (4) low volume in the first couple of days with a small increasing trend is expected, not a fault.\n\nRELATED DOC(S):\n\n* apps/web/content/docs/cold-email-agent/getting-started/your-first-campaign.mdx\n* apps/web/content/docs/cold-email-agent/email-accounts/warmup.mdx (covers inbox warmup, not campaign ramp)\n* apps/web/content/docs/cold-email-agent/email-accounts/health-and-troubleshooting.mdx\n\nINTERCOM: <url:app.intercom.com>\nSLACK THREAD: <url:acquisityworkspace.slack.com>\nDEVIN SESSION: <url>"
+    },
+    {
+      "id": "ENG-13312",
+      "createdAt": "2026-08-31T18:54:35.099Z",
+      "title": "Name 12 seeing volume error in Cold EM agent",
+      "state": "Done",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": ["Internal reported"],
+      "description": "#### Customer Name\n\nName 12\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nCompany Four\n\n#### Screenshot\n\n <image> \n\n#### What are you trying to achieve?\n\nClear this notification \"Wait for volume (250 per variant)\" and then confirm why the volume outreach seems to be doing less than 25-30 sends per inbox attached to the email campaign. Name 12 thinks it is\n\n#### What are you doing to achieve it?\n\nScreenshare and calculate that inboxes (9) seem to be sending more slowly than the expected 25-30 / day (I also had Name 12 ensure options in camp reflects sending is Mon-Fri 9A-6P EST\n\n#### What is happening instead?\n\nvolume seems limited and client perceives outreach is squashed\n\n#### What is the expected outcome?\n\nSolve sending 25-30 per inbox to maximize sending capacity for prewarmed"
+    },
+    {
+      "id": "ENG-14095",
+      "createdAt": "2026-09-21T21:36:54.887Z",
+      "title": "Name 13 - cold emails not sending to capacity",
+      "state": "Done",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": ["Customer reported"],
+      "description": "#### Customer Name\n\nName 14\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nCompany Five, and Name 14\n\n#### Screenshot\n\n#### What are you trying to achieve?\n\nneither platform are sending cold emails to capacity.  Please investigate and fix\n\n#### What are you doing to achieve it?\n\nSending cold email\n\n#### What is happening instead?\n\nonly a few are sending\n\n#### What is the expected outcome?\n\nSending to daily sending limit capacity"
+    },
+    {
+      "id": "ENG-9432",
+      "createdAt": "2026-05-28T19:55:28.557Z",
+      "title": "Campaign shows no connected inboxes and barely sends",
+      "state": "unknown",
+      "assignee": "Koppany Kondricz",
+      "parent": null,
+      "labels": [],
+      "description": "Customer details:\n\n* Name 3\n* <email>\n* Company Ten workspace\n* MAC Test campaign\n  \n  In the Company Ten workspace, a campaign launched yesterday with 9 inboxes is showing the message “No email accounts connected. Add one to start sending.” even though inboxes are attached.\n\nSupport asked for the inboxes to be unselected and reselected, but the banner still appeared and there was no forward movement in sending. \n\nObserved sending volume was 18 emails on day 1 and 36 on day 2."
+    },
+    {
+      "id": "ENG-13931",
+      "createdAt": "2026-09-16T16:43:48.508Z",
+      "title": "Name 15 - campaigns sending half volume",
+      "state": "Done",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [],
+      "description": "#### Customer Name\n\nName 9\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nCompany Six (Company Seven)\n\n#### Screenshot\n\n#### What are you trying to achieve?\n\nClient has 3 active campaigns, but only sending 300 emails/day - should be sending 540\n\n#### What are you doing to achieve it?\n\nall settings correct\n\n#### What is happening instead?\n\n300 emails/day sending\n\n#### What is the expected outcome?\n\n540 emails/day"
+    },
+    {
+      "id": "ENG-12384",
+      "createdAt": "2026-08-06T21:34:55.870Z",
+      "title": "Campaign Not Maximizing Inbox Sending Capacity",
+      "state": "Triage",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": ["Bug", "intercom-sourced"],
+      "description": "**Customer Name**\nName 16\n\n**Customer Email**\n<email>\n\n**Customer Email**\n<email>\n\n**Workspace name**\nAI Acquisition Tools\n\n**Screenshot**\n<optional>\n\n**What is the user trying to achieve?**\nMaximize the daily sending capacity of their campaigns by fully utilizing all 18 assigned inboxes.\n\n**What is the user doing to achieve it?**\nThe user has assigned 18 inboxes to their campaigns and is monitoring the daily sending volume across multiple campaigns to ensure the inbox capacity is being fully utilized.\n\n**What is happening instead?**\nThe campaigns are not consistently utilizing the available inbox capacity. The highest daily sending volume the user has observed is 441 emails, and that only occurred once. On most days, the campaigns send significantly fewer emails, and the daily sending volume varies considerably across campaigns. The user also noted that the Email Accounts page sometimes shows 17/30 sent daily and reports that the campaign has reached its maximum sending volume, despite having 18 assigned inboxes.\n\n**What is the expected outcome?**\nThe user expects the platform to consistently maximize the available sending capacity of the assigned inboxes (within platform limits and warm-up rules) and would like clarification on why the campaigns are not utilizing their full daily sending potential."
+    },
+    {
+      "id": "ENG-10830",
+      "createdAt": "2026-06-25T16:37:40.645Z",
+      "title": "Investigate decreasing volume for high-risk client",
+      "state": "Duplicate",
+      "assignee": "Koppany Kondricz",
+      "parent": null,
+      "labels": [],
+      "description": "#### Customer Name\n\nName 17\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\n* \n\n#### Screenshot\n\n <image> \n\n <image> \n\n#### What are you trying to achieve?\n\nCan someone please check why the volume has been decreasing? This client is a very high-risk client and we have several different issues we're solving with him right now (non-technical issues). Please prioritise this so I can get back to him today. He's a very frustrated client. -------- (I know this is a duplicate, but the other channel was archived, so I need a thread where i can see that this has been fixed)\n\n#### What are you doing to achieve it?\n\n* \n\n#### What is happening instead?\n\n* \n\n#### What is the expected outcome?\n\n* "
+    },
+    {
+      "id": "ENG-14515",
+      "createdAt": "2026-09-30T11:30:11.445Z",
+      "title": "Name 18 - needs to increase email volume for client Company Nine",
+      "state": "Done",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": ["Customer reported"],
+      "description": "#### Customer Name\n\nName 18\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 18\n\n#### Screenshot\n\n#### What are you trying to achieve?\n\nThe client is trying to increase the sending volume for client Company Nine ahead of a conference. He has had 15 inboxes warming up for a long time. They appear ready in Acquisity. Want to double check there is no issue with these inboxes for Company Nine\n\n#### What are you doing to achieve it?\n\nChecked the inbox health in acquisity and flagging because of previous acquisity issues.\n\n#### What is happening instead?\n\nLimited volume with sending.\n\n#### What is the expected outcome?\n\nTo be able to send emails using all 30 inboxes"
+    },
+    {
+      "id": "ENG-14755",
+      "createdAt": "2026-10-05T21:29:45.222Z",
+      "title": "Name 19 - not sending to daily limit",
+      "state": "Triage",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [],
+      "description": "#### Customer Name\n\nName 19\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nCompany Eight\n\n#### Screenshot\n\n#### What are you trying to achieve?\n\nsend to daily limit - currently sending 180 emails/day - 18 inboxes, expecting 540 emails/day to send\n\n#### What are you doing to achieve it?\n\nsetup verified correct\n\n#### What is happening instead?\n\nonly 180 emails being sent per day\n\n#### What is the expected outcome?\n\nsend 540 emails/day"
+    }
+  ]
+}

@@ -14,18 +14,27 @@ const TRUNCATION_MARKER = "...";
 // Redaction runs on a bounded head of the message; the log keeps 200 characters anyway.
 const MESSAGE_SCAN_LIMIT = 1000;
 const OPS_FIELD_KEYS = [
+  "assigneeKind",
+  "blockingFindings",
+  "classification",
   "code",
   "connection",
   "conversationId",
   "decision",
+  "duplicateOf",
+  "failedCriteria",
+  "issue",
   "message",
   "outcome",
+  "path",
+  "project",
   "requests",
   "runId",
   "sessionId",
   "stepIndex",
   "tool",
   "turnId",
+  "verdict",
 ] as const;
 
 type OpsField = (typeof OPS_FIELD_KEYS)[number];

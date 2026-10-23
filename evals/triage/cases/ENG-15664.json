@@ -1,0 +1,247 @@
+{
+  "id": "ENG-15664",
+  "provenance": "seeded",
+  "createdAt": "2026-10-17T18:29:57.064Z",
+  "lane": "triage",
+  "stratum": "bug_master",
+  "ticket": {
+    "title": "AI SDR escalating positive replies with “The AI encountered an issue processing this thread”",
+    "description": "#### Customer Name\n\nName 25\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nCompany Nine\n\n#### Screenshot\n\n <image> \n\n <image> \n\n#### What are you trying to achieve?\n\nHave the AI SDR reply to interested prospects on the Grow the Name 26 campaign and send them a booking link for Name 28.\n\n#### What are you doing to achieve it?\n\nThe AI SDR is on for the campaign. The knowledge base was updated with meeting details and rules for prospects who say yes. Name 28 is set as the Assigned Call Handler.\n\n#### What is happening instead?\n\nPositive replies are being escalated with the banner “The AI encountered an issue processing this thread. Please review manually.” Examples are Name 29 (Re: Guest spot, podcast invite for Name 29), Name 27 (RE: Guest invite for Name 103, replied October 15) and Name 101 (already reported to Foreman). The AI SDR pauses on each thread, so the prospect never gets a booking link.\n\n#### What is the expected outcome?\n\nThe AI SDR processes positive replies without errors and sends a booking link for Name 28's calendar.",
+    "attachmentKinds": ["image", "slack"]
+  },
+  "repoCommitAtCreate": "82ec7dc61cc1d76220a24b3522c9db9b332b1c87",
+  "flags": {
+    "descriptionEditedAfterCreate": false,
+    "needsProductionData": true,
+    "alreadyFixedAtTriage": false
+  },
+  "asFiled": {
+    "assignee": "Aaron Fraga",
+    "labels": [],
+    "parent": null,
+    "priority": 1,
+    "project": "Support"
+  },
+  "relatedSnapshot": [
+    {
+      "id": "ENG-15637",
+      "createdAt": "2026-10-16T17:59:57.824Z",
+      "title": "Fix error as AI SDR is unable to process and respond to an email thread",
+      "state": "unknown",
+      "assignee": "unknown",
+      "parent": "unknown",
+      "labels": "unknown",
+      "description": "#### Customer Name\n\nName 1\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 1\n\n#### Screenshot\n\n <image> \n\n#### What are you trying to achieve?\n\nAI SDR agent is not processing email threads and not responding with time slots connected to the right calendar at all.\n\n#### What are you doing to achieve it?\n\nSubmitting a ticket\n\n#### What is happening instead?\n\nNothing is happening\n\n#### What is the expected outcome?\n\nFix the issue"
+    },
+    {
+      "id": "ENG-15155",
+      "createdAt": "2026-10-11T16:31:07.044Z",
+      "title": "Company One: false Meeting Booked, no meeting ask, follow ups after replies (Name 2)",
+      "state": "unknown",
+      "assignee": "unknown",
+      "parent": "unknown",
+      "labels": "unknown",
+      "description": "#### Customer Name\n\nName 2\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nCompany Two\n\n#### Screenshot\n\n <image> \n\n <image> \n\n <image> \n\n <image> \n\n <image> \n\n#### What are you trying to achieve?\n\nGet the AI SDR on the Name 6 “copy/copy” campaign to deliver the lead magnet, then ask interested leads for a meeting and book it correctly\n\n#### What are you doing to achieve it?\n\nName 7’s Outlook calendar was reconnected, he’s set as the Assigned Call Handler, and the knowledge base was rewritten on Oct 8. The client tested the campaign flow with his own test leads and sent screenshots of each issue.\n\n#### What is happening instead?\n\n1. A thread from <email> is marked “Meeting Booked,” but no meeting was offered or booked.\n2. <email> (Name 3): the scorecard was delivered correctly, but when the lead replied “Data controls,” the AI asked another qualifying question instead of asking for a meeting.\n3. Same thread: follow ups (“Hey Name 4, just following up!” and “Just circling back...”) were still sent after the lead replied, and one used the wrong first name (Name 4 instead of Name 5).\n4. <email>: a forwarded reply chain triggered “Escalated for Review: the AI encountered an issue processing this thread.”\n   Also: Name 6 and Company Three use the same knowledge base, even though they are different businesses.\n\n#### What is the expected outcome?\n\nAfter the lead magnet is delivered and the lead engages, the AI SDR asks for a meeting and books it on Name 7’s calendar. “Meeting Booked” only appears when a meeting is actually booked. Follow ups stop once a lead replies and use the correct name. Forwarded replies are handled instead of escalated."
+    },
+    {
+      "id": "ENG-10735",
+      "createdAt": "2026-06-24T08:53:51.493Z",
+      "title": "AI SDR inbox delays and booking confirmation failures for some leads",
+      "state": "Blocked",
+      "assignee": "Koppany Kondricz",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "#### Customer Name\n\nName 8\n\n#### Workspace name\n\nCompany Four\n\n#### Screenshot\n\n <image> \n\n <image> \n\n <image> \n\n#### What is the user trying to achieve?\n\nMessages shoould show in AI SDR Inbox real time, have AI SDR process replies correctly, send follow-up responses, and handle scheduling without unnecessary escalation.\n\n#### What is the user doing to achieve it?\n\nMonitoring replies in Company Five and AI SDR Inbox for the Company Four workspace. The client sees the replies in Company Five but not in Acquisity. Upon checking it seems that it posts on Company Five after a few hours. The AI SDR is also  not  sending a confirmation email for booked calls and tagged as escalated. \n\n#### What is happening instead?\n\nSome replies appear in Company Five but are delayed by hours or missing in AI SDR Inbox, while newer leads can appear immediately. AI SDR did not reply to booking scheduled and tags it as \"Escalated for Review\" and reported a double reply after sending a manual response.\n\n#### What is the expected outcome?\n\nProspect replies should show up in AI SDR Inbox consistently without multi-hour delays, AI SDR should process those threads without escalating unnecessarily, booked meetings should still trigger the expected confirmation behavior, and manual intervention should not cause duplicate outbound replies."
+    },
+    {
+      "id": "ENG-3316",
+      "createdAt": "2025-12-02T20:55:14.675Z",
+      "title": "AI SDR incorrectly escalating positive responses instead of booking meetings",
+      "state": "Done",
+      "assignee": "Pieter Venter",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "## Issue Description\n\nThe AI SDR is failing to recognize positive responses from prospects and is incorrectly escalating conversations for human intervention instead of attempting to book meetings.\n\n## Example Case\n\n* **Client email**: <email>\n* **Prospect**: Name 9 (<email>)\n* **Response**: \"Sounds like fun, let's talk details!\"\n* **Expected behavior**: AI SDR should recognize positive intent and attempt to book a meeting\n* **Actual behavior**: Conversation was escalated for review with \"Escalated for Review\" status\n\n## Additional Context\n\n* Brand new workspace setup for a new client\n* Multiple positive responses are being escalated inappropriately\n* The prospect's response clearly indicates interest and willingness to discuss further\n* Related screenshots show the escalation pattern in the AI SDR inbox\n\n## Impact\n\n* Poor user experience as simple positive responses require human intervention\n* Defeats the purpose of the AI SDR automation\n* Creates unnecessary work for the sales team\n* May delay response times to interested prospects\n\n## Expected Resolution\n\nAI SDR should:\n\n1. Recognize positive intent phrases like \"sounds like fun\", \"let's talk\", \"sure\", etc.\n2. Attempt to book a meeting using the standard booking flow\n3. Only escalate when there are genuine blockers or complex questions that require human input\n\n## Screenshots\n\nSee attached screenshots showing the escalation pattern in the AI SDR inbox.\n\n <image> \n\n <image> "
+    },
+    {
+      "id": "ENG-14111",
+      "createdAt": "2026-09-22T10:53:42.057Z",
+      "title": "Master: AI SDR sends a reply that is never recorded in its conversation, so the inbox shows no slots message and the thread escalates as unanswered",
+      "state": "Backlog",
+      "assignee": "Koppany Kondricz",
+      "parent": null,
+      "labels": ["Bug", "fast-lane"],
+      "description": "## Overview\n\nThe AI SDR's own reply is delivered to the prospect but is often never recorded in the conversation it belongs to. The rep's inbox then shows the prospect's earlier reply as the newest message while the thread still claims a time-slot email was sent, and the thread can be escalated as unanswered.\n\n## Problem\n\nThe AI SDR inbox is the rep's record of what was promised to a prospect. When a sent reply is missing from the thread, the rep cannot see what the AI said, the thread state contradicts the thread contents, and the response-timeout monitor treats the thread as unanswered and puts it in the escalation queue, where a rep may answer the same prospect twice.\n\n## Root cause\n\n`executeSendEmailStep` / `syncThreadAfterSend` (`apps/web/lib/ai-sdr-v2/workflow/steps/send-email.ts`) sync the provider thread immediately after a successful send through `syncProviderThread` (`apps/web/lib/services/email-thread-sync-service.ts`), which reads the thread via `getEmailsForThread` (Company Five `search: thread:<id>`). The just-sent email is not in that read, so no `crm_message` row is created for it and `last_synced_at` advances only to the previous message. Nothing later re-reads the thread for that send: the other `syncProviderThread` callers are the follow-up send path, an out-of-office path, and a periodic `sync-email-threads` function whose event has no producer at the current commit, and the Company Five `email_sent` webhook handler only logs. The same step then writes the lifecycle `slots_sent` (\"Email with time slots sent\"), gated only on the send reporting success and on proposed or matched slots, without checking that the message was recorded. The response-timeout monitor (`apps/web/lib/inngest/functions/monitor-ai-sdr-response-timeout.ts`) then reads the newest recorded message, finds it inbound and older than two hours, and escalates.\n\nSecond call site, same cause (added 16 Oct 2026): the AI SDR inbox's manual reply route, `replyToEmail` in `apps/web/trpc/routers/integrations/Company Five.ts`. After `providerClient.sendMessage` succeeds it waits 2 seconds, re-reads the thread with `getEmailsForThread`, and saves only what that read returns. It never records the sent message from the send result. When Company Five hasn't indexed the reply yet, the rep's reply reaches the prospect but never shows in the thread, the request still reports success, and the thread is set to human takeover. If the rep then turns the AI SDR back on, the prospect's message is still the newest one and the response-timeout monitor re-escalates the thread.\n\n## Blast radius\n\n44 threads across 31 organizations in the 30 days before 2026-09-22 hold an ai-sdr-v2 \"Email with time slots sent\" lifecycle event with no sent message in the thread within ten minutes of it; 29 of those have nothing newer than the moment of the write. The same window holds 9,402 such lifecycle events across 962 organizations, so the path is traversed far more often than it fails. Query: `crm_message_thread` (deleted_at null, updated_at > 2026-08-23, `lifecycle_history` contains a `slots_sent` entry written by `ai-sdr-v2`) left-joined to `crm_message` on direction `sent` and `sent_at` within ±10 minutes of the lifecycle timestamp.\n\nConfirmed escalation fallout from this defect is 1 thread. The 646 threads across 181 organizations the same monitor escalated in the window are that monitor's total volume and are not attributable to this defect. Potentially exposed: every thread on the AI SDR send path. Affected user count is not measurable from these tables.\n\nManual reply route, counted 16 Oct 2026 over the previous 7 days: 162 of 2,144 manual AI SDR inbox replies (7.6%) were never recorded in their thread. That's 70 orgs and 69 users confirmed affected, out of 328 orgs and 306 users who sent manual replies (potentially exposed). Query: `crm_message_thread` (Company Five, not deleted, updated in the last 7 days) × `control_level_history` entries with reason \"Human replied via Company Five API\", where no `sent` `crm_message` exists in the thread within -3/+1 minutes of the transition. It's a floor, because replies sent with the AI SDR continuing write no transition.\n\n## Proposed fix\n\nRecord the sent reply authoritatively at send time instead of relying on an immediately following provider thread read: write the CRM message from the send result's provider message id, or re-read the provider thread until the sent message is present. Do not advance the lifecycle to `slots_sent` unless the sent message is recorded in the thread.\n\n## What's included\n\nThe send-time recording fix and the lifecycle gate, for both the AI SDR send step and the manual reply route (`replyToEmail`). Separately: a reconciliation pass for the affected threads, which overlaps the general periodic provider-versus-local reconciliation item ENG-10060 (Backlog, blocked by ENG-10043), and detection when a successful send has no recorded message. Excluded: the Company Five lead-push failure (ENG-13257) and the campaign lead-count receipt issues (ENG-13892), which govern whether leads reach the provider and are unrelated to this cause.\n\n## Regression seam\n\n`executeSendEmailStep` in `apps/web/lib/ai-sdr-v2/workflow/steps/send-email.ts`, at the point where `outcome.data.sent` is true. Red before: a `slots_sent` lifecycle event can exist while the thread has no `sent` `crm_message`. Green after: every ai-sdr-v2 `slots_sent` lifecycle event has a matching `sent` `crm_message` in the same thread, which the blast-radius query itself measures.\n\nSecond seam: `replyToEmail` in `apps/web/trpc/routers/integrations/Company Five.ts`, right after `providerClient.sendMessage` returns. Red before: a \"Human replied via Company Five API\" transition can exist with no matching `sent` `crm_message`. Green after: every such transition has one, which the manual-reply blast-radius query measures.\n\n## Done when\n\n* A send that reports success always produces a `crm_message` row for the sent email, including when the provider's thread read lags.\n* The `slots_sent` lifecycle is never written without that row.\n* Every manual reply sent from the AI SDR inbox produces a `crm_message` row in its thread, even when the provider's thread read lags.\n* A signal fires when a successful send has no recorded message.\n* A regression test proves the causal mechanism at the named seam.\n\n## Reports\n\n* ENG-14110\n* ENG-15629"
+    },
+    {
+      "id": "ENG-5431",
+      "createdAt": "2026-02-11T16:02:19.273Z",
+      "title": "Escalation for review triggered when Company Five Name 10 errors",
+      "state": "Done",
+      "assignee": "Jared Stauffer",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "user: <email>\n\nCustomer reports seeing the red “Escalated for Review” banner with message that the AI encountered an issue processing the thread in the AI SDR inbox. This coincides with an error shown when loading the Company Five Name 10. Company Five reports no active outage.\n\nSupport suspects the Company Five sub-workspace connection (managed by Acquisity) may have partially desynced, preventing the AI SDR from retrieving message payloads (reply content/classification), which triggers the escalation safety state.\n\nRequested from customer: workspace name and one affected inbox email address.\n\nerror encountered here <url>>\n\n <image> \n\n## **When This Message Appears**\n\nThe generic message appears in two main scenarios:\n\n**1. Technical Errors During Workflow Execution**\n\nWhen the AI SDR workflow throws an error during processing, it gets caught and the thread is escalated. ai-sdr-workflow.ts:1121-1132 The escalation reason will be a technical error message (like \"AI generation failed\" or \"Database query timeout\"), which gets filtered to the generic message on the frontend. escalation-reasons.ts:1-7\n\n**2. Name 11**\n\nWhen webhook events fail to process after retries, the system logs the failure and escalates the thread. process-reply-events.ts:179-201 These failures can occur due to:\n\n* Database connection issues\n* AI model timeouts\n* Email sync failures process-reply-events.ts:754-765\n\n**3. Response Timeouts**\n\nIf the AI SDR doesn't respond within 2 hours of receiving a prospect reply, the monitoring system automatically escalates the thread with the reason \"AI SDR failed to respond within 2 hours\". monitor-ai-sdr-response-timeout.ts:243 This also gets filtered to the generic message."
+    },
+    {
+      "id": "ENG-6157",
+      "createdAt": "2026-03-03T20:49:40.286Z",
+      "title": "AI SDR escalates simple email thread with processing error",
+      "state": "Done",
+      "assignee": "Beth Newton",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "User: <email>\nAn AI SDR escalated a reply that should have been handled automatically (requesting a discovery call time).\n\nShown error: \"The AI encountered an issue processing this thread. Please review manually.\"\nCalendar and Availability was set up properly\n\n <image> "
+    },
+    {
+      "id": "ENG-13779",
+      "createdAt": "2026-09-13T22:38:01.529Z",
+      "title": "Notify reps about replies and the AI SDR, and let them act from the card",
+      "state": "Done",
+      "assignee": "Elis Bushaj",
+      "parent": "ENG-13430",
+      "labels": ["CRM migration"],
+      "description": "## Overview\n\nReps hear straight away when a prospect replies positively, when the AI SDR needs them, or when a reply is stuck. They can act from the notification itself: book a meeting, reply, hand the thread back to the AI SDR or mark it handled.\n\n## Problem\n\n* The AI SDR classifies positive replies but only fires a workflow trigger, so nobody is told.\n* When the AI SDR hasn't replied in 2 hours, a reply fails to process, or an AI SDR run fails, it only reaches logs and internal alerts.\n* Escalations only go to the workspace Owner, so the rep running the campaign often never sees them.\n* There's no way to mark an escalation handled without resuming the AI SDR.\n\n## What's included\n\n| Event | Priority | Buttons |\n| -- | -- | -- |\n| Positive reply (\"Positive reply from Name 100\", company, quote, campaign and step, positive reply sound) | Good news | Open reply, **Book meeting** |\n| AI SDR escalation (\"Needs you\") | Urgent | Reply in inbox, **Hand back to AI SDR**, **Mark handled** |\n| AI SDR hasn't replied in 2 hours to a waiting prospect | Urgent | Open thread |\n| A reply couldn't be processed (clears once processed) | Red | Open thread |\n| AI SDR run failed | Red | Open thread |\n\n* Positive replies fire once when interest moves up to positive, not on every re-classification. Negative, neutral and out-of-office replies create nothing.\n* Recipients: the campaign owner or assignee, falling back to the workspace Owner. This applies to escalations too.\n* **Hand back to AI SDR** reuses the existing Resume AI SDR action. **Mark handled** is new: it records the escalation as handled by this person without resuming the AI SDR, once, even on double click.\n* **Book meeting** opens the existing booking flow for that lead.\n* Each event is registered as a notification kind and sent through `notify()`, or `openAlert` / `resolveAlert` for problems that stay open until fixed (ENG-13772). Every event honours Settings › Notifications (ENG-13776), is sent once per recipient, and no alert text names a supplier.\n\n## Blocked by\n\nENG-13772\n\n## Done when\n\n* A real positive reply creates one notification for the campaign owner; re-classifying the thread creates no more.\n* An escalation on a campaign owned by a Member reaches that Member, and Hand back and Mark handled each work once.\n* A stuck reply's alert clears once processed.\n* Every button lands on the right thread or lead in the right workspace, and refuses cleanly without access.\n* PostHog `notification.clicked` and `notification.actioned` show these kinds landing.\n\n## Design\n\nCurrent design (5 Oct 2026): Notifications kit, clickable. It opens on every card for this ticket. \"Show as pop-up\" under each card fires it the way it arrives.\n\nThe prototype is private until James shares it; the screenshot here shows the same cards.\n\n* Every card for this ticket\n* Drawer with an AI SDR escalation open\n* Pop-up stack under the bell (hover to fan)\n\n**Every reply and AI SDR card**\n\n <image> \n\n**AI SDR escalation open in the drawer**\n\n <image> \n\n**Pop-up stack under the bell**\n\n <image> \n\n**Drawn:** positive reply (Open reply, Book meeting), escalation \"Needs you\" with all three buttons (Reply in inbox, Hand back to AI SDR, Mark handled), an escalation after Mark handled, an escalation after Hand back, the AI SDR hasn't replied in 2 hours, a reply couldn't be processed (red), AI SDR run failed (red).\n\n**Changed from the earlier design:** the escalation card carries all three buttons. After an action the card says what happened (\"Marked handled by you · 16:22\", \"Handed back to the AI SDR by Name 12 · 15:40\") and drops its buttons. New cards: no reply in 2 hours, reply couldn't be processed (red), AI SDR run failed (red).\n\n**Not drawn, build from the text above:** nothing; every event in the table is drawn.\n\nSuperseded, do not build from: the 13 Sep prototype (link).\n\nSize: about 1,800 lines.\n\n## Shared roadmap and verification\n\nAdd this ticket’s real-source preview scenarios and verify the master’s flag, access, replay and evidence contract. Existing Wave 1 producers may ship before the runner; whichever side lands later completes integration and records the pending preview proof.\n\n## Implementation context\n\nAI context.md contains this ticket’s source seams, scope boundaries and QA handoff. Read the master plan and shared master AI context first. Shared revision: `ENG-13430/2026-09-14-r2`. Use the existing 15-ticket structure and native blockers; do not create or revive tickets automatically."
+    },
+    {
+      "id": "ENG-15358",
+      "createdAt": "2026-10-13T23:02:23.259Z",
+      "title": "AI SDR sometimes hands a positive reply with a question to a person instead of answering it",
+      "state": "Todo",
+      "assignee": "James Keeble",
+      "parent": "ENG-14843",
+      "labels": [],
+      "description": "## Overview\n\nFound by the new AI SDR preview check (PR 7183). Case SDR-01 (\"Positive interest with a question\") expects the agent to answer, but on one of two real-model runs it escalated to a person instead. Every needless escalation delays a warm lead's answer, which costs booked meetings.\n\n## Evidence\n\n* Run 38477447958 (head `ee3c4dfb5e`, 14 Oct 2026 2:23 to 2:44 am Name 13): SDR-01 PASS, SEND_RESPONSE.\n* Run 38480027120 (head `ae6e8bbcb6`, 2:47 to 2:59 am Name 13): SDR-01 FAIL, with status \"escalated\", action ESCALATE and controlLevel \"escalated\".\n* The only change between the two heads was tests and code comments, so model variance is the likely cause (medium confidence, two runs).\n\n## What's included\n\n* Run SDR-01 five times on a preview with `bun verify sdr SDR-01 --confirm-spend` (about $0.13 a run) and count escalations.\n* If it escalates more than once in five, find which signal triggers the escalation in the agent's reasoning, and fix the prompt or threshold.\n\n## Done when\n\n- [ ] SDR-01 passes on at least 5 of 5 real-model runs on a preview, with the run IDs and cost recorded."
+    },
+    {
+      "id": "ENG-4809",
+      "createdAt": "2026-01-23T23:32:32.281Z",
+      "title": "AI SDR replies with closing message after positive lead response",
+      "state": "Canceled",
+      "assignee": "Koppany Kondricz",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "A lead replied positively, but the AI SDR responded with a closing-style message: \"thanks for your honesty\" and \"thanks for your time\" instead of continuing the conversation.\n\nCustomer provided a screen recording of the issue: Jam recording."
+    },
+    {
+      "id": "ENG-2402",
+      "createdAt": "2025-10-28T16:05:40.961Z",
+      "title": "No way to get rid of escalated emails or mark as dealt with",
+      "state": "Done",
+      "assignee": "Koppany Kondricz",
+      "parent": "ENG-2579",
+      "labels": ["Feature"],
+      "description": "Request from multiple users to be able to mark an escalated reply as 'dealt with', and to be able to deescalate it. <url:thegrowthpartner.slack.com>\n\n<loom>\n\n <image> "
+    },
+    {
+      "id": "ENG-2649",
+      "createdAt": "2025-11-07T06:37:51.887Z",
+      "title": "AI SDR – not addressing some positive replies",
+      "state": "Done",
+      "assignee": "Pieter Venter",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "## Found Problem\n\nThe AI SDR is leaving some positive replies unanswered. When prospects respond positively to outreach (e.g., expressing interest in being on a podcast), the SDR does not always generate appropriate follow-up responses.\n\n## Reproduction Steps\n\n1. Prospect receives initial outreach about podcast invitation\n2. Prospect responds positively (e.g., \"I would love to be on the podcast\")\n3. SDR marks message as \"Sent\" or \"Escalated\" but does not send a follow-up response\n4. Positive reply remains unaddressed in the inbox\n\n## User Information\n\n* **Reported by:** Name 14 (<email>)\n* **Example prospect:** Name 15 (<email>)\n\n## Expected Behavior\n\nThe AI SDR should:\n\n1. Detect positive/interested replies from prospects\n2. Generate appropriate follow-up responses to continue the conversation\n3. Move the conversation forward (e.g., schedule podcast recording, provide next steps)\n4. Not leave engaged prospects without a response\n\n## Screenshots\n\nSee attached screenshot showing inbox with unanswered positive replies.\n\n## Related Slack Thread\n\n<url:aiaqusition.slack.com>\n\n\\__\\_\n\n**Root Cause:** \n\nThe issue was in the escalation detector (`lib/mastra/agents/ai-sdr-escalation/escalation-detector.ts`). While the system had comprehensive rules for when to escalate messages, it lacked explicit guidance on handling **positive interest expressions** like:\n\n* \"I would love to be on the podcast\"\n* \"I'm interested\"\n* \"Sounds great\"\n* \"Count me in\"\n\nWithout clear examples, the AI model could incorrectly classify these enthusiastic responses as requiring escalation, causing the AI SDR to not respond appropriately.\n\n### **Solution:**\n\nI updated the escalation detector with:\n\n1. **Explicit guidance** in the \"Do NOT Escalate\" section listing positive interest expressions\n2. **6 new examples** showing exactly how these should be handled (with `escalation_needed: false`)\n3. **6 comprehensive test cases** to ensure this behavior is maintained"
+    },
+    {
+      "id": "ENG-2482",
+      "createdAt": "2025-10-31T05:31:44.482Z",
+      "title": "AI SDR not responding to lead response after manual reply flagged as \"Personal Attention\"",
+      "state": "Canceled",
+      "assignee": "Blaise Gulaj",
+      "parent": null,
+      "labels": [],
+      "description": "**Found Problem:**\nThe AI SDR is not responding to a lead's reply after the user manually responded to an escalated email. The email thread shows:\n\n1. Lead (Name 16) responded positively to interview series invitation\n2. User (Name 18) manually replied and flagged as \"Personal Attention\"\n3. Lead responded again to Name 18's message\n4. AI SDR has not taken any action or responded since the lead's follow-up\n\n**Reproduction Steps:**\n\n1. AI SDR escalates an email requiring personal attention\n2. User manually responds to the escalated email\n3. Lead responds back to the user's manual reply\n4. AI SDR fails to detect or respond to the new lead response\n\n**User Email/Name:**\n\n* Reporter: Name 17 (<email>)\n* Lead: Name 16 (<email>)\n\n**Expected Behavior:**\nAfter a user manually responds to an escalated email, the AI SDR should:\n\n* Continue monitoring the conversation thread\n* Detect when the lead responds back\n* Take appropriate action (respond or escalate again if needed)\n* Not abandon the conversation after manual intervention\n\n**Slack Reference:**\n[<url:thegrowthpartner.slack.com>]/p1761830980914819](<url:thegrowthpartner.slack.com>)\n\n**Related Issues:**\n\n* Similar to ENG-2425: \"SDR not taking an action on a positive reply\"\n* Related to ENG-2465: Issues with AI response detection"
+    },
+    {
+      "id": "ENG-2500",
+      "createdAt": "2025-10-31T07:55:49.366Z",
+      "title": "AI SDR - Multiple critical issues: Manual replies not syncing from Company Five & AI not escalating unanswered questions",
+      "state": "Canceled",
+      "assignee": "Pieter Venter",
+      "parent": null,
+      "labels": [],
+      "description": "## Found Problem\n\nName 14 has reported multiple critical issues with the AI SDR system affecting inbox synchronization and AI agent logic:\n\n### Issue 1: Manual Replies Not Syncing from Company Five to AI SDR Inbox\n\nWhen a user manually replies to an email via the Company Five platform, that reply does not appear in the AI SDR inbox interface. This creates a disjointed workflow where users must switch between platforms to see the full conversation history.\n\n### Issue 2: AI SDR Not Escalating Questions It Cannot Answer\n\nDespite having explicit knowledge base rules to escalate conversations when the AI doesn't know the answer, the AI SDR is failing to flag positive replies that request more information for human review.\n\n### Issue 3: Missing Inbox Sync Feature Request\n\nUsers need a way to manually sync/refresh the AI SDR inbox with Company Five's unibox to force synchronization when automatic sync fails.\n\n## Reproduction Steps\n\n**For Issue 1 (Reply Sync Failure):**\n\n1. Navigate to AI SDR Inbox in the platform\n2. View an email conversation (e.g., \"Re: Interview X Anthony\" with Name 19)\n3. Go to Company Five platform and manually reply to the same email thread\n4. Return to AI SDR Inbox\n5. **Observe:** The manual reply sent via Company Five does not appear in the conversation thread in AI SDR Inbox\n6. **Expected:** The reply should sync and display in the AI SDR Inbox\n\n**For Issue 2 (AI Escalation Failure):**\n\n1. Configure Knowledge Base rule: \"If you do not know the answer to their question(s), do not reply, but escalate it for my review\"\n2. Prospect responds with questions asking for more details (e.g., \"Could you please share more details about this project like when and how it'll be?\")\n3. **Observe:** AI SDR takes no action - does not reply AND does not escalate\n4. **Expected:** AI should escalate the conversation to \"Needs Your Attention\" for human review\n\n## User Information\n\n* **Reporter:** Name 14\n* **Email:** <email> (inferred from org)\n* **Workspace:** Company Ten (<domain>)\n* **Reported Date:** October 29, 2025\n* **Reported via:** Slack with video demonstration\n\n**Specific Example:**\n\n* Prospect: Name 19 (<email>)\n* Campaign: Interview Method\n* Subject: \"Re: Interview X Anthony\"\n* Timestamp: \\~23 hours before report\n\n## Expected Behavior\n\n### For Reply Sync:\n\n1. When a user manually replies to an email in Company Five, the system should:\n   * Detect the outgoing message via webhook or polling\n   * Sync the reply to the AI SDR Inbox within seconds/minutes\n   * Display the complete conversation thread including manual replies\n   * Show proper status indicators (e.g., \"Manual Reply Sent\")\n\n### For AI Escalation Logic:\n\n1. When a prospect asks questions the AI cannot answer based on knowledge base:\n   * AI should recognize it lacks sufficient information\n   * AI should NOT attempt to reply\n   * AI should escalate conversation to \"Needs Your Attention\"\n   * AI should flag as \"Positive Reply - Needs Information\" or similar\n   * User should be notified of the escalation\n\n### For Inbox Sync Feature:\n\n1. Provide a manual \"Sync Now\" or \"Refresh from Company Five\" button\n2. Allow users to force synchronization when automatic sync fails\n3. Show sync status and last sync timestamp\n\n## Additional Context\n\n* **Video Recording:** User provided detailed screen recording showing both issues (Screenshare - 2025-10-29 4:38:54 PM.mp4)\n* **Slack Thread:** [<url:ai-acquisition.slack.com>]/p1761770385046919](<url:ai-acquisition.slack.com>)\n* **Related Issues:**\n  * ENG-2485: Client response visible in Company Five but not syncing to AI SDR inbox (similar sync issue)\n  * ENG-2492: AI SDR Inbox messages not receiving responses or escalations (similar escalation failure)\n\n## Technical Notes\n\n**Potential Causes for Issue 1:**\n\n* Company Five webhook not firing for manual replies\n* Name 20 handler not processing manual reply events correctly\n* Two-way sync only working for AI-generated replies, not manual ones\n* Race condition or timing issue with sync\n\n**Potential Causes for Issue 2:**\n\n* AI decision logic not properly evaluating knowledge base constraints\n* Escalation rules not being checked before response generation\n* Knowledge base rule parsing/interpretation failure\n* Missing classification for \"positive reply with unanswered questions\"\n\n**Suggested Investigation Areas:**\n\n1. Check Company Five webhook logs for manual reply events\n2. Review `process-reply-events.ts` for manual reply handling\n3. Audit AI agent prompt/logic for knowledge base rule adherence\n4. Test escalation triggers for various question types\n5. Consider implementing explicit \"question detection + knowledge gap\" logic"
+    },
+    {
+      "id": "ENG-3606",
+      "createdAt": "2025-12-09T21:55:27.904Z",
+      "title": "AI SDR Response Issues",
+      "state": "Canceled",
+      "assignee": "Koppany Kondricz",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "Investigate these issues and report back. If a bug is found, update the ticket with the bug info and fix.\n\nUser: <email>\nSlack: <url:fegrowthpartner.slack.com>\n\nName 8 had already spoken with a prospect and scheduled a podcast recording with him.\nHowever, the AI SDR reached back out afterward and began suggesting new meeting times, as if nothing had been booked. It even gave the prospect reasons for rescheduling and attempted to book him for a completely different time slot.\nThis created confusion on both sides, the prospect thought the original meeting might have been canceled, and he wasn’t sure why the AI SDR was re-engaging after the booking was already confirmed.\nName 8 said it isn’t the first time I’ve seen this behavior. He had several positive replies where the AI SDR hasn’t been able to complete the booking. He noticed 45 escalations that didn’t truly require escalation. For example, simple things like “prospect wants to follow up in a few weeks” or “requires scheduling outside a 24-hour window,” which he believe the SDR should be able to handle."
+    },
+    {
+      "id": "ENG-13450",
+      "createdAt": "2026-09-04T12:17:11.783Z",
+      "title": "AI SDR did not send meeting times after a positive reply — Company Five send failed with account error",
+      "state": "Todo",
+      "assignee": "unknown",
+      "parent": null,
+      "labels": ["Customer reported", "intercom-sourced"],
+      "description": "Intercom conversation: <url:app.intercom.com>\n\nCustomer: Name 21 (Name 21' Workspace). Reported the AI SDR did not provide meeting times after a prospect replied positively.\n\nContext: Prospect \"Name 102\" (<email>) replied to a podcast invitation with \"Thanks for the invite. Sure, I'm happy to help you out :)\" on Sep 4 (~2:13 AM EDT). The reply was ingested via Company Five and classified by the AI SDR as very-high-interest booking intent, lifecycle \"replied\".\n\nFinding: The AI SDR handled the reply correctly end to end, and the outbound email is what failed. Intent classification, data extraction, slot matchmaking, booking, copywriter, and copy review all completed. The send-email step then failed with \"Company Five API Client Error (400): ACC_UNKNOWN_ERROR\" (account error); the workflow finished with status \"failed\" and action NO_ACTION. No email was delivered, no follow-up was scheduled, and the thread was left stranded at \"replied\".\n\nEvidence: Inngest run 01M1NGSS1KB0DP0KY9FCGAH3FB (ai-sdr-v2/process-message) output `{\"action\":{\"type\":\"NO_ACTION\",\"reason\":\"Company Five API Client Error (400): ACC_UNKNOWN_ERROR\"},\"status\":\"failed\"}`. Thread id <uuid>.\n\nProposed action: Verify and reconnect the connected Company Five sending account (<email>), then re-trigger reply processing for this thread so the meeting can be booked. If the account is healthy and this recurs, escalate to engineering — send failures currently strand threads with no retry, escalation, or customer alert."
+    },
+    {
+      "id": "ENG-8198",
+      "createdAt": "2026-04-29T21:21:07.928Z",
+      "title": "AI SDR Escalating any threads with AI mentioned including in signature",
+      "state": "Done",
+      "assignee": "Arthur Li",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "When a prospect replies to a message, the Company Six Name from the clients company name being mentioned in the thread is causing the AI to escalate it. Happened multiple times on Company Seven Workspace. \n\nSimple fix, just tweak AI SDR AI escalation sensitivity. \n\n <image> \n\n <image> \n\n\n"
+    },
+    {
+      "id": "ENG-5167",
+      "createdAt": "2026-02-05T15:28:47.731Z",
+      "title": "AI SDR v2 shows raw error message to users",
+      "state": "Done",
+      "assignee": "Koppany Kondricz",
+      "parent": null,
+      "labels": [],
+      "description": "In the Demo workspace, AI SDR Inbox shows a raw error banner: `Copywriter failed: ?.find is not a function` (Escalated for Review). Errors in v2 should be more user-friendly.\n\n <image> "
+    },
+    {
+      "id": "ENG-5266",
+      "createdAt": "2026-02-07T22:51:43.185Z",
+      "title": "Update AI SDR v2 to not show code errors in SDR UI to users",
+      "state": "Duplicate",
+      "assignee": "Koppany Kondricz",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "The AI SDR V2 is showing somewhat raw code errors in the UI to the users. Make these friendly error messages and log the actual errors that are occurring."
+    },
+    {
+      "id": "ENG-15607",
+      "createdAt": "2026-10-16T13:24:01.788Z",
+      "title": "AI SDR not responding",
+      "state": "Triage",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [],
+      "description": "#### Customer Name\n\nName 22\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nCompany Eight\n\n#### Screenshot\n\n#### What are you trying to achieve?\n\nAI SDR isn't responding to some messages, the AI SDR is active and the message isn't escalated in needs attention, the AI just didn't respond.\n\n#### What are you doing to achieve it?\n\nFlagging issue with tech here for a resolution\n\n#### What is happening instead?\n\nAI isn't responding to some messages but isn't escalating anything for response, Name 23 is an example of this.\n\n#### What is the expected outcome?\n\nAI SDR responds to all messages or escalates the message."
+    },
+    {
+      "id": "ENG-14421",
+      "createdAt": "2026-09-28T20:21:52.919Z",
+      "title": "Master: Resuming AI SDR does not re-run it, so the response-timeout monitor re-escalates the thread",
+      "state": "Done",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": ["Bug", "fast-lane"],
+      "description": "## Overview\n\nWhen an operator returns an AI SDR thread to automation - Resume AI SDR after an escalation, dismissing an escalation back to automated, or re-enabling the AI SDR toggle - the AI SDR never processes the prospect reply that is still waiting. The response-timeout monitor escalates the thread again within about 15 minutes, it reads as AI SDR Disabled / Needs Attention again, and prospects stay unanswered for days. The operator cannot hand a conversation back to the AI SDR.\n\n## Problem\n\nFrom the operator's side: they review an escalated thread, resolve the reason it escalated, resume the AI SDR, and it is escalated again within one monitor tick with no AI SDR attempt. The same thread loops however often it is resumed, which is reported by customers as the AI SDR switching itself off.\n\n## Root cause\n\n`resumeFromEscalation` and `dismissEscalation` in `apps/web/trpc/routers/ai-sdr.ts` (about lines 1588 and 1516) and the re-enable toggle (about line 860) end at `updateControlLevel` plus `escalationDismissedAt`. None of them emits `ai-sdr-v2/message.received`, the only trigger of `aiSdrV2Workflow` (`apps/web/lib/ai-sdr-v2/workflow/workflow.ts`), so the pending prospect reply is never processed.\n\n`monitor-ai-sdr-response-timeout.ts` (`check-for-timeouts`, cron `*/15 * * * *`) then escalates any `controlLevel='automated'` thread whose newest recorded message is an inbound reply older than 2 hours and which has never booked, and it never reads `escalation_dismissed_at`. The resume is therefore undone at the next tick.\n\nScope note for the fix: ENG-8377 (\"AI SDR: Allow automation to resume after escalation\", Done) defines Resume as making \"the next inbound prospect reply\" pass the eligibility check, so not re-running the AI SDR for the pending reply was the shipped intent. That points at the monitor side (honour the resume - the newest resume timestamp in `control_level_history` or `escalation_dismissed_at` - or reset the 2-hour clock on resume) unless product decides Resume should also process the pending reply.\n\n## Blast radius\n\nCounted 2026-09-28, 45-day window, all organizations: 2104 resume-then-re-escalation pairs, 1105 distinct threads, 275 distinct organizations, 258 distinct operator users. An independent recount with the same pairing logic returned a slightly higher 2802 pairs / 1208 threads / 280 organizations / 263 users, so the recorded figure is conservative. In every pair measured, zero AI SDR agent executions occur between the resume and the re-escalation.\n\nQuery: pairs where a `crm_message_thread.control_level_history` entry `to='automated'` from `'escalated'` or `'human_takeover'` is followed within 2 hours by an entry `to='escalated'` with `updatedBy='monitor-ai-sdr-response-timeout'` (jsonb_array_elements joined on thread_id, `m.ts > r.ts AND m.ts <= r.ts + interval '2 hours'`), left-checked against `agent_executions` in the interval.\n\nPotentially exposed: every thread an operator returns to automated after an escalation.\n\n## Proposed fix\n\nMake the either/or explicit and implement it: a thread returned to automated must not be re-escalated by the response-timeout monitor before the AI SDR has had a chance on it. Either honour the resume when evaluating timeout candidates, or trigger the AI SDR on resume for the pending reply.\n\n## What's included\n\nThe monitor/resume decision and its regression test. Related, not included: ENG-14111 (a sent AI SDR reply is never recorded, which the same monitor also turns into an escalation) and ENG-10060 (periodic provider-versus-local thread/message reconciliation).\n\n## Regression seam\n\n`check-for-timeouts` in `apps/web/lib/inngest/functions/monitor-ai-sdr-response-timeout.ts`. Red before: a thread whose control level returned to `automated` with no new inbound is escalated by the monitor at the next tick. Green after: such a thread is not escalated, or, if Resume is redefined, the AI SDR runs for the pending reply. `apps/web/tests/lib/inngest/functions/monitor-ai-sdr-response-timeout-db.test.ts` already exercises the candidate filters against Postgres and is the place to add the resumed-thread case.\n\n## Done when\n\n* A thread returned to automated after an escalation is not re-escalated by the response-timeout monitor before the AI SDR has acted or the resume has been honoured.\n* No prospect reply is left unanswered because a resume silently did nothing.\n* A regression test proves the behaviour at the named seam.\n\n## Reports\n\n* ENG-14415"
+    },
+    {
+      "id": "ENG-14766",
+      "createdAt": "2026-10-05T21:58:39.601Z",
+      "title": "Switch AI SDR reply classification to Jev",
+      "state": "Done",
+      "assignee": "Koppany Kondricz",
+      "parent": "ENG-14763",
+      "labels": [],
+      "description": "## Overview\n\nu\n\n## Problem\n\n* About 970 AI emails a month go to autoresponders, and about 3,400 robot \"referrals\" a month reach humans. The classifiers never see the subject line or Company Five's auto-reply flag.\n* About 480 replies a month like \"travelling this week, send me times\" are blocked as out-of-office before intent runs, so those people get no reply.\n* Classification takes about 5.6 s of the 55 s median reply time and about $262 a month, and its confidence is almost always 0.9 or higher, so the low-confidence escalation never fires.\n\nOn three fresh random samples of 400 production replies, Jev matched today's classifier on routing (90 to 92% each), sent fewer replies to robots, and never sent a real question to the booking flow. James decided on 6 Oct 2026 to switch rather than trial in shadow.\n\n## User experience\n\nProspects see no change except better replies: autoresponders get nothing, people who are away but interested get times, opt-outs stop contact, and replies arrive a few seconds sooner. Operators see the same inbox labels, interest levels and deal stages as today.\n\n## Proposed fix\n\nOne Jev call per inbound reply, through the OpenRouter Decisions API (model `typesafe/jev-1.13`, pinned), with zero data retention and no data collection. Its answers are combined in code into today's labels, so routing, inbox labels, interest levels and CRM deal stages keep working unchanged.\n\n## What's included\n\n* Jev replaces do-not-contact detection, auto-reply and out-of-office detection, and intent classification.\n* Inputs: the new reply text with quoted history and signatures removed, subject line, sender name and address, Company Five's auto-reply flag, our last email, and whether a meeting is already booked (from the database, plus a Jev check of the thread).\n* Outputs mapped to today's labels, including the decline reason (fit mismatch, opt-out, other) and the wanted channel (phone, text, WhatsApp, LinkedIn). LinkedIn is added to the channel options.\n* \"Left the company\" notices are kept separate from out-of-office so those leads stop instead of being retried.\n* Language detection moves to a standard code library.\n* One setting switches back to the current classifiers Company Five.\n\nNot included: escalation detection (not tested with Jev, stays as is), extracting phone numbers and channels from replies (Jev does not produce text), and the reply writer.\n\n## How it should work\n\n* An opt-out counts only when Jev says a person wrote the reply. Jev can add a do-not-contact block but never remove one.\n* Nobody is declined unless Jev's stance is \"not interested\" and a separate \"clear no\" check agrees; otherwise the reply goes to the objection route.\n* Low Jev confidence (threshold set from the test data, starting at 0.6 on any answer) escalates to a human instead of guessing.\n* If the Jev call fails or times out, the run falls back to the current classifiers for that reply. It never fails open into sending.\n* Each run logs Jev's answers and confidence so the first week can be checked.\n\n## Blocked by\n\n* ENG-14765: changes the same part of the workflow and must land first.\n\n## Done when\n\n- [ ] All inbound replies are classified by Jev, with the switch-back setting available and tested.\n- [ ] Inbox labels, interest levels and CRM deal stages match the current behavior for the same labels.\n- [ ] A replay of at least 200 recent real replies through the new path shows routing no worse than today, with no replies sent to robots and no declines without a clear no.\n- [ ] One week after launch, a check of sent replies shows no replies to autoresponders and no rise in escalations or declines, shared with James.\n\n## Open questions\n\n* Company Five's flag was dropped on 28 Jul because it \"races and misclassifies\". Recommended default: pass it to Jev as an input, not as a hard block, and measure the race in the first week.\n\n## Implementation context\n\n* The tested question design, inputs, combining rules and benchmark results are in the master's AI context.md.\n* Name 24 auto-reply work: ENG-11710 and ENG-11721. The intent eval in ENG-10049 can reuse the labelled replies from this research.\n* CRM sync reads the latest intent-classification row to set deal stages, so Jev's mapped output must be written under the same agent name and shape.\n* Confirm OpenRouter account-level input and output logging is off before launch."
+    }
+  ]
+}

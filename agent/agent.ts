@@ -6,6 +6,8 @@ import {
   resolveModel,
 } from "./lib/models.js";
 import { ticketLinkedModel } from "./lib/ticket-link-model.js";
+import { replaySessionOf } from "./lib/triage-replay/mode.js";
+import { withoutProviderTools } from "./lib/triage-replay/model.js";
 import { isTriageIntake } from "./lib/trust.js";
 import { widgetInvestigationModel } from "./lib/widget-investigation-model.js";
 import { isWidgetSupport } from "./lib/widget-scope.js";
@@ -19,7 +21,9 @@ function investigationModel(
   if (isWidgetSupport(auth)) {
     return widgetInvestigationModel(id, sessionId, stepsId);
   }
-  return ticketLinkedModel(id);
+  return replaySessionOf(auth)
+    ? withoutProviderTools(ticketLinkedModel(id))
+    : ticketLinkedModel(id);
 }
 
 /** The root's model slot: widget sessions, then triage intake (ENG-15226), then everyone else. */

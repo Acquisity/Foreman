@@ -1,0 +1,227 @@
+{
+  "id": "ENG-14352",
+  "provenance": "seeded",
+  "createdAt": "2026-09-28T00:24:10.855Z",
+  "lane": "triage",
+  "stratum": "platform_limitation",
+  "ticket": {
+    "title": "Name 16 needs API/engineering support to enable or confirm Public CRM API access and the correct endpoint, permissions, and field mapping for her external website-to-Acquisity CRM integration.",
+    "description": "#### Customer Name\n\nName 16\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nCompany One\n\n#### Screenshot\n\n <image> \n\n#### What are you trying to achieve?\n\nGP is trying to integrate my external website with the Acquisity CRM so that leads submitted through her AI Business Systems Assessment can be automatically added to her CRM.\n\n#### What are you doing to achieve it?\n\nShe is using an organization API key to connect her website to the Acquisity CRM. Authentication is working successfully, and she can access her workspace through the API. She is currently attempting to use the documented People batch upsert endpoint to send lead information into the CRM.\n\n#### What is happening instead?\n\nThe workspace is successfully returned when she uses GET /v1/workspaces, but when she sends a request to POST /v1/workspaces/{workspaceId}/people/batch/upsert, she receives a 404 — Route not found error. It appears that the required CRM API rollout may not yet be enabled for her workspace.\n\n#### What is the expected outcome?\n\nShe would like the Public CRM API rollout enabled for her workspace and confirmation of the correct endpoint to use for website form submissions. Specifically, she needs to know whether she should use the People upsert endpoint or the Lead Intake /lead-submissions endpoint.\n\nHer goal is to send the following information from her AI Business Systems Assessment into Acquisity CRM:\n\nName\nEmail\nPhone\nOrganization\nIndustry\nAssessment responses\nSource/tags",
+    "attachmentKinds": ["image", "slack"]
+  },
+  "repoCommitAtCreate": "1be209963d41a5a2285963721049530b09c61822",
+  "flags": {
+    "descriptionEditedAfterCreate": false,
+    "needsProductionData": false,
+    "alreadyFixedAtTriage": false
+  },
+  "asFiled": {
+    "assignee": "Aaron Fraga",
+    "labels": [],
+    "parent": null,
+    "priority": 2,
+    "project": "Support"
+  },
+  "relatedSnapshot": [
+    {
+      "id": "ENG-9416",
+      "createdAt": "2026-05-28T17:17:37.543Z",
+      "title": "Add scoped permissions to public API keys",
+      "state": "Done",
+      "assignee": "Mahmut Jomaa",
+      "parent": null,
+      "labels": [],
+      "description": "Add first-class scopes to public API keys before external launch.\n\nScope examples:\n\n* workspaces:read\n* workspaces:write\n* people:read\n* people:write\n* companies:read\n* companies:write\n* deals:read\n* deals:write\n* pipelines:read\n* pipelines:write\n* tasks:read\n* tasks:write\n* notes:read\n* notes:write\n\nAcceptance criteria:\n\n* Public API access tokens can carry explicit scopes.\n* Name 1 middleware exposes token permissions to v1 route handlers.\n* Routes enforce read/write scopes consistently by resource/action.\n* Token settings UI exposes a resource/action scope matrix with Read and Write columns.\n* Token settings UI includes Read all and Read/write all convenience actions.\n* Token list shows a readable scope summary for each token.\n* Tokens must have valid stored permissions; null, empty, or malformed permission payloads are rejected.\n* OpenAPI documents the scope model where appropriate.\n* Targeted tests cover allowed and denied access for representative read and write endpoints.\n* No co-author trailers in commits.\n\nNote: Public API is pre-launch, so no legacy token compatibility fallback is required.\n\n<!-- preview-url-start -->\n**Preview:** <url:add-scoped-permissions-to-public-api-keys-aiacquisition.vercel.app> — PR #4309\n<!-- preview-url-end -->"
+    },
+    {
+      "id": "ENG-9061",
+      "createdAt": "2026-05-20T15:18:42.449Z",
+      "title": "Add API key authentication",
+      "state": "Done",
+      "assignee": "Mahmut Jomaa",
+      "parent": null,
+      "labels": [],
+      "description": "Add API key authentication for the Public API, including research on whether to use Name 2 API keys or a dedicated implementation.\n\nScope:\n\n* Name 3 API key support and determine whether it fits the Public API requirements.\n* Name 4 API keys against a custom API key model for organization-scoped public API access.\n* Define API key lifecycle behavior: create, list, reveal once, revoke, rotate, and audit usage.\n* Design secure storage using hashed key material and non-secret key prefixes for lookup/debugging.\n* Add authentication middleware for Public API endpoints.\n* Document rate-limit, permission scope, expiration, and ownership decisions.\n\nAcceptance criteria:\n\n* Decision is documented: Name 2 API keys vs custom implementation, with rationale and tradeoffs.\n* API keys can authenticate Public API requests using a documented header format.\n* Keys are organization-scoped and never stored in plaintext.\n* Revoked or expired keys cannot access protected endpoints.\n* Usage metadata is captured at a minimum for last used time and owning organization.\n* Tests cover valid key, invalid key, revoked key, expired key if supported, and missing key behavior."
+    },
+    {
+      "id": "ENG-9359",
+      "createdAt": "2026-05-27T21:17:05.420Z",
+      "title": "Add public API CRM search endpoints",
+      "state": "Done",
+      "assignee": "Mahmut Jomaa",
+      "parent": null,
+      "labels": [],
+      "description": "## Goal\n\nAdd workspace-scoped public API search endpoints for CRM resources.\n\n## Scope\n\n* Add read-only search endpoints that can search across public CRM resources currently available on latest main.\n* Support people, companies, deals, tasks, notes, meetings, campaigns, and campaign leads where the backing data supports useful text matching.\n* Keep endpoints workspace-scoped and permission-aware.\n* Do not include pending unmerged resources such as files or custom fields in this PR.\n* Do not add database migrations unless strictly required.\n* Do not commit markdown files.\n\n## Acceptance Criteria\n\n* API key permissions are enforced for each returned resource type.\n* Search is tenant-scoped to the requested workspace and excludes soft-deleted records.\n* Responses expose compact public search results with resource type, id, title, optional snippet, timestamps, and public links.\n* Tests cover auth/permission handling, query validation, tenant scoping, empty results, and representative matches.\n* A local smoke test uses a temporary API key against the local DB.\n\n<!-- preview-url-start -->\n**Preview:** <url:add-public-api-crm-search-endpoints-aiacquisition.vercel.app> — PR #4273\n<!-- preview-url-end -->"
+    },
+    {
+      "id": "ENG-9252",
+      "createdAt": "2026-05-26T15:17:54.565Z",
+      "title": "Tighten public API access token permission model",
+      "state": "Done",
+      "assignee": "Mahmut Jomaa",
+      "parent": null,
+      "labels": [],
+      "description": "## Context\n\nThe public API is still pre-launch, so we can tighten the permission model without preserving legacy token behavior.\n\nCurrent review findings:\n\n* DNC routes require `dnc:read`/`dnc:write`, but UI-created personal access tokens never receive DNC permissions.\n* Personal access token creation uses `protectedFeatureProcedure`, so it does not apply the normal mutation/client-role guard used by workspace-affecting mutations.\n* The UI field named `workspaceAccess` is really a token permission preset, not workspace scoping.\n* Permission parsing accepts unknown resources/actions, which is loose before we add custom scopes or organization token UI.\n\n## Scope\n\n* Add DNC permissions to the public API read/write presets if DNC remains part of the public API surface.\n* Restrict access token create/rename/revoke operations with mutation-safe server-side authorization so client users cannot mint API tokens.\n* Rename the internal token input from workspace access to a clearer permission preset/token access name while preserving the current UI behavior.\n* Tighten permission parsing to known public API resources/actions because the API is not yet in use.\n* Add/update focused tests for default/write permissions, malformed permissions, DNC access, and client-role token creation restrictions.\n\n## Out of scope\n\n* No database migration.\n* No organization API key UI.\n* No fine-grained CRM record-level permission enforcement in public API routes.\n* No opportunistic endpoint/resource changes."
+    },
+    {
+      "id": "ENG-9187",
+      "createdAt": "2026-05-25T12:51:15.629Z",
+      "title": "Add public API campaigns GET endpoints",
+      "state": "Done",
+      "assignee": "Mahmut Jomaa",
+      "parent": null,
+      "labels": [],
+      "description": "## Context\n\nExpose Outreach campaign read surfaces for external reporting and integration. Keep this read-only for the first public API version because campaign creation, pause/resume, provider sync, and setup flows are coupled to provider state and product-specific workflows.\n\n## Scope\n\nAdd read-only workspace-scoped Campaign endpoints under v1:\n\n* `GET /v1/workspaces/{workspaceId}/campaigns`\n* `GET /v1/workspaces/{workspaceId}/campaigns/{campaignId}`\n* Optionally `GET /v1/workspaces/{workspaceId}/campaigns/{campaignId}/metrics` if there is a stable aggregated model ready to expose.\n\n## API design\n\n* Route resource name should be `campaigns`.\n* Only GET endpoints in this issue.\n* Require bearer auth, workspace access, Public API feature gate, and `campaigns:read` or equivalent permission.\n* Public response shape should expose stable fields only: id, workspaceId, name, status, displayStatus, startDate, endDate, niche, location, jobTitle, companySize, industry, totalLeads, createdAt, updatedAt, links.\n* Avoid leaking provider credentials, raw settings, internal metadata, branch/preview details, and provider-specific campaign IDs unless explicitly designed.\n* Use cursor pagination for list.\n\n## Implementation notes\n\n* Follow the resource pattern from Contacts/Companies.\n* Add `apps/api/src/schemas/campaigns.ts`.\n* Add `apps/api/src/repositories/public-api-campaigns.ts`.\n* Add `apps/api/src/routes/v1/campaigns.ts` and mount under `workspaces/{workspaceId}`.\n* If metrics are included, expose only stable aggregate fields and document date semantics.\n\n## Tests\n\n* Route tests for list/get and permission failures.\n* Repository tests for org scoping, cursor pagination, deleted/provider filtering, and stable serialization.\n* OpenAPI assertions and real HTTP smoke coverage where available.\n\n## Acceptance criteria\n\n* Campaigns can be listed and retrieved through the Public API.\n* No write endpoints are added in this issue.\n* Cross-workspace access is impossible.\n* Provider/internal fields are not exposed.\n* Tests pass: API unit tests, DB/repository tests, typecheck, and API build.\n* PR includes an `ai_context` block and links this Name 5 issue.\n* One PR only, no co-author trailer."
+    },
+    {
+      "id": "ENG-9355",
+      "createdAt": "2026-05-27T20:42:56.870Z",
+      "title": "Add Public API custom fields metadata and values",
+      "state": "Done",
+      "assignee": "Mahmut Jomaa",
+      "parent": null,
+      "labels": [],
+      "description": "## Goal\n\nExpose CRM custom fields through the Public API so integrations can discover custom-field definitions and sync values on supported CRM records.\n\n## Scope\n\n* Add `GET /v1/workspaces/{workspaceId}/custom-fields`.\n* Add `GET /v1/workspaces/{workspaceId}/custom-fields/{customFieldId}`.\n* Include `customFields` in existing public API record responses where supported by the current schema: people, companies, deals, tasks, notes, and campaign leads if applicable.\n* Keep create/update custom-field writes out of scope unless validation is already settled in existing shared code.\n* Branch from latest `main`; do not add migrations unless the current schema requires none.\n\n## Acceptance Criteria\n\n* Custom-field definition endpoints are read-only, workspace-scoped, paginated where needed, and documented in OpenAPI.\n* Record responses expose custom-field values in a stable public shape.\n* IDs are validated against the workspace; soft-deleted definitions/records are excluded.\n* API-key permissions include custom fields read access.\n* Focused tests cover permissions, OpenAPI, repository behavior, cursor/scope behavior if paginated, and local HTTP smoke with a temporary API key.\n\n<!-- preview-url-start -->\n**Preview:** <url:aiacquisition-hsqhqvnog-aiacquisition.vercel.app> — PR #4272\n<!-- preview-url-end -->"
+    },
+    {
+      "id": "ENG-13206",
+      "createdAt": "2026-08-27T15:27:21.604Z",
+      "title": "Public API docs: position GET /v1/workspaces as the token-scoped discovery entrypoint",
+      "state": "Done",
+      "assignee": null,
+      "parent": "ENG-12011",
+      "labels": [],
+      "description": "## Context\n\nA question came up while reviewing the Public API plan (`references/public_api.md`): do we need a dedicated endpoint that returns the workspaces a token has permission to access, to make it easier for users to get started?\n\n**Decision: No new endpoint. **`GET /v1/workspaces` already *is* that discovery call.\n\nPer the plan, list is resolved dynamically from the token owner's `member` rows plus effective `FEATURES.PUBLIC_API`, scoped to `accessToken.userId`. So the response is, by construction, exactly the set of workspaces the bearer token can touch — not every org in the system. A second endpoint would return the same rows through a second code path (extra surface to build, document, and secure).\n\nTwo \"permissions\" concepts are being conflated, and the docs should make the distinction explicit:\n\n* **Token permission** = `{ \"workspaces\": [\"read\"] }` — a capability upper bound (same for every workspace).\n* **Workspace access** = resolved per-request from membership + feature gate — *which specific workspaces*.\n\n`GET /v1/workspaces` answers the second, which is the one a user actually needs to get productive. There's no per-workspace variation in the token scope itself, so there's nothing extra to enumerate.\n\n## Scope\n\nDocs-only. No new endpoints, routes, or DB changes.\n\n1. Update the OpenAPI/Swagger operation description for `GET /v1/workspaces` to position it as the starting point (copy below).\n2. Add a one-line \"Start here\" note in the OpenAPI intro / docs landing so the first call a user makes is obvious.\n3. Lean on the existing `role` field (already on the workspace object) so users see their per-workspace access level without a second call.\n\n## Proposed OpenAPI copy\n\n**Operation summary: **`List accessible workspaces`\n\n**Operation description:**\n\n> **Start here.** Returns every workspace your access token can use, resolved from your current membership and the workspaces where the Public API is enabled — not every workspace in the system. Use the `id` from each item as the `{workspaceId}` on all other endpoints, and read `role` to see your access level in that workspace.\n>\n> This is a workspace *discovery* call, not a token-scope call: your token's `workspaces:read` permission is the same for every workspace it can reach, so there is nothing extra to enumerate per workspace. Results are cursor-paginated (see Pagination); page until `links.next` is `null`.\n\n**Docs intro line:**\n\n> New to the API? Create a personal access token, then call `GET /v1/workspaces` to discover which workspaces you can access and grab their IDs.\n\n## Acceptance criteria\n\n- [ ] `GET /v1/workspaces` operation `summary` + `description` updated with the copy above (or equivalent) in the Hono/OpenAPI route metadata.\n- [ ] OpenAPI intro / docs landing includes the \"start here\" pointer to `GET /v1/workspaces`.\n- [ ] `role` is documented on the workspace schema as the per-workspace access indicator.\n- [ ] `/docs`, `/docs/v1`, `/openapi.json`, `/openapi/v1.json` render with the updated copy.\n\n## Follow-up (not this ticket)\n\nRevisit a dedicated token→workspace endpoint only when tokens become workspace-owned (`references: \"organization\"`), where \"which workspace does *this specific token* belong to\" becomes a genuinely different question than \"which workspaces does the user belong to.\""
+    },
+    {
+      "id": "ENG-9188",
+      "createdAt": "2026-05-25T12:51:29.460Z",
+      "title": "Add public API members GET endpoints",
+      "state": "Done",
+      "assignee": "Mahmut Jomaa",
+      "parent": null,
+      "labels": [],
+      "description": "## Context\n\nExpose workspace member reads after the workspace resource so API consumers can understand membership and ownership without using app session APIs. Keep this read-only for the first version.\n\n## Scope\n\nAdd read-only workspace-scoped member endpoints under v1:\n\n* `GET /v1/workspaces/{workspaceId}/members`\n* `GET /v1/workspaces/{workspaceId}/members/{memberId}`\n\n## API design\n\n* Route resource name should be `members`.\n* Only GET endpoints in this issue.\n* Require bearer auth, workspace access, Public API feature gate, and `members:read` or equivalent permission.\n* Public response shape should expose stable fields only: id, userId, name, email, image, role, createdAt, updatedAt, links.\n* Do not expose private user/account/security fields.\n* Use cursor pagination for list.\n* Include deleted-member filtering.\n\n## Implementation notes\n\n* Follow the workspace nested resource pattern.\n* Add `apps/api/src/schemas/members.ts`.\n* Add `apps/api/src/repositories/public-api-members.ts`.\n* Add `apps/api/src/routes/v1/members.ts` and mount under `workspaces/{workspaceId}`.\n* Keep invite/change-role/remove out of this issue.\n\n## Tests\n\n* Route tests for list/get and permission failures.\n* Repository tests for org scoping, deleted-member filtering, cursor pagination, and stable serialization.\n* OpenAPI assertions and real HTTP smoke coverage where available.\n\n## Acceptance criteria\n\n* Workspace members can be listed and retrieved through the Public API.\n* No write endpoints are added in this issue.\n* Cross-workspace access is impossible.\n* User private fields are not exposed.\n* Tests pass: API unit tests, DB/repository tests, typecheck, and API build.\n* PR includes an `ai_context` block and links this Name 5 issue.\n* One PR only, no co-author trailer."
+    },
+    {
+      "id": "ENG-9175",
+      "createdAt": "2026-05-25T03:53:44.654Z",
+      "title": "Add POST workspace endpoint to Public API",
+      "state": "Done",
+      "assignee": "Mahmut Jomaa",
+      "parent": null,
+      "labels": [],
+      "description": "## Context\n\nThe Public API currently exposes the workspace resource for reads. Add the first write endpoint so API consumers can create a workspace through the public API.\n\n## Scope\n\n* Add `POST /v1/workspaces` to the Name 6 public API.\n* Keep route naming as `workspaces`, while implementation/query naming should continue to use organization terminology where it maps to the database model.\n* Validate request payloads with Zod/OpenAPI schemas.\n* Create the underlying organization/workspace for the authenticated token user.\n* Return a documented 201 response with the serialized workspace resource and standard error envelope behavior.\n* Require the appropriate API key permission for write access.\n* Preserve request hardening, rate limiting, auth, and existing JSON error contracts.\n* Add OpenAPI/Swagger docs for the request body, response, auth requirements, and validation errors.\n* Add focused unit tests for success, validation failure, auth/permission behavior where feasible, and serialization.\n\n## Acceptance criteria\n\n* `POST /v1/workspaces` creates a workspace for the authenticated API user.\n* The endpoint is documented in `/openapi.json` and Swagger UI.\n* Existing `GET /v1/workspaces` behavior remains unchanged.\n* API package typecheck, build, and unit tests pass.\n* PR links this Name 5 issue and includes an `ai_context` block."
+    },
+    {
+      "id": "ENG-9361",
+      "createdAt": "2026-05-27T21:42:38.060Z",
+      "title": "Add read-only public API call and email activity endpoints",
+      "state": "Done",
+      "assignee": "Mahmut Jomaa",
+      "parent": null,
+      "labels": [],
+      "description": "Add read-only Public API endpoints for CRM call and email activity data.\n\nScope:\n\n* Branch from latest main in an isolated worktree.\n* Research the existing CRM activity tables/services before implementation.\n* Expose workspace-scoped read endpoints for call activity and email activity using existing permissions and API key authorization patterns.\n* Validate all record IDs and tenant boundaries against the workspace.\n* Keep schemas, OpenAPI tags/order, repository logic, and route tests consistent with the existing Public API resource patterns.\n* Add focused repository/route tests and run targeted verification.\n* Smoke test with a temporary API key against the local database when feasible.\n\nOut of scope:\n\n* No schema migrations unless an existing bug makes them unavoidable.\n* No unrelated refactors or opportunistic cleanup.\n* Do not commit markdown files.\n\n<!-- preview-url-start -->\n**Preview:** <url:aiacquisition-6infufbxc-aiacquisition.vercel.app> — PR #4274\n<!-- preview-url-end -->"
+    },
+    {
+      "id": "ENG-9335",
+      "createdAt": "2026-05-27T18:07:07.086Z",
+      "title": "Add public API relationship read endpoints",
+      "state": "Done",
+      "assignee": "Mahmut Jomaa",
+      "parent": null,
+      "labels": [],
+      "description": "## Summary\n\nAdd read/list endpoints for the public API CRM relationships so clients can discover existing person, company, and deal associations without fetching all records.\n\n## Name 7\n\n* `GET /v1/workspaces/{workspaceId}/people/{personId}/companies`\n* `GET /v1/workspaces/{workspaceId}/people/{personId}/deals`\n* `GET /v1/workspaces/{workspaceId}/companies/{companyId}/people`\n* `GET /v1/workspaces/{workspaceId}/companies/{companyId}/deals`\n* `GET /v1/workspaces/{workspaceId}/deals/{dealId}/people`\n* `GET /v1/workspaces/{workspaceId}/deals/{dealId}/companies`\n\n## Acceptance Criteria\n\n* Name 7 require the same workspace access and relevant read permissions as the existing public API resources.\n* Results are workspace-scoped and exclude soft-deleted records and soft-deleted relationships.\n* Responses reuse the existing public person/company/deal response shapes where practical.\n* Pagination uses the existing public API cursor conventions and binds cursors to workspace/query scope.\n* Includes route, repository, and OpenAPI tests for each relationship type and direction.\n* Local HTTP verification creates a temporary API key against the local database and hits the real endpoints.\n* No markdown/research files are committed."
+    },
+    {
+      "id": "ENG-9369",
+      "createdAt": "2026-05-28T08:23:56.029Z",
+      "title": "Add public API related activity timeline endpoints",
+      "state": "Done",
+      "assignee": "Mahmut Jomaa",
+      "parent": null,
+      "labels": [],
+      "description": "## Goal\n\nExpose CRM-style related activity timeline endpoints for public API consumers so integrations can retrieve the notes, tasks, calls, emails, meetings, and files attached to a specific record without calling each resource separately.\n\n## Scope\n\nAdd read-only workspace-scoped endpoints:\n\n* `GET /v1/workspaces/{workspaceId}/people/{personId}/activities`\n* `GET /v1/workspaces/{workspaceId}/companies/{companyId}/activities`\n* `GET /v1/workspaces/{workspaceId}/deals/{dealId}/activities`\n* `GET /v1/workspaces/{workspaceId}/leads/{leadId}/activities`\n\nUse the real outreach lead model for leads (`outreach_campaign_lead`), not dead `crm_lead` tables.\n\n## Requirements\n\n* Branch from latest `main` in an isolated worktree.\n* Reuse existing public API serializers/repositories where practical; avoid duplicating response shaping logic.\n* Validate every parent record belongs to the requested workspace before returning related activities.\n* Keep the endpoints read-only and permission-aware. Reuse existing resource permissions for included activity types.\n* Return a single cursor-paginated, timestamp-ordered timeline response with stable item type discriminators.\n* Include links back to the canonical resource endpoints where available.\n* Add OpenAPI schemas, root discovery if appropriate, and focused route/repository tests.\n* Test via a temporary API key against the local database before merge where practical.\n* Do not commit markdown/research files.\n* Commit without co-author trailers."
+    },
+    {
+      "id": "ENG-9234",
+      "createdAt": "2026-05-26T09:19:37.451Z",
+      "title": "Add read-only public API campaigns resource",
+      "state": "Done",
+      "assignee": "Mahmut Jomaa",
+      "parent": null,
+      "labels": [],
+      "description": "## Context\n\nExpose outreach campaigns through the Name 6 public API as the next read-only workspace-scoped resource.\n\nCampaigns should be the parent resource for future outreach lead, campaign metrics, thread/message, and meeting relationship APIs. Keep this first version conservative and do not expose raw provider payloads, campaign settings internals, email scripts, sequence content, provider credentials, or mutation endpoints.\n\n## Scope\n\nAdd workspace-scoped Campaigns endpoints under v1:\n\n* `GET /v1/workspaces/{workspaceId}/campaigns`\n* `GET /v1/workspaces/{workspaceId}/campaigns/{campaignId}`\n\nKeep this resource read-only. Do not add create, update, delete, pause, resume, sync, provider import, sequence editing, email account, or lead mutation endpoints.\n\n## API design\n\n* Resource name: `campaigns`.\n* Swagger tag: `Campaigns`.\n* Routes live directly under workspaces because campaigns are workspace-level outreach resources.\n* List endpoint supports `limit`, `cursor`, optional `status`, optional `displayStatus`, optional `providerId`, optional `createdAfter`, optional `createdBefore`, optional `updatedAfter`, and optional `updatedBefore`.\n* Cursor pagination must be stable, workspace-scoped, resource-scoped, and filter-scoped.\n* Sort by `updatedAt` descending/nulls-last and `id` as the tie breaker.\n* Use `campaigns:read` as a new public API permission. Do not infer access from workspace, people, company, deal, or meeting permissions.\n\n## Public response shape\n\nExpose safe campaign fields only:\n\n* `id`\n* `workspaceId`\n* `name`\n* `status`\n* `displayStatus`\n* `providerId`\n* `providerType`\n* `pipelineId`\n* `salesPersonId`\n* `startDate`\n* `endDate`\n* `leadListName`\n* `sourceUrl`\n* `niche`\n* `location`\n* `jobTitle`\n* `companySize`\n* `industry`\n* `totalLeads`\n* `metrics` with high-level aggregate counts/rates only when available\n* `createdAt`\n* `updatedAt`\n\nDo not expose `providerCampaignId`, raw provider metadata, settings JSON, top-performing variant payloads, email script content, sequence bodies, provider credentials, inbox/email account details, or internal decision logs.\n\n## Implementation notes\n\n* Use existing public API Name 6 route patterns, OpenAPI generation, error envelope, auth middleware, and root discovery links.\n* Add a focused DB repository in `packages/db/src/repositories/campaign-repository.ts` using `outreachCampaignTable`, `outreachProviderTable`, and optional aggregate metrics from `outreachCampaignOverview`.\n* Filter every query by `organizationId`.\n* Respect existing preview/environment filtering patterns if relevant for public API data.\n* Wrap repository calls in route-level `try/catch` and log detailed server context while returning generic structured errors.\n* Do not add migrations.\n\n## Tests\n\nAdd focused tests for:\n\n* list success, empty list, pagination, filter validation, and scoped cursor rejection\n* get success, 404, and workspace isolation\n* `campaigns:read` permission enforcement and default permission shape\n* OpenAPI paths and tag registration\n* root discovery links\n* repository workspace scoping, filters, cursor pagination, and safe-field selection\n\nRun targeted API, DB, and api-keys tests/typechecks before opening the PR.\n\n<!-- preview-url-start -->\n**Preview:** <url:add-read-only-public-api-campaigns-resource-aiacquisition.vercel.app> — PR #4207\n<!-- preview-url-end -->"
+    },
+    {
+      "id": "ENG-9354",
+      "createdAt": "2026-05-27T20:17:33.899Z",
+      "title": "Add read-only Public API CRM files resource",
+      "state": "Done",
+      "assignee": "Mahmut Jomaa",
+      "parent": null,
+      "labels": [],
+      "description": "## Summary\n\nExpose CRM file metadata through the Public API so integrations can discover attachments related to CRM records without reaching into internal storage or database tables.\n\n## Scope\n\nAdd read-only workspace-scoped endpoints:\n\n* `GET /v1/workspaces/{workspaceId}/files`\n* `GET /v1/workspaces/{workspaceId}/files/{fileId}`\n\nThe list endpoint should support filters where the underlying data supports them:\n\n* `personId`\n* `companyId`\n* `dealId`\n* `taskId`\n* `noteId`\n\n## Acceptance criteria\n\n* Name 7 require workspace access and a files read permission that fits the existing public API permission model.\n* Results are scoped to the workspace and exclude soft-deleted files and soft-deleted related records where applicable.\n* Response exposes safe metadata and links only; do not expose raw storage internals or unsafe download behavior unless an existing safe URL helper already exists.\n* Pagination uses existing public API cursor conventions and binds cursors to workspace/query scope.\n* OpenAPI docs include the list and detail endpoints under an appropriate CRM Files tag/order.\n* Route, repository, schema, cursor, and OpenAPI tests cover list, detail, filters, invalid cursor, not found, and permission behavior.\n* Local HTTP verification creates a temporary API key against the local database and hits the real endpoints.\n* No markdown or research files are committed."
+    },
+    {
+      "id": "ENG-9376",
+      "createdAt": "2026-05-28T10:45:42.621Z",
+      "title": "Add Sentry instrumentation to the public API app",
+      "state": "Done",
+      "assignee": "Mahmut Jomaa",
+      "parent": null,
+      "labels": [],
+      "description": "Add API-owned Sentry instrumentation for apps/api so unhandled public API errors are captured in Sentry, not only logged.\n\nAcceptance criteria:\n\n* apps/api initializes Sentry before route/middleware modules execute.\n* Name 8 public API errors are captured with request context when Sentry is configured.\n* Local/test behavior remains safe when Sentry env is absent.\n* Targeted API tests/typecheck pass.\n\n<!-- preview-url-start -->\n**Preview:** <url:add-sentry-instrumentation-to-the-public-api-app-aiacquisition.vercel.app> — PR #4288\n<!-- preview-url-end -->"
+    },
+    {
+      "id": "ENG-9186",
+      "createdAt": "2026-05-25T12:50:58.631Z",
+      "title": "Add public API outreach leads resource",
+      "state": "Done",
+      "assignee": "Mahmut Jomaa",
+      "parent": null,
+      "labels": [],
+      "description": "## Context\n\nExpose Outreach leads after the foundational CRM resources. This should use the global `outreach_lead` model first, not campaign-specific lead rows, so external clients can sync workspace-level prospects without coupling to campaign internals.\n\n## Scope\n\nAdd workspace-scoped Outreach Leads endpoints under v1:\n\n* `GET /v1/workspaces/{workspaceId}/leads`\n* `POST /v1/workspaces/{workspaceId}/leads`\n* `GET /v1/workspaces/{workspaceId}/leads/{leadId}`\n* `PATCH /v1/workspaces/{workspaceId}/leads/{leadId}`\n* `DELETE /v1/workspaces/{workspaceId}/leads/{leadId}` if safe as soft delete; otherwise read/create/update only and document why delete is excluded.\n\n## API design\n\n* Route resource name should be `leads`.\n* Backing model should be the stable global outreach lead table, not `outreach_campaign_lead`.\n* Require bearer auth, workspace access, Public API feature gate, and lead-specific API permissions.\n* Public response shape should expose stable fields only: id, workspaceId, globalStatus, firstName, lastName, fullName, email, company, linkedinUrl, title, source, externalId, createdAt, updatedAt, links.\n* Use cursor pagination for list.\n* Avoid leaking provider internals, raw metadata, preview hijack state, or campaign-specific status in this first version.\n\n## Implementation notes\n\n* Follow the resource pattern from Contacts/Companies.\n* Add `apps/api/src/schemas/leads.ts`.\n* Add `apps/api/src/repositories/public-api-leads.ts`.\n* Add `apps/api/src/routes/v1/leads.ts` and mount under `workspaces/{workspaceId}`.\n* Evaluate existing apps/web outreach lead helpers before duplicating logic.\n\n## Tests\n\n* Route tests for list/create/get/update and delete if included.\n* Repository tests for org scoping, uniqueness by workspace/email, cursor pagination, and soft-delete or exclusion behavior.\n* Permission tests for read-only vs write tokens.\n* OpenAPI assertions and real HTTP smoke coverage where available.\n\n## Acceptance criteria\n\n* Outreach leads can be managed through the Public API without exposing provider/campaign internals.\n* Cross-workspace access is impossible.\n* Duplicate email handling is deterministic and documented.\n* Tests pass: API unit tests, DB/repository tests, typecheck, and API build.\n* PR includes an `ai_context` block and links this Name 5 issue.\n* One PR only, no co-author trailer."
+    },
+    {
+      "id": "ENG-9184",
+      "createdAt": "2026-05-25T12:50:22.156Z",
+      "title": "Add public API contacts resource",
+      "state": "Done",
+      "assignee": "Mahmut Jomaa",
+      "parent": null,
+      "labels": [],
+      "description": "## Context\n\nThe Public API has a stable workspace blueprint. Add the first CRM resource using the same Hono/OpenAPI/auth/repository pattern. Contacts are the best first nested resource because they are organization-scoped, externally useful, and map cleanly to CRM sync use cases.\n\n## Scope\n\nAdd workspace-scoped Contacts endpoints under v1:\n\n* `GET /v1/workspaces/{workspaceId}/contacts`\n* `POST /v1/workspaces/{workspaceId}/contacts`\n* `GET /v1/workspaces/{workspaceId}/contacts/{contactId}`\n* `PATCH /v1/workspaces/{workspaceId}/contacts/{contactId}`\n* `DELETE /v1/workspaces/{workspaceId}/contacts/{contactId}`\n\n## API design\n\n* Route resource name should be `contacts`.\n* Code/repository naming should use CRM/contact naming where it maps to the database model.\n* Name 7 must require bearer auth and the Public API workspace feature gate.\n* Personal and organization API keys should both be supported where appropriate.\n* Read endpoints require `contacts:read` or equivalent permission.\n* Write/delete endpoints require `contacts:write` or equivalent permission.\n* Responses must use the existing public API envelope style, links, request IDs, and structured errors.\n* List endpoint must use cursor pagination, not offset pagination.\n* Public response shape should expose stable fields only: id, workspaceId, name, title, image, social links, tags, ownerId, createdAt, updatedAt, links.\n* Avoid leaking internal metadata unless explicitly designed.\n\n## Implementation notes\n\n* Reuse the workspace access middleware/pattern from the workspace endpoints.\n* Add `apps/api/src/schemas/contacts.ts`.\n* Add `apps/api/src/repositories/public-api-contacts.ts`.\n* Add `apps/api/src/routes/v1/contacts.ts` and mount it under `workspaces/{workspaceId}` routing.\n* Add shared DB repository helpers only if they remove duplication with apps/web CRM code.\n* Keep common serialization/pagination helpers DRY if the resource pattern repeats.\n* Update OpenAPI/Swagger docs for every request, response, auth requirement, error, and pagination detail.\n\n## Tests\n\n* Unit route tests for list/create/get/update/delete.\n* Repository tests for org scoping, soft delete filtering, cursor pagination, and update/delete behavior.\n* OpenAPI assertions that docs include contacts and schema does not expose internal fields.\n* Add or prepare black-box HTTP integration coverage using a generated local API key if the test harness exists by implementation time.\n\n## Acceptance criteria\n\n* Contacts can be listed, created, retrieved, updated, and soft-deleted through the Public API.\n* Cross-workspace access is impossible.\n* Public API feature-disabled workspaces return 403.\n* Read-only tokens cannot write.\n* Invalid payloads return 422; malformed JSON returns 400; wrong content-type returns 415.\n* Tests pass: API unit tests, DB/repository tests, typecheck, and API build.\n* PR includes an `ai_context` block and links this Name 5 issue.\n* One PR only, no co-author trailer."
+    },
+    {
+      "id": "ENG-13176",
+      "createdAt": "2026-08-26T19:40:11.825Z",
+      "title": "Add webhook endpoint creation to the public API",
+      "state": "Done",
+      "assignee": "Anthony Adewale",
+      "parent": "ENG-12011",
+      "labels": [],
+      "description": "## Overview\n\nThe public REST API (`apps/api`) had no way for a consumer to register an outbound webhook URL. Name 9 endpoints could only be created from the dashboard (tRPC), so third-party integrations couldn't subscribe to events like `ai_sdr.positive_reply` (and forthcoming `lead.attached`) programmatically.\n\nBuilds on the org webhook framework merged in #6138 (`webhook_endpoint` table, signed delivery, retries, fan-out dispatcher) — only the create surface was missing on the API.\n\n## Scope\n\nAdd `POST /v1/workspaces/{workspaceId}/webhooks`:\n\n* New `webhooks` public-API permission resource (`read`/`write`), grantable in the access-token scope UI.\n* Shared `createWebhookEndpoint` repository in `<mention>/db` so the DB write lives in one place (the API uses it; the dashboard tRPC keeps its existing path for now).\n* Request validation: HTTPS-only URL, 1–20 unique slug-format event names, optional description (≤200 chars).\n* Event membership is intentionally **not** enforced — only events in the server's outbound catalog deliver, and the catalog is additive, so a caller can subscribe to `lead.attached` ahead of its release.\n* Signing secret (`whsec_…`, matching the dashboard format) generated server-side and returned **once** on the `201`, with a `Location` header.\n\nNo schema change (the `webhook_endpoint` table already exists), so no migration.\n\n## Non-goals\n\n* Only `create` is exposed. list / update / delete / rotate-secret / send-test can follow if needed.\n* No changes to the delivery, signing, or dispatcher logic — all reused from #6138.\n\n## Acceptance criteria\n\n* `POST /v1/workspaces/{workspaceId}/webhooks` with a valid HTTPS URL and ≥1 event returns `201` with a `Location` header and a body whose `data.secret` is present (returned only here).\n* A token without `webhooks:write` gets `403`; a non-HTTPS URL gets `422`; an empty `events` array gets `422`.\n* Duplicate event names are de-duplicated before persistence.\n* The `webhooks:write` scope is grantable in the access-token creation UI.\n\n## References\n\n* Route: `apps/api/src/routes/v1/webhooks.ts`, schemas `apps/api/src/schemas/webhooks.ts`\n* Permission resource: `packages/api-keys/src/access.ts`, UI `apps/web/components/user/access-token-scopes.ts`\n* Shared repo: `packages/db/src/repositories/webhook-endpoint-repository.ts`\n* Tests: `apps/api/src/routes/v1/webhooks.test.ts`\n* Builds on #6138 (org webhook framework)\n\n## PR\n\nAcquisity/Acquisity#6151"
+    },
+    {
+      "id": "ENG-9428",
+      "createdAt": "2026-05-28T17:48:20.459Z",
+      "title": "Polish public API docs for launch",
+      "state": "Done",
+      "assignee": "Mahmut Jomaa",
+      "parent": null,
+      "labels": [],
+      "description": "Polish public API documentation for launch readiness.\n\nAcceptance criteria:\n\n* Public API docs cover authentication, error model, pagination, rate limits, and idempotency expectations.\n* Docs include concrete curl examples for major resources.\n* Docs are discoverable from the API docs surface.\n* Examples avoid real secrets and use safe placeholders.\n* OpenAPI descriptions are updated where useful to point users to these conventions.\n* No co-author trailers in commits."
+    },
+    {
+      "id": "ENG-9408",
+      "createdAt": "2026-05-28T14:55:49.684Z",
+      "title": "Define public runtime API security contract for funnel sites",
+      "state": "Done",
+      "assignee": "Mahmut Jomaa",
+      "parent": null,
+      "labels": ["Feature"],
+      "description": "## Goal\n\nDefine and implement the security contract for public AI Funnel Builder runtime APIs used by deployed funnel sites.\n\nThe deployed funnel is a public website, so not every endpoint can rely on user sessions. We need an explicit contract for which runtime endpoints are public, which are validated public writes, and which require post-purchase capability tokens or Whop-confirmed state.\n\n## Name 10\n\n### Safe Public Reads\n\nThese can be publicly accessible, but must only return buyer-safe data.\n\nExamples:\n\n* Product/offer attached to a funnel step.\n* Public price/billing terms.\n* Display name, description, image, and offer slug.\n\nDo not expose provider secrets, internal IDs that are not needed by the buyer, raw provider payloads, workspace/member state, organization internals, or arbitrary product lookup.\n\n### Public Writes With Name 11\n\nThese are callable from public funnel pages, but still need validation and abuse protection.\n\nExamples:\n\n* Lead submissions.\n* Analytics/runtime events.\n* Checkout start.\n\nRequired controls:\n\n* Name 13 token validation where applicable.\n* Allowed origin validation.\n* Rate limiting.\n* Managed block/config validation: the submitted form/offer/event must exist in the deployed managed block document.\n* Organization/website scoping.\n* No arbitrary cross-website IDs.\n\n### Money-Moving Or Entitlement Actions\n\nThese require stronger state checks.\n\nExamples:\n\n* One-click upsell charge.\n* Workspace/member provisioning.\n* Post-purchase workflow triggers.\n\nRequired controls:\n\n* Whop-confirmed purchase state.\n* Short-lived post-purchase capability tokens where the browser initiates the action.\n* Name 14 for retries and duplicate clicks.\n* Server-side provider credential use only.\n* No client-side payment method IDs or provider secrets.\n\n## Name 12 Name 15\n\nDefine the expected contract for:\n\n* `GET/POST /api/public/websites/[websiteId]/offers` or equivalent offer resolve endpoint.\n* `POST /api/public/websites/[websiteId]/checkout/start`.\n* `POST /api/public/websites/[websiteId]/checkout/confirm`.\n* `POST /api/public/websites/[websiteId]/upsell/start`.\n* `POST /api/public/websites/[websiteId]/upsell/status`.\n* `POST /api/public/websites/[websiteId]/leads`.\n* `POST /api/public/websites/[websiteId]/events`.\n* Whop webhook endpoints.\n\n## Acceptance Criteria\n\n* Name 13 API endpoints are documented by class: safe public read, validated public write, or protected money/entitlement action.\n* Public offer/product responses expose only buyer-safe fields.\n* Name 13 writes validate origin, website, token, rate limits, and managed block config.\n* Money-moving actions require Whop-confirmed state and short-lived capability tokens where browser-initiated.\n* Tests cover allowed/disallowed origin, invalid runtime token, unknown block/offer IDs, cross-website IDs, rate limiting behavior, and capability-token validation.\n* ENG-9317 can reference this contract for upsell endpoint security without duplicating all runtime security rules.\n\n<!-- preview-url-start -->\n**Preview:** <url:ic-runtime-api-security-contract-for-funnel-sites-aiacquisition.vercel.app> — PR #4367\n<!-- preview-url-end -->"
+    }
+  ]
+}

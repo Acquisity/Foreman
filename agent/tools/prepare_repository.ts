@@ -29,6 +29,8 @@ import {
   REPOSITORY_OPERATION_TIMEOUT_MS,
   TIMED_OUT_EXIT_CODE,
 } from "#lib/sandbox-deadline.js";
+import { prepareReplayWorkspace } from "#lib/triage-replay/archive.js";
+import { isTriageReplay } from "#lib/triage-replay/mode.js";
 import { isUnattended } from "#lib/trust.js";
 import { environment } from "#sandbox.js";
 
@@ -792,7 +794,12 @@ const refuse = (code: string, error: string) => {
 /** The part of eve's tool context preparing a repository reads. */
 interface PrepareContext {
   getSandbox: (sandbox: typeof environment) => Promise<VercelSandboxSession>;
-  session: { auth: { current: SessionAuthContext | null } };
+  session: {
+    auth: {
+      current: SessionAuthContext | null;
+      initiator?: SessionAuthContext | null;
+    };
+  };
 }
 
 /**
@@ -809,6 +816,15 @@ export const prepareRepositoryWorkspace = async (
   ctx: PrepareContext,
   options: CheckoutOptions = {}
 ) => {
+  if (isTriageReplay()) {
+    const replay = await prepareReplayWorkspace(
+      ctx.session.auth.initiator,
+      () => ctx.getSandbox(environment)
+    );
+    return "refusal" in replay
+      ? refuse(replay.refusal.code, replay.refusal.error)
+      : replay;
+  }
   let target: ReturnType<typeof resolveTarget>;
   try {
     target = resolveTarget(repository, ctx.session.auth.current);

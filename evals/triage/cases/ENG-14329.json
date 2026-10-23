@@ -1,0 +1,247 @@
+{
+  "id": "ENG-14329",
+  "provenance": "seeded",
+  "createdAt": "2026-09-27T14:54:05.314Z",
+  "lane": "triage",
+  "stratum": "duplicate",
+  "ticket": {
+    "title": "Bug: Name 1 AI consistently returning \"try again\" error",
+    "description": "#### Customer Name\n\nName 18 (and Name 19 P, and others)\n\n#### Customer Email\n\n<email>, <email>\n\n#### Workspace name\n\nNot provided\n\n#### Screenshot\n\n#### What are you trying to achieve?\n\nProcess prompts using Name 1 AI\n\n#### What are you doing to achieve it?\n\nSubmitting prompts to Name 1 AI and trying various re-wordings as suggested by support.\n\n#### What is happening instead?\n\nName 1 AI consistently returns a \"try again\" error and completely fails to process the prompts for these users. (Note: Researcher AI is working fine for them).\n\n#### What is the expected outcome?\n\nName 1 AI successfully processes the prompts and returns a generated response without timing out or erroring.",
+    "attachmentKinds": []
+  },
+  "repoCommitAtCreate": "f30d902c76141ccff3bff8bb0a37bedb2e261253",
+  "flags": {
+    "descriptionEditedAfterCreate": false,
+    "needsProductionData": true,
+    "alreadyFixedAtTriage": false
+  },
+  "asFiled": {
+    "assignee": "Aaron Fraga",
+    "labels": [],
+    "parent": null,
+    "priority": 2,
+    "project": "Support"
+  },
+  "relatedSnapshot": [
+    {
+      "id": "ENG-13661",
+      "createdAt": "2026-09-10T15:42:56.919Z",
+      "title": "Name 1 AI / Ask AI returns an empty reply instead of generating the requested one-pager",
+      "state": "Todo",
+      "assignee": "Jil Patel",
+      "parent": "ENG-13663",
+      "labels": ["Bug", "Customer reported", "intercom-sourced"],
+      "description": "Intercom conversation: <url:app.intercom.com>\n\nBounded context: Customer Name 2 Name 3 reported \"I found a bug\" and asked Name 1 AI (Ask AI) to create a one-pager explaining the B2B Acquisity lead gen tool for a SaaS prospect. She restarted and re-sent the prompt multiple times and got the same message each time. A Jam screen recording shows the AI shows \"Processing request\" and \"Searching knowledge base\", then after about a minute shows \"We couldn't generate a response. Please try again.\"\n\nTestable claim: When a user sends a message to Name 1 AI / Ask AI (AI Consultant) under the default GPT-5.6 Luna model, the assistant returns an empty reasoning-only reply that the client never renders, so the customer sees a spinner that ends in an error instead of a response.\n\nIntercom source: <url:app.intercom.com>\n\nForeman support operation: <id>\nIntercom source: <url:app.intercom.com>"
+    },
+    {
+      "id": "ENG-13502",
+      "createdAt": "2026-09-04T18:33:11.383Z",
+      "title": "Cold email daily sending limit under-allocated when a leadless completed campaign remains in the split",
+      "state": "Triage",
+      "assignee": "Anthony Adewale",
+      "parent": null,
+      "labels": ["Bug", "fast-lane"],
+      "description": "## Overview\n\nThe cold email daily sending limit is being under-allocated because the even-split logic counts finished campaigns that have no leads, cutting active campaigns' daily capacity by roughly 25%.\n\n## Problem\n\nA customer with 18 active inboxes and 3 active campaigns sends ~470 emails/day instead of ~630 because a fourth, completed campaign (with zero leads) is still counted as active in the split, diluting the daily-limit allocation.\n\n## Root cause\n\n`buildEvenSplitPlan` in `apps/web/lib/inngest/functions/campaign/util.ts` divides total daily capacity (unique inboxes × 35) evenly across every campaign the provider reports as active with a non-empty email list, without excluding campaigns that have no leads. A completed campaign left \"active\" on the provider (Acquisity-side status desync) is counted, so 18×35=630 splits 4 ways (157 each) instead of 3 ways (210 each).\n\n## Blast radius\n\n622 organizations hold 1,556 leadless \"completed\" campaigns that are still display-active with a non-empty email list. Counted 2026-09-04: `status = 'completed' AND display_status = 'active' AND total_leads = 0 AND jsonb_array_length(settings->'emailAccounts') > 0`. Confirmed affected: 1 organization (this report); potentially exposed: 622 organizations.\n\n## Proposed fix\n\nExclude campaigns with no leads (or campaigns Acquisity has marked completed/paused) from the daily-limit even split so capacity is divided only across campaigns that can actually send, and deactivate completed campaigns on the provider so they leave the active list.\n\n## What's included\n\nFix the split to exclude leadless/completed campaigns; containment is deactivating the ghost campaigns for affected orgs; observability is a signal for leadless campaigns present in the split.\n\n## Regression seam\n\n`buildEvenSplitPlan(campaigns, inboxes)`: given 18 inboxes, 3 campaigns with leads, and 1 leadless campaign, it must return 210/day for each of the 3 real campaigns (not 157) and emit no plan entry for the leadless campaign.\n\n## Done when\n\n* The split excludes leadless/completed campaigns.\n* A regression test proves 18 inboxes + 3 leaded campaigns + 1 leadless campaign yields 210 (not 157) per leaded campaign.\n* Affected organizations are rebalanced to their full capacity.\n\n## Reports\n\n* ENG-13501"
+    },
+    {
+      "id": "ENG-12353",
+      "createdAt": "2026-08-05T20:11:23.097Z",
+      "title": "Name 4 with Generic \"Publishing failed. Please try again.\" Error",
+      "state": "Done",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": ["Bug", "intercom-sourced"],
+      "description": "**Customer Name**\nName 5\n\n**Customer Email**\n<email>\n\n**Customer Email**\n<email>\n\n**Workspace name**\nCompany Six Workspace\n\n**Screenshot**\n<optional>\n\n**What is the user trying to achieve?**\nPublish their AI-generated website and connect it to their Cold Email campaign.\n\n**What is the user doing to achieve it?**\nUser attempts to publish the website.\nSelected Custom domain in the Publish dialog.\nPublishing begins (spinner appears), then fails.\nUser refreshed and retried publishing multiple times with the same result.\n\n**What is happening instead?**\nThe publish process consistently fails with the error:\n\nPublishing failed. Please try again.\n\nNo additional error details are displayed.\n\n**What is the expected outcome?**\nThe website should publish successfully without returning the generic publishing error."
+    },
+    {
+      "id": "ENG-13156",
+      "createdAt": "2026-08-26T17:14:02.830Z",
+      "title": "No Email Accounts Connected",
+      "state": "Todo",
+      "assignee": "Anthony Adewale",
+      "parent": "ENG-13178",
+      "labels": ["Bug", "Customer reported", "Provisioning Pipeline"],
+      "description": "#### Customer Name\n\nName 6\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 6\n\n#### Screenshot\n\n <image> \n\n <image> \n\n#### What are you trying to achieve?\n\nClear erroneous inboxes\n\n#### What are you doing to achieve it?\n\nScreen share, confirm billing is resolved (no past due or stripe issues), expand email accounts selection inside Cold EM agent and confirms errored inboxes showing\n\n#### What is happening instead?\n\nErrored inboxes are reducing Name 6's ability to send\n\n#### What is the expected outcome?\n\nSwap inboxes or reconcile current inboxes and resume sending please"
+    },
+    {
+      "id": "ENG-8135",
+      "createdAt": "2026-04-27T18:00:47.741Z",
+      "title": "AI Name 1 gets stuck in a reply loop",
+      "state": "Done",
+      "assignee": "Anuj Bhatt",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "User: <email>\nA new bug was reported where AI Name 1 keeps repeating itself and appears stuck in a loop. The issue was reported more than once in the conversation, including a later follow-up that it was happening again. No screenshot or conversation example was provided.\n\nRequesting for AI Name 1 response improvement\nAttached are the video examples\n\nvideo1152246802.mp4\n\n<!-- preview-url-start -->\n**Preview:** <url:pr-4512-ab-eng-8135-ai-jordan-gets-stuck-in-a-rep-aiacquisition.vercel.app> — PR #4512\n<!-- preview-url-end -->"
+    },
+    {
+      "id": "ENG-8276",
+      "createdAt": "2026-05-03T13:14:33.398Z",
+      "title": "AI assistant returns loop/reset message instead of replying",
+      "state": "unknown",
+      "assignee": "Anuj Bhatt",
+      "parent": null,
+      "labels": [],
+      "description": "User details: \n\n* Name 7\n* <email>\n* Name 7's Workspace\n\nThe AI assistant appears to get stuck in a loop/reset state and returns a generic \"ignore previous response\" message instead of an actual reply.\n\nRefreshing the page, closing and reopening the conversation, changing the prompt, and trying a different device did not resolve it. The same behavior was reported on Android as well.\n\nThis started within the last few weeks after previously working normally for several months.\n\nA screen recording of the issue was shared in the conversation."
+    },
+    {
+      "id": "ENG-1698",
+      "createdAt": "2025-10-08T11:12:09.603Z",
+      "title": "File processing fails with \"Provider returned error\" after 3 attempts",
+      "state": "Done",
+      "assignee": "Savinder Singh",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "## Problem\n\nWhen sending a message with an attached file in the AI Growth Consultant chat, the processing frequently fails with the error:\n\"Failed after 3 attempts. Last error: Provider returned error\"\n\nThis occurs more often than not when files are included in messages.\n\n## Context\n\n* Related to ENG-746 (Add dropping a file functionality)\n* The file drop functionality itself works correctly\n* The issue is specifically with processing messages that include files\n* Error appears after 3 retry attempts\n\n## Screenshot\n\n <image> \n\n## Expected Behavior\n\nMessages with attached files should process successfully on the first attempt\n\n## Actual Behavior\n\nProcessing fails after 3 attempts with a provider error\n\n## Investigation Needed\n\n* Review error logs to identify the specific provider error\n* Check file upload/processing pipeline\n* Examine retry logic and error handling\n* Verify provider API integration and rate limits"
+    },
+    {
+      "id": "ENG-9502",
+      "createdAt": "2026-05-29T17:07:39.233Z",
+      "title": "Ask AI panel returns Forbidden on submit",
+      "state": "Done",
+      "assignee": "Jil Patel",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "### Problem\n\nAsk AI panel returns Forbidden on submit\n\n### Current Behavior\n\nWhen you send a message to Ask AI, it gives a Forbidden error.\n\n <image> \n\n```typescript\n// Problematic code example\n```\n\n### Expected Behavior\n\nAsk AI should provide answers to questions\n\n### Steps to Reproduce\n\n1. Impersonated the account, same issue\n2. Issue is happening is supports own account\n\n### User Details\n\n* Company One\n* <email>\n* Company One's Workspace\n\n### "
+    },
+    {
+      "id": "ENG-4338",
+      "createdAt": "2026-01-09T11:44:50.834Z",
+      "title": "Niche Agent AI agent failed during onboarding",
+      "state": "Done",
+      "assignee": "Beth Newton",
+      "parent": null,
+      "labels": [],
+      "description": "The Niche Agent step in onboarding is failing for customer <email>.\n\n* Context: OB call with GP, using the Niche Agent during onboarding.\n* Behavior: The page shows an `Agent Failed` error stating that the AI agent encountered an error while researching niches and suggests changing answers and rerunning the agent.\n* Repro: The agent was rerun 5 times with different inputs, but the same failure occurred each time.\n* Notes: User reports this is the first time seeing this issue.\n\nScreenshot:\n\n <image> "
+    },
+    {
+      "id": "ENG-4078",
+      "createdAt": "2025-12-31T18:47:08.137Z",
+      "title": "Error when rating AI suggestions in Name 8 tickets",
+      "state": "Canceled",
+      "assignee": "Mahmut Jomaa",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "Users report seeing a generic \"something went wrong\" error when trying to provide AI feedback / rate AI suggestions in Name 8.\n\nAfter the error appears, the AI feedback does not show up on the ticket.\n\nExample affected ticket: <url>"
+    },
+    {
+      "id": "ENG-6276",
+      "createdAt": "2026-03-06T09:53:13.427Z",
+      "title": "Fix 5 bugs identified in automated code review (2026-03-06)",
+      "state": "Done",
+      "assignee": "Pieter Venter",
+      "parent": null,
+      "labels": [],
+      "description": "Five bugs found during automated review of commits landed in the last 24 hours.\n\n## Bugs fixed\n\n**1. Silent failures in batch token refresh** (`lib/inngest/functions/integrations/refresh-email-tokens-cron.ts`)\nThe first `processBatch` call (marking accounts without refresh tokens as invalid) returned `PromiseSettledResult[]` that was immediately discarded. Any unexpected promise rejections were never logged or sent to Sentry. Fixed by capturing the results and logging rejections.\n\n**2. Unbounded duplicate offset in workflow builder** (`components/workflows/builder/workflow-context-menu.tsx`)\n`duplicateOffsetRef` accumulated by 24px on every duplicate action for the lifetime of the component. After \\~40 duplications nodes would be placed far off-screen. Fixed by resetting the offset to 24 whenever the context menu closes.\n\n**3. Unsaveable \"Not set\" selection in campaign type selector** (`components/campaigns/detail/tabs/options/campaign-type-selector-card.tsx`)\nSelecting \"Not set\" set `emailScriptsMethod = null` and showed the Save button, but the button was `disabled` when `!emailScriptsMethod` — a broken UX with no explanation. The `handleSave` null guard was also unreachable dead code. Fixed by hiding the Save button when the selected value is null (the API cannot clear the field).\n\n**4. Type-unsafe fallback in campaign imports** (`lib/inngest/functions/campaign/process-campaign-imports.ts`)\n`c.raw ?? c` substituted the normalized `WithRaw<NormCampaign>` object when `raw` was absent, then cast it to `Campaign[]`. Downstream code expecting raw provider fields would receive wrong field names silently. Reverted to the original filter-out-undefined behaviour.\n\n**5. Workshop campaign type bypassing DB settings** (`lib/ai-sdr-v2/workflow/helpers/get-call-type.ts`)\nThe `workshop` branch returned before the `try` block, so it never read `aiSdrSettings` from the database. Unlike `podcast` and `interview`, the workshop call type was hardcoded and could not be configured via AI SDR settings. Moved inside the `try` block and added to the `catch` fallback.\n\n## Related\n\n* ENG-6177 (duplicate step — Workflows project)\n* ENG-5915 (AI Audit / workshop — AI SDR project)"
+    },
+    {
+      "id": "ENG-10687",
+      "createdAt": "2026-06-23T13:22:40.113Z",
+      "title": "\"Try Again\" Action Hidden Behind Uploaded Image After Response Generation Failure",
+      "state": "Triage",
+      "assignee": "James Keeble",
+      "parent": null,
+      "labels": [],
+      "description": "When a response generation failure occurs after uploading an image, the system displays the error message **\"Unable to generate a response. Please try again.\"** However, the **\"Try Again\"** action/button is not visible to the user and appears to be hidden behind the uploaded image attachment card. This prevents users from easily retrying the failed operation and creates a poor error recovery experience.\n\n<url:jam.dev>"
+    },
+    {
+      "id": "ENG-6722",
+      "createdAt": "2026-03-14T00:53:57.488Z",
+      "title": "Resolve recurring inbox errors for Company Five",
+      "state": "Done",
+      "assignee": "Tyler Olsen",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "<mention> - NEED - Swap out inboxes with new ones. User is still seeing 10% bounce rate. Current inboxes are burned.\n\n#### Customer Name\n\nName 9\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nCompany Two\n\n#### Screenshot\n\n#### What are you trying to achieve?\n\nfixed Inbox Name 10\n\n#### What are you doing to achieve it?\n\nticket created by client here - <url:app.intercom.com>\n\n#### What is happening instead?\n\nfixed but issue is back again\n\n#### What is the expected outcome?\n\nfixed Inbox Name 10"
+    },
+    {
+      "id": "ENG-5619",
+      "createdAt": "2026-02-17T18:51:37.061Z",
+      "title": "AI Consultant shows “insufficient credits” despite having credits",
+      "state": "Done",
+      "assignee": "Beth Newton",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "user: <email>\n\nA workspace named “Name 11's Workspace” reports seeing an “insufficient credits” error when trying to type/use the AI Consultant.\n\nIt appears to happen across all 4 AI Consultant modes even though credits are available."
+    },
+    {
+      "id": "ENG-4909",
+      "createdAt": "2026-01-28T02:40:01.688Z",
+      "title": "Growth plans consistently failing for customer Name 12",
+      "state": "Done",
+      "assignee": "Anuj Bhatt",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "#### Customer Name\n\nName 12\n\n#### Customer Email\n\n<email>\n\n#### Screenshot\n\n <image> \n\n#### Clear description of what the problem is\n\nName 12 has consistently experienced growth plans failing today.  Attached is a screenshot of his slack message including an image of the failed growth plan"
+    },
+    {
+      "id": "ENG-5606",
+      "createdAt": "2026-02-17T14:16:32.300Z",
+      "title": "Error in growth plan creator: analysis fails consistently",
+      "state": "Done",
+      "assignee": "Beth Newton",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "#### Customer Name\n\nName 13\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nCompany Three\n\n#### Screenshot\n\n <image> \n\n#### What are you trying to achieve?\n\nTrying to use the growth plan creator\n\n#### What are you doing to achieve it?\n\nGoing through the prompted steps as the tool lays out\n\n#### What is happening instead?\n\nConsistently being met with an error message that says \"Analysis failed: Unable to validate right now. Please try again in a moment.\"\n\n#### What is the expected outcome?\n\nThat the growth plan creator fully succeeds as I am having it process and analyze my transcript. That ultimately the growth plan creator fully completes its steps and provides a growth plan for the prospects"
+    },
+    {
+      "id": "ENG-8387",
+      "createdAt": "2026-05-07T16:24:09.165Z",
+      "title": "Fix 'request was invalid' error when adding leads",
+      "state": "Done",
+      "assignee": "Jared Stauffer",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "#### Customer Name\n\nName 14\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 14\n\n#### Screenshot\n\n <image> \n\n#### What are you trying to achieve?\n\nAdding more leads to renewable energy campaign\n\n#### What are you doing to achieve it?\n\nName 15 the lead scraper to add more leads\n\n#### What is happening instead?\n\nWe're getting a \"request was invalid\" error message\n\n#### What is the expected outcome?\n\nAdding additional leads"
+    },
+    {
+      "id": "ENG-6674",
+      "createdAt": "2026-03-12T21:52:26.694Z",
+      "title": "AI not responding to simple questions and escalating tickets",
+      "state": "Canceled",
+      "assignee": "Jared Stauffer",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "#### Customer Name\n\nName 16\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 16's Company Seven Workspace\n\n#### Screenshot\n\n <image> \n\n <image> \n\n#### What are you trying to achieve?\n\nHi team, the AI is not replying to simple questions from leads and is escalating tickets that should not be escalated. This is creating a lot of frustration and friction for the client. He is very annoyed and upset about it.  For example, in the screenshots below you can see simple questions about the podcast that are not answered and instead get escalated. Also, when a prospect finally selects a time to book a call, the AI is escalating the conversation instead of handling it normally.  I checked and the knowledge base does appear to be populated, so could someone please take a look and see what might be happening? Thank you.\n\n#### What are you doing to achieve it?\n\n* \n\n#### What is happening instead?\n\n* \n\n#### What is the expected outcome?\n\n* "
+    },
+    {
+      "id": "ENG-11017",
+      "createdAt": "2026-06-30T16:12:33.535Z",
+      "title": "Error: Company Four API Server Error (500): Something went wrong, please try again",
+      "state": "Canceled",
+      "assignee": "Anthony Adewale",
+      "parent": null,
+      "labels": ["Bug", "triaged-by-devin"],
+      "description": ""
+    },
+    {
+      "id": "ENG-9565",
+      "createdAt": "2026-06-01T15:22:24.120Z",
+      "title": "Error: Unknown error occurred: An unexpected error occurred. Refresh the page or try again. If it continues, contact support.",
+      "state": "Canceled",
+      "assignee": "Jared Stauffer",
+      "parent": null,
+      "labels": [],
+      "description": ""
+    },
+    {
+      "id": "ENG-13629",
+      "createdAt": "2026-09-10T00:55:23.338Z",
+      "title": "Name 1 AI / Ask AI returns empty or failed responses (GPT-5.6 Luna)",
+      "state": "Todo",
+      "assignee": "Jil Patel",
+      "parent": "ENG-13663",
+      "labels": ["Bug", "Customer reported", "intercom-sourced"],
+      "description": "Intercom conversation: <url:app.intercom.com>\n\nBounded context: Customer Name 17 reported \"JordanAI/ Ask AI is not working. I keep on running into an error.\" Fin AI asked her to record a video; she has not supplied it yet.\n\nTestable claim: When a user sends a message to Name 1 AI / Ask AI (AI Consultant) under the default GPT-5.6 Luna model, the assistant intermittently returns an empty or failed response instead of a text reply. Production chat_message rows for this workspace show several completed assistant messages whose parts contain only a reasoning part and no text, plus one message with empty parts and generationStatus \"failed\". A 7-day production count shows 321 completed assistant messages with no text part across 126 organizations.\n\nLikely root cause: GPT-5.6 Luna emits reasoning-only output. The completion route (apps/web/app/api/completion/route.ts) treats reasoning as persistable content (apps/web/lib/chat/message-content.ts hasRealContent), so the empty reply is saved as completed, while the client never renders it: apps/web/components/ai-chat/utils.ts marks Luna reasoning:false and apps/web/lib/chat/consultant-generation-settings.ts sets reasoning exclude:true for Luna. The user sees a spinner that ends with no answer, which reads as an error.\n\nForeman support operation: <id>\nIntercom source: <url:app.intercom.com>"
+    },
+    {
+      "id": "ENG-13663",
+      "createdAt": "2026-09-10T16:20:32.321Z",
+      "title": "Master: Name 1 AI / Ask AI returns empty replies on GPT-5.6 Luna (reasoning-only output)",
+      "state": "Backlog",
+      "assignee": "Jil Patel",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "## Overview\n\nName 1 AI / Ask AI intermittently shows no answer under the default GPT-5.6 Luna model. The user sees a spinner that ends in \"We couldn't generate a response. Please try again.\" because the model returned a reasoning-only completion that was persisted as a finished reply with no visible text.\n\n## Problem\n\nA customer asking Ask AI to generate content (for example a one-pager) gets \"Processing request\" and \"Searching knowledge base\", then an empty/error state instead of the answer, and can reproduce it by re-sending the prompt.\n\n## Root cause\n\nGPT-5.6 Luna intermittently returns a completion whose only part is a reasoning object with no text. The completion route (apps/web/api/completion/route.ts) persists it because `hasRealContent` in apps/web/lib/chat/message-content.ts counts reasoning as content, while the client (apps/web/lib/chat/assistant-render-plan.ts) has no renderable text part, so the empty reply reads as an error. Luna is configured to exclude reasoning (apps/web/lib/chat/consultant-generation-settings.ts sends reasoning exclude, and apps/web/components/ai-chat/utils.ts marks Luna reasoning: false), yet reasoning-only output still arrives and is stored as an answer.\n\n## Blast radius\n\n336 completed assistant messages in the last 7 days had a reasoning part and no non-whitespace text part, across 130 distinct organizations. Counted 2026-09-10 on PlanetScale production.\n\n## Proposed fix\n\nTreat a completion with reasoning but no renderable text as an empty/failed response (do not persist a usable-looking answer), and either stop Luna from emitting reasoning-only output or surface it correctly to the client.\n\n## What's included\n\nFix the empty-reply handling for reasoning-only completions on the AI Consultant path, with a regression test. Customer recovery wording is handled on the report tickets.\n\n## Regression seam\n\nSend a Name 1 AI / Ask AI message whose model returns a reasoning-only completion; the client must not show a completed empty answer ending in \"We couldn't generate a response\" — it should either render answer text or surface a genuine retry/failure rather than a persisted empty message.\n\n## Done when\n\n* A reasoning-only completion is no longer persisted as a visible answered message.\n* The customer can get an answer, or a clear retry, from Ask AI.\n* A regression test proves the empty-reply path at the persistence/render seam.\n\n## Reports\n\n* ENG-13661 (this report)\n* ENG-13629 (prior report of the same cause)"
+    }
+  ]
+}

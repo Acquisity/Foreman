@@ -1,0 +1,237 @@
+{
+  "id": "ENG-15968",
+  "provenance": "seeded",
+  "createdAt": "2026-10-22T09:32:16.450Z",
+  "lane": "triage",
+  "stratum": "platform_limitation",
+  "ticket": {
+    "title": "We need to reconsider conversation",
+    "description": "#### Customer Email\n\n<email>\n\n#### Workspace name\n\nAI Acquisition Sales Team\n\n#### Workspace ID\n\n<uuid>\n\n#### Which lead?\n\nall of them\n\n#### What's wrong?\n\nWe need to reconsider how we manage conversations through the CRM. Different people communicate with the client and a lot of the time my conversations are full of things that aren't for me to reply to. Please review the Loom video.\n\n#### Screenshot\n\n#### Video link\n\n<loom>",
+    "attachmentKinds": ["loom", "slack"]
+  },
+  "repoCommitAtCreate": "f0dca285d66b8a031305c53c05dfb6ed9a01a88a",
+  "flags": {
+    "descriptionEditedAfterCreate": false,
+    "needsProductionData": false,
+    "alreadyFixedAtTriage": false
+  },
+  "asFiled": {
+    "assignee": "James Keeble",
+    "labels": [],
+    "parent": null,
+    "priority": 3,
+    "project": "CRM"
+  },
+  "relatedSnapshot": [
+    {
+      "id": "ENG-14545",
+      "createdAt": "2026-09-30T20:16:00.818Z",
+      "title": "Conversations shows which rep sent each message, without opening it",
+      "state": "Done",
+      "assignee": "James Keeble",
+      "parent": "ENG-14113",
+      "labels": [],
+      "description": "## Overview\n\nIn Conversations, every message we send should show which rep sent it, at a glance. Today the rep's name only appears after clicking a text to expand it, so a thread worked by several reps (common under All) reads as if one person sent everything.\n\n## Problem\n\nSetters, closers and payment support all text and call the same people. Opening a conversation under All shows our messages on one side with no name, so a rep can't tell whether they, a setter or an automation sent the last text without clicking each one.\n\n## User experience\n\n* A rep opens any conversation in CRM v2 Conversations.\n* Each group of consecutive messages we sent from one sender carries that sender's name (for example \"Name 1\"), the way group chats label who is speaking. It updates when a different rep, or an automation, takes over.\n* Texts, emails and calls all show it: \"Name 1\" on a text, the sender on an email, and who made or took a call.\n* Messages with no known rep read \"Name 2\" when a workflow sent them, and \"Your team\" when the sender is unknown, matching today's wording.\n* Messages from the contact are unchanged.\n\n## What's included\n\n* The CRM v2 Conversations thread in light and dark, desktop and phone.\n* No change to how messages are sent or who is recorded as the sender.\n\n## Done when\n\n- [ ] Every run of our messages shows its sender's name without expanding anything, for texts, emails and calls.\n- [ ] A switch of sender inside a thread starts a new label.\n- [ ] Name 2 and unknown senders read \"Name 2\" and \"Your team\".\n- [ ] Checked in light and dark at desktop and phone widths.\n\n## Open questions\n\n* Should the Conversations list row also prefix the last message with the sender (\"Name 100: ...\")? Recommended default: not in this ticket; revisit after reps use the thread labels."
+    },
+    {
+      "id": "ENG-732",
+      "createdAt": "2025-08-08T10:38:21.335Z",
+      "title": "Implement conversation branching functionality",
+      "state": "Canceled",
+      "assignee": null,
+      "parent": null,
+      "labels": ["Feature"],
+      "description": "Add the ability to branch conversations from specific messages, allowing users to explore different conversation paths.\n\n**Context:**\n\n* Currently the chat system uses sequential message ordering with `sequenceNumber`\n* Branching would allow users to create alternative conversation threads from any point\n* This would be useful for exploring different AI responses or conversation directions\n\n**Technical Considerations:**\n\n* Need to modify the message sequencing logic to support branching\n* Consider how to handle message relationships and parent-child connections\n* UI/UX design for displaying and navigating branched conversations\n* Database schema updates to support conversation trees\n\n**Acceptance Criteria:**\n\n- [ ] Users can branch a conversation from any message\n- [ ] Branched conversations maintain proper message sequencing\n- [ ] UI clearly shows conversation branches and allows navigation\n- [ ] Database efficiently stores and retrieves branched conversation data"
+    },
+    {
+      "id": "ENG-4447",
+      "createdAt": "2026-01-12T08:53:57.316Z",
+      "title": "Check if we need anything custom for Intercom",
+      "state": "Canceled",
+      "assignee": "Blaise Gulaj",
+      "parent": null,
+      "labels": ["Feature"],
+      "description": "And check how GHL and <domain> does it"
+    },
+    {
+      "id": "ENG-3188",
+      "createdAt": "2025-11-30T17:15:20.908Z",
+      "title": "Check if we need a webhook for channel.deleted or archived",
+      "state": "Done",
+      "assignee": "Mahmut Jomaa",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "I'm not sure if deletion or archivization of a channel won't lead to some foreign key constraint issues"
+    },
+    {
+      "id": "ENG-2346",
+      "createdAt": "2025-10-27T10:33:21.269Z",
+      "title": "Create Company One API spec for the endpoints we need from them",
+      "state": "Done",
+      "assignee": "Pieter Venter",
+      "parent": null,
+      "labels": [],
+      "description": "* Use case\n* Name 3\n* Name 4\n* Expected response"
+    },
+    {
+      "id": "ENG-15372",
+      "createdAt": "2026-10-14T04:34:53.037Z",
+      "title": "UX - dashboard level search top should search leads",
+      "state": "Todo",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": ["Customer reported", "Feature Request"],
+      "description": "#### Customer Email\n\n<email>\n\n#### Workspace name\n\nAI Acquisition Sales Team\n\n#### Workspace ID\n\n<uuid>\n\n#### Which lead?\n\nall\n\n#### What's wrong?\n\nThere are two search bars: one at the top of the screen and one below that. When you click something like People, the top search bar right now won't take you to the lead if you put in their email, so you have to be in People. It's confusing. The top search bar should be a global search that searches across the platform, including People.\n\n#### Screenshot\n\n <image> \n\n <image> \n\n <image> \n\n <image> \n\n <image> \n\n#### Video link"
+    },
+    {
+      "id": "ENG-13408",
+      "createdAt": "2026-09-03T10:18:09.649Z",
+      "title": "On their client workspace, we've taken two months to get their clients campaign in draft | need to refund them (highly escalated)",
+      "state": "Todo",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [],
+      "description": "#### User Email\n\n<email>\n\n#### Workspace Name\n\nCompany Three\n\n#### Request Type\n\nRefund\n\n#### Reason for request\n\nThese clients are highly escalated & have been facing a number of escalation points over the last few months - they have a very niche client workspace (Company Three) - it's taken our back & fourths & email team 2 months to get their client campaign right & in draft. Can we refund them 2 months of their Acquisity fees for that workspace? Would ease the escalations and make them a little happier"
+    },
+    {
+      "id": "ENG-10363",
+      "createdAt": "2026-06-17T14:41:44.431Z",
+      "title": "Review thread conversation in AI SDR",
+      "state": "Backlog",
+      "assignee": "Koppany Kondricz",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "**Customer Name**\nName 6\n\n**Customer Email**\n<email>\n\n**Customer Email**\n<Enter text>\n\n**Workspace name**\nName 5's Workspace\n\n**Screenshot**\n<optional>\n\n**What is the user trying to achieve?**\nCheck the thread with Name 7\n​<email>. AI mentioned that it needs a response but we could not find the  thread\n\n**What is the user doing to achieve it?**\nReviewed the thread\n\n**What is happening instead?**\nno conversation\n\n**What is the expected outcome?**"
+    },
+    {
+      "id": "ENG-14728",
+      "createdAt": "2026-10-05T17:02:17.766Z",
+      "title": "Chat widget: Customer asked: \"That is not helping. Just wondering if we have an…",
+      "state": "In Progress",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [],
+      "description": "## Report\n\nReported by: Support team (Aaron Fraga)\n\nWhat went wrong: Customer asked: \"That is not helping. Just wondering if we have anything we can provide to a consultant customers in the procurement industry.\"\nForeman replied: \"I could not find a help-center article for that, so could you tell me which feature or page it is about?\"\n\nWhat went wrong:  Repeating i couldnt find a help center article. Which foreman isnt wrong here... Just need a better way to approach foreman help center failure responses and what that means\n\n## Conversation\n\nWorkspace: Name 8's Workspace (<uuid>)\n\nConversation: <url:app.acquisity.ai>\n\nReported reply: whole conversation\n\nForeman run: <uuid>\n\n### Transcript (oldest first, customer-visible turns only, last 12 turns max)\n\nCustomer: Why are  my  cold emails going to consultants when  my niche is real estate?\n\nForeman: When your search pulls in consultants instead of real estate companies, you can refine your results by checking the keywords attached to those companies in the preview panel and adding the unwanted terms to your excluded keywords \\[1\\]. You can also use the advanced filters to narrow your search by department, seniority, revenue, news, funding type, domains, or specific company names \\[2\\].\n\nCustomer: Do we have any tools that I could recommend to a consultant in the procurement arena that he could recommend to his clients?\n\nForeman: I could not find a help-center article for that, so could you tell me which feature or page it is about?\n\nCustomer: That is not helping. Just wondering if we have anything we can provide to a consultant customers in the procurement industry.\n\nForeman: I could not find a help-center article for that, so could you tell me which feature or page it is about?\n\n## Team detail\n\nGate decision: none recorded\n\n### Internal notes\n\n(none)\n\n### Findings\n\n(none)\n\n<!-- chat-widget-feedback conversation=<uuid> message=none run=<uuid> replay=none at=2026-10-05T17:02:17.454Z -->"
+    },
+    {
+      "id": "ENG-11732",
+      "createdAt": "2026-07-16T17:07:08.485Z",
+      "title": "One canonical AI SDR funnel metric + rebuild the broken admin conversion funnel [NEEDS DEFINITION SIGN-OFF]",
+      "state": "Backlog",
+      "assignee": "Koppany Kondricz",
+      "parent": "ENG-11708",
+      "labels": [],
+      "description": "## Review corrections (2026-07-16)\n\nThese notes supersede any conflicting implementation language below.\n\nDo not call 32.5% canonical until the definition session signs off. Define a cohort using the first qualifying positive event, then count bookings for that same cohort within a fixed attribution window. Report cohort start/end, maturation window, external booking inclusion, deduplication, and timezone. A same-window event ratio is not a true conversion rate.\n\n---\n\n## Overview\n\nDepending on where you look, our positive-reply-to-booked-meeting rate is 4.4%, 23.9%, 32.5%, or 53.1%. None of these is a lie; they count different things, and the 4.4% one is structurally meaningless. We pick ONE definition, rebuild the broken admin funnel on it, and give every surface the same number.\n\nSTATUS: needs a 30-minute definition sign-off with James before build. Recommended definition below.\n\n## The prod data (30 days, all measured 2026-07-16)\n\n* Broad-intent positive (distinct threads routed to any non-negative intent) = 17,972 threads; booked via BOOKING_CREATED agent execution = 4,295 (23.9%); booked via lifecycle transition to booked = 5,842 (32.5%).\n* 1,542 of the 5,842 booked threads (26%) have NO BOOKING_CREATED execution: scheduling-link/external bookings bypass the booking agent. Agent-based metrics undercount bookings by a quarter.\n* The admin funnel (`apps/web/trpc/routers/admin/admin-ai-sdr-v2-analytics.ts`, getConversionFunnel) reports 4.4% because it counts CURRENT lifecycle state filtered by thread.updated_at: ~993k NULL-lifecycle and ~205k stale replied threads merely touched in the window dominate the denominator.\n* getIntentDistribution in the same router queries the `intent_classifications` table, which has ZERO rows ever (dead schema); that admin panel renders empty. Intent data actually lives in agent_executions decisions.\n* Per-workspace (floor >= 10 positive threads, 437 orgs): p25/median/p75 = 16.7% / 23.8% / 31.9% (agent-booked) or 20.0% / 28.6% / 37.5% (lifecycle-booked); ~32% of orgs clear 30% under the strict definition, ~47% under lifecycle.\n\n## Root cause\n\n1. getConversionFunnel measures the CURRENT lifecycle state of every thread whose `updated_at` falls in the window, instead of counting state transitions that happened in the window. Any old thread that gets touched (webhook, sync, anything that bumps updated_at) re-enters the denominator, so ~1.2M stale/NULL-lifecycle threads drown the real signal and produce 4.4%.\n2. \"Booked\" defined as a BOOKING_CREATED agent execution misses every booking made through a scheduling link or externally (26% of all booked threads), so any agent-based rate undercounts by a quarter.\n3. getIntentDistribution reads a table (`intent_classifications`) that no code ever writes to; the intent data it wants lives in `agent_executions` decisions.\n4. No canonical definition exists anywhere in the repo, so each surface invented its own; that is why 4.4%, 23.9%, 32.5%, and 53.1% coexist.\n\n## Recommended canonical definition (to sign off)\n\n* Positive = distinct threads whose intent routed to any non-negative intent within the window (from agent_executions).\n* Booked = lifecycle_history transition to `booked` within the window (captures external/link bookings).\n* Candidate same-window ratio today: 32.5%. This is not canonical until cohort and attribution-window sign-off.\n\n## What to build (after sign-off, one PR)\n\n1. Document the canonical definition in the repo (analytics README) with the exact SQL.\n2. Rebuild getConversionFunnel on transitions-in-window (events, not current state). Repoint getIntentDistribution at agent_executions (or wire the dead table, per the observability ticket's decision).\n3. Add a per-workspace conversion view to the admin analytics: rate per org, p25/p50/p75, share above 30%, sortable by positive volume.\n4. Coordinate with ENG-10978 (Platform Metrics Overhaul): that master owns customer-facing dashboard numbers; this ticket owns the AI-SDR admin funnel. Same definitions, no double implementation.\n\n## Acceptance criteria\n\n- [ ] Admin funnel, ad-hoc SQL, and the weekly report produce the same number for the same window\n- [ ] External/link bookings included in booked counts\n- [ ] Per-workspace view live in admin\n- [ ] Definition doc merged"
+    },
+    {
+      "id": "ENG-7207",
+      "createdAt": "2026-03-21T10:10:11.692Z",
+      "title": "Add Intercom conversation export and question extraction scripts",
+      "state": "Canceled",
+      "assignee": "Blaise Gulaj",
+      "parent": null,
+      "labels": [],
+      "description": "## Problem Statement\n\nWe need visibility into what questions our users are asking via Intercom support tickets to identify knowledge gaps in our help center and track recurring issues.\n\n## Impact Analysis\n\n* **User Impact**: Users repeatedly ask questions that could be answered by help articles, leading to slower resolution times.\n* **Development Impact**: No systematic way to identify which documentation is missing or which bugs are most frequently reported.\n* **Business Impact**: Support team spending time on questions that could be self-served with proper documentation.\n\n## Solution\n\nTwo one-off scripts:\n\n1. `scripts/export-intercom-conversations.ts` — Exports all Intercom conversations with full message history via the Search Conversations API.\n2. `scripts/extract-intercom-question-gists.ts` — Processes exported conversations through an LLM to extract core questions, categories, bug/feature flags, knowledge gaps, and suggested article titles.\n\nPR: <url:github.com>"
+    },
+    {
+      "id": "ENG-14518",
+      "createdAt": "2026-09-30T12:00:15.966Z",
+      "title": "Scheduled folder in Conversations",
+      "state": "Done",
+      "assignee": "Ebubeker Rexha",
+      "parent": "ENG-14176",
+      "labels": [],
+      "description": "## Overview\n\nThe Clock button next to Compose opens a Scheduled folder right inside Conversations, so a rep can browse everything they have waiting, failed, sent or cancelled without leaving the inbox.\n\n## Problem\n\nToday the Clock button leaves Conversations for a separate Scheduled messages page with six status toggles including \"Unknown,\" raw phone numbers instead of names, no message text, and no way back into the conversation.\n\n## Proposed fix\n\nTurn the conversation list into a Scheduled folder in place. Group messages under Upcoming, Failed, Sent and Cancelled, show the person's name, the subject and first line, and who scheduled it, and let a rep edit, cancel or retry right from a row, or click through to that person's thread.\n\n## What's included\n\n* The Clock button switches the conversation list into the Scheduled folder instead of navigating to a separate page; Back returns to the list.\n* Header with a \"Scheduled\" title, an upcoming-count pill, and Mine/Everyone.\n* Tabs: Upcoming, Failed, Sent, Cancelled. A message still sending shows a pill on its row rather than its own tab, and one whose delivery is still being checked sits inside Upcoming with a \"Checking whether it sent\" pill rather than the old \"Unknown\" tab.\n* Rows grouped under day headings, soonest-first in Upcoming and newest-first elsewhere, each with Edit, Cancel and Retry where they apply.\n* The old separate Scheduled messages page redirects here, keeping its existing open-tracking.\n\nNot included: the scheduled-count badge on the Clock button itself (ENG-14171, a separate ticket), and anything from ENG-14168 (tasks, meetings, payments on the thread).\n\n## Blocked by\n\nEdit, retry, Remind if no reply and a better Schedule send in Conversations — this folder reuses that ticket's Edit panel and its Retry action rather than duplicating them.\n\n## How it should work\n\n* A rep sees only the scheduled messages, and only the message text, they could already see on today's separate Scheduled page; the folder doesn't loosen any of those checks, it reuses them.\n* Upcoming keeps refreshing live the way the current page does; the other tabs don't need to.\n* Clicking a row opens that person's thread with its scheduled bubble.\n\n## Who can do what\n\nSame as today's Scheduled page: a rep sees and acts on messages within their existing scope (their own, their team's, or the workspace's, depending on role), and never across workspaces.\n\n## What the user sees\n\nScheduled becomes a mode of Conversations rather than a separate destination. The open thread stays visible on the right while browsing the folder on the left. The footer states the sort order and the timezone in use.\n\n## Done when\n\n* The Clock button opens the Scheduled folder in place; Back returns to the normal conversation list.\n* Upcoming, Failed, Sent and Cancelled show the right messages for the current scope and channel filter, grouped by day.\n* Edit, Cancel and Retry work from a row the same way they work from the thread.\n* The old Scheduled messages page redirects here and keeps its own open-tracking event.\n* The screens match the kit in both light and dark mode.\n\n## Open questions\n\nNone: all required decisions are settled.\n\n## Expected outcome\n\nA rep can browse, edit, cancel or retry every scheduled message without leaving Conversations, and the old separate page is gone.\n\n## Implementation context\n\nSee the linked AI context document for the router change needed for the merged Upcoming view and the exact files this replaces."
+    },
+    {
+      "id": "ENG-729",
+      "createdAt": "2025-08-08T09:56:30.126Z",
+      "title": "Open the new conversation in the same page",
+      "state": "Done",
+      "assignee": "Savinder Singh",
+      "parent": "ENG-721",
+      "labels": ["Improvement"],
+      "description": "* When we click on the open conversation link it opens in the new tab, make sure to open it in the browser tab."
+    },
+    {
+      "id": "ENG-10005",
+      "createdAt": "2026-06-11T13:12:02.494Z",
+      "title": "Design a Conversations tab in the CRM",
+      "state": "Done",
+      "assignee": "Jeet Nirnejak",
+      "parent": null,
+      "labels": ["Design", "rep-command-center"],
+      "description": "Design a CRM conversations tab that lets users see communication in one place instead of opening each contact individually.\n\nContext from the thread suggests including texts and emails, with phone calls also visible. Additional ideas mentioned were Send Blue texts and, for ecommerce use cases, integrations for Instagram and Messenger.\n\n### Design (Name 9)\n\nThe revised final designs live in CRM implementation · revised after James feedback · 31 Jul 2026 — the earlier \"ENG-10005\" capture sections on the CRM page are superseded by these:\n\n* 19 · conversations — default + call detail\n* States: 33 · no selection · 34 · empty · 35 · error · 36 · loading\n* Threads: 37 · email · 38 · call · 39 · needs reply\n\nThe build ticket consuming these is ENG-12277 (master ENG-12250)."
+    },
+    {
+      "id": "ENG-6297",
+      "createdAt": "2026-03-06T14:33:43.187Z",
+      "title": "Reporting (Partner Admin): Funnel conversion rate report",
+      "state": "Canceled",
+      "assignee": "Mahmut Jomaa",
+      "parent": null,
+      "labels": ["Feature"],
+      "description": "## Problem\n\nCompany Two needs to see conversion rates by funnel step: opt-in → webinar registration → front-end purchase ($1,500) → back-end upsell ($6K/$10K/$20K). Currently `getExternalTrackingStats` in `affiliate.ts:1065-1134` returns flat totals — total leads, converted leads, total conversions, total revenue. No breakdown by funnel step or product.\n\n## Data available today\n\nThe data to build this already exists across three tables:\n\n1. `external_lead_capture` — opt-ins. Has `status` (captured/converted), `capturedAt`, `affiliateLinkId`, `partnerId`\n2. `external_conversion` — purchases. Has `productName`, `productId`, `amount`, `source`, `convertedAt`, `partnerId`. This is where GHL/Stripe/manual conversions land with product info\n3. `affiliate_link` — click counts per affiliate link. Has `clickCount`\n\nThe funnel steps map to:\n\n* **Clicks** → `SUM(affiliate_link.clickCount)` for all links in this partner\n* **Opt-ins** → `COUNT(external_lead_capture)` with status = any\n* **Purchases by product** → `external_conversion` grouped by `productName` or `productId`\n\nThe gap: there's no explicit \"webinar registration\" event type. This would need to either (a) be a separate `productName` value in external_conversion (e.g. GHL sends it as a conversion with `productName = 'Name 10'` and `amount = 0`), or (b) be tracked as a lead capture with a custom field. For now, we group conversions by product and let the product names define the funnel steps.\n\n## Approach\n\nNew tRPC procedure that aggregates funnel steps from the existing tables. New component on a reports page (or the existing analytics page) showing the funnel.\n\n## Changes\n\n### 1\\. `trpc/routers/partner-analytics.ts` — new `getFunnelReport` procedure\n\n```ts\ngetFunnelReport: partnerAdminProcedure\n  .input(z.object({\n    dateFrom: z.date().optional(),\n    dateTo: z.date().optional(),\n    affiliateUserId: z.string().uuid().optional(), // filter to one affiliate\n  }))\n  .query(...)\n```\n\nQuery logic:\n\n**Step 1 — Clicks:**\n\n```sql\nSELECT COALESCE(SUM(click_count), 0) as total_clicks\nFROM affiliate_link\nWHERE partner_id = :partnerId\n  AND (affiliate_account_id IN (SELECT id FROM affiliate_account WHERE owner_user_id = :affiliateUserId) OR :affiliateUserId IS NULL)\n```\n\n**Step 2 — Opt-ins:**\n\n```sql\nSELECT COUNT(*) as total_optins\nFROM external_lead_capture\nWHERE partner_id = :partnerId\n  AND captured_at BETWEEN :dateFrom AND :dateTo\n  AND (affiliate_link_id IN (...) OR :affiliateUserId IS NULL)\n```\n\n**Step 3 — Conversions grouped by product:**\n\n```sql\nSELECT\n  product_name,\n  COUNT(*) as conversion_count,\n  SUM(amount) as total_amount\nFROM external_conversion\nWHERE partner_id = :partnerId\n  AND converted_at BETWEEN :dateFrom AND :dateTo\n  AND (attributed_lead_id IN (\n    SELECT id FROM external_lead_capture WHERE affiliate_link_id IN (...))\n    OR :affiliateUserId IS NULL)\nGROUP BY product_name\nORDER BY total_amount DESC\n```\n\nReturn shape:\n\n```ts\n{\n  clicks: number;\n  optIns: number;\n  clickToOptInRate: number;\n  conversions: Array<{\n    productName: string | null;\n    count: number;\n    totalAmountCents: number;\n  }>;\n  totalConversions: number;\n  totalRevenueCents: number;\n  optInToConversionRate: number;\n}\n```\n\n### 2\\. New component `components/partner-admin/funnel-report.tsx`\n\nVisual funnel display:\n\n* Horizontal or vertical bar/step layout showing:\n  * Clicks → Opt-ins → \\[Product 1 purchases\\] → \\[Product 2 purchases\\] → ...\n* Each step shows: count, conversion rate from previous step\n* Optional affiliate filter dropdown at the top\n* Date range picker (reuse existing pattern)\n* Responsive card layout\n\n### 3\\. `app/(saas)/dashboard/(sidebar)/partner-admin/analytics/page.tsx`\n\nAdd the funnel report card below the revenue/commission charts (from spec #18). Uses the same `timeRange` state.\n\nAlternatively, if the analytics page gets too long, this can go on a new `/partner-admin/reports` page — but keeping it on analytics is simpler for now.\n\n## Dependencies\n\n* Funnel granularity depends on how Company Two's GHL is configured to send conversions. If GHL sends `productName` for each funnel step (webinar reg, front-end, back-end), the funnel will have that granularity automatically.\n* If event type tracking (spec #3) is built first, we could also break down by `eventType` instead of `productName`.\n\n## What this does NOT change\n\n* No DB migration\n* No changes to how conversions are recorded\n* Existing `getExternalTrackingStats` unchanged\n* No new pages (adds to existing analytics)\n\n## Files touched\n\n1. `trpc/routers/partner-analytics.ts` — new `getFunnelReport` procedure\n2. `components/partner-admin/funnel-report.tsx` — new funnel visualization component\n3. `app/(saas)/dashboard/(sidebar)/partner-admin/analytics/page.tsx` — render funnel report"
+    },
+    {
+      "id": "ENG-13610",
+      "createdAt": "2026-09-09T18:47:02.916Z",
+      "title": "Name 11 - needs WL costs covered",
+      "state": "Done",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [],
+      "description": "#### User Email\n\n<email>, <email>\n\n#### Workspace Name\n\n#### Request Type\n\nDiscount code\n\n#### Reason for request\n\nNeeds Whitelabel Acquisity costs covered as he was a refund save on a 80/20 split from a while back (we sell and we fulfill deal)"
+    },
+    {
+      "id": "ENG-2655",
+      "createdAt": "2025-11-07T10:16:13.215Z",
+      "title": "Research how we do forwarding from the ai sdr mailbox",
+      "state": "Done",
+      "assignee": "Koppany Kondricz",
+      "parent": null,
+      "labels": ["Feature"],
+      "description": "Takeaways:\n\n* Company One does not support forwarding, nor sending email to whatever email address. They support only replying on certain emails. And to be honest, that's totally understandable.\n* We need to rely on our own email sending infrastructure if we want to forward mails. Again it's not a problem, I just need to develop another endpoint!\n\nSo no major blockers here, I'm already coding this."
+    },
+    {
+      "id": "ENG-14521",
+      "createdAt": "2026-09-30T14:08:17.089Z",
+      "title": "Client needs 10,000 credits",
+      "state": "Done",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": ["Credits", "Customer reported", "Internal reported"],
+      "description": "#### User Email\n\n<email>\n\n#### Workspace Name\n\n#### Request Type\n\nLead credit\n\n#### Reason for request\n\nClient said he was promised 20k credits upon joining auto agency tier.  he only received 10k, can we add the remaining 10k?"
+    },
+    {
+      "id": "ENG-15712",
+      "createdAt": "2026-10-19T13:51:40.013Z",
+      "title": "Outlook copies every outside email into the CRM, even with nobody we know on it",
+      "state": "Done",
+      "assignee": "Ebubeker Rexha",
+      "parent": "ENG-15711",
+      "labels": ["Bug"],
+      "description": "## What's happening\n\nWhen someone connects Outlook, every conversation with anyone outside the company is copied into the CRM, including newsletters, receipts and personal mail. Almost none of it is linked to a person, so it clutters the workspace and exposes private mail to teammates.\n\n## What should happen\n\nOutlook follows the same rule as Gmail. A conversation is stored only when someone on it is already a contact, writes from a CRM company's work domain, or the conversation is already linked. Everything else stays in Outlook.\n\n## Who it hits and how bad\n\n* Every workspace with Outlook connected. On 19 Oct 2026, 9,390 of 9,789 stored Outlook threads (95.9%) had no person attached, across 61 workspaces (read-only replica, all time, not deleted).\n* In the last 30 days (19 Sep to 19 Oct 2026) it was 96.3% of 9,230 Outlook threads, against 17.4% of 363,286 for Gmail.\n* A customer has reported personal and family email showing in their CRM: ENG-14940. It isn't proven that this report is Outlook, so check it while fixing this.\n* The attached file `outlook-affected-workspaces-2026-10-19.md` lists every affected workspace with counts, dates, the Outlook users and the owners, so support can contact them.\n\n## How to see it\n\n1. Connect an Outlook inbox that has outside email to a new workspace with no contacts.\n2. Wait for the 90-day import to finish.\n3. Open Conversations or the database: outside conversations are stored with no person. With Gmail, the same inbox stores nothing.\n\nNot reproduced on a preview by us yet. The counts above are measured.\n\n## What we know so far\n\nPart of ENG-15711. Gmail got the \"only store mail that involves the CRM\" rule in ENG-13977, but Outlook never did. Outlook's page saver removes only internal-only conversations and saves the rest. It also ignores the workspace's \"New people from email\" setting.\n\nToday:\n\n```mermaid\nflowchart TD\n  A[Outlook page of messages] --> B{Internal only?}\n  B -- yes --> C[Dropped]\n  B -- no --> D[Saved to the CRM]\n```\n\nAfter this change:\n\n```mermaid\nflowchart TD\n  A[Outlook page of messages] --> B{Internal only?}\n  B -- yes --> C[Dropped]\n  B -- no --> E{NEW: anyone in the CRM?}\n  E -- yes --> D[Saved on their record]\n  E -- no --> F[NEW: not saved, address indexed]\n```\n\n## Split (19 Oct 2026)\n\nPulling in a contact's past Outlook email when they are added later moved to Show a new contact's past Outlook email on their record, so this fix can ship first. The address index bullet below is for that ticket.\n\n## Done when\n\n- [ ] An Outlook inbox connected to a workspace with no contacts stores 0 conversations.\n- [ ] A conversation with a contact on To or CC is stored on that contact.\n- [ ] A conversation from someone at a CRM company's work domain is stored.\n- [ ] A reply from a new address inside an already stored conversation is stored.\n- [ ] The workspace's \"New people from email\" setting applies to Outlook the same way it applies to Gmail.\n- [ ] Already stored Outlook conversations with nobody in the CRM are removed by a cleanup run, with a dry run first that reports the count per workspace.\n- [ ] Re-running an import page or a change notification creates no duplicates.\n- [ ] Tests cover the Outlook store rule at the page-save seam, red before and green after.\n\n<details><summary>For whoever fixes it</summary>\n\n* Outlook page saver: `apps/web/lib/services/outlook-message-page.ts` (`persistOutlookMessagePage`). The internal-only check and `saveThread` loop sit around lines 554 to 626 on main.\n* Gmail rule to reuse: `evaluateGmailThreadMatch` and `loadGmailMatchContextForAddresses` in `apps/web/lib/services/gmail-crm-thread-match.ts`. Gmail page flow for reference: `apps/web/lib/services/gmail-message-page.ts`.\n* Address index for later lookups: `integration_mailbox_address_index` is Gmail-shaped today (Gmail message and thread ids). Outlook needs an equivalent or a provider column so a contact added later can find their mail.\n* Cleanup to mirror: `apps/web/scripts/purge-unmatched-gmail-mail.ts` and `apps/web/lib/services/gmail-unmatched-mail-purge.ts`.\n* Policy: `organization.contact_creation_policy` in `packages/db/src/schema/organization.ts`; creation logic in `apps/web/lib/crm/contact-creation-policy.ts`.\n* Live sync path: `apps/web/lib/services/outlook-*` delta processing uses the same page saver.\n* Measurement queries: read-only replica, `crm_message_thread` where `outlook_conversation_id is not null`, split by `contact_id is null`.\n\n</details>"
+    },
+    {
+      "id": "ENG-12969",
+      "createdAt": "2026-08-20T16:22:59.203Z",
+      "title": "Conversations follow-ups",
+      "state": "Backlog",
+      "assignee": "Elis Bushaj",
+      "parent": "ENG-12277",
+      "labels": ["rep-command-center"],
+      "description": "unknown"
+    },
+    {
+      "id": "ENG-15956",
+      "createdAt": "2026-10-21T23:25:40.793Z",
+      "title": "I'm getting messages that are owned by other SDRs",
+      "state": "Done",
+      "assignee": "James Keeble",
+      "parent": null,
+      "labels": ["Customer reported", "Feature Request", "Internal reported"],
+      "description": "#### Customer Email\n\n<email>\n\n#### Workspace name\n\nAI Acquisition Sales Team\n\n#### Workspace ID\n\n<uuid>\n\n#### Which lead?\n\nName 12\n\n#### What's wrong?\n\nMessages appear in my inbox to be actioned when I am not the lead owner\n\n#### Screenshot\n\n <image> \n\n#### Video link"
+    }
+  ]
+}

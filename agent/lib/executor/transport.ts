@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { isTriageReplay } from "../triage-replay/mode.js";
 import { type ExecutorToolkit, toolkitUrl } from "./endpoint.js";
 
 const envelopeSchema = z.object({
@@ -165,6 +166,12 @@ async function executeExecutor(
   code: string,
   options: { fetch?: typeof fetch; timeoutMs?: number; maxBytes?: number } = {}
 ): Promise<unknown> {
+  // The last wall: a replay process never reaches Executor, whichever path asked.
+  if (isTriageReplay()) {
+    throw new ExecutorError("replay_transport_blocked", 503, {
+      dispatched: false,
+    });
+  }
   let dispatched = false;
   try {
     return await executeExecutorRequest(ctx, code, options, () => {

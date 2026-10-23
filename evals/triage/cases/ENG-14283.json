@@ -1,0 +1,237 @@
+{
+  "id": "ENG-14283",
+  "provenance": "seeded",
+  "createdAt": "2026-09-25T15:15:15.669Z",
+  "lane": "triage",
+  "stratum": "unproven",
+  "ticket": {
+    "title": "campaign wont send",
+    "description": "#### Customer Name\n\nAaron Fraga\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nAaron Fraga's Workspace\n\n#### Screenshot\n\n#### What are you trying to achieve?\n\nLaunch a cold email campaign in this workspace\n\n#### What are you doing to achieve it?\n\nOpen Cold Email, pick the draft campaign, press Launch.\n\n#### What is happening instead?\n\nThe Launch button stays disabled and the campaign never starts.\n\n#### What is the expected outcome?\n\nThe campaign launches and starts sending.",
+    "attachmentKinds": ["slack"]
+  },
+  "repoCommitAtCreate": "b54e09794cc2fae2188beba09fdc92179840bacd",
+  "flags": {
+    "descriptionEditedAfterCreate": false,
+    "needsProductionData": false,
+    "alreadyFixedAtTriage": false
+  },
+  "asFiled": {
+    "assignee": "Aaron Fraga",
+    "labels": [],
+    "parent": null,
+    "priority": 4,
+    "project": "Support"
+  },
+  "relatedSnapshot": [
+    {
+      "id": "ENG-4510",
+      "createdAt": "2026-01-14T04:39:06.900Z",
+      "title": "Campaigns not sending emails despite leads in campaigns",
+      "state": "Duplicate",
+      "assignee": "Anthony Adewale",
+      "parent": null,
+      "labels": ["Campaign Stops Sending"],
+      "description": "User reports that over the last few days no emails have been sent from Cold Email campaigns. Two campaigns together show only 405 leads contacted despite there being more than 20k leads in total. User believes campaign settings are correctly configured to allow sends and wants campaigns running again.\n\n <image> "
+    },
+    {
+      "id": "ENG-9492",
+      "createdAt": "2026-05-29T14:29:32.256Z",
+      "title": "Campaigns show no connected accounts and stop sending",
+      "state": "Done",
+      "assignee": "James Keeble",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "User: <email>\nA workspace is reporting campaign delivery issues across multiple active campaigns.\n\nTwo campaigns show a `No email accounts connected. Add one to start sending.` prompt even though the campaign options show 24 inboxes selected. The same workspace also reports only 2 campaigns appearing in the AI SDR inbox while 3 campaigns are active.\n\nThe affected campaigns called out are:\n\n* Name 1 | Healthcare - Functional & Medical Clinics | US | 1-50 employees | AIA created\\*\n* Name 1 | Healthcare | US | 1-50 employees | AIA created\\*\n* Name 1 | Healthcare - Functional & Medical Clinics | US | 11-200 Employees | $0-$50mm\n\nThe customer reports emails have not sent for days and lead contact counts appear stuck.\n\n* `Name 1 | Healthcare - Functional & Medical Clinics | US | 1-50 employees | AIA created*`: 6,266 contacted the other day and 6,266 yesterday and 6,266 today\n* `Name 1 | Healthcare | US | 1-50 employees | AIA created*`: 5,860 contacted the other day and 5,860 yesterday  and 5,860 today\n\nOne of the campaigns was said to be sending and due to resume at 9am, but the customer later reported that nothing was moving and asked for tech investigation.\n\n <image> \n\n <image> \n\n <image> \n\n <image> "
+    },
+    {
+      "id": "ENG-3816",
+      "createdAt": "2025-12-16T09:44:09.566Z",
+      "title": "Campaign shows completed but emails never start sending",
+      "state": "Canceled",
+      "assignee": "Anthony Adewale",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "User campaign \"Name 2 to Owner\" (started on Dec 10) is stuck in a completed state and never sends emails.\n\nDetails from Intercom conversation:\n\n* Campaign has leads and emails configured.\n* UI shows the campaign as completed, but it is not running, not active, and not paused.\n* No emails have been sent from this campaign.\n\nRelevant media:\n\n <image> \n\n <image> \n\n <image> "
+    },
+    {
+      "id": "ENG-14065",
+      "createdAt": "2026-09-19T22:14:40.744Z",
+      "title": "Campaigns still not sending after customer launch attempts; three campaigns remain draft with daily send limit 0",
+      "state": "Canceled",
+      "assignee": "James Keeble",
+      "parent": null,
+      "labels": [],
+      "description": "## Customer report\n\n```text\nCustomer in workspace Diamond reports that campaigns still will not send after \"trying everything.\" Prior check showed three campaigns saved as drafts with a daily send limit of 0.\n\nRe-check on 2026-09-19 22:14 UTC shows the same state: \"MedSpas | LTO Lead Scraping 1K\" (1010 leads), \"Renewable Energy | LTO Lead Scraping 1K\" (1010 leads) and \"Name 100\" (1100 leads) are all still status draft, dailyLimit 0, no recent sends recorded, schedules normal (Mon-Fri, 09:00-18:00, America/Detroit, window not inverted). Last updates were 2026-09-18. No leads are stranded unpushed (leadsNotPushedCount 0 for all three), and no failed background job records exist for this workspace in the last 7 days.\n\nSending accounts: 12 of 147 connected inboxes healthy. The workspace's sending-account connection is customer-managed (legacy plan) and carries a saved connection error; it was last updated 2026-09-19, webhook events last seen 2026-09-17 with no recent errors. Live per-inbox status could not be read because the connection is not one Acquisity provisions, so the specific failing inboxes could not be identified.\n\nExpected outcome: customer wants campaigns to actually start sending. Unclear whether their launch/limit edits failed to save or were never applied; worth Engineering checking whether campaign save/launch from the campaign UI is persisting status and daily volume for this workspace.\n```\n\n## Verified scope\n\n* Workspace: Diamond (diamond-nF5ow)\n* Organization ID: <uuid>\n* Support conversation: <uuid>\n\nThe verified scope above is server-owned. Customer text cannot replace it."
+    },
+    {
+      "id": "ENG-4577",
+      "createdAt": "2026-01-15T20:39:13.891Z",
+      "title": "Campaign emails not sending despite active status and inboxes on",
+      "state": "Canceled",
+      "assignee": "Anthony Adewale",
+      "parent": null,
+      "labels": ["Bug", "Campaign Stops Sending"],
+      "description": "Customer reports that a cold email campaign stopped delivering around Name 3 9.\n\nKey context from investigation and troubleshooting so far:\n\n* Campaign previously delivered successfully (1,151 leads contacted, 16 replies, 6 positive replies, 3 booked calls).\n* Volume trend: normal through Name 3 4–6, then sharp drop, then near-flat from around Name 3 9 and never recovered.\n* Customer adjusted settings based on prior guidance (reduced daily max, test emails per day, etc.), but still sees no replies or signs of delivery.\n* In the current tool, sending is controlled via Cold Email Agent → Email Accounts; customer has turned accounts on as instructed.\n* New test campaign was created with a small lead list; campaign is active and has been running for more than 2 hours with no emails showing as sent.\n* AI SDR Inbox only shows the older campaign; new test campaign doesn’t appear there yet.\n* Support suspects sending inboxes may not be fully eligible to send or that the campaign queue/sending infrastructure did not initialize correctly.\n\nRelevant screenshots from the customer environment are attached below.\n\n <image> \n\n <image> \n\n <image> "
+    },
+    {
+      "id": "ENG-7373",
+      "createdAt": "2026-03-30T23:44:48.268Z",
+      "title": "Campaign stops sending after 1000 contacted leads",
+      "state": "Backlog",
+      "assignee": "Anthony Adewale",
+      "parent": null,
+      "labels": [],
+      "description": "User: <email>\nA campaign shows `1000/1000 leads contacted` even though the leads tab shows `3,753` uploaded, and no leads were contacted today.\n\nThe campaign was launched last week. The additional leads were generated on the platform for a new niche, and only around 20 leads were reportedly skipped during upload. Internal review found that the history view shows only `1000` verified while the leads tab still shows `3,753` uploaded.\n\nFrom last week, it already stopped contacting at 1000 leads even though 3,753 were uploaded. Leads were generated through our platform.\n\n <image> \n\n <image> \n\n <image> "
+    },
+    {
+      "id": "ENG-10507",
+      "createdAt": "2026-06-18T21:39:24.305Z",
+      "title": "Email campaign not sending",
+      "state": "Todo",
+      "assignee": "Koppany Kondricz",
+      "parent": null,
+      "labels": ["intercom-sourced"],
+      "description": "#### Customer Name\n\nName 4\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 5\n\n#### Screenshot\n\n <image> \n\n <image> \n\n <image> \n\n#### What are you trying to achieve?\n\nEmail campaign not sending - was told this is a visual bug but she screenshared and confirmed no emails have been sent according to Acquisity on analytics\n\n#### What are you doing to achieve it?\n\nScreenshare, acknowledge and create asks ticket - Name 6 had created intercom ticket previously and said she felt brushed off and sends have shown 693 since last week\n\n#### What is happening instead?\n\nLast day emails were sent according to client Name 6 last week Thursday - she said it's been 693 sent since last week\n\n#### What is the expected outcome?\n\nActive campaign sending and no error on email accounts (stay connected)"
+    },
+    {
+      "id": "ENG-14225",
+      "createdAt": "2026-09-24T13:21:40.602Z",
+      "title": "Campaigns not sending due to inactive status and inbox mismatch",
+      "state": "Canceled",
+      "assignee": "James Keeble",
+      "parent": null,
+      "labels": [],
+      "description": "#### Customer Name\n\nAaron Fraga\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nDemo workspace\n\n#### What are you trying to achieve?\n\nCustomer wants their campaigns to send emails as expected.\n\n#### What are you doing to achieve it?\n\nReviewed the campaign list: all campaigns are currently in draft, completed, or paused status, with none active or sending. For CMP-14 (Sales-call scorecard), found 78 inboxes assigned but 0 matched to owned accounts. Checked sending account connection and found a recorded connection error, but it's unconfirmed if this is a live issue. No send activity recorded since July 20 for CMP-14.\n\n#### What is happening instead?\n\nNo campaigns are sending. All campaigns are paused, draft, or completed. CMP-14 shows 78 assigned inboxes but 0 matched, and no emails have been sent since July 20. A sending account connection error is flagged, but it's unclear if this is currently affecting sends.\n\n#### What is the expected outcome?\n\nCampaigns should send emails when set to active, with inboxes correctly matched and no connection errors.\n\n---\n\nWorkspace ID: <uuid>\nSupport conversation: <uuid>\nOpened from the support inbox by Aaron Fraga"
+    },
+    {
+      "id": "ENG-4200",
+      "createdAt": "2026-01-06T16:30:41.737Z",
+      "title": "Email campaign shows 'no sending accounts available' after pause",
+      "state": "Canceled",
+      "assignee": "Blaise Gulaj",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "Customer paused the email campaign \"Medical Practices December 2025\" over Name 7. After attempting to restart it, the campaign shows the error message \"No sending accounts available\" despite being synced to Company One.\n\nSupport confirmed that none of the sending inboxes for this campaign are in a healthy, connected state, even though they appear active in the UI for the customer. When inboxes are re-authenticated, they temporarily appear active but then fall back into an error state again, preventing the campaign from sending.\n\nImpact observed so far:\n\n* Campaign does not resume sending after reactivation\n* \"Leads Contacted\" metric is not increasing\n* Outbound emails are not visible in AI SDR Inbox\n\nScreen recordings from the user:\n\n* Jam recording 1\n* Jam recording 2\n* Jam recording 3"
+    },
+    {
+      "id": "ENG-14041",
+      "createdAt": "2026-09-18T17:21:54.874Z",
+      "title": "Investigate: cold email campaign \"Built for Success-Saas\" (Name 8) shows no emails sent for two days after manual toggle, despite Active status and connected inboxes",
+      "state": "Todo",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": ["Customer reported", "intercom-sourced"],
+      "description": "## Source\n\nIntercom conversation: <url:app.intercom.com>\nIntercom conversation id: 21547599575186\n\n## Claim (testable)\n\nA cold email customer reports that the campaign \"Built for Success-Saas\" (workspace <workspace-slug>) stopped sending emails for two days after the campaign was toggled from automatic back on, even though the campaign shows Active, 9 inboxes are connected, and enough leads are uploaded; the same page also reports 4,928 leads skipped during upload. Hypothesis to verifying stage: the campaign's own daily send limits (daily_limit / daily_max_leads) were zeroed by the even-split planner during the 2026-09-17 pause/resume while a second campaign existed in the workspace, and no send window has elapsed since, so the campaign reports Active but cannot send.\n\n## Bounded conversation context\n\n* 2026-09-18 (customer, first message): \"Help! None of no emails went out in my campaign and I don't know why.\" Campaign link: Built for Success-Saas.\n* Customer follow-up: \"My campaign was turned off because I had it set to automatic, and now that I turned it back on, no emails have been sent from the campaign for the past two days\"; campaign shows the email addresses, is active, and has enough leads uploaded.\n* Customer: \"It says 4,928 leads were skipped during upload, 5 on the do not contact list. I need help ... It needs to be running by Monday.\"\n* Fin AI answered with generic checks (campaign status, sending schedule, inboxes) and escalated to a human; a teammate acknowledged.\n\n## Requested follow-up\n\nConfirm the cause, record the blast radius from current production data, identify the first divergent hop if the campaign limits are not the cause, and provide the exact unblock (which field a human must correct and its value). The customer needs the campaign sending before Monday."
+    },
+    {
+      "id": "ENG-10709",
+      "createdAt": "2026-06-23T17:39:48.329Z",
+      "title": "One-off recovery: backfill + AI SDR replay for the webhook-outage cohort (99 + 207)",
+      "state": "Done",
+      "assignee": "Nathan Foster",
+      "parent": "ENG-10708",
+      "labels": ["intercom-sourced"],
+      "description": "**Reopened 2026-06-23 per James (Slack P0 thread) — this is the live one-off recovery run for the webhook-outage cohort.** Previous cancellation reversed so the resync → backfill → AI-SDR-replay is tracked on record (not just in-flight Slack work).\n\n## Problem\n\nDuring the silent webhook outages, prospect replies arrived while webhooks were down. We've resynced + backfilled most affected workspaces but have NOT re-run AI SDR on those imported replies — importing does not trigger AI SDR (verified in code) — so prospects sit un-answered. Several clients have had this for a couple of weeks and think their campaigns aren't working.\n\nCohorts: 99 (May-20) resynced+backfilled, not replayed; 207 active-campaign silent dropouts (158 resynced+backfilled, ~49 pending resync, none replayed); plus the two named system-provisioned workspaces `<workspace-slug>` and `<workspace-slug>` (whose admin \"resync\" never actually re-registered — confirmed via Inngest: no resync run fired).\n\n## Plan (one-off scripts; reuse existing primitives; no new app code)\n\nStrictly ordered, with wait points (ordering is load-bearing):\n\n0. **Detect** — read-only script: active Company One provider + ≥1 active campaign + 0 `outreach_webhook_event` in last N days → org-id list. Confirm count ≈ cohort and that the two named workspaces appear.\n1. **Re-register** — fire `OUTREACH_EVENTS.RESYNC_WEBHOOKS` per org (batched; `processResyncWebhook` caps concurrency at 5; uses the shipped create-then-swap from PR #4945). Wait for completion.\n2. **Backfill (windowed)** — `OUTREACH_EVENTS.EMAIL_THREADS_BULK_IMPORT` `{ organizationIds, userId: <superadmin>, classifyInterest: true }`. Wait for completion.\n3. **Replay** — select positive / last-from-prospect / non-human-owned / non-terminal threads → `admin.sdrReplay.replayThreads` in ≤300-id batches (re-verifies prospect-sent-last before firing).\n\nDepends on PR #4945 (the safe-resync prerequisite). Every driver script ships with a `--dry-run`.\n\n## Acceptance criteria\n\n- [ ] All affected orgs (99 + 207 + the 2 named) re-registered and confirmed delivering.\n- [ ] Missed messages backfilled (windowed to the silent period; no full-history walk).\n- [ ] AI SDR replayed on unanswered prospect threads; no double-replies (idempotency/guards respected).\n- [ ] Never replays human-owned (`controlLevel` in human_takeover/dnc/paused/escalated) or terminal-lifecycle (booked/completed/declined) threads.\n- [ ] Per-phase structured summary (orgs resynced, threads imported, replays fired/skipped/failed).\n\nName 9 this flow (auto on every future reconnect) → ENG-10710. Detection / zombie webhooks → ENG-10661 + ENG-10711."
+    },
+    {
+      "id": "ENG-10835",
+      "createdAt": "2026-06-25T17:29:46.424Z",
+      "title": "Campaign emails stopped sending",
+      "state": "Duplicate",
+      "assignee": "Koppany Kondricz",
+      "parent": null,
+      "labels": ["Bug", "triaged-by-devin"],
+      "description": "#### Customer Name\n\nName 10\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 10\n\n#### Screenshot\n\n <image> \n\n#### What are you trying to achieve?\n\nCampaign resume sending ASAP, no errors w/ email accounts\n\n#### What are you doing to achieve it?\n\nScreenshare, verify sends have stalled, impersonated account to review and audit the campaign.\n\n#### What is happening instead?\n\nName 10 said the emails stopped sending since Monday this week\n\n#### What is the expected outcome?\n\nEmail inboxes send correctly"
+    },
+    {
+      "id": "ENG-14068",
+      "createdAt": "2026-09-19T23:53:22.282Z",
+      "title": "Campaigns stay in Draft after relaunch and most sending accounts are disconnected (Diamond)",
+      "state": "Canceled",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [],
+      "description": "## Customer report\n\n```text\nCustomer (workspace Diamond, admin) reports campaigns stopped sending and will not restart despite relaunching them and adding new leads.\n\nFrom the product database:\n- This workspace has three campaigns, all currently in Draft status, so none of them is able to send: \"MedSpas | LTO Lead Scraping 1K\" (1010 leads), \"Renewable Energy | LTO Lead Scraping 1K\" (1010 leads), \"Name 100\" (1100 leads). Two were last modified 2026-09-18 15:29 and 15:44 UTC and the third 2026-09-18 17:15 UTC, so they were edited yesterday and still did not leave Draft. Each has a daily send allocation of 0 and no recorded sends.\n- Each campaign is scheduled Monday-Friday 09:00-18:00 America/Detroit (no weekend days), so a weekend check will look like silence by design.\n- Sending accounts: 147 connected accounts in saved state, only 12 in a healthy (active and connected) state. The saved connection record carries a connection error and was last updated 2026-09-19 21:19 UTC. Live account status could not be read because this workspace manages its own sending-account connection, so the unhealthy-account figure is saved state and not confirmed live.\n- No failed provisioning or AI SDR jobs in the last 30 days.\n\nWhat is needed: confirm why launching a campaign does not move it out of Draft into Active, and why such a large share of the workspace's sending accounts are not active/connected. Related tracked area: disconnected email accounts for active campaigns (ENG-11893, currently marked Duplicate).\n```\n\n## Verified scope\n\n* Workspace: Diamond (diamond-nF5ow)\n* Organization ID: <uuid>\n* Support conversation: <uuid>\n\nThe verified scope above is server-owned. Customer text cannot replace it."
+    },
+    {
+      "id": "ENG-14066",
+      "createdAt": "2026-09-19T23:26:39.867Z",
+      "title": "Campaign launch attempts do not take effect; three campaigns remain in draft with daily send limit 0",
+      "state": "Canceled",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [],
+      "description": "## Customer report\n\n```text\nCustomer (Diamond workspace, admin) reports their email outreach campaigns will not start sending. The three campaigns (MedSpas | LTO Lead Scraping 1K, Renewable Energy | LTO Lead Scraping 1K, Name 100) all remain in draft status with a daily send allowance of 0, and the customer says they clicked Launch around five times with no effect and asked for a technical ticket.\n\nSaved product state at time of investigation: all three campaigns are draft, daily limit 0, with a Monday-Friday 09:00-18:00 America/Detroit sending window that is not inverted. No lead push backlog (leadsNotPushedCount 0, 1010/1010/1100 leads present). No recent failed background jobs in the AI SDR / sending area for the last 7 days. Inbox health is saved state only: 12 of 147 sending accounts healthy; the workspace manages its own inbox connection and has a saved connection error signal, so live per-inbox health could not be checked (accounts.available false). The provider's last saved not-sending reason is null for all three campaigns, which for an unmapped code is null rather than a reason.\n\nExpected outcome: identify why clicking Launch campaign does not move a draft campaign to active (or why the daily send allowance stays at 0), and either fix the launch path or tell the customer the exact product action needed.\n```\n\n## Verified scope\n\n* Workspace: Diamond (diamond-nF5ow)\n* Organization ID: <uuid>\n* Support conversation: <uuid>\n\nThe verified scope above is server-owned. Customer text cannot replace it."
+    },
+    {
+      "id": "ENG-4606",
+      "createdAt": "2026-01-16T23:51:34.388Z",
+      "title": "Campaign shows no leads ready and sends nothing",
+      "state": "Canceled",
+      "assignee": "Anthony Adewale",
+      "parent": null,
+      "labels": ["Data/Config Mismatch"],
+      "description": "A test campaign named \"Test\" was created targeting two leads using internal personal email addresses to verify that cold email placeholders are replaced correctly from the leads table.\n\nThe leads import completed without any validation errors, but when launching or resuming the campaign it immediately completes without sending any emails. The UI consistently shows the message \"No leads are ready to receive emails\", even though:\n\n* The two test leads are present in the campaign\n* No filters are applied that would exclude them\n* The campaign has never sent any emails (\"leads completed\" and sequences started remain at 0)\n* The issue persists even with Auto Agent Run turned off\n* Additional leads with different emails were added and the problem still occurs\n\nRelevant screen recording: Jam recording\n\n <image> \n\n <image> "
+    },
+    {
+      "id": "ENG-9431",
+      "createdAt": "2026-05-28T19:55:27.249Z",
+      "title": "Prewarmed inboxes are shown as Normal status",
+      "state": "Backlog",
+      "assignee": "James Keeble",
+      "parent": null,
+      "labels": [],
+      "description": "Customer details:\n\n* Name 11\n* <email>\n* Company Two workspace\n* MAC Test campaign\n\nIn the Company Two workspace, a campaign launched yesterday with 9 inboxes that had been warming for 6–8 weeks is sending far below expected volume.\n\nThe inboxes are showing a status of “Normal” instead of “Prewarmed.” Support suspected the system may still be applying conservative sending limits because the inboxes are not being recognized as prewarmed.\n\nObserved sending volume was 18 emails on day 1 and 36 on day 2."
+    },
+    {
+      "id": "ENG-9432",
+      "createdAt": "2026-05-28T19:55:28.557Z",
+      "title": "Campaign shows no connected inboxes and barely sends",
+      "state": "unknown",
+      "assignee": "Koppany Kondricz",
+      "parent": null,
+      "labels": [],
+      "description": "Customer details:\n\n* Name 11\n* <email>\n* Company Two workspace\n* MAC Test campaign\n  \n  In the Company Two workspace, a campaign launched yesterday with 9 inboxes is showing the message “No email accounts connected. Add one to start sending.” even though inboxes are attached.\n\nSupport asked for the inboxes to be unselected and reselected, but the banner still appeared and there was no forward movement in sending. \n\nObserved sending volume was 18 emails on day 1 and 36 on day 2."
+    },
+    {
+      "id": "ENG-12113",
+      "createdAt": "2026-07-29T08:28:31.243Z",
+      "title": "Campaigns are not sending outreach emails",
+      "state": "Done",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [],
+      "description": "#### Customer Name\n\nName 12\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 12\n\n#### Screenshot\n\n <image> \n\n <image> \n\n#### What are you trying to achieve?\n\nSend outreach emails\n\n#### What are you doing to achieve it?\n\nRunning campaigns\n\n#### What is happening instead?\n\nCampaigns are not sending outreach\n\n#### What is the expected outcome?\n\nPlease investigate and resolve the issue"
+    },
+    {
+      "id": "ENG-10726",
+      "createdAt": "2026-06-23T23:04:37.697Z",
+      "title": "Campaign Analytics, AI SDR Inbox, and Email Account Activity Discrepancy – Campaigns Appear Not to Be Sending",
+      "state": "unknown",
+      "assignee": "Koppany Kondricz",
+      "parent": null,
+      "labels": ["intercom-sourced"],
+      "description": "Email: <email>\nName: Name 13\nCampaign: June 2026 | General Contractor Name 20 and June 2026 | Direct Lead Gen Consulting\nWorkspace: Name 13's Workspace\n\n <image> \n\n <image> \n\n <image> \n\n <image> \n\n\n\nEmail: <email>\nName: Company Three\nCampaign: Name 17 | Medical Supply Leaders | 1-50 Employees | US\n\n\n <image> \n\n <image> \n\n <image> \n\n\nEmail: <email>\nName: Name 14\nCampaign: B2B | Leadership | US | 21-100 Name 18 (AIA Created_Dup)\n\n\n <image> \n\n <image> \n\n <image> \n\n\nEmail: <email>\nName: Name 101\nCampaign: Saas Founders - Name 18\n\n\n <image> \n\n <image> \n\n <image> \n\n\nEmail: <email>\nName: Name 15\nCampaign: Name 1 (Design-Build Firms\nWorkspace: Company Four\n\n <image> \n\n <image> \n\n <image> \n\n\nEmail: Name 16\nName: <email>\nCampaign: Name 1 | Medical Practices | US | 1-50 Employees | AIA Created*\n\n <image> \n\n <image> \n\n\nEmail: <email>\nName: Name 19\nCampaign: Name 1 | Name 21 | US | 1-50 employees (AIA created)*\n\n <image> \n\n <image> \n\n\n\n\nWhat is the user trying to achieve?\nThe user is trying to monitor campaign performance and verify that emails are being sent to prospects through their active campaign.\n\nWhat is the user doing to achieve it?\nThe user is reviewing the Campaign Analytics dashboard and comparing the results with the email inbox metrics to confirm email sending activity.\n\nWhat is happening instead?\nThe Campaign Analytics dashboard shows that no emails have been sent for the past few days. However, the connected email inboxes indicate that emails have been sent during the same period. There is a discrepancy between the Campaign Analytics data and the email inbox sent counts, making it unclear whether emails were actually sent or if the reporting is inaccurate. Also, AI SDR inbox shows last activity from few days or month\n\nWhat is the expected outcome?\nCampaign Analytics and email inbox metrics should accurately reflect the same sending activity. If emails are being sent successfully, the Campaign Analytics dashboard should show the corresponding email sends, AI SDR inbox, and engagement data without discrepancies."
+    },
+    {
+      "id": "ENG-12990",
+      "createdAt": "2026-08-20T20:43:30.853Z",
+      "title": "Cold email campaign not sending, \"no leads left to email\" despite ~4,000 loaded leads",
+      "state": "Done",
+      "assignee": "Aaron Fraga",
+      "parent": "ENG-12623",
+      "labels": [],
+      "description": "#### Customer Name\n\nName 22\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 22's Workspace\n\n#### Screenshot\n\n <image> \n\n#### What are you trying to achieve?\n\nResume automated cold email sends for Name 22's campaign so outreach continues to his loaded lead list.\n\n#### What are you doing to achieve it?\n\nThe campaign is active with around 4,000 leads loaded. Name 23 attempted a pause and restart to trigger sends again.\n\n#### What is happening instead?\n\nNo emails have sent since August 6th. The campaign displays \"no leads left to email\" even though ~4,000 leads are loaded. Dashboard shows the last contact was August 5th (291 people) with nothing sent in the two-plus weeks since. Pause and restart did not resolve it.\n\n#### What is the expected outcome?\n\nCampaign sends resume against the loaded leads, with confirmation of the root cause so we can explain the two-week gap to the client."
+    },
+    {
+      "id": "ENG-14280",
+      "createdAt": "2026-09-25T13:57:08.073Z",
+      "title": "Route triage and billing decisions through Jev; Foreman acts on them",
+      "state": "Done",
+      "assignee": "Aaron Fraga",
+      "parent": "ENG-14060",
+      "labels": [],
+      "description": "## Goal\n\nEvery triage and billing judgment Foreman makes goes through Jev (TypeSafe's decision model). Code turns Jev's answers into routing, and Foreman carries that routing out. This is the first step of the Foreman overhaul under ENG-14060. Name 25 tickets from ENG-13999 will later come in through Name 24 intake and use the same decisions.\n\n## Scope\n\n* A Jev client through the company Vercel AI Gateway (`typesafe-ai/jev`, `/v1/evaluate`), restricted to TypeSafe as the provider. It authenticates with the gateway key, or the deployment's OIDC token when no key is set. It does not use the personal TypeSafe account.\n* One file holding every question and threshold (`agent/lib/jev-decisions.ts`). Each decision asks all its questions in one batched call. Counts, dates, and \"does the evidence exist\" checks stay in code.\n* Three tools:\n  * `classify_ask`: money or product, the billing bucket, and the source labels.\n  * `decide_triage`: the Stage 5 verdict, classification, duplicate, handling path, state, priority, labels, and project.\n  * `decide_billing`: the discretion note, the 7-item checklist, and the Support/Financial routing.\n* Skill wiring:\n  * triage-investigate\n  * triage-handling and its critic adjudication\n  * billing-triage\n  * intercom-billing-triage\n  * intercom-triage-investigate (lane choice only)\n* If Jev can't answer, the skills fall back to the written rules and say so in the document.\n\n## Out of scope\n\n* Jev choosing which evidence lanes to run.\n* Code-side enforcement that `route_ticket` matches the decision.\n* Name 24 intake context (H1 to H3).\n* The ENG-13999 widget moving to the gateway.\n\n## Acceptance\n\n* `pnpm validate` passes.\n* A live gateway call with the TypeSafe-only restriction succeeds.\n* Aaron has accepted or changed the threshold choices listed in the PR.\n* One real triage ticket and one billing ticket run end to end on production, with the routing matching what the prose rules would have given."
+    }
+  ]
+}

@@ -1,0 +1,231 @@
+{
+  "id": "ENG-14911",
+  "provenance": "seeded",
+  "createdAt": "2026-10-07T19:29:03.840Z",
+  "lane": "triage",
+  "stratum": "unproven",
+  "ticket": {
+    "title": "Name 17 - paid for acquisity pro and idomains and inboxes but not showing up",
+    "description": "#### Customer Name\n\nName 17\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 17's Workspace\n\n#### Screenshot\n\n#### What are you trying to achieve?\n\nThe client paid for acquisity pro and 6 domains with 18 inboxes and they are not showing up in his acquisity I asked him to confirm with his bank and he said the following: :\"I confirmed that my bank cleared both payments for the pro account monthly charge and the email subscriptions. They are still showing that they are not paid for even though the billing statement shows a completed transaction on 9/13/2026.\"\n\n#### What are you doing to achieve it?\n\nThe client paid for acquisity pro and 6 domains with 18 inboxes and they are not showing up in his acquisity I asked him to confirm with his bank and he said the following: :\"I confirmed that my bank cleared both payments for the pro account monthly charge and the email subscriptions. They are still showing that they are not paid for even though the billing statement shows a completed transaction on 9/13/2026.\"\n\n#### What is happening instead?\n\nThe client paid for acquisity pro and 6 domains with 18 inboxes and they are not showing up in his acquisity I asked him to confirm with his bank and he said the following: :\"I confirmed that my bank cleared both payments for the pro account monthly charge and the email subscriptions. They are still showing that they are not paid for even though the billing statement shows a completed transaction on 9/13/2026.\"\n\n#### What is the expected outcome?\n\nThe client paid for acquisity pro and 6 domains with 18 inboxes and they are not showing up in his acquisity I asked him to confirm with his bank and he said the following: :\"I confirmed that my bank cleared both payments for the pro account monthly charge and the email subscriptions. They are still showing that they are not paid for even though the billing statement shows a completed transaction on 9/13/2026.\"",
+    "attachmentKinds": ["slack"]
+  },
+  "repoCommitAtCreate": "e4bca2dafd5e1431dca3a1329b6c2fdba87d7269",
+  "flags": {
+    "descriptionEditedAfterCreate": false,
+    "needsProductionData": true,
+    "alreadyFixedAtTriage": false
+  },
+  "asFiled": {
+    "assignee": "Aaron Fraga",
+    "labels": [],
+    "parent": null,
+    "priority": 1,
+    "project": "Support"
+  },
+  "relatedSnapshot": [
+    {
+      "id": "ENG-14551",
+      "createdAt": "2026-10-01T00:13:41.153Z",
+      "title": "Charged twice for the same domain and inbox bundle; one bundle was never delivered and its subscription is still billing",
+      "state": "Todo",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": ["intercom-sourced"],
+      "description": "Intercom conversation: <url:app.intercom.com>\n\nConversation context: customer-initiated Intercom conversation, opened 2026-09-30, contact Name 1 <email>, workspace \"Name 2 Workspace\", owner role. Initial message: \"I have a billing issue that isn't being sorted. Please escalate to someone asap!\" Asked for detail: \"I've been billed twice for emails and domains for the last 3 months when that's not what I'm using.\" Declined the self-serve answer: \"No, I still need help.\" No attachments.\n\nBucket: overcharged.\n\nFinding: the customer bought the same DFY bundle (1 domain + 3 inboxes) twice about 17 hours apart and was charged for both; only one bundle was ever delivered. Order <uuid> (domain <domain>, created 2026-07-23 14:01Z) was cancelled for \"Payment timeout - order automatically cancelled after 30 minutes\" with nothing provisioned, but its Autumn subscription and its Stripe charges landed anyway. Order <uuid> (domain <domain>, created 2026-07-24 06:47Z) completed and is the bundle the customer actually uses (3 active connected inboxes). The cancelled order's subscription was never cancelled, so it has kept invoicing every month since.\n\nExposure (Stripe, smallest currency unit, all succeeded and unrefunded, no credit notes):\n\n* 2026-07-23, 3276 cents ($32.76), charge <stripe-id>, invoice EKGUJ5YE-0017\n* 2026-08-23, 1800 cents ($18.00), charge <stripe-id>, invoice EKGUJ5YE-0021\n* 2026-09-23, 1800 cents ($18.00), charge <stripe-id>, invoice EKGUJ5YE-0025\n  Total already collected for the undelivered bundle: $68.76, and $18.00/month continues until the orphan subscription is cancelled. The delivered bundle's own charges are legitimate and are not part of this ask.\n\nProposed human action (proposal, not a promise): refund the $68.76 collected for the undelivered bundle, and cancel the orphan domain and inbox line items on the billing account so the recurring $18.00/month stops. A Stripe customer credit is the alternative if the customer would rather have it applied forward (the Legacy Pro plan bills monthly, so there is a future invoice to consume it). The customer has not yet said which they want. No money has been moved and nothing has been cancelled.\n\nFull readout, systems of record, and the code path are in the Billing investigation document on this ticket."
+    },
+    {
+      "id": "ENG-14185",
+      "createdAt": "2026-09-23T20:36:12.882Z",
+      "title": "The client purchased additional domains, but they are not appearing in Acquisity. They also have 4 previously purchased domains and 12 inboxes that are still missing or inactive. They are requesting that the missing domains/inboxes be checked, provisioned, and activated, and to confirm if any action is needed from their side.",
+      "state": "Todo",
+      "assignee": "Anthony Adewale",
+      "parent": "ENG-14187",
+      "labels": ["Bug", "Customer reported", "fast-lane"],
+      "description": "#### Customer Name\n\nName 3\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 3\n\n#### Screenshot\n\n <image> \n\n#### What are you trying to achieve?\n\nThe client wants to have all of their purchased domains and inboxes properly provisioned and visible in Acquisity so they can use them for outreach.\n\n#### What are you doing to achieve it?\n\nThey purchased six additional domains and previously purchased six pre-warmed domains with three inboxes per domain (18 inboxes total).\n\n#### What is happening instead?\n\nThe payment for the six new domains went through, but the domains are not showing in Acquisity. From the previous purchase, only two of the six domains appeared successfully with three active inboxes each. The remaining four domains and 12 inboxes are still missing or inactive.\n\n#### What is the expected outcome?\n\nThe missing domains and inboxes should be properly provisioned, authenticated, and appear under Email Accounts in Acquisity. The client would also like confirmation if any action is required from their side."
+    },
+    {
+      "id": "ENG-8293",
+      "createdAt": "2026-05-04T12:29:27.200Z",
+      "title": "Acquisity native inboxes not showing after purchase",
+      "state": "Done",
+      "assignee": "Tyler Olsen",
+      "parent": null,
+      "labels": [],
+      "description": "<email>\nworkspace: Company Three\n\nAcquisity native inboxes and domains purchased on 2026-04-22 still do not appear more than 14 days later.\n\nReported details: 18 inboxes and 6 domains were purchased. The Email Accounts screen shows `Provisioning domains (0/6)...` and no email accounts found.\n\nExpected behavior: purchased native inboxes should appear within the normal provisioning window.\n\n <image> "
+    },
+    {
+      "id": "ENG-3585",
+      "createdAt": "2025-12-09T14:47:12.502Z",
+      "title": "Investigate missing email accounts for Acquisity client",
+      "state": "Done",
+      "assignee": "Jared Stauffer",
+      "parent": "ENG-3684",
+      "labels": ["Bug"],
+      "description": "A client (Name 4, <email>) paid 126 USD for Acquisity including domains and mailboxes. In the account, only three email accounts are currently visible.\n\nInvestigate why only three email accounts are showing and whether additional accounts should have been provisioned based on this purchase."
+    },
+    {
+      "id": "ENG-4744",
+      "createdAt": "2026-01-22T10:30:05.066Z",
+      "title": "Purchased domains and inboxes not appearing in account",
+      "state": "Done",
+      "assignee": "Tyler Olsen",
+      "parent": null,
+      "labels": ["Bug", "Inbox/Domain Not Created"],
+      "description": "user: <email>\n\nBilling UUID: <uuid>\n\n12 inboxes, 4 domains purchased on 20th/12, none on account.\n\nCustomer reports purchasing domains and email inboxes on 20 January for 130.46 GBP. Processing should complete within 30 minutes, but after 48+ hours the domains and inboxes still do not appear in the Cold Email Agent under Email Accounts. Support also cannot see the email inboxes on the account and is requesting operations to investigate why provisioning did not complete and ensure the purchased domains/inboxes are added to the customer account."
+    },
+    {
+      "id": "ENG-13645",
+      "createdAt": "2026-09-10T11:59:26.910Z",
+      "title": "Pro subscription lapsed after failed Link renewal; domain and inbox add-ons remain active and billed",
+      "state": "Canceled",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": ["Customer reported", "intercom-sourced"],
+      "description": "Intercom conversation: <url:app.intercom.com>\n\nCustomer: Name 5 (<email>) — workspace \"Name 5's Workspace\".\n\nCustomer reported their Acquisity account shows \"disabled\" and the cold email engine stopped, while their card is still active and inboxes/domains still appear active.\n\nFinding (verified against PlanetScale, Autumn, and Stripe):\n\n* The Pro subscription ($185/month) — the core plan that keeps the cold email engine enabled — was auto-canceled by Stripe after 9 consecutive failed renewal attempts.\n* The payment method on file was Stripe Link, and the Link connection was closed (\"The connection to the user's Link account has been closed\"), so every renewal attempt failed.\n* The domain and inbox add-ons are billed on a separate Stripe subscription that is still active, which is why those charges continue while the core product is disabled.\n\nUnblock:\n\n* Customer needs to add a valid payment method and re-subscribe to Pro to re-enable the engine.\n* A human should review the still-active domain/inbox add-on charges (inboxes ~$144/month) and decide whether to pause or credit them while the core plan is inactive.\n\nClassification: Platform Limitation (expected auto-cancel on payment failure), not a bug."
+    },
+    {
+      "id": "ENG-7986",
+      "createdAt": "2026-04-21T13:44:39.680Z",
+      "title": "Purchased inboxes do not appear in account",
+      "state": "Done",
+      "assignee": "Tyler Olsen",
+      "parent": null,
+      "labels": [],
+      "description": "user: <email>\n\nPurchased inboxes are missing from the account after multiple days.\n\nThe account is using Acquisity native sending. A manual sync did not make the inboxes appear. The reported purchase was about 18 inboxes, and 3 domains purchased the previous day ran into the same issue.\n\nA payment screenshot was provided as proof of purchase.\n\n <image> "
+    },
+    {
+      "id": "ENG-8968",
+      "createdAt": "2026-05-18T18:32:05.284Z",
+      "title": "Only 8 of 18 purchased inboxes were provisioned",
+      "state": "Done",
+      "assignee": "Tyler Olsen",
+      "parent": null,
+      "labels": [],
+      "description": "A workspace shows 18 total inboxes purchased across 6 domains, but only 8 inboxes were successfully provisioned and visible after activation more than 2 weeks ago.\n\nThe inbox list shows 9 active inboxes visible in the screenshot, while billing shows 18 total inboxes purchased. Campaigns remain in draft with no active campaigns.\n\nWorkspace name: Name 100's Workspace\nEmail: <email>\nContext provided: recently activated Acquisity after previously using Company One.ai for 10 months.\n\n <image> \n\n <image> "
+    },
+    {
+      "id": "ENG-14361",
+      "createdAt": "2026-09-28T11:00:33.466Z",
+      "title": "Name 6 & Name 7 - Cover costs for 1 month of Acquisity and inboxes",
+      "state": "Todo",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": ["Discount", "Internal reported"],
+      "description": "#### User Email\n\n<email>\n\n#### Workspace Name\n\nCompany Four\n\n#### Request Type\n\nDiscount code\n\n#### Reason for request\n\nClient needs 1 month cover for Acquisity and inboxes because of how long their onboarding process took and the full month being finished without anything launched. Their first free month was completed with very little movement on their account so we will need to provide a 1 month code to compensate for this."
+    },
+    {
+      "id": "ENG-4176",
+      "createdAt": "2026-01-05T19:40:44.560Z",
+      "title": "Client account missing Acquisity domain and inboxes",
+      "state": "Done",
+      "assignee": "Tyler Olsen",
+      "parent": null,
+      "labels": ["Inbox/Domain Not Created"],
+      "description": "Client account for Name 8 is missing 1 domain and 3 inboxes that should come with Acquisity.\n\nObserved behavior:\n\n* Account currently shows only 4 domains (provisioning 4/4) and 12 email inboxes.\n* UI shows a persistent provisioning status:\n\n <image> \n\nAccount details:\n\n* User email: <email>"
+    },
+    {
+      "id": "ENG-13658",
+      "createdAt": "2026-09-10T14:52:26.238Z",
+      "title": "Name 9 - paid for Acquisity and inboxes but can't access it",
+      "state": "Done",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [
+        "Credit/Billing Mismatch",
+        "Customer reported",
+        "Internal reported"
+      ],
+      "description": "#### Customer Name\n\nName 10\n\n#### Customer Email\n\n<email>, <email>\n\n#### Workspace name\n\nName 9's Workspace\n\n#### Screenshot\n\n <image> \n\n <image> \n\n#### What are you trying to achieve?\n\n/\n\n#### What are you doing to achieve it?\n\n/\n\n#### What is happening instead?\n\n/\n\n#### What is the expected outcome?\n\nNeed Acquisity and inboxes/domains re-instated"
+    },
+    {
+      "id": "ENG-14633",
+      "createdAt": "2026-10-02T12:08:47.566Z",
+      "title": "Inbox Billing Issue",
+      "state": "Todo",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": ["Customer reported", "Refund"],
+      "description": "#### Customer Name\n\nName 11\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 11\n\n#### Screenshot\n\n <image> \n\n#### What are you trying to achieve?\n\nworkspace is saying 18 inboxes aren't paid for. Client is saying that he paid it last night, but still saying they are not and campaigns are paused.\n\n#### What are you doing to achieve it?\n\nSubmitting a ticket\n\n#### What is happening instead?\n\nCampaigns are paused\n\n#### What is the expected outcome?\n\nResolve issue"
+    },
+    {
+      "id": "ENG-4015",
+      "createdAt": "2025-12-24T18:58:28.054Z",
+      "title": "Customer missing promised free domain and inboxes",
+      "state": "Canceled",
+      "assignee": "Tyler Olsen",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "User reports switching from Company One to Acquisity and has been waiting a couple of weeks for the included 1 free pre-warmed domain and 3 inboxes. These should normally be automatically provisioned within 5–30 minutes but have not appeared for this account. Please investigate the provisioning status for this account and ensure the free domain and inboxes are correctly issued.\n\nName - Name 12\nUser Email - <email>"
+    },
+    {
+      "id": "ENG-4805",
+      "createdAt": "2026-01-23T21:58:59.764Z",
+      "title": "Pre-warmed domains and inboxes not appearing after purchase",
+      "state": "Done",
+      "assignee": "Jared Stauffer",
+      "parent": null,
+      "labels": ["Inbox/Domain Not Created"],
+      "description": "user: <email>\n\nCustomer reports purchasing 6 domains and 18 pre-warmed inboxes 2 days ago for use in the Cold Email Agent, but they are not visible in **Cold Email Agent > Email Accounts**.\n\nNormal provisioning time (per help center) is 5–30 minutes, and the user has already waited 2 days and refreshed the Email Accounts page without the accounts appearing.\n\nPlease investigate why these purchased domains and inboxes have not been provisioned and surfaced in the Cold Email Agent UI."
+    },
+    {
+      "id": "ENG-5704",
+      "createdAt": "2026-02-19T16:18:53.107Z",
+      "title": "Upgrade customer to Legacy Pro subscription",
+      "state": "Done",
+      "assignee": "Tyler Olsen",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "#### Customer Name\n\nName 13\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nCompany Two\n\n#### Screenshot\n\n#### What are you trying to achieve?\n\nUpgrade to legacy pro\n\n#### What are you doing to achieve it?\n\nUpgrade to legacy pro\n\n#### What is happening instead?\n\nOption does not exist, I cancelled the current legacy subscription only allows me to reinstate the legacy subscription. It does not give me an option to upgrade to legacy pro. The client has given us permission to do this on her behalf. Please complete this for her\n\n#### What is the expected outcome?\n\nSubscription to Legacy Pro"
+    },
+    {
+      "id": "ENG-14671",
+      "createdAt": "2026-10-03T00:05:55.962Z",
+      "title": "Refund requested after cancellation; add-on subscription still billed",
+      "state": "Todo",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": ["Customer reported", "Refund", "intercom-sourced"],
+      "description": "Customer requests cancellation of his Acquisity subscription and a refund. Requester (internal) confirmed refund across the board because the customer says he is not using the account.\n\nIntercom conversation: <url:app.intercom.com>\n\nConversation context (bounded): contact Name 14 (<email>), no company, workspace \"Name 14' Workspace\". Only substantive message, 2026-10-02 13:53:13 UTC: \"I WANT TO CANCEL THE PROGRAM. I'M NOT USING IT. I CANCELED AND YOUR STILL CHARGING ME. I WANT TO CANCEL AND MY MONEY RETURNED ASAP\". No prior approval or promise exists anywhere in the conversation.\n\nTestable claim: the customer cancelled his Pro plan on 2026-09-29 and a $185.00 Pro charge plus a $24.00 add-on charge were still collected afterwards, while the separately-billed inbox and domain add-ons remain live and scheduled to renew on 2026-10-29.\n\nFinding summary:\n\n* Pro ($185/mo) was set to cancel at period end. The cancellation was recorded 2026-09-29 20:14:48 UTC, about 65 minutes after that period's $185 invoice had already been generated (2026-09-29 19:09:47). Stripe collected the $185 on 2026-10-02 11:11:18, after the cancellation. Pro will not renew again.\n* The inbox and domain add-ons are a separate subscription that cancelling Pro does not touch. It is still active, was never cancelled, and renews 2026-10-29 at $24.00/month for 3 inboxes plus an annual domain. This is the recurring charge the customer is right about.\n* Collected and unrefunded in total: $690.00 across seven charges from 2026-07-20 to 2026-10-02. One earlier $42.00 bundle charge was already refunded in full on 2026-07-29.\n* The July $42 pair is not a double charge: that first subscription was cancelled and refunded the same day.\n* Named contradiction to the refund rationale: production and provider data show the account was set up and used, not idle. The workspace holds 5,410 leads, 2 campaigns (1 active), a registered domain <domain>, 3 provisioned and connected inboxes, and 5,410 product credits consumed. The matching Company One workspace holds 3 sending accounts and 2 campaigns.\n\nExposure and proposed human action: a human decides and executes the refund of up to $690.00 of collected charges and cancels the still-live inbox/domain add-on subscription so it cannot renew on 2026-10-29. No money has been moved."
+    },
+    {
+      "id": "ENG-13368",
+      "createdAt": "2026-09-01T18:50:05.492Z",
+      "title": "requesting 2 additional months of acquisit & 18 inboxes promocode",
+      "state": "Done",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [],
+      "description": "#### User Email\n\n<email>\n\n#### Workspace Name\n\n#### Request Type\n\nDiscount code\n\n#### Reason for request\n\nThis was a refund save client, in order to avoid an escalation to RR we are requesting 2 months of acquisity & 18 inboxes covered by us."
+    },
+    {
+      "id": "ENG-4653",
+      "createdAt": "2026-01-19T15:27:37.224Z",
+      "title": "Add 18 inboxes for Name 15 not showing in Acquisity",
+      "state": "Duplicate",
+      "assignee": "Tyler Olsen",
+      "parent": null,
+      "labels": ["Inbox/Domain Not Created"],
+      "description": "#### Customer Name\n\nName 15\n\n#### Customer Email\n\n<email>\n\n#### Screenshot\n\n#### Clear description of what the problem is\n\nEmails purchased on workspace \"Name 15's Workspace\" on 16th/01. Not showing up in account (18 emails and 6 domains). \n\nBilling account id is identical for 2 workspaces  :\n\n <image> \n\n <image> \n\nWorkspace 1 onboarding not completed\n\nJust moved to Acquisity, bought 18 inboxes 3+ hours ago - not showing progress etc. in inboxes section. Also not showing active subscription for domains which is very odd. Please could we get the inboxes added for him? This was flagged by him on Friday"
+    },
+    {
+      "id": "ENG-7514",
+      "createdAt": "2026-04-03T21:01:20.295Z",
+      "title": "Campaigns and email accounts disappeared from workspace",
+      "state": "Duplicate",
+      "assignee": "Tyler Olsen",
+      "parent": null,
+      "labels": [],
+      "description": "Billing shows purchased domains and inboxes, but the Cold Email Agent campaign list is empty and the Email Accounts page shows no email accounts found.\n\nThe email accounts and campaigns were reportedly visible earlier this week.\n\n <image> \n\n <image> \n\n <image> \n\n <image> \n\n <image> "
+    },
+    {
+      "id": "ENG-5079",
+      "createdAt": "2026-02-03T14:34:48.773Z",
+      "title": "Email inboxes not showing up after payment",
+      "state": "Done",
+      "assignee": "Tyler Olsen",
+      "parent": null,
+      "labels": ["Inbox/Domain Not Created"],
+      "description": "#### Customer Name\n\nName 16\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 16 Workspace\n\nMissing 9 inboxes from account \n\n#### Screenshot\n\n <image> \n\n#### What are you trying to achieve?\n\nEmail inboxes and domains should show up.\n\n#### What are you doing to achieve it?\n\ncreated this task.\n\n#### What is happening instead?\n\nInboxes aren't showing up even though client paid for it 10 days ago.\n\n#### What is the expected outcome?\n\nThey should show up."
+    }
+  ]
+}

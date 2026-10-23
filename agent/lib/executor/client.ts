@@ -3,6 +3,11 @@ import {
   LINEAR_OPERATIONS,
   type LinearOperation,
 } from "../linear-operations.js";
+import {
+  recordReplayEvidenceMiss,
+  replayProviderClient,
+} from "../triage-replay/client.js";
+import { isTriageReplay } from "../triage-replay/mode.js";
 import { isQuestionsOnly } from "../trust.js";
 import { operationPath } from "./bindings.js";
 import type { ExecutorOutcome } from "./dispatch.js";
@@ -35,6 +40,9 @@ function assertLinearWriteAllowed(ctx: ProviderContext, operation: string) {
 
 /** Typed arguments cross one transport boundary; no simulated provider HTTP request. */
 export function executorClient(ctx: ProviderContext): ProviderClient {
+  if (isTriageReplay()) {
+    return replayProviderClient(ctx.session?.auth.initiator);
+  }
   return async (request, options = {}) => {
     assertLinearWriteAllowed(ctx, request.operation);
     const path = operationPath(request.operation);
@@ -119,6 +127,15 @@ export async function executorReadQuery(
   ctx: ProviderContext,
   args: Record<string, unknown>
 ): Promise<string> {
+  if (isTriageReplay()) {
+    await recordReplayEvidenceMiss(
+      ctx.session?.auth.initiator,
+      "planetscale.readQuery"
+    );
+    throw new ExecutorError("replay_evidence_unavailable", 503, {
+      dispatched: false,
+    });
+  }
   const path = operationPath("planetscale.readQuery");
   const input = operationInputs["planetscale.readQuery"].parse(args);
   const outcome = await invokeProvider(ctx, path, input);

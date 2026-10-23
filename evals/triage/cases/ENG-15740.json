@@ -1,0 +1,237 @@
+{
+  "id": "ENG-15740",
+  "provenance": "seeded",
+  "createdAt": "2026-10-19T18:05:15.887Z",
+  "lane": "triage",
+  "stratum": "user_error",
+  "ticket": {
+    "title": "Timezone mismatch — leads’ selected times not syncing correctly to Closer's Calendar",
+    "description": "#### Customer Name\n\nName 22\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 22\n\n#### Screenshot\n\n#### What are you trying to achieve?\n\nWhen a lead selects a time to book a call, the time that appears on his closer’s calendar does not match what the lead selected. Example from the call: lead Name 23 selected 2 PM GMT, but the appointment is showing on his closer’s calendar as 7 AM GMT — a 7-hour discrepancy. Name 22 also noted at least two other leads showing times that don’t match what they originally selected (multiple leads pulling through in GMT time zones despite being targeted at the US market).\n\nName 22 is currently viewing the CRM in Pacific Time and is uncertain whether the display issue is on his end or his closer’s calendar end — but the core problem is that whatever time the AI SDR is offering leads is not translating correctly when the appointment lands on his closer’s calendar.\n\nSuspected impact: Potential contributor to no-shows if his closer and the lead are expecting the call at different times.\n\n#### What are you doing to achieve it?\n\nSubmitting this ticket\n\n#### What is happening instead?\n\nPotential no shows due to time discrepancy\n\n#### What is the expected outcome?\n\nResolve",
+    "attachmentKinds": ["slack"]
+  },
+  "repoCommitAtCreate": "9f5a76c22d59a315ec9b27aab73a2f8e2d7b1d49",
+  "flags": {
+    "descriptionEditedAfterCreate": false,
+    "needsProductionData": true,
+    "alreadyFixedAtTriage": false
+  },
+  "asFiled": {
+    "assignee": "Aaron Fraga",
+    "labels": [],
+    "parent": null,
+    "priority": 2,
+    "project": "Support"
+  },
+  "relatedSnapshot": [
+    {
+      "id": "ENG-8148",
+      "createdAt": "2026-04-28T11:39:35.060Z",
+      "title": "Fix call booking issue with missing invite notifications",
+      "state": "Done",
+      "assignee": "Koppany Kondricz",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "#### Customer Name\n\nName 1\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 1\n\n#### Screenshot\n\n#### What are you trying to achieve?\n\nMessage from the client - \"The agent is telling clients that it has booked a call, chosen a time slot that I am not available for, and then not sending any invites. I've had 3 email threads now where people thought I stood them up because they agreed to a call and then never got an invite follow-up.\"\n\n#### What are you doing to achieve it?\n\ncreated this ticket\n\n#### What is happening instead?\n\nissue not resolved\n\n#### What is the expected outcome?\n\nresolve the issue"
+    },
+    {
+      "id": "ENG-8208",
+      "createdAt": "2026-04-30T12:22:34.160Z",
+      "title": "Fix scheduling issue with SDR",
+      "state": "Duplicate",
+      "assignee": "Arthur Li",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "#### Customer Name\n\nName 2\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 2\n\n#### Screenshot\n\n#### What are you trying to achieve?\n\nclient's message - \"I am having a bit of an issue where the AI SDR is suggesting times like \"Thursday 11pm EDT\" and the customer replies \"Thursday\" the email agent replies with something like \"That slot got taken up\" and repeatedly tries to schedule an appointment. \" Example thread here is the conversation with Name 3\n\n#### What are you doing to achieve it?\n\ncreated a ticket here\n\n#### What is happening instead?\n\nna\n\n#### What is the expected outcome?\n\nresolve the issue"
+    },
+    {
+      "id": "ENG-1473",
+      "createdAt": "2025-09-26T12:38:51.883Z",
+      "title": "Fix the calendar availability start and end time shift by the value of GMT",
+      "state": "Done",
+      "assignee": "Mahmut Jomaa",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "CleanShot 2025-09-26 at 16.37.20.mp4\n\n* See the video\n* It looks like the values in the dropdowns for the start and end time of calendar availability are shifted by the value of the timezone"
+    },
+    {
+      "id": "ENG-1507",
+      "createdAt": "2025-09-27T15:25:38.768Z",
+      "title": "Edit the prompt to always say what timezone it's suggesting the times in",
+      "state": "Done",
+      "assignee": "Blaise Gulaj",
+      "parent": null,
+      "labels": [],
+      "description": "* Use EST by default\n* Change from EST to something else if it can easily infer it from the email thread, eg. the prospect saying they're in Name 4 etc."
+    },
+    {
+      "id": "ENG-4101",
+      "createdAt": "2026-01-02T19:08:00.800Z",
+      "title": "Appointment calendar day label and cancellation inconsistencies",
+      "state": "Done",
+      "assignee": "Anuj Bhatt",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "A user reports two issues with the appointment calendar:\n\n1. On the appointment calendar, the day label at the top is off by one day, even though the underlying appointments are on the correct dates and times.\n2. An appointment scheduled for 1pm EST on January 5th with Name 5 was canceled via the dashboard. It was removed from Name 6 Calendar but still appears under appointments in the dashboard.\n\nBoth issues appear to be specific to this user’s account and current calendar setup."
+    },
+    {
+      "id": "ENG-4317",
+      "createdAt": "2026-01-08T19:37:33.581Z",
+      "title": "Calendar view shows mismatched date and weekday",
+      "state": "Duplicate",
+      "assignee": "Anuj Bhatt",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "Users report a glitch in the calendar where the selected date and the day of week do not match between the left-hand date picker and the main calendar grid.\n\nScreenshot shows January 2026 in the America/New_York timezone:\n\n <image> \n\nThe left mini calendar highlights Monday the 12th, while the main calendar grid displays the 12th under Sunday, causing appointments to appear on an incorrect weekday. This bug has been observed before but is difficult to reproduce consistently."
+    },
+    {
+      "id": "ENG-12202",
+      "createdAt": "2026-07-31T13:52:37.717Z",
+      "title": "Calendar sync issue",
+      "state": "Canceled",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [],
+      "description": "#### Customer Name\n\nName 7/Name 8\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 9's workspace\n\n#### Screenshot\n\n <image> \n\n <image> \n\n#### What are you trying to achieve?\n\nClient is facing multiple tech issues with the workspace. She's frustrated and a refund risk. There is a discrepancy in the time zone of calls getting booked. And half of the calls are not showing on her calendar.\n\n#### What are you doing to achieve it?\n\nChecked her workspace and there is a discrepancy in the call times. See attached screenshots.\n\n#### What is happening instead?\n\nCalls are getting booked at wrong time, time zone and a few calls are not showing up on the calendar\n\n#### What is the expected outcome?\n\nCalls to get booked on calendar as per the correct time zone"
+    },
+    {
+      "id": "ENG-12480",
+      "createdAt": "2026-08-10T19:36:43.339Z",
+      "title": "Closer and client's calendar mixed up",
+      "state": "Triage",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [],
+      "description": "#### Customer Name\n\nName 10\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\n* \n\n#### Screenshot\n\n <image> \n\n#### What are you trying to achieve?\n\nClient: Name 12 & Name 11\n\nThere appears to be a calendar/assignment issue in their CRM. Name 13's calendar seems to be mixed up with the closer’s calendar, and when we select Name 13's calendar in the Appointments tab, it appears to show events belonging to the closer (please see screenshot attached). The appointments are also displaying under Name 12/Name 13's names even when the closer is the assigned salesperson, creating confusion around who is actually receiving and taking the calls.\n\nThis has already been raised multiple times by them, including a similar ticket I submitted last week, and the issue has been ongoing for several weeks. Could someone please investigate this urgently and confirm what is causing the calendar/assignment mismatch and get it corrected? This is creating significant confusion for the clients and could result in calls being missed.\n\n#### What are you doing to achieve it?\n\n* \n\n#### What is happening instead?\n\n* \n\n#### What is the expected outcome?\n\n* "
+    },
+    {
+      "id": "ENG-10063",
+      "createdAt": "2026-06-12T01:36:17.141Z",
+      "title": "Timezone normalization pass for scheduling/booking",
+      "state": "Backlog",
+      "assignee": "Jared Stauffer",
+      "parent": "ENG-10037",
+      "labels": [],
+      "description": "**Sub-ticket 4 of 4 for** ENG-10037 **(Hardening 5). Blocked by the spec (**ENG-10044**), whose root-cause section sizes this ticket — re-scope it when the spec lands; it may split into 2–3 tickets if the cluster has multiple causes.**\n\n## Problem\n\nFive open tickets form a timezone/availability cluster with one customer (Name 14) appearing twice:\n\n* ENG-9676 — AI SDR books meetings five hours ahead\n* ENG-9918 — Outlook calendar sync + timezone issues\n* ENG-8998 — appointments booked in the wrong timezone\n* ENG-9776 — ignores Friday-only availability and shifts Zoom time\n* ENG-9841 — date hallucinations\n\nThese are currently five independent bug tickets; the hardening review's hypothesis is a shared root cause in how timezones flow between prospect-stated times, host availability, calendar provider APIs (Name 6 + the newer O365 support from ENG-8583), slot generation (`time-slot-generator`), and display.\n\n## Build notes\n\n* Start from the spec's per-ticket root-cause mapping. Expected shape of the fix: a single timezone-resolution helper with defined precedence (prospect-stated TZ > TZ inferred from prospect signature/location > org/host default), used consistently by extraction, slot generation, booking, and invite creation — instead of each surface doing its own conversion.\n* Surfaces to check: `apps/web/lib/ai-sdr-v2/` slot matchmaking + `closest-slot-finder.ts` + `time-slot-generator`, the scheduling services (`apps/web/lib/scheduling/services/` — `booking-service.ts`, `calendar-sync-service.ts`), and calendar provider integration code (Name 6 + Outlook).\n* The \"five hours ahead\" signature (ENG-9676) smells like a UTC↔local double-conversion; the Outlook case (ENG-9918) may be O365-specific TZ handling from the ENG-8583 integration. Verify with real appointment rows via the read-only prod DB.\n* Note ENG-8620's finding: some \"timezone bugs\" are user misunderstanding (the 8AM half was timezone confusion, not a bug) — validate each cluster ticket's repro before coding against it.\n* Tests: deterministic TZ cases in slot generation/booking tests (frozen clocks, DST boundaries, prospect-TZ ≠ host-TZ ≠ calendar-TZ).\n\n## Acceptance criteria\n\n* Each cluster ticket either: fixed and linked, reclassified with evidence, or explicitly out of scope with reason.\n* One shared timezone-resolution path with DST + cross-TZ test coverage."
+    },
+    {
+      "id": "ENG-13875",
+      "createdAt": "2026-09-14T22:31:32.090Z",
+      "title": "Dynamic Zoom meetings are created with a start time shifted by the booking timezone offset",
+      "state": "Done",
+      "assignee": "Anuj Bhatt",
+      "parent": null,
+      "labels": ["Bug", "fast-lane"],
+      "description": "## Overview\n\nDynamic Zoom meetings created by Acquisity are scheduled at the wrong instant. The booked appointment, the Name 6 Calendar event and the CRM record all carry the right time; the Zoom meeting that Acquisity creates from them is shifted by the booking timezone's UTC offset, four hours late for a US Company Two workspace. Hosts and prospects who read the Zoom meeting rather than the calendar invite see the wrong time.\n\n## Problem\n\nWhen the AI SDR or a CRM booking creates a dynamic Zoom meeting, the meeting's start time in Zoom does not match the appointment. A booking stored at 2026-09-16T14:30:00Z (10:30 AM America/New_York) is created in Zoom as 2:30 PM Eastern. Directly created Zoom meetings and meetings on a static link are unaffected. Every dynamic Zoom booking made for a host whose booking timezone is not UTC carries the shift, equal to that zone's offset from UTC.\n\n## Root cause\n\n`translateEvent` in `apps/web/lib/integrations/conferencing/zoom-video-api-service.ts` (line 286) emits `start_time: dayjs(event.startTime).utc().toISOString()`, which serialises as `YYYY-MM-DDTHH:mm:ss.SSSZ` with milliseconds, while line 292 also sends `timezone: event.organizer.timeZone`. Zoom accepts only `yyyy-MM-ddTHH:mm:ssZ` for GMT or `yyyy-MM-ddTHH:mm:ss` plus a `timezone` ID. On the millisecond-bearing form Zoom ignores the `Z` and reads the clock digits as local time in the supplied zone, so 14:30Z becomes 14:30 New York. Both `createMeeting` (line 349) and `updateMeeting` (line 393) share `translateEvent`.\n\nZoom's own documentation states the two accepted formats, and Zoom Developer Forum reports for the identical `.000Z` input record the `Z` being ignored and the value treated as local time (devforum.zoom.us/t/create-meeting-endpoint-problems/134291 and devforum.zoom.us/t/meeting-api-is-parsing-start-time-in-the-wrong-timezone/84492). The same behaviour reproduced with no `timezone` field present, so the start-time format, not the field's presence, is the trigger.\n\n## Blast radius\n\nDynamic Zoom meetings created in the last 30 days: 2,603 appointments across 320 organizations, counted 2026-09-14 from the production database with\n\n`select count(*), count(distinct organization_id) from scheduling_appointment where deleted_at is null and meeting_id is not null and meeting_id <> 'static' and meeting_url ilike '%zoom.us%' and created_at > now() - interval '30 days'`\n\nPotentially exposed: 1,489 users hold a valid Zoom conferencing account and every one of them runs the same payload; 1,329 users were configured for dynamic links over the same 30-day window. Confirmed affected: one workspace so far, with two current appointments and direct evidence. Counting limitation: the Zoom request and response are not persisted, so affected meetings cannot be read back and are counted from appointment rows.\n\n## Proposed fix\n\nSend Zoom a start-time format it honours. Either the local wall-clock in the booking timezone with no `Z` plus the `timezone` field, or the UTC instant stripped of milliseconds. Keep the appointment instant authoritative; the change is serialisation only. Do not fix this by dropping the `timezone` field alone, which leaves the millisecond-bearing form and the same shift.\n\n## What's included\n\nConferencing payload serialisation for Zoom, used by the AI SDR and CRM booking paths. Excluded: Name 6 and Outlook calendar writes, which already carry the correct instant; the static-link path; and the Zoom free/busy read, which re-normalises with `dayjs.utc` and is unaffected. Related for history, not owned here: ACQ-3599 and ENG-5589 (both closed without a durable fix, same symptom with other zones' offsets) and the Zoom-shift half of ENG-9776 (still open, mixed availability and timezone report).\n\n## Regression seam\n\nCreating a dynamic Zoom meeting for an appointment in a non-UTC booking timezone, then reading the meeting back, must return a start instant equal to the appointment instant. Red before the change (offset by the zone's UTC difference) and green after. `updateMeeting` already reads `meetings/{id}` back and can host the assertion; it needs the Zoom response schema to keep `start_time` and `timezone`, which `zoomEventResultSchema` currently discards.\n\n## Done when\n\n* A dynamic Zoom meeting created for an appointment in a non-UTC timezone carries the same start instant as the appointment, verified by reading the meeting back from Zoom.\n* The same holds for a meeting updated through the reschedule path, which shares `translateEvent`.\n* A regression test proves the red-before, green-after behaviour at the create-time read-back seam.\n\n## Reports\n\nTo be linked: the customer report for the Company Two workspace (ENG-13874)."
+    },
+    {
+      "id": "ENG-9918",
+      "createdAt": "2026-06-10T12:15:05.779Z",
+      "title": "Fix AI SDR Outlook calendar sync and timezone issues",
+      "state": "Canceled",
+      "assignee": "Koppany Kondricz",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "#### Customer Name\n\nName 14\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 14's workspcae\n\n#### Screenshot\n\n#### What are you trying to achieve?\n\nGet the AI SDR's calendar booking to sync correctly with the client's Outlook calendar, including respecting all-day appointments (out-of-office blocks) and matching the client's actual working hours in the correct timezone. Goal is Outlook feature parity with Name 6 Workspace, since the client was told during onboarding that Outlook is supported.\n\n#### What are you doing to achieve it?\n\nClient (Name 14, SERIOUS escalation tier) has already completed all standard troubleshooting per support guidance: Outlook is connected, timezone is set correctly on his side, middleware syncing was previously active and then disconnected by client because he doesn't use Name 6 Workspace day-to-day. Client also attended Name 15 drop-in sessions to verify setup on-screen with the team and the configuration was confirmed correct. Despite all of that, the AI SDR continues to book appointments 5 hours outside his working schedule. As of today, the client has manually created 8-5 working-hour blocks in Outlook as a workaround in case the system is not reading his Outlook working hours. Workaround effectiveness pending verification on next booking cycle.\n\n#### What is happening instead?\n\nTwo symptoms pointing to an incomplete Outlook integration:  AI SDR is booking appointments 5 hours ahead of the client's actual working hours. The consistent 5-hour offset suggests the system is reading his calendar in a different timezone than what Outlook is configured for on his side. AI SDR is not respecting all-day out-of-office appointments. Client is out 6/10-17 marked as all-day OOO in Outlook, and the AI SDR is still attempting bookings during that window.\n\n#### What is the expected outcome?\n\nOutlook should perform at full parity with Name 6 Workspace for AI SDR scheduling. Client was told during onboarding that Outlook works, so the expectation set with him is feature parity. Specifically: the AI SDR reads the correct timezone from Outlook, respects working-hour boundaries set in Outlook, and treats all-day OOO appointments as unavailable windows. Need a clear ETA on when this will be resolved at the platform level so I can communicate it back to the client."
+    },
+    {
+      "id": "ENG-6625",
+      "createdAt": "2026-03-11T17:35:57.841Z",
+      "title": "Email confirmation shows different meeting time than calendar",
+      "state": "Duplicate",
+      "assignee": "Jared Stauffer",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "A booked meeting appears with the correct day and time on the calendar, but the email confirmation shows a different time.\n\nIn the reported example, the AI agent scheduled the meeting for 3/16 at 11am in the email, while the calendar event came through at 3pm on 3/16. The calendar timezone was checked and is set to EST.\n\nRelevant screenshots are attached below.\n\n <image> \n\n <image> "
+    },
+    {
+      "id": "ENG-12989",
+      "createdAt": "2026-08-20T20:40:08.356Z",
+      "title": "Call getting booked on the client's calendar as opposed to the closer's",
+      "state": "unknown",
+      "assignee": "Koppany Kondricz",
+      "parent": null,
+      "labels": [],
+      "description": "#### Customer Name\n\nName 16\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\n* \n\n#### Screenshot\n\n <image> \n\n <image> \n\n <image> \n\n#### What are you trying to achieve?\n\nWhy did the call get booked on Name 100's calendar, when it should have been booked on the closer's calendar??\n\nYou can see on the screenshots that the assigned salesperson on that campaign is the closer Name 17 , and still the call got booked on Name 100's calendar. This needs to be fixed as soon as possible because there is already another call booked for next week with the same issue, and we need to make sure that this is fixed.\n\n#### What are you doing to achieve it?\n\n* \n\n#### What is happening instead?\n\n* \n\n#### What is the expected outcome?\n\n* "
+    },
+    {
+      "id": "ENG-13147",
+      "createdAt": "2026-08-26T14:46:41.866Z",
+      "title": "Name 18 - Calls not booking to closer calendar",
+      "state": "Duplicate",
+      "assignee": "Koppany Kondricz",
+      "parent": "ENG-12989",
+      "labels": ["Bug", "Customer reported"],
+      "description": "#### Customer Name\n\nName 18\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nCompany One Workspace\n\n#### Screenshot\n\n <image> \n\n <image> \n\n#### What are you trying to achieve?\n\nWe have has calls that are not booking to his closers calendar (Name 19)  as seen in the screenshot. We need to have all calls book to the closers calendar\n\n#### What are you doing to achieve it?\n\nI tried changing settings and I think everything is setup correctly but I would like to double check\n\n#### What is happening instead?\n\ncalls booking to client calendar (Name 101) instead of closers calendar (Name 102)\n\n#### What is the expected outcome?\n\nall calls book to Name 102's calendar"
+    },
+    {
+      "id": "ENG-3927",
+      "createdAt": "2025-12-19T19:15:41.405Z",
+      "title": "Auto-sync Name 6 Calendar working hours to CRM availability",
+      "state": "Canceled",
+      "assignee": "Anuj Bhatt",
+      "parent": null,
+      "labels": ["Feature Request"],
+      "description": "CRM availability and Name 6 Calendar are currently separate systems:\\\\n- **CRM availability:** Weekly work hours stored in `scheduling_work_hours` + `scheduling_work_time_slot` tables per user. Defaults to 9-17 M-F. Manually configured via Settings > Availability.\\\\n- **Name 6 Calendar:** Connected for busy/free conflict checking only. The service (`google-calendar-service.ts`) does NOT fetch working hours/office hours settings from Name 6.\\\\n\\\\nCustomer expectation: Name 6 Calendar working hours should auto-sync to CRM so they don't maintain availability in two places. This caused emails showing no availability on days that are actually free in Name 6 Calendar.\\\\n\\\\n**Scope:**\\\\n- Call Name 6 Calendar Settings API to fetch working hours/timezone\\\\n- Create Inngest background job to periodically sync Name 6 Calendar working hours to `scheduling_work_hours` table\\\\n- Add conflict resolution logic (what if local hours differ from Name 6?)\\\\n- Add UI toggle in availability settings: \"Sync from Name 6 Calendar\" vs \"Manual\"\\\\n- Consider syncing timezone preference as well\\\\n- May need `syncedFromGoogle` flag on `schedulingWorkHoursTable`\\\\n\\\\n**Key files:**\\\\n- `lib/scheduling/repositories/scheduling-repository.ts` — work hours queries\\\\n- `lib/integrations/calendar/google-calendar-service.ts` — add settings API calls\\\\n- `lib/scheduling/converters/work-hours-converter.ts` — WeekAvailability conversion\\\\n- `lib/inngest/functions/calendar/` — add sync job\\\\n- `components/user/schedule-card.tsx` — availability settings UI"
+    },
+    {
+      "id": "ENG-4343",
+      "createdAt": "2026-01-09T14:34:39.918Z",
+      "title": "Client meeting time mismatch between confirmation and invite",
+      "state": "Canceled",
+      "assignee": "Koppany Kondricz",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "Client reported an SDR scheduling issue where a meeting was confirmed for 12pm CST, but the calendar invite was sent for a different time. This needs to be investigated and resolved so the client receives invites that match the confirmed meeting time.\n\n <image> "
+    },
+    {
+      "id": "ENG-6446",
+      "createdAt": "2026-03-09T14:13:09.834Z",
+      "title": "AI SDR inbox not receiving new replies for days",
+      "state": "Done",
+      "assignee": "Beth Newton",
+      "parent": null,
+      "labels": [],
+      "description": "user: <email>\n\nAI SDR inbox stops showing new inbound replies (including expected out-of-office / do-not-contact responses) for multiple days while outbound campaigns continue sending. Email accounts show active.\n\nAuto Agent Run was found OFF per campaign and was turned back ON, but inbound volume still appears to be zero. A manual test reply to a campaign email did appear in the AI SDR inbox, yet normal inbound traffic is still missing; request is to investigate deeper (reply ingestion / campaign processing / account status)."
+    },
+    {
+      "id": "ENG-9776",
+      "createdAt": "2026-06-05T17:18:29.955Z",
+      "title": "AI scheduling ignores Friday-only availability and shifts Zoom time",
+      "state": "Todo",
+      "assignee": "Koppany Kondricz",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "User: <email>\n\n### AI SDR Scheduling & Availability Mismatch\n\nName 13’s workspace, we identified a potential scheduling issue involving availability rules and timezone handling.\n\n* Availability Constraint Not Being Followed\n\nThe user’s availability was set to Friday only, however the AI SDR is still offering time slots outside of the configured availability window.\n\n* Scheduling & Timezone Inconsistency\n\nAI SDR booked an appointment for Friday, June 5th at 1:00 PM EST with Name 20.\n\nThe AI SDR offered times in both 10:00 AM PDT / 1:00 PM EST.\n\nIn the appointments tab, the booking correctly shows 1:00 PM EST.\n\nHowever, when synced to Zoom, the appointment time shifted and appears as 5:00 PM EST.\n\nTimezone Validation Check\n\nWe verified Zoom’s timezone settings, and it is aligned with EST, consistent with the platform configuration.\n\n\n <image> \n\n <image> \n\n <image> \n\n <image> \n\n <image> "
+    },
+    {
+      "id": "ENG-11716",
+      "createdAt": "2026-07-16T17:02:40.584Z",
+      "title": "Timezone correctness: compute \"today\" in the prospect's timezone and fix THIS_WEEK day resolution",
+      "state": "Done",
+      "assignee": "Koppany Kondricz",
+      "parent": "ENG-11706",
+      "labels": [],
+      "description": "## Review corrections (2026-07-16)\n\nThese notes supersede any conflicting implementation language below.\n\nDo not assume organization timezone equals prospect timezone for booking. Record timezone source and confidence. If the timezone is unknown and the action would create or confirm a booking, request clarification or block the booking. Introduce an explicit next-occurrence semantic instead of silently changing the global meaning of THIS_WEEK.\n\n---\n\n## Overview\n\nTwo timezone bugs silently mangle what the prospect asked for. First, \"today\" is computed on the server clock (UTC), so for a US prospect replying in the evening, every day-of-week calculation is shifted by one day. Second, if a prospect says \"Monday\" on a Friday, the code looks for a Monday inside the CURRENT calendar week (which is already over), finds nothing, silently discards their preference, and offers unrelated times.\n\n## The prod data\n\n* Customer reports of exactly this class: ENG-5708 (\"Feb 21 is Saturday but AI SDR said Friday\"), ENG-8998 (booked in wrong timezone), ENG-6158 (Saturday slots offered when weekdays enabled). Those v1-era tickets were closed but the v2 mechanism below is live today.\n* Unknown prospect timezone silently defaults to America/New_York, poisoning business-hours filtering and displayed times.\n\n## Root cause (verified in code)\n\n1. `workflow/steps/data-extraction.ts:167-172`: `referenceDate: new Date()` (server/UTC) is used for day-of-week and week-window math, while the resulting slots are later interpreted in the prospect's timezone via `convertLocalSlotsToUtc(localSlots, threadTimezone)`.\n2. `workflow/helpers/time-preference-converter.ts:136`: `const refDay = dayjs(referenceDate).startOf('day')` uses the server-timezone day boundary; lines 158-162 implement THIS_WEEK as \"today through this Sunday\".\n3. The extraction prompt contradicts the code: `agents/data-extraction/default-agent.ts:35-42` says '\"Saturday\" → relative_week: THIS_WEEK (means the upcoming Saturday... the nearest one)'. So \"Monday\" said on a Friday resolves to an empty date window, candidateSlots ends empty, and the generic no-preference branch offers unrelated times.\n\n## What to build (exactly this, one PR)\n\n1. Compute refDay in the prospect timezone throughout time-preference-converter: `dayjs(referenceDate).tz(prospectTimezone).startOf('day')`.\n2. Change day+THIS_WEEK resolution to \"next occurrence of that weekday\" when the named day has already passed in the current calendar week (matching the prompt's stated semantics).\n3. Replace the silent America/New_York default: when prospect timezone is unknown, use the organization's timezone and record `timezone_source` so drafts can hedge (\"your time zone permitting\").\n4. Unit tests pinned at Friday/Saturday/Sunday reference days and at 23:30 UTC (the day-shift window for US timezones).\n\n## Acceptance criteria\n\n- [ ] Unit test: \"Monday\" said on a Friday (prospect tz) produces the upcoming Monday's slots\n- [ ] Unit test: a reply at 23:30 UTC from a US prospect computes \"today\" as the prospect's calendar day\n- [ ] Unknown-timezone threads no longer show America/New_York times (replay check)"
+    },
+    {
+      "id": "ENG-13357",
+      "createdAt": "2026-09-01T16:15:47.097Z",
+      "title": "AI SDR inbox \"New Appointment\" form books in host timezone instead of prospect timezone",
+      "state": "Done",
+      "assignee": "Koppany Kondricz",
+      "parent": null,
+      "labels": ["Bug", "fast-lane"],
+      "description": "## Overview\n\nThe AI SDR inbox \"New Appointment\" form books meetings in the host's timezone instead of the prospect's, so calls for prospects in other timezones land at the wrong local hour.\n\n## Problem\n\nWhen a user books a call from an AI SDR email thread using the \"New Appointment\" form, the entered time is interpreted in the host's timezone and the appointment's client timezone is stamped with the host's timezone. Prospects in other timezones therefore see the meeting at the wrong local time, arriving or joining at the wrong hour.\n\n## Root cause\n\n`apps/web/components/ai-sdr/create-appointment-from-thread-modal.tsx` `onSubmit` uses the host's timezone (`userTimeZone`, from `user?.timezone` or the browser) to interpret the entered time and passes it as `clientTimeZone` to `trpc.appointments.createFromThread`, instead of using the thread's `prospect_timezone`. The modal is opened from `email-thread-view.tsx` with `user?.timezone`.\n\n## Blast radius\n\n13 organizations, 25 appointments (origin `sdr_inbox`) where the thread's prospect timezone differs from the appointment's client timezone; 11 organizations, 22 appointments when restricted to `status = 'scheduled'`. Counted 2026-09-01. Lower bound: no creation-time window, joined through the thread's current appointment pointer.\n\n## Proposed fix\n\nThe \"New Appointment\" form should use the thread's prospect timezone to interpret the entered time and stamp the appointment's client timezone (or expose a timezone selector so the user can choose), so the meeting lands at the correct local time for the prospect.\n\n## What's included\n\nFix the manual create-from-thread form's timezone handling. Related but distinct: ENG-12571 (the same form books LLM-guessed duration instead of the call type preset).\n\n## Regression seam\n\n`create-appointment-from-thread-modal.tsx` `onSubmit`: given a thread whose `prospect_timezone` is America/Chicago and a host in America/New_York, entering \"3:15 PM\" must produce an appointment with `client_time_zone = 'America/Chicago'` and the correct UTC instant, not America/New_York.\n\n## Done when\n\n* The form interprets the entered time in the prospect's timezone (or a user-selected timezone).\n* The appointment's client timezone matches the prospect's timezone.\n* A regression test proves a cross-timezone booking lands at the correct instant.\n\n## Reports\n\n* ENG-13355"
+    },
+    {
+      "id": "ENG-15020",
+      "createdAt": "2026-10-09T08:04:08.727Z",
+      "title": "Name 21 - AI SDR booking in wrong timezone",
+      "state": "unknown",
+      "assignee": "unknown",
+      "parent": "unknown",
+      "labels": "unknown",
+      "description": "#### Customer Name\n\nName 21\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 21\n\n#### Screenshot\n\n#### What are you trying to achieve?\n\nRun campaigns and have AI SDR book calls\n\n#### What are you doing to achieve it?\n\nCampaigns are live, AI SDR KB is set up\n\n#### What is happening instead?\n\nA couple of issues going on with AI SDR:\n\nIt's started sending times in MDT only, leading to prospects showing up at the wrong time - 6 of my last 8 appointments have shown up at the wrong time in the last two days.\n\nI have reset my local timezone (which is MDT) but it typically would send the local timezone of the prospect and I am not sure what effects that decision for the SDR\n\nI have another instance where the agent received a confirmed time but did not book the appointment - the next day it asked the prospect if there were interested in an appointment\n\n#### What is the expected outcome?\n\nPlease investigate and fix the issue."
+    }
+  ]
+}

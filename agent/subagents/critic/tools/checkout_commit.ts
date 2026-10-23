@@ -7,6 +7,11 @@ import {
 } from "../../../lib/github/git-remote.js";
 import { readPreparedRepository, remoteUrl } from "../../../lib/repository.js";
 import { boundedRun } from "../../../lib/sandbox-deadline.js";
+import { withReplayState } from "../../../lib/triage-replay/backend.js";
+import {
+  isTriageReplay,
+  replaySessionOf,
+} from "../../../lib/triage-replay/mode.js";
 import { environment } from "../../../sandbox.js";
 
 const COMMIT_SHA_PATTERN = /^[a-f0-9]{40}$/iu;
@@ -38,6 +43,23 @@ export default defineTool({
       };
     }
     const sha = commit.toLowerCase();
+    // A replay holds one archive of one commit and never opens the network.
+    if (isTriageReplay()) {
+      const session = replaySessionOf(ctx.session.auth.initiator);
+      const pinned = session
+        ? await withReplayState(
+            session.runId,
+            session.caseId,
+            (state) => state.archive.commit
+          )
+        : null;
+      return pinned === sha
+        ? { commit: sha, success: true as const, worktree: "/workspace/repo" }
+        : {
+            error: "This replay holds only the commit the case was created at.",
+            success: false as const,
+          };
+    }
     const sandbox = await ctx.getSandbox(environment);
     const prepared = await readPreparedRepository(sandbox);
     if (prepared.slug.toLowerCase() !== REVIEWED_REPOSITORY) {
