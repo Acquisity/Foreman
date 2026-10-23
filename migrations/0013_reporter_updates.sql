@@ -6,6 +6,8 @@ CREATE TABLE reporter_updates (
   message text,
   comment_id text,
   checked_sha text,
+  claim_token uuid,
+  attempts integer NOT NULL DEFAULT 0,
   claimed_at timestamptz,
   sent_at timestamptz,
   created_at timestamptz NOT NULL DEFAULT now(),

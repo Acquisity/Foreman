@@ -3,6 +3,7 @@ import { describe, it } from "node:test";
 import { planReply, type ThreadComment } from "../requester-reply.js";
 import {
   bannedWordsIn,
+  coversOf,
   firstName,
   fixedText,
   isReporterUpdate,
@@ -144,5 +145,16 @@ describe("reporter updates and the requester thread", () => {
       lastReply: "Our answer.",
       replies: ["It still fails."],
     });
+  });
+});
+
+describe("coversOf", () => {
+  it("says a received message that names the owner covers both stages", () => {
+    assert.deepEqual(coversOf(receivedText("Sam")), ["received", "owner"]);
+    assert.deepEqual(coversOf(receivedText(null)), ["received"]);
+    assert.deepEqual(coversOf(ownerText("Sam")), ["owner"]);
+    assert.deepEqual(coversOf(fixedText()), ["fixed"]);
+    assert.deepEqual(coversOf(notFixedText("duplicate")), ["not_fixed"]);
+    assert.deepEqual(coversOf("An ordinary reply."), []);
   });
 });

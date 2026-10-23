@@ -24,49 +24,82 @@ const claims = await Promise.all(
     store.claim("ENG-1", "fixed", "Good news", "C0AAAAAAAAA")
   )
 );
-assert.equal(
-  claims.filter(Boolean).length,
-  1,
-  "eight racing claims, one winner"
-);
+const winners = claims.filter((claim) => claim.ok);
+assert.equal(winners.length, 1, "eight racing claims, one winner");
+const [first] = winners;
+assert.ok(first?.ok);
+const firstToken = first.token;
 
-assert.equal(await store.claim("ENG-1", "fixed", "again", null), false);
+assert.deepEqual(await store.claim("ENG-1", "fixed", "again", null), {
+  ok: false,
+  reason: "busy",
+});
 
 await pool.query(
   "UPDATE reporter_updates SET claimed_at = now() - interval '11 minutes' WHERE issue = 'ENG-1'"
 );
-assert.equal(
-  await store.claim("ENG-1", "fixed", "retry", null),
-  true,
-  "stale claim is taken over"
-);
+const second = await store.claim("ENG-1", "fixed", "retry", null);
+assert.ok(second.ok, "an expired claim is taken over");
 
-await store.markSent(
-  "ENG-1",
-  ["fixed"],
-  "Good news",
-  "C0AAAAAAAAA",
-  "comment-1"
+await store.release("ENG-1", "fixed", firstToken);
+assert.equal(
+  (await store.rows("ENG-1"))[0]?.status,
+  "claimed",
+  "a release with the old token changes nothing"
 );
 assert.equal(
-  await store.claim("ENG-1", "fixed", "again", null),
+  await store.complete(
+    "ENG-1",
+    "fixed",
+    ["fixed"],
+    "Good news",
+    null,
+    "c-old",
+    firstToken
+  ),
   false,
-  "sent is final"
+  "a completion with the old token is refused"
 );
+assert.equal(
+  await store.complete(
+    "ENG-1",
+    "fixed",
+    ["fixed"],
+    "Good news",
+    null,
+    "comment-1",
+    second.token
+  ),
+  true
+);
+assert.deepEqual(await store.claim("ENG-1", "fixed", "again", null), {
+  ok: false,
+  reason: "busy",
+});
 await store.markWaiting("ENG-1", "abc1234");
-const rows = await store.rows("ENG-1");
 assert.deepEqual(
-  rows.map((row) => [row.stage, row.status, row.commentId]),
+  (await store.rows("ENG-1")).map((row) => [
+    row.stage,
+    row.status,
+    row.commentId,
+  ]),
   [["fixed", "sent", "comment-1"]],
   "markWaiting never reopens a sent row"
 );
 
-await store.markSent(
-  "ENG-2",
-  ["received", "owner"],
-  "Hello",
-  null,
-  "comment-2"
+const named = await store.claim("ENG-2", "received", "Hello", null);
+assert.ok(named.ok);
+assert.equal(
+  await store.complete(
+    "ENG-2",
+    "received",
+    ["received", "owner"],
+    "Hello",
+    null,
+    "comment-2",
+    named.token
+  ),
+  true
 );
 assert.deepEqual(
   (await store.rows("ENG-2"))
@@ -80,18 +113,26 @@ await store.markWaiting("ENG-3", "sha-2");
 assert.deepEqual(await store.listWaiting(), [
   { checkedSha: "sha-2", issue: "ENG-3" },
 ]);
-assert.equal(
-  await store.claim("ENG-3", "fixed", "msg", null),
-  true,
-  "waiting row can be claimed"
-);
-await store.release("ENG-3", "fixed");
+const waiting = await store.claim("ENG-3", "fixed", "msg", null);
+assert.ok(waiting.ok, "a waiting row can be claimed");
+await store.release("ENG-3", "fixed", waiting.token);
 assert.equal(
   (await store.rows("ENG-3"))[0]?.status,
   "waiting",
   "release returns it to waiting"
 );
-assert.equal(await store.claim("ENG-3", "fixed", "msg", null), true);
+
+await [1, 2, 3, 4].reduce(async (previous) => {
+  await previous;
+  const claim = await store.claim("ENG-3", "fixed", "msg", null);
+  assert.ok(claim.ok);
+  await store.release("ENG-3", "fixed", claim.token);
+}, Promise.resolve());
+assert.deepEqual(
+  await store.claim("ENG-3", "fixed", "msg", null),
+  { ok: false, reason: "exhausted" },
+  "five attempts is the limit"
+);
 
 await assert.rejects(
   pool.query(

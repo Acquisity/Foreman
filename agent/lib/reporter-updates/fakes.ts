@@ -3,7 +3,7 @@ import type { DeployProbe } from "./deploy.js";
 import type { LinearPort, TicketView } from "./linear.js";
 import type { PullFacts, TicketFacts } from "./plan.js";
 import type { Deps, RunConfig } from "./run.js";
-import type { LedgerRow, ReporterStore } from "./store.js";
+import { type LedgerRow, MAX_ATTEMPTS, type ReporterStore } from "./store.js";
 
 export const SANDBOX = "C0AAAAAAAAA";
 export const FOREMAN = "foreman-user";
@@ -35,16 +35,51 @@ export const facts = (over: Partial<TicketFacts> = {}): TicketFacts => ({
 });
 
 interface StoredRow extends LedgerRow {
+  attempts: number;
   claimedAt: number;
   message: string;
+  token: string | null;
 }
 
 export const memoryStore = () => {
   const table = new Map<string, StoredRow>();
   const key = (issue: string, stage: Stage) => `${issue}|${stage}`;
-  const state: { failNextMarkSent: boolean; now: number } = {
+  const state: { failNextMarkSent: boolean; now: number; tokens: number } = {
     failNextMarkSent: false,
     now: 0,
+    tokens: 0,
+  };
+  const blank = (stage: Stage): StoredRow => ({
+    attempts: 0,
+    checkedSha: null,
+    claimedAt: 0,
+    commentId: null,
+    message: "",
+    stage,
+    status: "waiting",
+    token: null,
+  });
+  const markSent: ReporterStore["markSent"] = (
+    issue,
+    stages,
+    message,
+    _channel,
+    commentId
+  ) => {
+    if (state.failNextMarkSent) {
+      state.failNextMarkSent = false;
+      return Promise.reject(new Error("database unavailable"));
+    }
+    for (const stage of stages) {
+      table.set(key(issue, stage), {
+        ...(table.get(key(issue, stage)) ?? blank(stage)),
+        commentId,
+        message,
+        status: "sent",
+        token: null,
+      });
+    }
+    return Promise.resolve();
   };
   const store: ReporterStore = {
     claim(issue, stage, message) {
@@ -52,18 +87,34 @@ export const memoryStore = () => {
       const stale =
         existing?.status === "claimed" &&
         state.now - existing.claimedAt > 600_000;
-      if (existing && existing.status !== "waiting" && !stale) {
-        return Promise.resolve(false);
+      if (existing?.status === "sent") {
+        return Promise.resolve({ ok: false, reason: "busy" });
       }
+      if (existing && existing.attempts >= MAX_ATTEMPTS) {
+        return Promise.resolve({ ok: false, reason: "exhausted" });
+      }
+      if (existing && existing.status !== "waiting" && !stale) {
+        return Promise.resolve({ ok: false, reason: "busy" });
+      }
+      state.tokens += 1;
+      const token = `token-${state.tokens}`;
       table.set(key(issue, stage), {
-        checkedSha: existing?.checkedSha ?? null,
+        ...(existing ?? blank(stage)),
+        attempts: (existing?.attempts ?? 0) + 1,
         claimedAt: state.now,
-        commentId: null,
         message,
-        stage,
         status: "claimed",
+        token,
       });
-      return Promise.resolve(true);
+      return Promise.resolve({ ok: true, token });
+    },
+    async complete(issue, stage, covers, message, channel, commentId, token) {
+      const existing = table.get(key(issue, stage));
+      if (existing?.token !== token || existing.status !== "claimed") {
+        return false;
+      }
+      await markSent(issue, covers, message, channel, commentId);
+      return true;
     },
     listWaiting() {
       return Promise.resolve(
@@ -77,41 +128,26 @@ export const memoryStore = () => {
           }))
       );
     },
-    markSent(issue, stages, message, _channel, commentId) {
-      if (state.failNextMarkSent) {
-        state.failNextMarkSent = false;
-        return Promise.reject(new Error("database unavailable"));
-      }
-      for (const stage of stages) {
-        table.set(key(issue, stage), {
-          checkedSha: null,
-          claimedAt: state.now,
-          commentId,
-          message,
-          stage,
-          status: "sent",
-        });
-      }
-      return Promise.resolve();
-    },
+    markSent,
     markWaiting(issue, checkedSha) {
       const existing = table.get(key(issue, "fixed"));
       if (!existing || existing.status === "waiting") {
         table.set(key(issue, "fixed"), {
+          ...(existing ?? blank("fixed")),
           checkedSha,
-          claimedAt: 0,
-          commentId: null,
-          message: "",
-          stage: "fixed",
           status: "waiting",
         });
       }
       return Promise.resolve();
     },
-    release(issue, stage) {
+    release(issue, stage, token) {
       const existing = table.get(key(issue, stage));
-      if (existing?.status === "claimed") {
-        table.set(key(issue, stage), { ...existing, status: "waiting" });
+      if (existing?.status === "claimed" && existing.token === token) {
+        table.set(key(issue, stage), {
+          ...existing,
+          status: "waiting",
+          token: null,
+        });
       }
       return Promise.resolve();
     },
@@ -144,25 +180,49 @@ export const ticket = (over: Partial<TicketFacts> = {}): FakeTicket => {
 };
 
 export const fakeLinear = (tickets: FakeTicket[]) => {
-  const posts: { body: string; identifier: string }[] = [];
-  const state: { failNextPost: boolean; reads: number } = {
+  const posts: { body: string; id: string; identifier: string }[] = [];
+  const state: {
+    failAfterCreate: boolean;
+    failNextPost: boolean;
+    holdNextPost: Promise<void> | null;
+    reads: number;
+  } = {
+    failAfterCreate: false,
     failNextPost: false,
+    holdNextPost: null,
     reads: 0,
   };
+  const created = new Map<string, { anchorId: string }>();
   const port: LinearPort = {
-    postUnderAnchor(issueId, _anchorId, body) {
+    findComment(id) {
+      const found = created.get(id);
+      return Promise.resolve(found ? { parentId: found.anchorId } : null);
+    },
+    async postUnderAnchor(issueId, anchorId, body, id) {
+      const hold = state.holdNextPost;
+      state.holdNextPost = null;
+      if (hold) {
+        await hold;
+      }
       if (state.failNextPost) {
         state.failNextPost = false;
-        return Promise.reject(new Error("Linear is unavailable"));
+        throw new Error("Linear is unavailable");
       }
       const target = tickets.find((entry) => entry.issueId === issueId);
       if (!target) {
-        return Promise.reject(new Error("unknown issue"));
+        throw new Error("unknown issue");
       }
-      const id = `comment-${posts.length + 1}`;
+      if (created.has(id)) {
+        throw new Error("comment id already exists");
+      }
+      created.set(id, { anchorId });
       target.foremanComments.push({ body, id });
-      posts.push({ body, identifier: target.facts.identifier });
-      return Promise.resolve(id);
+      posts.push({ body, id, identifier: target.facts.identifier });
+      if (state.failAfterCreate) {
+        state.failAfterCreate = false;
+        throw new Error("Linear timed out after creating the comment");
+      }
+      return id;
     },
     readTicket(identifier) {
       state.reads += 1;

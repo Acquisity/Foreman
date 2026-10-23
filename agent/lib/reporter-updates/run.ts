@@ -1,4 +1,5 @@
-import { type Stage, stageOfBody } from "./copy.js";
+import { commentIdFor } from "./comment-id.js";
+import { coversOf, STAGES, type Stage } from "./copy.js";
 import type { DeployProbe } from "./deploy.js";
 import type { LinearPort, TicketView } from "./linear.js";
 import {
@@ -54,10 +55,15 @@ export const memoize = <T>(load: () => Promise<T>): (() => Promise<T>) => {
 
 const stagesInThread = (view: TicketView): Map<Stage, string> => {
   const found = new Map<Stage, string>();
+  const { identifier } = view.facts;
   for (const comment of view.foremanComments) {
-    const stage = stageOfBody(comment.body);
-    if (stage && !found.has(stage)) {
-      found.set(stage, comment.id);
+    const byId = STAGES.filter(
+      (stage) => commentIdFor(identifier, stage) === comment.id
+    );
+    for (const stage of [...coversOf(comment.body), ...byId]) {
+      if (!found.has(stage)) {
+        found.set(stage, comment.id);
+      }
     }
   }
   return found;
@@ -85,39 +91,65 @@ const recordThreadStages = async (
   );
 };
 
+const post = async (
+  view: TicketView,
+  planned: Planned,
+  deps: Deps
+): Promise<string> => {
+  const id = commentIdFor(view.facts.identifier, planned.stage);
+  const anchorId = view.anchorId ?? "";
+  try {
+    return await deps.linear.postUnderAnchor(
+      view.issueId,
+      anchorId,
+      planned.text,
+      id
+    );
+  } catch (error) {
+    const existing = await deps.linear.findComment(id);
+    if (existing?.parentId === anchorId) {
+      return id;
+    }
+    throw error;
+  }
+};
+
 const deliver = async (
   view: TicketView,
   planned: Planned,
   deps: Deps
 ): Promise<Outcome> => {
   const { identifier, channel } = view.facts;
-  const claimed = await deps.store.claim(
+  const claim = await deps.store.claim(
     identifier,
     planned.stage,
     planned.text,
     channel
   );
-  if (!claimed) {
-    return skipped("claimed_elsewhere");
+  if (!claim.ok) {
+    return skipped(
+      claim.reason === "exhausted" ? "retries_exhausted" : "claimed_elsewhere"
+    );
   }
   let commentId: string;
   try {
-    commentId = await deps.linear.postUnderAnchor(
-      view.issueId,
-      view.anchorId ?? "",
-      planned.text
-    );
+    commentId = await post(view, planned, deps);
   } catch (error) {
-    await deps.store.release(identifier, planned.stage);
+    await deps.store.release(identifier, planned.stage, claim.token);
     throw error;
   }
-  await deps.store.markSent(
+  const completed = await deps.store.complete(
     identifier,
+    planned.stage,
     planned.covers,
     planned.text,
     channel,
-    commentId
+    commentId,
+    claim.token
   );
+  if (!completed) {
+    throw new Error(`${identifier}: the ${planned.stage} claim was lost.`);
+  }
   return { kind: "posted", stage: planned.stage };
 };
 

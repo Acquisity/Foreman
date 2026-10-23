@@ -74,12 +74,22 @@ export const STAGE_PATTERNS: Record<Stage, RegExp> = {
   ]),
 };
 
+const RECEIVED_WITH_OWNER = exactly([receivedText(SLOT)]);
+
 const normalized = (body: string): string =>
   body.trim().replace(WHITESPACE_RUN, " ");
 
 export const stageOfBody = (body: string): Stage | null => {
   const text = normalized(body);
   return STAGES.find((stage) => STAGE_PATTERNS[stage].test(text)) ?? null;
+};
+
+export const coversOf = (body: string): Stage[] => {
+  const stage = stageOfBody(body);
+  if (stage === "received" && RECEIVED_WITH_OWNER.test(normalized(body))) {
+    return ["received", "owner"];
+  }
+  return stage ? [stage] : [];
 };
 
 export const isReporterUpdate = (body: string): boolean =>

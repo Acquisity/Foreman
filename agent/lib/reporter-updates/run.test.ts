@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
+import { commentIdFor } from "./comment-id.js";
 import {
   bannedWordsIn,
   fixedText,
@@ -362,6 +363,138 @@ describe("once only, and never lost", () => {
       kind: "posted",
       stage: "not_fixed",
     });
+  });
+});
+
+describe("claims and recovery", () => {
+  const tick = () => new Promise((resolve) => setImmediate(resolve));
+  const settled = async () => {
+    await tick();
+    await tick();
+    await tick();
+  };
+
+  it("records both stages of a named received message when the record write failed, and never repeats the owner", async () => {
+    const s = setup([ticket()]);
+    s.memory.state.failNextMarkSent = true;
+    await assert.rejects(reconcile(s), { message: "database unavailable" });
+    assert.equal(s.linear.posts.length, 1);
+    assert.equal(s.linear.posts[0]?.body, receivedText("Sam"));
+    assert.deepEqual(await reconcile(s), {
+      kind: "recorded",
+      stage: "received",
+    });
+    assert.deepEqual(
+      (await s.memory.store.rows("ENG-1"))
+        .map((row) => [row.stage, row.status])
+        .sort((a, b) => String(a[0]).localeCompare(String(b[0]))),
+      [
+        ["owner", "sent"],
+        ["received", "sent"],
+      ]
+    );
+    assert.deepEqual(await reconcile(s), {
+      kind: "skipped",
+      why: "nothing_due",
+    });
+    assert.equal(s.linear.posts.length, 1);
+  });
+
+  it("writes one comment even when a claim expires while the first write is still in flight", async () => {
+    const t = ticket({ stateName: "Duplicate", stateType: "canceled" });
+    const s = setup([t]);
+    let release: () => void = () => undefined;
+    s.linear.state.holdNextPost = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const first = reconcile(s);
+    const firstSettled = first.then(
+      () => "posted",
+      (error: Error) => error.message
+    );
+    await settled();
+    s.memory.state.now += 11 * 60_000;
+    assert.deepEqual(await reconcile(s), {
+      kind: "posted",
+      stage: "not_fixed",
+    });
+    release();
+    assert.equal(await firstSettled, "ENG-1: the not_fixed claim was lost.");
+    assert.equal(s.linear.posts.length, 1);
+    assert.deepEqual(
+      (await s.memory.store.rows("ENG-1")).map((row) => row.status),
+      ["sent"]
+    );
+  });
+
+  it("treats a write that timed out after Linear created the comment as posted", async () => {
+    const s = setup([
+      ticket({ stateName: "Duplicate", stateType: "canceled" }),
+    ]);
+    s.linear.state.failAfterCreate = true;
+    assert.deepEqual(await reconcile(s), {
+      kind: "posted",
+      stage: "not_fixed",
+    });
+    assert.equal(s.linear.posts.length, 1);
+    assert.deepEqual(await reconcile(s), {
+      kind: "skipped",
+      why: "nothing_due",
+    });
+  });
+
+  it("recognises a comment by its id even if its wording was edited", async () => {
+    const t = ticket({ stateName: "Duplicate", stateType: "canceled" });
+    t.foremanComments.push({
+      body: "Edited by a person.",
+      id: commentIdFor("ENG-1", "not_fixed"),
+    });
+    const s = setup([t]);
+    assert.deepEqual(await reconcile(s), {
+      kind: "recorded",
+      stage: "not_fixed",
+    });
+    assert.equal(s.linear.posts.length, 0);
+  });
+
+  it("stops retrying a message after five failed attempts", async () => {
+    const s = setup([
+      ticket({ stateName: "Duplicate", stateType: "canceled" }),
+    ]);
+    await [1, 2, 3, 4, 5].reduce(async (previous) => {
+      await previous;
+      s.linear.state.failNextPost = true;
+      await assert.rejects(reconcile(s), { message: "Linear is unavailable" });
+    }, Promise.resolve());
+    assert.deepEqual(await reconcile(s), {
+      kind: "skipped",
+      why: "retries_exhausted",
+    });
+    assert.equal(s.linear.posts.length, 0);
+  });
+
+  it("ignores a release made with a claim that is no longer current", async () => {
+    const s = setup();
+    const first = await s.memory.store.claim("ENG-1", "fixed", "x", null);
+    s.memory.state.now += 11 * 60_000;
+    const second = await s.memory.store.claim("ENG-1", "fixed", "x", null);
+    assert.ok(first.ok && second.ok);
+    if (first.ok && second.ok) {
+      await s.memory.store.release("ENG-1", "fixed", first.token);
+      assert.equal((await s.memory.store.rows("ENG-1"))[0]?.status, "claimed");
+      assert.equal(
+        await s.memory.store.complete(
+          "ENG-1",
+          "fixed",
+          ["fixed"],
+          "x",
+          null,
+          "c",
+          first.token
+        ),
+        false
+      );
+    }
   });
 });
 

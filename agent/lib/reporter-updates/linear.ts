@@ -22,10 +22,12 @@ export interface TicketView {
 }
 
 export interface LinearPort {
+  findComment: (id: string) => Promise<{ parentId: string | null } | null>;
   postUnderAnchor: (
     issueId: string,
     anchorId: string,
-    body: string
+    body: string,
+    id: string
   ) => Promise<string>;
   readTicket: (identifier: string) => Promise<TicketView | null>;
   recentIdentifiers: (
@@ -64,6 +66,10 @@ const TICKET_QUERY = `query ReporterTicket($id: String!) {
       nodes { id body createdAt parent { id } user { id } }
     }
   }
+}`;
+
+const COMMENT_QUERY = `query ReporterComment($id: String!) {
+  comment(id: $id) { id parent { id } }
 }`;
 
 const RECENT_QUERY = `query ReporterRecent($team: ID!, $since: DateTimeOrDuration!, $created: DateTimeOrDuration!, $ask: String!, $after: String) {
@@ -114,6 +120,11 @@ const ticketSchema = z.object({
     .nullable(),
   viewer: z.object({ id: z.string() }),
 });
+const commentSchema = z.object({
+  comment: z
+    .object({ id: z.string(), parent: z.object({ id: z.string() }).nullable() })
+    .nullable(),
+});
 const recentSchema = z.object({
   issues: z.object({
     nodes: z.array(z.object({ identifier: z.string() })),
@@ -159,11 +170,24 @@ export const linearPort = (
       variables,
     });
   return {
-    async postUnderAnchor(issueId, anchorId, body) {
+    async findComment(id) {
+      try {
+        const data = commentSchema.parse(
+          await call(COMMENT_QUERY, "ReporterComment", { id })
+        );
+        return data.comment
+          ? { parentId: data.comment.parent?.id ?? null }
+          : null;
+      } catch {
+        return null;
+      }
+    },
+    async postUnderAnchor(issueId, anchorId, body, id) {
       const created = await createThreadComment({
         api: { fetch: timed },
         body,
         credentials: { accessToken },
+        id,
         issueId,
         parentId: anchorId,
       });
