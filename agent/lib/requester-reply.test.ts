@@ -1,11 +1,14 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
+  assertThreadComplete,
+  createThreadComment,
   directFollowUp,
   planReply,
   promptedFollowUp,
   relayedFollowUp,
   type ThreadComment,
+  ThreadIncompleteError,
 } from "./requester-reply.js";
 
 const FOREMAN = "foreman";
@@ -350,4 +353,80 @@ test("treats a mention with only punctuation around it as bare", () => {
       );
     }
   }
+});
+
+const created = (id: string) =>
+  Response.json({
+    data: {
+      commentCreate: {
+        comment: { id, url: `https://example.com/${id}` },
+        success: true,
+      },
+    },
+  });
+
+test("createThreadComment writes under the anchor and carries a client id when given one", async () => {
+  const bodies: {
+    query: string;
+    variables: { input: Record<string, string> };
+  }[] = [];
+  const api = {
+    fetch: (_url: string | URL | Request, init?: RequestInit) => {
+      bodies.push(JSON.parse(String(init?.body)));
+      return Promise.resolve(created("c1"));
+    },
+  };
+  const base = {
+    api,
+    body: "Hello",
+    credentials: { accessToken: "t" },
+    issueId: "i1",
+    parentId: "a1",
+  };
+  assert.deepEqual(await createThreadComment(base), {
+    id: "c1",
+    url: "https://example.com/c1",
+  });
+  await createThreadComment({
+    ...base,
+    id: "00000000-0000-4000-8000-000000000001",
+  });
+  assert.deepEqual(bodies[0]?.variables.input, {
+    body: "Hello",
+    issueId: "i1",
+    parentId: "a1",
+  });
+  assert.equal(
+    bodies[1]?.variables.input.id,
+    "00000000-0000-4000-8000-000000000001"
+  );
+});
+
+test("createThreadComment refuses a write Linear does not confirm", async () => {
+  const api = {
+    fetch: () =>
+      Promise.resolve(
+        Response.json({
+          data: { commentCreate: { comment: null, success: false } },
+        })
+      ),
+  };
+  await assert.rejects(
+    createThreadComment({
+      api,
+      body: "x",
+      credentials: { accessToken: "t" },
+      issueId: "i",
+      parentId: "a",
+    }),
+    { message: "Linear did not create the reply." }
+  );
+});
+
+test("assertThreadComplete refuses a thread it cannot read in full", () => {
+  assert.doesNotThrow(() => assertThreadComplete("ENG-1", false));
+  assert.throws(
+    () => assertThreadComplete("ENG-1", true),
+    ThreadIncompleteError
+  );
 });
