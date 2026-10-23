@@ -19,15 +19,22 @@ interface Call {
   variables: Record<string, unknown>;
 }
 
-/** A Linear stand-in: ENG-1 (Bug label, unassigned) and master ENG-9 (assigned to Ada). */
+/** A Linear stand-in: ENG-1 (Bug label, unassigned) and master ENG-9 (assigned to Anuj). */
 const READ_BACK_FAILED = /could not be read back/u;
 const BEFORE_ROUTING = /before routing/u;
 const LINEAR_BUSY = /Linear is busy/u;
 const NOTHING_WRITTEN = /Nothing was written/u;
 
-const labelsFor = (master: boolean, readBack: boolean) => {
+const labelsFor = (
+  master: boolean,
+  readBack: boolean,
+  ticketLabels?: { id: string; name: string }[]
+) => {
   if (master) {
     return [];
+  }
+  if (ticketLabels) {
+    return ticketLabels;
   }
   return readBack
     ? [
@@ -37,7 +44,17 @@ const labelsFor = (master: boolean, readBack: boolean) => {
     : [{ id: "l-bug", name: "Bug" }];
 };
 
-const fakeLinear = ({ readBackFails = false } = {}) => {
+const fakeLinear = ({
+  masterAssignee = { id: "u-anuj", name: "Anuj Bhatt" },
+  readBackFails = false,
+  teamLabels = [],
+  ticketLabels,
+}: {
+  masterAssignee?: { id: string; name: string };
+  readBackFails?: boolean;
+  teamLabels?: { id: string; name: string }[];
+  ticketLabels?: { id: string; name: string }[];
+} = {}) => {
   const calls: Call[] = [];
   const fetchStub: ProviderClient = (request) => {
     const body = {
@@ -67,10 +84,10 @@ const fakeLinear = ({ readBackFails = false } = {}) => {
       return json({
         data: {
           issue: {
-            assignee: master || readBack ? { id: "u-ada", name: "Ada" } : null,
+            assignee: master || readBack ? masterAssignee : null,
             id: master ? "i-9" : "i-1",
             identifier: body.variables.id,
-            labels: { nodes: labelsFor(master, readBack) },
+            labels: { nodes: labelsFor(master, readBack, ticketLabels) },
             parent: null,
             priority: readBack ? 3 : 0,
             project: readBack ? { id: "p-support", name: "Support" } : null,
@@ -95,7 +112,10 @@ const fakeLinear = ({ readBackFails = false } = {}) => {
         : json({
             data: {
               issueLabels: {
-                nodes: [{ id: "l-cr", name: "Customer reported" }],
+                nodes: [
+                  { id: "l-cr", name: "Customer reported" },
+                  ...teamLabels,
+                ],
                 pageInfo: { endCursor: null, hasNextPage: false },
               },
             },
@@ -114,7 +134,7 @@ const fakeLinear = ({ readBackFails = false } = {}) => {
     }
     if (q === "linear.Users") {
       return json({
-        data: { users: { nodes: [{ id: "u-grace", name: "Grace" }] } },
+        data: { users: { nodes: [{ id: "u-ebu", name: "Ebubeker Rexha" }] } },
       });
     }
     if (q === "linear.RouteIssueUpdate") {
@@ -159,7 +179,7 @@ describe("routeTicket", () => {
     const [update] = linear.updates();
     assert.equal(linear.updates().length, 1);
     assert.deepEqual(update?.variables.input, {
-      assigneeId: "u-ada",
+      assigneeId: "u-anuj",
       labelIds: ["l-bug", "l-cr"],
       priority: 3,
       projectId: "p-support",
@@ -267,20 +287,28 @@ describe("routeTicket", () => {
   it("inherits an assigned master and falls back to assignee for an unassigned one", async () => {
     const inherited = fakeLinear();
     await routeTicket(
-      { assignee: "Grace", inheritAssigneeFrom: "ENG-9", issue: "ENG-1" },
+      {
+        assignee: "Ebubeker Rexha",
+        inheritAssigneeFrom: "ENG-9",
+        issue: "ENG-1",
+      },
       { client: inherited.fetchStub }
     );
     assert.deepEqual(inherited.updates()[0]?.variables.input, {
-      assigneeId: "u-ada",
+      assigneeId: "u-anuj",
     });
 
     const fallback = fakeLinear();
     await routeTicket(
-      { assignee: "Grace", inheritAssigneeFrom: "ENG-1", issue: "ENG-1" },
+      {
+        assignee: "Ebubeker Rexha",
+        inheritAssigneeFrom: "ENG-1",
+        issue: "ENG-1",
+      },
       { client: fallback.fetchStub }
     );
     const [update] = fallback.updates();
-    assert.deepEqual(update?.variables.input, { assigneeId: "u-grace" });
+    assert.deepEqual(update?.variables.input, { assigneeId: "u-ebu" });
   });
 
   it("fails before any write when the duplicate target does not exist", async () => {
@@ -305,6 +333,123 @@ describe("routeTicket", () => {
       UNKNOWN_LABEL
     );
     assert.equal(linear.updates().length, 0);
+  });
+});
+
+const FEATURE_LABELS = [
+  { id: "l-fr", name: "Feature Request" },
+  { id: "l-ok", name: "Approved" },
+  { id: "l-area", name: "Area: CRM Records" },
+];
+const NOT_IN_MAP = /"Pieter Venter" is not in the owner map/u;
+const OTHER_NOT_IN_MAP = /"Jil Patel" is not in the owner map/u;
+const A_DEVELOPER = /Ebubeker Rexha is a developer/u;
+const NOT_INHERITED =
+  /not in the owner map, so the assignee was not inherited/u;
+
+describe("routeTicket owner map", () => {
+  it("refuses an assignee who is not in the owner map before any write", async () => {
+    const cases: [string, RegExp][] = [
+      ["Pieter Venter", NOT_IN_MAP],
+      ["Jil Patel", OTHER_NOT_IN_MAP],
+    ];
+    await Promise.all(
+      cases.map(async ([assignee, message]) => {
+        const linear = fakeLinear();
+        await assert.rejects(
+          routeTicket(
+            { assignee, issue: "ENG-1" },
+            { client: linear.fetchStub }
+          ),
+          message
+        );
+        assert.equal(linear.updates().length, 0);
+      })
+    );
+  });
+
+  it("assigns a mapped developer to a Bug, by name", async () => {
+    const linear = fakeLinear();
+    await routeTicket(
+      { assignee: "ebubeker rexha", issue: "ENG-1" },
+      { client: linear.fetchStub }
+    );
+    const users = linear.calls.find((c) => c.query === "linear.Users");
+    assert.equal(users?.variables.name, "Ebubeker Rexha");
+    assert.deepEqual(linear.updates()[0]?.variables.input, {
+      assigneeId: "u-ebu",
+    });
+  });
+
+  it("refuses a developer for a ticket that is neither a Bug nor an approved feature request", async () => {
+    const kinds = [
+      { labels: [], name: "unlabelled" },
+      { labels: [{ id: "l-fr", name: "Feature Request" }], name: "unapproved" },
+      { labels: [{ id: "l-ok", name: "Approved" }], name: "approved only" },
+    ];
+    await Promise.all(
+      kinds.map(async (kind) => {
+        const linear = fakeLinear({
+          teamLabels: FEATURE_LABELS,
+          ticketLabels: kind.labels,
+        });
+        await assert.rejects(
+          routeTicket(
+            { assignee: "Ebubeker Rexha", issue: "ENG-1" },
+            { client: linear.fetchStub }
+          ),
+          A_DEVELOPER,
+          kind.name
+        );
+        assert.equal(linear.updates().length, 0, kind.name);
+      })
+    );
+  });
+
+  it("counts the labels being added when it checks the gate", async () => {
+    const linear = fakeLinear({
+      teamLabels: FEATURE_LABELS,
+      ticketLabels: [{ id: "l-fr", name: "Feature Request" }],
+    });
+    await routeTicket(
+      {
+        addLabels: ["Approved", "Area: CRM Records"],
+        assignee: "Ebubeker Rexha",
+        issue: "ENG-1",
+      },
+      { client: linear.fetchStub }
+    );
+    assert.deepEqual(linear.updates()[0]?.variables.input, {
+      assigneeId: "u-ebu",
+      labelIds: ["l-fr", "l-ok", "l-area"],
+    });
+  });
+
+  it("lets a support owner take any ticket", async () => {
+    const linear = fakeLinear({ ticketLabels: [] });
+    await routeTicket(
+      { assignee: "Aaron Fraga", issue: "ENG-1" },
+      { client: linear.fetchStub }
+    );
+    assert.equal(linear.updates().length, 1);
+  });
+
+  it("does not inherit an assignee outside the map and uses the fallback", async () => {
+    const linear = fakeLinear({
+      masterAssignee: { id: "u-gone", name: "Pieter Venter" },
+    });
+    const result = await routeTicket(
+      {
+        assignee: "Ebubeker Rexha",
+        inheritAssigneeFrom: "ENG-9",
+        issue: "ENG-1",
+      },
+      { client: linear.fetchStub }
+    );
+    assert.deepEqual(linear.updates()[0]?.variables.input, {
+      assigneeId: "u-ebu",
+    });
+    assert.match(result.warnings[0] ?? "", NOT_INHERITED);
   });
 });
 

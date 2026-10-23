@@ -1,6 +1,14 @@
 import { type ProviderClient, requiredClient } from "./executor/operations.js";
 import type { LinearOperation } from "./linear-operations.js";
 import { parseLinearResponse } from "./linear-response.js";
+import {
+  APPROVED_LABEL,
+  BUG_LABEL,
+  developerLabelsAllowed,
+  FEATURE_REQUEST_LABEL,
+  mappedOwner,
+  ownerNames,
+} from "./owner-map.js";
 
 /** Fixed Linear GraphQL operations. The injected Executor transport supplies provider authentication; this module retains routing and document semantics. */
 
@@ -442,28 +450,45 @@ async function resolveLabelIds(
   ].filter(Boolean);
 }
 
-/**
- * The assignee id: the source issue's assignee when `inheritAssigneeFrom` is
- * given and that issue has one; otherwise `assignee` by name or email, which
- * therefore acts as the fallback for an unassigned master.
- */
 async function resolveAssigneeId(
   gql: Gql,
+  issue: RouteIssue,
   input: RouteTicketInput
-): Promise<string | undefined> {
+): Promise<{ id?: string; warnings: string[] }> {
+  const warnings: string[] = [];
   if (input.inheritAssigneeFrom !== undefined) {
     const source = await requireIssue(gql, input.inheritAssigneeFrom);
+    if (source.assignee && mappedOwner(source.assignee.name)) {
+      return { id: source.assignee.id, warnings };
+    }
     if (source.assignee) {
-      return source.assignee.id;
+      warnings.push(
+        `${input.inheritAssigneeFrom} is held by ${source.assignee.name}, who is not in the owner map, so the assignee was not inherited.`
+      );
     }
   }
-  if (input.assignee !== undefined) {
-    const { users } = await gql<{ users: { nodes: Named[] } }>("Users", {
-      name: input.assignee,
-    });
-    return exactlyOne("user", input.assignee, users.nodes);
+  if (input.assignee === undefined) {
+    return { warnings };
   }
-  return undefined;
+  const owner = mappedOwner(input.assignee);
+  if (!owner) {
+    throw new Error(
+      `"${input.assignee}" is not in the owner map, so nothing was assigned. Use one of: ${ownerNames().join(", ")}.`
+    );
+  }
+  const labels = [
+    ...issue.labels.nodes.map((label) => label.name),
+    ...(input.addLabels ?? []),
+  ];
+  if (owner.lane === "developer" && !developerLabelsAllowed(labels)) {
+    throw new Error(
+      `${owner.name} is a developer. A ticket goes to a developer only when it is labelled ${BUG_LABEL}, or ${FEATURE_REQUEST_LABEL} and ${APPROVED_LABEL}. Add the label or leave the assignee unchanged.`
+    );
+  }
+  const { users } = await gql<{ users: { nodes: Named[] } }>("Users", {
+    name: owner.name,
+  });
+  return { id: exactlyOne("user", owner.name, users.nodes), warnings };
 }
 
 /** Builds the single issueUpdate input from the decisions given. */
@@ -471,7 +496,7 @@ async function buildUpdate(
   gql: Gql,
   issue: RouteIssue,
   input: RouteTicketInput
-): Promise<Record<string, unknown>> {
+): Promise<{ update: Record<string, unknown>; warnings: string[] }> {
   const update: Record<string, unknown> = {};
   if (input.addLabels?.length) {
     update.labelIds = await resolveLabelIds(gql, issue, input.addLabels);
@@ -496,14 +521,14 @@ async function buildUpdate(
       projects.nodes
     );
   }
-  const assigneeId = await resolveAssigneeId(gql, input);
-  if (assigneeId !== undefined) {
-    update.assigneeId = assigneeId;
+  const assignee = await resolveAssigneeId(gql, issue, input);
+  if (assignee.id !== undefined) {
+    update.assigneeId = assignee.id;
   }
   if (input.parent !== undefined) {
     update.parentId = (await requireIssue(gql, input.parent)).id;
   }
-  return update;
+  return { update, warnings: assignee.warnings };
 }
 
 /**
@@ -524,7 +549,7 @@ export async function routeTicket(
 
   const issue = await requireIssue(gql, input.issue);
 
-  const update = await buildUpdate(gql, issue, input);
+  const { update, warnings } = await buildUpdate(gql, issue, input);
   // Resolve the duplicate target before the first write, so a bad identifier
   // fails the whole call rather than leaving a routed ticket with no relation.
   const master =
@@ -546,7 +571,6 @@ export async function routeTicket(
 
   // The update above is the write. Anything after it that fails is reported
   // as a warning on a routed result, never as an unrouted ticket.
-  const warnings: string[] = [];
   const reason = (error: unknown) =>
     error instanceof Error ? error.message : String(error);
   // Caller cancellation is never a warning; the tool rethrows it.

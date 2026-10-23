@@ -13,7 +13,7 @@ export default defineTool({
   description:
     "Apply final routing decisions to a Linear ticket in one write: state, priority, labels to add, project, assignee, parent, and duplicate relation, then read it back. " +
     "Labels are added to the ones already on the ticket, never replaced; an unknown label name fails before any write and lists the valid names. " +
-    "Names are resolved for you: state by name within the ticket's team, project by name, assignee by name or email. " +
+    "Names are resolved for you: state by name within the ticket's team and project by name. The assignee must be a person in the owner map, given by name; any other name fails before any write. A developer takes a ticket only when it is labelled Bug, or Feature Request and Approved, counting the labels being added; support owners are not gated. " +
     "For a duplicate pass duplicateOf and inheritAssigneeFrom with the same master; when that master has an assignee it is inherited, otherwise assignee (the area owner) is used as the fallback. " +
     "links attach urls as resources on the ticket. Use the returned projectId for memory recording. " +
     "routed true with warnings means the ticket was updated but a relation or link after it failed; read the warning before retrying only that part.",
@@ -43,7 +43,7 @@ export default defineTool({
     assignee: name
       .optional()
       .describe(
-        "User name or email; with inheritAssigneeFrom, the fallback for an unassigned source."
+        "An owner-map person by name; with inheritAssigneeFrom, the fallback for an unassigned source or one held by someone outside the map."
       ),
     duplicateOf: identifier
       .optional()
