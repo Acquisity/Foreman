@@ -17,6 +17,7 @@ const OPS_FIELD_KEYS = [
   "assigneeKind",
   "blockingFindings",
   "classification",
+  "classificationConfidence",
   "code",
   "connection",
   "conversationId",
@@ -27,14 +28,18 @@ const OPS_FIELD_KEYS = [
   "message",
   "outcome",
   "path",
+  "pathConfidence",
   "project",
   "requests",
+  "reviewKind",
+  "reviewRequired",
   "runId",
   "sessionId",
   "stepIndex",
   "tool",
   "turnId",
   "verdict",
+  "verdictConfidence",
 ] as const;
 
 type OpsField = (typeof OPS_FIELD_KEYS)[number];

@@ -5,6 +5,7 @@ import type { TriageDecision } from "./jev-decisions.js";
 
 export interface LatestTriageDecision {
   classification: string | null;
+  closureReview?: boolean;
   issue: string;
   outcome: "route" | "unproven";
   path: string | null;
@@ -26,6 +27,60 @@ export const criticTaskIssues = defineState<Record<string, string>>(
   "foreman.criticTaskIssues",
   () => ({})
 );
+
+export interface CriticRounds {
+  objections: number;
+  ran: boolean;
+}
+
+export const criticRounds = defineState<Record<string, CriticRounds>>(
+  "foreman.criticRounds",
+  () => ({})
+);
+
+export const CRITIC_OBJECTION_LIMIT = 2;
+
+export function settleCriticRound(
+  rounds: Readonly<Record<string, CriticRounds>>,
+  issue: string,
+  verdict: CriticVerdictFields["verdict"]
+): Record<string, CriticRounds> {
+  let { objections } = rounds[issue] ?? { objections: 0 };
+  if (verdict === "APPROVE") {
+    objections = 0;
+  } else if (verdict !== "failed") {
+    objections += 1;
+  }
+  return { ...rounds, [issue]: { objections, ran: true } };
+}
+
+export const criticBlocked = (
+  rounds: Readonly<Record<string, CriticRounds>>,
+  issue: string
+): boolean => (rounds[issue]?.objections ?? 0) >= CRITIC_OBJECTION_LIMIT;
+
+const ownerOnly = (input: RouteInput & Record<string, unknown>): boolean =>
+  Object.entries(input).every(
+    ([key, value]) =>
+      key === "issue" || key === "assignee" || value === undefined
+  );
+
+export function routeRefusal(
+  decisions: Readonly<Record<string, LatestTriageDecision>>,
+  rounds: Readonly<Record<string, CriticRounds>>,
+  input: RouteInput & Record<string, unknown>
+): string | null {
+  if (ownerOnly(input)) {
+    return null;
+  }
+  if (criticBlocked(rounds, input.issue)) {
+    return `The critic objected to ${input.issue} twice, so it is not routed. Leave its state, priority, labels and project as they are, record the objections in the investigation document, and call route_ticket with only issue and assignee set to the area owner.`;
+  }
+  if (decisions[input.issue]?.closureReview && !rounds[input.issue]?.ran) {
+    return `${input.issue} is a closure or duplicate that needs the critic's second check first. Delegate to the critic with a first line of exactly "Source issue: ${input.issue}", then route once it settles.`;
+  }
+  return null;
+}
 
 export function settleDecision(
   decisions: Readonly<Record<string, LatestTriageDecision>>,
@@ -70,12 +125,22 @@ export function decisionFields(
   return decision.outcome === "route"
     ? {
         classification: decision.classification,
+        closureReview:
+          decision.review.required && decision.review.kind !== "bug",
         issue,
         outcome: "route",
         path: decision.path,
       }
     : { classification: null, issue, outcome: "unproven", path: null };
 }
+
+export const confidenceFields = (decision: TriageDecision) => ({
+  classificationConfidence: decision.confidence.classification,
+  pathConfidence: decision.confidence.path,
+  reviewKind: decision.review.kind,
+  reviewRequired: decision.review.required,
+  verdictConfidence: decision.confidence.verdict,
+});
 
 const criticReply = z.object({
   blocking_findings: z.array(z.unknown()),

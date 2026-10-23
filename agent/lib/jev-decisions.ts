@@ -35,6 +35,7 @@ import {
 export const BARS = {
   /** Below this, money versus product is unclear and the model follows the leaning. */
   askKind: 0.7,
+  classification: 0.6,
   /** Below this, an existing investigation is not reused. */
   continuation: 0.6,
   /** A billing verdict below this is left to a person. */
@@ -49,6 +50,7 @@ export const BARS = {
   grounded: 0.5,
   /** Below this, a hotlane call goes to a person instead of the fast lane. */
   incident: 0.6,
+  path: 0.6,
   /** Below this, the priority band takes the higher neighbour. */
   priorityBand: 0.6,
   /** Below this, the project is left unset and the area decides the owner. */
@@ -206,7 +208,17 @@ const LOW_PATHS = new Set<HandlingPath>([
   "Resolved by triage",
 ]);
 
+export interface BillingFacts {
+  checkedAt: string;
+  domainsLive: boolean | null;
+  organizationId: string;
+  paymentsFailing: boolean | null;
+  source: string;
+  subscriptionPaid: boolean | null;
+}
+
 export interface TriageInput {
+  billingFacts?: BillingFacts;
   blastRadius?: {
     countedAt: string;
     orgs: number;
@@ -223,10 +235,38 @@ export interface TriageInput {
   }[];
   evidence: string;
   identifier: string;
+  organizationId?: string;
   projects: { description?: string; name: string }[];
   rootCauseLabels: string[];
   sourceLabels: string[];
   ticketLabels?: string[];
+  unavailableLanes?: string[];
+}
+
+export const REVIEW_KINDS = [
+  "bug",
+  "duplicate",
+  "platform_limitation",
+  "user_error",
+  "billing_inbox",
+] as const;
+export type ReviewKind = (typeof REVIEW_KINDS)[number];
+
+export interface ReviewDecision {
+  kind: ReviewKind | null;
+  reason: string;
+  required: boolean;
+}
+
+export interface TriageConfidence {
+  classification: number;
+  path: number;
+  verdict: number;
+}
+
+export interface BillingCheck {
+  failures: string[];
+  outcome: "failed" | "passed";
 }
 
 export interface TriageRoute {
@@ -243,22 +283,27 @@ export interface TriageRoute {
 
 export type TriageDecision =
   | {
+      confidence: TriageConfidence;
       missing: string[];
       notes: string[];
       outcome: "unproven";
+      review: ReviewDecision;
       verdict: { confidence: number; value: string };
     }
   | {
       approval: "approved" | "needed" | "not-applicable";
       area: Ownership["area"];
       assignee: string | null;
+      billingCheck?: BillingCheck;
       classification: TriageClassification;
+      confidence: TriageConfidence;
       /** The incident-hotlane route, only for a Bug that is not a Duplicate. */
       hotlane?: HotlaneDecision;
       needsCriticReview: boolean;
       notes: string[];
       outcome: "route";
       path: HandlingPath;
+      review: ReviewDecision;
       route: TriageRoute;
       verdict: { confidence: number; value: string };
     };
@@ -297,6 +342,11 @@ export function triageQuestions(
         "Given the evidence, which one classification fits the root cause? Rule out settings, configuration, permissions, billing, provider limits, and expected behaviour before calling it a bug.",
       type: "choice",
     },
+    customer_saw_failure: {
+      instructions:
+        "Does the report describe a failure the customer saw, such as an error message, something that stopped working, or a wrong result?",
+      type: "boolean",
+    },
     data_loss_or_security: {
       instructions:
         "Does the evidence show data corruption, data loss, or a security exposure?",
@@ -317,6 +367,11 @@ export function triageQuestions(
       instructions:
         "How severe is the impact, weighing blast radius, then frequency, then customer tier? A workaround does not reduce it.",
       type: "score",
+    },
+    inbox_error: {
+      instructions:
+        "Is this report about an error on the customer's sending inboxes or mailboxes, such as inboxes disconnected, erroring, or not sending?",
+      type: "boolean",
     },
     incident: {
       criteria: { ...HOTLANE_ROUTES },
@@ -490,40 +545,308 @@ const resolveLabels = (
   return [...new Set(labels)];
 };
 
+const BILLING_FACTS_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+const BILLING_FACTS_CLOCK_SKEW_MS = 5 * 60 * 1000;
+const COULD_NOT_RUN = /could not run/iu;
+
+const BILLING_GAP =
+  "A billing check for the inbox error: the subscription is paid, payments are not failing, and the domains are live at the supplier, read now for this workspace.";
+
+const inspectBillingFacts = (
+  input: TriageInput,
+  now: Date
+): { gaps: string[] } | BillingCheck => {
+  const facts = input.billingFacts;
+  if (!facts) {
+    return { gaps: [BILLING_GAP] };
+  }
+  const readAt = Date.parse(facts.checkedAt);
+  const age = now.getTime() - readAt;
+  if (
+    Number.isNaN(readAt) ||
+    age > BILLING_FACTS_MAX_AGE_MS ||
+    age < -BILLING_FACTS_CLOCK_SKEW_MS
+  ) {
+    return { gaps: [`${BILLING_GAP} The facts given are stale or undated.`] };
+  }
+  if (!input.organizationId || facts.organizationId !== input.organizationId) {
+    return {
+      gaps: [`${BILLING_GAP} The facts are not tied to the pinned workspace.`],
+    };
+  }
+  const failures = [
+    ...(facts.subscriptionPaid === false
+      ? ["The subscription is not paid."]
+      : []),
+    ...(facts.paymentsFailing === true ? ["Payments are failing."] : []),
+    ...(facts.domainsLive === false
+      ? ["The domains are not live at the supplier."]
+      : []),
+  ];
+  if (failures.length > 0) {
+    return { failures, outcome: "failed" };
+  }
+  const unknown = [
+    facts.subscriptionPaid === null ? "whether the subscription is paid" : null,
+    facts.paymentsFailing === null ? "whether payments are failing" : null,
+    facts.domainsLive === null ? "whether the domains are live" : null,
+  ].filter((gap): gap is string => gap !== null);
+  return unknown.length > 0
+    ? { gaps: [`${BILLING_GAP} Not known: ${unknown.join(", ")}.`] }
+    : { failures: [], outcome: "passed" };
+};
+
+const UNPROVEN_REVIEW: ReviewDecision = {
+  kind: null,
+  reason: "the ticket stays open as unproven",
+  required: false,
+};
+
+interface BarContext {
+  answers: Answers;
+  classification: TriageClassification;
+  classificationConfidence: number;
+  duplicate: ReturnType<typeof findDuplicate>;
+  input: TriageInput;
+  pathConfidence: number;
+}
+
+const barGap = (
+  context: BarContext
+): { missing: string[]; note: string } | null => {
+  if (context.classificationConfidence < BARS.classification) {
+    return {
+      missing: ["A deciding confirmation for the classification."],
+      note: "The classification was not clear enough to act on.",
+    };
+  }
+  if (!context.duplicate && context.pathConfidence < BARS.path) {
+    return {
+      missing: ["A deciding confirmation for the handling path."],
+      note: "The handling path was not clear enough to act on.",
+    };
+  }
+  if (context.classification === "Bug" && !context.duplicate) {
+    const missing = bugBarGaps(context.input, context.answers);
+    if (missing.length > 0) {
+      return { missing, note: "Not a Bug yet: the Bug bar is not met." };
+    }
+  }
+  return null;
+};
+
+interface InboxGateContext {
+  answers: Answers;
+  classification: TriageClassification;
+  confidence: TriageConfidence;
+  duplicate: ReturnType<typeof findDuplicate>;
+  input: TriageInput;
+  notes: string[];
+  now: Date;
+  verdict: { confidence: number; value: string };
+}
+
+const gateInboxError = (
+  context: InboxGateContext
+): { billingCheck: BillingCheck } | { decision: TriageDecision } | null => {
+  const { answers, classification, confidence, duplicate, input, notes } =
+    context;
+  if (
+    probabilityOf(answers.inbox_error) < BARS.signal ||
+    !(classification === "Bug" || duplicate)
+  ) {
+    return null;
+  }
+  const inspected = inspectBillingFacts(input, context.now);
+  if ("gaps" in inspected) {
+    notes.push(
+      "An inbox error cannot be called a bug or linked to a master before the billing check."
+    );
+    return {
+      decision: {
+        confidence,
+        missing: inspected.gaps,
+        notes,
+        outcome: "unproven",
+        review: UNPROVEN_REVIEW,
+        verdict: context.verdict,
+      },
+    };
+  }
+  if (inspected.outcome === "passed") {
+    notes.push("The billing check passed: paid, not failing, domains live.");
+    return { billingCheck: inspected };
+  }
+  notes.push(
+    `The inbox error is billing, not a code bug: ${inspected.failures.join(" ")}`
+  );
+  if (duplicate) {
+    notes.push(
+      `The match with ${duplicate.candidate.identifier} was set aside.`
+    );
+  }
+  const path: HandlingPath = "Support/Financial";
+  return {
+    decision: {
+      assignee: "Aaron Fraga",
+      billingCheck: inspected,
+      classification: "Platform Limitation",
+      confidence,
+      needsCriticReview: true,
+      notes,
+      outcome: "route",
+      path,
+      review: {
+        kind: "billing_inbox",
+        reason: "an inbox error was set aside as billing, not code",
+        required: true,
+      },
+      route: {
+        addLabels: [...new Set(input.sourceLabels)],
+        assignee: "Aaron Fraga",
+        priority: resolvePriority(path, undefined, answers, notes),
+        project: "Support",
+        state: PATH_STATE[path],
+      },
+      verdict: context.verdict,
+    },
+  };
+};
+
+const reviewOf = (
+  input: TriageInput,
+  answers: Answers,
+  settled: {
+    classification: TriageClassification;
+    duplicate: boolean;
+    path: HandlingPath;
+  }
+): ReviewDecision => {
+  const { classification, duplicate, path } = settled;
+  if (duplicate) {
+    return {
+      kind: "duplicate",
+      reason: "a duplicate closes this ticket on another ticket's cause",
+      required: true,
+    };
+  }
+  if (classification === "Bug") {
+    return {
+      kind: "bug",
+      reason: "a Bug is routed to engineering",
+      required: true,
+    };
+  }
+  if (
+    classification === "Platform Limitation" ||
+    path === "Platform Limitation"
+  ) {
+    return {
+      kind: "platform_limitation",
+      reason: "a platform limitation closes the ticket as expected behaviour",
+      required: true,
+    };
+  }
+  const closes = PATH_STATE[path] === "Done";
+  const laneGap =
+    (input.unavailableLanes?.length ?? 0) > 0 ||
+    COULD_NOT_RUN.test(input.evidence);
+  if (closes && laneGap) {
+    return {
+      kind: "user_error",
+      reason:
+        "an evidence lane could not run, so the user error rests on missing evidence",
+      required: true,
+    };
+  }
+  if (closes && probabilityOf(answers.customer_saw_failure) >= BARS.signal) {
+    return {
+      kind: "user_error",
+      reason: "the customer saw a failure that the user error explains away",
+      required: true,
+    };
+  }
+  let reason =
+    "every evidence lane ran and the report names no failure the customer saw";
+  if (path === "Resolved by triage") {
+    reason = "the already-fixed check for this path ships separately";
+  } else if (!closes) {
+    reason = "the ticket stays open for a person";
+  }
+  return { kind: null, reason, required: false };
+};
+
 /** Turns Jev's answers into the triage decision. Pure, so it is tested alone. */
 export function resolveTriage(
   input: TriageInput,
-  answers: Answers
+  answers: Answers,
+  now: Date = new Date()
 ): TriageDecision {
   const notes: string[] = [];
-  const { choice, confidence } = choiceOf(answers.verdict);
-  const verdict = { confidence, value: choice };
+  const verdictPick = choiceOf(answers.verdict);
+  const verdict = {
+    confidence: verdictPick.confidence,
+    value: verdictPick.choice,
+  };
+  const classificationPick = choiceOf(answers.classification);
+  const pathPick = choiceOf(answers.path);
+  const confidence: TriageConfidence = {
+    classification: classificationPick.confidence,
+    path: pathPick.confidence,
+    verdict: verdict.confidence,
+  };
+  const unproven = (missing: string[]): TriageDecision => ({
+    confidence,
+    missing,
+    notes,
+    outcome: "unproven",
+    review: UNPROVEN_REVIEW,
+    verdict,
+  });
   if (verdict.value === "unproven" || verdict.confidence < BARS.verdict) {
-    return {
-      missing: ["A deciding confirmation for the claim."],
-      notes,
-      outcome: "unproven",
-      verdict,
-    };
+    return unproven(["A deciding confirmation for the claim."]);
   }
 
   const duplicate = findDuplicate(input, answers);
   const classification =
     CLASSIFICATION_NAMES[
-      choiceOf(answers.classification)
-        .choice as keyof typeof CLASSIFICATION_NAMES
+      classificationPick.choice as keyof typeof CLASSIFICATION_NAMES
     ];
-  if (classification === "Bug" && !duplicate) {
-    const missing = bugBarGaps(input, answers);
-    if (missing.length > 0) {
-      notes.push("Not a Bug yet: the Bug bar is not met.");
-      return { missing, notes, outcome: "unproven", verdict };
-    }
+  if (duplicate) {
+    confidence.path = duplicate.confidence;
+  }
+
+  const gate = gateInboxError({
+    answers,
+    classification,
+    confidence,
+    duplicate,
+    input,
+    notes,
+    now,
+    verdict,
+  });
+  if (gate && "decision" in gate) {
+    return gate.decision;
+  }
+  const billingCheck = gate?.billingCheck;
+
+  const gap = barGap({
+    answers,
+    classification,
+    classificationConfidence: classificationPick.confidence,
+    duplicate,
+    input,
+    pathConfidence: pathPick.confidence,
+  });
+  if (gap) {
+    notes.push(gap.note);
+    return unproven(gap.missing);
   }
 
   const path: HandlingPath = duplicate
     ? "Duplicate"
-    : (choiceOf(answers.path).choice as HandlingPath);
+    : (pathPick.choice as HandlingPath);
   const project = choiceOf(answers.project);
   const projectSettled =
     project.choice !== UNDETERMINED && project.confidence >= BARS.project;
@@ -532,7 +855,6 @@ export function resolveTriage(
       "The evidence does not settle the owning project; say which evidence is missing in the document."
     );
   }
-  const needsCriticReview = classification === "Bug" && path !== "Duplicate";
   const ownership = resolveOwnership({
     answers,
     bar: BARS.project,
@@ -551,19 +873,27 @@ export function resolveTriage(
     answers,
     notes
   );
+  const review = reviewOf(input, answers, {
+    classification,
+    duplicate: Boolean(duplicate),
+    path: ownership.path,
+  });
 
   return {
     approval: ownership.approval,
     area: ownership.area,
     assignee: ownership.assignee,
+    ...(billingCheck ? { billingCheck } : {}),
     classification,
-    ...(needsCriticReview
+    confidence,
+    ...(classification === "Bug" && ownership.path !== "Duplicate"
       ? { hotlane: resolveHotlane(answers, BARS.incident) }
       : {}),
-    needsCriticReview,
+    needsCriticReview: review.required,
     notes,
     outcome: "route",
     path: ownership.path,
+    review,
     route: {
       ...ownershipRoute(ownership, labels),
       priority,

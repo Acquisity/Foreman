@@ -126,6 +126,48 @@ describe("replay result", () => {
     });
   });
 
+  it("does not complete a routed duplicate until the critic has a result", async (t) => {
+    await replayProcess(t);
+    noTransport(t);
+    await toolResult(
+      "decide_triage",
+      routeDecision({
+        needsCriticReview: true,
+        review: { kind: "duplicate", reason: "r", required: true },
+      })
+    );
+    await routeTicket(
+      {
+        addLabels: ["Bug"],
+        duplicateOf: "ENG-90",
+        inheritAssigneeFrom: "ENG-90",
+        issue: "ENG-100",
+        project: "Cold Email Core",
+        state: "Duplicate",
+      },
+      { client: executorClient(ctx) }
+    );
+    await endTurn();
+    assert.equal(buildReplayResult(await state(), RUN).status, "failed");
+    await replayHandler("task.settled")(
+      {
+        data: {
+          callId: "critic-1",
+          kind: "agent",
+          name: "critic",
+          output: {
+            blocking_findings: [],
+            criteria_results: [],
+            verdict: "APPROVE",
+          },
+          status: "completed",
+        },
+      },
+      rootCtx
+    );
+    assert.equal(buildReplayResult(await state(), RUN).status, "completed");
+  });
+
   it("waits for the critic when the decision needs review", async (t) => {
     await replayProcess(t);
     noTransport(t);

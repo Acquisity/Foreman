@@ -6,13 +6,22 @@ import {
   assigneeKind,
   BILLING_PATH,
   billingDecisionFields,
+  confidenceFields,
+  criticBlocked,
   criticTaskIssue,
   criticVerdictFields,
   criticVerdictIssue,
   decisionFields,
   routeDecisionEvent,
+  routeRefusal,
+  settleCriticRound,
   settleDecision,
 } from "./triage-log.js";
+import { prepareReplayArchive } from "./triage-replay/archive.js";
+
+const FIRST_LINE_RULE = /Source issue: ENG-1/u;
+const TWICE_RULE = /objected to ENG-1 twice/u;
+const UNPACK = /tar -xzf .* && test ! -e \/workspace\/repo\/\.git/u;
 
 const criteria = (fail: number) =>
   CRITIC_CRITERIA.map((criterion, i) => ({
@@ -61,9 +70,11 @@ describe("triage.decision fields", () => {
   it("keeps the final decision's outcome, classification and path with the issue", () => {
     assert.deepEqual(
       decisionFields("ENG-1", {
+        confidence: { classification: 0.9, path: 0.9, verdict: 0.4 },
         missing: ["x"],
         notes: [],
         outcome: "unproven",
+        review: { kind: null, reason: "r", required: false },
         verdict: { confidence: 0.4, value: "unproven" },
       }),
       { classification: null, issue: "ENG-1", outcome: "unproven", path: null }
@@ -252,5 +263,176 @@ describe("issue-bound decisions", () => {
     assert.equal(criticTaskIssue({ message: 42 }), null);
     assert.equal(criticVerdictIssue({ c1: "ENG-3" }, "c1"), "ENG-3");
     assert.equal(criticVerdictIssue({ c1: "ENG-3" }, "c2"), null);
+  });
+});
+
+describe("replay archive", () => {
+  it("unpacks the pinned archive with no history and writes the repository marker", async () => {
+    const commands: string[] = [];
+    const files: Record<string, unknown> = {};
+    const sandbox = {
+      run: (options: { command: string }) => {
+        commands.push(options.command);
+        return Promise.resolve({ exitCode: 0, stderr: "", stdout: "" });
+      },
+      writeBinaryFile: (o: { content: unknown; path: string }) => {
+        files[o.path] = o.content;
+        return Promise.resolve();
+      },
+      writeTextFile: (o: { content: string; path: string }) => {
+        files[o.path] = o.content;
+        return Promise.resolve();
+      },
+    } as never;
+    const error = await prepareReplayArchive(
+      sandbox,
+      {
+        commit: "a".repeat(40),
+        url: "https://x.blob.vercel-storage.com/a.tgz",
+      },
+      () => Promise.resolve(new Uint8Array([1, 2, 3]))
+    );
+    assert.equal(error, null);
+    assert.match(commands[0], UNPACK);
+    assert.equal(
+      JSON.parse(String(files["/workspace/.foreman/repository.json"]))
+        .replayCommit,
+      "a".repeat(40)
+    );
+  });
+});
+
+describe("the critic's second check", () => {
+  const duplicate = {
+    classification: "Bug",
+    closureReview: true,
+    issue: "ENG-1",
+    outcome: "route" as const,
+    path: "Duplicate",
+  };
+  const bug = {
+    classification: "Bug",
+    closureReview: false,
+    issue: "ENG-2",
+    outcome: "route" as const,
+    path: "Engineering Todo",
+  };
+  const routeInput = {
+    duplicateOf: "ENG-9",
+    issue: "ENG-1",
+    state: "Duplicate",
+  };
+
+  it("marks a closure for review and carries confidence and review into the log", () => {
+    const fields = decisionFields("ENG-1", {
+      assignee: "area owner",
+      classification: "Bug",
+      confidence: { classification: 0.7, path: 0.85, verdict: 0.9 },
+      needsCriticReview: true,
+      notes: [],
+      outcome: "route",
+      path: "Duplicate",
+      review: { kind: "duplicate", reason: "r", required: true },
+      route: { addLabels: [], priority: 2, state: "Duplicate" },
+      verdict: { confidence: 0.9, value: "supported" },
+    });
+    assert.equal(fields.closureReview, true);
+    const bugFields = decisionFields("ENG-2", {
+      assignee: "area owner",
+      classification: "Bug",
+      confidence: { classification: 0.7, path: 0.85, verdict: 0.9 },
+      needsCriticReview: true,
+      notes: [],
+      outcome: "route",
+      path: "Engineering Todo",
+      review: { kind: "bug", reason: "r", required: true },
+      route: { addLabels: [], priority: 3, state: "Todo" },
+      verdict: { confidence: 0.9, value: "supported" },
+    });
+    assert.equal(bugFields.closureReview, false);
+    const line = JSON.parse(
+      formatOpsEvent("triage.decision", {
+        ...confidenceFields({
+          confidence: { classification: 0.7, path: 0.85, verdict: 0.9 },
+          missing: [],
+          notes: [],
+          outcome: "unproven",
+          review: { kind: null, reason: "r", required: false },
+          verdict: { confidence: 0.9, value: "supported" },
+        }),
+        issue: "ENG-1",
+      })
+    );
+    assert.equal(line.verdictConfidence, 0.9);
+    assert.equal(line.classificationConfidence, 0.7);
+    assert.equal(line.pathConfidence, 0.85);
+    assert.equal(line.reviewRequired, false);
+  });
+
+  it("holds a closure or duplicate from routing until the critic has settled", () => {
+    const decisions = { "ENG-1": duplicate, "ENG-2": bug };
+    assert.match(
+      routeRefusal(decisions, {}, routeInput) ?? "",
+      FIRST_LINE_RULE
+    );
+    for (const verdict of ["APPROVE", "CHALLENGE", "failed"] as const) {
+      const rounds = settleCriticRound({}, "ENG-1", verdict);
+      assert.equal(routeRefusal(decisions, rounds, routeInput), null, verdict);
+    }
+    assert.equal(
+      routeRefusal(decisions, {}, { issue: "ENG-2", state: "Todo" }),
+      null
+    );
+  });
+
+  it("blocks routing after a second objection and still allows the owner assignment", () => {
+    const decisions = { "ENG-1": duplicate };
+    const first = settleCriticRound({}, "ENG-1", "CHALLENGE");
+    assert.equal(criticBlocked(first, "ENG-1"), false);
+    assert.equal(routeRefusal(decisions, first, routeInput), null);
+    const second = settleCriticRound(first, "ENG-1", "INSUFFICIENT_EVIDENCE");
+    assert.equal(criticBlocked(second, "ENG-1"), true);
+    assert.match(routeRefusal(decisions, second, routeInput) ?? "", TWICE_RULE);
+    assert.match(
+      routeRefusal({}, second, { issue: "ENG-1", labels: ["Bug"] }) ?? "",
+      TWICE_RULE
+    );
+    assert.equal(
+      routeRefusal(decisions, second, { assignee: "Ada", issue: "ENG-1" }),
+      null
+    );
+    assert.equal(
+      routeRefusal(decisions, second, {
+        assignee: "Ada",
+        issue: "ENG-1",
+        state: undefined,
+      }),
+      null
+    );
+  });
+
+  it("clears the objections on an approval and does not count a failed review as one", () => {
+    const first = settleCriticRound({}, "ENG-1", "CHALLENGE");
+    const failed = settleCriticRound(first, "ENG-1", "failed");
+    assert.equal(failed["ENG-1"].objections, 1);
+    assert.equal(criticBlocked(failed, "ENG-1"), false);
+    const approved = settleCriticRound(first, "ENG-1", "APPROVE");
+    assert.equal(approved["ENG-1"].objections, 0);
+    const again = settleCriticRound(approved, "ENG-1", "CHALLENGE");
+    assert.equal(criticBlocked(again, "ENG-1"), false);
+    assert.equal(
+      criticBlocked(settleCriticRound(failed, "ENG-1", "CHALLENGE"), "ENG-1"),
+      true
+    );
+  });
+
+  it("keeps each issue's objections apart", () => {
+    const rounds = settleCriticRound(
+      settleCriticRound({}, "ENG-1", "CHALLENGE"),
+      "ENG-2",
+      "CHALLENGE"
+    );
+    assert.equal(criticBlocked(rounds, "ENG-1"), false);
+    assert.equal(criticBlocked(rounds, "ENG-2"), false);
   });
 });

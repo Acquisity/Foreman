@@ -5,7 +5,12 @@ import { questionsOnlyPolicy } from "#lib/github/approval.js";
 import { LINEAR_ISSUE_ID_PATTERN } from "#lib/investigation-memory/scope.js";
 import { routeTicket } from "#lib/linear-api.js";
 import { logOpsEvent } from "#lib/ops-log.js";
-import { routeDecisionEvent, triageDecisions } from "#lib/triage-log.js";
+import {
+  criticRounds,
+  routeDecisionEvent,
+  routeRefusal,
+  triageDecisions,
+} from "#lib/triage-log.js";
 
 const identifier = z.string().trim().regex(LINEAR_ISSUE_ID_PATTERN);
 const name = z.string().trim().min(1).max(120);
@@ -20,6 +25,14 @@ export default defineTool({
     "links attach urls as resources on the ticket. Use the returned projectId for memory recording. " +
     "routed true with warnings means the ticket was updated but a relation or link after it failed; read the warning before retrying only that part.",
   async execute(input, ctx) {
+    const refusal = routeRefusal(
+      triageDecisions.get(),
+      criticRounds.get(),
+      input
+    );
+    if (refusal) {
+      return { error: refusal, routed: false as const };
+    }
     try {
       const ticket = await routeTicket(input, {
         client: executorClient(ctx),
