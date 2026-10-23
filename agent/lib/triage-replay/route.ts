@@ -429,32 +429,29 @@ export async function startReplay(
   }
   const key = caseKeyOf(start);
   let session: { id: string };
+  let sendAttempted = false;
   try {
     await seedStore(start, replayStamp());
     await withReplayState(start.runId, key, (state) => {
       state.dispatchedSession = DISPATCH_ATTEMPTED;
     });
-    try {
-      session = await args
-        .from(`triage-replay:${start.runId}:${key}`)
-        .send(replayMessage(start), { auth: replayAuth(start.runId, key) });
-    } catch (sendError) {
-      const stuck = await persistently(() =>
-        withReplayState(start.runId, key, (state) => {
-          state.dispatchedSession = null;
-        })
-      );
-      if (stuck) {
-        logOpsEvent("triage_replay.ledger_unconfirmed", {
-          code: "dispatch_marker_stuck",
-        });
-      }
-      throw sendError;
-    }
+    sendAttempted = true;
+    session = await args
+      .from(`triage-replay:${start.runId}:${key}`)
+      .send(replayMessage(start), { auth: replayAuth(start.runId, key) });
   } catch (error) {
     if (error instanceof ReplayAlreadyStartedError) {
       await confirm(start, ledger);
       return json({ error: `${key} was already started in this run.` }, 409);
+    }
+    if (sendAttempted) {
+      logOpsEvent("triage_replay.ledger_unconfirmed", {
+        code: "send_unacknowledged",
+      });
+      throw new Error(
+        `Replay ${key} may have started, so its reservation stays charged; rerun it under a new run id.`,
+        { cause: error }
+      );
     }
     try {
       await release(start, ledger);

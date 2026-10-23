@@ -28,7 +28,7 @@ import {
 
 const BLOB_DOWN = /blob down/u;
 const NEW_RUN_ID = /Use a new run id/u;
-const SESSION_DOWN = /session down/u;
+const MAY_HAVE_STARTED = /may have started/u;
 
 describe("starting a replay", () => {
   const start = () =>
@@ -157,27 +157,27 @@ describe("starting a replay", () => {
     });
   });
 
-  it("releases the reservation when the session can't be sent, and the retry seeds nothing twice", async (t) => {
+  it("keeps the reservation charged when a send fails, because the run may have started, and refuses a retry", async (t) => {
     const backend = memoryBackend();
     const { args, failSendOnce, sent } = server(t, backend);
     const ledger = sharedLedger();
     const restore = failSendOnce();
-    await assert.rejects(startReplay(start(), args, ledger()), SESSION_DOWN);
+    await assert.rejects(startReplay(start(), args, ledger()), MAY_HAVE_STARTED);
     restore();
     assert.deepEqual(await afterRetry(ledger, backend), {
       admitted: [],
-      charged: 0,
-      inputs: 1,
-      reserved: [],
-    });
-    const retry = await startReplay(start(), args, ledger());
-    assert.equal(retry.status, 200);
-    assert.equal(sent.length, 2);
-    assert.deepEqual(await afterRetry(ledger, backend), {
-      admitted: [KEY],
       charged: 4,
       inputs: 1,
-      reserved: [],
+      reserved: [KEY],
+    });
+    const retry = await startReplay(start(), args, ledger());
+    assert.equal(retry.status, 429);
+    assert.equal(sent.length, 1);
+    assert.deepEqual(await afterRetry(ledger, backend), {
+      admitted: [],
+      charged: 4,
+      inputs: 1,
+      reserved: [KEY],
     });
   });
 
@@ -366,28 +366,6 @@ describe("starting a replay", () => {
     assert.equal(read?.result.foremanCommit, "c".repeat(40));
     assert.equal(read?.result.estimatedUsd, 4);
     assert.ok(Date.now() - Date.parse(read?.result.startedAt ?? "") < 60_000);
-  });
-
-  it("restamps a store left by a failed send with the deployment that retries it", async (t) => {
-    const backend = memoryBackend();
-    const { args, failSendOnce } = server(t, backend);
-    const ledger = sharedLedger();
-    process.env.VERCEL_GIT_COMMIT_SHA = "a".repeat(40);
-    const restore = failSendOnce();
-    await assert.rejects(startReplay(start(), args, ledger()), SESSION_DOWN);
-    restore();
-    const redeployedAt = Date.now();
-    process.env.VERCEL_GIT_COMMIT_SHA = "b".repeat(40);
-    process.env.TRIAGE_REPLAY_EST_USD_PER_CASE = "6";
-    assert.equal((await startReplay(start(), args, ledger())).status, 200);
-    const read = await readReplayResult({
-      caseKey: KEY,
-      cohortSha256: "0".repeat(64),
-      runId: RUN,
-    });
-    assert.equal(read?.result.foremanCommit, "b".repeat(40));
-    assert.equal(read?.result.estimatedUsd, 6);
-    assert.ok(Date.parse(read?.result.startedAt ?? "") >= redeployedAt);
   });
 
   it("records the commit as unknown when the deployment names none", () => {
