@@ -16,7 +16,12 @@ import {
   TEST_SECRET,
   triageCase,
 } from "./fixtures.js";
-import { REPLAY_SECRET_HEADER, startReplay } from "./route.js";
+import {
+  REPLAY_SECRET_HEADER,
+  readReplayResult,
+  replayStamp,
+  startReplay,
+} from "./route.js";
 
 const BLOB_DOWN = /blob down/u;
 const SESSION_DOWN = /session down/u;
@@ -170,5 +175,32 @@ describe("starting a replay", () => {
       inputs: 1,
       reserved: [],
     });
+  });
+
+  it("stamps the result with the deployment's commit, the start time and the estimated cost", async (t) => {
+    const backend = memoryBackend();
+    const { args } = server(t, backend);
+    process.env.VERCEL_GIT_COMMIT_SHA = `${"c".repeat(40)}\n`;
+    const ledger = sharedLedger();
+    assert.equal((await startReplay(start(), args, ledger())).status, 200);
+    const read = await readReplayResult({
+      caseKey: KEY,
+      cohortSha256: "0".repeat(64),
+      runId: RUN,
+    });
+    assert.equal(read?.result.foremanCommit, "c".repeat(40));
+    assert.equal(read?.result.estimatedUsd, 4);
+    assert.ok(Date.now() - Date.parse(read?.result.startedAt ?? "") < 60_000);
+  });
+
+  it("records the commit as unknown when the deployment names none", () => {
+    assert.deepEqual(
+      replayStamp({ TRIAGE_REPLAY_EST_USD_PER_CASE: "2.5" }, new Date(0)),
+      {
+        estimatedUsd: 2.5,
+        foremanCommit: "unknown",
+        startedAt: "1970-01-01T00:00:00.000Z",
+      }
+    );
   });
 });

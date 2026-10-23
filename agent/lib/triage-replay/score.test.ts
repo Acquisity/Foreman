@@ -22,6 +22,7 @@ const NO_LABEL = /no label: ENG-4/;
 const TWO_RUN_IDS = /more than one run id/;
 const REPEATED = /same case and run: ENG-1#1/;
 const OUTSIDE = /outside the cohort: ENG-99/;
+const MIXED_COMMITS = /more than one Foreman commit: /;
 const ABOVE_RUNS = /runs above --runs 1: ENG-1#2/;
 const RUNS_FLOOR = /--runs must be a whole number of at least 1/;
 const WRONG_SPLIT = /wrong split: ENG-3/;
@@ -144,6 +145,33 @@ test("scores every run number the results hold, and refuses a run count that wou
   assert.throws(() => checkScoreInput({ ...input, runs: 1 }), ABOVE_RUNS);
   assert.throws(() => scoreReplay({ ...base(), runs: 0 }), RUNS_FLOOR);
   assert.throws(() => checkScoreInput({ ...base(), runs: 1.5 }), RUNS_FLOOR);
+});
+
+test("refuses results from different Foreman commits, and reports the commit, start times and estimated cost", () => {
+  const mixed = base({
+    results: [
+      ...base().results.slice(1),
+      makeResult("ENG-1", { foremanCommit: "2".repeat(40) }),
+    ],
+  });
+  assert.throws(() => scoreReplay(mixed), MIXED_COMMITS);
+  assert.throws(() => checkScoreInput(mixed), MIXED_COMMITS);
+  const timed = base({
+    results: base().results.map((result, index) => ({
+      ...result,
+      startedAt: `2026-09-01T10:0${index}:00.000Z`,
+    })),
+  });
+  const { foreman } = scoreReplay(timed);
+  assert.deepEqual(foreman, {
+    commit: "1".repeat(40),
+    estimatedUsd: 24,
+    firstStartedAt: "2026-09-01T10:00:00.000Z",
+    lastStartedAt: "2026-09-01T10:05:00.000Z",
+  });
+  const card = renderScorecard(scoreReplay(timed));
+  assert.ok(card.includes(`Foreman commit ${"1".repeat(40)}`));
+  assert.ok(card.includes("estimated $24.00"));
 });
 
 test("insufficient labels are counted apart and left out of every score", () => {

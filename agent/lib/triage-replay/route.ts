@@ -25,6 +25,7 @@ import {
 import { type TriageResult, triageCaseSchema } from "./schema.js";
 import {
   frozenListsSchema,
+  type ReplayStamp,
   type ReplayState,
   seedReplayState,
 } from "./store.js";
@@ -314,6 +315,16 @@ export function replayMessage(request: StartRequest): string {
 export const caseKeyOf = (request: { case: { id: string }; run: number }) =>
   `${request.case.id}#${request.run}`;
 
+/** What a replay's result records about the server that ran it. */
+export const replayStamp = (
+  env: NodeJS.ProcessEnv = process.env,
+  now: Date = new Date()
+): ReplayStamp => ({
+  estimatedUsd: positive(env.TRIAGE_REPLAY_EST_USD_PER_CASE) ?? 0,
+  foremanCommit: env.VERCEL_GIT_COMMIT_SHA?.trim() || "unknown",
+  startedAt: now.toISOString(),
+});
+
 const neverDispatched = (state: ReplayState) =>
   state.steps === 0 && state.rootTurn === null && state.cancelled === null;
 
@@ -322,13 +333,14 @@ const neverDispatched = (state: ReplayState) =>
  * session ran is reused, and given its seed input if that was what failed;
  * one a session has touched is refused.
  */
-export async function seedStore(request: StartRequest) {
+export async function seedStore(request: StartRequest, stamp: ReplayStamp) {
   const key = replayStateKey(request.runId, caseKeyOf(request));
   const seed = seedReplayState(
     request.case,
     request.lists,
     request.archiveUrl,
-    request.cohortSha256
+    request.cohortSha256,
+    stamp
   );
   const backend = replayBackend();
   const stored = await backend.read(key);
@@ -397,7 +409,7 @@ export async function startReplay(
   const key = caseKeyOf(start);
   let session: { id: string };
   try {
-    await seedStore(start);
+    await seedStore(start, replayStamp());
     session = await args
       .from(`triage-replay:${start.runId}:${key}`)
       .send(replayMessage(start), { auth: replayAuth(start.runId, key) });
@@ -568,12 +580,15 @@ export function buildReplayResult(
     document: document
       ? { text: document.content, updatedAt: document.updatedAt }
       : null,
+    estimatedUsd: state.stamp.estimatedUsd,
     evidenceMisses: state.evidenceMisses,
     final,
+    foremanCommit: state.stamp.foremanCommit,
     inputs: state.inputs,
     listMembershipUnknown: state.listMembershipUnknown,
     run: meta.run,
     runId: meta.runId,
+    startedAt: state.stamp.startedAt,
     status: resultStatus(state, reachedTerminal(state, decision)),
   };
 }

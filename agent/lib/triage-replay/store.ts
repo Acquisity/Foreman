@@ -74,6 +74,18 @@ interface CreatedIssue {
   title: string;
 }
 
+export interface ReplayStamp {
+  estimatedUsd: number;
+  foremanCommit: string;
+  startedAt: string;
+}
+
+export const UNSTAMPED: ReplayStamp = {
+  estimatedUsd: 0,
+  foremanCommit: "unknown",
+  startedAt: "1970-01-01T00:00:00.000Z",
+};
+
 export interface ReplayState {
   /** The case's pinned repository archive in Blob; the only code the replay can read. */
   archive: { commit: string; url: string };
@@ -107,6 +119,8 @@ export interface ReplayState {
   routeResults: { issue: string | null; routed: boolean }[];
   /** Every RouteIssueUpdate the store applied to the case ticket. */
   routes: { input: Record<string, unknown>; seq: number }[];
+  /** What the server stamps on this replay's result: its commit, start time and charged cost. */
+  stamp: ReplayStamp;
   steps: number;
   writes: { operation: string; seq: number; variables: unknown }[];
 }
@@ -121,7 +135,8 @@ export function seedReplayState(
   triageCase: TriageCase,
   lists: FrozenLists,
   archiveUrl: string,
-  cohortSha256 = ""
+  cohortSha256 = "",
+  stamp: ReplayStamp = UNSTAMPED
 ): ReplayState {
   return {
     archive: { commit: triageCase.repoCommitAtCreate, url: archiveUrl },
@@ -160,6 +175,7 @@ export function seedReplayState(
     rootTurn: null,
     routeResults: [],
     routes: [],
+    stamp,
     steps: 0,
     writes: [],
   };

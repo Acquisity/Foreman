@@ -81,6 +81,7 @@ export const makeResult = (
     text: "Root cause: renderPanel.",
     updatedAt: "2026-09-01T10:05:00.000Z",
   },
+  estimatedUsd: 4,
   evidenceMisses: [],
   final: {
     assignee: "area owner",
@@ -91,10 +92,12 @@ export const makeResult = (
     path: "fix",
     project: "Platform",
   },
+  foremanCommit: "1".repeat(40),
   inputs: [],
   listMembershipUnknown: [],
   run: 1,
   runId: "run-1",
+  startedAt: "2026-09-01T10:00:00.000Z",
   status: "completed",
   ...overrides,
 });

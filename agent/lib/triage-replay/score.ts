@@ -152,6 +152,13 @@ export interface SplitScore {
 /** The whole scorer output, written as `scores.json`. */
 export interface ScoreReport {
   cohortSha256: string;
+  /** Which Foreman the results came from, when the replays began, and what they were charged. */
+  foreman: {
+    commit: string | null;
+    estimatedUsd: number;
+    firstStartedAt: string | null;
+    lastStartedAt: string | null;
+  };
   leakage: { caseId: string; hits: LeakageHit[]; run: number }[];
   runId: string | null;
   runs: number;
@@ -302,7 +309,7 @@ function labelsFor(ids: readonly string[], labels: readonly TriageLabel[]) {
 /**
  * Everything `scoreReplay` refuses on, callable before any leakage fetch or
  * judge spend: another cohort hash on any result, a split that disagrees with
- * the cohort, results outside the cohort, mixed run ids, a repeated case and
+ * the cohort, results outside the cohort, mixed run ids or Foreman commits, a repeated case and
  * run, a run count under 1 or under a run the results hold, a label filed under
  * the wrong split, or a split case with no label.
  * Returns the results' run id.
@@ -359,6 +366,12 @@ export function checkScoreInput(
   const runIds = new Set(input.results.map(({ runId }) => runId));
   if (runIds.size > 1) {
     fail("Results come from more than one run id", [...runIds]);
+  }
+  const commits = new Set(
+    input.results.map(({ foremanCommit }) => foremanCommit)
+  );
+  if (commits.size > 1) {
+    fail("Results come from more than one Foreman commit", [...commits]);
   }
   const seen = new Set<string>();
   const duplicates: string[] = [];
@@ -478,8 +491,18 @@ export function scoreReplay(input: ScoreInput): ScoreReport {
     }
     return split;
   };
+  const starts = input.results.map(({ startedAt }) => startedAt).sort();
   return {
     cohortSha256: input.cohortSha256,
+    foreman: {
+      commit: input.results[0]?.foremanCommit ?? null,
+      estimatedUsd: input.results.reduce(
+        (total, { estimatedUsd }) => total + estimatedUsd,
+        0
+      ),
+      firstStartedAt: starts[0] ?? null,
+      lastStartedAt: starts.at(-1) ?? null,
+    },
     leakage: [...(input.leakage ?? new Map<string, LeakageHit[]>())]
       .filter(([, hits]) => hits.length)
       .map(([key, hits]) => {
@@ -577,6 +600,8 @@ export function renderScorecard(report: ScoreReport): string {
     "# Triage replay scorecard",
     "",
     `Cohort ${report.cohortSha256}, run ${report.runId ?? "none"}, ${report.runs} run(s) per case (${report.runsGiven ? "given" : "inferred from the results; pass --runs so a run missing for every case still counts"}).`,
+    "",
+    `Foreman commit ${report.foreman.commit ?? "none"}, replays started ${report.foreman.firstStartedAt ?? "never"} to ${report.foreman.lastStartedAt ?? "never"}, estimated $${report.foreman.estimatedUsd.toFixed(2)} charged to the replays (an estimate, not metered).`,
     "",
     ...sections,
     "## Leakage failures",
