@@ -8,10 +8,12 @@ import type { TriageDecision } from "./jev-decisions.js";
  * verdicts and later corrections can be counted per ticket. `decide_triage`
  * logs `triage.decision` each time it settles (`decide`, then `adjudicate`
  * when the critic's adjudication re-runs it), unproven outcomes included, and
- * keeps the latest decision per issue; `route_ticket` logs a `route` line
- * only for an issue that has a decision; and the root's hook logs
- * `critic.verdict` against the issue named on the dispatch's first line,
- * and logs nothing for a critic call that named none.
+ * keeps the latest decision per issue; `route_ticket` logs a `route` line for
+ * every routed issue, with `code` `skill_fallback` when no Jev decision
+ * exists for it (the skill decided after a Jev failure) and `billing` for a
+ * `decide_billing` route; and the root's hook logs `critic.verdict` against
+ * the issue named on the dispatch's first line, and logs nothing for a
+ * critic call that named none.
  */
 export interface LatestTriageDecision {
   classification: string | null;
@@ -23,6 +25,19 @@ export interface LatestTriageDecision {
 export const triageDecisions = defineState<
   Record<string, LatestTriageDecision>
 >("foreman.triageDecisions", () => ({}));
+
+export const BILLING_PATH = "Support/Financial";
+
+/** The Support route the latest `decide_billing` returned, which `route_ticket` is told to apply unchanged. */
+export interface BillingRoute {
+  assignee: string;
+  project: string;
+}
+
+export const billingRoutes = defineState<BillingRoute | null>(
+  "foreman.billingRoute",
+  () => null
+);
 
 export const criticTaskIssues = defineState<Record<string, string>>(
   "foreman.criticTaskIssues",
@@ -122,20 +137,32 @@ export function routeDecisionEvent(
     inheritAssigneeFrom?: string;
     issue: string;
     project?: string;
-  }
+  },
+  billing: BillingRoute | null = null
 ) {
   const decision = decisions[input.issue];
+  const billed =
+    !decision &&
+    billing !== null &&
+    input.project === billing.project &&
+    input.assignee === billing.assignee;
+  let code: string | null = null;
   if (!decision) {
-    return null;
+    code = billed ? "billing" : "skill_fallback";
+  }
+  let outcome = decision?.outcome ?? "skill";
+  if (billed) {
+    outcome = "route";
   }
   return {
     assigneeKind: assigneeKind(input),
-    classification: decision.classification,
+    classification: decision?.classification ?? null,
+    code,
     decision: "route",
     duplicateOf: input.duplicateOf ?? null,
     issue: input.issue,
-    outcome: decision.outcome,
-    path: decision.path,
+    outcome,
+    path: decision?.path ?? (billed ? BILLING_PATH : null),
     project: input.project ?? null,
   };
 }

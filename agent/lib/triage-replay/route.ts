@@ -7,6 +7,7 @@ import {
   writePrivateDocument,
 } from "../blob.js";
 import { logOpsEvent } from "../ops-log.js";
+import { BILLING_PATH } from "../triage-log.js";
 import { stampTriageIntake, stampUnattended } from "../trust.js";
 import {
   loadReplayState,
@@ -469,8 +470,6 @@ const billingDecisionSchema = z.object({
   decided: z.literal(true),
   decision: z.object({ route: z.object({ project: z.string() }) }),
 });
-
-const BILLING_PATH = "Support/Financial";
 
 type FinalDecision =
   | { kind: "billing" }

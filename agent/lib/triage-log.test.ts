@@ -4,6 +4,7 @@ import { CRITIC_CRITERIA } from "../subagents/critic/agent.js";
 import { formatOpsEvent } from "./ops-log.js";
 import {
   assigneeKind,
+  BILLING_PATH,
   criticTaskIssue,
   criticVerdictFields,
   criticVerdictIssue,
@@ -132,15 +133,55 @@ describe("issue-bound decisions", () => {
       routed
     );
     assert.equal(
-      routeDecisionEvent(decisions, { issue: "ENG-1" })?.outcome,
+      routeDecisionEvent(decisions, { issue: "ENG-1" }).outcome,
       "unproven"
     );
     assert.equal(
       routeDecisionEvent(decisions, { issue: "ENG-2", project: "CRM" })
-        ?.classification,
+        .classification,
       "Bug"
     );
-    assert.equal(routeDecisionEvent(decisions, { issue: "ENG-9" }), null);
+  });
+
+  it("logs a route the skill decided after Jev failed, and a decide_billing route, instead of nothing", () => {
+    const { decisions } = settleDecision({}, routed);
+    const fallback = routeDecisionEvent(decisions, {
+      assignee: "Ada",
+      issue: "ENG-9",
+      project: "CRM",
+    });
+    assert.deepEqual(
+      [
+        fallback.issue,
+        fallback.outcome,
+        fallback.code,
+        fallback.classification,
+        fallback.path,
+      ],
+      ["ENG-9", "skill", "skill_fallback", null, null]
+    );
+    const billing = { assignee: "Aaron Fraga", project: "Support" };
+    const billed = routeDecisionEvent(
+      decisions,
+      { assignee: "Aaron Fraga", issue: "ENG-9", project: "Support" },
+      billing
+    );
+    assert.deepEqual(
+      [billed.outcome, billed.code, billed.path],
+      ["route", "billing", BILLING_PATH]
+    );
+    const other = routeDecisionEvent(
+      decisions,
+      { assignee: "Ada", issue: "ENG-9", project: "CRM" },
+      billing
+    );
+    assert.equal(other.code, "skill_fallback");
+    assert.equal(
+      routeDecisionEvent(decisions, { issue: "ENG-2" }, billing).code,
+      null
+    );
+    const line = JSON.parse(formatOpsEvent("triage.decision", billed));
+    assert.equal(line.code, "billing");
   });
 
   it("binds a critic task to the source issue named on its dispatch's first line, never to a candidate it mentions", () => {

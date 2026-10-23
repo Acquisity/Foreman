@@ -1,6 +1,7 @@
 import { defineTool } from "eve/tools";
 import { z } from "zod";
 import { BILLING_BUCKETS, decideBilling } from "#lib/jev-decisions.js";
+import { billingRoutes } from "#lib/triage-log.js";
 
 export default defineTool({
   approval: () => "not-applicable",
@@ -11,10 +12,12 @@ export default defineTool({
     "decided false means Jev could not answer: decide by the skill's rules and say so in the document.",
   async execute(input, ctx) {
     try {
-      return {
-        decided: true as const,
-        decision: await decideBilling(input, { signal: ctx.abortSignal }),
-      };
+      const decision = await decideBilling(input, { signal: ctx.abortSignal });
+      billingRoutes.update(() => ({
+        assignee: decision.route.assignee,
+        project: decision.route.project,
+      }));
+      return { decided: true as const, decision };
     } catch (error) {
       if (ctx.abortSignal.aborted) {
         throw error;
