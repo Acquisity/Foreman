@@ -332,6 +332,11 @@ describe("once only, and never lost", () => {
     await assert.rejects(reconcile(s), { message: "Linear is unavailable" });
     assert.equal(s.linear.posts.length, 0);
     assert.deepEqual(await reconcile(s), {
+      kind: "skipped",
+      why: "backing_off",
+    });
+    s.memory.state.now += 11 * 60_000;
+    assert.deepEqual(await reconcile(s), {
       kind: "posted",
       stage: "not_fixed",
     });
@@ -358,7 +363,7 @@ describe("once only, and never lost", () => {
     await s.memory.store.claim("ENG-1", "not_fixed", "x", null);
     assert.deepEqual(await reconcile(s), {
       kind: "skipped",
-      why: "claimed_elsewhere",
+      why: "busy",
     });
     s.memory.state.now += 11 * 60_000;
     assert.deepEqual(await reconcile(s), {
@@ -459,20 +464,48 @@ describe("claims and recovery", () => {
     assert.equal(s.linear.posts.length, 0);
   });
 
-  it("stops retrying a message after five failed attempts", async () => {
+  it("backs off after repeated failures, says so in the log, and still delivers once the provider works again", async () => {
     const s = setup([
       ticket({ stateName: "Duplicate", stateType: "canceled" }),
     ]);
-    await [1, 2, 3, 4, 5].reduce(async (previous) => {
+    const logged: { event: string; fields: Record<string, unknown> }[] = [];
+    s.deps.log = (event, fields) => logged.push({ event, fields });
+    await [1, 2, 3, 4, 5, 6].reduce(async (previous) => {
       await previous;
+      s.memory.state.now += 7 * 3_600_000;
       s.linear.state.failNextPost = true;
       await assert.rejects(reconcile(s), { message: "Linear is unavailable" });
     }, Promise.resolve());
+    assert.ok(logged.length >= 2);
+    assert.equal(logged[0]?.event, "reporter.update.backing_off");
+    assert.equal(logged[0]?.fields.decision, "not_fixed");
     assert.deepEqual(await reconcile(s), {
       kind: "skipped",
-      why: "retries_exhausted",
+      why: "backing_off",
     });
-    assert.equal(s.linear.posts.length, 0);
+    s.memory.state.now += 7 * 3_600_000;
+    assert.deepEqual(await reconcile(s), {
+      kind: "posted",
+      stage: "not_fixed",
+    });
+    assert.equal(s.linear.posts.length, 1);
+  });
+
+  it("never waits longer than six hours between attempts, however many have failed", async () => {
+    const s = setup([
+      ticket({ stateName: "Duplicate", stateType: "canceled" }),
+    ]);
+    await Array.from({ length: 30 }).reduce(async (previous) => {
+      await previous;
+      s.memory.state.now += 7 * 3_600_000;
+      s.linear.state.failNextPost = true;
+      await assert.rejects(reconcile(s), { message: "Linear is unavailable" });
+    }, Promise.resolve());
+    s.memory.state.now += 6 * 3_600_000 + 1;
+    assert.deepEqual(await reconcile(s), {
+      kind: "posted",
+      stage: "not_fixed",
+    });
   });
 
   it("ignores a release made with a claim that is no longer current", async () => {
@@ -582,6 +615,7 @@ describe("discovery", () => {
     const first = await run(s);
     assert.equal(first.errors.length, 1);
     assert.equal(s.linear.posts.length, 0);
+    s.memory.state.now += 11 * 60_000;
     const second = await run(s, NOW + 300_000);
     assert.equal(second.errors.length, 0);
     assert.equal(
@@ -666,15 +700,42 @@ describe("discovery", () => {
     );
   });
 
-  it("stops retrying a ticket that keeps failing after twenty attempts", async () => {
+  it("backs off a ticket that keeps failing to read, then reads it again once time has passed", async () => {
     const s = setup([old(1)]);
+    const original = s.linear.port.readTicket;
     s.linear.port.readTicket = () =>
       Promise.reject(new Error("Linear is unavailable"));
-    await Array.from({ length: 22 }).reduce<Promise<unknown>>(
-      (previous, _, i) => previous.then(() => run(s, NOW + i * 300_000)),
+    await Array.from({ length: 25 }).reduce<Promise<unknown>>(
+      (previous, _, i) =>
+        previous.then(() => {
+          s.memory.state.now += 7 * 3_600_000;
+          return run(s, NOW + i * 300_000);
+        }),
       Promise.resolve()
     );
-    assert.equal(s.memory.pending.get("ENG-1")?.attempts, 20);
+    assert.ok((s.memory.pending.get("ENG-1")?.attempts ?? 0) >= 20);
+    s.linear.port.readTicket = original;
+    s.memory.state.now += 7 * 3_600_000;
+    await run(s, NOW + 30 * 300_000);
+    assert.deepEqual(
+      s.linear.posts.map((p) => p.identifier),
+      ["ENG-1"]
+    );
+    assert.equal(s.memory.pending.size, 0);
+  });
+
+  it("retries at once when the ticket changes again, without waiting out the backoff", async () => {
+    const t = old(1, { stateName: "Duplicate", stateType: "canceled" });
+    const s = setup([t]);
+    s.linear.state.failNextPost = true;
+    await run(s);
+    assert.equal(s.linear.posts.length, 0);
+    t.updatedAt = new Date(NOW + 60_000).toISOString();
+    await run(s, NOW + 300_000);
+    assert.deepEqual(
+      s.linear.posts.map((p) => p.identifier),
+      ["ENG-1"]
+    );
   });
 });
 

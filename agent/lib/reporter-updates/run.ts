@@ -1,3 +1,4 @@
+import { logOpsEvent, type OpsFields } from "../ops-log.js";
 import { ThreadIncompleteError } from "../requester-reply.js";
 import { commentIdFor } from "./comment-id.js";
 import { coversOf, STAGES, type Stage } from "./copy.js";
@@ -14,7 +15,7 @@ import {
   planFixed,
   planNotFixed,
 } from "./plan.js";
-import type { ReporterStore } from "./store.js";
+import { GIVE_UP_LOG_ATTEMPTS, type ReporterStore } from "./store.js";
 
 export interface RunConfig {
   channels: ReadonlySet<string>;
@@ -28,6 +29,7 @@ export interface Deps {
   config: RunConfig;
   deploy: DeployProbe;
   linear: LinearPort;
+  log?: (event: string, fields: OpsFields) => void;
   store: ReporterStore;
 }
 
@@ -127,15 +129,20 @@ const deliver = async (
     channel
   );
   if (!claim.ok) {
-    return skipped(
-      claim.reason === "exhausted" ? "retries_exhausted" : "claimed_elsewhere"
-    );
+    return skipped(claim.reason);
   }
   let commentId: string;
   try {
     commentId = await post(view, planned, deps);
   } catch (error) {
     await deps.store.release(identifier, planned.stage, claim.token);
+    if (claim.attempts >= GIVE_UP_LOG_ATTEMPTS) {
+      (deps.log ?? logOpsEvent)("reporter.update.backing_off", {
+        code: String(claim.attempts),
+        decision: planned.stage,
+        outcome: "error",
+      });
+    }
     throw error;
   }
   const completed = await deps.store.complete(
@@ -271,7 +278,7 @@ const settle = async (
   }
 };
 
-const KEEP_PENDING = new Set(["claimed_elsewhere"]);
+const KEEP_PENDING = new Set(["backing_off", "busy"]);
 
 const discoverTickets = async (
   deps: Deps,

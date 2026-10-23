@@ -125,15 +125,38 @@ assert.equal(
 
 await [1, 2, 3, 4].reduce(async (previous) => {
   await previous;
+  await pool.query(
+    "UPDATE reporter_updates SET retry_after = NULL WHERE issue = 'ENG-3'"
+  );
   const claim = await store.claim("ENG-3", "fixed", "msg", null);
   assert.ok(claim.ok);
   await store.release("ENG-3", "fixed", claim.token);
 }, Promise.resolve());
 assert.deepEqual(
   await store.claim("ENG-3", "fixed", "msg", null),
-  { ok: false, reason: "exhausted" },
-  "five attempts is the limit"
+  { ok: false, reason: "backing_off" },
+  "a released claim waits out its backoff"
 );
+await pool.query(
+  "UPDATE reporter_updates SET retry_after = now() - interval '1 second' WHERE issue = 'ENG-3'"
+);
+const afterBackoff = await store.claim("ENG-3", "fixed", "msg", null);
+assert.ok(afterBackoff.ok, "and is claimable again once it has elapsed");
+assert.equal(afterBackoff.attempts, 6);
+await store.release("ENG-3", "fixed", afterBackoff.token);
+const [waitingRow] = await pool
+  .query(
+    "SELECT retry_after - now() AS wait FROM reporter_updates WHERE issue = 'ENG-3'"
+  )
+  .then((result) => result.rows);
+assert.ok(
+  (waitingRow?.wait.hours ?? 0) * 60 + (waitingRow?.wait.minutes ?? 0) <= 360,
+  "the wait never exceeds six hours"
+);
+await store.enqueue(["ENG-3"]);
+const reset = await store.claim("ENG-3", "fixed", "msg", null);
+assert.ok(reset.ok, "new ticket activity clears the backoff");
+assert.equal(reset.attempts, 1);
 
 await pool.query("TRUNCATE reporter_updates, reporter_pending");
 await pool.query(
@@ -152,21 +175,41 @@ assert.deepEqual(
 
 await store.enqueue(["ENG-2000", "ENG-5", "ENG-5"]);
 await store.failPending("ENG-2000");
-assert.deepEqual(
-  (await store.nextPending(10)).at(-1),
-  "ENG-2000",
-  "a ticket that just failed goes to the back of the queue"
+assert.equal(
+  (await store.nextPending(10)).includes("ENG-2000"),
+  false,
+  "a ticket that just failed waits out its backoff"
 );
 await store.resolvePending("ENG-5");
 assert.equal((await store.nextPending(10)).includes("ENG-5"), false);
-await Array.from({ length: 20 }, (_, i) => i).reduce(async (previous) => {
+await Array.from({ length: 25 }, (_, i) => i).reduce(async (previous) => {
   await previous;
   await store.failPending("ENG-2001");
 }, Promise.resolve());
+const [pendingRow] = await pool
+  .query(
+    "SELECT attempts, retry_after - now() AS wait FROM reporter_pending WHERE issue = 'ENG-2001'"
+  )
+  .then((result) => result.rows);
+assert.equal(pendingRow?.attempts, 25);
+assert.ok(
+  (pendingRow?.wait.hours ?? 0) * 60 + (pendingRow?.wait.minutes ?? 0) <= 360,
+  "the wait never exceeds six hours"
+);
+await pool.query(
+  "UPDATE reporter_pending SET retry_after = now() - interval '1 second' WHERE issue = 'ENG-2001'"
+);
 assert.equal(
   (await store.nextPending(10)).includes("ENG-2001"),
-  false,
-  "twenty failures take a ticket out of the queue"
+  true,
+  "a failing ticket is tried again once its backoff has passed"
+);
+await store.failPending("ENG-2001");
+await store.enqueue(["ENG-2001"]);
+assert.equal(
+  (await store.nextPending(10)).includes("ENG-2001"),
+  true,
+  "new ticket activity brings it back at once"
 );
 
 assert.equal(await store.readCursor(), null);

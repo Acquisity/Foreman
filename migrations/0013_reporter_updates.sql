@@ -8,6 +8,7 @@ CREATE TABLE reporter_updates (
   checked_sha text,
   claim_token uuid,
   attempts integer NOT NULL DEFAULT 0,
+  retry_after timestamptz,
   claimed_at timestamptz,
   sent_at timestamptz,
   created_at timestamptz NOT NULL DEFAULT now(),
@@ -19,7 +20,8 @@ CREATE TABLE reporter_pending (
   issue text PRIMARY KEY,
   attempts integer NOT NULL DEFAULT 0,
   added_at timestamptz NOT NULL DEFAULT now(),
-  last_try timestamptz
+  last_try timestamptz,
+  retry_after timestamptz
 );
 CREATE TABLE reporter_cursor (
   id boolean PRIMARY KEY DEFAULT true CHECK (id),

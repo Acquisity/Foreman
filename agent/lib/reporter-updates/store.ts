@@ -16,8 +16,8 @@ export interface LedgerRow {
 }
 
 export type ClaimResult =
-  | { ok: true; token: string }
-  | { ok: false; reason: "busy" | "exhausted" };
+  | { attempts: number; ok: true; token: string }
+  | { ok: false; reason: "backing_off" | "busy" };
 
 export interface ReporterStore {
   anyWaiting: () => Promise<boolean>;
@@ -66,8 +66,20 @@ const issueSchema = z.object({ issue: z.string() });
 const cursorSchema = z.object({ ms: z.coerce.number() });
 
 const STALE_CLAIM = "10 minutes";
-export const MAX_ATTEMPTS = 5;
-export const MAX_PENDING_ATTEMPTS = 20;
+export const GIVE_UP_LOG_ATTEMPTS = 5;
+const BACKOFF_BASE_MINUTES = 5;
+const BACKOFF_MAX_HOURS = 6;
+const BACKOFF_EXPONENT_LIMIT = 20;
+const BACKOFF = (attempts: string) =>
+  `LEAST(interval '${BACKOFF_MAX_HOURS} hours', interval '${BACKOFF_BASE_MINUTES} minutes' * power(2, LEAST(${attempts}, ${BACKOFF_EXPONENT_LIMIT})))`;
+
+export const backoffMs = (attempts: number): number =>
+  Math.min(
+    BACKOFF_MAX_HOURS * 3_600_000,
+    BACKOFF_BASE_MINUTES *
+      60_000 *
+      2 ** Math.min(attempts, BACKOFF_EXPONENT_LIMIT)
+  );
 
 export const createReporterStore = (query: Query): ReporterStore => {
   const store: ReporterStore = {
@@ -87,24 +99,23 @@ export const createReporterStore = (query: Query): ReporterStore => {
          SET status = 'claimed', message = EXCLUDED.message,
              slack_channel = EXCLUDED.slack_channel, claim_token = EXCLUDED.claim_token,
              claimed_at = now(), attempts = reporter_updates.attempts + 1, updated_at = now()
-         WHERE reporter_updates.attempts < ${MAX_ATTEMPTS}
-           AND (reporter_updates.status = 'waiting'
-                OR (reporter_updates.status = 'claimed'
-                    AND reporter_updates.claimed_at < now() - interval '${STALE_CLAIM}'))
-       RETURNING claim_token`,
+         WHERE (reporter_updates.status = 'waiting'
+                AND (reporter_updates.retry_after IS NULL OR reporter_updates.retry_after <= now()))
+            OR (reporter_updates.status = 'claimed'
+                AND reporter_updates.claimed_at < now() - interval '${STALE_CLAIM}')
+       RETURNING claim_token, attempts`,
         [issue, stage, message, channel, token]
       );
       if (rows.length === 1) {
-        return { ok: true, token };
+        return { attempts: Number(rows[0]?.attempts), ok: true, token };
       }
       const [current] = await query(
-        "SELECT attempts FROM reporter_updates WHERE issue = $1 AND stage = $2 AND status <> 'sent'",
+        "SELECT status FROM reporter_updates WHERE issue = $1 AND stage = $2",
         [issue, stage]
       );
       return {
         ok: false,
-        reason:
-          Number(current?.attempts) >= MAX_ATTEMPTS ? "exhausted" : "busy",
+        reason: current?.status === "waiting" ? "backing_off" : "busy",
       };
     },
     async complete(issue, stage, covers, message, channel, commentId, token) {
@@ -129,14 +140,23 @@ export const createReporterStore = (query: Query): ReporterStore => {
       if (issues.length === 0) {
         return;
       }
+      const unique = [...new Set(issues)];
       await query(
-        "INSERT INTO reporter_pending (issue) SELECT unnest($1::text[]) ON CONFLICT (issue) DO NOTHING",
-        [issues]
+        `INSERT INTO reporter_pending (issue) SELECT unnest($1::text[])
+         ON CONFLICT (issue) DO UPDATE SET attempts = 0, retry_after = NULL`,
+        [unique]
+      );
+      await query(
+        `UPDATE reporter_updates SET attempts = 0, retry_after = NULL, updated_at = now()
+         WHERE issue = ANY($1::text[]) AND status = 'waiting'`,
+        [unique]
       );
     },
     async failPending(issue) {
       await query(
-        "UPDATE reporter_pending SET attempts = attempts + 1, last_try = now() WHERE issue = $1",
+        `UPDATE reporter_pending
+         SET attempts = attempts + 1, last_try = now(), retry_after = now() + ${BACKOFF("attempts")}
+         WHERE issue = $1`,
         [issue]
       );
     },
@@ -163,7 +183,7 @@ export const createReporterStore = (query: Query): ReporterStore => {
     async nextPending(limit) {
       const rows = await query(
         `SELECT issue FROM reporter_pending
-         WHERE attempts < ${MAX_PENDING_ATTEMPTS}
+         WHERE retry_after IS NULL OR retry_after <= now()
          ORDER BY last_try NULLS FIRST, added_at LIMIT $1`,
         [limit]
       );
@@ -188,7 +208,8 @@ export const createReporterStore = (query: Query): ReporterStore => {
     async release(issue, stage, token) {
       await query(
         `UPDATE reporter_updates
-       SET status = 'waiting', claim_token = NULL, claimed_at = NULL, updated_at = now()
+       SET status = 'waiting', claim_token = NULL, claimed_at = NULL, updated_at = now(),
+           retry_after = now() + ${BACKOFF("attempts")}
        WHERE issue = $1 AND stage = $2 AND claim_token = $3 AND status = 'claimed'`,
         [issue, stage, token]
       );

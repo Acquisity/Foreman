@@ -3,12 +3,7 @@ import type { DeployProbe } from "./deploy.js";
 import type { LinearPort, TicketView } from "./linear.js";
 import type { PullFacts, TicketFacts } from "./plan.js";
 import type { Deps, RunConfig } from "./run.js";
-import {
-  type LedgerRow,
-  MAX_ATTEMPTS,
-  MAX_PENDING_ATTEMPTS,
-  type ReporterStore,
-} from "./store.js";
+import { backoffMs, type LedgerRow, type ReporterStore } from "./store.js";
 
 export const SANDBOX = "C0AAAAAAAAA";
 export const FOREMAN = "foreman-user";
@@ -42,13 +37,17 @@ interface StoredRow extends LedgerRow {
   attempts: number;
   claimedAt: number;
   message: string;
+  retryAfter: number;
   token: string | null;
 }
 
 export const memoryStore = () => {
   const table = new Map<string, StoredRow>();
   const key = (issue: string, stage: Stage) => `${issue}|${stage}`;
-  const pending = new Map<string, { attempts: number; lastTry: number }>();
+  const pending = new Map<
+    string,
+    { attempts: number; lastTry: number; retryAfter: number }
+  >();
   const state: {
     cursor: number | null;
     cursorWrites: number[];
@@ -70,6 +69,7 @@ export const memoryStore = () => {
     claimedAt: 0,
     commentId: null,
     message: "",
+    retryAfter: 0,
     stage,
     status: "waiting",
     token: null,
@@ -112,8 +112,8 @@ export const memoryStore = () => {
       if (existing?.status === "sent") {
         return Promise.resolve({ ok: false, reason: "busy" });
       }
-      if (existing && existing.attempts >= MAX_ATTEMPTS) {
-        return Promise.resolve({ ok: false, reason: "exhausted" });
+      if (existing?.status === "waiting" && existing.retryAfter > state.now) {
+        return Promise.resolve({ ok: false, reason: "backing_off" });
       }
       if (existing && existing.status !== "waiting" && !stale) {
         return Promise.resolve({ ok: false, reason: "busy" });
@@ -128,7 +128,11 @@ export const memoryStore = () => {
         status: "claimed",
         token,
       });
-      return Promise.resolve({ ok: true, token });
+      return Promise.resolve({
+        attempts: (existing?.attempts ?? 0) + 1,
+        ok: true,
+        token,
+      });
     },
     async complete(issue, stage, covers, message, channel, commentId, token) {
       const existing = table.get(key(issue, stage));
@@ -144,8 +148,15 @@ export const memoryStore = () => {
         return Promise.reject(new Error("database unavailable"));
       }
       for (const issue of issues) {
-        if (!pending.has(issue)) {
-          pending.set(issue, { attempts: 0, lastTry: 0 });
+        pending.set(issue, {
+          attempts: 0,
+          lastTry: pending.get(issue)?.lastTry ?? 0,
+          retryAfter: 0,
+        });
+        for (const [k, row] of table.entries()) {
+          if (k.startsWith(`${issue}|`) && row.status === "waiting") {
+            table.set(k, { ...row, attempts: 0, retryAfter: 0 });
+          }
         }
       }
       return Promise.resolve();
@@ -157,6 +168,7 @@ export const memoryStore = () => {
         pending.set(issue, {
           attempts: entry.attempts + 1,
           lastTry: state.tokens,
+          retryAfter: state.now + backoffMs(entry.attempts),
         });
       }
       return Promise.resolve();
@@ -176,7 +188,7 @@ export const memoryStore = () => {
     nextPending(limit) {
       return Promise.resolve(
         [...pending.entries()]
-          .filter(([, entry]) => entry.attempts < MAX_PENDING_ATTEMPTS)
+          .filter(([, entry]) => entry.retryAfter <= state.now)
           .sort((a, b) => a[1].lastTry - b[1].lastTry)
           .slice(0, limit)
           .map(([issue]) => issue)
@@ -190,7 +202,11 @@ export const memoryStore = () => {
           row.checkedSha !== liveSha &&
           !pending.has(k.split("|")[0] ?? "")
         ) {
-          pending.set(k.split("|")[0] ?? "", { attempts: 0, lastTry: 0 });
+          pending.set(k.split("|")[0] ?? "", {
+            attempts: 0,
+            lastTry: 0,
+            retryAfter: 0,
+          });
         }
       }
       return Promise.resolve();
@@ -203,6 +219,7 @@ export const memoryStore = () => {
       if (existing?.status === "claimed" && existing.token === token) {
         table.set(key(issue, stage), {
           ...existing,
+          retryAfter: state.now + backoffMs(existing.attempts),
           status: "waiting",
           token: null,
         });
