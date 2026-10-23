@@ -779,7 +779,7 @@ describe("discovery", () => {
     assert.equal(s.linear.state.discoveries[1]?.after, null);
   });
 
-  it("treats a thread too long to read as a skip, not as an error that blocks the queue", async () => {
+  it("keeps a ticket whose thread is too long to read pending and visible as an error, without blocking the others", async () => {
     const s = setup([
       old(1),
       old(2, { stateName: "Duplicate", stateType: "canceled" }),
@@ -790,16 +790,32 @@ describe("discovery", () => {
         ? Promise.reject(new ThreadIncompleteError("ENG-1"))
         : original(identifier);
     const report = await run(s);
-    assert.equal(report.errors.length, 0);
-    assert.deepEqual(
-      report.outcomes.find((o) => o.identifier === "ENG-1")?.outcome,
-      { kind: "skipped", why: "thread_incomplete" }
-    );
-    assert.equal(s.memory.pending.size, 0);
+    assert.equal(report.errors.length, 1);
+    assert.ok(report.errors[0]?.startsWith("ENG-1: ENG-1 has more than 100"));
+    assert.equal(s.memory.pending.get("ENG-1")?.attempts, 1);
     assert.deepEqual(
       s.linear.posts.map((p) => p.identifier),
       ["ENG-2"]
     );
+    assert.equal(s.memory.pending.has("ENG-2"), false);
+  });
+
+  it("retries that ticket under the same backoff, and delivers once the thread can be read", async () => {
+    const s = setup([
+      old(1, { stateName: "Duplicate", stateType: "canceled" }),
+    ]);
+    const original = s.linear.port.readTicket;
+    s.linear.port.readTicket = () =>
+      Promise.reject(new ThreadIncompleteError("ENG-1"));
+    await run(s);
+    s.linear.port.readTicket = original;
+    s.memory.state.now += 11 * 60_000;
+    await run(s, NOW + 300_000);
+    assert.deepEqual(
+      s.linear.posts.map((p) => p.identifier),
+      ["ENG-1"]
+    );
+    assert.equal(s.memory.pending.size, 0);
   });
 
   it("backs off a ticket that keeps failing to read, then reads it again once time has passed", async () => {

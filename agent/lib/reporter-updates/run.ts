@@ -1,5 +1,4 @@
 import { logOpsEvent, type OpsFields } from "../ops-log.js";
-import { ThreadIncompleteError } from "../requester-reply.js";
 import { commentIdFor } from "./comment-id.js";
 import { coversOf, STAGES, type Stage } from "./copy.js";
 import type { DeployProbe } from "./deploy.js";
@@ -268,9 +267,6 @@ const settle = async (
       outcome: await reconcileTicket(identifier, deps, liveSha),
     };
   } catch (error) {
-    if (error instanceof ThreadIncompleteError) {
-      return { identifier, outcome: skipped("thread_incomplete") };
-    }
     return {
       error: error instanceof Error ? error.message : "Unknown failure.",
       identifier,
