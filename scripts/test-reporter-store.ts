@@ -242,6 +242,40 @@ assert.ok(
 );
 
 await pool.query("TRUNCATE reporter_updates, reporter_pending");
+await store.markWaiting("ENG-8", "old-sha");
+await store.markSent("ENG-8", ["received"], "msg", null, "c-received");
+const sentFixed = await store.claim("ENG-8", "fixed", "msg", null);
+assert.ok(sentFixed.ok);
+await store.dropWaiting("ENG-8");
+assert.equal(
+  (await store.rows("ENG-8")).some((row) => row.stage === "fixed"),
+  true,
+  "a row that is claimed is not dropped"
+);
+await store.complete(
+  "ENG-8",
+  "fixed",
+  ["fixed"],
+  "msg",
+  null,
+  "c-fixed",
+  sentFixed.token
+);
+await store.markWaiting("ENG-9", "old-sha");
+await store.dropWaiting("ENG-9");
+await store.queueWaiting("new-sha");
+assert.equal(
+  (await store.nextPending(10)).includes("ENG-9"),
+  false,
+  "a dropped waiting row is never requeued"
+);
+assert.equal(
+  (await store.rows("ENG-8")).find((row) => row.stage === "fixed")?.status,
+  "sent",
+  "a sent row is never dropped"
+);
+
+await pool.query("TRUNCATE reporter_updates, reporter_pending");
 await pool.query(
   `INSERT INTO reporter_updates (issue, stage, status, checked_sha)
    SELECT 'ENG-' || n, 'fixed', 'waiting', 'live-sha' FROM generate_series(1000, 1249) AS n`

@@ -978,6 +978,109 @@ describe("a thread the receiver would not deliver to", () => {
   });
 });
 
+describe("a deploy wait that is no longer needed", () => {
+  const NEWER_SHA = "4444444444444444444444444444444444444444";
+  const MIN = 300_000;
+  const abandonCases: [
+    string,
+    (s: ReturnType<typeof setup>, t: ReturnType<typeof ticket>) => void,
+  ][] = [
+    [
+      "the ticket is cancelled",
+      (_s, t) => {
+        t.facts.stateName = "Canceled";
+        t.facts.stateType = "canceled";
+      },
+    ],
+    [
+      "the ticket is reopened",
+      (_s, t) => {
+        t.facts.stateType = "started";
+      },
+    ],
+    [
+      "its fix pull request is closed without merging",
+      (s) => {
+        s.probe.state.pulls[pullKey(7)] = merged({
+          mergeSha: null,
+          state: "closed",
+        });
+      },
+    ],
+    [
+      "its channel is no longer enabled",
+      (s) => {
+        s.deps.config.channels = new Set(["C0OTHER00000"]);
+      },
+    ],
+    [
+      "the ticket can no longer be found",
+      (s) => {
+        s.linear.port.readTicket = () => Promise.resolve(null);
+      },
+    ],
+  ];
+
+  for (const [name, abandon] of abandonCases) {
+    it(`closes the waiting row and never requeues it when ${name}`, async () => {
+      const t = ticket({ pullUrls: [PR_URL], stateType: "completed" });
+      const s = setup([t], {
+        liveSha: OLD_SHA,
+        pulls: { [pullKey(7)]: merged() },
+      });
+      await runReporterUpdates(s.deps, NOW, () => NOW);
+      assert.equal(waitingIssues(s.memory).length, 1);
+      abandon(s, t);
+      s.probe.state.liveSha = NEW_SHA;
+      await runReporterUpdates(s.deps, NOW + MIN, () => NOW + MIN);
+      assert.deepEqual(waitingIssues(s.memory), []);
+      const { reads } = s.linear.state;
+      s.probe.state.liveSha = NEWER_SHA;
+      await runReporterUpdates(s.deps, NOW + 2 * MIN, () => NOW + 2 * MIN);
+      assert.equal(
+        s.linear.state.reads,
+        reads,
+        "not read again after the next deploy"
+      );
+      assert.equal(s.memory.pending.size, 0);
+    });
+  }
+
+  it("still finds a ticket that becomes Done again later, and posts once its fix is live", async () => {
+    const t = ticket({ pullUrls: [PR_URL], stateType: "completed" });
+    const s = setup([t], {
+      liveSha: OLD_SHA,
+      pulls: { [pullKey(7)]: merged() },
+    });
+    await runReporterUpdates(s.deps, NOW, () => NOW);
+    t.facts.stateType = "started";
+    s.probe.state.liveSha = NEW_SHA;
+    await runReporterUpdates(s.deps, NOW + MIN, () => NOW + MIN);
+    assert.deepEqual(waitingIssues(s.memory), []);
+    t.facts.stateType = "completed";
+    t.updatedAt = new Date(NOW + 2 * MIN - 1000).toISOString();
+    await runReporterUpdates(s.deps, NOW + 2 * MIN, () => NOW + 2 * MIN);
+    assert.equal(waitingIssues(s.memory).length, 1);
+    s.probe.state.liveSha = NEWER_SHA;
+    s.probe.state.ancestors[`${MERGE_SHA}>${NEWER_SHA}`] = true;
+    await runReporterUpdates(s.deps, NOW + 3 * MIN, () => NOW + 3 * MIN);
+    assert.ok(s.linear.posts.some((p) => p.body === fixedText()));
+  });
+
+  it("keeps the row while the ticket still needs the deploy", async () => {
+    const t = ticket({ pullUrls: [PR_URL], stateType: "completed" });
+    const s = setup([t], {
+      liveSha: OLD_SHA,
+      pulls: { [pullKey(7)]: merged() },
+    });
+    await runReporterUpdates(s.deps, NOW, () => NOW);
+    s.probe.state.liveSha = NEW_SHA;
+    await runReporterUpdates(s.deps, NOW + MIN, () => NOW + MIN);
+    assert.equal(waitingIssues(s.memory).length, 1);
+    assert.equal(waitingIssues(s.memory)[0]?.checkedSha, NEW_SHA);
+  });
+});
+
 describe("run over several tickets", () => {
   const five = () =>
     [1, 2, 3, 4, 5].map((n) =>

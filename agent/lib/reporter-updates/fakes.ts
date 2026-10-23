@@ -170,6 +170,13 @@ export const memoryStore = () => {
       }
       return Promise.resolve();
     },
+    dropWaiting(issue) {
+      const row = table.get(key(issue, "fixed"));
+      if (row?.status === "waiting") {
+        table.delete(key(issue, "fixed"));
+      }
+      return Promise.resolve();
+    },
     enqueue(tickets) {
       if (state.failNextEnqueue) {
         state.failNextEnqueue = false;

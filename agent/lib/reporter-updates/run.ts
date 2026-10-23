@@ -390,6 +390,9 @@ export const runReporterUpdates = async (
     ) {
       await deps.store.failPending(identifier);
     } else {
+      if (result.outcome.kind !== "waiting") {
+        await deps.store.dropWaiting(identifier);
+      }
       await deps.store.resolvePending(identifier);
     }
   }, Promise.resolve());

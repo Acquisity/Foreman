@@ -53,6 +53,7 @@ export interface ReporterStore {
     token: string
   ) => Promise<boolean>;
   deferPending: (issue: string, untilMs: number) => Promise<void>;
+  dropWaiting: (issue: string) => Promise<void>;
   enqueue: (tickets: DiscoveredTicket[]) => Promise<void>;
   failPending: (issue: string) => Promise<void>;
   markSent: (
@@ -173,6 +174,12 @@ export const createReporterStore = (query: Query): ReporterStore => {
                                     to_timestamp($2::double precision / 1000))
          WHERE issue = $1`,
         [issue, untilMs]
+      );
+    },
+    async dropWaiting(issue) {
+      await query(
+        "DELETE FROM reporter_updates WHERE issue = $1 AND stage = 'fixed' AND status = 'waiting'",
+        [issue]
       );
     },
     async enqueue(tickets) {
