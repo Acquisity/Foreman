@@ -1370,3 +1370,48 @@ test("the Intercom skill agrees with triage-handling on the document and the des
   const description = intercomTriageSkill.match(DESCRIPTION_PATTERN)?.[1] ?? "";
   assert.ok(description.includes("confirmed bug or feature request"));
 });
+
+test("a correction to a feature request supersedes its case because both use the ticket identifier", () => {
+  const record = extractInstruction(
+    intercomTriageSkill,
+    "## Step 8:",
+    "Store only the sanitized pattern"
+  );
+  assert.ok(
+    record.includes(
+      "A Bug or feature request is recorded by `triage-handling` Stage 7 under its ticket identifier"
+    )
+  );
+  assert.ok(
+    record.includes(
+      "For a User Error, a Platform Limitation nobody wants lifted, or an unproven verdict"
+    )
+  );
+  const correction = extractInstruction(
+    intercomTriageSkill,
+    "### Corrections from the thread",
+    "## Step 9:"
+  );
+  assert.ok(
+    correction.includes(
+      "the ticket identifier for a Bug or feature request, `intercom:<conversation id>` otherwise"
+    )
+  );
+  const tools = readFileSync(
+    new URL(
+      "../skills/intercom-triage-investigate/references/tools.md",
+      import.meta.url
+    ),
+    "utf8"
+  );
+  assert.ok(
+    tools.includes(
+      "For a Bug or feature request, `triage-handling` Stage 7 owns the write under the report's ticket identifier"
+    )
+  );
+  assert.ok(
+    tools.includes(
+      "Step 8 records a User Error, a Platform Limitation nobody wants lifted, or an unproven claim"
+    )
+  );
+});
