@@ -425,3 +425,13 @@ describe("who may be assigned to a developer", () => {
     assert.equal(developerLabelsAllowed([]), false);
   });
 });
+
+describe("module size", () => {
+  it("keeps the decision module under the 1000 line limit by routing ownership elsewhere", () => {
+    const lines = readFileSync(
+      new URL("./jev-decisions.ts", import.meta.url),
+      "utf8"
+    ).split("\n").length;
+    assert.ok(lines < 1000, `jev-decisions.ts is ${lines} lines`);
+  });
+});

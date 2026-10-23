@@ -6,22 +6,19 @@ import {
   type JevQuestion,
   probabilityOf,
 } from "./jev.js";
+import { SUPPORT_OWNER } from "./owner-map.js";
 import {
-  APPROVED_LABEL,
-  AREA_KEYS,
-  AREAS,
-  type AreaKey,
-  areaForPath,
-  areaForProject,
-  FALLBACK_AREA,
-  FALLBACK_OWNER,
-  hasLabel,
-  isAreaKey,
-  isCrmArea,
-  NEEDS_APPROVAL_LABEL,
-  ownerForArea,
-  SUPPORT_OWNER,
-} from "./owner-map.js";
+  HOTLANE_IMPACTS,
+  HOTLANE_ROUTES,
+  type HotlaneDecision,
+  resolveHotlane,
+} from "./triage-hotlane.js";
+import {
+  areaQuestion,
+  type Ownership,
+  ownershipRoute,
+  resolveOwnership,
+} from "./triage-ownership.js";
 
 /**
  * Every triage and billing decision Foreman used to make in prose, as Jev
@@ -66,7 +63,7 @@ export const BARS = {
   verdict: 0.6,
 } as const;
 
-const UNDETERMINED = "undetermined";
+export const UNDETERMINED = "undetermined";
 const NO_LABEL = "none";
 
 const PRIORITY = { high: 2, low: 4, medium: 3, urgent: 1 } as const;
@@ -251,7 +248,7 @@ export type TriageDecision =
     }
   | {
       approval: "approved" | "needed" | "not-applicable";
-      area: { key: AreaKey; label: string; matched: boolean } | null;
+      area: Ownership["area"];
       assignee: string | null;
       classification: TriageClassification;
       /** The incident-hotlane route, only for a Bug that is not a Duplicate. */
@@ -277,7 +274,7 @@ const CLASSIFICATION_NAMES = {
   platform_limitation: "Platform Limitation",
   user_error: "User Error",
 } as const;
-type TriageClassification =
+export type TriageClassification =
   (typeof CLASSIFICATION_NAMES)[keyof typeof CLASSIFICATION_NAMES];
 
 const DUPLICATE_OUTCOMES = {
@@ -287,83 +284,11 @@ const DUPLICATE_OUTCOMES = {
   stale_or_superseded: "the same area, but already fixed or decided",
 } as const;
 
-export const HOTLANE_ROUTES = {
-  hotlane:
-    "current evidence confirms at least one of: a core workflow blocked or materially impaired; data lost, corrupted, exposed, or written to the wrong tenant; permissions, authentication, security, or privacy controls failing; paid work silently skipped or false success reported; customers actively charged or financially harmed incorrectly; material revenue loss, uncontrolled provider-cost burn, or customer-trust harm needing immediate containment; a high-frequency failure on a core path; or no safe workaround for a material customer outcome",
-  needs_human_urgent:
-    "the evidence points at one of those high-risk conditions, but a critical evidence lane was unavailable, so it cannot be confirmed",
-  standard: "a confirmed defect that meets none of those conditions",
-} as const;
-
-const HOTLANE_IMPACTS = {
-  BLOCKED: "completely blocks the user's objective",
-  DATA_OR_SECURITY_RISK: "risks data loss, corruption, security, or privacy",
-  INCORRECT_RESULT: "produces materially incorrect results",
-  MATERIAL_BUSINESS_HARM:
-    "active revenue, provider-cost, or customer-trust harm",
-  MATERIALLY_IMPAIRED: "materially impairs the user's objective",
-  MONEY_IMPACT: "customers charged or financially harmed incorrectly",
-  NON_CORE: "cosmetic, inconvenient, or a non-core edge case",
-  SILENTLY_SKIPPED: "silently skips paid or expected work",
-} as const;
-
-export interface HotlaneDecision {
-  impact: keyof typeof HOTLANE_IMPACTS | "UNCONFIRMED";
-  notes: string[];
-  proposedLabel: "fast-lane" | "none";
-  route: "HOTLANE" | "NEEDS_HUMAN_URGENT" | "STANDARD_ENGINEERING";
-}
-
-/**
- * Whether a Bug is an incident. Route by impact, never by report count; a
- * hotlane call below the bar goes to a person rather than to routine work.
- */
-export function resolveHotlane(answers: Answers): HotlaneDecision {
-  const notes: string[] = [];
-  const { choice, confidence } = choiceOf(answers.incident);
-  let route: HotlaneDecision["route"] = "STANDARD_ENGINEERING";
-  if (choice === "needs_human_urgent") {
-    route = "NEEDS_HUMAN_URGENT";
-  } else if (choice === "hotlane" && confidence >= BARS.incident) {
-    route = "HOTLANE";
-  } else if (choice === "hotlane") {
-    route = "NEEDS_HUMAN_URGENT";
-    notes.push(
-      "A hotlane condition was likely but not clear enough to confirm; a person confirms it."
-    );
-  }
-  return {
-    impact:
-      route === "NEEDS_HUMAN_URGENT"
-        ? "UNCONFIRMED"
-        : (choiceOf(answers.incident_impact)
-            .choice as keyof typeof HOTLANE_IMPACTS),
-    notes,
-    proposedLabel: route === "HOTLANE" ? "fast-lane" : "none",
-    route,
-  };
-}
-
 export function triageQuestions(
   input: TriageInput
 ): Record<string, JevQuestion> {
   const questions: Record<string, JevQuestion> = {
-    area: {
-      criteria: {
-        ...Object.fromEntries(
-          AREA_KEYS.filter((key) => key !== FALLBACK_AREA).map((key) => [
-            key,
-            AREAS[key].description,
-          ])
-        ),
-        [FALLBACK_AREA]: AREAS[FALLBACK_AREA].description,
-        [UNDETERMINED]:
-          "the evidence does not establish which area owns the root cause",
-      },
-      instructions:
-        "Which product area owns the confirmed root cause and the code path it runs through? Judge from the evidence, never from the ticket title or its incoming project.",
-      type: "choice",
-    },
+    area: areaQuestion(),
     classification: {
       criteria: { ...CLASSIFICATIONS },
       instructions:
@@ -491,7 +416,7 @@ const bandOf = (
   return { band: top.band };
 };
 
-type Answers = Record<string, JevAnswer>;
+export type Answers = Record<string, JevAnswer>;
 
 const findDuplicate = (input: TriageInput, answers: Answers) =>
   input.duplicateCandidates
@@ -615,6 +540,7 @@ export function resolveTriage(
   const needsCriticReview = classification === "Bug" && path !== "Duplicate";
   const ownership = resolveOwnership({
     answers,
+    bar: BARS.project,
     classification,
     duplicate: duplicate !== undefined,
     input,
@@ -629,23 +555,18 @@ export function resolveTriage(
     area: ownership.area,
     assignee: ownership.assignee,
     classification,
-    ...(needsCriticReview ? { hotlane: resolveHotlane(answers) } : {}),
+    ...(needsCriticReview
+      ? { hotlane: resolveHotlane(answers, BARS.incident) }
+      : {}),
     needsCriticReview,
     notes,
     outcome: "route",
     path,
     route: {
-      addLabels: [
-        ...new Set([
-          ...labels,
-          ...(ownership.area ? [ownership.area.label] : []),
-          ...(ownership.approval === "needed" ? [NEEDS_APPROVAL_LABEL] : []),
-        ]),
-      ],
+      ...ownershipRoute(ownership, labels),
       priority,
       state: ownership.approval === "approved" ? "Todo" : PATH_STATE[path],
       ...(projectSettled ? { project: project.choice } : {}),
-      ...(ownership.assignee ? { assignee: ownership.assignee } : {}),
       ...(duplicate
         ? {
             duplicateOf: duplicate.candidate.identifier,
@@ -654,103 +575,6 @@ export function resolveTriage(
         : {}),
     },
     verdict,
-  };
-}
-
-interface Ownership {
-  approval: "approved" | "needed" | "not-applicable";
-  area: { key: AreaKey; label: string; matched: boolean } | null;
-  assignee: string | null;
-}
-
-const settledArea = (
-  answers: Answers,
-  project: string | null,
-  codePath: TriageInput["codePath"]
-): { key: AreaKey; matched: boolean } => {
-  const answer = answers.area ? choiceOf(answers.area) : null;
-  let key: AreaKey | null =
-    answer &&
-    answer.choice !== UNDETERMINED &&
-    isAreaKey(answer.choice) &&
-    answer.confidence >= BARS.project
-      ? answer.choice
-      : null;
-  if (!key && project) {
-    key = areaForProject(project);
-  }
-  if (key && isCrmArea(key) && codePath) {
-    key = areaForPath(codePath.file) ?? key;
-  }
-  return key
-    ? { key, matched: !(key === FALLBACK_AREA) }
-    : { key: FALLBACK_AREA, matched: false };
-};
-
-const developerEligibility = (
-  classification: TriageClassification,
-  path: HandlingPath,
-  duplicate: boolean,
-  input: TriageInput,
-  answers: Answers
-): "approved" | "bug" | "needed" | "none" => {
-  if (classification === "Bug" && (duplicate || path === "Engineering Todo")) {
-    return "bug";
-  }
-  const featureRequest =
-    classification === "Platform Limitation" &&
-    probabilityOf(answers.wants_limit_lifted) >= BARS.signal;
-  if (!featureRequest) {
-    return "none";
-  }
-  return hasLabel(input.ticketLabels ?? [], APPROVED_LABEL)
-    ? "approved"
-    : "needed";
-};
-
-function resolveOwnership(context: {
-  answers: Answers;
-  classification: TriageClassification;
-  duplicate: boolean;
-  input: TriageInput;
-  notes: string[];
-  path: HandlingPath;
-  project: string | null;
-}): Ownership {
-  const { answers, classification, duplicate, input, notes, path } = context;
-  if (input.identifier.toUpperCase().startsWith("SAN-")) {
-    return { approval: "not-applicable", area: null, assignee: SUPPORT_OWNER };
-  }
-  const eligibility = developerEligibility(
-    classification,
-    path,
-    duplicate,
-    input,
-    answers
-  );
-  if (eligibility === "needed") {
-    notes.push(
-      `A feature request that nobody has approved gets no developer. It is labelled "${NEEDS_APPROVAL_LABEL}" for James to approve; add the "${APPROVED_LABEL}" label to release it.`
-    );
-    return { approval: "needed", area: null, assignee: null };
-  }
-  if (eligibility === "none") {
-    return { approval: "not-applicable", area: null, assignee: null };
-  }
-  const { key, matched } = settledArea(
-    answers,
-    context.project,
-    input.codePath
-  );
-  if (!matched) {
-    notes.push(
-      `The evidence does not place this in a mapped area, so it goes to ${FALLBACK_OWNER}; say which evidence is missing in the document.`
-    );
-  }
-  return {
-    approval: eligibility === "approved" ? "approved" : "not-applicable",
-    area: { key, label: AREAS[key].label, matched },
-    assignee: ownerForArea(key),
   };
 }
 
