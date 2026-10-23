@@ -279,14 +279,27 @@ export const areaForProject = (project: string): AreaKey | null => {
   );
 };
 
-export const areaForPath = (file: string): AreaKey | null => {
+const SPECIFIC_CRM_ORDER = CRM_PATH_ORDER.filter(
+  (key) => key !== "crm_records"
+);
+
+const pathMatches = (
+  order: readonly AreaKey[],
+  file: string
+): AreaKey | null => {
   const path = file.replaceAll("\\", "/");
   return (
-    CRM_PATH_ORDER.find((key) =>
+    order.find((key) =>
       AREAS[key].paths.some((prefix) => path.includes(prefix))
     ) ?? null
   );
 };
+
+export const areaForPath = (file: string): AreaKey | null =>
+  pathMatches(CRM_PATH_ORDER, file);
+
+export const specificAreaForPath = (file: string): AreaKey | null =>
+  pathMatches(SPECIFIC_CRM_ORDER, file);
 
 export const isCrmArea = (key: AreaKey): boolean => key.startsWith("crm_");
 

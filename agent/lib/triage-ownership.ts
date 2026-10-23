@@ -14,7 +14,6 @@ import {
   AREA_KEYS,
   AREAS,
   type AreaKey,
-  areaForPath,
   areaForProject,
   FALLBACK_AREA,
   FALLBACK_OWNER,
@@ -24,6 +23,7 @@ import {
   NEEDS_APPROVAL_LABEL,
   ownerForArea,
   SUPPORT_OWNER,
+  specificAreaForPath,
 } from "./owner-map.js";
 
 type Answers = Record<string, JevAnswer>;
@@ -72,7 +72,7 @@ const settledArea = (
     key = areaForProject(project);
   }
   if (key && isCrmArea(key) && codePath) {
-    key = areaForPath(codePath.file) ?? key;
+    key = specificAreaForPath(codePath.file) ?? key;
   }
   return key
     ? { key, matched: !(key === FALLBACK_AREA) }

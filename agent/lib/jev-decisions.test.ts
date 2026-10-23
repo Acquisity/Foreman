@@ -802,3 +802,27 @@ test("a confirmed Bug that needs no developer still carries its Area label", () 
     assert.equal(decision.route.assignee, undefined, path);
   }
 });
+
+test("a shared CRM file does not override a CRM sub-area the model settled", () => {
+  const shared = {
+    commit: "a".repeat(40),
+    file: "apps/web/components/crm-v2/shared.tsx",
+    function: "Shell",
+  };
+  const settled = resolveTriage(
+    triageInput({ codePath: shared }),
+    bugAnswers({ area: pick("crm_conversations"), project: pick("CRM") })
+  );
+  assert.ok(settled.outcome === "route");
+  assert.equal(settled.area?.key, "crm_conversations");
+  assert.equal(settled.assignee, "Elis Bushaj");
+  const specific = resolveTriage(
+    triageInput({
+      codePath: { ...shared, file: "apps/web/lib/dialer/session.ts" },
+    }),
+    bugAnswers({ area: pick("crm_conversations"), project: pick("CRM") })
+  );
+  assert.ok(specific.outcome === "route");
+  assert.equal(specific.area?.key, "crm_phone");
+  assert.equal(specific.assignee, "Ebubeker Rexha");
+});
