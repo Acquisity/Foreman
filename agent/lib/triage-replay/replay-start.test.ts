@@ -162,7 +162,10 @@ describe("starting a replay", () => {
     const { args, failSendOnce, sent } = server(t, backend);
     const ledger = sharedLedger();
     const restore = failSendOnce();
-    await assert.rejects(startReplay(start(), args, ledger()), MAY_HAVE_STARTED);
+    await assert.rejects(
+      startReplay(start(), args, ledger()),
+      MAY_HAVE_STARTED
+    );
     restore();
     assert.deepEqual(await afterRetry(ledger, backend), {
       admitted: [],
