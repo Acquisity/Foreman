@@ -388,54 +388,57 @@ describe("discover", () => {
         pageInfo: { endCursor: next, hasNextPage: next !== null },
       },
     });
+  const SINCE = "2026-10-10T00:00:00.000Z";
+  const CREATED = "2026-10-01T00:00:00.000Z";
 
-  it("follows the cursor across pages and reports the list as complete", async () => {
+  it("follows the cursor across pages and reports the list as finished", async () => {
     const { port, requests } = portWith((_query, variables) =>
       variables.after === null ? page("ENG-1", "next") : page("ENG-2", null)
     );
-    assert.deepEqual(
-      await port.discover(
-        "2026-10-10T00:00:00.000Z",
-        "2026-10-01T00:00:00.000Z"
-      ),
-      { complete: true, identifiers: ["ENG-1", "ENG-2"] }
-    );
+    assert.deepEqual(await port.discover(SINCE, CREATED, null), {
+      identifiers: ["ENG-1", "ENG-2"],
+      next: null,
+    });
     assert.equal(requests.length, 2);
-    assert.equal(requests[0]?.variables.since, "2026-10-10T00:00:00.000Z");
-    assert.equal(requests[0]?.variables.created, "2026-10-01T00:00:00.000Z");
+    assert.equal(requests[0]?.variables.since, SINCE);
+    assert.equal(requests[0]?.variables.created, CREATED);
   });
 
-  it("asks for tickets with a Slack thread anchor, never for an Ask link", async () => {
+  it("starts from the page cursor it is given", async () => {
+    const { port, requests } = portWith(() => page("ENG-9", null));
+    await port.discover(SINCE, CREATED, "resume-here");
+    assert.equal(requests[0]?.variables.after, "resume-here");
+  });
+
+  it("asks for tickets with a Slack thread anchor, never for an Ask link, in a stable order", async () => {
     const { port, requests } = portWith(() => page("ENG-1", null));
-    await port.discover("2026-10-10T00:00:00.000Z", "2026-10-01T00:00:00.000Z");
+    await port.discover(SINCE, CREATED, null);
     const query = requests[0]?.query ?? "";
     assert.equal(requests[0]?.variables.anchor, "Slack thread connected in ");
     assert.ok(
       query.includes("comments: { some: { body: { startsWith: $anchor } } }")
     );
+    assert.ok(query.includes("orderBy: createdAt"));
     assert.ok(!query.includes("attachments"));
     assert.ok(!query.includes("Ask from"));
   });
 
   it("also asks for tickets whose master changed, so a master closing finds its unchanged reports", async () => {
     const { port, requests } = portWith(() => page("ENG-1", null));
-    await port.discover("2026-10-10T00:00:00.000Z", "2026-10-01T00:00:00.000Z");
+    await port.discover(SINCE, CREATED, null);
     const query = requests[0]?.query ?? "";
     assert.ok(query.includes("{ parent: { updatedAt: { gt: $since } } }"));
     assert.ok(query.includes("createdAt: { gt: $created }"));
   });
 
-  it("says so when there are more tickets than it will list", async () => {
+  it("hands back the page cursor when there are more tickets than one run will list", async () => {
     let n = 0;
     const { port } = portWith(() => {
       n += 1;
       return page(`ENG-${n}`, `cursor-${n}`);
     });
-    const found = await port.discover(
-      "2026-10-10T00:00:00.000Z",
-      "2026-10-01T00:00:00.000Z"
-    );
-    assert.equal(found.complete, false);
+    const found = await port.discover(SINCE, CREATED, null);
+    assert.equal(found.next, "cursor-20");
     assert.equal(found.identifiers.length, 20);
   });
 });

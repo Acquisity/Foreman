@@ -280,6 +280,8 @@ const settle = async (
 
 const KEEP_PENDING = new Set(["backing_off", "busy"]);
 
+const SWEEP_MAX_AGE_MS = 86_400_000;
+
 const discoverTickets = async (
   deps: Deps,
   nowMs: number,
@@ -288,16 +290,28 @@ const discoverTickets = async (
   try {
     const cursor = await deps.store.readCursor();
     const created = Date.parse(deps.config.since);
-    const updatedSince = new Date(Math.max(cursor ?? created, created));
+    const resume =
+      cursor.sweep && nowMs - cursor.sweep.startedAt < SWEEP_MAX_AGE_MS
+        ? cursor.sweep
+        : null;
+    const updatedSince = resume
+      ? resume.since
+      : Math.max(cursor.since ?? created, created);
+    const startedAt = resume ? resume.startedAt : nowMs;
     const found = await deps.linear.discover(
-      updatedSince.toISOString(),
-      deps.config.since
+      new Date(updatedSince).toISOString(),
+      deps.config.since,
+      resume?.after ?? null
     );
     await deps.store.enqueue(found.identifiers);
-    if (found.complete) {
-      await deps.store.saveCursor(nowMs - CURSOR_OVERLAP_MS);
+    if (found.next === null) {
+      await deps.store.saveCursor(startedAt - CURSOR_OVERLAP_MS);
     } else {
-      report.errors.push("discovery: more tickets than one run can list.");
+      await deps.store.saveSweep({
+        after: found.next,
+        since: updatedSince,
+        startedAt,
+      });
     }
   } catch (error) {
     report.errors.push(

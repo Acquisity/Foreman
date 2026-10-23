@@ -697,14 +697,7 @@ describe("discovery", () => {
     assert.equal(s.memory.pending.size, 0);
   });
 
-  it("does not move the cursor when the listing was cut short or could not be saved", async () => {
-    const cut = setup([old(1)]);
-    cut.linear.state.discoverTruncated = true;
-    const report = await run(cut);
-    assert.equal(cut.memory.state.cursor, null);
-    assert.ok(report.errors.some((e) => e.startsWith("discovery:")));
-    assert.equal(cut.linear.posts.length, 1);
-
+  it("does not move the cursor when the queue could not be saved or Linear is down", async () => {
     const unsaved = setup([old(1)]);
     unsaved.memory.state.failNextEnqueue = true;
     const failed = await run(unsaved);
@@ -715,6 +708,75 @@ describe("discovery", () => {
     down.linear.state.discoverFails = true;
     await run(down);
     assert.equal(down.memory.state.cursor, null);
+  });
+
+  it("covers a backlog bigger than one run's page budget over several runs, resuming where the last one stopped", async () => {
+    const tickets = [1, 2, 3, 4, 5].map((n) =>
+      old(n, { stateName: "Duplicate", stateType: "canceled" })
+    );
+    const s = setup(tickets, { liveSha: OLD_SHA, pulls: {} });
+    s.linear.state.discoverPageSize = 2;
+    await run(s);
+    assert.equal(s.memory.state.cursor, null);
+    assert.deepEqual(s.memory.state.sweep, {
+      after: "2",
+      since: Date.parse(SINCE),
+      startedAt: NOW,
+    });
+    await run(s, NOW + 300_000);
+    assert.equal(s.memory.state.cursor, null);
+    await run(s, NOW + 600_000);
+    assert.deepEqual(
+      s.linear.state.discoveries.map((d) => d.after),
+      [null, "2", "4"]
+    );
+    assert.ok(
+      s.linear.state.discoveries.every((d) => d.updatedSince === SINCE),
+      "every page of one sweep uses the same window"
+    );
+    assert.equal(s.memory.state.sweep, null);
+    assert.equal(s.memory.state.cursor, NOW - 600_000);
+    assert.deepEqual(
+      s.linear.posts
+        .map((p) => p.identifier)
+        .sort((a, b) => a.localeCompare(b)),
+      ["ENG-1", "ENG-2", "ENG-3", "ENG-4", "ENG-5"]
+    );
+  });
+
+  it("starts the next sweep from when the finished one began, so nothing changed in between is missed", async () => {
+    const s = setup(
+      [1, 2, 3].map((n) =>
+        old(n, { stateName: "Duplicate", stateType: "canceled" })
+      ),
+      { liveSha: OLD_SHA, pulls: {} }
+    );
+    s.linear.state.discoverPageSize = 2;
+    await run(s);
+    await run(s, NOW + 300_000);
+    await run(s, NOW + 600_000);
+    assert.equal(
+      s.linear.state.discoveries[2]?.after,
+      null,
+      "the finished sweep is followed by a fresh one"
+    );
+    assert.equal(
+      s.linear.state.discoveries[2]?.updatedSince,
+      new Date(NOW - 600_000).toISOString()
+    );
+  });
+
+  it("gives up on a sweep that is a day old and starts again from the saved cursor", async () => {
+    const s = setup(
+      [1, 2, 3].map((n) =>
+        old(n, { stateName: "Duplicate", stateType: "canceled" })
+      ),
+      { liveSha: OLD_SHA, pulls: {} }
+    );
+    s.linear.state.discoverPageSize = 2;
+    await run(s);
+    await run(s, NOW + 2 * 86_400_000);
+    assert.equal(s.linear.state.discoveries[1]?.after, null);
   });
 
   it("treats a thread too long to read as a skip, not as an error that blocks the queue", async () => {

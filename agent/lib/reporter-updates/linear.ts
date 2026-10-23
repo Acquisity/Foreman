@@ -24,8 +24,9 @@ export interface TicketView {
 export interface LinearPort {
   discover: (
     updatedSince: string,
-    createdAfter: string
-  ) => Promise<{ complete: boolean; identifiers: string[] }>;
+    createdAfter: string,
+    after: string | null
+  ) => Promise<{ identifiers: string[]; next: string | null }>;
   findComment: (id: string) => Promise<{ parentId: string | null } | null>;
   postUnderAnchor: (
     issueId: string,
@@ -73,7 +74,7 @@ const COMMENT_QUERY = `query ReporterComment($id: String!) {
 }`;
 
 const DISCOVER_QUERY = `query ReporterDiscover($team: ID!, $since: DateTimeOrDuration!, $created: DateTimeOrDuration!, $anchor: String!, $after: String) {
-  issues(first: 100, after: $after, filter: {
+  issues(first: 100, after: $after, orderBy: createdAt, filter: {
     team: { id: { eq: $team } }
     createdAt: { gt: $created }
     comments: { some: { body: { startsWith: $anchor } } }
@@ -186,15 +187,15 @@ export const linearPort = (
       variables,
     });
   return {
-    async discover(updatedSince, createdAfter) {
+    async discover(updatedSince, createdAfter, after) {
       const identifiers: string[] = [];
       const page = async (
-        after: string | null,
+        cursor: string | null,
         remaining: number
-      ): Promise<boolean> => {
+      ): Promise<string | null> => {
         const data = recentSchema.parse(
           await call(DISCOVER_QUERY, "ReporterDiscover", {
-            after,
+            after: cursor,
             anchor: ANCHOR_PREFIX,
             created: createdAfter,
             since: updatedSince,
@@ -203,14 +204,13 @@ export const linearPort = (
         );
         identifiers.push(...data.issues.nodes.map((node) => node.identifier));
         const { endCursor, hasNextPage } = data.issues.pageInfo;
-        if (!hasNextPage) {
-          return true;
+        if (!(hasNextPage && endCursor)) {
+          return null;
         }
-        return endCursor && remaining > 1
-          ? page(endCursor, remaining - 1)
-          : false;
+        return remaining > 1 ? page(endCursor, remaining - 1) : endCursor;
       };
-      return { complete: await page(null, DISCOVER_PAGES), identifiers };
+      const next = await page(after, DISCOVER_PAGES);
+      return { identifiers, next };
     },
     async findComment(id) {
       try {

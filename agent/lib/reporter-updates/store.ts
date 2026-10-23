@@ -19,6 +19,17 @@ export type ClaimResult =
   | { attempts: number; ok: true; token: string }
   | { ok: false; reason: "backing_off" | "busy" };
 
+export interface Sweep {
+  after: string;
+  since: number;
+  startedAt: number;
+}
+
+export interface DiscoveryCursor {
+  since: number | null;
+  sweep: Sweep | null;
+}
+
 export interface ReporterStore {
   anyWaiting: () => Promise<boolean>;
   claim: (
@@ -48,11 +59,12 @@ export interface ReporterStore {
   markWaiting: (issue: string, checkedSha: string | null) => Promise<void>;
   nextPending: (limit: number) => Promise<string[]>;
   queueWaiting: (liveSha: string) => Promise<void>;
-  readCursor: () => Promise<number | null>;
+  readCursor: () => Promise<DiscoveryCursor>;
   release: (issue: string, stage: Stage, token: string) => Promise<void>;
   resolvePending: (issue: string) => Promise<void>;
   rows: (issue: string) => Promise<LedgerRow[]>;
   saveCursor: (ms: number) => Promise<void>;
+  saveSweep: (sweep: Sweep) => Promise<void>;
 }
 
 const ROW_STAGE = z.enum(STAGES as [Stage, ...Stage[]]);
@@ -63,7 +75,12 @@ const rowSchema = z.object({
   status: z.enum(["claimed", "sent", "waiting"]),
 });
 const issueSchema = z.object({ issue: z.string() });
-const cursorSchema = z.object({ ms: z.coerce.number() });
+const cursorSchema = z.object({
+  after: z.string().nullable(),
+  since: z.coerce.number().nullable(),
+  sweep_since: z.coerce.number().nullable(),
+  sweep_started: z.coerce.number().nullable(),
+});
 
 const STALE_CLAIM = "10 minutes";
 export const GIVE_UP_LOG_ATTEMPTS = 5;
@@ -200,10 +217,28 @@ export const createReporterStore = (query: Query): ReporterStore => {
     },
     async readCursor() {
       const rows = await query(
-        "SELECT (extract(epoch FROM since) * 1000)::bigint::text AS ms FROM reporter_cursor WHERE id",
+        `SELECT (extract(epoch FROM since) * 1000)::bigint::text AS since,
+                sweep_after AS after,
+                (extract(epoch FROM sweep_since) * 1000)::bigint::text AS sweep_since,
+                (extract(epoch FROM sweep_started) * 1000)::bigint::text AS sweep_started
+         FROM reporter_cursor WHERE id`,
         []
       );
-      return rows[0] ? cursorSchema.parse(rows[0]).ms : null;
+      if (!rows[0]) {
+        return { since: null, sweep: null };
+      }
+      const row = cursorSchema.parse(rows[0]);
+      return {
+        since: row.since,
+        sweep:
+          row.after && row.sweep_since !== null && row.sweep_started !== null
+            ? {
+                after: row.after,
+                since: row.sweep_since,
+                startedAt: row.sweep_started,
+              }
+            : null,
+      };
     },
     async release(issue, stage, token) {
       await query(
@@ -236,8 +271,19 @@ export const createReporterStore = (query: Query): ReporterStore => {
       await query(
         `INSERT INTO reporter_cursor (id, since) VALUES (true, to_timestamp($1::double precision / 1000))
          ON CONFLICT (id) DO UPDATE
-           SET since = GREATEST(reporter_cursor.since, EXCLUDED.since), updated_at = now()`,
+           SET since = GREATEST(reporter_cursor.since, EXCLUDED.since),
+               sweep_after = NULL, sweep_since = NULL, sweep_started = NULL, updated_at = now()`,
         [ms]
+      );
+    },
+    async saveSweep(sweep) {
+      await query(
+        `INSERT INTO reporter_cursor (id, sweep_after, sweep_since, sweep_started)
+         VALUES (true, $1, to_timestamp($2::double precision / 1000), to_timestamp($3::double precision / 1000))
+         ON CONFLICT (id) DO UPDATE
+           SET sweep_after = EXCLUDED.sweep_after, sweep_since = EXCLUDED.sweep_since,
+               sweep_started = EXCLUDED.sweep_started, updated_at = now()`,
+        [sweep.after, sweep.since, sweep.startedAt]
       );
     },
   };

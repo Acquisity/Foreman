@@ -212,13 +212,26 @@ assert.equal(
   "new ticket activity brings it back at once"
 );
 
-assert.equal(await store.readCursor(), null);
+assert.deepEqual(await store.readCursor(), { since: null, sweep: null });
 await store.saveCursor(1_760_000_000_000);
 await store.saveCursor(1_750_000_000_000);
 assert.equal(
-  await store.readCursor(),
+  (await store.readCursor()).since,
   1_760_000_000_000,
   "the cursor never moves back"
+);
+const sweep = {
+  after: "cursor-9",
+  since: 1_750_000_000_000,
+  startedAt: 1_770_000_000_000,
+};
+await store.saveSweep(sweep);
+assert.deepEqual(await store.readCursor(), { since: 1_760_000_000_000, sweep });
+await store.saveCursor(1_770_000_000_000);
+assert.equal(
+  (await store.readCursor()).sweep,
+  null,
+  "finishing a sweep clears the page cursor"
 );
 
 await assert.rejects(

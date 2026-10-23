@@ -51,6 +51,7 @@ export const memoryStore = () => {
   const state: {
     cursor: number | null;
     cursorWrites: number[];
+    sweep: { after: string; since: number; startedAt: number } | null;
     failNextEnqueue: boolean;
     failNextMarkSent: boolean;
     now: number;
@@ -61,6 +62,7 @@ export const memoryStore = () => {
     failNextEnqueue: false,
     failNextMarkSent: false,
     now: 0,
+    sweep: null,
     tokens: 0,
   };
   const blank = (stage: Stage): StoredRow => ({
@@ -212,7 +214,7 @@ export const memoryStore = () => {
       return Promise.resolve();
     },
     readCursor() {
-      return Promise.resolve(state.cursor);
+      return Promise.resolve({ since: state.cursor, sweep: state.sweep });
     },
     release(issue, stage, token) {
       const existing = table.get(key(issue, stage));
@@ -240,6 +242,11 @@ export const memoryStore = () => {
     saveCursor(ms) {
       state.cursor = Math.max(state.cursor ?? 0, ms);
       state.cursorWrites.push(ms);
+      state.sweep = null;
+      return Promise.resolve();
+    },
+    saveSweep(sweep) {
+      state.sweep = sweep;
       return Promise.resolve();
     },
   };
@@ -271,8 +278,12 @@ export const fakeLinear = (tickets: FakeTicket[]) => {
   const posts: { body: string; id: string; identifier: string }[] = [];
   const state: {
     discoverFails: boolean;
-    discoverTruncated: boolean;
-    discoveries: { createdAfter: string; updatedSince: string }[];
+    discoverPageSize: number;
+    discoveries: {
+      after: string | null;
+      createdAfter: string;
+      updatedSince: string;
+    }[];
     failAfterCreate: boolean;
     failNextPost: boolean;
     holdNextPost: Promise<void> | null;
@@ -280,7 +291,7 @@ export const fakeLinear = (tickets: FakeTicket[]) => {
   } = {
     discoverFails: false,
     discoveries: [],
-    discoverTruncated: false,
+    discoverPageSize: Number.POSITIVE_INFINITY,
     failAfterCreate: false,
     failNextPost: false,
     holdNextPost: null,
@@ -288,13 +299,13 @@ export const fakeLinear = (tickets: FakeTicket[]) => {
   };
   const created = new Map<string, { anchorId: string }>();
   const port: LinearPort = {
-    discover(updatedSince, createdAfter) {
-      state.discoveries.push({ createdAfter, updatedSince });
+    discover(updatedSince, createdAfter, after) {
+      state.discoveries.push({ after, createdAfter, updatedSince });
       if (state.discoverFails) {
         return Promise.reject(new Error("Linear is unavailable"));
       }
       const since = Date.parse(updatedSince);
-      const identifiers = tickets
+      const matching = tickets
         .filter(
           (entry) =>
             entry.anchorId !== null &&
@@ -303,10 +314,13 @@ export const fakeLinear = (tickets: FakeTicket[]) => {
               (entry.parentUpdatedAt !== null &&
                 Date.parse(entry.parentUpdatedAt) > since))
         )
-        .map((entry) => entry.facts.identifier);
+        .map((entry) => entry.facts.identifier)
+        .sort((a, b) => a.localeCompare(b));
+      const start = after === null ? 0 : Number(after);
+      const end = Math.min(matching.length, start + state.discoverPageSize);
       return Promise.resolve({
-        complete: !state.discoverTruncated,
-        identifiers,
+        identifiers: matching.slice(start, end),
+        next: end < matching.length ? String(end) : null,
       });
     },
     findComment(id) {

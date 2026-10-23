@@ -25,6 +25,9 @@ CREATE TABLE reporter_pending (
 );
 CREATE TABLE reporter_cursor (
   id boolean PRIMARY KEY DEFAULT true CHECK (id),
-  since timestamptz NOT NULL,
+  since timestamptz,
+  sweep_after text,
+  sweep_since timestamptz,
+  sweep_started timestamptz,
   updated_at timestamptz NOT NULL DEFAULT now()
 );
