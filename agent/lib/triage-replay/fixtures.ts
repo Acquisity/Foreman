@@ -7,6 +7,7 @@ import {
   seedReplayStore,
   setReplayBackend,
 } from "./backend.js";
+import { triageReplayHook } from "./hook.js";
 import { replayAuth } from "./route.js";
 import type { TriageCase, TriageLabel, TriageResult } from "./schema.js";
 import { seedReplayState } from "./store.js";
@@ -211,3 +212,27 @@ export const state = async () => {
   }
   return loaded;
 };
+
+type ReplayHookEvent = keyof NonNullable<typeof triageReplayHook.events>;
+
+export function replayHandler(name: ReplayHookEvent) {
+  const handler = triageReplayHook.events?.[name];
+  if (!handler) {
+    throw new Error(`The replay hook has no ${name} handler.`);
+  }
+  return handler as (event: unknown, ctx: unknown) => Promise<void>;
+}
+
+export async function outputOf<T>(
+  result: T | AsyncIterable<T> | Promise<T | AsyncIterable<T>>
+): Promise<T> {
+  const value = await result;
+  if (
+    typeof value === "object" &&
+    value !== null &&
+    Symbol.asyncIterator in value
+  ) {
+    throw new Error("A replay tool returned a stream, not one result.");
+  }
+  return value as T;
+}

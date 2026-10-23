@@ -466,7 +466,7 @@ export function scoreReplay(input: ScoreInput): ScoreReport {
   };
   return {
     cohortSha256: input.cohortSha256,
-    leakage: [...(input.leakage ?? new Map())]
+    leakage: [...(input.leakage ?? new Map<string, LeakageHit[]>())]
       .filter(([, hits]) => hits.length)
       .map(([key, hits]) => {
         const [caseId, run] = key.split("#");

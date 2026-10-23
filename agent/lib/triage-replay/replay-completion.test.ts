@@ -15,11 +15,12 @@ import {
   CASE_CREATED,
   ctx,
   KEY,
+  outputOf,
   RUN,
+  replayHandler,
   replayProcess,
   state,
 } from "./fixtures.js";
-import { triageReplayHook } from "./hook.js";
 import { buildReplayResult, replaySettled } from "./route.js";
 import { NEW_MASTER } from "./schema.js";
 import { replayMayCall } from "./tool-policy.js";
@@ -31,8 +32,7 @@ describe("replay result", () => {
     cancel: () => undefined,
     session: { auth: { current: auth, initiator: auth }, id: "sess-root" },
   } as never;
-  const handler = (name: keyof typeof triageReplayHook.events) =>
-    triageReplayHook.events[name] as (e: unknown, c: unknown) => Promise<void>;
+  const handler = replayHandler;
   let call = 0;
   const callTool = async (
     toolName: string,
@@ -283,13 +283,15 @@ describe("replay completion and Linear tools", () => {
       (recordCaseTool.approval as (c: unknown) => unknown)(toolCtx),
       "not-applicable"
     );
-    const recorded = await recordCaseTool.execute(
-      {
-        claim: "Reconnect after send.",
-        classification: "bug",
-        sourceIssueId: "ENG-100",
-      } as never,
-      toolCtx
+    const recorded = await outputOf(
+      recordCaseTool.execute(
+        {
+          claim: "Reconnect after send.",
+          classification: "bug",
+          sourceIssueId: "ENG-100",
+        } as never,
+        toolCtx
+      )
     );
     assert.equal(recorded.recorded, true);
     const s = await state();
@@ -307,7 +309,9 @@ describe("replay completion and Linear tools", () => {
       { body: "Root cause: the token refresh.", issue: "ENG-100" },
       toolCtx
     );
-    const read = await readIssueTool.execute({ issue: "ENG-100" }, toolCtx);
+    const read = await outputOf(
+      readIssueTool.execute({ issue: "ENG-100" }, toolCtx)
+    );
     assert.equal(read.found, true);
     const inputs = (await state()).inputs.filter(
       (input) => input.source === "read_triage_replay_issue"
@@ -321,7 +325,8 @@ describe("replay completion and Linear tools", () => {
     const related = await readIssueTool.execute({ issue: "ENG-90" }, toolCtx);
     assert.equal((related as { issue: { state: string } }).issue.state, "Todo");
     assert.equal(
-      (await readIssueTool.execute({ issue: "ENG-404" }, toolCtx)).found,
+      (await outputOf(readIssueTool.execute({ issue: "ENG-404" }, toolCtx)))
+        .found,
       false
     );
   });
@@ -331,13 +336,15 @@ describe("replay completion and Linear tools", () => {
     t.mock.method(executorTransport, "call", () => {
       throw new Error("transport reached");
     });
-    const { identifier } = await createIssueTool.execute(
-      {
-        assignee: "ada@example.test",
-        description: "Token refresh races the send.",
-        title: "Inbox token refresh race",
-      },
-      toolCtx
+    const { identifier } = await outputOf(
+      createIssueTool.execute(
+        {
+          assignee: "ada@example.test",
+          description: "Token refresh races the send.",
+          title: "Inbox token refresh race",
+        },
+        toolCtx
+      )
     );
     await routeTicket(
       { inheritAssigneeFrom: identifier, issue: "ENG-100", parent: identifier },

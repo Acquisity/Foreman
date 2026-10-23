@@ -23,12 +23,12 @@ import {
   KEY,
   lists,
   RUN,
+  replayHandler,
   replayProcess,
   state,
   TEST_SECRET,
   triageCase,
 } from "./fixtures.js";
-import { triageReplayHook } from "./hook.js";
 import { readReplayResult } from "./route.js";
 import { seedReplayState } from "./store.js";
 import { replayDocumentText } from "./views.js";
@@ -245,11 +245,7 @@ describe("replay storage", () => {
       cancel: () => cancels.push("cancel"),
       session: { auth: { current: auth, initiator: auth }, id: "sess-1" },
     };
-    const handler = (name: keyof typeof triageReplayHook.events) =>
-      triageReplayHook.events[name] as (
-        e: unknown,
-        c: unknown
-      ) => Promise<void>;
+    const handler = replayHandler;
     await assert.rejects(
       handler("actions.requested")(
         {

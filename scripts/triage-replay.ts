@@ -19,6 +19,11 @@ import { REPLAY_SECRET_HEADER } from "../agent/lib/triage-replay/route.js";
 import { triageCaseSchema } from "../agent/lib/triage-replay/schema.js";
 import { cohortSha256 } from "../agent/lib/triage-replay/score.js";
 
+interface Polled {
+  result: { status: string };
+  settled: boolean;
+}
+
 const COHORT = "evals/triage";
 const POLL_MS = 5000;
 const JSON_SUFFIX = /\.json$/u;
@@ -138,7 +143,7 @@ for (const id of ids) {
       runId,
     });
     const until = Date.now() + deadlineMs;
-    let last: { result: { status: string }; settled: boolean } | null = null;
+    let last: Polled | null = null;
     while (Date.now() < until) {
       // biome-ignore lint/performance/noAwaitInLoops: polling waits between reads by design.
       await new Promise((resolve) => setTimeout(resolve, POLL_MS));
@@ -150,7 +155,7 @@ for (const id of ids) {
         }
       );
       if (polled.ok) {
-        last = (await polled.json()) as typeof last;
+        last = (await polled.json()) as Polled;
         if (last?.settled) {
           break;
         }

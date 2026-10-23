@@ -10,6 +10,7 @@ import {
   CASE_CREATED,
   ctx,
   RUN,
+  replayHandler,
   replayProcess,
   state,
 } from "./fixtures.js";
@@ -175,10 +176,7 @@ describe("replay hook", () => {
     await replayProcess(t);
     process.env.TRIAGE_REPLAY_MAX_STEPS = "2";
     const cancels: string[] = [];
-    const handler = triageReplayHook.events["step.started"] as (
-      e: unknown,
-      c: unknown
-    ) => Promise<void>;
+    const handler = replayHandler("step.started");
     for (let i = 0; i < 3; i += 1) {
       // biome-ignore lint/performance/noAwaitInLoops: steps start one after another.
       await handler({}, hookCtx(cancels));
@@ -191,10 +189,7 @@ describe("replay hook", () => {
   it("cancels the turn on a tool the replay policy denies", async (t) => {
     await replayProcess(t);
     const cancels: string[] = [];
-    const handler = triageReplayHook.events["actions.requested"] as (
-      e: unknown,
-      c: unknown
-    ) => Promise<void>;
+    const handler = replayHandler("actions.requested");
     await handler(
       {
         data: {
@@ -244,10 +239,7 @@ describe("replay evidence misses and provider search", () => {
   it("judges a catalog call by the tool it names", async (t) => {
     await replayProcess(t);
     const cancels: string[] = [];
-    const requested = triageReplayHook.events["actions.requested"] as (
-      e: unknown,
-      c: unknown
-    ) => Promise<void>;
+    const requested = replayHandler("actions.requested");
     const hookCtx = {
       cancel: () => cancels.push("cancel"),
       session: { auth: { current: auth, initiator: auth }, id: "sess-1" },
@@ -290,12 +282,7 @@ describe("replay evidence misses and provider search", () => {
   it("records a closed Executor connection call as a miss without cancelling", async (t) => {
     await replayProcess(t);
     const cancels: string[] = [];
-    await (
-      triageReplayHook.events["actions.requested"] as (
-        e: unknown,
-        c: unknown
-      ) => Promise<void>
-    )(
+    await replayHandler("actions.requested")(
       {
         data: {
           actions: [
@@ -336,7 +323,9 @@ describe("replay evidence misses and provider search", () => {
       ],
     };
     const transformed = await (
-      replayToolsMiddleware.transformParams as (o: unknown) => Promise<{
+      replayToolsMiddleware.transformParams as unknown as (
+        o: unknown
+      ) => Promise<{
         tools: { name: string }[];
       }>
     )({ model: {}, params, type: "stream" });
@@ -351,12 +340,7 @@ describe("replay leakage recording", () => {
   it("keeps a long tool result whole, so a fix reference at its end is still scanned", async (t) => {
     await replayProcess(t);
     const tail = "fixed by #6108";
-    await (
-      triageReplayHook.events["action.result"] as (
-        e: unknown,
-        c: unknown
-      ) => Promise<void>
-    )(
+    await replayHandler("action.result")(
       {
         data: {
           result: {
@@ -393,10 +377,7 @@ describe("replay leakage recording", () => {
         },
       },
     });
-    const handler = triageReplayHook.events["action.result"] as (
-      e: unknown,
-      c: unknown
-    ) => Promise<void>;
+    const handler = replayHandler("action.result");
     const rootCtx = {
       cancel: () => undefined,
       session: { auth: { current: auth, initiator: auth }, id: "sess-1" },
@@ -414,10 +395,7 @@ describe("replay leakage recording", () => {
 
   it("keeps a loaded skill's text as a seeded input for the leakage scan", async (t) => {
     await replayProcess(t);
-    const handler = triageReplayHook.events["action.result"] as (
-      e: unknown,
-      c: unknown
-    ) => Promise<void>;
+    const handler = replayHandler("action.result");
     await handler(
       {
         data: {
@@ -444,10 +422,7 @@ describe("replay leakage recording", () => {
   it("fails the run on an image, because a case seeds no image bytes", async (t) => {
     await replayProcess(t);
     const cancels: string[] = [];
-    const handler = triageReplayHook.events["action.result"] as (
-      e: unknown,
-      c: unknown
-    ) => Promise<void>;
+    const handler = replayHandler("action.result");
     await handler(
       {
         data: {
@@ -513,10 +488,7 @@ describe("replay leakage recording", () => {
     it(`fails the run on ${shape}, because eve loads its bytes for the model`, async (t) => {
       await replayProcess(t);
       const cancels: string[] = [];
-      const handler = triageReplayHook.events["action.result"] as (
-        e: unknown,
-        c: unknown
-      ) => Promise<void>;
+      const handler = replayHandler("action.result");
       await handler(
         {
           data: {
@@ -554,10 +526,7 @@ describe("replay leakage recording", () => {
   it("lets a text read_file through", async (t) => {
     await replayProcess(t);
     const cancels: string[] = [];
-    const handler = triageReplayHook.events["action.result"] as (
-      e: unknown,
-      c: unknown
-    ) => Promise<void>;
+    const handler = replayHandler("action.result");
     await handler(
       {
         data: {

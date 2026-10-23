@@ -54,11 +54,25 @@ export async function prepareReplayArchive(
   return null;
 }
 
+export interface ReplayWorkspaceRefusal {
+  refusal: { code: string; error: string };
+}
+
+export interface ReplayWorkspace {
+  current: { repository: string; source: "explicit" };
+  previous: null;
+  replaced: false;
+  repository: string;
+  reused: false;
+  success: true;
+  worktree: "/workspace/repo";
+}
+
 /** A replay reads only the case's pinned archive; nothing is cloned or refreshed. */
 export async function prepareReplayWorkspace(
   initiator: SessionAuthContext | null | undefined,
   getSandbox: () => Promise<SandboxSession>
-) {
+): Promise<ReplayWorkspace | ReplayWorkspaceRefusal> {
   const session = replaySessionOf(initiator);
   if (!session) {
     return {
