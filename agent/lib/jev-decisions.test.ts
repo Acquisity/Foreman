@@ -908,3 +908,34 @@ test("an approved feature request drops the label that held it for approval", ()
   assert.ok(bug.outcome === "route");
   assert.equal(bug.route.removeLabels, undefined);
 });
+
+test("an outcome that is not for a developer releases the one holding the ticket", () => {
+  const userError = resolveTriage(
+    triageInput(),
+    bugAnswers({
+      classification: pick("user_error"),
+      path: pick("User Error"),
+    })
+  );
+  assert.ok(userError.outcome === "route");
+  assert.equal(userError.route.releaseDeveloper, true);
+  assert.equal(userError.route.assignee, undefined);
+  const unapproved = resolveTriage(
+    triageInput(),
+    bugAnswers({
+      classification: pick("platform_limitation"),
+      path: pick("Platform Limitation"),
+      wants_limit_lifted: yes(),
+    })
+  );
+  assert.ok(unapproved.outcome === "route");
+  assert.equal(unapproved.route.releaseDeveloper, true);
+  for (const kept of [
+    bugAnswers(),
+    bugAnswers({ path: pick("Backlog/low-impact") }),
+  ]) {
+    const bug = resolveTriage(triageInput(), kept);
+    assert.ok(bug.outcome === "route");
+    assert.equal(bug.route.releaseDeveloper, undefined);
+  }
+});

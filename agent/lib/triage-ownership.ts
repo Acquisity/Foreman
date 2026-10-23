@@ -36,6 +36,7 @@ export interface Ownership {
   area: { key: AreaKey; label: string; matched: boolean } | null;
   assignee: string | null;
   path: HandlingPath;
+  releaseDeveloper: boolean;
 }
 
 export const areaQuestion = (): JevQuestion => ({
@@ -103,9 +104,10 @@ export function resolveOwnership(context: {
     area: null,
     assignee: null,
     path,
+    releaseDeveloper: classification !== "Bug",
   };
   if (input.identifier.toUpperCase().startsWith("SAN-")) {
-    return { ...none, assignee: SUPPORT_OWNER };
+    return { ...none, assignee: SUPPORT_OWNER, releaseDeveloper: false };
   }
   const place = () => {
     const area = settledArea(
@@ -148,13 +150,19 @@ export function resolveOwnership(context: {
     area,
     assignee: ownerForArea(area.key),
     path: "Engineering Todo",
+    releaseDeveloper: false,
   };
 }
 
 export const ownershipRoute = (
   ownership: Ownership,
   labels: string[]
-): { addLabels: string[]; assignee?: string; removeLabels?: string[] } => ({
+): {
+  addLabels: string[];
+  assignee?: string;
+  releaseDeveloper?: boolean;
+  removeLabels?: string[];
+} => ({
   addLabels: [
     ...new Set([
       ...labels,
@@ -166,4 +174,5 @@ export const ownershipRoute = (
     ? { removeLabels: [NEEDS_APPROVAL_LABEL] }
     : {}),
   ...(ownership.assignee ? { assignee: ownership.assignee } : {}),
+  ...(ownership.releaseDeveloper ? { releaseDeveloper: true } : {}),
 });

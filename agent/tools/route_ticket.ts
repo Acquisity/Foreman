@@ -67,6 +67,12 @@ export default defineTool({
       .optional()
       .describe("1 Urgent, 2 High, 3 Medium, 4 Low, 0 none."),
     project: name.optional().describe("Project name."),
+    releaseDeveloper: z
+      .boolean()
+      .optional()
+      .describe(
+        "Unassign the ticket when a developer holds it and nobody new is assigned; James and support owners are kept."
+      ),
     removeLabels: z
       .array(name)
       .max(10)

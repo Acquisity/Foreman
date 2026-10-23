@@ -48,11 +48,13 @@ const fakeLinear = ({
   masterAssignee = { id: "u-anuj", name: "Anuj Bhatt" },
   readBackFails = false,
   teamLabels = [],
+  ticketAssignee = null,
   ticketLabels,
 }: {
   masterAssignee?: { id: string; name: string };
   readBackFails?: boolean;
   teamLabels?: { id: string; name: string }[];
+  ticketAssignee?: { id: string; name: string } | null;
   ticketLabels?: { id: string; name: string }[];
 } = {}) => {
   const calls: Call[] = [];
@@ -84,7 +86,7 @@ const fakeLinear = ({
       return json({
         data: {
           issue: {
-            assignee: master || readBack ? masterAssignee : null,
+            assignee: master || readBack ? masterAssignee : ticketAssignee,
             id: master ? "i-9" : "i-1",
             identifier: body.variables.id,
             labels: { nodes: labelsFor(master, readBack, ticketLabels) },
@@ -471,6 +473,41 @@ describe("routeTicket owner map", () => {
     );
     assert.equal(linear.updates().length, 0);
     assert.equal(result.identifier, "ENG-1");
+  });
+
+  it("unassigns a developer when the outcome is not a developer one", async () => {
+    const held = { id: "u-anuj", name: "Anuj Bhatt" };
+    const released = fakeLinear({ ticketAssignee: held });
+    await routeTicket(
+      { issue: "ENG-1", priority: 3, releaseDeveloper: true },
+      { client: released.fetchStub }
+    );
+    assert.deepEqual(released.updates()[0]?.variables.input, {
+      assigneeId: null,
+      priority: 3,
+    });
+    await Promise.all(
+      [
+        { id: "u-james", name: "James Keeble" },
+        { id: "u-aaron", name: "Aaron Fraga" },
+        { id: "u-gone", name: "Pieter Venter" },
+      ].map(async (keeper) => {
+        const kept = fakeLinear({ ticketAssignee: keeper });
+        await routeTicket(
+          { issue: "ENG-1", priority: 3, releaseDeveloper: true },
+          { client: kept.fetchStub }
+        );
+        assert.deepEqual(kept.updates()[0]?.variables.input, { priority: 3 });
+      })
+    );
+    const replaced = fakeLinear({ ticketAssignee: held });
+    await routeTicket(
+      { assignee: "Ebubeker Rexha", issue: "ENG-1", releaseDeveloper: true },
+      { client: replaced.fetchStub }
+    );
+    assert.deepEqual(replaced.updates()[0]?.variables.input, {
+      assigneeId: "u-ebu",
+    });
   });
 
   it("lets a support owner take any ticket", async () => {

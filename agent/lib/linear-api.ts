@@ -5,6 +5,7 @@ import {
   APPROVED_LABEL,
   BUG_LABEL,
   developerLabelsAllowed,
+  FALLBACK_OWNER,
   FEATURE_REQUEST_LABEL,
   mappedOwner,
   ownerNames,
@@ -334,6 +335,7 @@ export interface RouteTicketInput {
   parent?: string;
   priority?: number;
   project?: string;
+  releaseDeveloper?: boolean;
   removeLabels?: string[];
   state?: string;
 }
@@ -459,7 +461,7 @@ async function resolveLabelIds(
   ].filter(Boolean);
 }
 
-async function resolveAssigneeId(
+async function chooseAssignee(
   gql: Gql,
   issue: RouteIssue,
   input: RouteTicketInput
@@ -498,6 +500,22 @@ async function resolveAssigneeId(
     name: owner.name,
   });
   return { id: exactlyOne("user", owner.name, users.nodes), warnings };
+}
+
+async function resolveAssigneeId(
+  gql: Gql,
+  issue: RouteIssue,
+  input: RouteTicketInput
+): Promise<{ id?: string | null; warnings: string[] }> {
+  const chosen = await chooseAssignee(gql, issue, input);
+  if (chosen.id !== undefined || !input.releaseDeveloper) {
+    return chosen;
+  }
+  const holder = issue.assignee ? mappedOwner(issue.assignee.name) : null;
+  if (holder?.lane === "developer" && holder.name !== FALLBACK_OWNER) {
+    return { id: null, warnings: chosen.warnings };
+  }
+  return chosen;
 }
 
 /** Builds the single issueUpdate input from the decisions given. */
