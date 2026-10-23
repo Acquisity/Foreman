@@ -125,7 +125,6 @@ export interface ReplayState {
   stamp: ReplayStamp;
   steps: number;
   writes: { operation: string; seq: number; variables: unknown }[];
-  written: string[];
 }
 
 export const CASE_ISSUE_ID = "replay-case";
@@ -181,7 +180,6 @@ export function seedReplayState(
     stamp,
     steps: 0,
     writes: [],
-    written: [],
   };
 }
 

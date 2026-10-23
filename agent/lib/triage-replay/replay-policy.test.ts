@@ -26,9 +26,11 @@ import { replayToolsMiddleware } from "./model.js";
 import { buildReplayResult } from "./route.js";
 import { triageResultSchema } from "./schema.js";
 import {
+  REPLAY_SANDBOX_TOOLS,
   REPLAY_TOOL_POLICY,
   replayMayCall,
   replayOutputIsGenerated,
+  replayOutputIsSandbox,
 } from "./tool-policy.js";
 
 const CANNOT_RUN = /Triage replay cannot run/u;
@@ -475,12 +477,10 @@ describe("replay leakage recording", () => {
     assert.deepEqual(hits, []);
   });
 
-  it("counts what the run wrote to scratch and read back as generated, and only the rest as seeded", async (t) => {
+  it("keeps every sandbox result whole and seeded, whatever the run wrote there", async (t) => {
     await replayProcess(t);
     const phrase =
       "The save handler cleared the cached layout before the panel rendered it again.";
-    const repoLine =
-      "A repository note says the fix landed in #6108 last week.";
     const rootCtx = {
       cancel: () => undefined,
       session: { auth: { current: auth, initiator: auth }, id: "sess-1" },
@@ -495,12 +495,6 @@ describe("replay leakage recording", () => {
               kind: "tool-call",
               toolName: "write_file",
             },
-            {
-              callId: "w2",
-              input: { command: `cat > /tmp/note.md <<'EOF'\n${phrase}\nEOF` },
-              kind: "tool-call",
-              toolName: "bash",
-            },
           ],
         },
       },
@@ -511,87 +505,41 @@ describe("replay leakage recording", () => {
         { data: { result: { callId, kind: "tool-result", output, toolName } } },
         rootCtx
       );
-    await read("r1", "read_file", {
-      content: `1: ${phrase}`,
-      path: "/tmp/cause.md",
-      totalLines: 1,
-      truncated: false,
-    });
-    await read("r2", "bash", {
-      exitCode: 0,
-      status: "completed",
-      stderr: "",
-      stdout: `${phrase}\n`,
-      truncated: false,
-    });
-    await read("r3", "grep", {
-      content: `/tmp/cause.md:1:${phrase}\nsrc/notes.md:4:${repoLine}`,
-      matchCount: 2,
-      path: "/tmp",
-      truncated: false,
-    });
+    await read("r1", "read_file", { content: `1: ${phrase}` });
+    await read("r2", "bash", { exitCode: 0, stdout: `${phrase}\n` });
+    await read("r3", "grep", { content: `/tmp/cause.md:1:${phrase}` });
     const { inputs } = await state();
-    const bySource = (source: string) =>
-      inputs
-        .filter((input) => input.source === source)
-        .map((input) => input.provenance);
-    assert.deepEqual(bySource("read_file"), ["generated"]);
-    assert.deepEqual(bySource("bash"), ["generated"]);
-    assert.deepEqual(bySource("grep"), ["generated", "seeded"]);
-    const label = makeLabel("ENG-100", { fixPr: 6108 });
-    const hits = findLeaks({ label, result: { inputs } });
     assert.deepEqual(
-      hits.map((hit) => [hit.kind, hit.source]),
-      [["fix_pr", "grep"]]
+      inputs
+        .filter((input) => ["bash", "grep", "read_file"].includes(input.source))
+        .map((input) => [input.source, input.provenance]),
+      [
+        ["read_file", "seeded"],
+        ["bash", "seeded"],
+        ["grep", "seeded"],
+      ]
     );
     assert.equal(
-      hits.some((hit) => hit.kind === "root_cause"),
-      false
+      inputs.some((input) => input.content.includes(phrase)),
+      true
     );
   });
 
-  it("keeps a read-back seeded when the run wrote nothing like it", async (t) => {
-    await replayProcess(t);
-    await replayHandler("actions.requested")(
-      {
-        data: {
-          actions: [
-            {
-              callId: "w1",
-              input: { content: "unrelated scratch words", filePath: "/tmp/a" },
-              kind: "tool-call",
-              toolName: "write_file",
-            },
-          ],
-        },
-      },
-      {
-        cancel: () => undefined,
-        session: { auth: { current: auth, initiator: auth }, id: "sess-1" },
-      }
-    );
-    await replayHandler("action.result")(
-      {
-        data: {
-          result: {
-            callId: "r1",
-            kind: "tool-result",
-            output: { content: "1: the save handler cleared the cache" },
-            toolName: "read_file",
-          },
-        },
-      },
-      {
-        cancel: () => undefined,
-        session: { auth: { current: auth, initiator: auth }, id: "sess-1" },
-      }
-    );
+  it("marks exactly the sandbox tools as the ones whose text the scorer checks against the archive", () => {
     assert.deepEqual(
-      (await state()).inputs
-        .filter((input) => input.source === "read_file")
-        .map((input) => input.provenance),
-      ["seeded"]
+      [...REPLAY_SANDBOX_TOOLS].sort((a, b) => a.localeCompare(b)),
+      [
+        "bash",
+        "checkout_commit",
+        "glob",
+        "grep",
+        "prepare_repository",
+        "read_file",
+        "read_image",
+        "write_file",
+      ]
     );
+    assert.equal(replayOutputIsSandbox("find_related_issues"), false);
   });
 
   it("marks exactly the tools that echo the model's own work as generated", () => {

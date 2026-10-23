@@ -1,15 +1,19 @@
 // Trusted triage replay scorer (ENG-16049).
 //
 //   pnpm triage:score <resultsDir> --heldout-labels <path> [--judge] [--max-judge-calls N]
-//                     [--calibration <path>] [--rerun]
+//                     [--calibration <path>] [--rerun] [--acquisity <checkout>]
 //                     [--cohort evals/triage] [--repo Acquisity/Acquisity] [--runs N]
 //
 // Scores every result JSON in <resultsDir> against the frozen cohort, train
 // labels from the repository and held-out labels from the explicit path, which
 // must sit outside this repository. The leakage check fetches each fix PR with
-// `gh pr view` and refuses the run when it can't. --judge grades root cause
-// through headless Claude Code, capped at --max-judge-calls (default 20), and
-// refuses before the first call when more rows need judging than the cap.
+// `gh pr view` and refuses the run when it can't. A flagged phrase a replay
+// read from its sandbox counts only when the case's repository archive holds
+// it too, so --acquisity must name a local Acquisity checkout that has each
+// case commit, and the run is refused without one when any such phrase exists.
+// --judge grades root cause through headless Claude Code, capped at
+// --max-judge-calls (default 20), and refuses before the first call when more
+// rows need judging than the cap.
 // --calibration reads hand labels (row, documentSha256, grade, reason) from a
 // file outside this repository and reports the judge's agreement with them;
 // --rerun judges every row twice and reports the flip rate, so it needs twice
@@ -20,6 +24,11 @@ import { readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { promisify } from "node:util";
 import { z } from "zod";
+import {
+  gitArchiveScanner,
+  keepArchiveBackedHits,
+  type ScoredRow,
+} from "../agent/lib/triage-replay/archive-text.js";
 import {
   calibrate,
   handLabelsSchema,
@@ -63,9 +72,10 @@ const OUTPUTS = new Set(["scores.json"]);
 const labelsSchema = z.array(triageLabelSchema);
 
 const USAGE =
-  "Usage: pnpm triage:score <resultsDir> --heldout-labels <path> [--judge] [--max-judge-calls N] [--calibration <path>] [--rerun] [--cohort evals/triage] [--repo Acquisity/Acquisity] [--runs N]";
+  "Usage: pnpm triage:score <resultsDir> --heldout-labels <path> [--judge] [--max-judge-calls N] [--calibration <path>] [--rerun] [--acquisity <checkout>] [--cohort evals/triage] [--repo Acquisity/Acquisity] [--runs N]";
 
 interface Options {
+  acquisity: string;
   calibration: string;
   cohort: string;
   heldout: string;
@@ -79,6 +89,7 @@ interface Options {
 
 function parseArgs(argv: string[]): Options {
   const options: Options = {
+    acquisity: "",
     calibration: "",
     cohort: "evals/triage",
     heldout: "",
@@ -105,6 +116,9 @@ function parseArgs(argv: string[]): Options {
     return parsed;
   };
   const flags: Record<string, (flag: string) => void> = {
+    "--acquisity": (flag) => {
+      options.acquisity = value(flag);
+    },
     "--calibration": (flag) => {
       options.calibration = value(flag);
     },
@@ -321,7 +335,7 @@ async function main() {
   );
   const cases = new Map(cohort.cases.map((item) => [item.id, item]));
   const prs = new Map<number, Awaited<ReturnType<typeof fetchPr>>>();
-  const leakage = new Map<string, LeakageHit[]>();
+  const found: ScoredRow[] = [];
   for (const result of results) {
     const label = labels.get(result.caseId) as TriageLabel;
     const ticket = cases.get(result.caseId)?.ticket;
@@ -329,22 +343,36 @@ async function main() {
       // biome-ignore lint/performance/noAwaitInLoops: one gh call at a time, cached per PR.
       prs.set(label.fixPr, await fetchPr(options.repo, label.fixPr));
     }
-    const { counted, availableAtTriage } = leaksThatCount(
-      findLeaks({
+    found.push({
+      commit: cases.get(result.caseId)?.repoCommitAtCreate,
+      hits: findLeaks({
         baseline: ticket ? `${ticket.title}\n${ticket.description}` : "",
         label,
         pr: label.fixPr ? prs.get(label.fixPr) : undefined,
         result,
       }),
+      key: rowKey(result.caseId, result.run),
+    });
+  }
+  const backed = await keepArchiveBackedHits(
+    found,
+    options.acquisity ? gitArchiveScanner(options.acquisity) : undefined
+  );
+  const leakage = new Map<string, LeakageHit[]>();
+  for (const result of results) {
+    const key = rowKey(result.caseId, result.run);
+    const { fixPr } = labels.get(result.caseId) as TriageLabel;
+    const { counted, availableAtTriage } = leaksThatCount(
+      backed.get(key) ?? [],
       cases.get(result.caseId),
-      label.fixPr ? prs.get(label.fixPr) : undefined
+      fixPr ? prs.get(fixPr) : undefined
     );
     if (availableAtTriage.length > 0) {
       console.error(
-        `${rowKey(result.caseId, result.run)}: ${availableAtTriage.length} fix reference(s) seen; the fix merged before triage, so not a leak.`
+        `${key}: ${availableAtTriage.length} fix reference(s) seen; the fix merged before triage, so not a leak.`
       );
     }
-    leakage.set(rowKey(result.caseId, result.run), counted);
+    leakage.set(key, counted);
   }
 
   const { calibration, rootCauseGrades } = options.judge

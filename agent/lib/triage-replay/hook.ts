@@ -3,7 +3,6 @@ import { logOpsEvent } from "../ops-log.js";
 import { criticVerdictFields } from "../triage-log.js";
 import { withReplayState } from "./backend.js";
 import { replaySessionOf } from "./mode.js";
-import { ownWrite, resultInputs } from "./provenance.js";
 import type { ReplayState } from "./store.js";
 import { replayMayCall, replayOutputIsGenerated } from "./tool-policy.js";
 
@@ -240,16 +239,15 @@ export const triageReplayHook = defineHook({
         () =>
           withReplayState(session.runId, session.caseId, (state) => {
             const generated = replayOutputIsGenerated(result.toolName);
-            state.inputs.push(
-              ...resultInputs(state.written, {
-                asOf: AS_OF_CASE_RESULTS.has(result.toolName)
+            state.inputs.push({
+              availableAt:
+                !generated && AS_OF_CASE_RESULTS.has(result.toolName)
                   ? state.case.createdAt
                   : null,
-                generated,
-                output: result.output,
-                source: result.toolName,
-              })
-            );
+              content: fullText(result.output),
+              provenance: generated ? "generated" : "seeded",
+              source: result.toolName,
+            });
             if (image) {
               state.cancelled ??= `${UNSEEDED_IMAGE}:${result.toolName}`;
             }
@@ -268,7 +266,6 @@ export const triageReplayHook = defineHook({
       const denied: string[] = [];
       const misses: string[] = [];
       const calls: [string, ReplayState["calls"][string]][] = [];
-      const writes: string[] = [];
       for (const action of event.data.actions) {
         const name = actionName(action);
         if (name === null) {
@@ -280,15 +277,11 @@ export const triageReplayHook = defineHook({
         if (CLOSED_CONNECTION_TOOLS.has(name)) {
           misses.push(name);
         }
-        if (action.kind === "tool-call") {
-          const input = calledInput(action);
-          const text = ownWrite(name, input);
-          if (text) {
-            writes.push(text);
-          }
-          if (DECISION_TOOLS.has(name)) {
-            calls.push([action.callId, { input, tool: name }]);
-          }
+        if (action.kind === "tool-call" && DECISION_TOOLS.has(name)) {
+          calls.push([
+            action.callId,
+            { input: calledInput(action), tool: name },
+          ]);
         }
       }
       if (denied.length > 0) {
@@ -307,7 +300,6 @@ export const triageReplayHook = defineHook({
               state.calls[callId] = call;
             }
             state.evidenceMisses.push(...misses);
-            state.written.push(...writes);
             if (denied.length > 0) {
               state.cancelled = `denied_tool:${denied.join(",")}`;
             }

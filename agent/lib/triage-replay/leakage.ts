@@ -2,9 +2,11 @@ import type { TriageLabel, TriageResult } from "./schema.js";
 
 /**
  * The scorer's leakage check (ENG-16049): did a replay see the answer? Only
- * inputs seeded from the case or frozen lists are scanned. Content the run
- * wrote itself and read back (`generated`) is skipped, so Foreman's own
- * correct document is never counted as a leak.
+ * inputs seeded from the case, the frozen lists or the sandbox are scanned.
+ * Content the run wrote itself and read back (`generated`) is skipped, so
+ * Foreman's own correct document is never counted as a leak. A hit in a
+ * sandbox input counts only when the case's repository archive holds the
+ * same phrase (see archive-text.ts).
  */
 
 /** What a leakage hit found: the fix commit, PR number, PR title or body, or a root-cause phrase. */
@@ -51,7 +53,7 @@ const STOPWORDS = new Set(
   )
 );
 
-const NON_WORD = /[^\p{L}\p{N}]+/gu;
+export const NON_WORD = /[^\p{L}\p{N}]+/gu;
 const FENCED = /```[\s\S]*?(?:```|$)/g;
 const INLINE_CODE = /`[^`\n]*`/g;
 const DIFF_LINE = /^\s*(?:[+-]|@@).*$/gm;
