@@ -1296,3 +1296,7 @@ test("the unblock never replaces the root cause or the master ticket", () => {
     )
   );
 });
+
+test("the investigation document template records the handling path completion reads", () => {
+  assert.ok(triageReportingReference.includes("**Handling path**:"));
+});

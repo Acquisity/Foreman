@@ -27,6 +27,7 @@ const issueSchema = z.object({
   status: z.string(),
 });
 const CLASSIFICATION = /^\*\*Classification\*\*:\s*([^\r\n]+)/m;
+const HANDLING_PATH = /^\*\*Handling path\*\*:\s*([^\r\n]+)/m;
 const REVIEW = /^\*\*Review\*\*:\s*([^\r\n]+)/m;
 const SETTLED_REVIEW =
   /^(?:Approved \S+ at [a-f0-9]{40}|Adjudicated \S+ at [a-f0-9]{40}: (?:CHALLENGE|INSUFFICIENT_EVIDENCE|review failure)[;:,]?[ \t]+\S.*)$/;
@@ -50,6 +51,13 @@ const ownerRecordMissing = (
   );
 };
 
+const isSupportFollowUp = (
+  issue: z.infer<typeof issueSchema>,
+  handlingPath: string | undefined
+): boolean =>
+  issue.assignee === SUPPORT_OWNER &&
+  Boolean(handlingPath?.startsWith("Support/"));
+
 /** Check durable outputs, not whether a model says it loaded the workflow. */
 export function assertTriageOutputs(
   rawIssue: unknown,
@@ -59,6 +67,7 @@ export function assertTriageOutputs(
   const issue = issueSchema.parse(rawIssue);
   const document = documentSchema.parse(rawDocument);
   const classification = CLASSIFICATION.exec(document.content)?.[1].trim();
+  const handlingPath = HANDLING_PATH.exec(document.content)?.[1].trim();
   const review = REVIEW.exec(document.content)?.[1].trim() ?? "";
   const urgent = review.startsWith("Stopped: NEEDS_HUMAN_URGENT");
   const reported = comments.some((comment) => {
@@ -113,7 +122,7 @@ export function assertTriageOutputs(
     (classification === "Bug" &&
       issue.status === "Todo" &&
       !issue.parentId &&
-      issue.assignee !== SUPPORT_OWNER) ||
+      !isSupportFollowUp(issue, handlingPath)) ||
     (duplicate && !issue.relations?.duplicateOf)
   ) {
     throw new SupportRefusal(

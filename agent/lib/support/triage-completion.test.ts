@@ -650,19 +650,73 @@ test("a Bug on a Support path finishes with Aaron as its owner and no master", (
     project: null,
     status: "Todo",
   };
-  assert.doesNotThrow(() => assertTriageOutputs(followUp, document, comments));
+  const supportDocument = {
+    ...document,
+    content: document.content.replace(
+      "**Review**",
+      "**Handling path**: Support/Product follow-up\n**Review**"
+    ),
+  };
+  assert.doesNotThrow(() =>
+    assertTriageOutputs(followUp, supportDocument, comments)
+  );
   assert.throws(
     () =>
-      assertTriageOutputs({ ...followUp, assignee: null }, document, comments),
+      assertTriageOutputs(
+        { ...followUp, assignee: null },
+        supportDocument,
+        comments
+      ),
     SupportRefusal
   );
   assert.throws(
     () =>
       assertTriageOutputs(
         { ...followUp, assignee: "Area Owner" },
-        document,
+        supportDocument,
         comments
       ),
     SupportRefusal
+  );
+});
+
+test("only a Bug on a Support path is exempt from needing a master, even when Aaron owns it", () => {
+  const owned = {
+    ...report,
+    assignee: "Aaron Fraga",
+    labels: [
+      "intercom-sourced",
+      "Customer reported",
+      "Bug",
+      "Area: Support Widget",
+    ],
+    parentId: null,
+    project: null,
+    status: "Todo",
+  };
+  const withPath = (path: string) => ({
+    ...document,
+    content: `${document.content.split("\n")[0]}\n**Classification**: Bug\n**Handling path**: ${path}\n**Review**: Approved 2026-09-10T12:00:00Z at ${"a".repeat(40)}`,
+  });
+  assert.throws(
+    () => assertTriageOutputs(owned, withPath("Engineering Todo"), comments),
+    SupportRefusal
+  );
+  assert.throws(
+    () => assertTriageOutputs(owned, document, comments),
+    SupportRefusal
+  );
+  for (const path of ["Support/Product follow-up", "Support/Financial"]) {
+    assert.doesNotThrow(
+      () => assertTriageOutputs(owned, withPath(path), comments),
+      path
+    );
+  }
+  assert.doesNotThrow(() =>
+    assertTriageOutputs(
+      { ...owned, parentId: "ENG-13136" },
+      withPath("Engineering Todo"),
+      comments
+    )
   );
 });
