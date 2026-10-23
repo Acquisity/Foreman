@@ -117,6 +117,39 @@ describe("liveSha", () => {
     assert.equal(await probe.liveSha(), OLD_SHA);
   });
 
+  it("stops at the newest live deployment, so a failing read of an older one cannot hide it", async () => {
+    const { probe, seen } = probeWith({
+      [DEPLOYMENTS]: () =>
+        json([
+          { id: 5, sha: NEW_SHA },
+          { id: 4, sha: MERGE_SHA },
+          { id: 1, sha: OLD_SHA },
+        ]),
+      [statusesOf(4)]: () => json({}, 500),
+      [statusesOf(5)]: () => json(DEPLOY_DONE),
+    });
+    assert.equal(await probe.liveSha(), NEW_SHA);
+    assert.deepEqual(
+      seen.filter((path) => path.includes("/statuses")),
+      [statusesOf(5)]
+    );
+  });
+
+  it("reads newest first and fails if it cannot tell whether a newer deployment is live", async () => {
+    const { probe } = probeWith({
+      [DEPLOYMENTS]: () =>
+        json([
+          { id: 5, sha: NEW_SHA },
+          { id: 4, sha: MERGE_SHA },
+        ]),
+      [statusesOf(5)]: () => json({}, 500),
+      [statusesOf(4)]: () => json(DEPLOY_DONE),
+    });
+    await assert.rejects(probe.liveSha(), {
+      message: "GitHub read failed: HTTP 500.",
+    });
+  });
+
   it("fails loudly when GitHub refuses, rather than reporting nothing deployed", async () => {
     const { probe } = probeWith({ [DEPLOYMENTS]: () => json({}, 403) });
     await assert.rejects(probe.liveSha(), {

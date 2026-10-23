@@ -104,22 +104,22 @@ export const githubDeployProbe = (
         timeoutMs
       )
     );
-    const live = await Promise.all(
-      deployments.map(async ({ id }) =>
-        isLive(
-          statusesSchema.parse(
-            await read(
-              token,
-              fetchImpl,
-              `/repos/${DEPLOY_REPOSITORY}/deployments/${id}/statuses?per_page=${STATUSES_READ}`,
-              timeoutMs
-            )
-          )
+    const firstLive = async (index: number): Promise<string | null> => {
+      const deployment = deployments[index];
+      if (!deployment) {
+        return null;
+      }
+      const statuses = statusesSchema.parse(
+        await read(
+          token,
+          fetchImpl,
+          `/repos/${DEPLOY_REPOSITORY}/deployments/${deployment.id}/statuses?per_page=${STATUSES_READ}`,
+          timeoutMs
         )
-      )
-    );
-    const index = live.indexOf(true);
-    return index === -1 ? null : (deployments[index]?.sha ?? null);
+      );
+      return isLive(statuses) ? deployment.sha : firstLive(index + 1);
+    };
+    return firstLive(0);
   },
   async pull(repo, number) {
     if (!REPOSITORY.test(repo)) {
