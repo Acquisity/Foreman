@@ -47,7 +47,7 @@ export const reporterUpdatesConfig = (
       DEFAULT_MAX_POSTS,
       MAX_MAX_POSTS
     ),
-    nameOwner: env.REPORTER_UPDATES_NAME_OWNER !== "false",
+    nameOwner: env.REPORTER_UPDATES_NAME_OWNER === "true",
     since: new Date(since).toISOString(),
   };
 };

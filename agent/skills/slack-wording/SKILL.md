@@ -44,7 +44,7 @@ Four messages are posted by the scheduled reporter-updates job, not by a model t
 
 - Under 50 words each, and longer only when explaining something.
 - The first sentence says whether the report is handled.
-- Name one owner by first name, only in the received and owner messages. This is the one exception to the rule above against naming assignees; setting `REPORTER_UPDATES_NAME_OWNER=false` turns it off.
+- Name one owner by first name, only in the received and owner messages. This is the one exception to the rule above against naming assignees; it applies only when `REPORTER_UPDATES_NAME_OWNER=true`, which is off by default.
 - Give at most one action, or say "Nothing for you to do".
 - Never use file paths, PR numbers, CI, ticket states or IDs, model names, "root cause", "deploy", "merge" or raw error codes. A test checks every message against this list.
 - A fixed message is sent only after the fix is live for users, never when the ticket merely moves to Done.
