@@ -76,6 +76,7 @@ Nothing in the bad comment is wrong; it is all in the wrong place, and the one s
 
 **Ticket**: <ENG-XXXX>
 **Classification**: <User Error | Platform Limitation | Bug>
+**Handling path**: <the Stage 5 path, such as Engineering Todo or Support/Product follow-up>
 **Organization**: <organization_id> (<org name>)
 **Review**: <Pending critic | Approved <document updatedAt> at <commit> | Adjudicated <document updatedAt> at <commit>: <CHALLENGE | INSUFFICIENT_EVIDENCE | review failure> | Stopped: NEEDS_HUMAN_URGENT | Not required>
 

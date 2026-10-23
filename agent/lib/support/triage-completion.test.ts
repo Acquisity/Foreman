@@ -528,3 +528,276 @@ test("finish refuses omitted or failed writes; a blocker retry stays unprocessed
     "A teammate taking ownership cannot conceal unfinished triage"
   );
 });
+
+test("an outcome left unassigned on purpose can finish, an unassigned Bug cannot", () => {
+  const closed = {
+    ...report,
+    assignee: null,
+    labels: ["intercom-sourced", "Customer reported"],
+    parentId: null,
+    project: null,
+    status: "Done",
+  };
+  for (const classification of ["User Error", "Platform Limitation"]) {
+    assert.doesNotThrow(
+      () =>
+        assertTriageOutputs(
+          closed,
+          {
+            ...document,
+            content: `**Classification**: ${classification}\n**Review**: Not required`,
+          },
+          comments
+        ),
+      classification
+    );
+  }
+  assert.throws(
+    () =>
+      assertTriageOutputs(
+        { ...report, assignee: null, project: null },
+        document,
+        comments
+      ),
+    SupportRefusal
+  );
+  assert.throws(
+    () =>
+      assertTriageOutputs(
+        {
+          ...closed,
+          priority: null,
+        },
+        {
+          ...document,
+          content: "**Classification**: User Error\n**Review**: Not required",
+        },
+        comments
+      ),
+    SupportRefusal
+  );
+});
+
+test("an open non-Bug outcome needs an owner, a closed one does not", () => {
+  const followUp = {
+    ...report,
+    assignee: null,
+    labels: ["intercom-sourced", "Customer reported"],
+    parentId: null,
+    project: null,
+    status: "Todo",
+  };
+  const content = {
+    ...document,
+    content: "**Classification**: User Error\n**Review**: Not required",
+  };
+  assert.throws(
+    () => assertTriageOutputs(followUp, content, comments),
+    SupportRefusal
+  );
+  assert.doesNotThrow(() =>
+    assertTriageOutputs(
+      { ...followUp, assignee: "Aaron Fraga" },
+      content,
+      comments
+    )
+  );
+  assert.doesNotThrow(() =>
+    assertTriageOutputs({ ...followUp, status: "Done" }, content, comments)
+  );
+});
+
+test("a Bug that routing left unassigned on purpose finishes with its Area label as the owner record", () => {
+  const parked = {
+    ...report,
+    assignee: null,
+    labels: ["intercom-sourced", "Customer reported", "Bug", "Area: AI SDR"],
+    parentId: null,
+    project: null,
+  };
+  for (const status of ["Backlog", "Done"]) {
+    assert.doesNotThrow(
+      () => assertTriageOutputs({ ...parked, status }, document, comments),
+      status
+    );
+  }
+  assert.throws(
+    () =>
+      assertTriageOutputs({ ...parked, status: "Todo" }, document, comments),
+    SupportRefusal
+  );
+  assert.throws(
+    () =>
+      assertTriageOutputs(
+        {
+          ...parked,
+          labels: ["intercom-sourced", "Customer reported", "Bug"],
+          status: "Backlog",
+        },
+        document,
+        comments
+      ),
+    SupportRefusal
+  );
+});
+
+test("a Bug on a Support path finishes with Aaron as its owner and no master", () => {
+  const followUp = {
+    ...report,
+    assignee: "Aaron Fraga",
+    labels: ["intercom-sourced", "Customer reported", "Bug", "Area: AI SDR"],
+    parentId: null,
+    project: null,
+    status: "Todo",
+  };
+  const supportDocument = {
+    ...document,
+    content: document.content.replace(
+      "**Review**",
+      "**Handling path**: Support/Product follow-up\n**Review**"
+    ),
+  };
+  assert.doesNotThrow(() =>
+    assertTriageOutputs(followUp, supportDocument, comments)
+  );
+  assert.throws(
+    () =>
+      assertTriageOutputs(
+        { ...followUp, assignee: null },
+        supportDocument,
+        comments
+      ),
+    SupportRefusal
+  );
+  assert.throws(
+    () =>
+      assertTriageOutputs(
+        { ...followUp, assignee: "Area Owner" },
+        supportDocument,
+        comments
+      ),
+    SupportRefusal
+  );
+});
+
+test("only a Bug on a Support path is exempt from needing a master, even when Aaron owns it", () => {
+  const owned = {
+    ...report,
+    assignee: "Aaron Fraga",
+    labels: [
+      "intercom-sourced",
+      "Customer reported",
+      "Bug",
+      "Area: Support Widget",
+    ],
+    parentId: null,
+    project: null,
+    status: "Todo",
+  };
+  const withPath = (path: string) => ({
+    ...document,
+    content: `${document.content.split("\n")[0]}\n**Classification**: Bug\n**Handling path**: ${path}\n**Review**: Approved 2026-09-10T12:00:00Z at ${"a".repeat(40)}`,
+  });
+  assert.throws(
+    () => assertTriageOutputs(owned, withPath("Engineering Todo"), comments),
+    SupportRefusal
+  );
+  assert.throws(
+    () => assertTriageOutputs(owned, document, comments),
+    SupportRefusal
+  );
+  for (const path of ["Support/Product follow-up", "Support/Financial"]) {
+    assert.doesNotThrow(
+      () => assertTriageOutputs(owned, withPath(path), comments),
+      path
+    );
+  }
+  assert.doesNotThrow(() =>
+    assertTriageOutputs(
+      { ...owned, parentId: "ENG-13136" },
+      withPath("Engineering Todo"),
+      comments
+    )
+  );
+});
+
+test("a report whose recorded path is Engineering Todo needs its master whatever its type", () => {
+  const approvedRequest = {
+    ...report,
+    assignee: "Koppany Kondricz",
+    labels: [
+      "intercom-sourced",
+      "Customer reported",
+      "Feature Request",
+      "Approved",
+      "Area: AI SDR",
+    ],
+    parentId: null,
+    status: "Todo",
+  };
+  const requestDocument = {
+    ...document,
+    content:
+      "# Triage investigation\n**Classification**: Platform Limitation\n**Handling path**: Engineering Todo\n**Review**: Not required",
+  };
+  assert.throws(
+    () => assertTriageOutputs(approvedRequest, requestDocument, comments),
+    SupportRefusal
+  );
+  assert.doesNotThrow(() =>
+    assertTriageOutputs(
+      { ...approvedRequest, parentId: "ENG-13136" },
+      requestDocument,
+      comments
+    )
+  );
+  for (const labels of [
+    ["intercom-sourced", "Customer reported", "Area: AI SDR"],
+    ["intercom-sourced", "Customer reported", "Feature Request"],
+  ]) {
+    assert.throws(
+      () =>
+        assertTriageOutputs(
+          { ...approvedRequest, labels, parentId: "ENG-13136" },
+          requestDocument,
+          comments
+        ),
+      SupportRefusal
+    );
+  }
+  assert.throws(
+    () =>
+      assertTriageOutputs(
+        { ...approvedRequest, assignee: null, parentId: "ENG-13136" },
+        requestDocument,
+        comments
+      ),
+    SupportRefusal
+  );
+});
+
+test("completion accepts James as the owner of a request waiting in Backlog for approval", () => {
+  const parked = {
+    ...report,
+    assignee: "James Keeble",
+    labels: [
+      "intercom-sourced",
+      "Customer reported",
+      "Feature Request",
+      "Needs approval",
+    ],
+    parentId: null,
+    project: null,
+    status: "Backlog",
+  };
+  const content = {
+    ...document,
+    content:
+      "# Triage investigation\n**Classification**: Platform Limitation\n**Handling path**: Backlog/low-impact\n**Review**: Not required",
+  };
+  assert.doesNotThrow(() => assertTriageOutputs(parked, content, comments));
+  assert.throws(
+    () => assertTriageOutputs({ ...parked, assignee: null }, content, comments),
+    SupportRefusal
+  );
+});

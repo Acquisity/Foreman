@@ -1,0 +1,3300 @@
+[
+  {
+    "ticket": "ENG-8471",
+    "project": "CRM Phone Calling & Texting",
+    "ticketPaths": [],
+    "files": [
+      "apps/web/components/a2p-registration/a2p-registration-actions.tsx",
+      "apps/web/components/a2p-registration/a2p-registration-status.tsx",
+      "apps/web/lib/services/a2p-registration/brand/identity.ts",
+      "apps/web/components/a2p-registration/a2p-business-identity-fields.tsx",
+      "apps/web/components/a2p-registration/a2p-business-form.tsx"
+    ]
+  },
+  {
+    "ticket": "ENG-8605",
+    "project": "Cold Email Leads",
+    "ticketPaths": [],
+    "files": [
+      "apps/web/lib/inngest/functions/campaign/reconcile-lead-status-applications.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-9926",
+    "project": "CRM",
+    "ticketPaths": [
+      "apps/web/components/crm/shared/activity-stream/activity-row-detail.tsx",
+      "apps/web/components/crm/shared/activity-stream/helpers.tsx",
+      "apps/web/tests/trpc/crm-deal-bulk-actions-router.test.ts",
+      "apps/web/trpc/routers/crm/deal.ts"
+    ],
+    "files": [
+      "apps/web/components/crm/shared/activity-stream/deal-pipeline-stage-history.tsx",
+      "apps/web/trpc/routers/crm/activity-timeline.ts",
+      "apps/web/components/crm/shared/activity-stream/activity-row-detail.tsx",
+      "apps/web/components/crm/shared/activity-stream/activity-row.tsx",
+      "apps/web/components/crm/shared/activity-stream/deal-pipeline-stage-transition.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-10275",
+    "project": "Dev Ops",
+    "ticketPaths": [],
+    "files": [
+      "scripts/dev-worktree.ts",
+      "scripts/dev-terminal-sanitizer.ts",
+      "scripts/dev-terminal-output.ts",
+      "apps/web/lib/slack/service.ts",
+      "apps/web/lib/inngest/functions/campaign/workspaces/poll-oauth-session.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-10751",
+    "project": "Billing",
+    "ticketPaths": [],
+    "files": [
+      "apps/web/lib/billing/subscription-cancellation-safety.ts",
+      "apps/web/app/api/webhooks/whop/[partnerId]/route.ts",
+      "apps/web/lib/inngest/functions/billing/handle-subscription-access-change.ts",
+      "apps/web/lib/inngest/functions/campaign/process-campaign-activity.ts",
+      "apps/web/scripts/dump-preview-data.sh"
+    ]
+  },
+  {
+    "ticket": "ENG-10970",
+    "project": "Acquisity Agent",
+    "ticketPaths": ["apps/web/app/api/completion/route.ts"],
+    "files": [
+      "apps/web/lib/chat/assistant-generation.ts",
+      "apps/web/app/api/completion/route.ts",
+      "apps/web/lib/chat/assistant-generation-deletion.ts",
+      "apps/web/app/api/chat/[id]/stream/route.ts",
+      "apps/web/components/ai-chat/hooks/use-assistant-reconnect-identity.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-11356",
+    "project": "AI SDR Escalation & Classification",
+    "ticketPaths": [
+      "apps/web/components/ai-sdr/escalation-action-box.tsx",
+      "apps/web/components/ai-sdr/inbox-sidebar.tsx",
+      "apps/web/content/docs/ai-sdr/inbox.mdx",
+      "apps/web/hooks/use-ai-sdr-emails.tsx",
+      "apps/web/lib/inngest/functions/monitor-ai-sdr-response-timeout.ts",
+      "apps/web/lib/outreach/db/crm-message-thread-queries.ts",
+      "apps/web/trpc/routers/ai-sdr.ts",
+      "apps/web/trpc/routers/outreach/leads.ts"
+    ],
+    "files": ["apps/web/trpc/routers/ai-sdr.ts"]
+  },
+  {
+    "ticket": "ENG-11696",
+    "project": "CRM",
+    "ticketPaths": [],
+    "files": [
+      "apps/web/lib/services/twilio-subaccount-voice.ts",
+      "apps/web/app/api/voice/answer/route.ts",
+      "apps/web/lib/services/browser-voice-caller-id.ts",
+      "apps/web/lib/services/browser-voice-access-token.ts",
+      ".github/workflows/migration-management.yml"
+    ]
+  },
+  {
+    "ticket": "ENG-11706",
+    "project": "AI SDR Core",
+    "ticketPaths": [],
+    "files": [
+      "apps/web/lib/ai-sdr-v2/workflow/steps/booking.ts",
+      "apps/web/lib/ai-sdr-v2/observability/raindrop-signals.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-11715",
+    "project": "AI SDR Core",
+    "ticketPaths": [],
+    "files": [
+      "apps/web/lib/ai-sdr-v2/workflow/helpers/format-slot-for-display.ts",
+      "apps/web/lib/ai-sdr-v2/workflow/steps/offer-alternatives.ts",
+      "apps/web/lib/ai-sdr-v2/workflow/steps/slot-matchmaking.ts",
+      "apps/web/lib/ai-sdr-v2/workflow/helpers/context-pack.ts",
+      "apps/web/lib/ai-sdr-v2/workflow/helpers/context-pack-helpers/booking-section.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-11720",
+    "project": "AI SDR Core",
+    "ticketPaths": [],
+    "files": [
+      "apps/web/lib/outreach/db/campaign.ts",
+      "apps/web/components/ai-sdr/escalation-action-box.tsx",
+      "apps/web/lib/ai-sdr-v2/constants/escalation-reasons.ts",
+      "apps/web/components/user/schedule-card.tsx",
+      "apps/web/components/ai-sdr/email-list.tsx"
+    ]
+  },
+  {
+    "ticket": "ENG-11883",
+    "project": "AI SDR Scheduling",
+    "ticketPaths": ["apps/web/lib/ai-sdr-v2"],
+    "files": [
+      "apps/web/lib/ai-sdr-v2/workflow/helpers/no-calendar-availability.ts",
+      "apps/web/lib/ai-sdr-v2/workflow/steps/copy-review.ts",
+      "apps/web/lib/ai-sdr-v2/workflow/helpers/context-pack-helpers/reply-directive.ts",
+      "apps/web/lib/ai-sdr-v2/workflow/helpers/context-pack.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-11895",
+    "project": "AI SDR Scheduling",
+    "ticketPaths": [],
+    "files": [
+      "apps/web/lib/ai-sdr-v2/workflow/steps/offer-alternatives.ts",
+      "apps/web/lib/ai-sdr-v2/constants/escalation-reasons.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-12001",
+    "project": "Cold Email Agent",
+    "ticketPaths": [
+      "apps/web/lib/outreach/campaign-niche-intent.ts",
+      "packages/ai/src/prompts/campaign/campaign-name.ts"
+    ],
+    "files": [
+      "apps/web/lib/inngest/functions/campaign/process-campaign-creator.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-12034",
+    "project": "CRM",
+    "ticketPaths": [
+      "apps/web/lib/crm/my-day-target-user.ts",
+      "apps/web/tests/lib/crm/my-day-target-user.test.ts",
+      "apps/web/trpc/routers/crm/my-day.ts"
+    ],
+    "files": [
+      "apps/web/lib/crm/my-day-target-user.ts",
+      "apps/web/lib/crm/my-day-team-member-eligibility.ts",
+      "apps/web/lib/auth/permissions.ts",
+      "apps/web/lib/crm/my-day-team-members-service.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-12035",
+    "project": "Whitelabel Partners",
+    "ticketPaths": [],
+    "files": [
+      "apps/web/app/(saas)/dashboard/(sidebar)/partner-admin/domains/page.tsx"
+    ]
+  },
+  {
+    "ticket": "ENG-12042",
+    "project": null,
+    "ticketPaths": [
+      "apps/web/app/(saas)/dashboard/(sidebar)/partner-admin/domains/page.tsx",
+      "apps/web/tests/components/partner-admin/partner-domains-page.test.tsx",
+      "apps/web/tests/lib/auth/organization-session-activation-db.test.ts",
+      "apps/web/tests/lib/ecom-ads/agent-reader-db.test.ts",
+      "apps/web/tests/trpc/billing-router-impersonation-access.test.ts",
+      "apps/web/tests/trpc/routers/admin-organizations-add-credits.test.ts",
+      "apps/web/tests/trpc/routers/outreach/campaigns.test.ts",
+      "apps/web/tests/trpc/routers/outreach/preview-studio.test.ts",
+      "apps/web/tests/trpc/routers/sales-calls/read-security.test.ts",
+      "apps/web/tests/trpc/routers/website/validation.test.ts",
+      "apps/web/trpc/routers/crm/my-day.ts",
+      "packages/db/src/schema-support/dashboard-view-config.ts",
+      "packages/db/src/schema-support/dashboard-view-period-values.ts"
+    ],
+    "files": [
+      "packages/db/src/schema-support/dashboard-view-config.ts",
+      "packages/db/src/schema-support/dashboard-view-period-values.ts",
+      "apps/web/trpc/routers/crm/my-day.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-12046",
+    "project": "Dev Ops",
+    "ticketPaths": [],
+    "files": [
+      ".github/scripts/linear-username-map.ts",
+      ".github/scripts/shared/assignee-utils.js",
+      ".github/scripts/pr-status-manager.ts",
+      ".github/scripts/linear-webhook-handler.ts",
+      ".github/scripts/linear-status-constants.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-12049",
+    "project": "Domains & Inboxes",
+    "ticketPaths": [],
+    "files": [
+      "apps/web/lib/inngest/functions/billing/reconcile-reservation-expired-domain-orders.ts",
+      "apps/web/lib/inngest/functions/billing/reconcile-domain-orders-cron.ts",
+      "apps/web/lib/billing/domain-order-retry.ts",
+      "apps/web/lib/billing/domain-order-recovery.ts",
+      "apps/web/lib/billing/order-refund.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-12056",
+    "project": "AI SDR Scheduling",
+    "ticketPaths": [],
+    "files": ["apps/web/lib/integrations/calendar/google-calendar-service.ts"]
+  },
+  {
+    "ticket": "ENG-12077",
+    "project": "AI Website Builder",
+    "ticketPaths": [],
+    "files": [
+      "apps/web/components/ai-website-creator/publish-control.tsx",
+      "apps/web/trpc/routers/website/web-core.ts",
+      "apps/web/lib/website/public-deployment-url.ts",
+      "apps/web/lib/website/published-website-url.ts",
+      "apps/web/lib/website/publish-website-deployment.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-12081",
+    "project": null,
+    "ticketPaths": [
+      "apps/web/lib/integrations/calendar/google-calendar-service.ts",
+      "apps/web/lib/scheduling/services/calendar-integration.ts",
+      "apps/web/scripts/backfill-eng11292-missing-calendar-events.ts",
+      "packages/db/migrations/20260708120000_eng11292_calendar_dedup_repair.sql"
+    ],
+    "files": [
+      "apps/web/plugins/workflows/scheduling/lib/calendly-create-appointment.ts",
+      "apps/web/lib/workflows/calendly-booking-trigger.ts",
+      "apps/web/lib/workflows/codegen-registry.ts",
+      "apps/web/plugins/workflows/scheduling/steps/create-appointment.ts",
+      "apps/web/scripts/backfill-eng11292-missing-calendar-events.core.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-12086",
+    "project": null,
+    "ticketPaths": [],
+    "files": [
+      "apps/web/lib/scheduling/services/external-booking-calendar-event-link-resolver.ts",
+      "apps/web/lib/workflows/workflow-executor.ts",
+      "apps/web/lib/inngest/functions/workflows/run-workflow-step.ts",
+      "apps/web/lib/scheduling/services/external-booking-tracking-service.ts",
+      "apps/web/lib/workflows/codegen-registry.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-12100",
+    "project": "Support",
+    "ticketPaths": [],
+    "files": [
+      "apps/web/components/user/impersonate-banner.tsx",
+      "apps/web/components/campaigns/approvals/campaign-approval-modal-frame.tsx",
+      "apps/web/components/campaigns/approvals/campaign-approvals-modal.tsx",
+      "apps/web/hooks/use-hotkeys.tsx",
+      "apps/web/components/ui/alert-dialog.tsx"
+    ]
+  },
+  {
+    "ticket": "ENG-12103",
+    "project": "Core Platform",
+    "ticketPaths": [],
+    "files": [
+      "apps/web/components/auth/auth.module.css",
+      "apps/web/components/auth/auth-shell.tsx",
+      "apps/web/components/auth/auth-primitives.tsx",
+      "apps/web/lib/theming/app-branding.ts",
+      "apps/web/components/auth/sign-in-card.tsx"
+    ]
+  },
+  {
+    "ticket": "ENG-12114",
+    "project": "CRM",
+    "ticketPaths": ["apps/web/lib/analytics/operating-system.ts"],
+    "files": [
+      "apps/web/lib/analytics/closer-show-ups.ts",
+      "apps/web/lib/analytics/operating-system.ts",
+      "apps/web/lib/crm/my-day-closer-scoreboard-service.ts",
+      "apps/web/lib/analytics/closer-scoreboard.ts",
+      "apps/web/lib/crm/recording-queries.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-12131",
+    "project": "Core Platform",
+    "ticketPaths": [],
+    "files": [
+      "apps/web/lib/auth/google-login-oauth-proxy.ts",
+      "apps/web/lib/auth/google-login-proxy-context.ts",
+      "apps/web/lib/auth/google-login-config.ts",
+      "apps/web/lib/auth/index.ts",
+      "apps/web/env/server.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-12136",
+    "project": "Whitelabel Partners",
+    "ticketPaths": [],
+    "files": [
+      "apps/web/components/auth/auth-primitives.tsx",
+      "apps/web/lib/theming/app-branding.ts",
+      "apps/web/components/auth/auth-shell.tsx",
+      "apps/web/components/auth/auth.module.css"
+    ]
+  },
+  {
+    "ticket": "ENG-12139",
+    "project": "Core Platform",
+    "ticketPaths": [],
+    "files": [
+      "apps/web/hooks/use-auth-errors-messages.tsx",
+      "apps/web/components/auth/otp-card.tsx",
+      "apps/web/components/auth/totp-setup-card.tsx",
+      "apps/web/components/user/two-factor-modal.tsx"
+    ]
+  },
+  {
+    "ticket": "ENG-12218",
+    "project": "Cold Email Core",
+    "ticketPaths": [],
+    "files": [
+      "apps/web/lib/inngest/functions/campaign/reactivate-campaign-after-lead-add.ts",
+      "apps/web/lib/inngest/functions/campaign/process-campaign-add-leads.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-12234",
+    "project": "CRM",
+    "ticketPaths": [],
+    "files": [
+      "apps/web/lib/crm/view-field-keys.ts",
+      "apps/web/trpc/routers/crm/views.ts",
+      "apps/web/lib/crm/deal-view-filters.ts",
+      "apps/web/lib/crm/advanced-query-builder.ts",
+      "apps/web/components/crm/crm-data-table/invalid-filters-warning.tsx"
+    ]
+  },
+  {
+    "ticket": "ENG-12287",
+    "project": "CRM",
+    "ticketPaths": [],
+    "files": [
+      "apps/web/lib/crm/advanced-query-builder.ts",
+      "apps/web/lib/crm/filter-rule-compilation.ts",
+      "apps/web/trpc/routers/crm/deal.ts",
+      "apps/web/lib/crm/deal-query-builder.ts",
+      "apps/web/components/crm/crm-data-table/filters-not-applied-chip.tsx"
+    ]
+  },
+  {
+    "ticket": "ENG-12288",
+    "project": "Acquisity Agent",
+    "ticketPaths": [
+      "apps/web/app/(saas)/dashboard/(sidebar)/partner-admin/ai-modes/page.tsx",
+      "apps/web/app/api/completion/route.ts",
+      "apps/web/components/ai-chat/ask-ai/chat-input.tsx",
+      "apps/web/components/ai-chat/chat-input/chat-input.tsx",
+      "apps/web/lib/consultant-modes/",
+      "apps/web/lib/consultant-modes/cache.ts",
+      "apps/web/lib/consultant-modes/resolve.ts",
+      "apps/web/lib/partner/cache.ts",
+      "apps/web/lib/partner/features.ts",
+      "apps/web/lib/workflows/ai-agent-models.ts",
+      "apps/web/package.json",
+      "apps/web/scripts/dump-preview-data.sh",
+      "apps/web/scripts/seed-consultant-modes.ts",
+      "apps/web/tests/lib/consultant-modes/resolve.test.ts",
+      "apps/web/trpc/routers/ask-brook-knowledge.ts",
+      "apps/web/trpc/routers/chat.ts",
+      "apps/web/trpc/routers/partner-consultant-modes.ts",
+      "packages/db",
+      "packages/db/migrations/",
+      "packages/db/migrations/20260727071732_seed_acquisity_agent_consultant_mode.sql",
+      "packages/db/src/client.ts",
+      "packages/db/src/schema/consultant-mode.ts"
+    ],
+    "files": [
+      "apps/web/lib/consultant-modes/resolve.ts",
+      "apps/web/lib/consultant-modes/cache.ts",
+      "apps/web/lib/partner/features.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-12294",
+    "project": "Cold Email Core",
+    "ticketPaths": [],
+    "files": [
+      "apps/web/lib/outreach/util.ts",
+      "apps/web/lib/inngest/functions/campaign/process-campaign-creator.ts",
+      "apps/web/lib/scrape/db.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-12298",
+    "project": "CRM",
+    "ticketPaths": [
+      "apps/web/components/crm/tasks/inbox-emails-view.tsx",
+      "apps/web/trpc/routers/crm/communication.ts"
+    ],
+    "files": [
+      "apps/web/lib/crm/email-thread-query-builder.ts",
+      "apps/web/trpc/routers/crm/communication.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-12301",
+    "project": "CRM",
+    "ticketPaths": [
+      "apps/web/lib/services/sms-sender-resolution.ts",
+      "apps/web/lib/services/twilio.ts",
+      "apps/web/tests/lib/services/outbound-message-recording.test.ts",
+      "apps/web/tests/trpc/routers/phone-numbers.test.ts",
+      "apps/web/trpc/routers/phone-numbers.ts",
+      "apps/web/trpc/routers/sms.ts",
+      "packages/db"
+    ],
+    "files": [
+      "apps/web/lib/services/outbound-sms-timeline-event.ts",
+      "apps/web/trpc/routers/sms.ts",
+      "apps/web/trpc/routers/phone-numbers.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-12317",
+    "project": "Acquisity Agent",
+    "ticketPaths": [
+      ".github/scripts/check-pr-size-limit.js",
+      "apps/web/app/(saas)/dashboard/(sidebar)/partner-admin/ai-modes/page.tsx",
+      "apps/web/components/ai-chat/ask-ai/chat-input.tsx",
+      "apps/web/components/ai-chat/chat-input/chat-input.tsx",
+      "apps/web/lib/consultant-modes/resolve.ts",
+      "apps/web/lib/prompts/ai-growth-consultant-prompts.ts",
+      "apps/web/package.json",
+      "apps/web/scripts/seed-consultant-modes.ts",
+      "apps/web/tests/lib/consultant-modes/acquisity-agent-migration.test.ts",
+      "apps/web/trpc/routers/ask-brook-knowledge.ts",
+      "apps/web/trpc/routers/partner-consultant-modes.ts",
+      "packages/db/migrations",
+      "packages/db/migrations/",
+      "packages/db/migrations/20260727071732_seed_acquisity_agent_consultant_mode.sql",
+      "packages/db/src/schema/consultant-mode.ts"
+    ],
+    "files": [
+      "packages/db/migrations/20260810154452_seed_tech_wiz_consultant_mode.sql",
+      "apps/web/lib/consultant-modes/cache.ts",
+      "apps/web/lib/consultant-modes/tech-wiz.ts",
+      "apps/web/scripts/seed-consultant-modes.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-12318",
+    "project": "CRM",
+    "ticketPaths": ["apps/web/lib/services/inbound-voice-processor.ts"],
+    "files": [
+      "apps/web/lib/inngest/functions/crm/backfill-voicemail-thread-lines.ts",
+      "packages/db/migrations/20260806072025_jittery_human_torch.sql",
+      "apps/web/lib/services/inbound-voice-processor.ts",
+      "packages/db/src/schema/crm.ts",
+      "apps/web/lib/services/outbound-message-recording.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-12343",
+    "project": "CRM",
+    "ticketPaths": [],
+    "files": [
+      "apps/web/lib/crm/floor-command/payment-auto-win-review.ts",
+      "apps/web/lib/crm-payments/services/payment-auto-win-service.ts",
+      "apps/web/lib/crm-payments/services/payment-auto-win-policy.ts",
+      "apps/web/lib/crm/floor-command/scope-resolver.ts",
+      "apps/web/lib/crm/floor-command/historical-auto-win-exclusion-cache.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-12351",
+    "project": "CRM",
+    "ticketPaths": [],
+    "files": [".github/scripts/deferred-index-contract.ts"]
+  },
+  {
+    "ticket": "ENG-12361",
+    "project": "AI Growth Plan Creator",
+    "ticketPaths": [],
+    "files": [
+      "apps/web/components/acquisition/growth-plan/transcript-intake.tsx",
+      "apps/web/trpc/routers/acquisition.ts",
+      "apps/web/components/acquisition/growth-plan/use-recording-transcription.ts",
+      "apps/web/components/acquisition/growth-plan/recording-intake-field.tsx",
+      "apps/web/lib/growth-plan-creator/recording-object.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-12383",
+    "project": "CRM",
+    "ticketPaths": [],
+    "files": [
+      "apps/web/components/crm/crm-data-table/view-selector-utils.ts",
+      "apps/web/components/crm/crm-data-table/view-selector.tsx",
+      "apps/web/components/crm/crm-data-table/view-selector-item.tsx"
+    ]
+  },
+  {
+    "ticket": "ENG-12397",
+    "project": "Cold Email Core",
+    "ticketPaths": [],
+    "files": ["apps/web/lib/outreach/supersearch-filters.ts"]
+  },
+  {
+    "ticket": "ENG-12400",
+    "project": "CRM",
+    "ticketPaths": ["apps/web/lib/crm/deal-view-filters.ts"],
+    "files": [
+      "apps/web/lib/crm/deal-bucket-filters.ts",
+      "apps/web/lib/crm/deal-view-filters.ts",
+      "apps/web/hooks/use-deal-filters.ts",
+      "apps/web/components/crm/deal/deals-kanban.tsx",
+      "apps/web/lib/crm/deal-bucket-filter-sql.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-12442",
+    "project": null,
+    "ticketPaths": [],
+    "files": [
+      "apps/web/lib/workflows/codegen-registry.ts",
+      "apps/web/plugins/workflows/crm/steps/crm-write-transaction.ts",
+      "apps/web/plugins/workflows/crm/steps/update-deal.ts",
+      "apps/web/plugins/workflows/crm/steps/delete-contact.ts",
+      "apps/web/plugins/workflows/crm/steps/delete-deal.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-12443",
+    "project": null,
+    "ticketPaths": [],
+    "files": [
+      "apps/web/trpc/routers/crm/contact.ts",
+      "apps/web/lib/crm/person-merge/undo.ts",
+      "packages/db/migrations/20261008172416_crm_telephone_single_primary.sql",
+      "apps/web/lib/crm/primary-phone.ts",
+      "packages/db/src/schema/crm.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-12444",
+    "project": null,
+    "ticketPaths": [],
+    "files": [
+      "apps/web/lib/workflows/codegen-registry.ts",
+      "apps/web/plugins/workflows/crm/steps/upsert-company.ts",
+      "apps/web/plugins/workflows/crm/steps/upsert-contact.ts",
+      "apps/web/plugins/workflows/crm/steps/array-match.ts",
+      "apps/web/plugins/workflows/crm/steps/upsert-deal.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-12450",
+    "project": "CRM",
+    "ticketPaths": [],
+    "files": [
+      "apps/web/lib/crm/my-day-closer-scoreboard-service.ts",
+      "apps/web/components/crm/my-day/manager-closer-scoreboard.tsx",
+      "apps/web/lib/crm/floor-command/appointment-attendance.ts",
+      "apps/web/lib/crm/floor-command/call-metrics.ts",
+      "apps/web/components/crm/my-day/my-day-manager-view.tsx"
+    ]
+  },
+  {
+    "ticket": "ENG-12452",
+    "project": "CRM",
+    "ticketPaths": [],
+    "files": [
+      "packages/db/src/repositories/crm-floor-command-cash-report-repository.ts",
+      "apps/web/components/crm/my-day/manager-cash-reconciliation-panel.tsx",
+      "apps/web/lib/crm/my-day-closer-scoreboard-service.ts",
+      "apps/web/components/crm/timezone-select.tsx",
+      "apps/web/lib/crm/my-day-manager-summary.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-12453",
+    "project": "CRM",
+    "ticketPaths": [],
+    "files": [
+      "apps/web/lib/crm/floor-command/report.ts",
+      "apps/web/lib/crm/floor-command/report-rows.ts",
+      "apps/web/components/crm/my-day/my-day-manager-view.tsx",
+      "apps/web/lib/crm/floor-command/report-csv.ts",
+      "apps/web/components/crm/my-day/manager-closer-scoreboard.tsx"
+    ]
+  },
+  {
+    "ticket": "ENG-12498",
+    "project": "CRM",
+    "ticketPaths": [],
+    "files": [
+      "apps/web/lib/services/outbound-sms-thread.ts",
+      "apps/web/lib/services/outbound-message-recording.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-12518",
+    "project": "CRM",
+    "ticketPaths": [],
+    "files": [
+      "apps/web/lib/crm/view-content-policy.ts",
+      "apps/web/trpc/routers/crm/views.ts",
+      "apps/web/hooks/use-crm-view-lookups.ts",
+      "apps/web/hooks/use-crm-view-state.ts",
+      "apps/web/lib/crm/view-selection.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-12529",
+    "project": "CRM",
+    "ticketPaths": [],
+    "files": [
+      "apps/web/lib/services/inbound-call-reconciliation.ts",
+      "packages/db/src/repositories/call-repository.ts",
+      "apps/web/lib/inngest/functions/crm/reconcile-stale-inbound-calls.ts",
+      "apps/web/lib/services/twilio-subaccount-client.ts",
+      "packages/db/src/types/enums.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-12540",
+    "project": "Core Platform",
+    "ticketPaths": [
+      ".github/scripts/check-workflow-injection.ts",
+      ".github/workflows/migration-management.yml"
+    ],
+    "files": [
+      ".github/scripts/check-workflow-injection.ts",
+      ".github/workflows/ci.yml",
+      ".github/workflows/migration-management.yml",
+      ".github/workflows/preview-cleanup.yml",
+      ".github/workflows/deploy-production.yml"
+    ]
+  },
+  {
+    "ticket": "ENG-12569",
+    "project": "CRM",
+    "ticketPaths": [],
+    "files": [
+      "apps/web/lib/services/connected-mailbox-send-recording.ts",
+      "apps/web/trpc/routers/integrations/email-calendar.ts",
+      "apps/web/components/crm/shared/email-sent-toast.ts",
+      "apps/web/components/crm/email-composer-modal.tsx",
+      "apps/web/lib/integrations/email/email-service.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-12570",
+    "project": "CRM",
+    "ticketPaths": [
+      "apps/web",
+      "apps/web/components/ai-sdr/email-composer.tsx",
+      "apps/web/components/crm/email-composer-modal.tsx",
+      "apps/web/lib/auth/",
+      "apps/web/lib/auth/server.ts",
+      "apps/web/lib/integrations/email/organization-sender-accounts.ts",
+      "apps/web/lib/outreach/db/campaign.ts",
+      "apps/web/lib/services/email-thread-sync-service.ts",
+      "packages/db/src/schema/integration.ts"
+    ],
+    "files": [
+      "apps/web/trpc/routers/integrations/email-calendar.ts",
+      "apps/web/lib/services/email-thread-sync-service.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-12572",
+    "project": "CRM",
+    "ticketPaths": [],
+    "files": [
+      "apps/web/trpc/routers/crm/communication.ts",
+      "apps/web/lib/ai-sdr-v2/services/replay-message-store.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-12583",
+    "project": "CRM",
+    "ticketPaths": [
+      "apps/web/app/api/voice/status/route.ts",
+      "apps/web/components/crm/call/",
+      "apps/web/components/crm/call/call-start-plan.ts",
+      "apps/web/components/crm/call/use-call-session-controller.tsx",
+      "apps/web/lib/voice/caller-id.ts",
+      "apps/web/tests/components/crm/call/",
+      "packages/jobs",
+      "packages/jobs/src/events.ts"
+    ],
+    "files": ["apps/web/components/crm/call/use-call-session-controller.tsx"]
+  },
+  { "ticket": "ENG-12595", "project": "CRM", "ticketPaths": [], "files": [] },
+  {
+    "ticket": "ENG-12623",
+    "project": "Cold Email Core",
+    "ticketPaths": [
+      "apps/web/components/campaigns/detail/tabs/leads/leads-metrics.tsx",
+      "apps/web/lib/inngest/functions/campaign/process-campaign-add-leads.ts",
+      "apps/web/lib/inngest/functions/outreach/campaign-leads-import.ts",
+      "apps/web/lib/outreach/db/campaign.ts",
+      "apps/web/lib/outreach/services/out-reach-service.ts",
+      "apps/web/lib/services/lead-scrape-service.ts"
+    ],
+    "files": [
+      "apps/web/lib/outreach/db/campaign.ts",
+      "apps/web/lib/inngest/functions/campaign/process-campaign-add-leads.ts",
+      "apps/web/lib/services/lead-scrape-service.ts",
+      "apps/web/trpc/routers/outreach/leads.ts",
+      "apps/web/lib/outreach/provider-upload-receipts.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-12625",
+    "project": "CRM",
+    "ticketPaths": [],
+    "files": [
+      "apps/web/lib/services/sms-send-idempotency.ts",
+      "apps/web/lib/services/outbound-message-recording.ts",
+      "apps/web/lib/workflows/codegen-registry.ts",
+      "packages/db/src/schema/crm.ts",
+      "apps/web/components/crm/contact-record/contact-tabs/calls/index.tsx"
+    ]
+  },
+  {
+    "ticket": "ENG-12643",
+    "project": "Support",
+    "ticketPaths": [],
+    "files": [
+      "apps/web/lib/onboarding/onboarding-exit.ts",
+      "apps/web/trpc/routers/onboarding.ts",
+      "apps/web/lib/onboarding/workspace-setup-lifecycle.ts",
+      "apps/web/lib/onboarding/onboarding-access.ts",
+      "apps/web/lib/onboarding/onboarding-completion-guard.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-12656",
+    "project": null,
+    "ticketPaths": [],
+    "files": [
+      "apps/web/lib/crm/task-field-values.ts",
+      "apps/web/components/crm-v2/tasks/use-tasks-v2.ts",
+      "apps/web/components/crm/tasks-content.tsx"
+    ]
+  },
+  {
+    "ticket": "ENG-12663",
+    "project": "CRM",
+    "ticketPaths": [
+      "apps/web/app/api/voice/answer/route.ts",
+      "apps/web/app/api/webhooks/sendblue/call-log/route.ts",
+      "apps/web/lib/services/inbound-voice-processor.ts",
+      "apps/web/lib/services/twilio.ts",
+      "apps/web/trpc/routers/phone-numbers.ts",
+      "apps/web/trpc/routers/voice.ts",
+      "packages/db/migrations/20260807060459_sour_blink.sql",
+      "packages/db/migrations/20260813094803_volatile_shockwave.sql",
+      "packages/db/src/schema/voice.ts",
+      "packages/db/src/types/enums.ts"
+    ],
+    "files": [
+      "apps/web/lib/services/inbound-voice-processor.ts",
+      "apps/web/app/api/webhooks/twilio/voice/dial-status/route.ts",
+      "apps/web/app/api/webhooks/twilio/voice/route.ts",
+      "apps/web/lib/inngest/functions/crm/settle-direct-voicemail-call.ts",
+      "apps/web/lib/inngest/send-with-partner-retry.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-12687",
+    "project": "CRM",
+    "ticketPaths": [
+      "apps/web/app/api/voice/status/route.ts",
+      "apps/web/lib/crm/call-history-fields.ts",
+      "apps/web/lib/crm/communication-fields.ts",
+      "apps/web/lib/crm/contact-phone-lookup.ts",
+      "apps/web/lib/crm/my-day-call-scoreboard-service.ts",
+      "apps/web/lib/crm/my-day-closer-scoreboard-service.ts",
+      "apps/web/lib/services/recall-calendar-recording-overview-stats.ts",
+      "apps/web/tests/lib/crm/my-day-call-scoreboard-db.test.ts",
+      "apps/web/tests/lib/crm/my-day-call-scoreboard-service.test.ts",
+      "apps/web/trpc/routers/crm/communication.ts",
+      "apps/web/trpc/routers/crm/my-day.ts",
+      "packages/db/migrations/20260806125602_abandoned_jack_power.sql",
+      "packages/db/src/schema-support/crm-event.ts",
+      "packages/db/src/schema/crm.ts",
+      "packages/db/src/schema/voice.ts"
+    ],
+    "files": ["apps/web/lib/crm/my-day-call-scoreboard-service.ts"]
+  },
+  {
+    "ticket": "ENG-12705",
+    "project": "CRM",
+    "ticketPaths": [],
+    "files": [
+      "apps/web/lib/crm/note-lifecycle.ts",
+      "apps/web/trpc/routers/crm/note.ts",
+      "apps/web/trpc/routers/crm/deal.ts",
+      "apps/web/lib/auth/permissions.ts",
+      "apps/web/trpc/routers/crm/contact.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-12740",
+    "project": "CRM",
+    "ticketPaths": [],
+    "files": [
+      "apps/web/trpc/routers/crm/contact.ts",
+      "apps/web/lib/crm/contact-import-companies.ts",
+      "apps/web/lib/workflows/codegen-registry.ts",
+      "packages/db/src/repositories/note-repository.ts",
+      "packages/db/src/crm-record-lock.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-12771",
+    "project": "AI SDR Core",
+    "ticketPaths": [
+      "apps/web/lib/ai-sdr-v2/workflow/steps/finalize.ts",
+      "apps/web/lib/ai-sdr-v2/workflow/steps/send-email.ts",
+      "apps/web/lib/ai-sdr-v2/workflow/workflow.ts",
+      "apps/web/lib/outreach/instantly/client.ts",
+      "apps/web/lib/outreach/instantly/get-prospect-reply-id.ts"
+    ],
+    "files": [
+      "apps/web/lib/outreach/instantly/get-prospect-reply-id.ts",
+      "apps/web/lib/ai-sdr-v2/workflow/steps/send-email.ts",
+      "apps/web/lib/ai-sdr-v2/workflow/followup-workflow.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-12785",
+    "project": "CRM",
+    "ticketPaths": [],
+    "files": [
+      "apps/web/lib/crm/schema.ts",
+      "apps/web/lib/crm/call-history-fields.ts",
+      "apps/web/lib/crm/filter-conditions.ts",
+      "apps/web/components/crm/sample-data/sample-rule-filter.ts",
+      "apps/web/lib/crm/filter-operators.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-12812",
+    "project": "CRM",
+    "ticketPaths": ["apps/web/lib/crm/floor-command/metric-query-filters.ts"],
+    "files": [
+      "apps/web/lib/crm/floor-command/metric-query-filters.ts",
+      "apps/web/lib/crm/my-day-missed-work-service.ts",
+      "apps/web/lib/crm/my-day-action-source-query.ts",
+      "apps/web/lib/crm/my-day-team-members-service.ts",
+      "apps/web/lib/crm/floor-command/appointment-attendance.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-12840",
+    "project": null,
+    "ticketPaths": [],
+    "files": [
+      "apps/web/lib/crm/absolute-date-plan.ts",
+      "apps/web/lib/crm/filter-sort-utils.ts",
+      "apps/web/lib/crm/filter-conditions.ts",
+      "apps/web/lib/crm/advanced-query-builder.ts",
+      "apps/web/lib/crm/comparable-text.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-12841",
+    "project": null,
+    "ticketPaths": [],
+    "files": [
+      "apps/web/lib/crm/scalar-value-type.ts",
+      "apps/web/lib/crm/filter-conditions.ts",
+      "apps/web/components/crm/sample-data/sample-rule-filter.ts",
+      "apps/web/lib/crm/sample-derived-filters.ts",
+      "apps/web/lib/crm/advanced-query-builder.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-12859",
+    "project": "AI SDR Core",
+    "ticketPaths": [],
+    "files": [
+      "apps/web/lib/scheduling/services/booking-service.ts",
+      "apps/web/lib/ai-sdr-v2/workflow/helpers/booking-constants.ts",
+      "apps/web/lib/ai-sdr-v2/constants/escalation-reasons.ts",
+      "apps/web/lib/ai-sdr-v2/workflow/steps/booking.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-12860",
+    "project": "AI Funnel Builder",
+    "ticketPaths": [],
+    "files": [
+      "apps/web/lib/webhooks/partner-customer-lifecycle.ts",
+      "apps/web/lib/auth/external-user-creation.ts",
+      "apps/web/app/api/partner/customer-lifecycle/route.ts",
+      "apps/web/lib/webhooks/partner-user-provisioning-email.ts",
+      "apps/web/lib/webhooks/partner-customer-lifecycle-schema.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-12871",
+    "project": null,
+    "ticketPaths": [
+      "apps/web/lib/dialer/authorize-dial.ts",
+      "apps/web/lib/services/browser-voice-caller-id.ts",
+      "apps/web/lib/services/twilio-subaccount-client.ts",
+      "apps/web/lib/services/twilio.ts",
+      "apps/web/trpc/routers/phone-numbers.ts",
+      "apps/web/trpc/routers/voice.ts"
+    ],
+    "files": [
+      "apps/web/trpc/routers/phone-numbers.ts",
+      "apps/web/trpc/routers/voice.ts",
+      "apps/web/app/api/webhooks/twilio/caller-id-verification/route.ts",
+      "apps/web/lib/services/twilio.ts",
+      "apps/web/lib/services/browser-voice-caller-id.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-12877",
+    "project": null,
+    "ticketPaths": [
+      "apps/web/components/crm/payments/",
+      "apps/web/lib/crm-payments/providers/whop/checkout.ts",
+      "packages/db/src/schema-support/crm-payment-method-configuration.ts"
+    ],
+    "files": [
+      "packages/db/src/schema-support/crm-payment-method-configuration.ts",
+      "apps/web/lib/crm-payments/providers/whop/checkout.ts",
+      "apps/web/lib/crm-payments/services/payment-links.ts",
+      "apps/web/components/crm/payments/payment-link-builder.tsx"
+    ]
+  },
+  {
+    "ticket": "ENG-12909",
+    "project": "CRM",
+    "ticketPaths": [
+      "apps/web/components/crm/my-day/manager-metrics-grid.tsx",
+      "apps/web/lib/crm/floor-command/closer-credit-cash.ts",
+      "apps/web/lib/crm/floor-command/report.ts"
+    ],
+    "files": [
+      "apps/web/components/crm/my-day/manager-metrics-grid.tsx",
+      "apps/web/lib/crm/floor-command/closer-credit-cash.ts",
+      "packages/db/src/repositories/crm-floor-command-cash-report-builder.ts",
+      "apps/web/lib/crm/floor-command/report.ts",
+      "packages/db/src/repositories/crm-floor-command-cash-report-types.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-12911",
+    "project": "CRM",
+    "ticketPaths": [
+      "apps/web/components/crm/my-day/floor-command-cash-settings-section.tsx",
+      "packages/db/src/schema-support/crm-floor-command.ts"
+    ],
+    "files": [
+      "apps/web/components/crm/my-day/floor-command-cash-category-activation.tsx",
+      "apps/web/components/crm/my-day/floor-command-cash-settings-section.tsx",
+      "apps/web/lib/crm/floor-command/reporting-view-configuration-service.ts",
+      "apps/web/components/crm/my-day/floor-command-global-settings-editor.tsx"
+    ]
+  },
+  {
+    "ticket": "ENG-12912",
+    "project": "CRM",
+    "ticketPaths": [],
+    "files": [
+      "apps/web/components/crm/my-day/manager-metrics-grid.tsx",
+      "packages/db/src/queries/crm-pending-payments.ts",
+      "packages/db/src/repositories/crm-floor-command-cash-report-repository.ts",
+      "apps/web/components/crm/my-day/manager-cash-reconciliation-panel.tsx",
+      "apps/web/lib/crm/floor-command/cash-ui.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-12913",
+    "project": "CRM",
+    "ticketPaths": [
+      "apps/web/components/crm/my-day/manager-cash-overview.tsx",
+      "apps/web/components/crm/payments/product-catalog-row.tsx",
+      "apps/web/trpc/routers/crm/payments.ts",
+      "packages/db/src/repositories/crm-floor-command-cash-report-types.ts",
+      "packages/db/src/schema-support/crm-floor-command-cash.ts",
+      "packages/db/src/schema-support/crm-payment-business-categories.ts",
+      "packages/db/src/schema/crm-payments.ts"
+    ],
+    "files": [
+      "apps/web/components/crm-v2/floor-command/cash-card.tsx",
+      "apps/web/lib/crm/floor-command/closer-credit-cash.ts",
+      "apps/web/lib/crm/floor-command/report.ts",
+      "packages/db/src/repositories/crm-floor-command-cash-report-types.ts",
+      "apps/web/lib/crm/my-day-closer-scoreboard-service.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-12922",
+    "project": "AI SDR Core",
+    "ticketPaths": [],
+    "files": [
+      "apps/web/lib/ai-sdr-v2/workflow/steps/slot-matchmaking.ts",
+      "apps/web/lib/ai-sdr-v2/workflow/steps/booking.ts",
+      "apps/web/lib/ai-sdr-v2/agents/data-extraction/default-agent.ts",
+      "apps/web/lib/ai-sdr-v2/agents/data-extraction/helpers.ts",
+      "apps/web/lib/ai-sdr-v2/workflow/helpers/context-pack-helpers/booking-section.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-12924",
+    "project": null,
+    "ticketPaths": [],
+    "files": [
+      "apps/web/lib/crm/scope-prompt.ts",
+      "apps/web/lib/crm/schema.ts",
+      "apps/web/lib/crm/scope-field-contract.ts",
+      "apps/web/lib/crm/scope-prompts/shared-guidance.ts",
+      "apps/web/lib/crm/scope-build-error.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-12931",
+    "project": null,
+    "ticketPaths": [],
+    "files": [
+      "apps/web/lib/ai-sdr-v2/workflow/steps/deferred-followup.ts",
+      "apps/web/lib/ai-sdr-v2/services/followup-scheduler.ts",
+      "apps/web/lib/ai-sdr-v2/agents/data-extraction/default-agent.ts",
+      "apps/web/lib/ai-sdr-v2/workflow/steps/offer-alternatives.ts",
+      "apps/web/lib/ai-sdr-v2/agents/data-extraction/helpers.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-12933",
+    "project": "AI SDR Core",
+    "ticketPaths": [],
+    "files": ["apps/web/lib/ai-sdr-v2/workflow/helpers/context-pack.ts"]
+  },
+  {
+    "ticket": "ENG-12943",
+    "project": "CRM",
+    "ticketPaths": ["apps/web/lib/crm/floor-command/appointment-attendance.ts"],
+    "files": [
+      "apps/web/lib/crm/floor-command/appointment-attendance.ts",
+      "apps/web/plugins/workflows/scheduling/steps/delete-appointment.ts",
+      "apps/web/lib/workflows/codegen-registry.ts",
+      "apps/web/components/crm/my-day/manager-metrics-grid.tsx",
+      "apps/web/plugins/workflows/scheduling/index.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-12955",
+    "project": "CRM",
+    "ticketPaths": [],
+    "files": [
+      "apps/web/components/crm/crm-data-table/index.tsx",
+      "apps/web/components/crm/crm-data-table/filter-panel.tsx",
+      "apps/web/components/crm/crm-data-table/filter-panel-view-header.tsx"
+    ]
+  },
+  {
+    "ticket": "ENG-12959",
+    "project": "CRM",
+    "ticketPaths": [],
+    "files": [
+      "apps/web/lib/crm/call-history-fields.ts",
+      "apps/web/lib/crm/appointment-fields.ts",
+      "apps/web/components/crm/crm-data-table/field-configs/deal.ts",
+      "apps/web/lib/crm/filter-field-registry.ts",
+      "apps/web/lib/crm/scope-prompts/deal.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-12960",
+    "project": "CRM",
+    "ticketPaths": [],
+    "files": [
+      "apps/web/components/crm/email-templates/template-preview-dialog.tsx"
+    ]
+  },
+  {
+    "ticket": "ENG-12996",
+    "project": null,
+    "ticketPaths": [],
+    "files": [
+      "scripts/build-crm-event-source-call-sid-index.sh",
+      ".github/workflows/ci.yml"
+    ]
+  },
+  {
+    "ticket": "ENG-13035",
+    "project": "CRM",
+    "ticketPaths": ["apps/web/tests/trpc/routers/phone-numbers.test.ts"],
+    "files": []
+  },
+  {
+    "ticket": "ENG-13053",
+    "project": "CRM",
+    "ticketPaths": [],
+    "files": ["apps/web/lib/services/a2p-registration/brand/status.ts"]
+  },
+  {
+    "ticket": "ENG-13083",
+    "project": "CRM",
+    "ticketPaths": [],
+    "files": [
+      "apps/web/lib/services/a2p-registration/campaign-contract.ts",
+      "apps/web/components/a2p-registration/a2p-campaign-compliance-fields.tsx"
+    ]
+  },
+  {
+    "ticket": "ENG-13103",
+    "project": "Whitelabel Partners",
+    "ticketPaths": [
+      "apps/web/components/affiliate/affiliate-stats-cards.tsx",
+      "apps/web/lib/affiliate-payouts/balance.ts",
+      "apps/web/lib/affiliate-payouts/policy.ts",
+      "apps/web/lib/inngest/functions/affiliate/run-affiliate-payout-batches-cron.ts",
+      "apps/web/trpc/routers/partner-affiliate-payouts.ts"
+    ],
+    "files": [
+      "apps/web/lib/inngest/functions/affiliate/run-affiliate-payout-batches-cron.ts",
+      "apps/web/lib/affiliate-payouts/schedule.ts",
+      "apps/web/lib/affiliate-payouts/batch.ts",
+      ".env.example",
+      "apps/web/vitest.config.mts"
+    ]
+  },
+  {
+    "ticket": "ENG-13108",
+    "project": "CRM",
+    "ticketPaths": [],
+    "files": [
+      "apps/web/lib/scheduling/cancellation-attribution.ts",
+      "apps/web/lib/scheduling/repositories/appointment-repository.ts",
+      "apps/web/components/calendar/appointments-agenda.tsx",
+      "apps/web/lib/scheduling/services/calendar-sync-service.ts",
+      "apps/web/components/calendar/appointment-modal.tsx"
+    ]
+  },
+  {
+    "ticket": "ENG-13125",
+    "project": "Cold Email Agent",
+    "ticketPaths": [],
+    "files": [
+      "apps/web/lib/outreach/db/usage.ts",
+      "apps/web/lib/inngest/functions/campaign/process-campaign-add-leads.ts",
+      "apps/web/components/admin/hooks/use-organization-limit-form.tsx",
+      "apps/web/lib/inngest/functions/campaign/process-campaign-analytics.ts",
+      "apps/web/lib/services/novu.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-13128",
+    "project": "AI SDR Scheduling",
+    "ticketPaths": [],
+    "files": ["apps/web/trpc/routers/appointments.ts"]
+  },
+  {
+    "ticket": "ENG-13277",
+    "project": "AI SDR Core",
+    "ticketPaths": [],
+    "files": [
+      "apps/web/hooks/use-connection-status.ts",
+      "apps/web/lib/ai-sdr/setup-connection-status.ts",
+      "apps/web/components/ai-sdr/ai-sdr-setup-modal.tsx"
+    ]
+  },
+  {
+    "ticket": "ENG-13294",
+    "project": "Public API",
+    "ticketPaths": ["apps/api"],
+    "files": [
+      "apps/web/content/developer/campaign-agent/openapi.json",
+      "apps/api/src/schemas/campaigns.ts",
+      "apps/api/src/routes/v1/campaigns/shared.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-13309",
+    "project": "CRM",
+    "ticketPaths": [
+      "apps/web/lib/crm-payments/providers/whop/webhooks.ts",
+      "apps/web/tests/lib/crm-payments/whop-webhooks.test.ts"
+    ],
+    "files": ["apps/web/lib/crm-payments/providers/whop/webhooks.ts"]
+  },
+  {
+    "ticket": "ENG-13327",
+    "project": "Billing",
+    "ticketPaths": [],
+    "files": [
+      "apps/web/trpc/routers/outreach/campaigns.ts",
+      "apps/web/trpc/routers/outreach/leads.ts",
+      "apps/web/components/billing/subscription-gate.tsx",
+      "apps/web/components/ai-sdr/email-thread-view.tsx",
+      "apps/web/trpc/routers/ai-sdr.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-13331",
+    "project": "Whitelabel Partners",
+    "ticketPaths": [],
+    "files": [
+      "apps/web/components/invitations/organization-invitation-card.tsx",
+      "apps/web/components/invitations/sign-out-button.tsx",
+      "apps/web/trpc/routers/invitations.ts",
+      "apps/web/proxy.ts",
+      "apps/web/lib/auth/redirect-path.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-13343",
+    "project": "CRM",
+    "ticketPaths": [],
+    "files": [
+      "apps/web/lib/services/scheduled-message/transitions.ts",
+      "apps/web/lib/services/scheduled-message/email-execution-preparation.ts",
+      "apps/web/lib/services/email-send-idempotency.ts",
+      "apps/web/lib/services/email-send-operation-errors.ts",
+      "apps/web/lib/services/scheduled-message/execution.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-13355",
+    "project": "AI SDR Core",
+    "ticketPaths": [],
+    "files": [
+      "apps/web/components/ai-sdr/create-appointment-from-thread-modal.tsx"
+    ]
+  },
+  {
+    "ticket": "ENG-13388",
+    "project": "CRM",
+    "ticketPaths": [],
+    "files": [
+      "apps/web/lib/crm/my-day-closer-scoreboard-service.ts",
+      "apps/web/lib/crm/floor-command/report.ts",
+      "apps/web/lib/crm/floor-command/appointment-attendance.ts",
+      "apps/web/lib/crm/my-day-manager-summary.ts",
+      "apps/web/components/crm/my-day/floor-command-metric-detail-dialog.tsx"
+    ]
+  },
+  {
+    "ticket": "ENG-13403",
+    "project": "CRM",
+    "ticketPaths": [],
+    "files": [
+      "apps/web/lib/crm-payments/services/apply-payment-repair.ts",
+      "apps/web/lib/crm-payments/services/payment-repair-records.ts",
+      "apps/web/lib/crm-payments/services/provider-events.ts",
+      "apps/web/lib/crm-payments/services/payment-repair-facts.ts",
+      "apps/web/lib/crm-payments/services/payment-repair.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-13422",
+    "project": null,
+    "ticketPaths": [],
+    "files": [
+      "apps/web/components/command-palette/command-palette.tsx",
+      "apps/web/hooks/use-shell-workspace.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-13490",
+    "project": "CRM",
+    "ticketPaths": [],
+    "files": [
+      "packages/db/src/repositories/conversation-list-call-query.ts",
+      "packages/db/migrations/20260904175157_dry_scalphunter.sql",
+      ".github/scripts/deferred-index-contract.ts",
+      "packages/db/src/schema/crm-recall.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-13503",
+    "project": "Core Platform",
+    "ticketPaths": [],
+    "files": [
+      "apps/web/components/ai-tools/processing-state.tsx",
+      "apps/web/components/ai-tools/processing-state-header.tsx"
+    ]
+  },
+  {
+    "ticket": "ENG-13505",
+    "project": null,
+    "ticketPaths": [],
+    "files": [
+      "scripts/build-crm-recall-calendar-recording-org-voice-message-index.sh",
+      ".github/workflows/ci.yml"
+    ]
+  },
+  {
+    "ticket": "ENG-13514",
+    "project": "CRM",
+    "ticketPaths": [],
+    "files": [
+      "packages/db/src/repositories/record-communication-timeline-call-query.ts",
+      "apps/web/hooks/use-activity-events.tsx",
+      "apps/web/trpc/client-link-routing.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-13516",
+    "project": "CRM",
+    "ticketPaths": [],
+    "files": ["packages/db/src/repositories/conversation-list-context-query.ts"]
+  },
+  {
+    "ticket": "ENG-13532",
+    "project": null,
+    "ticketPaths": [],
+    "files": [
+      "apps/web/lib/crm-payments/checkout-schedule.ts",
+      "apps/web/components/crm/payments/payment-link-display.ts",
+      "apps/web/components/crm/payments/payment-link-builder.tsx",
+      "apps/web/app/pay/[publicToken]/page.tsx",
+      "apps/web/components/crm/payments/first-recurring-payment-input.tsx"
+    ]
+  },
+  {
+    "ticket": "ENG-13533",
+    "project": null,
+    "ticketPaths": [],
+    "files": [
+      "apps/web/lib/inngest/functions/calendar/recording-discovery.ts",
+      "apps/web/lib/services/recall-calendar-recording-service.ts",
+      "apps/web/lib/services/recall-calendar-recording-settings.ts",
+      "apps/web/lib/services/recall-bot-cleanup-service.ts",
+      "apps/web/lib/inngest/functions/calendar/register-channels.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-13534",
+    "project": null,
+    "ticketPaths": [
+      "apps/web/lib/services/recall-calendar-recording-detail-helpers.ts",
+      "apps/web/lib/services/recall-calendar-recording-service.ts"
+    ],
+    "files": [
+      "apps/web/lib/services/recall-calendar-recording-overview.ts",
+      "apps/web/lib/services/recall-calendar-recording-detail-helpers.ts",
+      "apps/web/lib/recall-ai/recording-duration.ts",
+      "apps/web/lib/services/recall-calendar-recording-service.ts",
+      "apps/web/lib/services/recall-calendar-recording-overview-stats.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-13535",
+    "project": null,
+    "ticketPaths": ["apps/web/app/api/webhooks/recall-bot/route.ts"],
+    "files": [
+      "apps/web/lib/services/recall-calendar-recording-service.ts",
+      "apps/web/lib/recall-ai/bot-attempt.ts",
+      "apps/web/lib/recall-ai/bot-attempt-store.ts",
+      "apps/web/lib/recall-ai/verify-bot-attempt.ts",
+      "apps/web/app/api/webhooks/recall-recording/route.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-13537",
+    "project": null,
+    "ticketPaths": [
+      "apps/web/app/api/webhooks/recall-recording/route.ts",
+      "apps/web/lib/services/recall-calendar-recording-service.ts"
+    ],
+    "files": [
+      "apps/web/lib/services/recall-recording-recovery.ts",
+      "apps/web/lib/services/recall-calendar-recording-service.ts",
+      "apps/web/app/api/webhooks/recall-recording/route.ts",
+      "apps/web/lib/crm/meeting-presentation.ts",
+      "apps/web/components/crm/intelligence/meeting-recording-video-panel.tsx"
+    ]
+  },
+  {
+    "ticket": "ENG-13541",
+    "project": "CRM",
+    "ticketPaths": [],
+    "files": [
+      "packages/db/migrations/20260907094542_eng_13541_mailbox_workspace_binding_backfill.sql"
+    ]
+  },
+  {
+    "ticket": "ENG-13542",
+    "project": "CRM",
+    "ticketPaths": [],
+    "files": [
+      "apps/web/lib/integrations/email/mailbox-availability.ts",
+      "apps/web/components/ai-sdr/email-composer.tsx",
+      "apps/web/components/crm/email-composer-modal.tsx",
+      "apps/web/trpc/routers/integrations/email-calendar.ts",
+      "apps/web/lib/integrations/email/user-email-accounts.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-13553",
+    "project": null,
+    "ticketPaths": [],
+    "files": [
+      "apps/web/hooks/use-floor-command-reporting-view-selection-controller.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-13566",
+    "project": "Whitelabel Partners",
+    "ticketPaths": [],
+    "files": [
+      "apps/web/components/website-builder/preview-panel.tsx",
+      "apps/web/components/ai-website-creator/preview/preview-area.tsx"
+    ]
+  },
+  {
+    "ticket": "ENG-13599",
+    "project": null,
+    "ticketPaths": [],
+    "files": [
+      "apps/web/trpc/routers/appointments.ts",
+      "apps/web/components/user/reveal-external-events-setting.tsx"
+    ]
+  },
+  {
+    "ticket": "ENG-13605",
+    "project": "CRM",
+    "ticketPaths": [],
+    "files": [
+      "apps/web/scripts/repair-crm-contract-values.ts",
+      "apps/web/lib/crm-payments/services/contract-values.ts",
+      "packages/db/src/schema-support/crm-payment-contract.ts",
+      "apps/web/lib/crm/my-day-closer-scoreboard-service.ts",
+      "apps/web/lib/crm-payments/services/repair-payment-match-operations.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-13616",
+    "project": "CRM",
+    "ticketPaths": [],
+    "files": [
+      "apps/web/lib/services/recall-bot-webhook-ownership.ts",
+      "apps/web/app/api/webhooks/recall-recording/route.ts",
+      "apps/web/lib/services/recall-bot-cleanup-service.ts",
+      "apps/web/lib/services/recall-calendar-recording-service.ts",
+      "apps/web/app/api/webhooks/recall-bot/route.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-13617",
+    "project": "CRM",
+    "ticketPaths": [],
+    "files": [
+      "apps/web/lib/services/recall-calendar-recording-service.ts",
+      "apps/web/lib/inngest/functions/intelligence/reconcile-recall-provider-schedule.ts",
+      "apps/web/lib/inngest/functions/intelligence/register-recall-bot-cleanup.ts",
+      "apps/web/lib/integrations/mailbox-workspace-binding-service.ts",
+      "packages/jobs/src/events.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-13618",
+    "project": "CRM",
+    "ticketPaths": [],
+    "files": [
+      "apps/web/lib/services/recall-calendar-recording-service.ts",
+      "apps/web/lib/services/recall-bot-cleanup-service.ts",
+      "apps/web/lib/scheduling/services/calendar-sync-service.ts",
+      "apps/web/lib/inngest/functions/intelligence/finish-deferred-recall-recording-cancellation.ts",
+      "apps/web/lib/integrations/mailbox-workspace-binding-service.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-13632",
+    "project": null,
+    "ticketPaths": [
+      "apps/web/tests/lib/public-api/operation-dispatch-sweeper-repository-db.test.ts",
+      "packages/db/src/repositories/public-api-operation-repository.ts"
+    ],
+    "files": ["packages/db/src/repositories/public-api-operation-repository.ts"]
+  },
+  {
+    "ticket": "ENG-13643",
+    "project": "Core Platform",
+    "ticketPaths": [],
+    "files": ["apps/web/lib/onboarding/finalize-onboarding.ts"]
+  },
+  {
+    "ticket": "ENG-13656",
+    "project": "CRM",
+    "ticketPaths": [],
+    "files": [
+      "apps/web/hooks/use-twilio-device-lifecycle.ts",
+      "apps/web/hooks/use-twilio-device.tsx",
+      "apps/web/hooks/use-incoming-registration.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-13667",
+    "project": "CRM",
+    "ticketPaths": [],
+    "files": [
+      "apps/web/trpc/routers/crm/deal.ts",
+      "apps/web/trpc/routers/crm/company.ts",
+      "apps/web/trpc/routers/crm/contact.ts",
+      "apps/web/lib/services/crm-event-service.ts",
+      "apps/web/trpc/routers/crm/task.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-13682",
+    "project": "CRM",
+    "ticketPaths": [
+      "apps/web/lib/crm/floor-command/rep-activity-service.ts",
+      "apps/web/lib/crm/my-day-call-scoreboard-service.ts",
+      "apps/web/lib/dashboard/calls-widget-source-query-adapter.ts",
+      "apps/web/lib/voice/call-timing.ts"
+    ],
+    "files": [
+      "apps/web/components/crm/my-day/floor-command-financial-scope-control.tsx",
+      "apps/web/lib/crm/my-day-call-scoreboard-service.ts",
+      "apps/web/lib/crm/floor-command/rep-activity-service.ts",
+      "apps/web/lib/crm/floor-command/sdr-report.ts",
+      "apps/web/components/crm/my-day/floor-command-setup-controls.tsx"
+    ]
+  },
+  {
+    "ticket": "ENG-13683",
+    "project": "CRM",
+    "ticketPaths": [
+      "apps/web/app/api/voice/answer/route.ts",
+      "apps/web/app/api/voice/status/route.ts",
+      "apps/web/lib/crm/my-day-call-scoreboard-service.ts",
+      "apps/web/lib/services/twilio.ts",
+      "apps/web/lib/voice/call-disposition.ts"
+    ],
+    "files": [
+      "apps/web/trpc/routers/crm/floor-command.ts",
+      "apps/web/trpc/routers/crm/floor-command-metric-detail.ts",
+      "apps/web/lib/crm/floor-command/call-metric-detail-service.ts",
+      "apps/web/lib/voice/answer-detection-service.ts",
+      "apps/web/components/voice/answer-detection-setting.tsx"
+    ]
+  },
+  {
+    "ticket": "ENG-13701",
+    "project": "CRM",
+    "ticketPaths": ["apps/web/components/crm/my-day/manager-metrics-grid.tsx"],
+    "files": [
+      "apps/web/components/crm-v2/floor-command/screen/use-floor-view-model.ts",
+      "apps/web/components/crm-v2/floor-command/metric-card.tsx",
+      "apps/web/components/crm-v2/floor-command/model/card-model.ts",
+      "apps/web/lib/crm/floor-command/closer-credit-cash.ts",
+      "apps/web/lib/crm/floor-command/rate-service.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-13718",
+    "project": "CRM",
+    "ticketPaths": [],
+    "files": ["apps/web/lib/crm-payments/providers/whop/catalog-reader.ts"]
+  },
+  {
+    "ticket": "ENG-13720",
+    "project": "AI SDR Core",
+    "ticketPaths": [
+      "apps/web/lib/ai-sdr-v2/workflow/helpers/track-step.ts",
+      "apps/web/lib/ai-sdr-v2/workflow/steps/booking.ts",
+      "apps/web/lib/ai-sdr-v2/workflow/steps/offer-alternatives.ts",
+      "apps/web/lib/scheduling/services/booking-service.ts",
+      "apps/web/lib/scheduling/services/slot-generator.ts"
+    ],
+    "files": [
+      "apps/web/lib/scheduling/services/booking-service.ts",
+      "apps/web/lib/ai-sdr-v2/workflow/steps/booking.ts",
+      "apps/web/lib/ai-sdr-v2/workflow/helpers/track-step.ts",
+      "apps/web/lib/scheduling/repositories/appointment-repository.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-13723",
+    "project": null,
+    "ticketPaths": [],
+    "files": [
+      "apps/web/app/api/webhooks/whop/[partnerId]/route.ts",
+      "apps/web/app/api/partner/customer-lifecycle/route.ts",
+      "apps/web/app/api/partner/user/provisioning/route.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-13750",
+    "project": "CRM",
+    "ticketPaths": [],
+    "files": [
+      "apps/web/lib/integrations/mailbox-workspace-binding-service.ts",
+      "apps/web/trpc/routers/integrations/email-calendar.ts",
+      "apps/web/lib/services/email-thread-sync-service.ts",
+      "apps/web/lib/services/scheduled-message/schedule-email.ts",
+      "apps/web/lib/integrations/email/user-email-accounts.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-13771",
+    "project": "CRM",
+    "ticketPaths": [],
+    "files": [
+      "apps/web/lib/inngest/functions/crm/overdue-task-delivery.ts",
+      "apps/web/lib/inngest/functions/crm/check-overdue-tasks.ts",
+      "apps/web/lib/outreach/db/escalation-metadata.ts",
+      "apps/web/lib/auth/invitation-revocation.ts",
+      "apps/web/lib/services/novu.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-13823",
+    "project": "Whitelabel Partners",
+    "ticketPaths": [
+      "apps/ls8uffkp/conversations/215475926659783",
+      "apps/ls8uffkp/conversations/215475926659783]("
+    ],
+    "files": [
+      "apps/web/lib/billing/providers/whop/workspace-subscriptions.ts",
+      "apps/web/lib/onboarding/onboarding-plan-presentation.server.ts",
+      "apps/web/components/onboarding/onboarding-screens.tsx"
+    ]
+  },
+  {
+    "ticket": "ENG-13851",
+    "project": "CRM",
+    "ticketPaths": [],
+    "files": [
+      "apps/web/lib/services/inbound-sendblue-message-processor.ts",
+      "apps/web/lib/services/sendblue-sms-status.ts",
+      "apps/web/lib/services/outbound-sms-thread.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-13874",
+    "project": "Core Platform",
+    "ticketPaths": [],
+    "files": [
+      "apps/web/lib/integrations/conferencing/zoom-video-api-service.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-13877",
+    "project": "CRM",
+    "ticketPaths": [
+      "apps/web/tests/lib/crm/conversation-list-performance-db.test.ts",
+      "packages/db/src/repositories/canonical-communication-call-query.ts",
+      "packages/db/src/repositories/conversation-list-snapshot-query.ts"
+    ],
+    "files": [
+      "packages/db/src/repositories/canonical-communication-call-query.ts",
+      "packages/db/src/repositories/conversation-list-call-query.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-13878",
+    "project": "Billing",
+    "ticketPaths": [
+      "apps/web/lib/billing/subscription-cancellation-safety.ts",
+      "apps/web/tests/lib/billing/subscription-cancellation-safety.test.ts"
+    ],
+    "files": []
+  },
+  {
+    "ticket": "ENG-13885",
+    "project": "Dev Ops",
+    "ticketPaths": [],
+    "files": [
+      ".github/scripts/production-migrate.ts",
+      ".github/scripts/production-migration-plan.ts",
+      ".github/scripts/check-migration-compatibility.ts",
+      ".github/workflows/deploy-production.yml",
+      ".github/workflows/migration-compatibility.yml"
+    ]
+  },
+  {
+    "ticket": "ENG-13886",
+    "project": null,
+    "ticketPaths": [],
+    "files": [
+      "apps/web/lib/inngest/functions/campaign/process-lead-status-updates.ts",
+      "apps/web/lib/outreach/db/campaign.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-13943",
+    "project": "CRM",
+    "ticketPaths": [],
+    "files": [
+      "apps/web/lib/crm/floor-command/contract-payments.ts",
+      "apps/web/lib/crm/my-day-closer-scoreboard-service.ts",
+      "apps/web/hooks/use-my-day-manager-view.ts",
+      "packages/db/src/repositories/crm-floor-command-cash-report-repository.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-13977",
+    "project": "CRM",
+    "ticketPaths": [],
+    "files": [
+      "apps/web/lib/services/gmail-crm-thread-match.ts",
+      "apps/web/lib/services/gmail-message-page.ts",
+      "apps/web/lib/services/gmail-address-index.ts",
+      "apps/web/lib/inngest/functions/integrations/gmail-initial-import.ts",
+      "packages/db/src/repositories/company-repository.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-14014",
+    "project": null,
+    "ticketPaths": [
+      "apps/web/.test-db-info.json",
+      "apps/web/tests/support/setup-db-url.ts",
+      "apps/web/tests/support/setup-db.ts"
+    ],
+    "files": []
+  },
+  {
+    "ticket": "ENG-14020",
+    "project": "Whitelabel Partners",
+    "ticketPaths": [],
+    "files": [
+      "apps/web/lib/whop/order-plan-payments.ts",
+      "apps/web/app/api/webhooks/whop/[partnerId]/route.ts",
+      "apps/web/lib/whop/order-plan.ts",
+      "apps/web/lib/website/domain-marketplace/purchase-availability.ts",
+      "apps/web/lib/billing/refused-order-checkout.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-14034",
+    "project": "CRM",
+    "ticketPaths": [
+      "apps/web/lib/integrations/mailbox-workspace-binding-service.ts",
+      "apps/web/trpc/routers/integrations/email-calendar.ts"
+    ],
+    "files": [
+      "apps/web/lib/services/gmail-sync-disconnect.ts",
+      "apps/web/lib/integrations/mailbox-workspace-binding-service.ts",
+      "apps/web/trpc/routers/organizations.ts",
+      "apps/web/trpc/routers/integrations/email-calendar.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-14046",
+    "project": "CRM",
+    "ticketPaths": [],
+    "files": [
+      "apps/web/lib/outreach/db/outlook-conversation-resolution.ts",
+      "apps/web/lib/services/outlook-message-page.ts",
+      "apps/web/lib/integrations/email/outlook-mail-sync-service.ts",
+      "apps/web/lib/services/recall-recording-sync-exclusion.ts",
+      "apps/web/lib/services/recall-calendar-recording-service.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-14087",
+    "project": "Cold Email Core",
+    "ticketPaths": [],
+    "files": [
+      "apps/web/lib/outreach/db/webhook-events.ts",
+      "apps/web/lib/inngest/functions/campaign/process-campaign-metric-update.ts",
+      "apps/web/lib/inngest/functions/campaign/process-campaign-webhooks.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-14093",
+    "project": null,
+    "ticketPaths": [],
+    "files": [
+      "apps/web/lib/utils/organization.ts",
+      "apps/web/lib/email/services/announcement-email.ts",
+      "apps/web/lib/inngest/functions/crm/overdue-task-delivery.ts",
+      "apps/web/lib/partner/resolve.ts",
+      "apps/web/lib/scheduling/services/booking-service.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-14112",
+    "project": "CRM",
+    "ticketPaths": [],
+    "files": [
+      "apps/web/lib/services/gmail-live-sync-service.ts",
+      "apps/web/lib/services/gmail-initial-import-service.ts",
+      "apps/web/lib/inngest/functions/integrations/gmail-sync-activate.ts",
+      "apps/web/lib/services/gmail-sync-health.ts",
+      "apps/web/lib/integrations/email/gmail-api-error.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-14117",
+    "project": null,
+    "ticketPaths": [
+      "apps/web/components/ui/context-menu.tsx",
+      "apps/web/components/ui/dropdown-menu.tsx",
+      "apps/web/tests/components/ui/dropdown-menu.test.tsx"
+    ],
+    "files": [
+      "apps/web/components/ui/dropdown-menu.tsx",
+      "apps/web/components/ui/context-menu.tsx"
+    ]
+  },
+  {
+    "ticket": "ENG-14123",
+    "project": "CRM",
+    "ticketPaths": [
+      "apps/web/lib/crm/floor-command/closer-assignment-service.ts",
+      "apps/web/lib/crm/floor-command/unattributed-cash-service.ts",
+      "apps/web/lib/crm/payment-detail-fields.ts",
+      "packages/db/src/queries/crm-payment-seller-attribution.ts",
+      "packages/db/src/repositories/crm-floor-command-cash-report-builder.ts",
+      "packages/db/src/repositories/crm-floor-command-cash-report-repository.ts",
+      "packages/db/src/repositories/crm-payment-repository.ts"
+    ],
+    "files": [
+      "apps/web/lib/crm/floor-command/closer-assignment-service.ts",
+      "apps/web/components/crm/payments/change-payment-closer-dialog.tsx",
+      "apps/web/trpc/routers/crm/payments.ts",
+      "packages/db/src/repositories/crm-floor-command-cash-report-builder.ts",
+      "packages/db/src/queries/crm-payment-seller-attribution.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-14125",
+    "project": null,
+    "ticketPaths": [],
+    "files": [
+      "apps/web/hooks/use-novu-unread-count.tsx",
+      "apps/web/components/notifications/notification-panel.tsx"
+    ]
+  },
+  {
+    "ticket": "ENG-14126",
+    "project": null,
+    "ticketPaths": [],
+    "files": [
+      "apps/web/app/(saas)/dashboard/(sidebar)/partner-admin/emails/page.tsx",
+      "packages/mail/src/service.ts",
+      "apps/web/trpc/routers/partner-admin.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-14148",
+    "project": "CRM",
+    "ticketPaths": [
+      "apps/web/components/crm/my-day/floor-command-setup-draft.ts"
+    ],
+    "files": [
+      "apps/web/components/crm/my-day/floor-command-setup-draft.ts",
+      "apps/web/components/crm/my-day/use-floor-command-setup-dialog-controller.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-14177",
+    "project": "CRM",
+    "ticketPaths": [
+      "apps/web/lib/crm-payments/services/cash-purchase-origin.ts",
+      "packages/db/migrations/20260915182729_cash_categories.sql",
+      "packages/db/src/schema-support/crm-floor-command-cash.ts"
+    ],
+    "files": [
+      "packages/db/src/repositories/crm-floor-command-cash-report-repository.ts",
+      "apps/web/components/crm/payments/product-cash-mapping.tsx",
+      "apps/web/components/crm/payments/product-catalog-row.tsx",
+      "apps/web/lib/crm-payments/services/cash-categories.ts",
+      "packages/db/src/schema-support/crm-floor-command-cash.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-14179",
+    "project": "CRM",
+    "ticketPaths": ["packages/db/src/schema-support/crm-floor-command-cash.ts"],
+    "files": [
+      "apps/web/lib/crm/floor-command/report-context.ts",
+      "packages/db/src/repositories/crm-floor-command-cash-report-repository.ts",
+      "apps/web/components/crm-v2/floor-command/setup/view-setup-scope-tab.tsx",
+      "apps/web/components/crm/my-day/floor-command-reporting-view-cash-total.tsx",
+      "apps/web/lib/crm/floor-command/cash-roster-scope.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-14181",
+    "project": "CRM",
+    "ticketPaths": [],
+    "files": [
+      "apps/web/lib/workflows/codegen-registry.ts",
+      "apps/web/plugins/workflows/crm/steps/update-deal-stage.ts",
+      "apps/web/plugins/workflows/crm/index.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-14207",
+    "project": "CRM",
+    "ticketPaths": [],
+    "files": ["apps/web/lib/billing/phone-call-funding/forwarding.ts"]
+  },
+  {
+    "ticket": "ENG-14208",
+    "project": "AI SDR Escalation & Classification",
+    "ticketPaths": [
+      "apps/web/lib/ai-sdr-v2/helpers/copy-review-policy.ts",
+      "apps/web/lib/ai-sdr-v2/workflow/helpers/context-pack-helpers/reply-directive.ts",
+      "apps/web/lib/ai-sdr-v2/workflow/helpers/context-pack.ts",
+      "apps/web/lib/ai-sdr-v2/workflow/helpers/copywriter-with-review.ts",
+      "apps/web/lib/ai-sdr-v2/workflow/workflow.ts"
+    ],
+    "files": [
+      "apps/web/lib/ai-sdr-v2/workflow/helpers/append-time-offer.ts",
+      "apps/web/lib/ai-sdr-v2/workflow/helpers/context-pack-helpers/reply-directive.ts",
+      "apps/web/lib/ai-sdr-v2/workflow/steps/knowledge-analysis.ts",
+      "apps/web/lib/ai-sdr-v2/workflow/steps/objection-handling.ts",
+      ".github/scripts/check-dev-type-startup.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-14242",
+    "project": "CRM",
+    "ticketPaths": [],
+    "files": [
+      "apps/web/lib/scheduling/services/calendar-booking-deal-link.ts",
+      "apps/web/scripts/eng14242-restamp-host-owned-booking-deals.ts",
+      "apps/web/lib/inngest/functions/calendar/link-calendar-booking-deal.ts",
+      "apps/web/lib/crm/appointment-crm-relationship-resolver.ts",
+      "apps/web/lib/crm/appointment-crm-relationship-utils.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-14246",
+    "project": "CRM",
+    "ticketPaths": [],
+    "files": [
+      "apps/web/lib/services/crm-deal-contact-link-events.ts",
+      "apps/web/plugins/workflows/crm/steps/creation-event-utils.ts",
+      "apps/web/trpc/routers/crm/deal.ts",
+      "packages/db/src/repositories/crm-relationship-command-repository.ts",
+      "apps/web/lib/services/crm-sync/sync-thread-to-crm.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-14289",
+    "project": "CRM",
+    "ticketPaths": [],
+    "files": [
+      "apps/web/hooks/use-sms-delivery-overlay.ts",
+      "apps/web/lib/crm/sms-delivery-refresh.ts",
+      "apps/web/components/crm-v2/conversations/use-live-delivery-view.ts",
+      "apps/web/components/crm-v2/conversations/conversation-thread-pane.tsx",
+      "packages/db/src/schema-support/crm-sms-delivery-status.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-14326",
+    "project": "CRM",
+    "ticketPaths": [
+      "apps/web/tests/lib/notifications/notification-state-projection-qa-db.test.ts",
+      "apps/web/tests/lib/notifications/notification-state-projection-worker-db.test.ts"
+    ],
+    "files": []
+  },
+  {
+    "ticket": "ENG-14358",
+    "project": "CRM",
+    "ticketPaths": [],
+    "files": [
+      "apps/web/trpc/routers/crm/contact.ts",
+      "apps/web/lib/crm/contact-dnc.ts",
+      "apps/web/components/crm/contact-record/contact-meta/details/contact-dnc-property.tsx",
+      "apps/web/components/crm/contact-record/dnc-removal-modal.tsx",
+      "apps/web/lib/services/dnc-service.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-14360",
+    "project": "CRM",
+    "ticketPaths": [],
+    "files": [
+      "apps/web/lib/crm-payments/services/manual-payments.ts",
+      "packages/db/src/schema-support/crm-payment-manual-provenance.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-14382",
+    "project": "Core Platform",
+    "ticketPaths": [],
+    "files": [
+      "apps/web/scripts/typecheck-task.ts",
+      "apps/web/scripts/build-trpc-types.ts",
+      "turbo.json",
+      "apps/web/package.json",
+      ".github/scripts/benchmark-typechecks.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-14383",
+    "project": "Core Platform",
+    "ticketPaths": [],
+    "files": [
+      ".github/scripts/check-declaration-cache.ts",
+      "apps/web/scripts/trpc-declaration-cache.ts",
+      "apps/web/scripts/build-trpc-types.ts",
+      ".github/scripts/check-web-typecheck-cache.ts",
+      "apps/web/scripts/typecheck-task.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-14398",
+    "project": "CRM",
+    "ticketPaths": [],
+    "files": [
+      "apps/web/lib/crm/record-search-relations.ts",
+      "apps/web/lib/crm/record-search-custom-fields.ts",
+      "apps/web/lib/crm/record-search.ts",
+      "apps/web/lib/crm/sample-record-search.ts",
+      "apps/web/components/crm/deal/deals-kanban.tsx"
+    ]
+  },
+  {
+    "ticket": "ENG-14404",
+    "project": "CRM",
+    "ticketPaths": [],
+    "files": [
+      "apps/web/lib/crm/absolute-date-rule-plan.ts",
+      "apps/web/scripts/audit-crm-date-filters.ts",
+      "apps/web/lib/crm/activity-rule-plan.ts",
+      "apps/web/scripts/lib/date-filter-impact.ts",
+      "apps/web/lib/crm/absolute-date-plan.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-14405",
+    "project": "CRM",
+    "ticketPaths": [],
+    "files": [
+      "apps/web/hooks/use-clock-filter-refresh.ts",
+      "apps/web/lib/crm/call-history-fields.ts",
+      "apps/web/lib/crm/call-date-rule-plan.ts",
+      "apps/web/lib/crm/sample-call-filters.ts",
+      "apps/web/lib/crm/deal-export.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-14448",
+    "project": "Core Platform",
+    "ticketPaths": [],
+    "files": [
+      "packages/db/src/repositories/activity-timeline-repository.ts",
+      "packages/db/src/repositories/millisecond-keyset.ts",
+      "apps/api/src/repositories/public-api-search.ts",
+      "packages/db/src/repositories/dnc-repository.ts",
+      "packages/db/src/repositories/activity-repository.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-14456",
+    "project": "CRM",
+    "ticketPaths": [],
+    "files": [
+      "apps/web/lib/crm/conversation-inbox-state-parity.ts",
+      "packages/db/src/repositories/conversation-inbox-state-list-query.ts",
+      "packages/db/src/repositories/conversation-inbox-state-read-path-repository.ts",
+      "packages/db/src/repositories/conversation-inbox-state-rebuild-repository.ts",
+      "packages/db/src/repositories/conversation-inbox-state-rebuild-query.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-14461",
+    "project": "CRM",
+    "ticketPaths": [],
+    "files": [
+      "packages/db/src/schema-support/crm-payment-contract.ts",
+      "apps/web/lib/crm-payments/services/contract-values.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-14475",
+    "project": "Cold Email Core",
+    "ticketPaths": [],
+    "files": [
+      "apps/web/lib/inngest/functions/campaign/process-campaign-creator.ts",
+      "apps/web/lib/services/early-lead-scrape-submission.ts",
+      "apps/web/lib/services/campaign-creator.ts",
+      "apps/web/hooks/campaign/use-get-campaign.ts",
+      "apps/web/lib/services/lead-scrape-service.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-14477",
+    "project": null,
+    "ticketPaths": [],
+    "files": [
+      "apps/web/lib/inngest/functions/campaign/util/campaign-generation-settings.ts",
+      "apps/web/lib/inngest/functions/campaign/process-campaign-creator.ts",
+      "apps/web/lib/inngest/functions/campaign/util/campaign-decision-analysis.ts",
+      "apps/web/lib/outreach/campaign-niche-intent.ts",
+      "apps/web/lib/prompts/cold-email-research.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-14503",
+    "project": "CRM",
+    "ticketPaths": [],
+    "files": [
+      "apps/web/lib/crm/contact-export.ts",
+      "apps/web/lib/crm/company-export.ts",
+      "apps/web/lib/crm/deal-export.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-14504",
+    "project": "CRM",
+    "ticketPaths": [],
+    "files": [
+      "apps/web/lib/crm/appointment-scope.ts",
+      "apps/web/lib/crm/appointment-export.ts",
+      "apps/web/trpc/routers/appointments.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-14562",
+    "project": "CRM",
+    "ticketPaths": [],
+    "files": [
+      "apps/web/components/crm/my-day/action-queue-section.tsx",
+      "apps/web/lib/crm/floor-command/my-day-view-roster.ts",
+      "apps/web/lib/crm/floor-command/view-access.ts",
+      "apps/web/hooks/use-my-day-deal-stage-actions.ts",
+      "apps/web/components/crm/my-day/outcome-prompts-section.tsx"
+    ]
+  },
+  {
+    "ticket": "ENG-14572",
+    "project": "CRM",
+    "ticketPaths": [
+      "apps/web/lib/inngest/functions/notifications/backfill-legacy-novu-receipts.ts",
+      "apps/web/lib/notifications/provider/novu-legacy-messages.ts"
+    ],
+    "files": [
+      "apps/web/lib/notifications/personal/legacy-backfill-failure.ts",
+      "apps/web/lib/notifications/provider/novu-legacy-messages.ts",
+      "apps/web/lib/inngest/functions/notifications/backfill-legacy-novu-receipts.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-14581",
+    "project": "CRM",
+    "ticketPaths": [],
+    "files": [
+      "apps/web/lib/services/scheduled-message/list.ts",
+      "apps/web/lib/services/scheduled-message/list-for-person.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-14593",
+    "project": "CRM",
+    "ticketPaths": [
+      "apps/web/components/crm-v2/conversations/composer-text.tsx",
+      "apps/web/components/crm-v2/record/record-composer.tsx",
+      "apps/web/hooks/use-contact-sms-consent.ts"
+    ],
+    "files": [
+      "apps/web/components/crm/shared/contact-sms-consent-notice.tsx",
+      "apps/web/hooks/use-contact-sms-consent.ts",
+      "apps/web/components/crm-v2/conversations/composer-text.tsx",
+      "apps/web/components/crm/contact-record/contact-tabs/calls/index.tsx",
+      "apps/web/hooks/use-contact-sms-composer.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-14595",
+    "project": "CRM",
+    "ticketPaths": [
+      "apps/web/app/(saas)/dashboard/(sidebar)/[organizationSlug]/crm/appointments/page.tsx",
+      "apps/web/components/crm-v2/meetings/schedule/calendar-rail.tsx",
+      "apps/web/trpc/query-client.ts",
+      "apps/web/trpc/routers/appointments.ts"
+    ],
+    "files": [
+      "apps/web/components/crm-v2/meetings/schedule/team-calendars.tsx",
+      "apps/web/trpc/routers/appointments.ts",
+      "apps/web/hooks/use-calendar-filters.ts",
+      "apps/web/lib/scheduling/calendar-filter-sources.ts",
+      "apps/web/components/crm-v2/meetings/schedule/calendar-rail.tsx"
+    ]
+  },
+  {
+    "ticket": "ENG-14599",
+    "project": "CRM",
+    "ticketPaths": [
+      "apps/web/lib/crm/contact-phone-lookup.ts",
+      "apps/web/lib/crm/conversation-list-cursor.ts",
+      "apps/web/lib/crm/record-search-relations.ts",
+      "apps/web/lib/crm/record-search.ts",
+      "apps/web/trpc/routers/crm/contact.ts",
+      "packages/db/src/repositories/conversation-list-context-query.ts"
+    ],
+    "files": [
+      "packages/db/src/repositories/conversation-list-context-query.ts",
+      "packages/db/src/repositories/conversation-person-search-call-scope.ts",
+      "apps/web/components/crm-v2/conversations/conversations-list-pane.tsx",
+      "packages/db/src/schema/crm.ts",
+      "packages/db/migrations/20261002085128_quiet_sugar_man.sql"
+    ]
+  },
+  {
+    "ticket": "ENG-14601",
+    "project": "CRM",
+    "ticketPaths": [],
+    "files": [
+      "packages/db/src/repositories/conversation-inbox-state-list-query.ts",
+      "apps/web/lib/crm/conversation-latest-sender.ts",
+      "packages/db/src/repositories/conversation-automated-email.test-support.ts",
+      "packages/db/src/repositories/conversation-automated-email.ts",
+      "packages/db/src/repositories/conversation-inbox-state-rebuild-query.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-14603",
+    "project": "CRM",
+    "ticketPaths": ["apps/web/lib/crm/my-day-team-members-service.ts"],
+    "files": ["apps/web/lib/crm/my-day-team-members-service.ts"]
+  },
+  {
+    "ticket": "ENG-14624",
+    "project": "CRM",
+    "ticketPaths": [
+      "apps/web/lib/notifications/provider/novu-legacy-messages.ts"
+    ],
+    "files": ["apps/web/lib/notifications/provider/novu-legacy-messages.ts"]
+  },
+  {
+    "ticket": "ENG-14625",
+    "project": "CRM",
+    "ticketPaths": [
+      "apps/web/lib/notifications/personal/legacy-receipt-match.ts",
+      "packages/db/src/repositories/legacy-receipt-candidate-repository.ts"
+    ],
+    "files": [
+      "packages/db/src/repositories/legacy-receipt-candidate-repository.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-14627",
+    "project": "CRM",
+    "ticketPaths": [
+      "apps/web/plugins/workflows/crm/steps/contact-write-utils.ts",
+      "apps/web/plugins/workflows/crm/steps/upsert-contact.ts",
+      "packages/db/src/phone-number-normalization.ts"
+    ],
+    "files": [
+      "packages/db/src/phone-number-normalization.ts",
+      "apps/web/lib/workflows/codegen-registry.ts",
+      "apps/web/plugins/workflows/crm/steps/upsert-contact.ts",
+      "packages/db/src/repositories/crm-person-identity-repository.ts",
+      "packages/db/src/repositories/crm-contact-data-repository.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-14640",
+    "project": "CRM",
+    "ticketPaths": [],
+    "files": [
+      "apps/web/lib/crm/view-save-rules.ts",
+      "apps/web/lib/crm/advanced-query-builder.ts",
+      "apps/web/lib/crm/objects/stored-view-access.ts",
+      "apps/web/trpc/routers/crm/views.ts",
+      "apps/web/lib/crm/view-field-keys.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-14652",
+    "project": "CRM",
+    "ticketPaths": [],
+    "files": [
+      "apps/web/trpc/routers/crm/deal.ts",
+      "apps/web/trpc/routers/partner-users.ts",
+      "apps/web/trpc/routers/admin/admin-organizations.ts",
+      "apps/web/trpc/routers/admin/admin-users.ts",
+      "apps/web/lib/services/inbound-sendblue-message-processor.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-14654",
+    "project": "CRM",
+    "ticketPaths": [
+      "apps/web/lib/notifications/provider/inbound-text-novu-workflow.ts"
+    ],
+    "files": [
+      "apps/web/lib/notifications/provider/inbound-text-novu-workflow.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-14655",
+    "project": "Domains & Inboxes",
+    "ticketPaths": [],
+    "files": [
+      "apps/web/lib/billing/providers/autumn/managed-domain-cancellation.ts",
+      "apps/web/lib/billing/providers/autumn/domain-entitlement.ts",
+      "apps/web/lib/billing/providers/autumn/client.ts",
+      "apps/web/lib/billing/email-management.ts",
+      "apps/web/lib/billing/providers/autumn/subscription-ids.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-14693",
+    "project": "Core Platform",
+    "ticketPaths": [],
+    "files": [
+      "apps/web/scripts/build-trpc-types.ts",
+      "apps/web/lib/integrations/google/oauth-client.ts",
+      "apps/web/trpc/init.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-14709",
+    "project": "CRM",
+    "ticketPaths": [
+      "apps/web/lib/notifications/personal/legacy-history-rules.ts",
+      "apps/web/lib/notifications/provider/novu-legacy-messages.ts"
+    ],
+    "files": [
+      "apps/web/lib/notifications/personal/legacy-receipt-writes.ts",
+      "apps/web/lib/notifications/provider/novu-legacy-messages.ts",
+      "apps/web/lib/notifications/personal/legacy-history-rules.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-14711",
+    "project": "CRM",
+    "ticketPaths": ["apps/web/trpc/routers/crm/deal.ts"],
+    "files": [
+      "apps/web/trpc/routers/crm/deal.ts",
+      "apps/web/lib/workflows/codegen-registry.ts",
+      "apps/web/plugins/workflows/crm/steps/update-deal.ts",
+      "apps/web/plugins/workflows/crm/steps/upsert-deal.ts",
+      "apps/web/plugins/workflows/crm/steps/update-deal-stage.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-14712",
+    "project": "CRM",
+    "ticketPaths": [
+      "apps/web/lib/crm-payments/services/payment-auto-win-service.ts"
+    ],
+    "files": [
+      "packages/db/src/schema-support/crm-floor-command-cash.ts",
+      "apps/web/lib/crm-payments/services/payment-auto-win-policy.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-14713",
+    "project": "CRM",
+    "ticketPaths": [
+      "packages/db/src/queries/crm-floor-command-attribution.ts",
+      "packages/db/src/queries/crm-payment-seller-attribution.ts"
+    ],
+    "files": [
+      "packages/db/src/queries/crm-payment-seller-attribution.ts",
+      "packages/db/src/repositories/crm-floor-command-cash-row-classifier.ts",
+      "packages/db/src/repositories/crm-floor-command-cash-report-repository.ts",
+      "packages/db/src/repositories/crm-floor-command-cash-report-types.ts",
+      "packages/db/src/repositories/crm-payment-repository.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-14715",
+    "project": "CRM",
+    "ticketPaths": [],
+    "files": [
+      "apps/web/components/crm/payments/product-catalog-row.tsx",
+      "apps/web/lib/crm-payments/services/payment-category-overrides.ts",
+      "apps/web/lib/crm-payments/services/cash-categories.ts",
+      "apps/web/trpc/routers/crm/payments.ts",
+      "apps/web/components/crm-v2/settings/payments-history.tsx"
+    ]
+  },
+  {
+    "ticket": "ENG-14719",
+    "project": "CRM",
+    "ticketPaths": [
+      "apps/web/lib/calendly/client.ts",
+      "apps/web/lib/scheduling/services/booking-service.ts",
+      "apps/web/trpc/routers/appointments.ts"
+    ],
+    "files": [
+      "apps/web/lib/calendly/cancel-appointment.ts",
+      "apps/web/plugins/workflows/scheduling/lib/prepare-create-appointment-input.ts",
+      "apps/web/lib/calendly/booking-connection.ts",
+      "apps/web/lib/calendly/workspace-connection.ts",
+      "apps/web/lib/calendly/cancel-event.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-14729",
+    "project": "AI SDR Core",
+    "ticketPaths": [
+      "apps/web/lib/ai-sdr-v2/workflow/helpers/context-pack.ts",
+      "apps/web/lib/inngest/functions/outreach/campaign-leads-import.ts",
+      "apps/web/lib/outreach/db/campaign.ts",
+      "packages/db/src/repositories/campaign-lead-repository.ts"
+    ],
+    "files": ["apps/web/lib/ai-sdr-v2/workflow/helpers/context-pack.ts"]
+  },
+  {
+    "ticket": "ENG-14731",
+    "project": "AI SDR Inbox & UI",
+    "ticketPaths": [],
+    "files": [
+      "apps/web/lib/outreach/db/crm-message-thread-queries.ts",
+      "apps/web/lib/types/ai-sdr-v2-status.ts",
+      "apps/web/lib/outreach/db/campaign.ts",
+      "apps/web/components/ai-sdr/sample-data/constants.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-14738",
+    "project": "CRM",
+    "ticketPaths": [],
+    "files": [
+      "apps/web/lib/inngest/functions/crm/process-inbound-twilio-sms.ts",
+      "apps/web/lib/services/twilio-inbound-sms-event-state.ts",
+      "apps/web/lib/services/twilio-inbound-sms-event.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-14739",
+    "project": "AI SDR Core",
+    "ticketPaths": [
+      "apps/web/lib/ai-sdr-v2/workflow/helpers/record-decision.ts",
+      "apps/web/lib/ai-sdr-v2/workflow/steps/campaign-type-detection.ts",
+      "apps/web/lib/ai-sdr-v2/workflow/steps/cancel-existing-followups.ts",
+      "apps/web/lib/ai-sdr-v2/workflow/steps/followup.ts",
+      "apps/web/lib/ai-sdr-v2/workflow/steps/intent-classification.ts",
+      "apps/web/lib/ai-sdr-v2/workflow/steps/send-dry-email.ts"
+    ],
+    "files": [
+      "apps/web/lib/ai-sdr-v2/workflow/steps/cancel-existing-followups.ts",
+      "apps/web/lib/ai-sdr-v2/workflow/steps/followup.ts",
+      "apps/web/lib/ai-sdr-v2/workflow/steps/campaign-type-detection.ts",
+      "apps/web/lib/ai-sdr-v2/workflow/steps/intent-classification.ts",
+      "apps/web/lib/ai-sdr-v2/workflow/steps/send-dry-email.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-14765",
+    "project": "AI SDR Escalation & Classification",
+    "ticketPaths": [],
+    "files": [
+      "apps/web/lib/ai-sdr-v2/workflow/workflow.ts",
+      "apps/web/lib/ai-sdr-v2/workflow/steps/finalize.ts",
+      "apps/web/lib/ai-sdr-v2/workflow/steps/dnc-detection.ts",
+      "apps/web/lib/ai-sdr-v2/workflow/steps/dnc-constants.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-14780",
+    "project": "CRM",
+    "ticketPaths": [
+      "apps/web/lib/notifications/personal/legacy-backfill-blocking.ts",
+      "apps/web/lib/notifications/personal/legacy-history-rules.ts",
+      "apps/web/lib/notifications/provider/inbound-text-novu.ts",
+      "apps/web/lib/notifications/provider/novu-history-inventory.ts",
+      "apps/web/lib/notifications/provider/novu-list-budget.ts"
+    ],
+    "files": [
+      "apps/web/lib/notifications/personal/legacy-history-rules.ts",
+      "apps/web/lib/notifications/provider/novu-history-inventory.ts",
+      "apps/web/lib/notifications/personal/legacy-backfill-blocking.ts",
+      "apps/web/lib/notifications/provider/novu-state-adapter.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-14787",
+    "project": null,
+    "ticketPaths": [
+      ".github/workflows/claude-turbo-review.yml",
+      ".github/workflows/claude-turbo-review.yml](",
+      "packages/db/migrations/meta/"
+    ],
+    "files": [
+      ".claude/hooks/protect-files.sh",
+      ".claude/settings.json",
+      ".gitignore"
+    ]
+  },
+  {
+    "ticket": "ENG-14798",
+    "project": null,
+    "ticketPaths": [
+      "apps/web/app/globals.css",
+      "apps/web/components/ui/sidebar.tsx",
+      "apps/web/components/ui/sonner.tsx",
+      "apps/web/components/ui/tooltip.tsx"
+    ],
+    "files": [
+      "design-system/kit/src/components/ui/sonner.tsx",
+      "apps/web/components/ui/tooltip.tsx",
+      "design-system/kit/src/components/ui/tooltip.tsx",
+      "apps/web/app/globals.css",
+      "design-system/kit/src/screens/crm-shell.tsx"
+    ]
+  },
+  {
+    "ticket": "ENG-14803",
+    "project": "Core Platform",
+    "ticketPaths": [],
+    "files": [
+      "apps/web/scripts/watch-trpc-types.ts",
+      ".github/scripts/check-dev-type-startup.ts",
+      "apps/web/scripts/type-refresh-inputs.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-14804",
+    "project": null,
+    "ticketPaths": [
+      ".github/scripts/backfill-international-calling.ts",
+      ".github/scripts/backfill-international-calling.ts]("
+    ],
+    "files": [
+      "apps/web/lib/voice/international-calling-rollout.ts",
+      "apps/web/trpc/routers/voice-international-calling.ts",
+      ".github/scripts/backfill-international-calling.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-14806",
+    "project": null,
+    "ticketPaths": [],
+    "files": [
+      "apps/web/lib/voice/call-status-persistence.ts",
+      "packages/db/migrations/20261007183354_eng_14806_outbound_call_duration.sql",
+      "apps/web/lib/voice/call-timing.ts",
+      "apps/web/lib/crm/my-day-call-scoreboard-service.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-14819",
+    "project": "CRM",
+    "ticketPaths": [],
+    "files": [
+      "apps/web/lib/notifications/provider/novu-state-adapter.ts",
+      "apps/web/lib/notifications/provider/novu-history-inventory.ts",
+      "apps/web/lib/notifications/provider/state-projection-sweep.ts",
+      "apps/web/lib/notifications/provider/novu-list-budget.ts",
+      "apps/web/lib/notifications/personal/legacy-backfill-failure.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-14827",
+    "project": "Core Platform",
+    "ticketPaths": [],
+    "files": [
+      ".github/workflows/preview-cleanup.yml",
+      ".github/workflows/ci.yml",
+      "package.json"
+    ]
+  },
+  {
+    "ticket": "ENG-14828",
+    "project": "CRM",
+    "ticketPaths": [
+      "apps/web/lib/crm/floor-command/metric-query-filters.ts",
+      "apps/web/lib/crm/my-day-closer-scoreboard-service.ts",
+      "packages/db/src/queries/crm-floor-command-attribution.ts"
+    ],
+    "files": [
+      "packages/db/src/queries/crm-floor-command-attribution.ts",
+      "apps/web/lib/crm/floor-command/setter-report-service.ts",
+      "apps/web/lib/crm/my-day-closer-scoreboard-service.ts",
+      "packages/db/src/queries/crm-sale-history.ts",
+      "apps/web/lib/crm/floor-command/report-context.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-14863",
+    "project": null,
+    "ticketPaths": [
+      ".github/workflows/preview-cleanup.yml",
+      "apps/web/scripts/dump-preview-data.sh"
+    ],
+    "files": [
+      "apps/web/scripts/sync-docs-to-intercom.ts",
+      "apps/web/scripts/dump-preview-data.sh",
+      ".github/workflows/docs-fin-sync.yml",
+      ".github/workflows/refresh-neon-preview-base.yml",
+      ".github/workflows/preview-cleanup.yml"
+    ]
+  },
+  {
+    "ticket": "ENG-14875",
+    "project": "CRM",
+    "ticketPaths": [],
+    "files": [
+      "packages/db/src/repositories/conversation-inbox-state-list-query.ts",
+      "packages/db/src/repositories/conversation-inbox-state-read-path-repository.ts",
+      "apps/web/lib/crm/conversation-inbox-state-read-path.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-14883",
+    "project": null,
+    "ticketPaths": [],
+    "files": [
+      "apps/web/lib/crm/last-date-recompute.ts",
+      "apps/web/lib/inngest/functions/crm/last-date-recompute.ts",
+      "packages/db/src/database-operational-error.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-14907",
+    "project": "CRM",
+    "ticketPaths": [
+      "apps/web/lib/inngest/functions/calendar/polling-fallback.ts"
+    ],
+    "files": [
+      "apps/web/lib/inngest/functions/calendar/polling-cancellation-alert.ts",
+      "apps/web/lib/inngest/functions/calendar/polling-fallback.ts",
+      "apps/web/lib/inngest/functions/calendar/index.ts",
+      "apps/web/lib/inngest/functions/index.ts",
+      "packages/jobs/src/function-ids.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-14936",
+    "project": "Cold Email Leads",
+    "ticketPaths": [
+      "apps/web/lib/inngest/functions/campaign/util/campaign-analytics.ts",
+      "apps/web/lib/inngest/functions/outreach/campaign-import.ts",
+      "apps/web/lib/outreach/db/campaign.ts",
+      "apps/web/lib/outreach/db/campaign.ts](",
+      "packages/db/src/schema-support/lead-status-application-sql.ts"
+    ],
+    "files": [
+      "apps/web/lib/inngest/functions/campaign/process-campaign-duplicate.ts",
+      "apps/web/lib/outreach/db/campaign.ts",
+      "packages/db/src/schema-support/lead-status-semantics.ts",
+      "apps/web/lib/webhooks/outreach/shared-processor.ts",
+      "apps/web/lib/outreach/lead-status-rollout.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-14941",
+    "project": "Public API",
+    "ticketPaths": [
+      "apps/web/lib/inngest/functions/public-api/operation-dispatch-sweeper.ts"
+    ],
+    "files": [
+      "apps/web/lib/inngest/functions/public-api/operation-dispatch-sweeper.ts",
+      "packages/db/src/repositories/public-api-operation-repository.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-14974",
+    "project": "CRM",
+    "ticketPaths": [],
+    "files": [
+      "apps/web/lib/crm/record-search-index-maintenance.ts",
+      "apps/web/lib/inngest/functions/crm/record-search-index-build.ts",
+      "apps/web/lib/inngest/functions/crm/build-record-search-index.ts",
+      "apps/web/lib/inngest/functions/crm/rebuild-record-search-index-cron.ts",
+      "packages/jobs/src/events.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-14975",
+    "project": "CRM",
+    "ticketPaths": [],
+    "files": [
+      "apps/web/trpc/routers/crm/entities.ts",
+      "apps/web/lib/crm/record-search-phone.ts",
+      "apps/web/trpc/routers/crm/contact.ts",
+      "apps/web/components/crm/people-table.tsx",
+      "apps/web/lib/crm/list-search-timeout.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-14981",
+    "project": "Core Platform",
+    "ticketPaths": [],
+    "files": [".github/workflows/ci.yml"]
+  },
+  {
+    "ticket": "ENG-14984",
+    "project": "Public API",
+    "ticketPaths": [],
+    "files": [
+      "packages/db/src/repositories/public-api-operation-repository.ts",
+      "apps/web/lib/inngest/functions/public-api/operation-dispatch-sweeper.ts",
+      "packages/jobs/src/events.ts",
+      "apps/api/src/lib/public-api-mutation.ts",
+      "apps/api/src/lib/crm-create-workflow-operation-dispatch.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-14988",
+    "project": null,
+    "ticketPaths": [
+      "apps/web/drizzle.config.ts",
+      "apps/web/package.json",
+      "apps/web/package.json](",
+      "apps/web/scripts",
+      "apps/web/scripts/seed-agent-crm-fixture.ts",
+      "apps/web/scripts/seed-my-day-qa.ts"
+    ],
+    "files": [
+      "scripts/local-postgres.ts",
+      "scripts/lib/database-target.ts",
+      "apps/web/scripts/seed-partner-consultant-modes.ts",
+      "apps/web/scripts/lib/partner-consultant-modes.ts",
+      "apps/web/scripts/seed-agent-crm-fixture.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-14989",
+    "project": null,
+    "ticketPaths": [
+      "apps/api",
+      "apps/api/src/mcp/in-process-dispatch.ts",
+      "apps/api/src/middleware/client-ip.ts",
+      "apps/api/src/middleware/rate-limit.ts",
+      "apps/api/src/public-api-app.ts",
+      "apps/web",
+      "apps/web/lib/webhooks/security.ts",
+      "apps/web/lib/webhooks/webhook-rate-limit.ts",
+      "apps/web/trpc/context.ts",
+      "apps/web]"
+    ],
+    "files": [
+      "apps/web/lib/webhooks/security.ts",
+      "packages/env/src/trusted-client-ip.ts",
+      "apps/web/app/api/crm/payments/public/[publicToken]/view/route.ts",
+      "apps/web/app/api/auth/[...all]/route.ts",
+      "apps/web/lib/webhooks/webhook-rate-limit.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-14996",
+    "project": null,
+    "ticketPaths": [
+      "apps/web/components/crm-v2/record/record-hooks.ts",
+      "apps/web/lib/billing/phone-call-funding/account-lock.ts",
+      "apps/web/lib/billing/phone-call-funding/admission.ts",
+      "apps/web/trpc/client.tsx"
+    ],
+    "files": [
+      "apps/web/lib/billing/phone-call-funding/account-lock.ts",
+      "packages/db/src/query-tags.ts",
+      "apps/web/lib/billing/phone-call-funding/admission.ts",
+      "apps/web/lib/crm-v2/record/record-model.ts",
+      "apps/web/components/crm-v2/record/person-record.tsx"
+    ]
+  },
+  {
+    "ticket": "ENG-15032",
+    "project": null,
+    "ticketPaths": [
+      "apps/web/tests/trpc/type-build-lock.test.ts",
+      "apps/web/tests/trpc/type-build-lock.test.ts]("
+    ],
+    "files": [
+      "scripts/run-type-build.mjs",
+      ".github/scripts/check-dev-type-startup.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-15050",
+    "project": "Domains & Inboxes",
+    "ticketPaths": [
+      "apps/web/lib/inngest/functions/mail/instantly-dfy-order-state.ts",
+      "apps/web/lib/inngest/functions/mail/instantly-dfy-provider.ts",
+      "apps/web/tests/lib/inngest/functions/mail/instantly-dfy-order-state-db.test.ts",
+      "packages/db/src/schema/billing.ts",
+      "packages/db/src/schema/billing.ts]("
+    ],
+    "files": [
+      "apps/web/lib/inngest/functions/mail/instantly-dfy-order-state.ts",
+      "packages/db/src/schema/billing.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-15059",
+    "project": "Core Platform",
+    "ticketPaths": [],
+    "files": ["apps/web/lib/dashboard/widget-data-resolver.ts"]
+  },
+  {
+    "ticket": "ENG-15067",
+    "project": null,
+    "ticketPaths": [
+      "apps/web/lib/inngest/functions/calendar/polling-fallback.ts",
+      "apps/web/lib/integrations/calendar/google-calendar-webhook-service.ts"
+    ],
+    "files": [
+      "apps/web/lib/integrations/calendar/calendar-error-classifier.ts",
+      "apps/web/lib/inngest/functions/calendar/polling-fallback.ts",
+      "apps/web/lib/integrations/calendar/google-calendar-unavailable.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-15137",
+    "project": "CRM",
+    "ticketPaths": [
+      "apps/web/lib/notifications/personal/history-import.ts",
+      "apps/web/lib/notifications/personal/legacy-history-rules.ts",
+      "apps/web/lib/notifications/provider/overdue-receipt-bridge.ts"
+    ],
+    "files": [
+      "apps/web/lib/notifications/personal/history-item-decision.ts",
+      "apps/web/lib/notifications/personal/history-import.ts",
+      "apps/web/lib/notifications/personal/history-report.ts",
+      "apps/web/lib/notifications/personal/history-deferral.ts",
+      "apps/web/lib/notifications/personal/history-native-guard.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-15142",
+    "project": "Domains & Inboxes",
+    "ticketPaths": [
+      "apps/web/components/campaigns/email-accounts/domain-provisioning-status.tsx",
+      "apps/web/lib/inngest/functions/billing/",
+      "apps/web/trpc/routers/billing.ts"
+    ],
+    "files": [
+      "apps/web/lib/billing/confirm-autumn-dfy-order.ts",
+      "apps/web/trpc/routers/billing.ts",
+      "apps/web/lib/billing/providers/autumn/dfy-order-payment-evidence.ts",
+      "apps/web/lib/inngest/functions/billing/reconcile-domain-orders-cron.ts",
+      "apps/web/lib/inngest/functions/billing/cleanup-stale-orders-cron.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-15144",
+    "project": null,
+    "ticketPaths": [
+      "apps/web/lib/inngest/functions/outreach/campaign-leads-import.ts"
+    ],
+    "files": [
+      "apps/web/lib/inngest/functions/outreach/campaign-leads-import.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-15178",
+    "project": "Dev Ops",
+    "ticketPaths": [
+      "apps/web",
+      "apps/web/content-collections.ts",
+      "apps/web/content/",
+      "apps/web/next.config.ts",
+      "apps/web/next.config.ts](",
+      "apps/web/tests",
+      "apps/web]"
+    ],
+    "files": [
+      "apps/web/content/content-collections.ts",
+      "apps/web/next.config.ts",
+      "tsconfig.json",
+      "apps/web/lib/developer/campaign-agent/source.ts",
+      "apps/web/package.json"
+    ]
+  },
+  {
+    "ticket": "ENG-15180",
+    "project": "Dev Ops",
+    "ticketPaths": [],
+    "files": ["scripts/dev-worktree.ts"]
+  },
+  {
+    "ticket": "ENG-15181",
+    "project": "Dev Ops",
+    "ticketPaths": [
+      "apps/web/scripts/dev-next.mjs",
+      "apps/web/scripts/dev-next.mjs]("
+    ],
+    "files": [
+      "scripts/dev-with-packages.mjs",
+      "scripts/dev-worktree.ts",
+      "apps/web/scripts/dev-with-types.mjs"
+    ]
+  },
+  {
+    "ticket": "ENG-15231",
+    "project": null,
+    "ticketPaths": ["apps/web/components/crm-v2/filters/list-search.tsx"],
+    "files": ["apps/web/components/crm-v2/filters/list-search.tsx"]
+  },
+  {
+    "ticket": "ENG-15244",
+    "project": "Dev Ops",
+    "ticketPaths": [
+      ".github/scripts/ready-to-merge-publisher.ts",
+      ".github/scripts/ready-to-merge-target.ts",
+      "apps/web/tests/scripts"
+    ],
+    "files": [
+      ".github/scripts/ready-to-merge-publisher.ts",
+      ".github/scripts/review-to-qa-reconciler.ts",
+      ".github/scripts/ready-to-merge-target.ts",
+      ".github/scripts/linear-ticket-reference.ts",
+      ".github/scripts/ready-to-merge-reconciler.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-15360",
+    "project": null,
+    "ticketPaths": [],
+    "files": [
+      "apps/web/components/organization/organization-members-table.tsx",
+      "scripts/e2e/e2e-map.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-15367",
+    "project": null,
+    "ticketPaths": [],
+    "files": [
+      "apps/web/lib/prompts/cold-email-locked-copy.ts",
+      "apps/web/lib/prompts/cold-email-postprocess.ts",
+      "apps/web/lib/prompts/cold-email-writer-prompts.ts",
+      "apps/web/lib/inngest/functions/campaign/process-campaign-creator.ts",
+      "apps/web/lib/inngest/functions/process-cold-email-writer-submission.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-15373",
+    "project": null,
+    "ticketPaths": [
+      "apps/web/components/admin/admin-website-builder-ops-table.tsx",
+      "apps/web/components/lead-sources/lead-table.tsx"
+    ],
+    "files": [
+      "apps/web/components/organization/organization-members-table.tsx",
+      "apps/web/components/campaigns/email-accounts/email-accounts-table.tsx"
+    ]
+  },
+  {
+    "ticket": "ENG-15413",
+    "project": "CRM",
+    "ticketPaths": [
+      "apps/web/hooks/use-contact-email-threads.tsx",
+      "apps/web/lib/crm/email-utils.ts",
+      "apps/web/lib/crm/merge-variable-values.ts",
+      "apps/web/lib/outreach/db/crm-message-thread-queries.ts",
+      "apps/web/trpc/routers/crm/sms-template.ts",
+      "apps/web/trpc/routers/outreach/leads.ts"
+    ],
+    "files": [
+      "apps/web/components/crm/contact-record/contact-tabs/emails/index.tsx",
+      "apps/web/lib/crm/merge-render.ts",
+      "apps/web/lib/crm/sequences/templates.ts",
+      "apps/web/trpc/routers/crm/email-template.ts",
+      "apps/web/trpc/routers/crm/sms-template.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-15414",
+    "project": "CRM",
+    "ticketPaths": [
+      "apps/web/app/api/voice/answer/route.ts",
+      "apps/web/components/crm/call/incoming/use-incoming-ringtone.ts",
+      "apps/web/hooks/use-twilio-device.tsx",
+      "apps/web/lib/voice/apply-stored-audio-settings.ts",
+      "apps/web/lib/voice/attach-call-listeners.ts"
+    ],
+    "files": [
+      "apps/web/components/crm/call/incoming/use-incoming-ringtone.ts",
+      "apps/web/lib/voice/ring-tone-player.ts",
+      "apps/web/lib/voice/outbound-ringback.ts",
+      "apps/web/hooks/use-twilio-device.tsx",
+      "apps/web/lib/voice/attach-call-listeners.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-15415",
+    "project": null,
+    "ticketPaths": [
+      "apps/web/lib/ai-sdr-v2/agents/",
+      "apps/web/lib/ai-sdr-v2/agents/shared.ts"
+    ],
+    "files": [
+      "apps/web/lib/ai-sdr-v2/agents/shared.ts",
+      "apps/web/lib/ai-sdr-v2/agents/copy-review/default-agent.ts",
+      "apps/web/lib/ai-sdr-v2/agents/copywriter-scorer/default-agent.ts",
+      "apps/web/lib/ai-sdr-v2/agents/data-extraction/default-agent.ts",
+      "apps/web/lib/ai-sdr-v2/agents/knowledge-analysis/default-agent.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-15423",
+    "project": null,
+    "ticketPaths": [],
+    "files": [
+      "packages/db/src/repositories/lead-status-application-repository.ts",
+      "packages/db/src/lead-status-application-admission.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-15469",
+    "project": null,
+    "ticketPaths": [
+      ".github/dependabot.yml",
+      ".github/scripts/ready-to-merge-runtime",
+      "apps/api",
+      "apps/web",
+      "packages/mail"
+    ],
+    "files": [
+      "apps/web/package.json",
+      "package.json",
+      "apps/api/package.json",
+      "packages/mail/package.json"
+    ]
+  },
+  {
+    "ticket": "ENG-15480",
+    "project": null,
+    "ticketPaths": ["apps/web/components/ui/button.tsx"],
+    "files": ["apps/web/components/ui/button.tsx"]
+  },
+  {
+    "ticket": "ENG-15534",
+    "project": null,
+    "ticketPaths": [],
+    "files": [
+      "packages/db/src/repositories/lead-status-application-repository.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-15551",
+    "project": null,
+    "ticketPaths": [],
+    "files": [
+      "apps/web/lib/scheduling/services/calendar-sync-service.ts",
+      "apps/web/lib/scheduling/services/calendar-change-row-links.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-15560",
+    "project": null,
+    "ticketPaths": [
+      ".github/scripts/check-preview-database.ts",
+      ".github/scripts/preview-url.sh",
+      ".github/workflows/ci.yml",
+      ".github/workflows/preview-seed.yml",
+      "apps/web/lib/preview/database-host.ts",
+      "apps/web/tests/scripts/verify/preview-qa-ci.test.ts",
+      "apps/web/tests/scripts/verify/sdr-preview-ci.test.ts"
+    ],
+    "files": [".github/workflows/ci.yml"]
+  },
+  {
+    "ticket": "ENG-15586",
+    "project": null,
+    "ticketPaths": [
+      "packages/db/src/repositories/conversation-list-call-query.ts"
+    ],
+    "files": [
+      "packages/db/src/repositories/conversation-list-call-query.ts",
+      "packages/db/src/repositories/conversation-list-scope-query.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-15599",
+    "project": null,
+    "ticketPaths": [],
+    "files": [
+      "apps/web/lib/scheduling/services/calendar-event-change-resolver.ts",
+      "apps/web/lib/scheduling/services/calendar-event-parsers.ts",
+      "apps/web/lib/scheduling/services/calendar-sync-service.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-15640",
+    "project": null,
+    "ticketPaths": [],
+    "files": [
+      "scripts/test-select/shadow-report.ts",
+      "scripts/test-select/fixtures/jobs-api-rerun.json",
+      ".github/workflows/ci.yml",
+      "scripts/test-select/fixtures/attempts-api-rerun.json"
+    ]
+  },
+  {
+    "ticket": "ENG-15673",
+    "project": null,
+    "ticketPaths": [],
+    "files": [
+      "apps/web/lib/services/a2p-registration/rejection-guidance.ts",
+      "apps/web/components/a2p-registration/a2p-campaign-rejection.tsx",
+      "apps/web/lib/services/a2p-registration/provider-rejection.ts",
+      "apps/web/lib/services/a2p-registration/analytics.ts",
+      "apps/web/lib/services/a2p-registration/brand/status.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-15691",
+    "project": null,
+    "ticketPaths": [],
+    "files": [
+      "apps/web/lib/crm/my-day-numbers/own-views.ts",
+      "apps/web/lib/crm/my-day-numbers/service.ts",
+      "apps/web/lib/crm/floor-command/personal-read.ts",
+      "apps/web/lib/crm/floor-command/scope-resolver.ts",
+      "apps/web/lib/crm/floor-command/cached-report-service.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-15762",
+    "project": "CRM Phone Calling & Texting",
+    "ticketPaths": [],
+    "files": [
+      "apps/web/components/crm/power-dialer/use-refused-call-recovery.ts",
+      "apps/web/lib/dialer/authorize-dial.ts",
+      "apps/web/components/crm/power-dialer/use-power-dialer-controller.ts",
+      "apps/web/components/crm/power-dialer/controller-state.ts",
+      "apps/web/lib/dialer/complete-item.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-15763",
+    "project": "CRM Phone Calling & Texting",
+    "ticketPaths": [],
+    "files": [
+      "apps/web/app/api/voice/answer/route.ts",
+      "apps/web/lib/dialer/authorize-dial.ts",
+      "apps/web/lib/billing/phone-call-funding/admission.ts",
+      "apps/web/lib/voice/call-record-persistence.ts",
+      "apps/web/lib/voice/undialled-call.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-15765",
+    "project": "CRM Phone Calling & Texting",
+    "ticketPaths": [],
+    "files": [
+      "apps/web/lib/billing/phone-usage/collector.ts",
+      "apps/web/lib/billing/phone-usage/retry-policy.ts",
+      "apps/web/lib/inngest/functions/billing/twilio-usage-cost.ts",
+      "apps/web/lib/billing/phone-reconciliation/call-discovery.ts",
+      "apps/web/lib/billing/phone-reconciliation/funded-call.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-15768",
+    "project": "CRM Phone Calling & Texting",
+    "ticketPaths": [],
+    "files": [
+      "apps/web/lib/voice/outbound-ringback.ts",
+      "apps/web/hooks/use-twilio-device.tsx",
+      "apps/web/lib/voice/sdk-meter-probe.ts",
+      "apps/web/lib/voice/attach-call-listeners.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-15788",
+    "project": "CRM Phone Calling & Texting",
+    "ticketPaths": [],
+    "files": [
+      "apps/web/components/crm/power-dialer/use-power-dialer-wrap-up-surface.ts",
+      "apps/web/components/crm/power-dialer/wrap-up-state.ts",
+      "apps/web/components/crm-v2/phone/power-dialer-session-wrap-up.tsx",
+      "apps/web/components/crm/power-dialer/power-dialer-wrap-up-dock.tsx",
+      "apps/web/components/crm/power-dialer/use-power-dialer-wrap-up.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-15793",
+    "project": "Core Platform",
+    "ticketPaths": [
+      "apps/web/lib/ai-sdr-v2/workflow/helpers/context-pack.ts",
+      "apps/web/lib/chat/onboarding-context.ts"
+    ],
+    "files": [
+      "apps/web/components/acquisity-brain/brain-settings.tsx",
+      "apps/web/components/acquisity-brain/use-brain-form.ts",
+      "apps/web/lib/chat/onboarding-context.ts",
+      "apps/web/lib/ai-sdr-v2/workflow/helpers/context-pack.ts",
+      "apps/web/lib/acquisity-brain/brain-form.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-15822",
+    "project": "CRM Phone Calling & Texting",
+    "ticketPaths": [],
+    "files": [
+      "apps/web/lib/voice/stranded-refused-call-repair.ts",
+      "apps/web/lib/dialer/target-visibility.ts",
+      "apps/web/scripts/settle-stranded-refused-call-events.ts",
+      "apps/web/lib/dialer/authorize-dial.ts",
+      "apps/web/app/api/voice/answer/route.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-15842",
+    "project": "CRM Phone Calling & Texting",
+    "ticketPaths": [],
+    "files": [
+      "apps/web/lib/dialer/target-visibility.ts",
+      "apps/web/lib/voice/call-dialer-item-link.ts",
+      "apps/web/lib/voice/call-record-persistence.ts",
+      "apps/web/lib/billing/phone-error-metadata.ts",
+      "apps/web/app/api/voice/answer/route.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-15893",
+    "project": null,
+    "ticketPaths": [],
+    "files": [
+      "apps/web/lib/inngest/functions/dialer/reconcile-stale-live-calls.ts",
+      "apps/web/lib/dialer/finalize-live-call.ts",
+      "apps/web/lib/dialer/settle-undialled-call.ts",
+      "apps/web/trpc/routers/dialer/ended-call.ts",
+      "apps/web/components/crm/power-dialer/use-ended-call-settle.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-15915",
+    "project": null,
+    "ticketPaths": [
+      "apps/web/lib/auth/permissions.ts",
+      "apps/web/lib/auth/permissions/backfill.ts",
+      "apps/web/trpc/routers/workspace-roles/assignments.ts"
+    ],
+    "files": [
+      "apps/web/lib/auth/permissions/batch-scoped-target-access.ts",
+      "apps/web/trpc/routers/workspace-roles/assignments.ts",
+      "apps/web/lib/auth/permissions/implied-permissions.ts",
+      "apps/web/lib/auth/permissions.ts",
+      "apps/web/lib/auth/permissions/member-role-removal.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-15918",
+    "project": null,
+    "ticketPaths": [],
+    "files": [
+      "apps/web/app/pay/[publicToken]/complete/page.tsx",
+      "apps/web/components/crm/payments/public-checkout-unpaid.tsx",
+      "apps/web/components/crm/payments/public-checkout-submitted.tsx",
+      "apps/web/components/crm-v2/payments/public-checkout-v2.tsx",
+      "apps/web/lib/crm-payments/public-checkout-complete-state.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-15922",
+    "project": null,
+    "ticketPaths": [],
+    "files": [
+      "apps/web/lib/services/gmail-live-sync-service.ts",
+      "apps/web/lib/inngest/functions/integrations/gmail-sync-process-history.ts"
+    ]
+  },
+  {
+    "ticket": "ENG-15981",
+    "project": null,
+    "ticketPaths": ["apps/web/lib/outreach/sender-details-requirement.ts"],
+    "files": ["apps/web/lib/outreach/sender-details-requirement.ts"]
+  }
+]
