@@ -94,17 +94,33 @@ test("a missing result, a failed run and a boundary error each score wrong and s
   assert.deepEqual(heldout.all.fields.verdict, { correct: 1, total: 2 });
 });
 
-test("a leaked run scores wrong on every field and is counted", () => {
+test("a leak-suspect case is left out of the main rows and scored apart", () => {
   const report = scoreReplay(
     base({ leakage: new Map([[rowKey("ENG-1", 1), [leak]]]) })
   );
-  const { all } = report.splits.train;
-  assert.equal(all.leaked, 1);
-  assert.equal(all.completion.completed, 4);
-  for (const tally of Object.values(all.fields)) {
-    assert.deepEqual(tally, { correct: 3, total: 4 });
+  const { train } = report.splits;
+  assert.equal(train.all.rows, 3);
+  assert.equal(train.apart.leak_suspect.rows, 1);
+  assert.equal(train.apart.leak_suspect.leaked, 1);
+  for (const tally of Object.values(train.all.fields)) {
+    assert.deepEqual(tally, { correct: 3, total: 3 });
   }
+  assert.deepEqual(report.suspects, { cases: ["ENG-1"], rows: 1 });
   assert.deepEqual(report.leakage, [{ caseId: "ENG-1", hits: [leak], run: 1 }]);
+});
+
+test("the scorecard prints the suspect count and the score with suspects as failures and as passes", () => {
+  const card = renderScorecard(
+    scoreReplay(base({ leakage: new Map([[rowKey("ENG-1", 1), [leak]]]) }))
+  );
+  const row = (name: string, bound: string, value: string) =>
+    `| ${name} | suspects as ${bound} | ${new Array(7).fill(value).join(" | ")} |`;
+  assert.ok(card.includes("## Leak-suspect cases: 1"));
+  assert.ok(card.includes("- ENG-1#1: fix_commit in linear.issue"));
+  assert.ok(card.includes(row("train", "failures", "75.0% (3/4)")));
+  assert.ok(card.includes(row("train", "passes", "100.0% (4/4)")));
+  assert.ok(card.includes(row("heldout", "failures", "100.0% (2/2)")));
+  assert.ok(card.includes(row("heldout", "passes", "100.0% (2/2)")));
 });
 
 test("held-out leakage hits keep kind and source but drop the matched text", () => {
@@ -112,7 +128,15 @@ test("held-out leakage hits keep kind and source but drop the matched text", () 
     base({ leakage: new Map([[rowKey("ENG-5", 1), [leak]]]) })
   );
   assert.deepEqual(report.leakage[0].hits, [{ ...leak, match: "" }]);
-  assert.equal(report.splits.heldout.all.leaked, 1);
+  assert.equal(report.splits.heldout.apart.leak_suspect.leaked, 1);
+  assert.deepEqual(report.splits.heldout.bounds.asFailures.verdict, {
+    correct: 1,
+    total: 2,
+  });
+  assert.deepEqual(report.splits.heldout.bounds.asPasses.verdict, {
+    correct: 2,
+    total: 2,
+  });
 });
 
 test("every run of every case is a row, so a missing second run counts", () => {
@@ -453,7 +477,12 @@ test("an edited description scores apart before the production-data group, and a
   const { train } = scoreReplay(input).splits;
   assert.deepEqual(
     [...APART],
-    ["edited_after_create", "list_membership_unknown", "needs_production_data"]
+    [
+      "edited_after_create",
+      "list_membership_unknown",
+      "needs_production_data",
+      "leak_suspect",
+    ]
   );
   assert.equal(train.apart.edited_after_create.rows, 1);
   assert.equal(train.apart.needs_production_data.rows, 0);

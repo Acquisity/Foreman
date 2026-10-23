@@ -1,12 +1,12 @@
 import type { TriageLabel, TriageResult } from "./schema.js";
 
 /**
- * The scorer's leakage check (ENG-16049): did a replay see the answer? Only
- * inputs seeded from the case, the frozen lists or the sandbox are scanned.
- * Content the run wrote itself and read back (`generated`) is skipped, so
- * Foreman's own correct document is never counted as a leak. A hit in a
- * sandbox input counts only when the case's repository archive holds the
- * same phrase (see archive-text.ts).
+ * The scorer's leakage check (ENG-16049): did a replay see the answer? Every
+ * input a tool, skill or subagent returned that wasn't Foreman's own draft is
+ * scanned, the sandbox's included, because the scorer can't tell the pinned
+ * code from text the run wrote itself or from supporting skill files. A hit
+ * marks the case leak-suspect (see score.ts). Only content a replay tool
+ * answered from the run's own writes (`generated`) is skipped.
  */
 
 /** What a leakage hit found: the fix commit, PR number, PR title or body, or a root-cause phrase. */
@@ -53,10 +53,11 @@ const STOPWORDS = new Set(
   )
 );
 
-export const NON_WORD = /[^\p{L}\p{N}]+/gu;
+const NON_WORD = /[^\p{L}\p{N}]+/gu;
 const FENCED = /```[\s\S]*?(?:```|$)/g;
 const INLINE_CODE = /`[^`\n]*`/g;
 const DIFF_LINE = /^\s*(?:[+-]|@@).*$/gm;
+const JSON_LINE_BREAK = /\\[nrt]/gu;
 const HEX_TOKEN = /\b[0-9a-f]{7,40}\b/gi;
 const MIN_SHA_PREFIX = 7;
 /** A whole PR title counts only from this many words; shorter titles match common phrases. */
@@ -88,7 +89,15 @@ export const prose = (text: string) =>
   text.replace(FENCED, " ").replace(INLINE_CODE, " ").replace(DIFF_LINE, " ");
 
 const prPattern = (pr: number) =>
-  new RegExp(`(?:(?<![\\w#])#${pr}|/pull/${pr})(?!\\d)`, "i");
+  new RegExp(`(?:(?<![\\w#])#${pr}|/pull/${pr})(?!\\d)`, "gi");
+
+const distinct = (matches: Iterable<string>) => {
+  const seen = new Map<string, string>();
+  for (const match of matches) {
+    seen.set(match.toLowerCase(), seen.get(match.toLowerCase()) ?? match);
+  }
+  return [...seen.values()];
+};
 
 function shingleHits(
   needles: Set<string>,
@@ -102,7 +111,7 @@ function shingleHits(
   );
 }
 
-type Detector = (content: string) => string | undefined;
+type Detector = (content: string) => string[];
 
 /** One detector per leak kind the label and PR allow; a kind with nothing to look for is absent. */
 function detectors(
@@ -117,18 +126,18 @@ function detectors(
     out.push([
       "fix_commit",
       (content) =>
-        content
-          .match(HEX_TOKEN)
-          ?.find(
+        distinct(
+          (content.match(HEX_TOKEN) ?? []).filter(
             (token) =>
               token.length >= MIN_SHA_PREFIX &&
               commit.startsWith(token.toLowerCase())
-          ),
+          )
+        ),
     ]);
   }
   if (label.fixPr) {
     const ref = prPattern(label.fixPr);
-    out.push(["fix_pr", (content) => content.match(ref)?.[0]]);
+    out.push(["fix_pr", (content) => distinct(content.match(ref) ?? [])]);
   }
   if (pr) {
     const title = shingles(prose(pr.title));
@@ -142,21 +151,23 @@ function detectors(
       "pr_title",
       (content) =>
         whole && ` ${words(content).join(" ")} `.includes(whole)
-          ? whole.trim()
-          : shingleHits(title, content, SHINGLE_WORDS, known)[0],
+          ? [whole.trim()]
+          : shingleHits(title, content, SHINGLE_WORDS, known).slice(0, 1),
     ]);
     const body = shingles(prose(pr.body), BODY_SHINGLE_WORDS);
     const knownBody = shingles(baseline, BODY_SHINGLE_WORDS);
     out.push([
       "pr_body",
-      (content) => shingleHits(body, content, BODY_SHINGLE_WORDS, knownBody)[0],
+      (content) =>
+        shingleHits(body, content, BODY_SHINGLE_WORDS, knownBody).slice(0, 1),
     ]);
   }
   if (label.rootCause) {
     const rootCause = shingles(label.rootCause.text);
     out.push([
       "root_cause",
-      (content) => shingleHits(rootCause, content, SHINGLE_WORDS, known)[0],
+      (content) =>
+        shingleHits(rootCause, content, SHINGLE_WORDS, known).slice(0, 1),
     ]);
   }
   return out;
@@ -165,8 +176,10 @@ function detectors(
 /**
  * Scan every seeded input for the fix commit (full SHA or any 7+ character
  * prefix), the fix PR as `#<n>` or `/pull/<n>`, the PR title and body, and
- * 5-word shingles of the label's root cause. Returns one hit per kind and
- * input; an empty list means the run is clean.
+ * 5-word shingles of the label's root cause. Returns every distinct commit
+ * token and PR reference, and one hit for each other kind, per input; an empty
+ * list means no seeded input held the answer. Tool outputs stored as JSON carry
+ * their line breaks as escapes, so those read as spaces.
  */
 export function findLeaks({
   baseline = "",
@@ -177,14 +190,17 @@ export function findLeaks({
   const checks = detectors(label, pr, baseline);
   return result.inputs
     .filter(({ provenance }) => provenance === "seeded")
-    .flatMap(({ availableAt, content, source }) =>
-      checks.flatMap(([kind, detect]) => {
-        const match = detect(content);
-        return match
-          ? [{ availableAt: availableAt ?? null, kind, match, source }]
-          : [];
-      })
-    );
+    .flatMap(({ availableAt, content, source }) => {
+      const text = content.replace(JSON_LINE_BREAK, " ");
+      return checks.flatMap(([kind, detect]) =>
+        detect(text).map((match) => ({
+          availableAt: availableAt ?? null,
+          kind,
+          match,
+          source,
+        }))
+      );
+    });
 }
 
 const AVAILABLE_KINDS: ReadonlySet<LeakKind> = new Set([

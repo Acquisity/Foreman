@@ -26,11 +26,9 @@ import { replayToolsMiddleware } from "./model.js";
 import { buildReplayResult } from "./route.js";
 import { triageResultSchema } from "./schema.js";
 import {
-  REPLAY_SANDBOX_TOOLS,
   REPLAY_TOOL_POLICY,
   replayMayCall,
   replayOutputIsGenerated,
-  replayOutputIsSandbox,
 } from "./tool-policy.js";
 
 const CANNOT_RUN = /Triage replay cannot run/u;
@@ -519,27 +517,16 @@ describe("replay leakage recording", () => {
         ["grep", "seeded"],
       ]
     );
-    assert.equal(
-      inputs.some((input) => input.content.includes(phrase)),
-      true
-    );
-  });
-
-  it("marks exactly the sandbox tools as the ones whose text the scorer checks against the archive", () => {
     assert.deepEqual(
-      [...REPLAY_SANDBOX_TOOLS].sort((a, b) => a.localeCompare(b)),
+      findLeaks({ label: makeLabel("ENG-100"), result: { inputs } }).map(
+        (hit) => [hit.kind, hit.source]
+      ),
       [
-        "bash",
-        "checkout_commit",
-        "glob",
-        "grep",
-        "prepare_repository",
-        "read_file",
-        "read_image",
-        "write_file",
+        ["root_cause", "read_file"],
+        ["root_cause", "bash"],
+        ["root_cause", "grep"],
       ]
     );
-    assert.equal(replayOutputIsSandbox("find_related_issues"), false);
   });
 
   it("marks exactly the tools that echo the model's own work as generated", () => {

@@ -10,8 +10,9 @@ import {
 
 /**
  * The trusted scorer's pure core (ENG-16049): every cohort case in a split is
- * scored, and anything short of a completed, leak-free run scores wrong on
- * every field. It reads nothing from disk; `scripts/triage-score.ts` loads the
+ * scored, and anything short of a completed run scores wrong on every field.
+ * A case with a seeded phrase in any tool output is leak-suspect: scored apart,
+ * with bounds that count it as all failures and as all passes. It reads nothing from disk; `scripts/triage-score.ts` loads the
  * files, including held-out labels from an explicit path, and passes them in.
  */
 
@@ -103,18 +104,21 @@ export const APART = [
   "edited_after_create",
   "list_membership_unknown",
   "needs_production_data",
+  "leak_suspect",
 ] as const;
 export type Apart = (typeof APART)[number];
 
 const APART_TITLES: Record<Apart, string> = {
   edited_after_create: "description edited after filing",
+  leak_suspect: "a seeded phrase in a tool output (leak-suspect)",
   list_membership_unknown: "frozen list entry with no creation time",
   needs_production_data: "needs production data",
 };
 
 export function apartReason(
   triageCase: TriageCase | undefined,
-  listMembershipUnknown = false
+  listMembershipUnknown = false,
+  leakSuspect = false
 ): Apart | null {
   if (!triageCase) {
     return null;
@@ -125,13 +129,21 @@ export function apartReason(
   if (listMembershipUnknown) {
     return "list_membership_unknown";
   }
-  return triageCase.flags.needsProductionData ? "needs_production_data" : null;
+  if (triageCase.flags.needsProductionData) {
+    return "needs_production_data";
+  }
+  return leakSuspect ? "leak_suspect" : null;
 }
 
 /** One split's scores, overall and per intake lane, with the cases scored apart from both. */
 export interface SplitScore {
   all: GroupScore;
   apart: Record<Apart, GroupScore>;
+  /** The main rows plus the leak-suspect cases, counted as all failures or all passes. */
+  bounds: {
+    asFailures: Record<Field, Tally>;
+    asPasses: Record<Field, Tally>;
+  };
   lanes: Record<string, GroupScore>;
 }
 
@@ -150,6 +162,8 @@ export interface ScoreReport {
   /** Whether `runs` was passed in, or inferred from the highest run number seen. */
   runsGiven: boolean;
   splits: Record<"heldout" | "train", SplitScore>;
+  /** Cases with a seeded phrase in any run's tool outputs, and how many rows those are. */
+  suspects: { cases: string[]; rows: number };
 }
 
 /** Everything the scorer needs, loaded by the CLI. */
@@ -157,7 +171,7 @@ export interface ScoreInput {
   cases: readonly TriageCase[];
   cohortSha256: string;
   heldoutLabels: readonly TriageLabel[];
-  /** Leakage hits per row key; a row with any hit scores wrong on every field. */
+  /** Leakage hits per row key; a case with any hit in any run is leak-suspect and scored apart. */
   leakage?: ReadonlyMap<string, LeakageHit[]>;
   results: readonly TriageResult[];
   /** Judge grades per row key; omit to report root cause as not judged. */
@@ -422,7 +436,7 @@ function addRow(
  * against another cohort hash, when results, split and labels disagree, or
  * when a split case has no label. Every case times every run is a row: no
  * result counts as `missing`, and a missing, failed, cancelled, boundary
- * error or leaked row scores wrong on every field.
+ * error row scores wrong on every field.
  */
 export function scoreReplay(input: ScoreInput): ScoreReport {
   const runId = checkScoreInput(input);
@@ -434,6 +448,11 @@ export function scoreReplay(input: ScoreInput): ScoreReport {
   const cases = new Map(input.cases.map((item) => [item.id, item]));
   const judged = input.rootCauseGrades !== undefined;
   const heldout = new Set(input.split.heldout);
+  const suspectCases = new Set(
+    [...(input.leakage ?? new Map<string, LeakageHit[]>())]
+      .filter(([, hits]) => hits.length > 0)
+      .map(([key]) => key.split("#")[0])
+  );
   const membershipUnknown = new Set(
     input.results
       .filter((result) => result.listMembershipUnknown.length > 0)
@@ -446,13 +465,21 @@ export function scoreReplay(input: ScoreInput): ScoreReport {
       apart: Object.fromEntries(
         APART.map((reason) => [reason, emptyGroup(judged)])
       ) as Record<Apart, GroupScore>,
+      bounds: {
+        asFailures: {} as Record<Field, Tally>,
+        asPasses: {} as Record<Field, Tally>,
+      },
       lanes: {},
     };
     for (const id of [...ids].sort()) {
       const triageCase = cases.get(id);
       const lane = triageCase?.lane ?? "unknown";
       const label = byId.get(id) as TriageLabel;
-      const reason = apartReason(triageCase, membershipUnknown.has(id));
+      const reason = apartReason(
+        triageCase,
+        membershipUnknown.has(id),
+        suspectCases.has(id)
+      );
       if (!(reason || split.lanes[lane])) {
         split.lanes[lane] = emptyGroup(judged);
       }
@@ -467,6 +494,18 @@ export function scoreReplay(input: ScoreInput): ScoreReport {
           addRow(group, label, results.get(key), leaked, grade);
         }
       }
+    }
+    for (const field of FIELDS) {
+      const main = split.all.fields[field];
+      const suspect = split.apart.leak_suspect.fields[field];
+      split.bounds.asFailures[field] = {
+        correct: main.correct,
+        total: main.total + suspect.total,
+      };
+      split.bounds.asPasses[field] = {
+        correct: main.correct + suspect.total,
+        total: main.total + suspect.total,
+      };
     }
     return split;
   };
@@ -500,6 +539,12 @@ export function scoreReplay(input: ScoreInput): ScoreReport {
     splits: {
       heldout: score(input.split.heldout, input.heldoutLabels),
       train: score(input.split.train, input.trainLabels),
+    },
+    suspects: {
+      cases: [...suspectCases].sort(),
+      rows: [...(input.leakage ?? new Map<string, LeakageHit[]>())].filter(
+        ([, hits]) => hits.length > 0
+      ).length,
     },
   };
 }
@@ -575,6 +620,12 @@ export function renderScorecard(report: ScoreReport): string {
           `- ${rowKey(caseId, run)}: ${hits.map((hit) => `${hit.kind} in ${hit.source}`).join("; ")}`
       )
     : ["- none"];
+  const bounds = (["train", "heldout"] as const).flatMap((name) =>
+    (["asFailures", "asPasses"] as const).map(
+      (bound) =>
+        `| ${name} | suspects as ${bound === "asFailures" ? "failures" : "passes"} | ${FIELDS.map((field) => pct(report.splits[name].bounds[bound][field])).join(" | ")} |`
+    )
+  );
   return [
     "# Triage replay scorecard",
     "",
@@ -583,11 +634,17 @@ export function renderScorecard(report: ScoreReport): string {
     `Foreman commit ${report.foreman.commit ?? "none"}, replays started ${report.foreman.firstStartedAt ?? "never"} to ${report.foreman.lastStartedAt ?? "never"}, estimated $${report.foreman.estimatedUsd.toFixed(2)} charged to the replays (an estimate, not metered).`,
     "",
     ...sections,
-    "## Leakage failures",
+    `## Leak-suspect cases: ${report.suspects.cases.length}`,
+    "",
+    `${report.suspects.cases.length} case(s), ${report.suspects.rows} row(s), had a seeded phrase in a tool output and are left out of the main rows above. The check cannot tell the pinned code, skill reference files or the run's own scratch from planted text, so it errs toward suspect and the main score is biased down. The two scores below bracket it: every suspect case counted as a failure, then as a pass.`,
+    "",
+    `| split | suspects | ${FIELDS.join(" | ")} |`,
+    `|${" --- |".repeat(FIELDS.length + 2)}`,
+    ...bounds,
     "",
     ...leaks,
     "",
-    "Every cohort case counts once per run, in the main rows or in exactly one scored-apart group, taken in this order: a description edited after filing, a case whose run answered from a frozen list entry with no creation time (so its case-time membership is unknown; any run of the case puts every run of it here), or a case that needs production data the replay can't reach. A missing, failed, cancelled, boundary-error or leaked row scores wrong on every field. Text fields match trimmed and case-folded; a field the label leaves null is unscored, so its total counts only labels that settle it. Owner compares the label owner with the assignee the store applied. Duplicates match as sets of issue ids, with null and empty equal (a null duplicate is scored: it means not a duplicate); the final `duplicateOf` is split on commas or spaces. Master compares the label's master with the parent the run set, and a master filed after the case means the run should have created a new one.",
+    "Every cohort case counts once per run, in the main rows or in exactly one scored-apart group, taken in this order: a description edited after filing, a case whose run answered from a frozen list entry with no creation time (so its case-time membership is unknown; any run of the case puts every run of it here), a case that needs production data the replay can't reach, or a leak-suspect case (any run of it puts every run of it here). A missing, failed, cancelled or boundary-error row scores wrong on every field. Text fields match trimmed and case-folded; a field the label leaves null is unscored, so its total counts only labels that settle it. Owner compares the label owner with the assignee the store applied. Duplicates match as sets of issue ids, with null and empty equal (a null duplicate is scored: it means not a duplicate); the final `duplicateOf` is split on commas or spaces. Master compares the label's master with the parent the run set, and a master filed after the case means the run should have created a new one.",
     "",
   ].join("\n");
 }

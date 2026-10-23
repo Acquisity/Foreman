@@ -116,6 +116,64 @@ test("a root-cause phrase planted in seeded evidence fails", () => {
   ]);
 });
 
+test("scratch the run wrote and read back is flagged, because the scorer can't tell it from the pinned code", () => {
+  const readBack = JSON.stringify({
+    exitCode: 0,
+    stdout:
+      "The save handler cleared the cached layout before the panel rendered it again.\n",
+  });
+  assert.deepEqual(scan(seeded(readBack, "bash")), [
+    {
+      availableAt: null,
+      kind: "root_cause",
+      match: "the save handler cleared the",
+      source: "bash",
+    },
+  ]);
+});
+
+test("a fix reference planted in a skill reference file read from the sandbox is flagged", () => {
+  const reference = JSON.stringify({
+    content:
+      "1: Prior fix, shipped in #6108.\n2: Keep cached layout through panel re-render.",
+  });
+  assert.deepEqual(
+    scan(seeded(reference, "read_file")).map(({ kind, match, source }) => [
+      kind,
+      match,
+      source,
+    ]),
+    [
+      ["fix_pr", "#6108", "read_file"],
+      ["pr_title", "keep cached layout through panel re render", "read_file"],
+    ]
+  );
+});
+
+test("a short SHA prefix printed before a full-SHA file name flags the full SHA too", () => {
+  const output = JSON.stringify({
+    content: `scratch/${FIX_COMMIT.slice(0, 7)}.md:1:return true;\nnotes/${FIX_COMMIT}.md:1:return true;`,
+  });
+  assert.deepEqual(
+    scan(seeded(output, "grep")).map(({ kind, match }) => [kind, match]),
+    [
+      ["fix_commit", "3f9c2b7"],
+      ["fix_commit", "3f9c2b7d41e85a0c6b19d2e4f7a3c8b5d0e1f2a3"],
+    ]
+  );
+});
+
+test("a phrase that JSON output splits across lines is flagged", () => {
+  const wrapped = JSON.stringify({
+    stdout: "Older note: the save handler cleared\nthe cached layout early.\n",
+  });
+  assert.ok(wrapped.includes("cleared\\nthe"));
+  assert.deepEqual(
+    scan(seeded(wrapped, "bash")).map(({ kind, match }) => [kind, match]),
+    [["root_cause", "the save handler cleared the"]]
+  );
+});
+
 test("clean seeded evidence passes", () => {
   assert.deepEqual(
     scan(seeded(CLEAN), seeded("Projects: Platform, Billing, Growth")),
