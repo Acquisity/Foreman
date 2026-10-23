@@ -24,6 +24,7 @@ import {
 } from "./mode.js";
 import { replayToolsMiddleware } from "./model.js";
 import { buildReplayResult } from "./route.js";
+import { triageResultSchema } from "./schema.js";
 import {
   REPLAY_TOOL_POLICY,
   replayMayCall,
@@ -397,6 +398,31 @@ describe("replay leakage recording", () => {
       ["subagent:vision", "seeded", null],
       ["subagent:critic", "generated", null],
     ]);
+  });
+
+  it("keeps the counts of a failed critic review unknown instead of zero", async (t) => {
+    await replayProcess(t);
+    const settled = replayHandler("task.settled");
+    const rootCtx = {
+      cancel: () => undefined,
+      session: { auth: { current: auth, initiator: auth }, id: "sess-1" },
+    };
+    await settled(
+      { data: { kind: "agent", name: "critic", status: "failed" } },
+      rootCtx
+    );
+    const failed = (await state()).critic;
+    assert.deepEqual(failed, {
+      blockingFindings: null,
+      failedCriteria: null,
+      verdict: "failed",
+    });
+    const result = buildReplayResult(await state(), {
+      cohortSha256: "0".repeat(64),
+      run: 1,
+      runId: RUN,
+    });
+    assert.deepEqual(triageResultSchema.parse(result).critic, failed);
   });
 
   it("records the model's own drafts and decisions as generated, so they never count as leakage", async (t) => {

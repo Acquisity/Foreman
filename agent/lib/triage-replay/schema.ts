@@ -116,8 +116,8 @@ export const triageResultSchema = z.strictObject({
   cohortSha256: z.string().regex(/^[0-9a-f]{64}$/),
   critic: z
     .strictObject({
-      blockingFindings: z.int().nonnegative(),
-      failedCriteria: z.int().nonnegative(),
+      blockingFindings: z.int().nonnegative().nullable(),
+      failedCriteria: z.int().nonnegative().nullable(),
       verdict: z.enum([
         "APPROVE",
         "CHALLENGE",

@@ -329,8 +329,8 @@ export const triageReplayHook = defineHook({
       await persistOrCancel(ctx, () =>
         withReplayState(session.runId, session.caseId, (state) => {
           state.critic = {
-            blockingFindings: verdict.blockingFindings ?? 0,
-            failedCriteria: verdict.failedCriteria ?? 0,
+            blockingFindings: verdict.blockingFindings,
+            failedCriteria: verdict.failedCriteria,
             verdict: verdict.verdict,
           };
         })

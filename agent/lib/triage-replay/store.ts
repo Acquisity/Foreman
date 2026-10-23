@@ -101,8 +101,8 @@ export interface ReplayState {
   comments: { body: string; issue: string }[];
   created: CreatedIssue[];
   critic: {
-    blockingFindings: number;
-    failedCriteria: number;
+    blockingFindings: number | null;
+    failedCriteria: number | null;
     verdict: "APPROVE" | "CHALLENGE" | "INSUFFICIENT_EVIDENCE" | "failed";
   } | null;
   /** Every settled decide_triage and decide_billing result, in order; the last one is the final decision. */
