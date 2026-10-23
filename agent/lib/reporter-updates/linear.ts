@@ -1,0 +1,246 @@
+import { callLinearGraphQL } from "eve/channels/linear";
+import { z } from "zod";
+import { ENGINEERING_TEAM_ID } from "../linear-api.js";
+import { slackChannelOf } from "../linear-context.js";
+import { parsePullUrl, type TicketFacts } from "./plan.js";
+
+export interface ThreadComment {
+  body: string;
+  id: string;
+}
+
+export interface TicketView {
+  anchorId: string | null;
+  facts: TicketFacts;
+  foremanComments: ThreadComment[];
+  issueId: string;
+}
+
+export interface LinearPort {
+  postUnderAnchor: (
+    issueId: string,
+    anchorId: string,
+    body: string
+  ) => Promise<string>;
+  readTicket: (identifier: string) => Promise<TicketView | null>;
+  recentIdentifiers: (
+    updatedSince: string,
+    createdAfter: string
+  ) => Promise<string[]>;
+}
+
+type Fetch = typeof fetch;
+type Variables = NonNullable<
+  Parameters<typeof callLinearGraphQL>[0]["variables"]
+>;
+
+const ANCHOR = /^Slack thread connected in /u;
+const ASK_FROM = /^Ask from /u;
+const ASK_FROM_TITLE = "Ask from ";
+const ANCHOR_LINK = /\]\((https:\/\/[^\s)]+)\)/u;
+const RECENT_PAGES = 5;
+
+const TICKET_QUERY = `query ReporterTicket($id: String!) {
+  viewer { id }
+  issue(id: $id) {
+    id
+    identifier
+    createdAt
+    state { name type }
+    assignee { name }
+    labels(first: 50) { nodes { name } }
+    attachments(first: 50) { nodes { title url } }
+    parent {
+      identifier
+      state { type }
+      attachments(first: 50) { nodes { title url } }
+    }
+    comments(first: 100) {
+      pageInfo { hasNextPage }
+      nodes { id body createdAt parent { id } user { id } }
+    }
+  }
+}`;
+
+const RECENT_QUERY = `query ReporterRecent($team: ID!, $since: DateTimeOrDuration!, $created: DateTimeOrDuration!, $ask: String!, $after: String) {
+  issues(first: 100, after: $after, filter: {
+    team: { id: { eq: $team } }
+    updatedAt: { gt: $since }
+    createdAt: { gt: $created }
+    attachments: { some: { title: { startsWith: $ask } } }
+  }) {
+    pageInfo { hasNextPage endCursor }
+    nodes { identifier }
+  }
+}`;
+
+const POST_MUTATION = `mutation ReporterUpdate($input: CommentCreateInput!) {
+  commentCreate(input: $input) { success comment { id } }
+}`;
+
+const attachments = z.object({
+  nodes: z.array(z.object({ title: z.string(), url: z.string() })),
+});
+const ticketSchema = z.object({
+  issue: z
+    .object({
+      assignee: z.object({ name: z.string() }).nullable(),
+      attachments,
+      comments: z.object({
+        nodes: z.array(
+          z.object({
+            body: z.string(),
+            createdAt: z.string(),
+            id: z.string(),
+            parent: z.object({ id: z.string() }).nullable(),
+            user: z.object({ id: z.string() }).nullable(),
+          })
+        ),
+        pageInfo: z.object({ hasNextPage: z.boolean() }),
+      }),
+      createdAt: z.string(),
+      id: z.string(),
+      identifier: z.string(),
+      labels: z.object({ nodes: z.array(z.object({ name: z.string() })) }),
+      parent: z
+        .object({
+          attachments,
+          identifier: z.string(),
+          state: z.object({ type: z.string() }),
+        })
+        .nullable(),
+      state: z.object({ name: z.string(), type: z.string() }),
+    })
+    .nullable(),
+  viewer: z.object({ id: z.string() }),
+});
+const recentSchema = z.object({
+  issues: z.object({
+    nodes: z.array(z.object({ identifier: z.string() })),
+    pageInfo: z.object({
+      endCursor: z.string().nullable(),
+      hasNextPage: z.boolean(),
+    }),
+  }),
+});
+const postSchema = z.object({
+  commentCreate: z.object({
+    comment: z.object({ id: z.string() }).nullable(),
+    success: z.boolean(),
+  }),
+});
+
+const channelOf = (
+  asks: readonly { title: string; url: string }[],
+  anchorBody: string
+): string | null => {
+  const ask = asks.find((node) => ASK_FROM.test(node.title.trim()));
+  const fromAsk = ask ? slackChannelOf(ask.url) : null;
+  if (fromAsk) {
+    return fromAsk;
+  }
+  const link = ANCHOR_LINK.exec(anchorBody)?.[1];
+  return link ? slackChannelOf(link) : null;
+};
+
+export const linearPort = (
+  accessToken: string,
+  fetchImpl?: Fetch
+): LinearPort => {
+  const call = <T>(query: string, queryName: string, variables: Variables) =>
+    callLinearGraphQL<T>({
+      api: fetchImpl ? { fetch: fetchImpl } : undefined,
+      credentials: { accessToken },
+      query,
+      queryName,
+      variables,
+    });
+  return {
+    async postUnderAnchor(issueId, anchorId, body) {
+      const created = postSchema.parse(
+        await call(POST_MUTATION, "ReporterUpdate", {
+          input: { body, issueId, parentId: anchorId },
+        })
+      ).commentCreate;
+      if (!(created.success && created.comment)) {
+        throw new Error("Linear did not create the update.");
+      }
+      return created.comment.id;
+    },
+    async readTicket(identifier) {
+      const data = ticketSchema.parse(
+        await call(TICKET_QUERY, "ReporterTicket", { id: identifier })
+      );
+      const { issue } = data;
+      if (!issue) {
+        return null;
+      }
+      if (issue.comments.pageInfo.hasNextPage) {
+        throw new Error(`${identifier} has more than 100 comments.`);
+      }
+      const comments = issue.comments.nodes;
+      const anchor = comments
+        .filter(
+          (comment) => !comment.parent && ANCHOR.test(comment.body.trim())
+        )
+        .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
+        .at(0);
+      const pullUrls = [
+        ...issue.attachments.nodes,
+        ...(issue.parent?.attachments.nodes ?? []),
+      ]
+        .map((node) => node.url.trim())
+        .filter((url) => parsePullUrl(url) !== null);
+      return {
+        anchorId: anchor?.id ?? null,
+        facts: {
+          assignee: issue.assignee?.name ?? null,
+          channel: channelOf(issue.attachments.nodes, anchor?.body ?? ""),
+          createdAt: issue.createdAt,
+          identifier: issue.identifier,
+          labels: issue.labels.nodes.map((label) => label.name),
+          parent: issue.parent
+            ? {
+                identifier: issue.parent.identifier,
+                stateType: issue.parent.state.type,
+              }
+            : null,
+          pullUrls: [...new Set(pullUrls)],
+          stateName: issue.state.name,
+          stateType: issue.state.type,
+        },
+        foremanComments: comments
+          .filter(
+            (comment) =>
+              anchor &&
+              comment.parent?.id === anchor.id &&
+              comment.user?.id === data.viewer.id
+          )
+          .map((comment) => ({ body: comment.body, id: comment.id })),
+        issueId: issue.id,
+      };
+    },
+    recentIdentifiers(updatedSince, createdAfter) {
+      const page = async (
+        after: string | null,
+        remaining: number
+      ): Promise<string[]> => {
+        const data = recentSchema.parse(
+          await call(RECENT_QUERY, "ReporterRecent", {
+            after,
+            ask: ASK_FROM_TITLE,
+            created: createdAfter,
+            since: updatedSince,
+            team: ENGINEERING_TEAM_ID,
+          })
+        );
+        const here = data.issues.nodes.map((node) => node.identifier);
+        const { endCursor, hasNextPage } = data.issues.pageInfo;
+        return hasNextPage && endCursor && remaining > 1
+          ? [...here, ...(await page(endCursor, remaining - 1))]
+          : here;
+      };
+      return page(null, RECENT_PAGES);
+    },
+  };
+};

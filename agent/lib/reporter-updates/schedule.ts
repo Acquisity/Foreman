@@ -1,0 +1,46 @@
+import { getToken as getConnectToken } from "@vercel/connect";
+import { GITHUB_CONNECTOR } from "../github/credentials.js";
+import { logOpsEvent } from "../ops-log.js";
+import { reporterUpdatesConfig } from "./config.js";
+import { githubDeployProbe } from "./deploy.js";
+import { linearPort } from "./linear.js";
+import { runReporterUpdates } from "./run.js";
+import { databaseReporterStore } from "./store.js";
+
+const LINEAR_SCOPES = ["read", "write", "comments:create"];
+
+export const runScheduledReporterUpdates = async (): Promise<void> => {
+  const config = reporterUpdatesConfig();
+  if (!config) {
+    return;
+  }
+  const linearToken = await getConnectToken(
+    process.env.LINEAR_CONNECTOR ?? "linear/foreman-agent",
+    { scopes: LINEAR_SCOPES, subject: { type: "app" } }
+  );
+  const report = await runReporterUpdates(
+    {
+      config,
+      deploy: githubDeployProbe(() =>
+        getConnectToken(GITHUB_CONNECTOR, { subject: { type: "app" } })
+      ),
+      linear: linearPort(linearToken),
+      store: databaseReporterStore(),
+    },
+    Date.now()
+  );
+  for (const { outcome } of report.outcomes) {
+    if (outcome.kind === "posted") {
+      logOpsEvent("reporter.update", {
+        decision: outcome.stage,
+        outcome: "posted",
+      });
+    }
+  }
+  if (report.errors.length > 0) {
+    logOpsEvent("reporter.update.failed", {
+      code: String(report.errors.length),
+      outcome: "error",
+    });
+  }
+};

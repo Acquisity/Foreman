@@ -10,6 +10,7 @@ import {
   SLACK_PROMPT,
 } from "./jev-decisions.js";
 import { askFromName, isTriageIntakeAsk } from "./linear-context.js";
+import { withoutReporterUpdates } from "./reporter-updates/copy.js";
 import { WIDGET_FEEDBACK_PROJECT_ID } from "./widget-feedback.js";
 
 /**
@@ -219,13 +220,16 @@ async function readThread(
       `${issue} has more than 100 comments, so the thread state cannot be checked; reply in Slack by hand.`
     );
   }
-  const comments = thread.issue.comments.nodes.map((c) => ({
-    body: c.body,
-    createdAt: c.createdAt,
-    id: c.id,
-    parentId: c.parent?.id ?? null,
-    userId: c.user?.id ?? null,
-  }));
+  const comments = withoutReporterUpdates(
+    thread.issue.comments.nodes.map((c) => ({
+      body: c.body,
+      createdAt: c.createdAt,
+      id: c.id,
+      parentId: c.parent?.id ?? null,
+      userId: c.user?.id ?? null,
+    })),
+    thread.viewer.id
+  );
   return {
     comments,
     foreman: thread.viewer,

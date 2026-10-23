@@ -1,0 +1,249 @@
+import assert from "node:assert/strict";
+import { describe, it } from "node:test";
+import { linearPort } from "./linear.js";
+
+const SANDBOX = "C0AAAAAAAAA";
+const PR = "https://github.com/Acquisity/Acquisity/pull/7";
+
+const ok = (data: unknown) =>
+  new Response(JSON.stringify({ data }), { status: 200 });
+
+const comment = (
+  id: string,
+  body: string,
+  over: {
+    parent?: string | null;
+    user?: string | null;
+    createdAt?: string;
+  } = {}
+) => ({
+  body,
+  createdAt: over.createdAt ?? "2026-10-10T10:00:00Z",
+  id,
+  parent: over.parent ? { id: over.parent } : null,
+  user:
+    over.user === undefined ? { id: "bot" } : over.user && { id: over.user },
+});
+
+const issue = (over: Record<string, unknown> = {}) => ({
+  assignee: { name: "Sam Jones" },
+  attachments: {
+    nodes: [
+      {
+        title: "Ask from A. Reporter",
+        url: `https://x.slack.com/archives/${SANDBOX}/p1`,
+      },
+      { title: "Fix", url: PR },
+      { title: "Notes", url: "https://example.com/notes" },
+    ],
+  },
+  comments: {
+    nodes: [
+      comment(
+        "c-anchor",
+        "Slack thread connected in [#sandbox](https://x.slack.com/archives/C0ZZZZZZZZZ/p1)"
+      ),
+      comment("c-1", "We've received your report", {
+        parent: "c-anchor",
+        user: "viewer",
+      }),
+      comment("c-2", "my own reply", { parent: "c-anchor", user: "reporter" }),
+      comment("c-3", "elsewhere", { parent: "other", user: "viewer" }),
+    ],
+    pageInfo: { hasNextPage: false },
+  },
+  createdAt: "2026-10-10T09:00:00Z",
+  id: "uuid-1",
+  identifier: "ENG-1",
+  labels: { nodes: [{ name: "Bug" }, { name: "Customer reported" }] },
+  parent: {
+    attachments: {
+      nodes: [
+        { title: "Fix", url: PR },
+        {
+          title: "Fix 2",
+          url: "https://github.com/Acquisity/Acquisity/pull/8",
+        },
+      ],
+    },
+    identifier: "ENG-9",
+    state: { type: "completed" },
+  },
+  state: { name: "Done", type: "completed" },
+  ...over,
+});
+
+const portWith = (
+  respond: (query: string, variables: Record<string, unknown>) => Response
+) => {
+  const requests: { query: string; variables: Record<string, unknown> }[] = [];
+  const port = linearPort("token", (_url, init) => {
+    const body = JSON.parse(String(init?.body)) as {
+      query: string;
+      variables: Record<string, unknown>;
+    };
+    requests.push(body);
+    return Promise.resolve(respond(body.query, body.variables));
+  });
+  return { port, requests };
+};
+
+describe("readTicket", () => {
+  it("builds the facts, the thread anchor and Foreman's own comments under it", async () => {
+    const { port } = portWith(() =>
+      ok({ issue: issue(), viewer: { id: "viewer" } })
+    );
+    const view = await port.readTicket("ENG-1");
+    assert.deepEqual(view?.facts, {
+      assignee: "Sam Jones",
+      channel: SANDBOX,
+      createdAt: "2026-10-10T09:00:00Z",
+      identifier: "ENG-1",
+      labels: ["Bug", "Customer reported"],
+      parent: { identifier: "ENG-9", stateType: "completed" },
+      pullUrls: [PR, "https://github.com/Acquisity/Acquisity/pull/8"],
+      stateName: "Done",
+      stateType: "completed",
+    });
+    assert.equal(view?.anchorId, "c-anchor");
+    assert.equal(view?.issueId, "uuid-1");
+    assert.deepEqual(view?.foremanComments, [
+      { body: "We've received your report", id: "c-1" },
+    ]);
+  });
+
+  it("falls back to the thread link when there is no Ask from link", async () => {
+    const { port } = portWith(() =>
+      ok({
+        issue: issue({ attachments: { nodes: [] } }),
+        viewer: { id: "viewer" },
+      })
+    );
+    const view = await port.readTicket("ENG-1");
+    assert.equal(view?.facts.channel, "C0ZZZZZZZZZ");
+  });
+
+  it("does not treat a support inbox note as a reporter thread", async () => {
+    const { port } = portWith(() =>
+      ok({
+        issue: issue({
+          comments: {
+            nodes: [
+              comment(
+                "n",
+                "Support conversation connected in [inbox](https://example.com/c/1)"
+              ),
+            ],
+            pageInfo: { hasNextPage: false },
+          },
+        }),
+        viewer: { id: "viewer" },
+      })
+    );
+    assert.equal((await port.readTicket("ENG-1"))?.anchorId, null);
+  });
+
+  it("uses the earliest Slack thread when a ticket has more than one", async () => {
+    const { port } = portWith(() =>
+      ok({
+        issue: issue({
+          comments: {
+            nodes: [
+              comment(
+                "late",
+                "Slack thread connected in [#a](https://x.slack.com/archives/C0YYYYYYYYY/p2)",
+                { createdAt: "2026-10-12T10:00:00Z" }
+              ),
+              comment(
+                "early",
+                "Slack thread connected in [#a](https://x.slack.com/archives/C0YYYYYYYYY/p1)",
+                { createdAt: "2026-10-11T10:00:00Z" }
+              ),
+            ],
+            pageInfo: { hasNextPage: false },
+          },
+        }),
+        viewer: { id: "viewer" },
+      })
+    );
+    assert.equal((await port.readTicket("ENG-1"))?.anchorId, "early");
+  });
+
+  it("returns null for a missing ticket and refuses a thread it cannot read in full", async () => {
+    const missing = portWith(() =>
+      ok({ issue: null, viewer: { id: "viewer" } })
+    );
+    assert.equal(await missing.port.readTicket("ENG-1"), null);
+    const long = portWith(() =>
+      ok({
+        issue: issue({
+          comments: { nodes: [], pageInfo: { hasNextPage: true } },
+        }),
+        viewer: { id: "viewer" },
+      })
+    );
+    await assert.rejects(long.port.readTicket("ENG-1"), {
+      message: "ENG-1 has more than 100 comments.",
+    });
+  });
+});
+
+describe("postUnderAnchor", () => {
+  it("writes the message under the thread anchor and returns the new comment id", async () => {
+    const { port, requests } = portWith(() =>
+      ok({ commentCreate: { comment: { id: "new" }, success: true } })
+    );
+    assert.equal(
+      await port.postUnderAnchor("uuid-1", "c-anchor", "Hello"),
+      "new"
+    );
+    assert.deepEqual(requests[0]?.variables, {
+      input: { body: "Hello", issueId: "uuid-1", parentId: "c-anchor" },
+    });
+  });
+
+  it("fails when Linear does not confirm the comment", async () => {
+    const { port } = portWith(() =>
+      ok({ commentCreate: { comment: null, success: false } })
+    );
+    await assert.rejects(port.postUnderAnchor("uuid-1", "c-anchor", "Hello"), {
+      message: "Linear did not create the update.",
+    });
+  });
+});
+
+describe("recentIdentifiers", () => {
+  it("follows the cursor across pages", async () => {
+    const { port, requests } = portWith((_query, variables) =>
+      variables.after === null
+        ? ok({
+            issues: {
+              nodes: [{ identifier: "ENG-1" }],
+              pageInfo: { endCursor: "next", hasNextPage: true },
+            },
+          })
+        : ok({
+            issues: {
+              nodes: [{ identifier: "ENG-2" }],
+              pageInfo: { endCursor: null, hasNextPage: false },
+            },
+          })
+    );
+    assert.deepEqual(
+      await port.recentIdentifiers(
+        "2026-10-10T00:00:00.000Z",
+        "2026-10-01T00:00:00.000Z"
+      ),
+      ["ENG-1", "ENG-2"]
+    );
+    assert.equal(requests.length, 2);
+    assert.equal(requests[0]?.variables.since, "2026-10-10T00:00:00.000Z");
+    assert.equal(requests[0]?.variables.created, "2026-10-01T00:00:00.000Z");
+    assert.equal(requests[0]?.variables.ask, "Ask from ");
+    assert.ok(
+      requests[0]?.query.includes(
+        "attachments: { some: { title: { startsWith: $ask } } }"
+      )
+    );
+  });
+});
