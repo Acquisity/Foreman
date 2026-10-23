@@ -8,6 +8,7 @@ import {
   SLACK_ANCHOR_PATTERN,
 } from "../requester-reply.js";
 import { parsePullUrl, type TicketFacts } from "./plan.js";
+import type { DiscoveredTicket } from "./store.js";
 
 export interface ThreadComment {
   body: string;
@@ -26,7 +27,7 @@ export interface LinearPort {
     updatedSince: string,
     createdAfter: string,
     after: string | null
-  ) => Promise<{ identifiers: string[]; next: string | null }>;
+  ) => Promise<{ next: string | null; tickets: DiscoveredTicket[] }>;
   findComment: (id: string) => Promise<{ parentId: string | null } | null>;
   postUnderAnchor: (
     issueId: string,
@@ -81,7 +82,7 @@ const DISCOVER_QUERY = `query ReporterDiscover($team: ID!, $since: DateTimeOrDur
     or: [{ updatedAt: { gt: $since } }, { parent: { updatedAt: { gt: $since } } }]
   }) {
     pageInfo { hasNextPage endCursor }
-    nodes { identifier }
+    nodes { identifier updatedAt parent { updatedAt } }
   }
 }`;
 
@@ -128,7 +129,13 @@ const commentSchema = z.object({
 });
 const recentSchema = z.object({
   issues: z.object({
-    nodes: z.array(z.object({ identifier: z.string() })),
+    nodes: z.array(
+      z.object({
+        identifier: z.string(),
+        parent: z.object({ updatedAt: z.string() }).nullable(),
+        updatedAt: z.string(),
+      })
+    ),
     pageInfo: z.object({
       endCursor: z.string().nullable(),
       hasNextPage: z.boolean(),
@@ -188,7 +195,7 @@ export const linearPort = (
     });
   return {
     async discover(updatedSince, createdAfter, after) {
-      const identifiers: string[] = [];
+      const tickets: DiscoveredTicket[] = [];
       const page = async (
         cursor: string | null,
         remaining: number
@@ -202,7 +209,15 @@ export const linearPort = (
             team: ENGINEERING_TEAM_ID,
           })
         );
-        identifiers.push(...data.issues.nodes.map((node) => node.identifier));
+        tickets.push(
+          ...data.issues.nodes.map((node) => ({
+            issue: node.identifier,
+            version: Math.max(
+              Date.parse(node.updatedAt),
+              node.parent ? Date.parse(node.parent.updatedAt) : 0
+            ),
+          }))
+        );
         const { endCursor, hasNextPage } = data.issues.pageInfo;
         if (!(hasNextPage && endCursor)) {
           return null;
@@ -210,7 +225,7 @@ export const linearPort = (
         return remaining > 1 ? page(endCursor, remaining - 1) : endCursor;
       };
       const next = await page(after, DISCOVER_PAGES);
-      return { identifiers, next };
+      return { next, tickets };
     },
     async findComment(id) {
       try {

@@ -46,7 +46,12 @@ export const memoryStore = () => {
   const key = (issue: string, stage: Stage) => `${issue}|${stage}`;
   const pending = new Map<
     string,
-    { attempts: number; lastTry: number; retryAfter: number }
+    {
+      attempts: number;
+      lastTry: number;
+      retryAfter: number;
+      version: number;
+    }
   >();
   const state: {
     cursor: number | null;
@@ -144,16 +149,21 @@ export const memoryStore = () => {
       await markSent(issue, covers, message, channel, commentId);
       return true;
     },
-    enqueue(issues) {
+    enqueue(tickets) {
       if (state.failNextEnqueue) {
         state.failNextEnqueue = false;
         return Promise.reject(new Error("database unavailable"));
       }
-      for (const issue of issues) {
+      for (const { issue, version } of tickets) {
+        const existing = pending.get(issue);
+        if (existing && version <= existing.version) {
+          continue;
+        }
         pending.set(issue, {
           attempts: 0,
-          lastTry: pending.get(issue)?.lastTry ?? 0,
+          lastTry: existing?.lastTry ?? 0,
           retryAfter: 0,
+          version,
         });
         for (const [k, row] of table.entries()) {
           if (k.startsWith(`${issue}|`) && row.status === "waiting") {
@@ -171,6 +181,7 @@ export const memoryStore = () => {
           attempts: entry.attempts + 1,
           lastTry: state.tokens,
           retryAfter: state.now + backoffMs(entry.attempts),
+          version: entry.version,
         });
       }
       return Promise.resolve();
@@ -208,6 +219,7 @@ export const memoryStore = () => {
             attempts: 0,
             lastTry: 0,
             retryAfter: 0,
+            version: 0,
           });
         }
       }
@@ -314,13 +326,19 @@ export const fakeLinear = (tickets: FakeTicket[]) => {
               (entry.parentUpdatedAt !== null &&
                 Date.parse(entry.parentUpdatedAt) > since))
         )
-        .map((entry) => entry.facts.identifier)
-        .sort((a, b) => a.localeCompare(b));
+        .map((entry) => ({
+          issue: entry.facts.identifier,
+          version: Math.max(
+            Date.parse(entry.updatedAt),
+            entry.parentUpdatedAt ? Date.parse(entry.parentUpdatedAt) : 0
+          ),
+        }))
+        .sort((a, b) => a.issue.localeCompare(b.issue));
       const start = after === null ? 0 : Number(after);
       const end = Math.min(matching.length, start + state.discoverPageSize);
       return Promise.resolve({
-        identifiers: matching.slice(start, end),
         next: end < matching.length ? String(end) : null,
+        tickets: matching.slice(start, end),
       });
     },
     findComment(id) {

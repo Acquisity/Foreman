@@ -21,7 +21,8 @@ CREATE TABLE reporter_pending (
   attempts integer NOT NULL DEFAULT 0,
   added_at timestamptz NOT NULL DEFAULT now(),
   last_try timestamptz,
-  retry_after timestamptz
+  retry_after timestamptz,
+  seen_version bigint
 );
 CREATE TABLE reporter_cursor (
   id boolean PRIMARY KEY DEFAULT true CHECK (id),

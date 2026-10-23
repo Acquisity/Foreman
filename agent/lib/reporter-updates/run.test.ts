@@ -843,6 +843,35 @@ describe("discovery", () => {
     assert.equal(s.memory.pending.size, 0);
   });
 
+  it("keeps the backoff when the overlap lists an unchanged ticket again, and clears it only when the ticket has moved on", async () => {
+    const t = old(1, { stateName: "Duplicate", stateType: "canceled" });
+    t.updatedAt = new Date(NOW - 60_000).toISOString();
+    const s = setup([t]);
+    s.linear.state.failNextPost = true;
+    await run(s);
+    s.memory.state.now += 60_000;
+    const second = await run(s, NOW + 300_000);
+    assert.equal(second.errors.length, 0);
+    assert.equal(s.linear.state.discoveries[1]?.after, null);
+    assert.equal(s.linear.posts.length, 0, "no early retry");
+    assert.equal(s.memory.pending.get("ENG-1")?.attempts, 1, "attempts kept");
+    t.updatedAt = new Date(NOW + 400_000).toISOString();
+    await run(s, NOW + 600_000);
+    assert.equal(s.linear.posts.length, 1, "a real change retries at once");
+  });
+
+  it("treats a change to the master as the ticket having moved on", async () => {
+    const t = old(1, { stateName: "Duplicate", stateType: "canceled" });
+    t.updatedAt = new Date(NOW - 60_000).toISOString();
+    t.parentUpdatedAt = new Date(NOW - 50_000).toISOString();
+    const s = setup([t]);
+    s.linear.state.failNextPost = true;
+    await run(s);
+    t.parentUpdatedAt = new Date(NOW + 100_000).toISOString();
+    await run(s, NOW + 300_000);
+    assert.equal(s.linear.posts.length, 1);
+  });
+
   it("retries at once when the ticket changes again, without waiting out the backoff", async () => {
     const t = old(1, { stateName: "Duplicate", stateType: "canceled" });
     const s = setup([t]);
@@ -941,8 +970,7 @@ describe("run over several tickets", () => {
     const tickets = five().slice(0, 1);
     const s = setup(tickets, fiveDeploy(OLD_SHA, false));
     await runReporterUpdates(s.deps, NOW, () => NOW);
-    s.linear.port.discover = () =>
-      Promise.resolve({ identifiers: [], next: null });
+    s.linear.port.discover = () => Promise.resolve({ next: null, tickets: [] });
     const readsBefore = s.linear.state.reads;
     await runReporterUpdates(s.deps, NOW + 300_000, () => NOW + 300_000);
     assert.equal(s.linear.state.reads, readsBefore);

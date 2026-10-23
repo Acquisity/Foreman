@@ -153,7 +153,7 @@ assert.ok(
   (waitingRow?.wait.hours ?? 0) * 60 + (waitingRow?.wait.minutes ?? 0) <= 360,
   "the wait never exceeds six hours"
 );
-await store.enqueue(["ENG-3"]);
+await store.enqueue([{ issue: "ENG-3", version: 100 }]);
 const reset = await store.claim("ENG-3", "fixed", "msg", null);
 assert.ok(reset.ok, "new ticket activity clears the backoff");
 assert.equal(reset.attempts, 1);
@@ -173,7 +173,11 @@ assert.deepEqual(
   "rows already checked against the live commit never crowd out the others"
 );
 
-await store.enqueue(["ENG-2000", "ENG-5", "ENG-5"]);
+await store.enqueue([
+  { issue: "ENG-2000", version: 100 },
+  { issue: "ENG-5", version: 100 },
+  { issue: "ENG-5", version: 90 },
+]);
 await store.failPending("ENG-2000");
 assert.equal(
   (await store.nextPending(10)).includes("ENG-2000"),
@@ -205,11 +209,25 @@ assert.equal(
   "a failing ticket is tried again once its backoff has passed"
 );
 await store.failPending("ENG-2001");
-await store.enqueue(["ENG-2001"]);
+await store.enqueue([{ issue: "ENG-2001", version: 100 }]);
 assert.equal(
   (await store.nextPending(10)).includes("ENG-2001"),
   true,
   "new ticket activity brings it back at once"
+);
+
+await store.failPending("ENG-2001");
+await store.enqueue([{ issue: "ENG-2001", version: 100 }]);
+assert.equal(
+  (await store.nextPending(10)).includes("ENG-2001"),
+  false,
+  "rediscovering the same version keeps the backoff"
+);
+await store.enqueue([{ issue: "ENG-2001", version: 101 }]);
+assert.equal(
+  (await store.nextPending(10)).includes("ENG-2001"),
+  true,
+  "a newer version clears it"
 );
 
 assert.deepEqual(await store.readCursor(), { since: null, sweep: null });

@@ -299,7 +299,7 @@ const discoverTickets = async (
       deps.config.since,
       resume?.after ?? null
     );
-    await deps.store.enqueue(found.identifiers);
+    await deps.store.enqueue(found.tickets);
     if (found.next === null) {
       await deps.store.saveCursor(startedAt - CURSOR_OVERLAP_MS);
     } else {

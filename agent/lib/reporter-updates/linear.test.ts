@@ -384,7 +384,9 @@ describe("discover", () => {
   const page = (identifier: string, next: string | null) =>
     ok({
       issues: {
-        nodes: [{ identifier }],
+        nodes: [
+          { identifier, parent: null, updatedAt: "2026-10-12T10:00:00Z" },
+        ],
         pageInfo: { endCursor: next, hasNextPage: next !== null },
       },
     });
@@ -396,8 +398,11 @@ describe("discover", () => {
       variables.after === null ? page("ENG-1", "next") : page("ENG-2", null)
     );
     assert.deepEqual(await port.discover(SINCE, CREATED, null), {
-      identifiers: ["ENG-1", "ENG-2"],
       next: null,
+      tickets: [
+        { issue: "ENG-1", version: Date.parse("2026-10-12T10:00:00Z") },
+        { issue: "ENG-2", version: Date.parse("2026-10-12T10:00:00Z") },
+      ],
     });
     assert.equal(requests.length, 2);
     assert.equal(requests[0]?.variables.since, SINCE);
@@ -439,7 +444,7 @@ describe("discover", () => {
     });
     const found = await port.discover(SINCE, CREATED, null);
     assert.equal(found.next, "cursor-20");
-    assert.equal(found.identifiers.length, 20);
+    assert.equal(found.tickets.length, 20);
   });
 });
 

@@ -19,6 +19,11 @@ export type ClaimResult =
   | { attempts: number; ok: true; token: string }
   | { ok: false; reason: "backing_off" | "busy" };
 
+export interface DiscoveredTicket {
+  issue: string;
+  version: number;
+}
+
 export interface Sweep {
   after: string;
   since: number;
@@ -47,7 +52,7 @@ export interface ReporterStore {
     commentId: string,
     token: string
   ) => Promise<boolean>;
-  enqueue: (issues: string[]) => Promise<void>;
+  enqueue: (tickets: DiscoveredTicket[]) => Promise<void>;
   failPending: (issue: string) => Promise<void>;
   markSent: (
     issue: string,
@@ -153,20 +158,27 @@ export const createReporterStore = (query: Query): ReporterStore => {
       }
       return true;
     },
-    async enqueue(issues) {
-      if (issues.length === 0) {
+    async enqueue(tickets) {
+      const latest = new Map<string, number>();
+      for (const { issue, version } of tickets) {
+        latest.set(issue, Math.max(latest.get(issue) ?? 0, version));
+      }
+      if (latest.size === 0) {
         return;
       }
-      const unique = [...new Set(issues)];
       await query(
-        `INSERT INTO reporter_pending (issue) SELECT unnest($1::text[])
-         ON CONFLICT (issue) DO UPDATE SET attempts = 0, retry_after = NULL`,
-        [unique]
-      );
-      await query(
-        `UPDATE reporter_updates SET attempts = 0, retry_after = NULL, updated_at = now()
-         WHERE issue = ANY($1::text[]) AND status = 'waiting'`,
-        [unique]
+        `WITH moved AS (
+           INSERT INTO reporter_pending (issue, seen_version)
+           SELECT * FROM unnest($1::text[], $2::bigint[])
+           ON CONFLICT (issue) DO UPDATE
+             SET attempts = 0, retry_after = NULL, seen_version = EXCLUDED.seen_version
+             WHERE reporter_pending.seen_version IS NULL
+                OR EXCLUDED.seen_version > reporter_pending.seen_version
+           RETURNING issue
+         )
+         UPDATE reporter_updates SET attempts = 0, retry_after = NULL, updated_at = now()
+         WHERE issue IN (SELECT issue FROM moved) AND status = 'waiting'`,
+        [[...latest.keys()], [...latest.values()]]
       );
     },
     async failPending(issue) {
