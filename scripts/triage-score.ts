@@ -1,7 +1,7 @@
 // Trusted triage replay scorer (ENG-16049).
 //
 //   pnpm triage:score <resultsDir> --heldout-labels <path> [--judge] [--max-judge-calls N]
-//                     [--calibration <path>] [--rerun]
+//                     [--calibration <path>] [--rerun] [--allow-suspects]
 //                     [--cohort evals/triage] [--repo Acquisity/Acquisity] [--runs N]
 //
 // Scores every result JSON in <resultsDir> against the frozen cohort, train
@@ -10,14 +10,16 @@
 // `gh pr view` and refuses the run when it can't. A seeded phrase in any tool
 // output, the sandbox's included, marks the case leak-suspect: it is left out of
 // the main score, and the scorecard prints the suspect count and the score with
-// every suspect counted as a failure and as a pass. --judge grades root cause
+// every suspect counted as a failure and as a pass. Any suspect case makes the
+// scorer exit 3 after it writes its outputs, so a planted leak fails the check;
+// --allow-suspects exits 0 for real runs where suspects are expected. --judge grades root cause
 // through headless Claude Code, capped at --max-judge-calls (default 20), and
 // refuses before the first call when more rows need judging than the cap.
 // --calibration reads hand labels (row, documentSha256, grade, reason) from a
 // file outside this repository and reports the judge's agreement with them;
 // --rerun judges every row twice and reports the flip rate, so it needs twice
 // the calls. Both print in the scorecard as counts, never label text.
-// Writes scorecard.md and scores.json into <resultsDir>; prints the leak-suspect count.
+// Writes scorecard.md and scores.json into <resultsDir>; exits 3 on any leak-suspect case unless --allow-suspects.
 import { execFile } from "node:child_process";
 import { readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -56,6 +58,7 @@ import {
   renderScorecard,
   rowKey,
   scoreReplay,
+  scorerExitCode,
   splitSchema,
 } from "../agent/lib/triage-replay/score.js";
 
@@ -66,9 +69,10 @@ const OUTPUTS = new Set(["scores.json"]);
 const labelsSchema = z.array(triageLabelSchema);
 
 const USAGE =
-  "Usage: pnpm triage:score <resultsDir> --heldout-labels <path> [--judge] [--max-judge-calls N] [--calibration <path>] [--rerun] [--cohort evals/triage] [--repo Acquisity/Acquisity] [--runs N]";
+  "Usage: pnpm triage:score <resultsDir> --heldout-labels <path> [--judge] [--max-judge-calls N] [--calibration <path>] [--rerun] [--allow-suspects] [--cohort evals/triage] [--repo Acquisity/Acquisity] [--runs N]";
 
 interface Options {
+  allowSuspects: boolean;
   calibration: string;
   cohort: string;
   heldout: string;
@@ -82,6 +86,7 @@ interface Options {
 
 function parseArgs(argv: string[]): Options {
   const options: Options = {
+    allowSuspects: false,
     calibration: "",
     cohort: "evals/triage",
     heldout: "",
@@ -108,6 +113,9 @@ function parseArgs(argv: string[]): Options {
     return parsed;
   };
   const flags: Record<string, (flag: string) => void> = {
+    "--allow-suspects": () => {
+      options.allowSuspects = true;
+    },
     "--calibration": (flag) => {
       options.calibration = value(flag);
     },
@@ -366,9 +374,10 @@ async function main() {
     `${JSON.stringify({ ...report, calibration }, null, 2)}\n`
   );
   console.log(scorecard);
+  process.exitCode = scorerExitCode(report, options.allowSuspects);
   if (report.suspects.cases.length) {
     console.error(
-      `${report.suspects.cases.length} leak-suspect case(s) left out of the main score; read the bounds in the scorecard.`
+      `${report.suspects.cases.length} leak-suspect case(s) left out of the main score; read the bounds in the scorecard.${options.allowSuspects ? "" : " Exiting 3; pass --allow-suspects when suspects are expected."}`
     );
   }
 }

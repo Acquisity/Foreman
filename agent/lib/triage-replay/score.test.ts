@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { makeCase, makeLabel, makeResult, SHA } from "./fixtures.js";
-import type { LeakageHit } from "./leakage.js";
+import { findLeaks, type LeakageHit } from "./leakage.js";
 import { NEW_MASTER, triageLabelSchema } from "./schema.js";
 import {
   APART,
@@ -14,8 +14,10 @@ import {
   renderScorecard,
   rowKey,
   type ScoreInput,
+  SUSPECT_EXIT_CODE,
   sameDuplicates,
   scoreReplay,
+  scorerExitCode,
 } from "./score.js";
 
 const OTHER_COHORT = /different cohort/;
@@ -522,4 +524,41 @@ test("a case whose run answered from a frozen list entry with no creation time s
   assert.equal(train.all.listMembershipUnknown, 0);
   assert.equal(train.all.rows, 3 * 2);
   assert.match(renderScorecard(report), MEMBERSHIP_APART);
+});
+
+test("a planted fix commit, PR text or cause phrase fails the scorer with exit 3 unless suspects are allowed", () => {
+  const fixCommit = "3f9c2b7d41e85a0c6b19d2e4f7a3c8b5d0e1f2a3";
+  const label = makeLabel("ENG-1", { fixCommit, fixPr: 6108 });
+  const pr = {
+    body: "Keeps the cached layout in memory until the panel finishes its second render pass.",
+    title: "Keep cached layout through panel re-render",
+  };
+  const exitFor = (content: string, allow: boolean) => {
+    const hits = findLeaks({
+      label,
+      pr,
+      result: {
+        inputs: [
+          { availableAt: null, content, provenance: "seeded", source: "bash" },
+        ],
+      },
+    });
+    const input = base({
+      leakage: new Map([[rowKey("ENG-1", 1), hits]]),
+    });
+    input.trainLabels = input.trainLabels.map((item) =>
+      item.id === "ENG-1" ? label : item
+    );
+    return scorerExitCode(scoreReplay(input), allow);
+  };
+  assert.equal(SUSPECT_EXIT_CODE, 3);
+  for (const planted of [
+    `commit ${fixCommit} touched the panel`,
+    "Keep cached layout through panel re-render",
+    "The save handler cleared the cached layout before the panel rendered it again.",
+  ]) {
+    assert.equal(exitFor(planted, false), 3);
+    assert.equal(exitFor(planted, true), 0);
+  }
+  assert.equal(exitFor("nothing relevant here", false), 0);
 });

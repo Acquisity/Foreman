@@ -135,6 +135,14 @@ export function apartReason(
   return leakSuspect ? "leak_suspect" : null;
 }
 
+export const SUSPECT_EXIT_CODE = 3;
+
+export const scorerExitCode = (
+  report: Pick<ScoreReport, "suspects">,
+  allowSuspects: boolean
+) =>
+  report.suspects.cases.length > 0 && !allowSuspects ? SUSPECT_EXIT_CODE : 0;
+
 /** One split's scores, overall and per intake lane, with the cases scored apart from both. */
 export interface SplitScore {
   all: GroupScore;
