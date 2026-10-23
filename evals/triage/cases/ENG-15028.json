@@ -1,0 +1,230 @@
+{
+  "id": "ENG-15028",
+  "provenance": "seeded",
+  "createdAt": "2026-10-09T11:10:35.157Z",
+  "lane": "triage",
+  "stratum": "bug_master",
+  "ticket": {
+    "title": "Name 26 - Paid for inboxes and domain but those are nowhere to be found in the workspace",
+    "description": "#### Customer Name\n\nName 26\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 26' Workspace\n\n#### Screenshot\n\n <image> \n\n <image> \n\n#### What are you trying to achieve?\n\nPaid for inboxes and domain but those are nowhere to be found in the workspace\n\n#### What are you doing to achieve it?\n\nPaid for inboxes and domain but those are nowhere to be found in the workspace\n\n#### What is happening instead?\n\nPaid for inboxes and domain but those are nowhere to be found in the workspace\n\n#### What is the expected outcome?\n\nInboxes and domains should be visible after payment and purchase",
+    "attachmentKinds": ["image", "slack"]
+  },
+  "repoCommitAtCreate": "630800c2681f2d2619970faeac32cb74939e448e",
+  "flags": {
+    "descriptionEditedAfterCreate": false,
+    "needsProductionData": true,
+    "alreadyFixedAtTriage": false
+  },
+  "relatedSnapshot": [
+    {
+      "id": "ENG-14226",
+      "createdAt": "2026-09-24T13:22:37.473Z",
+      "title": "Name 1 - Outreach inboxe purchase failed",
+      "state": "Todo",
+      "assignee": "Anthony Adewale",
+      "parent": "ENG-14227",
+      "labels": ["Bug", "Customer reported", "fast-lane"],
+      "description": "#### Customer Name\n\nName 1\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nCompany One\n\n#### Screenshot\n\n <image> \n\n <image> \n\n <image> \n\n#### What are you trying to achieve?\n\nClient was trying to purchase more outreach inboxes\n\n#### What are you doing to achieve it?\n\nmade the payment, see attached receipts\n\n#### What is happening instead?\n\nThe payment went through but the emails did not show up. There was a cancel order button which he pressed assuming that it would reset. But all the existing emails also dropped from the account.\n\n#### What is the expected outcome?\n\nPlease investigate. Client would like to get the existing emails back as well as the ones he purchased just now"
+    },
+    {
+      "id": "ENG-11251",
+      "createdAt": "2026-07-08T06:50:39.789Z",
+      "title": "Domain and Inboxes order failed",
+      "state": "Done",
+      "assignee": "Tyler Olsen",
+      "parent": null,
+      "labels": ["Bug", "intercom-sourced", "triaged-by-devin"],
+      "description": "**Customer Name**\nName 2\n\n**Customer Email**\n<email>\n\n**Customer Email**\n<Enter text>\n\n**Workspace name**\nName 2's Workspace\n\n**Screenshot**\n\n**What is the user trying to achieve?**\n3 Domains and inboxes\n\n**What is the user doing to achieve it?**\nordered 3 domains and inboxes\n\n**What is happening instead?**\nOrder failed and domain and inboxes not showing\n\n**What is the expected outcome?**\nSuccessfully have domains and inboxes"
+    },
+    {
+      "id": "ENG-11254",
+      "createdAt": "2026-07-08T13:17:45.280Z",
+      "title": "Paid domains/pre-warmed inboxes never provision after a successful charge",
+      "state": "Duplicate",
+      "assignee": "Tyler Olsen",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "## Problem\n\nCustomers are charged for pre-warmed domains and inboxes, but the purchased items never appear in their workspace — provisioning is stuck after a successful charge (distinct from checkout failing). Name 2 paid for domains + inboxes that are not showing up.\n\n## Name 5 signal\n\n* Name 5 topic: `<uuid>`\n* Severity: High | Confidence: 0.85 | Track: Engineering\n* 2nd customer this week (3 in 30d).\n\n## Why new\n\nAll prior provision-after-charge tickets are closed: ENG-8024 (marked Duplicate), ENG-7601 (Done), ENG-3964 (Done), ENG-4903 (Done), ENG-8098 (Done, refund). The symptom is recurring again with no open canonical ticket to track it. Separate from the checkout \"payment failed\" error tracked in ENG-10691.\n\n## Source\n\n* Name 3\n* Reporter: Name 2 (charge succeeded, domains/inboxes absent from workspace).\n\n## Name 4\n\n`modem-<uuid>-2026-07-08`"
+    },
+    {
+      "id": "ENG-14551",
+      "createdAt": "2026-10-01T00:13:41.153Z",
+      "title": "Charged twice for the same domain and inbox bundle; one bundle was never delivered and its subscription is still billing",
+      "state": "Todo",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": ["intercom-sourced"],
+      "description": "Intercom conversation: <url:app.intercom.com>\n\nConversation context: customer-initiated Intercom conversation, opened 2026-09-30, contact Name 6 <email>, workspace \"Name 7 Workspace\", owner role. Initial message: \"I have a billing issue that isn't being sorted. Please escalate to someone asap!\" Asked for detail: \"I've been billed twice for emails and domains for the last 3 months when that's not what I'm using.\" Declined the self-serve answer: \"No, I still need help.\" No attachments.\n\nBucket: overcharged.\n\nFinding: the customer bought the same DFY bundle (1 domain + 3 inboxes) twice about 17 hours apart and was charged for both; only one bundle was ever delivered. Order <uuid> (domain <domain>, created 2026-07-23 14:01Z) was cancelled for \"Payment timeout - order automatically cancelled after 30 minutes\" with nothing provisioned, but its Autumn subscription and its Stripe charges landed anyway. Order <uuid> (domain <domain>, created 2026-07-24 06:47Z) completed and is the bundle the customer actually uses (3 active connected inboxes). The cancelled order's subscription was never cancelled, so it has kept invoicing every month since.\n\nExposure (Stripe, smallest currency unit, all succeeded and unrefunded, no credit notes):\n\n* 2026-07-23, 3276 cents ($32.76), charge <stripe-id>, invoice EKGUJ5YE-0017\n* 2026-08-23, 1800 cents ($18.00), charge <stripe-id>, invoice EKGUJ5YE-0021\n* 2026-09-23, 1800 cents ($18.00), charge <stripe-id>, invoice EKGUJ5YE-0025\n  Total already collected for the undelivered bundle: $68.76, and $18.00/month continues until the orphan subscription is cancelled. The delivered bundle's own charges are legitimate and are not part of this ask.\n\nProposed human action (proposal, not a promise): refund the $68.76 collected for the undelivered bundle, and cancel the orphan domain and inbox line items on the billing account so the recurring $18.00/month stops. A Stripe customer credit is the alternative if the customer would rather have it applied forward (the Legacy Pro plan bills monthly, so there is a future invoice to consume it). The customer has not yet said which they want. No money has been moved and nothing has been cancelled.\n\nFull readout, systems of record, and the code path are in the Billing investigation document on this ticket."
+    },
+    {
+      "id": "ENG-4009",
+      "createdAt": "2025-12-24T15:11:54.076Z",
+      "title": "Missing domains and inboxes from recent purchase",
+      "state": "Done",
+      "assignee": "Tyler Olsen",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "Customer Name 8 (user: <email>) in workspace Company Five reports that after purchasing 3 domains and 9 inboxes, 2 domains and 6 inboxes are still missing.\n\nThe subscription for Email - Domains (x3) and Email - Inboxes (x9) appears active in billing (see screenshot below).\n\n <image> "
+    },
+    {
+      "id": "ENG-12580",
+      "createdAt": "2026-08-12T09:56:13.200Z",
+      "title": "Client paid for Outreach domains and Inboxes but they are not showing in his workspace",
+      "state": "Done",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [],
+      "description": "#### Customer Name\n\nName 9\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 9\n\n#### Screenshot\n\n <image> \n\n#### What are you trying to achieve?\n\nClient paid for Outreach inboxes and domains but they are not showing in his workspace.\n\n#### What are you doing to achieve it?\n\nName 10 opened a support ticket on July 25, which is still not resolved. \n<url:fegrowthpartner.slack.com>\n\n#### What is happening instead?\n\nThe inboxes and domains are still not showing on his account. This client is a refund risk.\n\n#### What is the expected outcome?\n\nPlease investigate and resolve this issue on highest priority"
+    },
+    {
+      "id": "ENG-14670",
+      "createdAt": "2026-10-02T23:11:22.293Z",
+      "title": "Overcharged for inbox and domain seats — billed 24 inbox seats while 12 live on the workspace",
+      "state": "Todo",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": ["Customer reported", "Refund", "intercom-sourced"],
+      "description": "Intercom conversation: <url:app.intercom.com>\n\nConversation context: customer-initiated Intercom conversation. Contact Name 11, <email>, workspace \"Company Four\" (the billing URL in the conversation pins it: <url:app.acquisity.ai>). She opened with \"i have a billing question\", attached a screenshot of the Billing page and asked \"why does my billing say i owe $96/month for 12 total inboxes but then it says below $24/month x 4 domains,\" then \"then why am i getting billed double that per month\", then \"speak to a human\". Fin AI twice explained it away as the same cost shown two ways; she did not accept that. She then sent a second screenshot of the page's \"Invoices & payment history\" table and asked \"checking the Payment history, there were other charges. Where is this coming from?\" No requested remedy stated, only that the monthly amount looks wrong.\n\nBucket: overcharged.\n\nFinding: the Billing page is not double counting. The $96/month \"Total Inboxes\" line and the \"$24/month x 4 domains\" rows are the same 12 inboxes recomputed, which is why they agree. The real divergence is that her billing account carries 24 inbox seats and 8 domain seats while the workspace holds 12 live inboxes on 4 active domains.\n\n* Billed: 18 inbox seats ($24 + $24 + $96 = $144.00/month) + 6 inbox seats (6 x $8.00 = $48.00/month) = $192.00/month; and 6 + 2 = 8 domain seats = $144.00/year; plus a $1.00/month legacy plan.\n* Live: 4 active domains with 3 prewarmed inboxes each = 12 inboxes.\n* Excess: 12 inbox seats ($96.00/month) and 4 domain seats ($72.00/year). The excess inbox seats are exactly the $96/month she pointed at.\n\nHer second screenshot answers \"where is this coming from\". Every row is a real paid invoice on this billing account, and the two recurring lines are the two subscriptions renewing on different days of the month: $144.00 on the 24th (the 18-seat subscription) and $48.00 on the 19th (the older 6-seat legacy subscription). The $23.75 and $10.00 rows are one-off credit purchases, not subscriptions, so they are not part of the recurring cost. Nothing in the history is a duplicate, a refund, a credit note, or a failed payment.\n\nProposed human action (proposal, not a promise): reconcile the live add-on seats on the billing account against the resources genuinely in the workspace, end the excess inbox and domain line items so the recurring charge stops, and decide the refund of the overcollected amount against the uncapped charge history. She has no self-serve path to remove the excess seats.\n\nOpen human decisions: the customer has not yet said whether she wants money back or a credit, and the suspended <domain> domain's 3 inboxes are excluded from the Billing page but not obviously excluded from billing."
+    },
+    {
+      "id": "ENG-7410",
+      "createdAt": "2026-03-31T19:36:47.334Z",
+      "title": "Purchased domains and inboxes never appear after provisioning",
+      "state": "Done",
+      "assignee": "Tyler Olsen",
+      "parent": null,
+      "labels": ["Inbox/Domain Not Created"],
+      "description": "Domains and inboxes were purchased, but none have appeared in **Cold Email Agent → Email Accounts** even after more than a day.\n\nWorkspace: Name 12's Workspace\nUser email: <email>\n\nNo campaigns have been set up yet."
+    },
+    {
+      "id": "ENG-4638",
+      "createdAt": "2026-01-18T20:11:30.332Z",
+      "title": "Missing Domains and Inboxes",
+      "state": "Done",
+      "assignee": "Tyler Olsen",
+      "parent": null,
+      "labels": ["Bug", "Inbox/Domain Not Created"],
+      "description": "#### Customer Name\n\nName 13\n\n#### Customer Email\n\n<email>\n\n#### Screenshot\n\n <image> \n\n#### Clear description of what the problem is\n\nClient has purchased Domains and Inboxes but the following prompt shows up. Expectations analyze the prompt and workspace.\n\nWorkspace shows 3/3 domains used. User signed up to Pro on the 12th/01. "
+    },
+    {
+      "id": "ENG-12049",
+      "createdAt": "2026-07-25T05:52:56.281Z",
+      "title": "Paid domains and inboxes not visible on account",
+      "state": "Done",
+      "assignee": "Nathan Foster",
+      "parent": null,
+      "labels": ["Bug", "Inbox/Domain Not Created", "triaged-by-devin"],
+      "description": "#### Customer Name\n\nName 9\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 9's Workspace\n\n#### Screenshot\n\n <image> \n\n#### What are you trying to achieve?\n\nclient paid for 6 domains/18 inboxes but they are not visible on his account\n\n#### What are you doing to achieve it?\n\ncollected proof of payment from the client\n\n#### What is happening instead?\n\nhe does not have the inboxes preventing us from creating his initial campaign\n\n#### What is the expected outcome?\n\nTo get the 6 domains and 18 inboxes transferred to his account"
+    },
+    {
+      "id": "ENG-7740",
+      "createdAt": "2026-04-13T11:12:00.863Z",
+      "title": "Workspace limits and inbox counts appear reduced",
+      "state": "Done",
+      "assignee": "Tyler Olsen",
+      "parent": null,
+      "labels": [],
+      "description": "user: <email>\n\nFor the `Company Six` workspace, reported billing/usage limits do not match expected values.\n\nReported details:\n\n* Workspace contact capacity was previously 210,000 and now appears as 100,000.\n* Expected count is 33 domains and 99 inboxes.\n* Billing/settings currently show 72 emails.\n* Invoice shows a total of $792 for email inboxes.\n* The customer said leads and inboxes disappeared and that sending capacity is lower than expected as a result.\n\nThis issue is focused on verifying the workspace's actual purchased limits and why the visible domain/inbox/contact-capacity counts changed."
+    },
+    {
+      "id": "ENG-8024",
+      "createdAt": "2026-04-22T16:04:55.141Z",
+      "title": "Purchased inboxes do not appear after payment",
+      "state": "Duplicate",
+      "assignee": "Tyler Olsen",
+      "parent": null,
+      "labels": [],
+      "description": "user: <email>\n\nIn workspace `Company Three`, 6 domains and 18 email accounts were purchased, but no email accounts appear in the Email Accounts page after 12+ hours.\n\nA support review found no visible purchase in the account at first, but the customer shared a pending $252 bank charge. The customer also re-authenticated the affected Name 14 accounts after a Name 14 error banner was identified, but the email accounts still do not show.\n\n <image> \n\n <image> "
+    },
+    {
+      "id": "ENG-14185",
+      "createdAt": "2026-09-23T20:36:12.882Z",
+      "title": "The client purchased additional domains, but they are not appearing in Acquisity. They also have 4 previously purchased domains and 12 inboxes that are still missing or inactive. They are requesting that the missing domains/inboxes be checked, provisioned, and activated, and to confirm if any action is needed from their side.",
+      "state": "Todo",
+      "assignee": "Anthony Adewale",
+      "parent": "ENG-14187",
+      "labels": ["Bug", "Customer reported", "fast-lane"],
+      "description": "#### Customer Name\n\nName 15\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 15\n\n#### Screenshot\n\n <image> \n\n#### What are you trying to achieve?\n\nThe client wants to have all of their purchased domains and inboxes properly provisioned and visible in Acquisity so they can use them for outreach.\n\n#### What are you doing to achieve it?\n\nThey purchased six additional domains and previously purchased six pre-warmed domains with three inboxes per domain (18 inboxes total).\n\n#### What is happening instead?\n\nThe payment for the six new domains went through, but the domains are not showing in Acquisity. From the previous purchase, only two of the six domains appeared successfully with three active inboxes each. The remaining four domains and 12 inboxes are still missing or inactive.\n\n#### What is the expected outcome?\n\nThe missing domains and inboxes should be properly provisioned, authenticated, and appear under Email Accounts in Acquisity. The client would also like confirmation if any action is required from their side."
+    },
+    {
+      "id": "ENG-4966",
+      "createdAt": "2026-01-29T17:59:39.328Z",
+      "title": "Purchased domains and email inboxes not appearing in workspace",
+      "state": "Done",
+      "assignee": "Tyler Olsen",
+      "parent": null,
+      "labels": ["Inbox/Domain Not Created"],
+      "description": "user: <email>\n\nworkspace: Name 18 and Name 19 - <workspace-slug>\n\n36 inboxes missing from Name 17 17 and Name 17 27 purchases (18 inboxes each)\n\nUser purchased 6 domains and 18 email inboxes on January 27, 2026 at \\~10:30pm using Name 16\u0019s credit card (Gold) for $252 plus $8/month for the emails. Almost three days later, the domains and inboxes still do not appear in the Email Accounts / campaign options, so variants cannot be created.\n\n <image> "
+    },
+    {
+      "id": "ENG-4186",
+      "createdAt": "2026-01-06T00:23:32.087Z",
+      "title": "Inboxes not created after purchase in Company Seven workspace",
+      "state": "Done",
+      "assignee": "Tyler Olsen",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "Customer Name 20 (<email>) bought domains/inboxes in the platform for workspace \"Name 20's  Company Seven Workspace\".\n\nInitially an error was shown while provisioning the domains/inboxes. The error banner is now gone but no inboxes/email accounts are present in any of the customer’s workspaces.\n\nRelevant screenshots:\n\n <image> \n\n <image> "
+    },
+    {
+      "id": "ENG-14064",
+      "createdAt": "2026-09-19T21:28:42.375Z",
+      "title": "Purchased domains and inboxes not appearing after checkout",
+      "state": "Canceled",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [],
+      "description": "#### Customer Name\n\nName 21\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nDiamond\n\n#### What are you trying to achieve?\n\nThe customer is trying to purchase domains (bundled with inboxes) and have them appear in their workspace for use.\n\n#### What are you doing to achieve it?\n\nThe customer followed the documented process to purchase domains via the dashboard. Support has checked for the workspace's orders and inboxes but could not verify any records or provisioning state. There is an open engineering issue for inboxes stuck in provisioning. The customer was advised to check Email Accounts and Billing for any listed domains or inboxes.\n\n#### What is happening instead?\n\nAfter purchasing, no domains or inboxes have appeared in the workspace for over a week. Support cannot confirm whether the purchase went through, as no orders or inboxes are visible for this workspace. No error messages or IDs were provided.\n\n#### What is the expected outcome?\n\nPurchased domains and inboxes should appear in the workspace shortly after checkout and be available for use.\n\n---\n\nWorkspace ID: <uuid>\nSupport conversation: <uuid>\nOpened from the support inbox by Aaron Fraga"
+    },
+    {
+      "id": "ENG-4348",
+      "createdAt": "2026-01-09T17:27:04.649Z",
+      "title": "Pro plan workspace missing purchased domain and inboxes",
+      "state": "Done",
+      "assignee": "Tyler Olsen",
+      "parent": null,
+      "labels": ["Inbox/Domain Not Created"],
+      "description": "Client Name 100 (user <email>) is on a Pro plan but is missing 1 domain and 3 inboxes from what was purchased.\n\nWorkspace shows an error: \"Workspace setup failed: More than 50% of account creations failed for domain <domain>: 3/3.\"\n\nName 22 is also unable to purchase 4 domains and 12 inboxes for this client.\n\nScreenshot of the error message is attached.\n\n <image> "
+    },
+    {
+      "id": "ENG-13213",
+      "createdAt": "2026-08-27T18:52:02.359Z",
+      "title": "DFY domain orders that fail leave names claimed and un-cancellable, blocking re-purchase and leaving the domain store inconsistent",
+      "state": "Todo",
+      "assignee": "Anthony Adewale",
+      "parent": null,
+      "labels": ["Bug", "fast-lane", "master"],
+      "description": "## Root cause\n\nWhen a Done-For-You domain order fails to provision at the provider, the domain rows are written to `mail_domain` (which has a global unique index `mail_domain_domain_unique` on `domain`) and left in a `failed` or `pending` state. Those rows are never released, so they keep holding the name for the original organization. A later order for the same name throws \"Unable to claim domains for this organization\" at the claim step, silently drops the overlapping domains, and leaves the new order stuck in `provisioning`.\n\nSeparately, a domain that failed still renders in Billing with no Cancel option, and the domain store availability check reads the registrar/provider (which never registered the failed name) instead of `mail_domain`. The result is a failed domain that shows as \"available to purchase\" while its name is actually still claimed internally.\n\n## Evidence\n\n* `apps/web/lib/inngest/functions/mail/process-create-order.ts` `processCreateColdMailOrder`: claims domains into `mail_domain` (unique on `domain`), throws \"Unable to claim domains for this organization: ...\" when a name is already held, and on provider failure writes domains to `status='failed'` with the order left `requires_attention` or `provisioning`.\n* `apps/web/lib/inngest/functions/billing/reconcile-domain-orders-cron.ts`: retries failed inboxes on `requires_attention` orders, but does not release a domain name that failed at the provider and does not recover the duplicate-domain-claim collision.\n\n## Blast radius (counted 2026-08-27)\n\nDomain orders stuck in a non-terminal provisioning state: 17 `provisioning` across 17 organizations, 66 `requires_attention` across 66 organizations, 17 `failed` across 16 organizations. Done-For-You specifically: 3 `provisioning`, 26 `requires_attention`.\n\nDomains in `failed` status with at least one `active` inbox (counted 2026-09-05): 106 domains across 41 organizations.\n\nPaid `requires_attention` orders older than 7 days that hold `failed` domains (counted 2026-09-11): 26 orders across 25 organizations, holding 51 failed domains. Never-retried `error` inboxes on failed domains older than 7 days: 33, across 5 organizations. A 2026-09-10 count of the same cohort returned identical figures.\n\nDFY orders stranded by a stale cross-organization `mail_domain` claim, with no saved provider order id and stale beyond 24 hours (counted 2026-09-23): 5 orders across 5 organizations and 5 users, from the ENG-14139 report. Collision cascade as of 2026-09-23: one stale failed claim is a foreign claim on 4 later DFY orders across 4 organizations, and pending claims written by two stuck orders block 4 further organizations' orders. The wider stuck-in-`provisioning` population is 9 orders across 9 organizations, of which 4 belong to ENG-13308's stall mechanism.\n\n## Fix direction\n\n* Release a failed domain's claim so the name can be re-purchased, and reconcile the domain store's availability check against owned-but-failed domains.\n* Stop silently dropping overlapping domains from a new DFY order; fail fast with a clear message to the customer instead."
+    },
+    {
+      "id": "ENG-14455",
+      "createdAt": "2026-09-29T11:16:45.515Z",
+      "title": "Name 23 - client domains not working",
+      "state": "unknown",
+      "assignee": "unknown",
+      "parent": "unknown",
+      "labels": "unknown",
+      "description": "#### Customer Name\n\nName 23\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 23 (Company Two)\n\n#### Screenshot\n\n#### What are you trying to achieve?\n\nClient Name 24 is trying to launch cold emails for her client Company Two, who purchased 3 domains and 6 email addresses each. To this day only 6 addresses are available to use on their campaigns. The client Company Two is urgently wanting to increase their volume.\n\n#### What are you doing to achieve it?\n\nFlagging for the appropriate team.\n\n#### What is happening instead?\n\nVolume is not where the client wants it to be.\n\n#### What is the expected outcome?\n\nResolve the issue with the unused addresses so that we can ramp up volume."
+    },
+    {
+      "id": "ENG-14664",
+      "createdAt": "2026-10-02T19:36:58.134Z",
+      "title": "Client has paid for inboxes twice and none are showing",
+      "state": "Triage",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [],
+      "description": "#### Customer Name\n\nName 25\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 25\n\n#### Screenshot\n\n <image> \n\n#### What are you trying to achieve?\n\nClient has paid twice for inboxes and hasnt received any\n\n#### What are you doing to achieve it?\n\nChecked his account and there are no email accounts even though he has paid twice\n\n#### What is happening instead?\n\nNo email accounts\n\n#### What is the expected outcome?\n\nRefund his extra charges and make sure he gets his inboxes"
+    },
+    {
+      "id": "ENG-14737",
+      "createdAt": "2026-10-05T18:12:23.750Z",
+      "title": "Pre-warmed domain orders stop entirely when one chosen domain stalls at the supplier",
+      "state": "Backlog",
+      "assignee": null,
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "unknown"
+    }
+  ]
+}

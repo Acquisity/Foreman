@@ -1,0 +1,220 @@
+{
+  "id": "ENG-15020",
+  "provenance": "seeded",
+  "createdAt": "2026-10-09T08:04:08.727Z",
+  "lane": "triage",
+  "stratum": "duplicate",
+  "ticket": {
+    "title": "Name 34 - AI SDR booking in wrong timezone",
+    "description": "#### Customer Name\n\nName 34\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 34\n\n#### Screenshot\n\n#### What are you trying to achieve?\n\nRun campaigns and have AI SDR book calls\n\n#### What are you doing to achieve it?\n\nCampaigns are live, AI SDR KB is set up\n\n#### What is happening instead?\n\nA couple of issues going on with AI SDR:\n\nIt's started sending times in MDT only, leading to prospects showing up at the wrong time - 6 of my last 8 appointments have shown up at the wrong time in the last two days.\n\nI have reset my local timezone (which is MDT) but it typically would send the local timezone of the prospect and I am not sure what effects that decision for the SDR\n\nI have another instance where the agent received a confirmed time but did not book the appointment - the next day it asked the prospect if there were interested in an appointment\n\n#### What is the expected outcome?\n\nPlease investigate and fix the issue.",
+    "attachmentKinds": []
+  },
+  "repoCommitAtCreate": "bf279a1704d5368ca6cbd218247c9d1e38cc91a4",
+  "flags": {
+    "descriptionEditedAfterCreate": false,
+    "needsProductionData": true,
+    "alreadyFixedAtTriage": true
+  },
+  "relatedSnapshot": [
+    {
+      "id": "ENG-12050",
+      "createdAt": "2026-07-25T12:38:31.158Z",
+      "title": "AI SDR offers AEST times to US prospects and books the wrong slot when the prospect replies in a US timezone",
+      "state": "Done",
+      "assignee": "Koppany Kondricz",
+      "parent": null,
+      "labels": ["Bug", "Docs Gap", "intercom-sourced", "triaged-by-devin"],
+      "description": "Reported via Loom + #customer-support-investigations (no Intercom conversation for this one).\n\n#### Customer\n\nName 1 — <email> — workspace **Name 2 AI** (`<uuid>`), campaign \"Fractional Executive businesses | Name 3 approach\" (`<uuid>`).\n\nLoom: <loom>\nSlack: <url:acquisityworkspace.slack.com>\n\n#### Symptom\n\nAI SDR offers **AEST** times to US prospects, and when the prospect replies with a US time it confirms and books a completely different (usually overnight) time. Multiple threads in the same campaign; at least one real Zoom appointment was created at the wrong time.\n\n#### Two distinct defects\n\n**1. Prospect timezone silently falls back to the host's timezone.**\n\n`apps/web/lib/ai-sdr-v2/data-normalizer.ts` (thread creation):\n\n```ts\nconst defaultTimezone =\n  locationTimezone ?? calendarUser?.timezone ?? 'America/New_York';\n// ...\nprospectTimezone: defaultTimezone,\n```\n\nThis customer's leads carry no location data (`custom_fields` has no location/state/country) and the campaign has no `location`, so `getTimezoneFromLocation()` returns null and every US prospect's thread is stamped with the *host's* timezone (`Australia/Melbourne` at the time). The AI SDR then formats offered slots in the prospect's timezone — i.e. AEST — and the host's 9–5 Name 4 availability means the only bookable slots for a US prospect are overnight.\n\nThere is no signal that the timezone was guessed from the host rather than derived from the prospect. ENG-11716's review note already says \"Do not assume organization timezone equals prospect timezone for booking… record timezone source and confidence\"; this is the concrete production case for it.\n\n**2. The** `selected_offered_slot` **fast path ignores the timezone the prospect stated.**\n\n`apps/web/lib/ai-sdr-v2/workflow/steps/data-extraction.ts`: when the extractor sets `selected_offered_slot`, the workflow takes the \"FAST PATH\" and reuses the exact UTC instant of the previously offered slot, even when the same extractor output says the prospect's timezone is different from the one the slot was offered in.\n\nProduction evidence, thread `<uuid>` (<email>):\n\n* Run `<uuid>` — offered \"Tuesday at 10am, Wednesday at 1:30pm, or Thursday at 11:30am AEST\".\n* Prospect replied choosing **1:30 PM ET**.\n* Run `<uuid>` — data-extraction output: `{\"timezone\":\"America/New_York\",\"selected_offered_slot\":1}`, reasoning: *\"Prospect selected previously offered slot #2: Wednesday, July 29th at 1:30 PM AEST (2026-07-29T03:30:00.000Z)\"*. The stated `America/New_York` was discarded; slot-matchmaking took the AEST instant and booking created appointment `<uuid>` (Zoom `84370563861`), and the reply said \"Tuesday, July 28th at **11:30 PM EDT** is locked in.\"\n* The prospect had to correct it; only then did the thread timezone flip to `America/New_York`.\n\nSame pattern, thread for <email> (runs `<uuid>`, `<uuid>`): offered \"…10:30am AEST\", prospect asked for a CT time, AI confirmed \"Monday, July 27th at **7:00 PM CDT**\".\n\n#### Expected\n\n* When the prospect's timezone cannot be derived from lead/reply data, do not silently use the host's timezone as the prospect's — either ask, or clearly label offers in the host's timezone as such.\n* When a prospect picks an offered slot but states a timezone that differs from the one the slot was offered in, treat it as a timezone conflict: re-resolve the time in the stated timezone, or ask, rather than booking the original UTC instant.\n* Don't confirm/book slots that land outside business hours in the prospect's timezone (ENG-11505 covered the offering side; the booking/confirmation side still does it).\n\n#### Related\n\nENG-11716, ENG-10063, ENG-8998, ENG-9676, ENG-11505, ENG-7595.\n\n#### Docs gap\n\n`/docs/ai-sdr/faq/scheduling-calendar/how-do-i-set-the-correct-timezone-for-my-ai-sdr` says the AI SDR proposes times \"in the prospect's local timezone when it can determine it (from their location or their reply)\" but never states what happens when it *can't* — that it falls back to the call handler's timezone, and that leads imported without location fields will therefore be treated as being in the host's timezone. Worth documenting, plus a note that lead lists should include city/state/country for timezone inference."
+    },
+    {
+      "id": "ENG-5874",
+      "createdAt": "2026-02-25T00:57:52.178Z",
+      "title": "AI incorrectly converts time zones for call scheduling",
+      "state": "Canceled",
+      "assignee": "Koppany Kondricz",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "#### Customer Name\n\nName 5\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 5's Workspace\n\n#### Screenshot\n\n#### What are you trying to achieve?\n\nBook a call with a lead at the right time (Name 6 - <email>) 3pm her time (PST), which is 6am AEST, but it booked for 2pm AEST which is 7pm PST\n\n#### What are you doing to achieve it?\n\nKB has info on what time zone he's in, availability is set to his time zone\n\n#### What is happening instead?\n\nThe AI is messing up the time zone conversions\n\n#### What is the expected outcome?\n\nHave the AI convert time zones accurately and book calls for when it says"
+    },
+    {
+      "id": "ENG-1341",
+      "createdAt": "2025-09-22T07:45:48.759Z",
+      "title": "Fix BST timezone handling issue",
+      "state": "Canceled",
+      "assignee": "Ben Ford",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "The timezone isn't quite right - BST (Name 7) is being handled incorrectly. Need to debug and fix the timezone logic to ensure proper BST handling."
+    },
+    {
+      "id": "ENG-12719",
+      "createdAt": "2026-08-14T08:42:03.057Z",
+      "title": "AI SDR is stating wrong time zone for Call handler",
+      "state": "Todo",
+      "assignee": "Koppany Kondricz",
+      "parent": null,
+      "labels": [],
+      "description": "#### Customer Name\n\nName 8\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nCompany One\n\n#### Screenshot\n\n <image> \n\n#### What are you trying to achieve?\n\nRunning campaign\n\n#### What are you doing to achieve it?\n\nUpdated the time zone in availability as EST\n\n#### What is happening instead?\n\nAI SDR is telling prospects that Name 9 is in Pacific time zone instead of Eastern\n\n#### What is the expected outcome?\n\nPlease investigate and make sure there's no issue with the AI SDR"
+    },
+    {
+      "id": "ENG-13875",
+      "createdAt": "2026-09-14T22:31:32.090Z",
+      "title": "Dynamic Zoom meetings are created with a start time shifted by the booking timezone offset",
+      "state": "Done",
+      "assignee": "Anuj Bhatt",
+      "parent": null,
+      "labels": ["Bug", "fast-lane"],
+      "description": "## Overview\n\nDynamic Zoom meetings created by Acquisity are scheduled at the wrong instant. The booked appointment, the Name 10 Calendar event and the CRM record all carry the right time; the Zoom meeting that Acquisity creates from them is shifted by the booking timezone's UTC offset, four hours late for a US Company Three workspace. Hosts and prospects who read the Zoom meeting rather than the calendar invite see the wrong time.\n\n## Problem\n\nWhen the AI SDR or a CRM booking creates a dynamic Zoom meeting, the meeting's start time in Zoom does not match the appointment. A booking stored at 2026-09-16T14:30:00Z (10:30 AM America/New_York) is created in Zoom as 2:30 PM Eastern. Directly created Zoom meetings and meetings on a static link are unaffected. Every dynamic Zoom booking made for a host whose booking timezone is not UTC carries the shift, equal to that zone's offset from UTC.\n\n## Root cause\n\n`translateEvent` in `apps/web/lib/integrations/conferencing/zoom-video-api-service.ts` (line 286) emits `start_time: dayjs(event.startTime).utc().toISOString()`, which serialises as `YYYY-MM-DDTHH:mm:ss.SSSZ` with milliseconds, while line 292 also sends `timezone: event.organizer.timeZone`. Zoom accepts only `yyyy-MM-ddTHH:mm:ssZ` for GMT or `yyyy-MM-ddTHH:mm:ss` plus a `timezone` ID. On the millisecond-bearing form Zoom ignores the `Z` and reads the clock digits as local time in the supplied zone, so 14:30Z becomes 14:30 New York. Both `createMeeting` (line 349) and `updateMeeting` (line 393) share `translateEvent`.\n\nZoom's own documentation states the two accepted formats, and Zoom Developer Forum reports for the identical `.000Z` input record the `Z` being ignored and the value treated as local time (devforum.zoom.us/t/create-meeting-endpoint-problems/134291 and devforum.zoom.us/t/meeting-api-is-parsing-start-time-in-the-wrong-timezone/84492). The same behaviour reproduced with no `timezone` field present, so the start-time format, not the field's presence, is the trigger.\n\n## Blast radius\n\nDynamic Zoom meetings created in the last 30 days: 2,603 appointments across 320 organizations, counted 2026-09-14 from the production database with\n\n`select count(*), count(distinct organization_id) from scheduling_appointment where deleted_at is null and meeting_id is not null and meeting_id <> 'static' and meeting_url ilike '%zoom.us%' and created_at > now() - interval '30 days'`\n\nPotentially exposed: 1,489 users hold a valid Zoom conferencing account and every one of them runs the same payload; 1,329 users were configured for dynamic links over the same 30-day window. Confirmed affected: one workspace so far, with two current appointments and direct evidence. Counting limitation: the Zoom request and response are not persisted, so affected meetings cannot be read back and are counted from appointment rows.\n\n## Proposed fix\n\nSend Zoom a start-time format it honours. Either the local wall-clock in the booking timezone with no `Z` plus the `timezone` field, or the UTC instant stripped of milliseconds. Keep the appointment instant authoritative; the change is serialisation only. Do not fix this by dropping the `timezone` field alone, which leaves the millisecond-bearing form and the same shift.\n\n## What's included\n\nConferencing payload serialisation for Zoom, used by the AI SDR and CRM booking paths. Excluded: Name 10 and Outlook calendar writes, which already carry the correct instant; the static-link path; and the Zoom free/busy read, which re-normalises with `dayjs.utc` and is unaffected. Related for history, not owned here: ACQ-3599 and ENG-5589 (both closed without a durable fix, same symptom with other zones' offsets) and the Zoom-shift half of ENG-9776 (still open, mixed availability and timezone report).\n\n## Regression seam\n\nCreating a dynamic Zoom meeting for an appointment in a non-UTC booking timezone, then reading the meeting back, must return a start instant equal to the appointment instant. Red before the change (offset by the zone's UTC difference) and green after. `updateMeeting` already reads `meetings/{id}` back and can host the assertion; it needs the Zoom response schema to keep `start_time` and `timezone`, which `zoomEventResultSchema` currently discards.\n\n## Done when\n\n* A dynamic Zoom meeting created for an appointment in a non-UTC timezone carries the same start instant as the appointment, verified by reading the meeting back from Zoom.\n* The same holds for a meeting updated through the reschedule path, which shares `translateEvent`.\n* A regression test proves the red-before, green-after behaviour at the create-time read-back seam.\n\n## Reports\n\nTo be linked: the customer report for the Company Three workspace (ENG-13874)."
+    },
+    {
+      "id": "ENG-11716",
+      "createdAt": "2026-07-16T17:02:40.584Z",
+      "title": "Timezone correctness: compute \"today\" in the prospect's timezone and fix THIS_WEEK day resolution",
+      "state": "Done",
+      "assignee": "Koppany Kondricz",
+      "parent": "ENG-11706",
+      "labels": [],
+      "description": "## Review corrections (2026-07-16)\n\nThese notes supersede any conflicting implementation language below.\n\nDo not assume organization timezone equals prospect timezone for booking. Record timezone source and confidence. If the timezone is unknown and the action would create or confirm a booking, request clarification or block the booking. Introduce an explicit next-occurrence semantic instead of silently changing the global meaning of THIS_WEEK.\n\n---\n\n## Overview\n\nTwo timezone bugs silently mangle what the prospect asked for. First, \"today\" is computed on the server clock (UTC), so for a US prospect replying in the evening, every day-of-week calculation is shifted by one day. Second, if a prospect says \"Monday\" on a Friday, the code looks for a Monday inside the CURRENT calendar week (which is already over), finds nothing, silently discards their preference, and offers unrelated times.\n\n## The prod data\n\n* Customer reports of exactly this class: ENG-5708 (\"Feb 21 is Saturday but AI SDR said Friday\"), ENG-8998 (booked in wrong timezone), ENG-6158 (Saturday slots offered when weekdays enabled). Those v1-era tickets were closed but the v2 mechanism below is live today.\n* Unknown prospect timezone silently defaults to America/New_York, poisoning business-hours filtering and displayed times.\n\n## Root cause (verified in code)\n\n1. `workflow/steps/data-extraction.ts:167-172`: `referenceDate: new Date()` (server/UTC) is used for day-of-week and week-window math, while the resulting slots are later interpreted in the prospect's timezone via `convertLocalSlotsToUtc(localSlots, threadTimezone)`.\n2. `workflow/helpers/time-preference-converter.ts:136`: `const refDay = dayjs(referenceDate).startOf('day')` uses the server-timezone day boundary; lines 158-162 implement THIS_WEEK as \"today through this Sunday\".\n3. The extraction prompt contradicts the code: `agents/data-extraction/default-agent.ts:35-42` says '\"Saturday\" → relative_week: THIS_WEEK (means the upcoming Saturday... the nearest one)'. So \"Monday\" said on a Friday resolves to an empty date window, candidateSlots ends empty, and the generic no-preference branch offers unrelated times.\n\n## What to build (exactly this, one PR)\n\n1. Compute refDay in the prospect timezone throughout time-preference-converter: `dayjs(referenceDate).tz(prospectTimezone).startOf('day')`.\n2. Change day+THIS_WEEK resolution to \"next occurrence of that weekday\" when the named day has already passed in the current calendar week (matching the prompt's stated semantics).\n3. Replace the silent America/New_York default: when prospect timezone is unknown, use the organization's timezone and record `timezone_source` so drafts can hedge (\"your time zone permitting\").\n4. Unit tests pinned at Friday/Saturday/Sunday reference days and at 23:30 UTC (the day-shift window for US timezones).\n\n## Acceptance criteria\n\n- [ ] Unit test: \"Monday\" said on a Friday (prospect tz) produces the upcoming Monday's slots\n- [ ] Unit test: a reply at 23:30 UTC from a US prospect computes \"today\" as the prospect's calendar day\n- [ ] Unknown-timezone threads no longer show America/New_York times (replay check)"
+    },
+    {
+      "id": "ENG-11715",
+      "createdAt": "2026-07-16T17:02:26.891Z",
+      "title": "Never show the copywriter a raw timestamp (wrong-weekday fix + weekday post-check)",
+      "state": "Done",
+      "assignee": "Koppany Kondricz",
+      "parent": "ENG-11706",
+      "labels": [],
+      "description": "## Review corrections (2026-07-16)\n\nThese notes supersede any conflicting implementation language below.\n\nKeep deterministic prospect-timezone formatting as the primary fix. The weekday/date validator must be timezone-aware, year-aware, and tested for ambiguous formats. It should reject or regenerate uncertain pairs rather than guessing.\n\n---\n\n## Overview\n\nProspects were told \"Tuesday, July 15\" when July 15 was a Wednesday. That kills trust exactly when a meeting is close, and wrong dates are the top trigger for prospects realizing they are talking to an AI (\"This must be AI, as you keep sending me incorrect dates. No human is that dense.\"). The model is not bad at scheduling; we hand it raw machine timestamps and force it to work out the weekday itself, which language models are documented to get wrong roughly a third of the time.\n\n## The prod data\n\n* Raindrop issue \"July dates paired with wrong weekdays\" confirmed on the copywriter (claude-sonnet-4.5).\n* AI-suspicion escalations tripled in one day (+245%) with wrong dates named as the primary trigger; that bucket is 1,142 escalations/30d.\n\n## Root cause (three code paths, all verified live)\n\nSlot display strings are computed correctly elsewhere (dayjs `dddd, MMMM Do [at] h:mm A` in `steps/slot-matchmaking.ts:144`), but three paths hand the model raw UTC ISO with no weekday:\n\n1. `workflow/helpers/context-pack-helpers/reply-directive.ts:58-70`: the CONFIRM_BOOKING directive falls back to raw ISO when slot-matchmaking's display_time is absent:\n\n```typescript\nconst slotDisplay =\n  chosenDisplayTime ??\n  `${booking.data.slot.start} - ${booking.data.slot.end}`;\n```\n\n2. `workflow/helpers/context-pack-helpers/booking-section.ts:52-56`: always renders `Booked Slot: <UTC ISO> - <UTC ISO>`.\n3. `workflow/helpers/context-pack.ts:1065-1067`: `## Current Time\\n${new Date().toISOString()}` (no weekday, no prospect timezone).\n\nThe only prompt rule is \"Use the display_time as your source of truth\", which is meaningless when no display_time is supplied. There is no rule \"never state a weekday you were not given\".\n\n## What to build (exactly this, one PR)\n\n1. Format `booking.data.slot` through the same `formatSlotForDisplay` helper (prospect timezone) in both reply-directive.ts and booking-section.ts. No raw ISO may reach the copywriter context.\n2. Render Current Time as e.g. \"Wednesday, July 16, 2026, 3:04 PM EDT (prospect local time)\" in the prospect's timezone.\n3. Copywriter prompt rule (new agent-table version, prod runs v9; sync repo): \"Copy weekday+date pairs verbatim from the context. If a weekday is not provided for a date, do not write one.\"\n4. Deterministic post-generation check in code: extract every weekday+date pair from the draft; if any pair does not match a real calendar pairing (compute with dayjs), block the send and feed it back as review feedback for regeneration.\n\n## Acceptance criteria\n\n- [ ] Unit test: no code path can place a bare ISO timestamp in the copywriter context (assert on the three paths above)\n- [ ] Unit test: a draft containing \"Tuesday, July 15, 2026\" (a Wednesday) is blocked and regenerated\n- [ ] Replay of booked-slot confirmations shows weekday+date+prospect-local time in every draft\n\n## Sequencing\n\nNot hard-blocked, but ideally lands after ENG-11711 (fail-closed copy review): step 4's block-and-regenerate loop feeds into the review machinery, which should already fail closed by then. Do not wait on it if ENG-11711 slips."
+    },
+    {
+      "id": "ENG-13357",
+      "createdAt": "2026-09-01T16:15:47.097Z",
+      "title": "AI SDR inbox \"New Appointment\" form books in host timezone instead of prospect timezone",
+      "state": "Done",
+      "assignee": "Koppany Kondricz",
+      "parent": null,
+      "labels": ["Bug", "fast-lane"],
+      "description": "## Overview\n\nThe AI SDR inbox \"New Appointment\" form books meetings in the host's timezone instead of the prospect's, so calls for prospects in other timezones land at the wrong local hour.\n\n## Problem\n\nWhen a user books a call from an AI SDR email thread using the \"New Appointment\" form, the entered time is interpreted in the host's timezone and the appointment's client timezone is stamped with the host's timezone. Prospects in other timezones therefore see the meeting at the wrong local time, arriving or joining at the wrong hour.\n\n## Root cause\n\n`apps/web/components/ai-sdr/create-appointment-from-thread-modal.tsx` `onSubmit` uses the host's timezone (`userTimeZone`, from `user?.timezone` or the browser) to interpret the entered time and passes it as `clientTimeZone` to `trpc.appointments.createFromThread`, instead of using the thread's `prospect_timezone`. The modal is opened from `email-thread-view.tsx` with `user?.timezone`.\n\n## Blast radius\n\n13 organizations, 25 appointments (origin `sdr_inbox`) where the thread's prospect timezone differs from the appointment's client timezone; 11 organizations, 22 appointments when restricted to `status = 'scheduled'`. Counted 2026-09-01. Lower bound: no creation-time window, joined through the thread's current appointment pointer.\n\n## Proposed fix\n\nThe \"New Appointment\" form should use the thread's prospect timezone to interpret the entered time and stamp the appointment's client timezone (or expose a timezone selector so the user can choose), so the meeting lands at the correct local time for the prospect.\n\n## What's included\n\nFix the manual create-from-thread form's timezone handling. Related but distinct: ENG-12571 (the same form books LLM-guessed duration instead of the call type preset).\n\n## Regression seam\n\n`create-appointment-from-thread-modal.tsx` `onSubmit`: given a thread whose `prospect_timezone` is America/Chicago and a host in America/New_York, entering \"3:15 PM\" must produce an appointment with `client_time_zone = 'America/Chicago'` and the correct UTC instant, not America/New_York.\n\n## Done when\n\n* The form interprets the entered time in the prospect's timezone (or a user-selected timezone).\n* The appointment's client timezone matches the prospect's timezone.\n* A regression test proves a cross-timezone booking lands at the correct instant.\n\n## Reports\n\n* ENG-13355"
+    },
+    {
+      "id": "ENG-6634",
+      "createdAt": "2026-03-12T00:21:52.203Z",
+      "title": "AI SDR booking incorrect time due to timezone confusion",
+      "state": "Duplicate",
+      "assignee": "Koppany Kondricz",
+      "parent": "ENG-5122",
+      "labels": ["Bug"],
+      "description": "#### Customer Name\n\nName 11\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 11 Workspace\n\n#### Screenshot\n\n <image> \n\n <image> \n\n#### What are you trying to achieve?\n\nAI SDR booking wrong time - problem with timezone, edt vs est\n\n#### What are you doing to achieve it?\n\ncorrect booking\n\n#### What is happening instead?\n\nClient offered 4pm est - AI SDR booked 5pm edt\n\n#### What is the expected outcome?\n\nShould be 4pm ET ( label should be changed not include the time )\n\n<!-- preview-url-start -->\n**Preview:** <url:force-est-conversion-aiacquisition.vercel.app> — PR #3140\n<!-- preview-url-end -->"
+    },
+    {
+      "id": "ENG-13113",
+      "createdAt": "2026-08-25T16:43:08.631Z",
+      "title": "Cold email campaign sending-schedule timezone list omits America/Los_Angeles (Pacific Time)",
+      "state": "In Progress",
+      "assignee": "Anthony Adewale",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "## Root cause\n\nThe campaign \"Sending schedule\" timezone dropdown is populated from `instantlyTimezoneOptions` in `apps/web/lib/outreach/Company Two/timezones.ts`. That curated list omits `America/Los_Angeles` (US Pacific Time). The only UTC-08:00-labeled entry is `America/Dawson` (\"Pacific Time - Name 13\", Name 14, which is actually UTC-07:00 year-round). The alias map in the same file covers the other common US zones (New York → Name 15, Name 16 → Name 17, Phoenix → Name 18) but has no `America/Los_Angeles` entry.\n\nCompounding this, `normalizeInstantlySupportedScheduleTimezone` maps any timezone absent from the list to `DEFAULT_INSTANTLY_TIMEZONE` = `America/Detroit` (Eastern), so a Pacific-time workspace that needs a \"supported\" value is silently shifted 3 hours earlier. The calendar/availability settings surface uses a separate timezone source that does include `America/Los_Angeles`, so the two settings surfaces disagree for the same workspace.\n\n## Blast radius\n\n769 organizations have at least one user whose `user.timezone = America/Los_Angeles` (counted 2026-08-25). Name 12 workspaces cannot set their campaign sending schedule to their local timezone, and existing campaigns default to (or fall back to) `America/Detroit`.\n\n## Files\n\n* `apps/web/lib/outreach/Company Two/timezones.ts` — `instantlyTimezoneOptions`, `normalizeInstantlySupportedScheduleTimezone`\n* `apps/web/components/campaigns/detail/tabs/options/campaign-settings-card-utils.ts` — `timezoneOptions` export drives the dropdown"
+    },
+    {
+      "id": "ENG-4899",
+      "createdAt": "2026-01-27T17:55:29.512Z",
+      "title": "Fix AI SDR bugs: wrong time zones and duplicate messages",
+      "state": "Canceled",
+      "assignee": "Jared Stauffer",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "#### Customer Name\n\nName 19\n\n#### Customer Email\n\n<email>\n\n#### Screenshot\n\n#### Clear description of what the problem is\n\nBugs with the AI SDR\n\n1. Sends in wrong time zones - have overviewed settings - nothing changed.\n2. Sends many messages to the same person - that makes no sense\n\nURGENCY - HIGH \nDue date: 28th of Name 20"
+    },
+    {
+      "id": "ENG-4595",
+      "createdAt": "2026-01-16T15:08:14.541Z",
+      "title": "Cannot save Cold Email Agent timezone to UTC+00:00",
+      "state": "Canceled",
+      "assignee": "Anuj Bhatt",
+      "parent": null,
+      "labels": ["Bug", "Data/Config Mismatch"],
+      "description": "User: <email>\n\nUser cannot update the timezone field in **Settings → Workspace → Cold Email Agent → Default Campaign Settings**. Attempts to change the timezone to a UTC+00:00 option (e.g. UK/Isle of Man equivalent) do not save.\n\nBecause the workspace timezone cannot be updated, an active campaign continues to show the status \"outside scheduled sending hours\" even when it is within the configured 9:00–18:00 window for the user’s local time.\n\nPlease investigate why timezone changes in the Cold Email Agent settings are not persisting and ensure UTC+00:00 options can be selected and saved successfully.\n\n <image> \n\nName 21 when clicking on save button "
+    },
+    {
+      "id": "ENG-4706",
+      "createdAt": "2026-01-20T20:01:47.088Z",
+      "title": "Fix timezone bug in campaign end date alert",
+      "state": "Canceled",
+      "assignee": "Beth Newton",
+      "parent": null,
+      "labels": [],
+      "description": "The campaign end date alert was showing incorrect warnings due to a timezone bug. Users in certain timezones were seeing \"Campaign End Date Passed\" when the campaign should show \"Campaign Ends Today\" (or vice versa).\n\nRoot Cause: The date comparison was using setUTCHours(0, 0, 0, 0) to normalize dates, but differenceInDays from date-fns compares dates in the local timezone.\n\nFix: Changed the date normalization to use local timezone by extracting UTC date components and creating local Date objects for comparison.\n\nPR: <url:github.com>"
+    },
+    {
+      "id": "ENG-10063",
+      "createdAt": "2026-06-12T01:36:17.141Z",
+      "title": "Timezone normalization pass for scheduling/booking",
+      "state": "Backlog",
+      "assignee": "Jared Stauffer",
+      "parent": "ENG-10037",
+      "labels": [],
+      "description": "**Sub-ticket 4 of 4 for** ENG-10037 **(Hardening 5). Blocked by the spec (**ENG-10044**), whose root-cause section sizes this ticket — re-scope it when the spec lands; it may split into 2–3 tickets if the cluster has multiple causes.**\n\n## Problem\n\nFive open tickets form a timezone/availability cluster with one customer (Name 22) appearing twice:\n\n* ENG-9676 — AI SDR books meetings five hours ahead\n* ENG-9918 — Outlook calendar sync + timezone issues\n* ENG-8998 — appointments booked in the wrong timezone\n* ENG-9776 — ignores Friday-only availability and shifts Zoom time\n* ENG-9841 — date hallucinations\n\nThese are currently five independent bug tickets; the hardening review's hypothesis is a shared root cause in how timezones flow between prospect-stated times, host availability, calendar provider APIs (Name 10 + the newer O365 support from ENG-8583), slot generation (`time-slot-generator`), and display.\n\n## Build notes\n\n* Start from the spec's per-ticket root-cause mapping. Expected shape of the fix: a single timezone-resolution helper with defined precedence (prospect-stated TZ > TZ inferred from prospect signature/location > org/host default), used consistently by extraction, slot generation, booking, and invite creation — instead of each surface doing its own conversion.\n* Surfaces to check: `apps/web/lib/ai-sdr-v2/` slot matchmaking + `closest-slot-finder.ts` + `time-slot-generator`, the scheduling services (`apps/web/lib/scheduling/services/` — `booking-service.ts`, `calendar-sync-service.ts`), and calendar provider integration code (Name 10 + Outlook).\n* The \"five hours ahead\" signature (ENG-9676) smells like a UTC↔local double-conversion; the Outlook case (ENG-9918) may be O365-specific TZ handling from the ENG-8583 integration. Verify with real appointment rows via the read-only prod DB.\n* Note ENG-8620's finding: some \"timezone bugs\" are user misunderstanding (the 8AM half was timezone confusion, not a bug) — validate each cluster ticket's repro before coding against it.\n* Tests: deterministic TZ cases in slot generation/booking tests (frozen clocks, DST boundaries, prospect-TZ ≠ host-TZ ≠ calendar-TZ).\n\n## Acceptance criteria\n\n* Each cluster ticket either: fixed and linked, reclassified with evidence, or explicitly out of scope with reason.\n* One shared timezone-resolution path with DST + cross-TZ test coverage."
+    },
+    {
+      "id": "ENG-1266",
+      "createdAt": "2025-09-19T08:44:37.489Z",
+      "title": "Adjust selecting the default timezone to use the user's timezone",
+      "state": "Done",
+      "assignee": "Declan Lupari",
+      "parent": "ENG-1004",
+      "labels": [],
+      "description": " <image> "
+    },
+    {
+      "id": "ENG-5654",
+      "createdAt": "2026-02-18T18:11:48.159Z",
+      "title": "Name 23/Dublin GMT options to timezone picklist",
+      "state": "Canceled",
+      "assignee": "Jared Stauffer",
+      "parent": null,
+      "labels": ["Improvement"],
+      "description": "user: <email>\n\nIn Cold Email Agent default campaign settings, the timezone dropdown does not show the standard (UTC+00:00) Name 24 option with cities like Name 25, Name 26, Name 27, or Name 28. Workaround used: selecting an equivalent UTC+00:00 entry (e.g., Isle of Man), but request is to include main cities in the list rather than obscure locations."
+    },
+    {
+      "id": "ENG-13114",
+      "createdAt": "2026-08-25T16:43:26.570Z",
+      "title": "Campaign sending schedule stuck on Eastern time; Pacific Time (Name 29) not selectable",
+      "state": "Todo",
+      "assignee": "Anthony Adewale",
+      "parent": "ENG-13113",
+      "labels": ["Bug", "Customer reported", "intercom-sourced"],
+      "description": "## Intercom source\n\n<url:app.intercom.com>\n\n## Customer\n\nName 30 (<email>) — \"Name 30's Workspace\" (assistant Name 16 on the thread)\n\n## Context\n\nThe customer paused a cold email campaign and, while reviewing settings, found the campaign \"Sending schedule\" timezone stuck on Eastern Time (Name 15). Their calendar/availability settings are correctly set to America/Los_Angeles (Pacific), but when they try to change the campaign sending schedule to Pacific Time, \"Name 29\" is not in the dropdown, so they cannot align their send window with their own timezone.\n\n## Claim\n\nThe campaign \"Sending schedule\" timezone dropdown does not offer US Pacific Time (America/Los_Angeles), so a Pacific-time workspace cannot set its send window to its local timezone and is left on (or silently falls back to) Eastern Time.\n\n## Classification\n\nBug — confirmed against code and production data.\n\n## Root cause\n\n`instantTimezoneOptions` in `apps/web/lib/outreach/Company Two/timezones.ts` omits `America/Los_Angeles`; see master ENG-13113."
+    },
+    {
+      "id": "ENG-8998",
+      "createdAt": "2026-05-19T12:44:45.569Z",
+      "title": "AISDR books appointments in the wrong timezone",
+      "state": "Done",
+      "assignee": "Koppany Kondricz",
+      "parent": "ENG-11716",
+      "labels": ["intercom-sourced"],
+      "description": "\n\n<email>\n**Name 31's Workspace**\n**\nAn appointment request for 1:00 PM ET was confirmed as 3:00 PM ET, and the calendar then placed it at 1:00 PM Mountain Time during a busy slot. The appointment was not actually booked and had to be created manually.\n\nThere is also a report that AISDR marks time as busy in the calendar without following up or completing the appointment flow.\n\nRelevant examples: Loom 1, Loom 2"
+    },
+    {
+      "id": "ENG-2420",
+      "createdAt": "2025-10-29T09:12:44.226Z",
+      "title": "Meetings showing up on the wrong day of the week",
+      "state": "Done",
+      "assignee": "Mahmut Jomaa",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "The user has correct timezone selected, but meetings are showing up on Sunday  in the calendar when they should be showing on the monday\n\n<loom>\n\n<url:thegrowthpartner.slack.com>"
+    },
+    {
+      "id": "ENG-13749",
+      "createdAt": "2026-09-11T23:37:22.199Z",
+      "title": "Campaign creator forwards a saved schedule timezone Company Two rejects, failing campaign creation",
+      "state": "Todo",
+      "assignee": "Anthony Adewale",
+      "parent": null,
+      "labels": ["Bug", "Data/Config Mismatch", "fast-lane"],
+      "description": "## Overview\n\nA campaign created while the workspace's default sending schedule timezone is a zone Company Two does not accept fails at the provider. The wizard has already shown every generation step at 100%, so the customer sees only the generic \"We could not finish this request. Try again, or contact support if it keeps happening.\" and has no way to tell what went wrong.\n\n## Problem\n\nThe workspace Default Campaign Sending Schedule accepts and stores a timezone that the provider rejects. A campaign created with no campaign-specific settings of its own inherits that value, the provider call fails, and campaign creation does not complete. The customer sees a catch-all error and cannot act on it.\n\n## Root cause\n\nThe app persists a schedule timezone it will later hand to Company Two unchanged, and the set of zones the settings page accepts is wider than the set Company Two accepts.\n\n* The settings page validates the timezone with `isAllowedScheduleTimeZone` in `apps/web/components/campaigns/settings/cold-email-agent-settings-page-client.tsx`, which accepts any zone `Name 33` recognizes, and the save path writes `normalizeInstantlyScheduleTimezone(data.timezone)` from `packages/timezones/src/index.ts`. That function returns the input unchanged when it is neither a picklist value nor a known alias, so a real but unsupported zone is stored.\n* The campaign creator then reads it back: `configure-campaign-settings` in `apps/web/lib/inngest/functions/campaign/process-campaign-creator.ts` resolves `campaignSettingsData?.timezone ?? 'America/Detroit'`, and `buildCampaignObject` puts it on `campaign_schedule.schedules[0].timezone` (`apps/web/lib/inngest/functions/campaign/util.ts`).\n* `createCampaign()` and `updateCampaign()` in `apps/web/lib/outreach/Company Two/client.ts` pass it through `normalizeInstantlyCampaignSchedule`, which maps known aliases but deliberately leaves unsupported zones alone, so the raw value reaches the provider and is rejected.\n* \n\n`normalizeInstantlySupportedScheduleTimezone()` in the same package already falls back to `America/Detroit` for an unsupported value, but the settings save path does not use it.\n\nThe failure lands after the app has already written the campaign and its generated result, which is why the UI renders success and then a generic error.\n\n## Blast radius\n\nCounted from production on 2026-09-12. The earlier 162 rows / 158 organizations figure was an over-count that misclassified picklist values as unsupported; the corrected figures are below.\n\n* Confirmed affected: 3 failed `campaign_creator` submissions across 3 organizations carry the diagnostic `Company Two API Client Error (400): body/campaign_schedule/schedules/0/timezone must be equal to one of the allowed values`; first 2026-08-13, most recent 2026-09-05.\n* Potentially exposed: 9 workspace-level default settings rows (campaign_id NULL) across 9 organizations hold a timezone outside the Company Two accepted set: `America/Los_Angeles` x8 (8 orgs) and `America/Vancouver` x1 (1 org). Every other stored value in the full production grouping (37 distinct values) is either in `instantlyTimezoneOptions` or covered by `INSTANTLY_TIMEZONE_ALIASES`. An exposed workspace is unaffected while its campaigns carry their own supported settings; it fails when a campaign is created with no settings of its own.\n* Query: `select timezone, count(*) as rows, count(distinct organization_id) as orgs from outreach__campaign_settings where campaign_id is null group by timezone order by rows desc`, with each returned value classified against the accepted set at commit b5441c5beaa07393423d28462e1e4a36e2fce216; failures counted from `submission` where `type = 'campaign_creator'` and `metadata->>'diagnosticError'` carries the message.\n* Confirmed affected and potentially exposed are separate figures; the exposed count is stored state and an upper bound on future failures, not a failure count. Most workspaces are unaffected in practice because campaign creators usually save campaign-specific settings.\n\n## Proposed fix\n\nThe end-to-end behavior that should change: a schedule timezone that Company Two will reject can never reach the provider, and no customer sees a generic failure for it again.\n\n* Validate at the settings boundary against the accepted provider set rather than any `Name 33`-recognized zone, keeping the stored value supported at all times.\n* Keep a fail-safe at the provider boundary so a bad stored value cannot fail campaign creation outright.\n* Surface the provider's real reason on the failed submission instead of the catch-all banner.\n\n## What's included\n\nIn scope: the settings validation, the normalization at the provider call, and the customer-visible failure message. Excluded: widening the accepted timezone set to cover every IANA zone (a separate product decision with its own verification). Recommended separately, as containment for the 9 organizations already holding an unsupported stored default: a correction or flagging pass on those rows, proposable by support or product rather than filed here. No separate customer-recovery issue is filed: this bug's blast radius is campaign-creation failure with no data loss, and the one known affected customer's campaign is active.\n\n## Regression seam\n\nThe provider client boundary. A campaign create or update whose schedule carries a zone outside the accepted set must never be sent verbatim to Company Two, and the campaign creation path must complete or fail with the provider's reason attached. Red before: an unsupported stored zone reaches the provider and the submission is marked failed. Green after: it cannot.\n\n## Done when\n\n* A workspace whose default sending-schedule timezone is a zone Company Two does not accept can still create a campaign end to end.\n* A failed campaign creation names the provider's reason on the failed submission rather than only the generic banner.\n* The stored default schedule timezone is always a value the provider accepts.\n* A regression test proves the mechanism at the named provider-client seam.\n\n## Reports\n\n* ENG-13748, customer report for the Name 32 workspace (parented as a sub-issue).\n\nForeman support operation: <id>"
+    }
+  ]
+}

@@ -1,0 +1,220 @@
+{
+  "id": "ENG-14415",
+  "provenance": "seeded",
+  "createdAt": "2026-09-28T19:45:10.096Z",
+  "lane": "triage",
+  "stratum": "bug_master",
+  "ticket": {
+    "title": "Name 9 - AI SDR shutting off",
+    "description": "#### Customer Name\n\nName 9\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 9\n\n#### Screenshot\n\n#### What are you trying to achieve?\n\nAISDR Keeps shutting off - not followning up\n\n#### What are you doing to achieve it?\n\nall settings correct\n\n#### What is happening instead?\n\nAI SDR stopping responding, disabled on campaigns\n\n#### What is the expected outcome?\n\nAI SDR normal",
+    "attachmentKinds": ["slack"]
+  },
+  "repoCommitAtCreate": "d5658fc4208eb3bf17c19a41e97e2ca85f05708c",
+  "flags": {
+    "descriptionEditedAfterCreate": false,
+    "needsProductionData": false,
+    "alreadyFixedAtTriage": false
+  },
+  "relatedSnapshot": [
+    {
+      "id": "ENG-2457",
+      "createdAt": "2025-10-30T11:25:16.293Z",
+      "title": "Turning off followups",
+      "state": "Done",
+      "assignee": "Anthony Adewale",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "Agent turned off a followup step without replacing it\n\n<url:thegrowthpartner.slack.com> (minute 3:05)"
+    },
+    {
+      "id": "ENG-3503",
+      "createdAt": "2025-12-06T17:42:40.898Z",
+      "title": "AI SDR auto-reenabled after being turned off",
+      "state": "Canceled",
+      "assignee": "Pieter Venter",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "Customer reports turning off the AI SDR, but later saw that it had been turned back on without their action. To prevent further sends, they deleted the API keys. This suggests the AI SDR may be auto-enabling or being re-enabled unexpectedly."
+    },
+    {
+      "id": "ENG-10782",
+      "createdAt": "2026-06-24T20:05:35.681Z",
+      "title": "Banned/offboarded users can still have active Autumn/Stripe billing",
+      "state": "Duplicate",
+      "assignee": "Jared Stauffer",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "unknown"
+    },
+    {
+      "id": "ENG-12159",
+      "createdAt": "2026-07-30T17:22:57.725Z",
+      "title": "Campaign keeps shutting off and ai agent turns off",
+      "state": "Canceled",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [],
+      "description": "#### Customer Name\n\nName 1\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 1\n\n#### Screenshot\n\n <image> \n\n <image> \n\n <image> \n\n <image> \n\n#### What are you trying to achieve?\n\nGet campaign to stay turned on, ai agent manage campaign proactively\n\n#### What are you doing to achieve it?\n\nscreenshared with Name 1 and confirmed issue - cold EM C has dropped off since 26 July, and also the agent stopped/ togge is not on, confirmed bounce rate acceptable and the em variants are enabled\n\n#### What is happening instead?\n\nContinue sending - current campaign shut off for no reason and also the ai campaign mgt is off. We turned on the campaign to reusme and it shut off again by itself\n\n#### What is the expected outcome?\n\nResume campaign, stay on and we manage his campaign w/ the ai agent"
+    },
+    {
+      "id": "ENG-8150",
+      "createdAt": "2026-04-28T13:53:29.148Z",
+      "title": "Disabled AI SDR now prompts for payment",
+      "state": "Canceled",
+      "assignee": "Beth Newton",
+      "parent": null,
+      "labels": [],
+      "description": "user: <email>\n\nAfter AI SDR was disabled in SDR settings, Acquisity now asks for payment before it can be accessed again. The account was intended to be temporarily shut off after upgrading to Name 2 with Meta ads, but support observed that Acquisity appears to have been canceled instead of just disabling AI SDR.\n\nReported behavior: access is blocked by a paywall, so the user cannot proceed further."
+    },
+    {
+      "id": "ENG-7451",
+      "createdAt": "2026-04-02T06:49:23.545Z",
+      "title": "Request lead credits to stabilize refund-risk client",
+      "state": "Done",
+      "assignee": "Beth Newton",
+      "parent": null,
+      "labels": ["Refund"],
+      "description": "#### Workspace Name\n\nName 3\n\n#### Request Type\n\nLead credit\n\n#### Reason for request\n\nThis is a refund-risk client that I was able to stabilize on a Name 4 call today. She came in asking for a refund due to lack of results and early setup issues, plus she’s currently in a tight financial situation and had to shut off her tools (Company One, etc.).\nI got her to agree to give this one more shot, but we need to remove friction and get something working for her fast.\nRequesting lead credits so we can get campaigns live without her needing to spend more out of pocket right now. Goal is to generate pipeline quickly, show movement, and retain the client.\nShe’s willing to move forward, just needs momentum."
+    },
+    {
+      "id": "ENG-7498",
+      "createdAt": "2026-04-03T09:12:08.625Z",
+      "title": "Tutorial cannot be turned off",
+      "state": "Canceled",
+      "assignee": null,
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "## Problem\n\nA tutorial overlay appears above important UI elements and cannot be turned off. This blocks or interferes with normal use of the page.\n\n <image> \n\n## Solution\n\nProvide a reliable way for a user to fully disable the tutorial so it does not continue appearing over important elements once the user has turned it off.\n\n## Scope\n\n* Tutorial UI shown in the product interface\n* A control that lets the user fully disable the tutorial\n* Persistence of that preference for the user after the tutorial is turned off\n\n## Saved model / behavior model\n\n* The system should store tutorial enabled/disabled state per user.\n* Once a user disables the tutorial, it should remain hidden for that user until explicitly re-enabled.\n* A temporary dismiss-only behavior is not sufficient for this issue.\n\n## Permissions / ownership\n\n* Any user who sees the tutorial should be able to turn it off for their own account.\n* The setting is per user, not workspace-wide.\n\n## UX behavior\n\n* The tutorial should not obscure primary interface elements once disabled.\n* Turning the tutorial off should be straightforward and discoverable.\n* After a user disables it, the tutorial should not reappear unexpectedly for that user.\n\n## Acceptance criteria\n\n* A user can fully disable the tutorial from the UI.\n* After the tutorial is disabled, it no longer appears above important interface elements for that user.\n* The disabled state persists across page reloads and future sessions for that user.\n* The behavior is user-specific and does not affect other users.\n* The implementation does not only dismiss the tutorial temporarily.\n\n## Open questions or design follow-ups\n\n* Where should the control live: close button, settings, or both?\n* Should there be a way to re-enable the tutorial after disabling it?\n* What should happen if tutorial content changes in the future: stay hidden or re-show?\n* Does the tutorial need different behavior on mobile vs desktop?\n\n## Outcome\n\nUsers can permanently turn off the tutorial for themselves so it no longer blocks or distracts from normal product use."
+    },
+    {
+      "id": "ENG-3984",
+      "createdAt": "2025-12-23T13:31:50.322Z",
+      "title": "Investigate cut off user tag",
+      "state": "Canceled",
+      "assignee": "Blaise Gulaj",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "\"Thank you <mention>>I think time ran out on that code.\" was sent from Name 5's profile when it should've been <slack-user> but somehow that first < was cut off.\n\n <image> "
+    },
+    {
+      "id": "ENG-3124",
+      "createdAt": "2025-11-22T15:48:08.092Z",
+      "title": "Cramped UI and Cut off Tickets",
+      "state": "Done",
+      "assignee": "Declan Lupari",
+      "parent": null,
+      "labels": [],
+      "description": "The UI is cramped in the centre of the screen and the tickets have cut off text\n\n <image> "
+    },
+    {
+      "id": "ENG-10543",
+      "createdAt": "2026-06-19T13:02:38.181Z",
+      "title": "Turn off \"Retry on fail\" by default",
+      "state": "Todo",
+      "assignee": "Nathan Foster",
+      "parent": null,
+      "labels": [],
+      "description": "Currently it's on by default for all nodes, for 10 retries\n\n <image> \n\n# Expected behavior\n\nIt should be disabled by default for all nodes"
+    },
+    {
+      "id": "ENG-13115",
+      "createdAt": "2026-08-25T17:49:39.805Z",
+      "title": "Name 6 - lead top-off error",
+      "state": "Done",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": ["Customer reported"],
+      "description": "#### Customer Name\n\nName 6\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 6\n\n#### Screenshot\n\n <image> \n\n#### What are you trying to achieve?\n\ntop off lead credits\n\n#### What are you doing to achieve it?\n\nclicking through the interface to purchase lead credits\n\n#### What is happening instead?\n\nGiving an error (see screenshot)\n\n#### What is the expected outcome?\n\nable to purchase leads"
+    },
+    {
+      "id": "ENG-13603",
+      "createdAt": "2026-09-09T15:12:55.931Z",
+      "title": "Add PayPal to payment links, switched off by default",
+      "state": "In Progress",
+      "assignee": "James Keeble",
+      "parent": null,
+      "labels": [],
+      "description": "unknown"
+    },
+    {
+      "id": "ENG-5846",
+      "createdAt": "2026-02-24T01:55:10.989Z",
+      "title": "AISDR signs off emails as prospect name",
+      "state": "Canceled",
+      "assignee": "Jared Stauffer",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "user: <email>\n\nAISDR is repeatedly signing off emails using the prospect’s name, even after updating the knowledge base and saving settings.\n\n <image> \n\n <image> "
+    },
+    {
+      "id": "ENG-14188",
+      "createdAt": "2026-09-23T21:07:46.258Z",
+      "title": "AI SDR not responding due to toggle being off",
+      "state": "Canceled",
+      "assignee": "James Keeble",
+      "parent": null,
+      "labels": [],
+      "description": "#### Customer Name\n\nAaron Fraga\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nDemo workspace\n\n#### What are you trying to achieve?\n\nEnsure the AI SDR is responding to prospect emails as expected.\n\n#### What are you doing to achieve it?\n\nChecked the AI SDR toggle status (currently recorded as off), verified sending accounts (all healthy), reviewed campaign and connection records, and checked for job failures or generation errors (none found). Awaiting customer confirmation of toggle status and a specific example if the toggle is on.\n\n#### What is happening instead?\n\nNo AI SDR replies are being sent to prospects. The AI SDR enabled flag is off for this workspace. No recent thread activity is recorded, and there are no system errors or blocks.\n\n#### What is the expected outcome?\n\nAI SDR should be enabled and actively responding to prospect emails when the toggle is on.\n\n---\n\nWorkspace ID: <uuid>\nSupport conversation: <uuid>\nOpened from the support inbox by Aaron Fraga"
+    },
+    {
+      "id": "ENG-2456",
+      "createdAt": "2025-10-30T11:22:58.247Z",
+      "title": "Basing decisions to turn off variants on incorrect data",
+      "state": "Done",
+      "assignee": "Anthony Adewale",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "<url:thegrowthpartner.slack.com> Check this video from around 1:25 \n\nAgent turned off \"variant 0/O\" based on it sending 176 emails (amount showing as sent in the agent). However in Company One, it turned off Variant A, and it only had sent 74 emails"
+    },
+    {
+      "id": "ENG-12536",
+      "createdAt": "2026-08-11T15:16:38.820Z",
+      "title": "Name 7 - Turn off Acquisity Subscription",
+      "state": "Done",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [],
+      "description": "#### User Email\n\n<email>\n\n#### Workspace Name\n\nName 7's Workspace\n\n#### Request Type\n\nRefund\n\n#### Reason for request\n\nCancel his subscription - next charge is due tomorrow for $1\n\nHe is offboarding"
+    },
+    {
+      "id": "ENG-10055",
+      "createdAt": "2026-06-12T01:34:35.356Z",
+      "title": "Audit for remaining off-pipeline generation paths",
+      "state": "Backlog",
+      "assignee": "Jared Stauffer",
+      "parent": "ENG-10034",
+      "labels": [],
+      "description": "**Sub-ticket 4 of 4 for** ENG-10034 **(Hardening 2). Independent — half-day survey; can run any time. May spawn follow-up tickets.**\n\n## Goal\n\nThe scheduled-follow-up path was the known off-pipeline generator, but the fabrication arc teaches that ANY generation path not flowing through context-pack + KB-rules + copy-review will eventually produce the next hallucination incident. Find them all.\n\n## Method\n\n* Sweep for model-call sites producing user-visible outbound text in the AI SDR / outreach surface: grep for AI SDK `generateText`/`generateObject`/`streamText` usage and direct provider client usage outside `apps/web/lib/ai-sdr-v2/agents/*` + `prepareAgent`.\n* Candidate paths to check explicitly:\n  * Manual-reply assist / compose suggestions in the inbox UI (if any)\n  * Closure/ghosted follow-up messages (the `followup-workflow.ts` closure branch — distinct from the deferred follow-up branch)\n  * Deferred-followup date-confirmation replies (`workflow/steps/deferred-followup.ts`)\n  * Anything in `apps/web/lib/services/thread-followup.ts` and the CRM sync side (`ai-crm-entity-create/*` writes prospect-visible fields?)\n  * Playground paths that can leak into production behavior\n* For each path found, record: what it generates, whether it uses generateContextPack, whether KB rules apply, whether copy-review gates it, and whether its prompt is DB-versioned.\n\n## Deliverable\n\nA findings table commented on this ticket + one spawned sub-ticket per off-pipeline path worth fixing (parent: ENG-10034), each scoped like ENG-10041 (move to agent system) or the context-pack routing ticket.\n\n## Acceptance criteria\n\n* Every model-call site producing outbound user-visible text is inventoried with its grounding status; gaps have tickets or documented justifications."
+    },
+    {
+      "id": "ENG-7904",
+      "createdAt": "2026-04-16T21:20:39.620Z",
+      "title": "Investigate AI SDR turning off on positive replies",
+      "state": "Canceled",
+      "assignee": "Beth Newton",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "#### Customer Name\n\nName 8\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 8\n\n#### Screenshot\n\n <image> \n\n#### What are you trying to achieve?\n\nAI SDR got turned off on positive reply\n\n#### What are you doing to achieve it?\n\nI suspect client did this in error.  Can you just make sure there isn't a glitch in the SDR that would cause it to turn itself off?\n\n#### What is happening instead?\n\ndisabled\n\n#### What is the expected outcome?\n\nAI SDR respond and book call"
+    },
+    {
+      "id": "ENG-4683",
+      "createdAt": "2026-01-20T08:29:41.274Z",
+      "title": "Add 90 Day Challenge on/off toggle control",
+      "state": "Duplicate",
+      "assignee": "Pieter Venter",
+      "parent": null,
+      "labels": [],
+      "description": "Add a toggle for 90 Day Challenge that can be turned on or off. It should behave in the same way as the existing In Refund Request button."
+    },
+    {
+      "id": "ENG-14045",
+      "createdAt": "2026-09-18T17:37:35.531Z",
+      "title": "Turn sharing on and manage the blocklist in settings",
+      "state": "Todo",
+      "assignee": "Elis Bushaj",
+      "parent": "ENG-13791",
+      "labels": ["CRM migration", "Feature"],
+      "description": "unknown"
+    }
+  ]
+}

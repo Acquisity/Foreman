@@ -1,0 +1,230 @@
+{
+  "id": "ENG-14717",
+  "provenance": "seeded",
+  "createdAt": "2026-10-05T13:55:33.848Z",
+  "lane": "triage",
+  "stratum": "duplicate_hard_negative",
+  "ticket": {
+    "title": "AI SDR not booking meetings",
+    "description": "#### Customer Name\n\nName 8\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 8's Workspace\n\n#### Screenshot\n\n <image> \n\n#### What are you trying to achieve?\n\nAI SDR is not booking meetings. It shows the error shown above and the client is repeatedly getting escalation emails. He had to book 5 calls manually and is angry that he's being charged full for Acquisity.\n\n#### What are you doing to achieve it?\n\nDid everything: reconnected the Zoom, the link was pasted again and again, and I resumed the AI SDR manually but it's still not working for the last 45 days\n\n#### What is happening instead?\n\nMeetings are not being booked into the calendar.\n\n#### What is the expected outcome?\n\nFor AISDR to start booking meetings automatically like it used to.",
+    "attachmentKinds": ["image"]
+  },
+  "repoCommitAtCreate": "4160a73c75df5c0a9e1ac12790119e285f912970",
+  "flags": {
+    "descriptionEditedAfterCreate": false,
+    "needsProductionData": true,
+    "alreadyFixedAtTriage": false
+  },
+  "relatedSnapshot": [
+    {
+      "id": "ENG-1961",
+      "createdAt": "2025-10-16T07:06:18.837Z",
+      "title": "Rescheduled Meetings in AI SDR Are Not Removing the Old Appointment from the Calendar",
+      "state": "Canceled",
+      "assignee": null,
+      "parent": null,
+      "labels": ["Feature", "Improvement"],
+      "description": "User Story\nWhile testing the AI SDR, I replied “yes” to my podcast interview invitation. I received a few available dates via email, selected one, and the meeting was successfully booked — it appeared correctly in my appointment calendar.\n\nLater, I attempted to reschedule the meeting through the email thread. The reschedule was successful, and I received a confirmation email. A new meeting was added to my appointment calendar; however, the old meeting was not removed, resulting in both meetings appearing on the calendar.\n\nHere are the screen shots  and email thread\n\n <image> \n\n <image> \n\nGmail - podcast opportunity.pdf\n\n\n\n\nDescription:\nThe old meeting is not being removed from the appointment calendar. When booed from Ai Sdr.  \n\n <image> "
+    },
+    {
+      "id": "ENG-12675",
+      "createdAt": "2026-08-13T13:14:14.051Z",
+      "title": "Show each real meeting once",
+      "state": "Todo",
+      "assignee": null,
+      "parent": "ENG-12666",
+      "labels": [],
+      "description": "unknown"
+    },
+    {
+      "id": "ENG-12673",
+      "createdAt": "2026-08-13T13:14:06.827Z",
+      "title": "Bring Name 1 Calendar meetings into CRM automatically",
+      "state": "Backlog",
+      "assignee": "Elis Bushaj",
+      "parent": "ENG-12666",
+      "labels": [],
+      "description": "unknown"
+    },
+    {
+      "id": "ENG-14216",
+      "createdAt": "2026-09-24T09:38:36.866Z",
+      "title": "CRM v2 Meetings: parity follow-ups from the production cut",
+      "state": "Backlog",
+      "assignee": null,
+      "parent": "ENG-14113",
+      "labels": [],
+      "description": "unknown"
+    },
+    {
+      "id": "ENG-8193",
+      "createdAt": "2026-04-29T18:50:37.860Z",
+      "title": "Add meeting recordings to CRM meetings",
+      "state": "Done",
+      "assignee": "Savinder Singh",
+      "parent": null,
+      "labels": ["Feature"],
+      "description": "Add support for meeting recordings in the meetings feature.\n\nMeeting recordings should be attachable either as a link or as a file upload.\n\nThis should also be available as a Workflow action so a workflow can add a meeting recording link, for example a Zoom call URL, to a meeting.\n\nRelevant existing work: ENG-1051.\n\nDesign links carried over from that issue:\n\n* CRM design: Meetings design\n* Workflow builder design: Get Call design\n\n<!-- preview-url-start -->\n**Preview:** <url:add-meeting-recordings-aiacquisition.vercel.app> — PR #3681\n<!-- preview-url-end -->"
+    },
+    {
+      "id": "ENG-13850",
+      "createdAt": "2026-09-14T15:47:01.090Z",
+      "title": "Reps pick a meeting outcome on the meeting card",
+      "state": "Done",
+      "assignee": "Ebubeker Rexha",
+      "parent": "ENG-13795",
+      "labels": ["CRM migration", "Feature"],
+      "description": "## Overview\n\nA rep records what a meeting meant by picking from the same workspace outcome list, limited to outcomes that apply to meetings.\n\n## Problem\n\nMeetings have attendance (show or no-show) but no way to record the business result. Close shares one outcome list between calls and meetings and reports on it.\n\n## Proposed fix\n\nPut the outcome picker on the meeting card, save the choice on the meeting and its timeline event, and keep attendance as it is.\n\n## What's included\n\n* The picker on the existing meeting card.\n* Saving on the meeting and its timeline event together.\n* Archived handling as on calls.\n\nExcluded: attendance, which stays a separate field and is shown per Show meeting outcomes in CRM Activity; the redesigned meeting card and its outcome pill, which Koppany builds in ENG-13803.\n\n## Blocked by\n\n* Every workspace gets its own outcome list, seeded from today's call results\n* Reps pick a call outcome in the call dock and on the call card\n\n## How it should work\n\nThe picker offers selectable outcomes that apply to meetings. Saving writes the meeting and its event together. A meeting with no outcome shows none. Archived outcomes show greyed on meetings that have them and are not offered. Attendance and outcome are independent: marking a no-show does not change the outcome and vice versa. A failed save keeps the previous value and shows an error.\n\n## Who can do what\n\nAnyone who can open the meeting and change its attendance today can set its outcome.\n\n## What the user sees\n\nAn outcome label on the meeting card, editable in place, beside the existing attendance state. The empty picker states that no outcomes apply to meetings. Follows the current app styling; the redesign restyles it later.\n\n## Done when\n\n- [ ] Picking an outcome on a meeting saves it and it survives reload.\n- [ ] The picker shows only meeting-applicable outcomes.\n- [ ] Changing attendance leaves the outcome unchanged.\n- [ ] An archived outcome shows on an old meeting and is absent from the picker.\n- [ ] The meeting timeline event carries the outcome reference.\n\n## Open questions\n\nNone: all required decisions are settled.\n\n## Expected outcome\n\nCalls and meetings share one outcome vocabulary, and Koppany's redesigned card can read the meeting outcome without further data work.\n\n## Implementation context\n\n* Reuse the picker from ENG-13848.\n* Attendance keeps its existing storage and history.\n* Coordinate with Koppany so the appointment migration from ENG-13846 and his origin change land in a known order."
+    },
+    {
+      "id": "ENG-13788",
+      "createdAt": "2026-09-14T08:59:12.560Z",
+      "title": "Meeting recordings",
+      "state": "Todo",
+      "assignee": "Koppany Kondricz",
+      "parent": null,
+      "labels": ["CRM migration", "Feature", "master"],
+      "description": "## Overview\n\nA meeting can hold many recordings (gallery view, speaker view, audio only, transcript), guests show whether they accepted, meetings carry an outcome, and Zoom cloud recordings attach to the right meeting automatically and play from Zoom, as in Close.\n\n## Why\n\nClose shows several Zoom assets per meeting; Acquisity's Recall notetaker tables are vendor-specific and cannot point at an appointment, and legacy `crm_meeting` has 6 rows. A sibling asset table keeps 500k Recall recordings untouched. What follows Close: linked Zoom cloud recordings for calendar-linked meetings (Close does not store them). What goes beyond Close: switching our own Zoom meetings to cloud auto-recording behind a toggle.\n\n## Close reference\n\n<url> <url> <url>\n\n## Execution order\n\nMeeting assets first, then Zoom sync. Zoom sync shares scope and re-consent work with ENG-13164 and matching with ENG-13163, so it waits for ENG-13164."
+    },
+    {
+      "id": "ENG-9143",
+      "createdAt": "2026-05-22T13:17:14.952Z",
+      "title": "Added Meetings Are Not Displayed in Contact Details Meeting Tab",
+      "state": "Done",
+      "assignee": "Anuj Bhatt",
+      "parent": null,
+      "labels": [],
+      "description": "After creating or adding a meeting to a contact, the meeting does not appear in the Contact Details page under the Meetings tab. The newly added meeting should be immediately visible and linked to the respective contact.\n\n<url:jam.dev>"
+    },
+    {
+      "id": "ENG-14242",
+      "createdAt": "2026-09-24T18:37:24.591Z",
+      "title": "Meetings link to the deal owned by the meeting host, not the SDR deal",
+      "state": "Done",
+      "assignee": "James Keeble",
+      "parent": null,
+      "labels": [],
+      "description": "## Overview\n\nWhen a closer's meeting belongs to a person who has several deals, the meeting should link to the deal the closer owns. Today My Day often shows the person's SDR deal on the closer's meeting, or no deal at all, and the same wrong answer feeds booking attribution on Floor Command.\n\n## Problem\n\nA closer opens My Day and sees a meeting booked with them. The deal on the card is the person's webinar SDR deal, not the Closer deal they own. Opening the deal from the card takes them to the wrong pipeline, and outcomes, missed-work prompts and the action queue act on that wrong deal.\n\nThe meeting's deal is chosen by trying a fixed list of sources and taking the first that gives exactly one deal: the booking's own deal, the conversation's deal, deals that have a meeting event for this appointment, then all of the person's deals. It never checks who owns a deal or which pipeline it is in. That fails two ways in the AI Acquisition Sales Team workspace (24 Sep, production read-only):\n\n* **SDR deal chosen.** Booking workflows create the meeting a second before the Closer deal. The meeting event is written onto the only deal that exists at that moment, the SDR deal, and from then on that one tagged deal always wins. 216 closer meetings in the last 30 days are stuck this way. For 214 of them, the host owns the Closer deal. About 181 Payment Support meetings are stuck the same way.\n* **No deal chosen.** Calendly bookings write no meeting event, so the person's deals are checked next. The person has both an SDR and a Closer deal, and two matches means no deal. 23 closer meetings in the next week are in this state.\n\nSince ENG-14180 shipped (24 Sep 10:00 UTC), new bookings are also stamped with a deal using the same rules, so a wrong answer is now stored on the booking too. 4 bookings so far were stamped with the SDR deal while the host owns another deal.\n\n## User experience\n\nNothing new to learn. The closer's meeting card on My Day, the action queue, outcome prompts and missed work all show the deal the closer owns. Floor Command credits the booking to that deal and its pipeline.\n\n## What's included\n\n* After the explicit sources (the booking's own deal, then conversation deals), look at the tagged deals and the person's deals together. If exactly one of them is owned by the meeting host, use it. Otherwise keep today's order unchanged.\n* Apply this everywhere the rule is used: My Day calls, action queue, outcome prompts, missed work and booking deal stamping. The stamper currently passes no host and must pass it.\n* A dry-run-first way to re-stamp bookings already stamped with a deal the host does not own when a host-owned deal exists, writing the same audit entry the stamper writes.\n* Not included: removing the SDR meeting events. They are a correct record of activity on the person.\n\n## Done when\n\n* A closer meeting for a person with an SDR deal and a host-owned Closer deal shows the Closer deal on My Day, whether the SDR deal has a meeting event or not.\n* A meeting with no host-owned deal behaves exactly as today.\n* New bookings are stamped with the host-owned deal.\n* The re-stamp dry run lists the affected bookings per workspace, and the apply run fixes them with audit entries.\n* Tests cover: SDR event only, both deals with no events, no host-owned deal, two host-owned deals, booking deal present.\n\n## Implementation context\n\n* Name 2 with evidence, file references and the post-merge re-stamp plan: AI context.md\n* James decided on 24 Sep to apply the host-owned rule everywhere, including Floor Command attribution, not only My Day."
+    },
+    {
+      "id": "ENG-13803",
+      "createdAt": "2026-09-14T09:02:28.898Z",
+      "title": "Meeting assets, attach service, guest responses and meeting outcome",
+      "state": "Done",
+      "assignee": "Koppany Kondricz",
+      "parent": "ENG-13788",
+      "labels": ["CRM migration", "Feature"],
+      "description": "## Overview\n\nA meeting shows every recording it has (gallery view, speaker view, audio only, transcript), with inline playback, which guests accepted, and its outcome; the Close importer and later Zoom use one internal service to attach recordings, transcripts and summaries.\n\n## Why\n\nClose shows several Zoom assets per meeting; the Recall notetaker tables are vendor-specific and cannot point at an appointment, and the legacy `crm_meeting` table has 6 rows. A sibling asset table keeps the 500k Recall recordings untouched and unblocks the migration independently of Zoom.\n\n## Close reference\n\n<url> and <url>\n\n## Done when\n\n- [ ] New `crm_meeting_asset` (id, organization_id, appointment_id FK cascade, kind CHECK video_gallery|video_speaker|video_screen|audio|transcript|summary|chat|other, source CHECK recall|zoom|upload|import, provider_asset_id, external_url, storage_path, content_type, size_bytes, duration_seconds, text_content (transcript and summary kinds), recorded_at, availability CHECK available|unavailable, metadata, created_by_id, timestamps, soft delete; unique `(organization_id, source, provider_asset_id) WHERE provider_asset_id IS NOT NULL AND deleted_at IS NULL`).\n- [ ] Guest responses reuse the existing attendee `status` (accepted, declined, tentative, needsAction) from `packages/db/src/types/crm-meeting-attendee.ts`; display label for missing or needsAction is \"No response\"; preserved through sync, normalisation and events. No new property.\n- [ ] `scheduling_appointment.origin` gains `import` in both the TypeScript catalogue and the CHECK (`NOT VALID` then out-of-band `VALIDATE`); `outcome_id` from ENG-13795.\n- [ ] Internal `attachMeetingAsset({ organizationId, actor, appointmentId, kind, source, providerAssetId?, file? | externalUrl?, textContent?, metadata? })`: workspace and appointment access checked; idempotent on `(source, providerAssetId)`; a soft-deleted duplicate is restored, not duplicated; text-only, file and URL assets each valid; transcript attach succeeds even if summary generation fails (summary retried in a job with bounded input, reusing the Recall summary prompt).\n- [ ] Meeting card lists assets with inline playback (audio via `recording-player.tsx`, video element for video), guest response states, outcome pill, \"no longer available\" state. These UI lines wait for the redesign drawing (ENG-13792).\n- [ ] Shared migration checklist (as on the fields master's first child). Tests: idempotent attach, restore of soft-deleted duplicate, transcript without summary, status preservation.\n\n## Blocked by\n\nENG-13795 (outcome list) and ENG-13792 (UI lines only)."
+    },
+    {
+      "id": "ENG-13957",
+      "createdAt": "2026-09-17T07:43:45.129Z",
+      "title": "AI SDR is not booking meetings and escalating with an Error - Meeting Location unavailable",
+      "state": "Todo",
+      "assignee": "Koppany Kondricz",
+      "parent": "ENG-13278",
+      "labels": ["Bug", "Customer reported", "fast-lane"],
+      "description": "#### Customer Name\n\nName 3\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 3\n\n#### Screenshot\n\n <image> \n\n <image> \n\n <image> \n\n <image> \n\n <image> \n\n#### What are you trying to achieve?\n\nAI SDR to book meetings as per prospects availability\n\n#### What are you doing to achieve it?\n\nZoom and email are connected.\n\n#### What is happening instead?\n\nAI SDR is escalating the threads instead of booking the call, with the error - Meeting Location Unavailable\n\n#### What is the expected outcome?\n\nPlease investigate and resolve"
+    },
+    {
+      "id": "ENG-14213",
+      "createdAt": "2026-09-24T09:38:07.145Z",
+      "title": "CRM v2: Meetings",
+      "state": "Done",
+      "assignee": "James Keeble",
+      "parent": "ENG-14113",
+      "labels": [],
+      "description": "## Overview\n\nWhen a workspace has the CRM v2 flag on, Meetings, Recordings and a single recording show the redesign, built to the production cut. Reps keep everything they can do today on these pages. With the flag off, nothing changes.\n\n## User experience\n\n* **Calendar (Meetings):** a rail with a mini month, my and team calendars (the on and off choice is remembered, as today), a Connect calendar link to calendar settings, and a call type filter. Day / Week / Month with keyboard keys, a now-line, Hide weekends, Calendar / List, search, Join and Add appointment. Events are coloured by calendar. Meetings that clash sit side by side. Times show in the rep's saved time zone, as today. Export and Edit meeting types stay in a small More menu.\n* **Appointment sheet:** view, edit and create with today's fields (title, call type, date and time, host, meeting link, location, attendees, notes). Reschedule, Cancel (no \"tell the contact\"), Delete for people allowed to delete, and Join. Attendance (took place, host no-show, prospect no-show, awaiting host) and the meeting outcome (ENG-13850) are two separate controls. The person links to their record only when their email matches one contact exactly.\n* **Recordings** (workspaces with live connect, not client members): four stats, Host / Participant / Company / Comments filters, Mine / Everyone, ranges, sorts, cards, Match for an unmatched or unclear attendee, the upcoming list, and add the bot by link (owners and admins).\n* **Recording page:** player with speed, summary, action items, transcript, chapters, speakers, comments, linked records, talk time, Ask, Share, and Download (video and transcript). A recording that is still processing shows today's \"Recording processing\" placeholder.\n* **Phones:** with the flag on, these pages say \"Open this on a computer\", as the design language sets for Meetings.\n\n## Decisions taken (James can veto)\n\n* Events coloured by calendar; call-type colours are a follow-up.\n* Outcome and attendance are two controls. No default meeting outcomes are seeded; an empty list says so and points to settings.\n* The Call log tab is left out (ENG-14217).\n* Meeting assets, guest responses and \"no longer available\" (ENG-13803, Acquisity/Acquisity#6408, Acquisity/Acquisity#6464): the published production cut keeps none of them on these pages, and today they show only in the record timeline, so this build adds none. They are on ENG-14216.\n* Open contact goes to the full record page, as the cut draws it; switching to the record drawer is a follow-up.\n\n## Not included (tracked elsewhere)\n\n* Everything else the production cut hides is on ENG-14216.\n* Recordings are not linked to appointments and have no outcome until ENG-13540.\n\n## Done when\n\n* With the flag on, the three pages match the production cut, with the differences listed in the PR, and pass browser QA in light and dark, 1440 / 1650 / 1920, phone width, reduced motion and keyboard only.\n* With the flag off, the pages and their page-open events are unchanged.\n* `tool.opened` with the v2 variant is seen landing in PostHog for Meetings, Recordings and a recording, or reported as unverified with the reason.\n\n## Implementation context\n\nExisting procedures only, plus one field: the appointment detail read also returns the saved outcome (same row, same access checks). Standard risk; rollback is turning the flag off. Builds on ENG-14184 and ENG-14190. Design links are attached; they're private until James shares them."
+    },
+    {
+      "id": "ENG-567",
+      "createdAt": "2025-06-05T01:37:06.293Z",
+      "title": "Meeting Actions Agent",
+      "state": "Canceled",
+      "assignee": "Jose Cervino",
+      "parent": null,
+      "labels": [],
+      "description": "* **Actioning Your Meeting Name 4 Transcripts and AI** (10 Official n8n Templates)"
+    },
+    {
+      "id": "ENG-12839",
+      "createdAt": "2026-08-17T20:03:48.574Z",
+      "title": "The AI cannot build views that filter on meeting date or meeting owner",
+      "state": "Canceled",
+      "assignee": null,
+      "parent": null,
+      "labels": [],
+      "description": "## Overview\n\nA rep can filter by meeting date or meeting owner by hand, but cannot ask the AI to build the same view. This ticket is the decision about whether the AI should be able to.\n\n## Problem\n\nA rep asking for \"contacts with a meeting next week\" or \"meetings owned by Name 5\" gets a view without those conditions, because the AI is not told those two filters exist. Building it by hand works fine.\n\nThere is no bug here. Both filters work in the editor. The gap is only that the AI cannot generate them.\n\n## Proposed fix\n\nDecide one of two things and act on it.\n\nEither teach the AI about both filters, which needs three pieces of supporting work first, or decide they stay manual and record that as a deliberate product choice rather than an outstanding task.\n\n## What's included\n\nThe product decision, plus whatever the chosen answer requires.\n\nNot included: the wider registry unification, which is ENG-12535. This ticket depends on it if the answer is to advertise them.\n\n## Blocked by\n\nNone to make the decision. If the answer is to advertise them, the demo-data work in ENG-12535 needs to come first, since without it \"Build with AI\" would produce a view returning nothing on demo data.\n\n## How it should work\n\nIf advertised, asking the AI for a meeting-based view produces one that works, on real and demo data alike.\n\nIf kept manual, the filters stay available by hand and the exclusion is recorded as a decision.\n\n## Who can do what\n\nNo permission change. Note that meeting owner currently defaults to the viewer, because it refuses to guess when it cannot identify a person.\n\n## What the user sees\n\nEither the AI starts producing meeting-based views, or nothing changes and the reason is written down.\n\n## Done when\n\n- [ ] The decision is made and recorded.\n- [ ] If advertised: the AI can generate both filters, they work on demo data, and the exclusion list is cleaned up.\n- [ ] If kept manual: the exclusion reason states the product decision rather than pointing at this ticket.\n\n## Open questions\n\nAdvertise them or keep them manual? Recommended default: keep them manual for now. There is no user-visible gap beyond convenience, and advertising them requires demo-data support that does not exist yet, so the cost is real and the payoff is small.\n\nIf advertised, a second question follows: what should the AI produce when someone names a colleague rather than themselves as the meeting owner?\n\n## Expected outcome\n\nThe gap stops being an untracked exclusion sitting in a test file and becomes either shipped behaviour or a recorded decision.\n\n## Implementation context\n\nThe exclusion is currently enforced by a guard requiring every filter offered in the menu to be AI-generatable unless explicitly listed as manual, with a reason. Those two reasons currently cite this ticket, which is why closing it either way matters.\n\nThree things stand in the way of advertising them. They are hand-written configurations rather than registry entries, so describing them to the AI is not a one-line change. They have no demo-data implementation, so an AI-built view would silently match nothing there. And meeting owner needs a decision about naming someone other than the viewer.\n\nA related guard also requires that registry entries be reachable from their AI field list, so the first of those cannot be done halfway."
+    },
+    {
+      "id": "ENG-1462",
+      "createdAt": "2025-09-26T10:54:50.436Z",
+      "title": "Static meeting links",
+      "state": "Done",
+      "assignee": "Mahmut Jomaa",
+      "parent": null,
+      "labels": ["Feature"],
+      "description": "Allow static meeting links and disable zoom until verification is done."
+    },
+    {
+      "id": "ENG-3900",
+      "createdAt": "2025-12-18T18:27:59.784Z",
+      "title": "Conferencing setting: “Static meeting link” cannot be disabled and meeting link cannot be cleared",
+      "state": "Canceled",
+      "assignee": "Anuj Bhatt",
+      "parent": null,
+      "labels": ["Bug", "Power User Request"],
+      "description": "In **Workspace Settings → Conferencing**, the option **“Static meeting link (Same link for all meetings)”** cannot be turned off. Additionally, the meeting link field does not persist deletions: when a user enters a client’s Name 1 Meet link and later deletes it, the link reappears or is not actually removed after saving/reloading.\n\nThis prevents users from disabling static links and creates incorrect behavior where a previously entered meeting link remains active even after being cleared.\n\nUser: Name 6\n\nSlack: <url:fegrowthpartner.slack.com>\n\n**Impact**\n\n* Users cannot switch away from a static meeting link setup.\n* Users may unintentionally keep using an outdated or incorrect meeting link for meetings.\n* Confusing and breaks expected “save” behavior for workspace settings.\n\n### Testing\n\n**Repro steps**\n\n 1. Open the app and navigate to a specific workspace (example: Company One).\n 2. Go to **Settings → Conferencing**.\n 3. Observe the toggle: **“Static meeting link (Same link for all meetings)”**.\n 4. Try to turn the toggle **off**, then **Save**.\n 5. Refresh the page or navigate away and back.\n 6. Enter a valid meeting link (example: a Name 1 Meet URL) into the static meeting link input.\n 7. **Save**.\n 8. Delete the meeting link value so the field is empty.\n 9. **Save** again.\n10. Refresh / revisit the page.\n\n**Expected**\n\n* Toggle state persists: if turned off and saved, it remains off when returning.\n* If the meeting link input is cleared and saved, it stays empty when returning.\n* When toggle is off, the static meeting link should not be used by the scheduling/booking flow.\n\n**Actual**\n\n* Toggle cannot be turned off (or reverts to on after save/reload).\n* Deleted meeting link is not removed (reappears or persists).\n\n**Test variations**\n\n* Repeat in multiple workspaces to confirm setting is truly workspace-scoped.\n* Test with multiple users (owner/admin) if roles exist.\n* Test on Chrome and Safari.\n\n### Definition of Done\n\n* User can successfully toggle **Static meeting link** on/off in **Settings → Conferencing**, and the state persists after save, refresh, and re-login.\n* User can clear the static meeting link input, save, and it remains cleared after refresh/navigation.\n* Backend persists `null`/empty value correctly (no fallback re-population unless explicitly intended).\n* When static meeting link is **off**, meeting creation/booking does **not** use the static link.\n* Add automated coverage:\n  * Unit/integration test verifying update + persistence of conferencing settings (toggle and link value).\n  * E2E test verifying UI save and reload behavior for toggle + clearing link.\n* Confirm workspace isolation: changing conferencing settings in one workspace does not affect another workspace."
+    },
+    {
+      "id": "ENG-1455",
+      "createdAt": "2025-09-26T08:28:05.843Z",
+      "title": "Add a field to store Zoom Personal Meeting Link and use that non-dynamically to add as meeting location for AI SDR-booked meetings",
+      "state": "Done",
+      "assignee": "Mahmut Jomaa",
+      "parent": null,
+      "labels": ["Feature"],
+      "description": "* Field\n* Video adapter\n* "
+    },
+    {
+      "id": "ENG-12590",
+      "createdAt": "2026-08-12T11:56:12.158Z",
+      "title": "Add first, last and next interaction to Deals",
+      "state": "Todo",
+      "assignee": "Elis Bushaj",
+      "parent": "ENG-12585",
+      "labels": [],
+      "description": "unknown"
+    },
+    {
+      "id": "ENG-2004",
+      "createdAt": "2025-10-17T12:28:45.913Z",
+      "title": "Check if static meeting link field allows for Name 1 Meet links",
+      "state": "Done",
+      "assignee": "Mahmut Jomaa",
+      "parent": null,
+      "labels": [],
+      "description": "if not, why not?"
+    },
+    {
+      "id": "ENG-11762",
+      "createdAt": "2026-07-17T15:48:00.800Z",
+      "title": "Meeting Types PR2: cut consumers over to meeting_type_id",
+      "state": "Done",
+      "assignee": null,
+      "parent": "ENG-11760",
+      "labels": [],
+      "description": "Parent: ENG-11760. High-risk (booking behavior). Schema-free — reads what PR1 built.\n\nEvery consumer reads the resolved meeting type / appointment snapshot instead of re-deriving from the campaign method.\n\n## Scope\n\n* **AI SDR booking**, slot matchmaking (bind the offered slot to its resolved snapshot so acceptance books the exact offered end), offer-alternatives.\n* **Reschedule** carries the appointment snapshot (title / duration / buffers). An update is an edit only on an explicit dirty-field change, never \"field present\" (the modal always submits title + duration, so field-present would misclassify every edit).\n* **Calendar event build + sync** for Name 1 AND Outlook (Outlook delta sync #4962 landed after the #5508 review and needs the same propagation).\n* **Dynamic video meeting** create/update on date-change reschedule and on duration-only edits (both currently skip the video update).\n* **External / self-booked tracking**: snapshot the resolved title + duration for matched bookings; provider values stay authoritative for unmatched, stored in named provider columns.\n* **CRM stage** derived from `call_type_key`, never reverse-looked-up from a UUID.\n* **Appointments calendar filter** includes org rows + null historical rows; \"all\" omits the filter rather than listing static IDs.\n* `generateAppointmentDetails` **+ create-from-thread modal** return/use the resolved type (duration from the type, not the LLM).\n* **Manual appointment dropdown** reads the shared list.\n\n## Acceptance\n\n* The workshop/podcast contradiction is gone: AI SDR booking and manual \"suggest appointment\" resolve the same meeting type and length for a given campaign.\n* Rescheduling never rewrites a historical appointment's title/duration on meeting-type config drift; only an explicit edit does.\n* Name 1 and Outlook reschedule/duration-edit paths are at parity for appointment, calendar event, and video meeting.\n* Every Mahmut comment on PR #5508 is addressed or explicitly refuted with evidence (including the two partials, and Name 7's refuted calendar-sync reschedule comment — do NOT apply that patch; it would break Google-edit sync).\n\n## Depends on\n\nBlocked by PR1 (needs the model + backfill live)."
+    },
+    {
+      "id": "ENG-13278",
+      "createdAt": "2026-08-30T16:37:42.705Z",
+      "title": "AI SDR assigned hosts left with invalid Zoom accounts in dynamic mode — booking pauses while conferencing UI shows connected",
+      "state": "Done",
+      "assignee": "Koppany Kondricz",
+      "parent": null,
+      "labels": ["fast-lane", "master"],
+      "description": "## Root cause\n\nAI SDR assigned call handlers configured in Zoom-connect (dynamic) mode can be left with a single Zoom account marked disconnected (`integration_conferencing_account.invalid = true`) in the backend while the conferencing settings still present the connection as healthy. When the AI SDR reaches the final booking step it resolves the meeting location from that host, finds no valid Zoom account and no static fallback, and pauses/escalates with `MEETING_LOCATION_UNAVAILABLE` instead of booking.\n\nThis is a recurrence of the Zoom-credential-invalidation cluster addressed by ENG-12700 (\"Prevent AI SDR bookings without meeting links and harden Zoom OAuth refresh\", Done). The fail-closed gate is behaving as designed (it correctly refuses to book without a link), but hosts are still getting detached, so the assigned handler is left unable to book until the Zoom account is reconnected or a static link is set. A customer believing \"Zoom is connected\" does not see a backend disconnect in the UI.\n\n## Current blast radius (2026-09-17)\n\n27 call hosts are in the exact blocked state: dynamic mode, every conferencing account marked invalid, no static fallback. 10 organizations reach it through their assigned call handler, 9 of which also have an active campaign, and 11 organizations have at least one active campaign whose Assigned Salesperson is such a host. 87 Zoom accounts are marked invalid across 87 distinct hosts, oldest invalidation 2026-01-10, newest 2026-09-15, so accounts are still detaching.\n\nCounted 2026-09-17 in production: hosts with `conferencing_link_type = 'dynamic'`, a null or blank static link, and zero non-invalid conferencing rows, joined to `organization.ai_sdr_assigned_call_handler_id` and to active `outreach_campaign.sales_person_id`. Limitation: the count models those two host-resolution routes only.\n\nPrevious figure, 2026-08-30: 58 organizations / 10 assigned call handlers.\n\n## Code path\n\n* `apps/web/lib/scheduling/repositories/scheduling-repository.ts` — `getUserWithIntegrations` loads only `invalid = false` Zoom accounts, so an invalid account resolves to zero conferencing accounts.\n* `apps/web/lib/scheduling/services/video-meeting-manager.ts` — `resolveMeetingLocation` returns no location for dynamic mode with no valid account (only logs a warning).\n* `apps/web/lib/scheduling/services/booking-service.ts` — `bookAppointment` returns `MEETING_LOCATION_UNAVAILABLE` when `requireMeetingLocation` is set and no location resolved.\n* `apps/web/lib/ai-sdr-v2/workflow/steps/booking.ts` — escalates the thread on `CALENDAR_ESCALATION_CODES`, including `MEETING_LOCATION_UNAVAILABLE`.\n\n## Two things need engineering\n\n1. The invalid-Zoom-but-UI-shows-connected discrepancy: the assigned handler's backend disconnect is not surfaced reliably in Conferencing / AI SDR settings, so operators believe booking should work and cannot see the actual blocker.\n2. Detached-account recurrence and detection: hosts are still ending up invalid after the ENG-12700 Zoom OAuth work. Confirm whether reconnection/protection is holding, and surface a persistent \"assigned host not ready\" warning so ops can fix the host rather than the customer discovering it when bookings silently stop."
+    }
+  ]
+}

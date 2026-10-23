@@ -1,0 +1,67 @@
+[
+  {
+    "createdAt": "2023-09-15T12:52:00.017Z",
+    "id": "ca948ac6-1d14-4855-bdf8-de3173f929e7",
+    "name": "Backlog"
+  },
+  {
+    "createdAt": "2025-10-17T11:57:04.828Z",
+    "id": "c82200e9-1a5b-4e4c-b022-3e7966d8244e",
+    "name": "Blocked"
+  },
+  {
+    "createdAt": "2023-09-15T12:52:00.017Z",
+    "id": "a74e0bec-5f7e-4598-8a28-85f6220ebc44",
+    "name": "Canceled"
+  },
+  {
+    "createdAt": "2023-09-15T12:52:00.017Z",
+    "id": "0b7a97fb-fa1f-4da8-83a4-a446c3a86e3c",
+    "name": "Done"
+  },
+  {
+    "createdAt": "2023-09-15T12:52:00.017Z",
+    "id": "3e0176f2-3bb6-4b84-b550-33c907481d6b",
+    "name": "Duplicate"
+  },
+  {
+    "createdAt": "2025-09-14T12:22:56.967Z",
+    "id": "51f8c061-2c79-4ba1-bb4c-cb0535546aa8",
+    "name": "In Code Review"
+  },
+  {
+    "createdAt": "2023-09-15T12:52:00.017Z",
+    "id": "50e56024-b6c0-4f59-a884-c3cd5095012e",
+    "name": "In Progress"
+  },
+  {
+    "createdAt": "2025-09-14T12:21:48.989Z",
+    "id": "51b9b893-e5b1-4228-8305-302d27f560d0",
+    "name": "In QA"
+  },
+  {
+    "createdAt": "2025-12-30T14:41:37.840Z",
+    "id": "56684ee5-263f-4dbe-8deb-4e1dce6062f0",
+    "name": "Ready to Merge"
+  },
+  {
+    "createdAt": "2025-09-14T12:22:31.680Z",
+    "id": "d49c0b5a-c79e-40b9-b654-c0ce1158097a",
+    "name": "To Code Review"
+  },
+  {
+    "createdAt": "2023-09-15T12:52:36.588Z",
+    "id": "1daca1e2-5699-4bb9-8094-ba7b00498f6b",
+    "name": "To QA"
+  },
+  {
+    "createdAt": "2023-09-15T12:52:00.017Z",
+    "id": "a653a470-6971-4d76-8c09-f4db3a87f9fc",
+    "name": "Todo"
+  },
+  {
+    "createdAt": "2025-04-16T11:08:02.933Z",
+    "id": "a858457e-66b2-42ed-b208-0081daf8320b",
+    "name": "Triage"
+  }
+]

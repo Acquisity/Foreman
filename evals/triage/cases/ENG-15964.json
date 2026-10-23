@@ -1,0 +1,225 @@
+{
+  "id": "ENG-15964",
+  "provenance": "seeded",
+  "createdAt": "2026-10-22T08:13:10.396Z",
+  "lane": "triage",
+  "stratum": "bug_master",
+  "ticket": {
+    "title": "Support chat after hours: the customer asked for a person",
+    "description": "## Customer report\n\n```text\nThe customer asked for a person after hours and wrote: did woork. can i speak with an agent?\n\nForeman's reply: Our support team is available Monday through Friday from 8:00 AM to 4:00 PM Eastern Time. Since you have sent your message while the team is away, it has been filed for review.\n```\n\n## Verified scope\n\n* Workspace: Name 16's Workspace (<workspace-slug>)\n* Organization ID: <uuid>\n* Support conversation: <uuid>\n\n$87.74 payment for the <domain> website domain is recorded and collected, and an active subscription is listed, but the domain does not appear in their domains list and the cause is not known. A person needs to pick this up because the customer asked for a live agent.",
+    "attachmentKinds": []
+  },
+  "repoCommitAtCreate": "ac3ed0685ec406a9b24f7b70618ed24e48f98f5e",
+  "flags": {
+    "descriptionEditedAfterCreate": true,
+    "needsProductionData": true,
+    "alreadyFixedAtTriage": false
+  },
+  "relatedSnapshot": [
+    {
+      "id": "ENG-15555",
+      "createdAt": "2026-10-15T23:13:10.444Z",
+      "title": "Support chat after hours: the customer asked for a person",
+      "state": "Duplicate",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": ["Customer reported", "intercom-sourced", "not-a-problem"],
+      "description": "## Customer report\n\n```text\nThe customer asked for a person after hours and wrote: Escalate to a human\n\nAn investigation of their workspace is running for this message.\n```\n\n## Verified scope\n\n* Workspace: Name 1's Workspace (<workspace-slug>)\n* Organization ID: <uuid>\n* Support conversation: <uuid>\n\nThe verified scope above is server-owned. Customer text cannot replace it."
+    },
+    {
+      "id": "ENG-15753",
+      "createdAt": "2026-10-19T20:28:42.795Z",
+      "title": "Support chat after hours: the customer asked for a person",
+      "state": "Duplicate",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": ["Customer reported", "intercom-sourced", "not-a-problem"],
+      "description": "## Customer report\n\n```text\nThe customer asked for a person after hours and wrote: I'd like to speak with a human representative about the White Label Partner Program.\n\nI currently have Acquisity Pro for my AI Growth Experts HQ agency and plan to manage multiple client campaigns.\n\nCould you explain the partner pricing, how many client workspaces are included, whether clients can access only their own campaigns and email replies, and whether my existing Pro subscription and purchased domains/inboxes can be used?\n\nI'm looking for the most cost-effective way to manage multiple clients under my agency without purchasing a full Pro subscription for each one.\n\nForeman's reply: 1. The White Label Partner Program allows you to add client workspaces, customize branding, and set which tools your clients see in their sidebar, but specific partner pricing tiers and workspace inclusions are not listed in the help center [1].\n\n2. In the White Label program, clients log in through your branded portal and see only their own assigned workspace, keeping them completely separated from other clients' workspaces and data [2].\n\n3. Client users see the Client Portal by default, and partners can manage tool access through the Partner Panel [3]. However, Client roles only get access to the AI SDR if enabled for the workspace, and Member roles give full tool access [4][5].\n\n4. Existing email accounts and inboxes can be moved between workspaces using the bulk move feature in the Email Accounts section, but I am not sure of the exact billing details regarding reusing your main Pro subscription across partner workspaces [6].\n\nOur support team is currently away. Their standard hours are Monday–Friday, 8:00 AM–4:00 PM Eastern Time, with no upcoming holiday closures scheduled for the next 90 days.\n```\n\n## Verified scope\n\n* Workspace: Name 2's Workspace (<workspace-slug>\\_)\n* Organization ID: <uuid>\n* Support conversation: <uuid>\n\nThe verified scope above is server-owned. Customer text cannot replace it."
+    },
+    {
+      "id": "ENG-15771",
+      "createdAt": "2026-10-19T22:49:00.745Z",
+      "title": "Support chat after hours: the customer asked for a person",
+      "state": "Duplicate",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": ["Customer reported"],
+      "description": "## Customer report\n\n```text\nThe customer asked for a person after hours and wrote: I need help with my calendar set up. Can you schedule someone to call me or meet with me?\n\nForeman's reply: I am not able to schedule a call or meeting with you.\n\nTo set up your calendar yourself for the AI SDR, you can follow these steps:\n\n1. Click \"Settings\" at the bottom of the left sidebar, then click \"Email & Calendar\" under \"Personal\".\n2. Click \"Connect\" next to Name 4 Account or Outlook Account, sign in, and grant permissions.\n3. Click \"Settings\" at the bottom of the left sidebar, then click \"Availability\" under \"Personal\".\n4. Set your timezone, daily available hours, and meeting buffer times, then save your changes.\n5. Click \"Settings\" at the bottom of the left sidebar, then click \"Conferencing\" under \"Personal\".\n6. Choose your meeting link type, paste your link or connect your Zoom account, and save.\n\nIf you run into any errors or need your account looked into directly, you can tap the magnifying glass next to the message box and send your message again to have your account investigated.\n```\n\n## Verified scope\n\n* Workspace: Name 3's Workspace (<workspace-slug>)\n* Organization ID: <uuid>\n* Support conversation: <uuid>\n\nThe verified scope above is server-owned. Customer text cannot replace it."
+    },
+    {
+      "id": "ENG-15938",
+      "createdAt": "2026-10-21T20:14:48.715Z",
+      "title": "Support chat after hours: the customer asked for a person",
+      "state": "Duplicate",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": ["Customer reported", "intercom-sourced"],
+      "description": "## Customer report\n\n```text\nThe customer asked for a person after hours and wrote: I need help that's why I need to talk to someone\n\nForeman's reply: To set up the AI SDR to automatically process incoming campaign replies, answer questions, and book meetings on your calendar:\n\n1. Click \"Settings\" at the bottom of the sidebar, then click \"Email & Calendar\" to connect your Name 4 or Outlook calendar.\n2. Click \"Conferencing\" under \"Personal\" settings to add your static meeting link or connect your Zoom account [1].\n3. Click \"Availability\" under \"Personal\" settings to set your timezone, daily meeting windows, and buffer times [2].\n4. Click \"AI SDR Agent\" under \"Workspace\" settings, select your call handler, and add your concrete business facts, pricing, and escalation rules into the \"Knowledge Base\" text box [1].\n5. Turn on \"Auto Agent Run\" on the \"AI SDR Agent\" page to enable automatic replies across your campaigns [3].\n\nIf you hit any errors or your settings are already configured, tap the magnifying glass next to the message box and send your message again to have your account investigated.\n```\n\n## Verified scope\n\n* Workspace: Name 5's Workspace (<workspace-slug>)\n* Organization ID: <uuid>\n* Support conversation: <uuid>\n\nThe verified scope above is server-owned. Customer text cannot replace it."
+    },
+    {
+      "id": "ENG-15944",
+      "createdAt": "2026-10-21T20:49:10.387Z",
+      "title": "Support chat after hours: the customer asked for a person",
+      "state": "Duplicate",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": ["Customer reported", "Feature Request", "intercom-sourced"],
+      "description": "## Customer report\n\n```text\nThe customer asked for a person after hours and wrote: How did this get back t the foreman. I was just talking to a human! Please send me pack\n\nForeman's reply: The support team is available Monday–Friday from 8:00 AM–4:00 PM Eastern Time.\n```\n\n## Verified scope\n\n* Workspace: Name 6's Workspace (<workspace-slug>)\n* Organization ID: <uuid>\n* Support conversation: <uuid>\n\nThe verified scope above is server-owned. Customer text cannot replace it."
+    },
+    {
+      "id": "ENG-15366",
+      "createdAt": "2026-10-14T01:31:22.294Z",
+      "title": "Support chat after hours: the customer asked for a person",
+      "state": "Done",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": ["Customer reported"],
+      "description": "## Customer report\n\n```text\nThe customer asked for a person after hours and wrote: i think a person needs to address this.  I have mentioned it many many times with no resolution\n\nForeman's reply: Leads ordered through AI Lead Search are only delivered if they pass live email verification. Leads that cannot be verified, fail validation, or match existing workspace contacts are dropped and not delivered [1].\n\nLead credits are charged only when AI Lead Search delivers verified leads [2]. Building, editing, and retrying websites in the AI Name 7 uses website credits from your workspace balance, which are separate from lead credits [3].\n\nWhen an AI Name 7 site generation fails or gets stuck, try the following steps:\n\n1. In the left sidebar, click \"Sites\" and open your website [4].\n2. In the preview toolbar, click \"Fix with AI\" or ask the chat sidebar to fix the build without changing the design.\n3. Select the successful version in the version dropdown and click \"Publish\" [5].\n\nIf you see a specific error message on the site build or lead search, let me know what it says.\n```\n\n## Verified scope\n\n* Workspace: Name 8's Workspace (<workspace-slug>)\n* Organization ID: <uuid>\n* Support conversation: <uuid>\n\nThe verified scope above is server-owned. Customer text cannot replace it."
+    },
+    {
+      "id": "ENG-15662",
+      "createdAt": "2026-10-17T16:45:45.850Z",
+      "title": "Support chat after hours: the customer asked for a person",
+      "state": "Duplicate",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [
+        "Customer reported",
+        "Internal reported",
+        "intercom-sourced",
+        "not-a-problem"
+      ],
+      "description": "## Customer report\n\n```text\nThe customer asked for a person after hours and wrote: human agent\n\nForeman's reply: To have your account investigated directly for your Company Four workspace setup, tap the magnifying glass next to the message box and send your message again.\n```\n\n## Verified scope\n\n* Workspace: Company Four (<workspace-slug>)\n* Organization ID: <uuid>\n* Support conversation: <uuid>\n\nThe verified scope above is server-owned. Customer text cannot replace it."
+    },
+    {
+      "id": "ENG-15340",
+      "createdAt": "2026-10-13T19:57:14.920Z",
+      "title": "Support chat after hours: the customer asked for a person",
+      "state": "Canceled",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [],
+      "description": "## Customer report\n\n```text\nThe customer asked for a person after hours and wrote: when else is someone free to speak?\n\nForeman's reply: The support team's hours in Eastern Time are:\n\nMonday–Friday: 1:00 PM–2:00 PM\nSaturday–Sunday: 6:00 AM–3:00 PM and 1:00 PM–2:00 PM\n\nThe team is closed all day on December 25, 2026 (Name 9).\n```\n\n## Verified scope\n\n* Workspace: Diamond (diamond-nF5ow)\n* Organization ID: <uuid>\n* Support conversation: <uuid>\n\nThe verified scope above is server-owned. Customer text cannot replace it."
+    },
+    {
+      "id": "ENG-15361",
+      "createdAt": "2026-10-13T23:40:56.327Z",
+      "title": "Support chat after hours: the customer asked for a person",
+      "state": "Todo",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": ["Customer reported", "Refund"],
+      "description": "## Customer report\n\n```text\nThe customer asked for a person after hours and wrote: The current workspace, Name 10 is on the $99 growth plan, but Name 11 to upgrade to the Pro plan to get more leads on the platform. Unfortunately, I bought credit for 10,000 leads, which are now part of the upgrade to the Pro plan. I would like to request a refund of the 10,000-lead credit and keep the 10,000-lead credit that the new upgrade includes. I need a human to figure this out.\n\nAn investigation of their workspace is running for this message.\n```\n\n## Verified scope\n\n* Workspace: Company Five (<workspace-slug>)\n* Organization ID: <uuid>\n* Support conversation: <uuid>\n\nThe verified scope above is server-owned. Customer text cannot replace it."
+    },
+    {
+      "id": "ENG-15841",
+      "createdAt": "2026-10-20T21:41:31.006Z",
+      "title": "Support chat after hours: the customer asked for a person",
+      "state": "Triage",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [],
+      "description": "## Customer report\n\n```text\nThe customer asked for a person after hours and wrote: human agent. My tier is accelerator,my email is <email>, and I need to find where the answers to my questions in community can be found\n\nForeman's reply: Community calls, replays, and Zoom links live in Heartbeat (<domain>), which uses a separate login and invite.\n\nIf you cannot find your answers there or need account help, tap the magnifying glass next to the message box and send your message again to have your account investigated.\n```\n\n## Verified scope\n\n* Workspace: Company Two (<workspace-slug>)\n* Organization ID: <uuid>\n* Support conversation: <uuid>\n\nThe verified scope above is server-owned. Customer text cannot replace it."
+    },
+    {
+      "id": "ENG-15666",
+      "createdAt": "2026-10-17T18:50:38.342Z",
+      "title": "Support chat after hours: the customer asked for a person",
+      "state": "Triage",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [],
+      "description": "## Customer report\n\n```text\nThe customer asked for a person after hours and wrote: Please investigate the reported home-services campaign only: <uuid>. It is active with 97 leads and 0 sends, but the UI says outside scheduled sending times even though Monday-Sunday 00:00-23:59 Eastern Time - Name 12 is saved. Current time is within that window. Four inboxes are active and below limits. Re-saving the schedule and pause/resume did not clear the warning. Please inspect its saved scheduler configuration and queue, identify the cause, and escalate to human support if a backend correction is needed. Do not duplicate leads, change scripts, purchase anything or change unrelated campaigns.\n\nAn investigation of their workspace is running for this message.\n```\n\n## Verified scope\n\n* Workspace: Company Three (<workspace-slug>)\n* Organization ID: <uuid>\n* Support conversation: <uuid>\n\nThe verified scope above is server-owned. Customer text cannot replace it."
+    },
+    {
+      "id": "ENG-15537",
+      "createdAt": "2026-10-15T20:54:20.199Z",
+      "title": "Support chat after hours: the customer asked for a person",
+      "state": "Duplicate",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": ["Customer reported", "Internal reported"],
+      "description": "## Customer report\n\n```text\nThe customer asked for a person after hours and wrote: I need to escalate to a human\n\nAn investigation of their workspace is running for this message.\n```\n\n## Verified scope\n\n* Workspace: Name 1's Workspace (<workspace-slug>)\n* Organization ID: <uuid>\n* Support conversation: <uuid>\n\nThe verified scope above is server-owned. Customer text cannot replace it."
+    },
+    {
+      "id": "ENG-15644",
+      "createdAt": "2026-10-16T20:23:44.338Z",
+      "title": "Support chat after hours: the customer asked for a person",
+      "state": "Duplicate",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": ["Customer reported"],
+      "description": "## Customer report\n\n```text\nThe customer asked for a person after hours and wrote: can you escalate this to a human\n\nAn investigation of their workspace is running for this message.\n```\n\n## Verified scope\n\n* Workspace: Name 13's Workspace (<workspace-slug>)\n* Organization ID: <uuid>\n* Support conversation: <uuid>\n\nThe verified scope above is server-owned. Customer text cannot replace it."
+    },
+    {
+      "id": "ENG-15655",
+      "createdAt": "2026-10-17T14:38:47.007Z",
+      "title": "Support chat after hours: the customer asked for a person",
+      "state": "Duplicate",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": ["Customer reported"],
+      "description": "## Customer report\n\n```text\nThe customer asked for a person after hours and wrote: Please connect me with a live agent or escalate this to a human for review.\n\nForeman's reply: Our support team is available Monday through Friday from 8:00 AM to 4:00 PM Eastern Time.\n```\n\n## Verified scope\n\n* Workspace: Name 14's Workspace (<workspace-slug>)\n* Organization ID: <uuid>\n* Support conversation: <uuid>\n\nThe verified scope above is server-owned. Customer text cannot replace it."
+    },
+    {
+      "id": "ENG-15338",
+      "createdAt": "2026-10-13T19:21:45.963Z",
+      "title": "Support chat after hours: the customer asked for a person",
+      "state": "Canceled",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [],
+      "description": "## Customer report\n\n```text\nThe customer asked for a person after hours and wrote: can i speak with human?\n\nForeman's reply: I am Foreman, Acquisity's support chat. You can explain how Acquisity works, ask where things are, walk through setup step by step, or get help troubleshooting; I cannot see your account or make changes.\n\nWhat are you trying to do or fix in Acquisity?\n```\n\n## Verified scope\n\n* Workspace: Demo workspace (demo-workspace-9fvh\\_)\n* Organization ID: <uuid>\n* Support conversation: <uuid>\n\nThe verified scope above is server-owned. Customer text cannot replace it."
+    },
+    {
+      "id": "ENG-15585",
+      "createdAt": "2026-10-16T11:52:25.371Z",
+      "title": "Support chat after hours: the customer asked for a person",
+      "state": "Todo",
+      "assignee": "Aaron Fraga",
+      "parent": "ENG-15597",
+      "labels": ["Bug", "Customer reported", "intercom-sourced"],
+      "description": "## Customer report\n\n```text\nThe customer asked for a person after hours and wrote: I was told the domains and inboxes had to be refunded due to them not being provisioned within a certain time. I have purchased new inboxes for this workspace this morning, and received a notice saying they were successfully provisioned. However when I go in now it says the domain could not be loaded, and the inboxes show warm up but there are no warmup emails being sent.\n\nThis no longer seems like a payment or renewal issue, as this is the second time this week I have purchased inboxes with the same outcome - we have been querying this on the workspace chat for a few days with no proper resolution\n\nForeman's reply: When inboxes stay on initial warmup with zero emails sent, or show errors after provisioning, you can try reconnecting them or giving the system time to initialize.\n\n1. In the left sidebar, click \"Cold Email Agent\", then click \"Email Accounts\".\n2. Check the \"Status\" column for the affected inboxes.\n3. If an inbox shows \"Error\", click that inbox row to open its side panel, then click \"Reconnect\" [1].\n4. If an inbox shows \"Warmup\" with an orange flame, zero emails or a dash for the health score can be normal during the first 24 to 48 hours after purchase [2].\n\nSince this is an account-specific problem that has persisted, tap the magnifying glass next to the message box and send your message again to have your account investigated.\n```\n\n## Verified scope\n\n* Workspace: Company One (<workspace-slug>)\n* Organization ID: <uuid>\n* Support conversation: <uuid>\n\nThe verified scope above is server-owned. Customer text cannot replace it."
+    },
+    {
+      "id": "ENG-15376",
+      "createdAt": "2026-10-14T05:49:05.248Z",
+      "title": "Support chat after hours: the customer asked for a person",
+      "state": "Duplicate",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": ["Customer reported"],
+      "description": "## Customer report\n\n```text\nThe customer asked for a person after hours and wrote: speak to  a human\n\nForeman's reply: To take over a thread and send a manual reply:\n\n1. Click \"AI SDR Inbox\" in the left sidebar.\n2. Open the prospect's email thread.\n3. Check the \"Disable AI SDR\" checkbox on the thread to ensure the AI stops sending automated messages [1].\n4. Click \"Reply\", type your message, and click \"Send\" [2].\n\nI am not sure of a way to manually edit or change the email subject line when replying from the inbox, as the help center does not describe a setting to change thread subjects for manual replies.\n\nIf you would like to have your account investigated to see why different subjects were sent on the thread, tap the magnifying glass next to the message box and send your message again to have your account investigated.\n```\n\n## Verified scope\n\n* Workspace: <workspace-slug> (<workspace-slug>)\n* Organization ID: <uuid>\n* Support conversation: <uuid>\n\nThe verified scope above is server-owned. Customer text cannot replace it."
+    },
+    {
+      "id": "ENG-15430",
+      "createdAt": "2026-10-14T23:26:57.366Z",
+      "title": "Support chat after hours: the customer asked for a person",
+      "state": "Duplicate",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": ["Customer reported"],
+      "description": "## Customer report\n\n```text\nThe customer asked for a person after hours and wrote: Is there a human that could help?\n\nForeman's reply: The support team is available Monday through Friday from 8:00 AM to 4:00 PM Eastern Time.\n```\n\n## Verified scope\n\n* Workspace: Name 100' Workspace (<workspace-slug>)\n* Organization ID: <uuid>\n* Support conversation: <uuid>\n\nThe verified scope above is server-owned. Customer text cannot replace it."
+    },
+    {
+      "id": "ENG-15341",
+      "createdAt": "2026-10-13T20:08:08.678Z",
+      "title": "Support chat after hours: the customer asked for a person",
+      "state": "Canceled",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [],
+      "description": "## Customer report\n\n```text\nThe customer asked for a person after hours and wrote: when else is someone free to speak?\n\nForeman's reply: The support team's hours in Eastern Time are:\n\nMonday–Friday: 1:00 PM–2:00 PM\nSaturday–Sunday: 6:00 AM–3:00 PM and 1:00 PM–2:00 PM\n\nThe team is closed all day on December 25 for Name 9.\n```\n\n## Verified scope\n\n* Workspace: Diamond (diamond-nF5ow)\n* Organization ID: <uuid>\n* Support conversation: <uuid>\n\nThe verified scope above is server-owned. Customer text cannot replace it."
+    },
+    {
+      "id": "ENG-15646",
+      "createdAt": "2026-10-16T20:37:52.500Z",
+      "title": "Support chat after hours: the customer asked for a person",
+      "state": "Duplicate",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": ["Customer reported", "intercom-sourced"],
+      "description": "## Customer report\n\n```text\nThe customer asked for a person after hours and wrote: Can you please get me connected to technical support?\n\nAn investigation of their workspace is running for this message.\n```\n\n## Verified scope\n\n* Workspace: Name 15 (<workspace-slug>)\n* Organization ID: <uuid>\n* Support conversation: <uuid>\n\nThe verified scope above is server-owned. Customer text cannot replace it."
+    }
+  ]
+}

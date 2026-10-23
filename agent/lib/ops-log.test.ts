@@ -124,7 +124,7 @@ describe("formatOpsEvent", () => {
       sessionId: "s1",
       turnId: "t1",
     });
-    assert.equal(descriptorReads, 12);
+    assert.equal(descriptorReads, 21);
     assert.equal(ownKeysCalls, 0);
   });
 
@@ -327,17 +327,19 @@ describe("ops hook action.result", () => {
 });
 
 describe("ops hook", () => {
-  it("subscribes to exactly the eleven covered events", () => {
+  it("subscribes to exactly the thirteen covered events", () => {
     assert.deepEqual(
       Object.keys(opsHook.events ?? {}).sort(),
       [
         "action.result",
+        "actions.requested",
         "authorization.required",
         "input.requested",
         "session.completed",
         "session.failed",
         "session.started",
         "step.failed",
+        "task.settled",
         "turn.cancelled",
         "turn.completed",
         "turn.failed",

@@ -1,0 +1,240 @@
+{
+  "id": "ENG-15429",
+  "provenance": "seeded",
+  "createdAt": "2026-10-14T23:00:11.699Z",
+  "lane": "triage",
+  "stratum": "bug_master",
+  "ticket": {
+    "title": "Acquisity: Lead Upload Shows 6,432 Skipped Leads",
+    "description": "#### Customer Name\n\nName 21\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nCompany Seven Workspace\n\n#### Screenshot\n\n <image> \n\n#### What are you trying to achieve?\n\nUpload leads into an Acquisity campaign and understand why certain leads are being skipped.\n\n#### What are you doing to achieve it?\n\nUploading a lead list into Acquisity and reviewing the upload results to identify any skipped leads and their reasons.\n\n#### What is happening instead?\n\nAcquisity reports that 6,432 leads were skipped during the upload, but the displayed reasons only account for 36 leads:\n\n3 already exist in other campaigns\n\n4 blocked by email security (Mimecast)\n\n29 on the do-not-contact list\n\nThis leaves 6,396 skipped leads unexplained.\n\n#### What is the expected outcome?\n\nAcquisity should provide an accurate breakdown of all skipped leads, including the reason each lead was excluded.\n\nWe need to determine whether the remaining 6,396 leads were skipped due to additional validation rules or whether the upload summary is displaying an incorrect count.",
+    "attachmentKinds": ["image", "slack"]
+  },
+  "repoCommitAtCreate": "ecdd2712501d061be40225fa84c124b519d5b487",
+  "flags": {
+    "descriptionEditedAfterCreate": false,
+    "needsProductionData": false,
+    "alreadyFixedAtTriage": false
+  },
+  "relatedSnapshot": [
+    {
+      "id": "ENG-8614",
+      "createdAt": "2026-05-15T18:18:07.558Z",
+      "title": "CSV lead upload: validation fix + Leads tab + UX overhaul",
+      "state": "Backlog",
+      "assignee": "James Keeble",
+      "parent": null,
+      "labels": [],
+      "description": "## Problem\n\nCSV lead upload is too brittle for real production data. A few malformed or placeholder values can block an entire import, users cannot fix bad rows inline, duplicate handling is unclear, and the surrounding experience is off-brand and harder to trust than the rest of the product.\n\nThere are three connected problems to solve:\n\n* Import resilience: valid rows should continue importing even when some rows contain invalid soft-field values.\n* Data visibility and control: users should be able to inspect, understand, and correct problematic rows before importing.\n* Product UX consistency: the flow should match the current Acquisity design system and make import outcomes predictable.\n\nA concrete failure mode already seen in production is a workspace with roughly 7,000 leads failing to complete import because a small number of rows contained malformed values. One invalid soft field could fail a whole batch and prevent later batches from processing.\n\n## Solution\n\nRebuild CSV lead upload end to end so a production CSV can import cleanly, users can understand and correct issues before committing, duplicate behavior is explicit, and the UI matches the current product experience.\n\nThis work is intentionally split into independently shippable parts:\n\n1. Server-side ingestion resilience and partitioning.\n2. Leads tab field visibility and export parity.\n3. Upload wizard redesign across Upload, Map columns, Review values, and Preview import.\n4. Duplicate detection and import preview improvements.\n\n## Scope\n\n### 1. Server-side ingestion resilience and partitioning\n\nThis part is already implemented.\n\nIncluded behavior:\n\n* Invalid soft URL values are auto-cleaned where possible.\n* If a soft value cannot be normalized safely, it is stored as `null` and surfaced as a warning.\n* Intra-CSV duplicates keep the first occurrence and report aggregate skipped counts.\n* A lead can never be added to the same campaign twice; those rows are always skipped and reported.\n* Skip and rejection detail is capped at 10,000 entries per campaign.\n* Upload stats are persisted on `campaign.metadata.csvUploadStats`.\n* Banner dismissal is persisted on `campaign.metadata.csvUploadStats.dismissedAt`.\n\n### 2. Leads tab visibility and export parity\n\nIncluded behavior:\n\n* The Leads tab must expose the expected uploaded and enriched lead fields.\n* Custom-variable columns must render in a stable order.\n* CSV export from the Leads tab must match the surfaced field set.\n* Custom-variable column ordering is alphabetical across the campaign.\n\n### 3. Upload wizard redesign\n\nIncluded behavior:\n\n* The upload flow becomes a 4-step wizard:\n  * Upload\n  * Map columns\n  * Review values\n  * Preview import\n* The flow uses the current Acquisity design system, including Name 1, light mode, dark mode, and current pill/table styling.\n* The product sidebar and top bar remain unchanged.\n* Validation and import feedback move from transient toasts and alarming banners to more durable in-page UI.\n* Review values supports inline editable cells so users can fix problems without re-uploading.\n* Progress is shown in-page.\n* The summary/skip banner is dismissable.\n\n### 4. Duplicate detection and preview improvements\n\nIncluded behavior:\n\n* Before importing, users can choose duplicate detection scope.\n* Supported scope options are:\n  * other campaigns\n  * whole workspace\n  * neither\n* Preview import shows counts for importing, skipped, and rejected rows before commit.\n* Preview import shows workspace contact capacity before starting import.\n* Duplicate/verification information is surfaced prominently on the Preview step.\n\n## Saved model / behavior model\n\nThe system should persist enough information for users and support/debugging workflows to understand what happened during an import without rerunning it.\n\nPersisted or decided behavior:\n\n* Upload outcome detail lives in `campaign.metadata.csvUploadStats`.\n* Banner dismissal persists on `campaign.metadata.csvUploadStats.dismissedAt`.\n* Rejection and skip detail is capped at 10,000 entries per campaign.\n* Duplicate handling is not a hidden system choice; it is an explicit user-selected setting during import.\n* No GrowthBook flag is planned.\n* Name 2 is 100% after smoke test.\n* Rollback is a git revert.\n\n## Permissions / ownership\n\nCurrent assumptions from the issue:\n\n* Anyone who can run CSV lead import can complete the redesigned flow.\n* The duplicate-scope choice is made per import attempt, not as a workspace setting.\n* Leads tab visibility changes apply to campaign/workspace users who already have access to those leads.\n\nOpen questions:\n\n* Is duplicate-scope choice saved as a per-user default, a campaign-level default, or only for the current import session?\n* Are there any workspace roles that should be prevented from choosing `whole workspace` duplicate detection?\n* Who should be allowed to dismiss the import summary banner, and is dismissal shared across users or local to a user?\n\n## UX behavior\n\n### Upload\n\n* A user uploads a CSV and enters a guided import flow instead of a brittle one-shot action.\n\n### Map columns\n\n* A user maps incoming columns to supported lead fields with the current visual design language.\n\n### Review values\n\n* The user sees row-level problems in a form that is understandable and actionable.\n* Raw validation errors should not be exposed if they can be translated into user-facing messages.\n* The user can edit cells inline and continue without re-uploading the full CSV.\n* Warnings, auto-cleaned values, rejected rows, and skipped rows should be distinguishable.\n\n### Preview import\n\n* The user sees what will happen before committing the import.\n* Duplicate handling is explicit and selectable.\n* The user sees importing / skipped / rejected counts before start.\n* The user sees workspace contact-capacity impact before start.\n* Verification-related information is prominent rather than buried.\n\n### Post-import feedback\n\n* The user can understand what imported, what was skipped, what was rejected, and why.\n* Dismissal of the summary banner persists.\n\n## Sub-issues\n\n* ENG-8615: ingestion resilience, soft-field normalization, row partitioning, persisted upload stats, banner-dismiss mutation. Implemented.\n* ENG-8616: Leads tab field visibility, stable custom-variable columns, matching CSV export.\n* ENG-8617: wizard redesign, validation UX, inline Review edits, in-page progress, summary banner, current design system.\n* ENG-11101: duplicate detection across campaigns/workspace, verification prominence, preview counts, workspace capacity.\n\n## Design\n\nApproved MagicPath mockups in the Acquisity design system:\n\n* mockups\n\nCanonical frames:\n\n* Upload: `glad-hour-3574`\n* Map columns: `calm-dawn-1052`\n* Review values: `solid-current-3456`\n* Preview import: `dreamily-creek-8090`\n\n## Acceptance criteria\n\n* A CSV containing malformed soft-field values no longer fails the entire import when valid rows can still proceed.\n* Invalid soft URL values are auto-cleaned where possible and otherwise converted to `null` with a warning.\n* Users can see which rows were rejected, auto-cleaned, warned, or skipped, with understandable reasons.\n* Users can fix values inline in Review values instead of re-uploading the CSV.\n* Users can choose duplicate detection against other campaigns, the whole workspace, or neither.\n* Preview import shows importing, skipped, and rejected counts before import starts.\n* Preview import shows workspace contact capacity before import starts.\n* The Leads tab surfaces the expected uploaded and enriched lead fields.\n* Custom-variable columns are stable and ordered alphabetically across the campaign.\n* Leads export matches the surfaced field set.\n* The wizard follows the current Acquisity design system in light and dark mode.\n* The summary banner is dismissable and its dismissal persists.\n\n## Open questions or design follow-ups\n\n* What exact row states should exist in Review values: warning, auto-cleaned, rejected, skipped, duplicate, edited, or a smaller set?\n* When a user edits a row inline, should the system revalidate only that cell, the whole row, or the full import dataset?\n* Are inline edits saved immediately in draft state, or only when advancing to the next step?\n* If a user leaves and returns mid-flow, should mapped columns, inline edits, and duplicate-scope selection be restored?\n* For `whole workspace` duplicate detection, what is the exact matching logic and tie-breaking behavior?\n* If a row matches both an existing lead in the campaign and one elsewhere in the workspace, which reason takes precedence in the UI?\n* Should skipped/rejected detail beyond the 10,000-entry cap be summarized in aggregate, and how should that summary be presented?\n* Should the contact-capacity preview hard-block import when capacity would be exceeded, or warn and let the user decide?\n* Should dismissing the summary banner hide it only for the current user or for all users viewing that campaign?\n\n## Outcome\n\nThe product moves from “a malformed row can block a CSV import and leave the user confused” to “valid leads import, problem rows are understandable and fixable inline, duplicate handling is explicit, and the user sees exactly what will happen before importing in a UI that matches the rest of the product.”"
+    },
+    {
+      "id": "ENG-12623",
+      "createdAt": "2026-08-12T18:12:25.237Z",
+      "title": "Fix campaigns counting skipped leads as uploaded to Company One",
+      "state": "Done",
+      "assignee": "Koppany Kondricz",
+      "parent": null,
+      "labels": ["Bug", "Dashboard Metrics", "weekend-fastlane"],
+      "description": "## Problem\n\nA campaign can show **1,500 leads uploaded** in Acquisity while only **48 leads are actually present in Company One**.\n\nThe Company One upload is not failing. Acquisity deliberately removes leads already present in another active campaign, plus DNC leads, but still counts those removed leads as uploaded.\n\n### Why this matters\n\nThe customer sees a full campaign and assumes it is ready to contact roughly 1,500 people. In reality, it may only contain a few dozen people and will reach far fewer prospects. Acquisity gives no accurate warning or breakdown, so this looks like silent lead loss.\n\n## Verified production evidence\n\nInvestigation date: **12 August 2026**\nWorkspace: `campaigns-team-testing-space-Ih-ZF`\nOrganization ID: `<uuid>`\n\nExample campaign:\n\n* Acquisity campaign ID: `<uuid>`\n* Company One campaign ID: `<uuid>`\n* Campaign target: **1,500**\n* Active Acquisity campaign-lead rows: **1,499**\n* Removed by Acquisity cross-campaign duplicate filtering: **1,450**\n* Removed by email DNC filtering: **1**\n* Sent to Company One: **48**\n* Acquisity persisted provider result: **48 uploaded**\n* Live Company One campaign membership: **48**\n\n| Stage | Leads |\n| -- | -- |\n| Locally saved campaign candidates | 1,499 |\n| Skipped because they exist in another active campaign | 1,450 |\n| Skipped because the email is on DNC | 1 |\n| Actually uploaded and currently present in Company One | 48 |\n\n`1,450 + 1 + 48 = 1,499`\n\nAdditional evidence:\n\n* **1,434** emails overlap one earlier SaaS 10K campaign.\n* All three Inngest upload-page runs completed successfully; there is no failed step to retry:\n  * `01KZRM25NS0Z1TNJNNHY1Z0S4K`\n  * `01KZRM34KG1KXZ2MSS583WM2KK`\n  * `01KZRM424KZ9T3HJ17R1TDK7A3`\n* Company One's live count exactly matches Acquisity's stored provider-accepted count.\n* Across nine recent 1,500-lead campaigns checked:\n  * Active Acquisity rows: **13,166**\n  * Live Company One campaign members: **4,773**\n  * Overstatement: **8,393**\n* Every checked live Company One count matched the campaign's recorded accepted result. This rules out Company One dropping leads after accepting them.\n\n## Root cause\n\nAcquisity treats two different things as if they are the same:\n\n1. **Candidates found for a campaign**\n2. **Leads confirmed as uploaded to the provider campaign**\n\nAll candidates are saved as local campaign members. Acquisity later removes cross-campaign duplicates and DNC leads before calling Company One. Company One receives the smaller, correct list, but the UI counts every local candidate and calls that number **Leads Uploaded**.\n\nTwo supporting accounting defects make the user feedback disappear:\n\n* Acquisity calculates `skippedCrossCampaign` separately, but does not merge it into the durable result when Company One succeeds.\n* The multi-run fallback calculates `uploaded - local rows`, which is the wrong direction and is clamped to zero.\n\nVerified against current `main` at `aff8baccba638ca849e0770861250ec7345927a5`; the affected paths are unchanged from the incident deployment.\n\n## Code evidence\n\n* Candidates are persisted as campaign rows independently of confirmed provider membership:\n  * campaign-leads-import.ts:846-850\n  * campaign-leads-import.ts:973-977\n* Cross-campaign duplicates are correctly removed before the provider call:\n  * out-reach-service.ts:397-411\n* A successful provider result is returned without adding `skippedCrossCampaign`:\n  * process-campaign-add-leads.ts:886-900\n* The UI labels the local row count as **Leads Uploaded**:\n  * leads-metrics.tsx:175-182\n  * campaign.ts:14916-14927\n* The fallback skipped calculation subtracts in the wrong direction:\n  * lead-scrape-service.ts:266-274\n\n## Required solution\n\nKeep this as a fast-lane, fix-forward change:\n\n1. Keep scraped candidates separate from confirmed provider campaign membership, or only create/count membership for post-filter leads actually sent and accepted.\n2. Name 3 skip counts and reasons even when Company One succeeds.\n3. Make **Leads Uploaded** show provider-confirmed campaign membership.\n4. Show an accurate uploaded-versus-skipped breakdown.\n5. Correct the multi-run skip calculation.\n6. Preserve existing cross-campaign duplicate and DNC protections.\n\n## Acceptance criteria\n\n* Given 1,499 candidates where 1,450 are in another active campaign and 1 is DNC, Acquisity sends 48 leads to Company One.\n* The campaign displays **48 Leads Uploaded**, not 1,499 or 1,500.\n* The user sees **1,450 cross-campaign duplicates skipped** and **1 DNC skipped**.\n* A successful Company One response does not discard Acquisity-side skip counts.\n* Multi-page uploads aggregate uploaded and skipped counts correctly.\n* An Company One contact/search result ID is not treated as proof that the lead belongs to this provider campaign.\n* Focused regression coverage reproduces the verified 1,499 → 1,450 duplicate + 1 DNC + 48 uploaded case.\n* No-duplicate uploads continue to behave normally.\n* No automatic re-upload, removal from earlier campaigns, or destructive historical cleanup is introduced.\n\n## Recovery follow-up\n\nExisting affected campaigns need a separately approved reconciliation/recovery path before deleting local rows or retrying uploads. That recovery work is not part of this fast-lane fix.\n\n## Related historical work\n\n* ENG-6023: duplicate leads silently dropped with no user feedback\n* ENG-8162: campaign analytics uploaded-leads denominator\n* ENG-5400: Leads Completed/Uploaded counts incorrect"
+    },
+    {
+      "id": "ENG-7186",
+      "createdAt": "2026-03-25T19:18:08.806Z",
+      "title": "Leads are skipped after deletion from another campaign",
+      "state": "Canceled",
+      "assignee": "Anthony Adewale",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "user: <email>\n\nLeads remain blocked during upload even after being deleted from the old campaign and re-uploaded to a new one.\n\nA workspace in Company Eight reported that 6,276 leads were validated and mapped correctly, but the upload was skipped because the system still detected the leads as already used in the workspace.\n\nOld campaign: `AEO 2 | Healthcare | Name 4`\nNew campaign: `Healthcare | Leadership | US | AEO (AIA Created)`\nUser email: `<email>`\n\nThis appears to prevent transferring unused leads between campaigns after deletion.\n\n<!-- preview-url-start -->\n**Preview:** <url:fix-cross-campaign-dedup-deleted-leads-aiacquisition.vercel.app> — PR #3317\n<!-- preview-url-end -->"
+    },
+    {
+      "id": "ENG-4326",
+      "createdAt": "2026-01-08T23:41:49.624Z",
+      "title": "CSV-uploaded leads skipped so campaign shows completed",
+      "state": "Done",
+      "assignee": "Anthony Adewale",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "Client campaign on Acquisity was set up and launched on 1/5 with about 1,500 leads. The campaign now shows as `Completed` with 0 of 0 leads processed and 0% performance, and no sequences were started.\n\nInvestigation so far:\n\n* Campaign link: <url>\n* Leads were uploaded via CSV (manual scrape).\n* Inboxes, sequences, and configuration appear correct from the UI.\n* Initial assessment is that leads never got uploaded to Company One (possibly all treated as duplicates or otherwise skipped).\n* There is a related change to CSV imports and a PR that adds visibility into skipped leads: <url:github.com>\n\nScreenshot reference:\n\n <image> \n\nNeed to investigate why CSV-uploaded leads are not making it into Company One, causing campaigns to complete immediately with 0 leads processed, and validate there is no regression from recent CSV import changes."
+    },
+    {
+      "id": "ENG-5097",
+      "createdAt": "2026-02-03T20:00:22.319Z",
+      "title": "Investigate Acquisity lead scrape delays and skipped upload counts",
+      "state": "Canceled",
+      "assignee": "Beth Newton",
+      "parent": null,
+      "labels": [],
+      "description": "user: <email>\n\nCustomer’s campaign **“Chiropractors-Podcast Offer”** is showing inconsistent and confusing lead counts and behavior:\n\n* Used Acquisity lead scraper to request 2,000 leads; credits appear to have been deducted.\n* History/UI shows roughly: 2,000 requested, 500 received, 1,901 verified/uploaded.\n* After monitoring for 30+ minutes, the 500 received / 1,901 verified numbers are not changing.\n* Only \\~500 leads (manually uploaded via CSV) appear in the campaign; Acquisity-sourced leads are not visible in the campaign as expected.\n* UI also shows that 1,571 leads were \"skipped\" during CSV upload, even though the CSV was previously cleaned using MillionVerifier.\n* Customer is confused why so many were skipped and why they only see the 500 CSV leads in the campaign despite requesting 2,000 through Acquisity.\n\nThe support explanation indicates the UI is mixing job-level stats, workspace-level verification, and campaign-level visibility, which is causing confusion, and the batch may be idle/finished but still not delivering leads into the campaign as the customer expects.\n\nPlease investigate whether:\n\n* The Acquisity job for this workspace/campaign is stuck, delayed, or failing to push verified leads into the campaign.\n* The “requested/received/verified/uploaded” and “skipped leads” counters are accurate and behaving as intended for this scenario.\n* The filtering of 1,571 CSV leads (duplicates / previously contacted / suppression) is functioning correctly.\n* Additional UX or copy changes are needed to make these states and numbers clearer.\n\nRelevant screenshots from the customer are attached below:\n\n <image> \n\n <image> \n\n <image> "
+    },
+    {
+      "id": "ENG-4431",
+      "createdAt": "2026-01-12T04:46:04.177Z",
+      "title": "Campaign stops after contacting 22 of 2000 scraped leads",
+      "state": "Done",
+      "assignee": "Anthony Adewale",
+      "parent": null,
+      "labels": ["Campaign Stops Sending"],
+      "description": "Customer reports that after using the AI lead scraper in Acquisity to add \\~2000 leads to a campaign, only 22 leads were actually contacted and the campaign shows as completed.\n\nDetails shared so far:\n\n* All \\~2000 leads appear in the campaign in Acquisity.\n* Only 22 of the leads were contacted.\n* The campaign is marked as completed after sending to just those 22 leads.\n* Leads were expected to transfer to / be contacted via Company One, but remained in Acquisity instead.\n* A screen recording of the behaviour is available in this Jam: <url:jam.dev>"
+    },
+    {
+      "id": "ENG-12798",
+      "createdAt": "2026-08-15T13:17:14.256Z",
+      "title": "Deleted leads still block re-upload — Company One workspace skip flags exclude re-scraped leads after delete",
+      "state": "Triage",
+      "assignee": "Anthony Adewale",
+      "parent": null,
+      "labels": [],
+      "description": "BUG: Yes\nRELATED: ENG-7186 (stale — superseded by this ticket). Also ENG-7247 \"Deleted leads still block re-upload as duplicates\" (Done) — same class; likely only our own dedup was fixed (deleted/archived campaigns excluded, ENG-11034), the Instantly-side skip remains.\n\nEVIDENCE:\n\n* Company Two & Name 5 workspace: customer deleted all 12,126 leads and re-scraped (4 new runs, 2026-08-13 ~22:16–23:51 UTC, ~10,729 new leads). Customer reports \"Lead Uploaded\" count is correct (e.g. 2,728 from 55 pages × 50) but a large number of newly-scraped leads are \"skipped during upload\" (~4,720 for L&D, similarly high on other campaigns). Leads the customer needs are missing from the campaign; he cannot launch.\n* Root cause: Acquisity's Company One client sends skip_if_in_campaign=true and skip_if_in_workspace=true by default (bulkAddLeadsSchema, lib/outreach/Company One/schemas/leads.ts:181-182). Company One's /leads/add returns skipped_count for any email it already holds anywhere in the workspace. Deleting leads in Acquisity (deleteAllLeadsByCampaign hard-deletes outreach_campaign_lead rows; process-campaign-delete-all-leads.ts) does NOT clear Company One's workspace-level \"already have this lead\" state, so a re-scrape of the same audience is skipped.\n* The org's scrape-lead store (lead_scrape_lead) still holds all 22,865 leads from both scrapes — delete-all never touches it.\n* The skip even appeared within the first scrape: the two Dairy L&D runs skipped 1,780 because they overlapped.\n\nBLAST RADIUS: systemic (any org that deletes leads then re-scrapes the same audience). Verified this run: 1 org, 4 campaigns.\n\nPOTENTIAL FIX:\n\n* On re-upload after a delete, pass skip_if_in_workspace=false / skip_if_in_campaign=false; and/or\n* Purge deleted leads from Company One (and the scrape-lead store) so the workspace-level dedup no longer matches.\n\nWHATS NEEDED TO RESOLVE:\n\n* Decide whether to disable the workspace skip on re-scrape-after-delete, or fully clear Instantly-side lead state on delete-all; confirm whether Company One's deleteLeadsBulk actually removes leads from the workspace-level dedup index.\n\nCONFIDENCE: High — mechanism confirmed in code (default skip flags) and in this org's production data (22,865 retained scrape leads; customer already deleted + re-scraped and the skip persisted).\n\nINTERCOM: attached via linear_attach\nTRIAGE SCOPE: No branch, commit, PR, deployment, migration, patch, or code/docs/config change was created in this session.\n\n---\n\nINTERCOM: <url:app.intercom.com>\nSLACK THREAD: not captured\nORGANIZATION: <uuid>\nFiled by Support from a CS investigation."
+    },
+    {
+      "id": "ENG-12122",
+      "createdAt": "2026-07-29T13:12:34.213Z",
+      "title": "Adding leads to an existing campaign wipes the campaign's existing leads while still consuming credits",
+      "state": "Blocked",
+      "assignee": "Koppany Kondricz",
+      "parent": null,
+      "labels": ["Bug", "intercom-sourced", "triaged-by-devin"],
+      "description": "## Name 8 signal (daily triage 2026-07-29)\n\nName 8 cluster *Campaign leads vanish after new upload, credits consumed* — severity high, confidence 0.88, **2 customers this week**.\n\n* **Name 6 (Company Three)**: 5,347 existing leads in a campaign disappeared when she added more leads to it.\n* **Name 7**: hit the same data-loss pattern today.\n\nIn both cases the leads are gone and the credits were still charged, so the customer pays twice to rebuild the list.\n\nName 8 topic: <url>\n\n## Why this is a new issue\n\nDuplicate search found no open canonical for \"adding leads wipes the existing lead set\":\n\n* ENG-10981 \"Scraped leads disappear after processing — credits consumed, campaign stays empty\" — Done (2026-06-29); different trigger (initial scrape, not a second upload into a populated campaign)\n* ENG-8186 \"Cold Email Agent lead count resets after import\" — Done (2026-05-03)\n* ENG-7942 \"Campaign upload loses leads and skips to step 4\" — Done\n* ENG-4551 \"Missing ~760 leads after CSV import\" — Done\n* ENG-7247 / ENG-7186 — deletion/duplicate-skip behaviour, not data loss on add\n\nDistinct from the stuck-processing cluster on ENG-10762: here the leads were present and are afterwards gone.\n\n## Suggested starting points\n\n* The add-leads path into an existing campaign: whether the import replaces rather than appends the campaign lead set\n* Credit deduction on the second import happening before/independently of the lead write, so credits are consumed even when the resulting lead set shrinks\n\n## Triage metadata\n\n* Name 9 key: `modem_daily_triage:v1/<uuid>/2026-07-29`\n* Window: 2026-07-28 13:02 UTC → 2026-07-29 13:02 UTC\n* Recurrence: recurring, 2 customers this week"
+    },
+    {
+      "id": "ENG-4353",
+      "createdAt": "2026-01-09T20:52:26.407Z",
+      "title": "Acquisity credits missing and Workspace Leads still show Company One usage",
+      "state": "Canceled",
+      "assignee": "Beth Newton",
+      "parent": null,
+      "labels": [],
+      "description": "User: <email>\n\nUser switched a workspace from using Company One to using Acquisity for cold email.\n\nObserved behavior:\n\n* Under Cold Email Agent, the 10k Acquisity credits that were just purchased do not appear.\n* Workspace Leads still show the Instantly-based usage: 23,375 / 25,000 leads used.\n\nContext:\n\n* Company One was initially imported into the workspace.\n* Afterward, the user discontinued Company One and paid to switch to Acquisity.\n* Name 10 explained this appears to be an edge case where Company One lead usage and Acquisity entitlements are mixed, and said this would be escalated to developers.\n\nRequested outcome:\n\n* Realign the workspace so that the Acquisity 10k included credits are correctly visible/usable under Cold Email Agent.\n* Ensure the Workspace Leads counter reflects the correct limits/usage for the current Acquisity setup rather than the prior Company One import."
+    },
+    {
+      "id": "ENG-7669",
+      "createdAt": "2026-04-09T19:13:51.516Z",
+      "title": "Leads skipped as duplicates with no other active campaign",
+      "state": "Canceled",
+      "assignee": "Beth Newton",
+      "parent": null,
+      "labels": [],
+      "description": "User: <email>\nName 11's Workspace, campaign `HVAC BATCH 1 5000-3963 4.9.26` reported that leads were skipped because they were already in another campaign, but no other active campaigns were visible in the workspace.\n\nThe upload message said 4 of 3962 leads were uploaded, 4 existing leads were linked to the campaign, and 3958 leads were skipped as already being in another campaign.\n\n <image> \n\n <image> "
+    },
+    {
+      "id": "ENG-13678",
+      "createdAt": "2026-09-10T23:38:06.024Z",
+      "title": "Customer report: \"Name 12 | Marketing Agencies | US | Leadership | AIA Created* (copy)\" shows all emails sent with 0 sent — 1,620 leads never reached Company One (Company Four)",
+      "state": "Canceled",
+      "assignee": "Anthony Adewale",
+      "parent": null,
+      "labels": ["Bug", "Customer reported", "intercom-sourced"],
+      "description": "## Source\n\nIntercom conversation: <url:app.intercom.com>\n\nConversation context: customer (owner of the Company Four workspace) reports a bug and attaches a screenshot: the cold email campaign \"Name 12 | Marketing Agencies | US | Leadership | AIA Created* (copy)\" shows \"Attention Needed\" and the banner \"All emails in the sequence have been sent to every lead\", with 0 emails sent on every variant. They ask us to fix it. A teammate replied \"let me check this\".\n\nCampaign in the conversation link: <url:app.acquisity.ai>\n\n## Testable claim\n\nCampaign \"Name 12 | Marketing Agencies | US | Leadership | AIA Created* (copy)\" (launched 2026-09-07) sent zero emails because all 1,620 of its leads were skipped by Company One at upload and none was ever uploaded, so the campaign held no leads at the provider and no lead received a provider_lead_id, while the product reported the campaign complete and told the user all emails had been sent.\n\n## Evidence\n\n* outreach_campaign <uuid>: status attention_needed, pause_reason \"Provider reported the campaign completed, but no emails were sent. Re-verify the leads and restart the campaign.\", 1,620 leads bulk-uploaded 2026-09-07 20:27, launched 2026-09-07 20:28:55.\n* Provider upload receipts for that campaign (outreach_campaign_activity, metadata.type = provider_upload_receipt) all read status \"success\" with total_sent = skipped_count = 500 / 500 / 499 / 121 and leads_uploaded = 0, remaining_in_plan null. Not one lead was created at the provider.\n* All 1,620 outreach_campaign_lead rows for the campaign have provider_lead_id NULL and status not_yet_contacted (count date 2026-09-10).\n* Activity 2026-09-09 13:01: \"Campaign completed with no emails sent — needs attention\".\n* The bulk lead payload is built with skip_if_in_workspace: true (apps/web/lib/inngest/functions/campaign/util.ts, buildLeads), so Company One skips leads that already exist anywhere in the workspace.\n* 2026-09-10 23:06 the team deleted the 1,620 leads and re-uploaded them to a fresh copy (<uuid>). Company One then accepted all 1,620 (leads_uploaded 500/500/500/120, skipped 0), so the workspace's provider push works now and the customer-facing symptom is a launch-time skip, not a permanent block. The refreshed copy's rows still have provider_lead_id NULL.\n* Platform-wide Inngest failures of ai-clients.campaigns.process-add-leads-page continue: latest failed run 01M26HNNFZYD1G9YAP758J30R5 (2026-09-10 20:55, bulk-add step and Finalization); run 01M1YVGTA98W2ZG1Z8531TTZEC (2026-09-07 21:13) failed with \"Company One API Client Error (403): Lead limit reached. Reamining uploads: 73.\".\n* Blast radius, current query (count date 2026-09-10): 39 campaigns across 29 organizations have at least one upload receipt since 2026-08-27 with total_sent > 0 and leads_uploaded = 0 (every sent lead skipped). 70 campaigns across 54 organizations sit in attention_needed.\n\n## Prior related work\n\nENG-13257 is the open master for Company One lead-push leaving leads without a provider id so campaigns send zero, and a human triage of a sibling report (ENG-13568) adjudicated that symptom family as a duplicate of it. This report carries a distinct provider-side signature (upload recorded as success with zero created) and is submitted for cause matching.\n\nForeman support operation: <id>\nIntercom source: <url:app.intercom.com>"
+    },
+    {
+      "id": "ENG-6668",
+      "createdAt": "2026-03-12T17:08:12.185Z",
+      "title": "Leads scraped via Add Leads do not appear",
+      "state": "Canceled",
+      "assignee": "Jared Stauffer",
+      "parent": null,
+      "labels": [],
+      "description": "On March 10, leads were scraped using the **Add Leads** button under a campaign, but the leads did not appear in the account.\n\nSupport observed a message that 324 leads were skipped during upload and 330 leads were successfully uploaded. The issue needs investigation to confirm whether the scrape job or upload logs show skipped leads due to duplication, campaign requirements, or another backend problem.\n\nRelevant context: Loom link"
+    },
+    {
+      "id": "ENG-13867",
+      "createdAt": "2026-09-14T20:23:16.263Z",
+      "title": "Customer report: \"Personalized Researched Targets\" shows \"Leads Uploaded 0\" while three leads are listed (<domain>)",
+      "state": "Todo",
+      "assignee": "Anthony Adewale",
+      "parent": "ENG-13892",
+      "labels": ["Bug", "Customer reported", "intercom-sourced"],
+      "description": "## Source\n\nIntercom conversation: <url:app.intercom.com>\n\nConversation context: the owner of the <domain> workspace opened with \"I found a bug\" and attached a screenshot of one campaign's Leads tab: \"why is this campaign saying no leads are uploaded when I have 3 in there?\" A teammate replied that the three leads are present as \"Not Yet Contacted\" and that the \"Leads Uploaded\" counter may not populate until the campaign is launched. Campaign from the conversation link: <url:app.acquisity.ai>\n\n## Testable claim\n\nCampaign \"Personalized Researched Targets\" (draft, never launched) displays \"Leads Uploaded 0\" while three leads are listed, because the metric subtracts two provider delete receipts that were recorded for leads Company One never accepted, so one accepted upload is offset by two deletions.\n\n## Evidence\n\n* outreach_campaign <uuid>: status draft, launched_at NULL, Company One provider <uuid>, provider_campaign_id <uuid> (Company One status 0, draft). Three outreach_campaign_lead rows, all status not_yet_contacted: two added 2026-09-12 01:30 (both <domain> addresses), one added 2026-09-14 17:33.\n* Provider upload receipts (outreach_campaign_activity, metadata.type = provider_upload_receipt): 2026-09-12 00:54 total_sent 2, leads_uploaded 0, skipped_count 2; 2026-09-12 01:30 total_sent 2, leads_uploaded 0, skipped_count 2; 2026-09-14 17:34 total_sent 1, leads_uploaded 1 with created_leads\\[0\\].id populated. Every skip-reason counter is 0 in all three receipts.\n* Provider delete receipts: 2026-09-12 01:36 leads_deleted 1 and 2026-09-12 03:44 leads_deleted 1. No upload receipt had ever recorded an accepted lead at that point, so those two deletions cannot both correspond to accepted uploads. Only one lead was ever accepted by Company One, so the true provider-accepted count for this campaign is 1, and the card shows 0.\n* The card is provider-receipt based by design: OutreachRepository.getCampaignLeadStats returns totalLeads = currentProviderLeadCount when the projection is authoritative, and getProviderUploadReceiptProjection computes Math.max(0, totalLeadsUploaded - totalLeadsDeleted) (apps/web/lib/outreach/db/campaign.ts). apps/web/components/campaigns/detail/tabs/leads/leads-metrics.tsx renders value={stats?.totalLeads || 0} with the provider-accepted tooltip, and apps/web/content/docs/cold-email-agent/campaigns/managing-campaigns/leads.mdx documents the same meaning.\n* The delete receipt is not evidence of a provider deletion: process-campaign-remove-leads sets providerLeadRemoved = true whenever provider.removeLead() does not throw, and InstantlyClient.removeLead (apps/web/lib/outreach/Company One/client.ts:1815) returns successfully without deleting anything when the lead is not found in the campaign.\n* Second finding in the same campaign, reported as context rather than as this cause: the two leads Company One skipped at upload stay in the campaign as ordinary \"Not Yet Contacted\" rows and will never be emailed, and no \"Leads skipped during upload\" card appears for provider-side skips (the campaign's last csvUploadStats shows zero skips).\n* Blast radius, current query (count date 2026-09-14): of 885 campaigns holding an authoritative provider-receipt projection, 7 campaigns across 7 organizations and 5 creators have recorded provider deletions exceeding recorded provider uploads (6,441 leads of net over-subtraction), so their \"Leads Uploaded\" under-reports or clamps to 0. This campaign is one of the seven.\n* Repository commit read: e75c68fe1da6424e94a149d02d846c2c8becd947.\n\n## Unblock\n\nAfter the accounting fix this campaign's card should read 1. For the customer's actual problem, the two skipped leads must be re-added or replaced, because Company One refused them at upload and they will never be emailed from this campaign.\n\nForeman support operation: recorded under the customer-report creation role.\n\nForeman support operation: <id>\nIntercom source: <url:app.intercom.com>"
+    },
+    {
+      "id": "ENG-7934",
+      "createdAt": "2026-04-17T21:09:34.388Z",
+      "title": "Increase lead generation beyond 1K in Acquisity",
+      "state": "Canceled",
+      "assignee": "Beth Newton",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "#### Customer Name\n\nName 13\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nCompany Five\n\n#### Screenshot\n\n <image> \n\n#### What are you trying to achieve?\n\nGarner additional leads beyond what Acquisity\n\n#### What are you doing to achieve it?\n\nClient screenshared, confirmed less than 1K leads showing, increased headcount, keywords added and also leveraged ChatGPT to increase number of leads but issue persists\n\n#### What is happening instead?\n\nName 14 only showing <1K leads and focused on Name 15 niche (USA, employee headcount 1-200)\n\n#### What is the expected outcome?\n\nGenerate a minimum 4K leads"
+    },
+    {
+      "id": "ENG-4973",
+      "createdAt": "2026-01-29T20:43:43.580Z",
+      "title": "Retrieve deleted campaign and leads for client in Acquisity",
+      "state": "Canceled",
+      "assignee": "Anthony Adewale",
+      "parent": null,
+      "labels": ["Campaign State"],
+      "description": "#### Customer Name\n\nName 16\n\n#### Customer Email\n\n<email>\n\n#### Screenshot\n\n#### Clear description of what the problem is\n\nClient accidentally deleted campaign in Acquisity.  Can't find the leads he loaded to the campaign.  Is there a way for us to retrieve this for him? (Ideally the entire campaign, but minimally, the leads?)"
+    },
+    {
+      "id": "ENG-6028",
+      "createdAt": "2026-02-27T21:34:20.532Z",
+      "title": "1. Update Lead Source Selection Step (Acquisity Database + Upload)",
+      "state": "Done",
+      "assignee": "Anthony Adewale",
+      "parent": "ENG-6027",
+      "labels": ["Feature", "Improvement"],
+      "description": "## Overview\n\nUpdate the campaign wizard's lead source selection step to replace the current 3-option layout (AI Generated / Upload Your Own / Manual Filters) with a 2-option layout:\n\n* **Acquisity Database** — opens the new unified lead scraping UI (v2)\n* **Upload Your Own** — CSV upload (unchanged)\n\nThe campaign wizard step count also changes from 4 steps to 3 steps.\n\n## Current Implementation\n\n* File: `components/campaigns/new/steps/lead-source-selection-step.tsx`\n* Currently renders 3 `SelectionCard` components with icons for AI Generated, Upload Your Own, and Manual Filters\n* Lead source type: `'ai-generated' | 'upload' | 'manual-filters' | null`\n\n## Requirements\n\n### UI Changes\n\n- [ ] Replace 3-card grid with 2-card grid\n- [ ] Card 1: \"Acquisity Database\" with database icon (purple/brand color), subtitle description\n- [ ] Card 2: \"Upload Your Own\" with upload icon, subtitle \"Drop your .CSV file here to upload\"\n- [ ] Remove the \"Manual Filters\" card entirely\n- [ ] Update step indicator from 4 steps to 3 steps\n- [ ] Replace \"Previous\" button with \"Cancel\" button\n- [ ] Keep \"Next\" button behavior\n- [ ] Remove the auto-launch checkbox (or keep if still needed)\n\n### Type Changes\n\n- [ ] Update `LeadSourceType` to `'acquisity-database' | 'upload' | null` (remove `'ai-generated'` and `'manual-filters'`)\n- [ ] Update all references to the old lead source types throughout the campaign wizard\n\n### Flow Changes\n\n- [ ] When \"Acquisity Database\" is selected and Next is clicked → navigate to the new unified lead scraping page (sub-ticket #2-4)\n- [ ] When \"Upload Your Own\" is selected → continue to existing upload step\n\n## Design Reference\n\nSee attached screenshots showing the new 2-option layout with \"Acquisity Database\" and \"Upload Your Own\" cards.\n\n## Dependencies\n\nNone — this is the entry point and can be built first.\n\n## Priority\n\nP1 — Must be done first as it's the entry point to the new flow."
+    },
+    {
+      "id": "ENG-7889",
+      "createdAt": "2026-04-16T14:32:15.762Z",
+      "title": "Request 10,000 Lead Credits for Acquisity discount code",
+      "state": "Done",
+      "assignee": "Beth Newton",
+      "parent": null,
+      "labels": ["Refund"],
+      "description": "#### Workspace Name\n\nName 17\n\n#### Request Type\n\nDiscount code\n\n#### Reason for request\n\n2 Months Acquisity with Inboxes.\nAccount needs to get 10 000 Lead Credits."
+    },
+    {
+      "id": "ENG-7734",
+      "createdAt": "2026-04-13T06:01:22.599Z",
+      "title": "Deleted leads still blocked from new campaign upload",
+      "state": "Canceled",
+      "assignee": "Beth Newton",
+      "parent": null,
+      "labels": [],
+      "description": "user: <email>\n\nA customer paused a campaign and tried to upload about 2,248 uncontacted leads into a new campaign. After deleting those leads from the original campaign in AI Acquisition and in Company One, the new upload still shows that all leads are already assigned to another campaign and skips them.\n\nSupport noted the leads may still exist in the archive and asked for them to be deleted there as well.\n\n <image> "
+    },
+    {
+      "id": "ENG-5614",
+      "createdAt": "2026-02-17T16:20:17.913Z",
+      "title": "Request approval to upload 10k leads in Acquisity",
+      "state": "Done",
+      "assignee": "Beth Newton",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "#### Customer Name\n\nName 18\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nCompany Six\n\n#### Screenshot\n\n <image> \n\n#### What are you trying to achieve?\n\nApproval for 10k leads in Acquisity\n\n#### What are you doing to achieve it?\n\nPart of agreement to retract RR\n\n#### What is happening instead?\n\nn/a\n\n#### What is the expected outcome?\n\nName 19 10k credits"
+    },
+    {
+      "id": "ENG-3016",
+      "createdAt": "2025-11-26T12:20:49.105Z",
+      "title": "Show total uploaded leads in cold email agent settings",
+      "state": "Canceled",
+      "assignee": "Anthony Adewale",
+      "parent": null,
+      "labels": ["Feature"],
+      "description": "Add a display of the total number of leads uploaded to Acquisity within the cold email agent settings.\n\nThe display should appear at the bottom of the settings section, after the existing lead scraping credits information.\n\nScope is limited to surfacing the aggregate \"total uploaded leads to Acquisity\" count; no additional behavior or configuration was requested."
+    },
+    {
+      "id": "ENG-13257",
+      "createdAt": "2026-08-28T17:53:35.249Z",
+      "title": "Master: Company One lead-push page-dispatch job fails, leaving leads without a provider id so campaigns send zero",
+      "state": "Todo",
+      "assignee": "Anthony Adewale",
+      "parent": null,
+      "labels": ["fast-lane"],
+      "description": "## Root cause\n\nThe Company One lead-push page-dispatch job (`ai-clients.campaigns.process-add-leads-page`, `apps/web/lib/inngest/functions/campaign/process-campaign-add-leads.ts` → `processCampaignAddLeadsPage`) is failing platform-wide. The bulk-add step and finalization fail, and the onFailure handler throws `Campaign id not found for dispatch release`, so campaign leads are never assigned a `provider_lead_id` and never reach Company One. With no leads pushed, Company One reports the campaign completed, and `handleCampaignCompleted` (`apps/web/lib/webhooks/outreach/inngest-routing.ts`) marks it attention_needed with \"no emails were sent.\"\n\n## Evidence\n\n* Inngest: 8 failed runs of `ai-clients.campaigns.process-add-leads-page` between 2026-08-27 and 2026-08-28; latest run 01M14H60H8P7Q3399P8FX7W6Q2 failed at the bulk-add step and finalization.\n* Production: 99,971 lead rows created since 2026-08-26 have `provider_lead_id` NULL and `not_yet_contacted`; 52 distinct organizations affected (count date 2026-08-28).\n* Code commit: ef57fe3f266327a5bccfb03be00eca065e7bacbd.\n\n## Blast radius\n\n52 organizations / ~99,971 uncontacted, un-pushed lead rows (since 2026-08-26, count date 2026-08-28) — upper bound on the current active window.\n\n## Prior related work\n\nENG-13045, ENG-13154, ENG-13185 report the same dispatch failure and were parented under the earlier skip-count root cause ENG-12623. This master owns the distinct, still-failing dispatch-job cause.\n\n## Updated blast radius\n\n2026-09-09: 44 organizations have unpushed leads (`provider_lead_id` NULL) created in the last 3 days (read replica). The dispatch job is still failing — Inngest runs failed 2026-09-07."
+    },
+    {
+      "id": "ENG-13285",
+      "createdAt": "2026-08-31T10:47:46.788Z",
+      "title": "When uploading leads via CSV, it says the leads are skipped, yet they are not - which glitches out the entire campaign",
+      "state": "Triage",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [],
+      "description": "#### Customer Name\n\nName 20\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 20\n\n#### Screenshot\n\n <image> \n\n#### What are you trying to achieve?\n\nTo get the CSV lead upload to actually work congruently: when you upload the leads, it doesn't skip them all but then uploads them to the campaign anyway. The numbers do not reflect the leads uploaded, and when you go and launch the campaign, it completely breaks it. You have to create another campaign and then scrape more leads directly from the platform rather than just re-uploading them from a pre-existing campaign which has X amount in it already.\n\n#### What are you doing to achieve it?\n\n.\n\n#### What is happening instead?\n\n.\n\n#### What is the expected outcome?\n\nTo have the CSV upload not glitch out and break the entire campaign."
+    }
+  ]
+}

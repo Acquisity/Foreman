@@ -1,0 +1,220 @@
+{
+  "id": "ENG-14514",
+  "provenance": "seeded",
+  "createdAt": "2026-09-30T10:03:21.327Z",
+  "lane": "triage",
+  "stratum": "duplicate",
+  "ticket": {
+    "title": "Name 9 - lead scraping failing with \"We could not finish this request. Try again or contact Support\"",
+    "description": "#### Customer Name\n\nName 9\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 9's Workspace\n\n#### Screenshot\n\n <image> \n\n#### What are you trying to achieve?\n\nName 9 - lead scraping failing with \"We could not finish this request. Try again or contact Support\"\n\n#### What are you doing to achieve it?\n\nName 9 - lead scraping failing with \"We could not finish this request. Try again or contact Support\"\n\n#### What is happening instead?\n\nName 9 - lead scraping failing with \"We could not finish this request. Try again or contact Support\"\n\n#### What is the expected outcome?\n\nLead Scraping should work as expected",
+    "attachmentKinds": ["image"]
+  },
+  "repoCommitAtCreate": "861c29780184fc87ff4c2f7b7753f905ac8ddced",
+  "flags": {
+    "descriptionEditedAfterCreate": false,
+    "needsProductionData": true,
+    "alreadyFixedAtTriage": false
+  },
+  "relatedSnapshot": [
+    {
+      "id": "ENG-4548",
+      "createdAt": "2026-01-14T23:26:09.357Z",
+      "title": "Lead scraping returns error despite valid lead preview",
+      "state": "Done",
+      "assignee": "Anthony Adewale",
+      "parent": null,
+      "labels": ["Lead Scraping Fails"],
+      "description": "Lead scraping in Name 1 is intermittently failing at 100% completion with a generic error banner:\n\n> Something went wrong while processing your request. Please try again or contact support if the issue persists.\n\nThis has been observed when running campaigns using the funding filter and also for a simple search over the entire financial services niche, where the preview count showed around 50k leads. Despite the non-zero preview count, the campaign creation fails with the error.\n\nExample affected client: <email>\n\nScreenshot of the failed run:\n\n <image> "
+    },
+    {
+      "id": "ENG-14443",
+      "createdAt": "2026-09-29T07:03:50.933Z",
+      "title": "Customer report: Company Four lead search now succeeds (4,474 leads delivered) but the campaign is stuck in Draft",
+      "state": "Todo",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": ["Customer reported", "intercom-sourced"],
+      "description": "## Source\n\nIntercom conversation: <url:app.intercom.com>\n\n## Conversation context (bounded)\n\nContact: Name 2 (agency owner, <email>). Workspace: Company Four. On 2026-09-18 he reported that every attempt to set up a Cold Email Agent campaign failed at the end of the lead finder with the generic red screen “We could not finish this request. Try again, or contact support if it keeps happening.”, on three fresh campaigns. A support agent reproduced it and escalated it. The customer reported again on 2026-09-25 that he still could not scrape leads, then answered on 2026-09-28 that it is Company Four's workspace. The conversation is open and waiting on a human reply.\n\n## What the evidence shows (checked 2026-09-29)\n\n* The 2026-09-18 failures were the known Company One enrichment-credit condition: the lead-search dispatch step was rejected with `Company One API Client Error (402): Insufficient credits` from the workspace's system-provisioned Company One workspace. That is already tracked by the customer report ENG-14049 under master ENG-14030, both closed.\n* The reported scrape failure is no longer reproducing for this workspace. His 2026-09-25 lead search completed and delivered 4,474 leads into the campaign, and all 15 of the workspace's sending inboxes are active.\n* No failed lead-search submission or run exists for this workspace after 2026-09-18.\n* The campaign “Company Four” is still `status=draft` with `wizard_completed_at` null because its 2026-09-18 creation submission failed on the 402 before the wizard could finalize. It is complete by the product's own readiness rule (leads + valid sequence + selected sending inboxes), so opening it lands on the campaign, not back in setup, and it can be launched.\n\n## Human action\n\nReply to the customer in Intercom: the lead search is no longer failing and 4,474 leads are already in his campaign, so he can finish and launch it without rebuilding. Reopen this if the setup error appears again or the campaign will not launch."
+    },
+    {
+      "id": "ENG-14030",
+      "createdAt": "2026-09-18T14:06:21.307Z",
+      "title": "ApiClientError: Company One API Client Error (402): Insufficient credits",
+      "state": "Triage",
+      "assignee": "Anthony Adewale",
+      "parent": null,
+      "labels": ["bugfix", "fast-lane"],
+      "description": "## Overview\n\nAI lead search (the \"lead scrape\" that feeds a cold email campaign) fails for workspaces whose Company One enrichment workspace is out of provider credit. The user sees only a generic \"Unable to complete your request. Please try again later.\", no leads are delivered, and the campaign stays empty.\n\n## Problem\n\nFrom the user's side: they launch or configure a cold email campaign, confirm the lead search, and it errors out with no leads and no actionable message. There is no setting they can change to fix it, because the exhausted pool belongs to an Company One workspace Acquisity provisioned and manages on their behalf.\n\n## Root cause\n\nThe AI lead-search dispatch uses the organization's own Company One enrichment workspace when one is configured (`system_provisioned`, i.e. Acquisity owns and pays for it). When that workspace has no remaining Company One enrichment credit, Company One rejects the enrichment call with HTTP 402 `Insufficient credits`. The HTTP layer maps any non-429 4xx to a non-retriable `ApiClientError` and the dispatch path has no 402 handling, so the step fails, no scrape run is created, and the campaign receives zero leads.\n\nThe seam: other Company One callers already treat 402 as a known signal via `isNoActivePaidPlanError()` and raise `alertProvisioningBillingGap()`; the lead-generator dispatch path does not, so the condition is neither alerted nor surfaced to the user as an actionable state.\n\n## Blast radius\n\nConfirmed affected (cause-confirmed from production, counted 2026-09-18 from `submission.metadata->>'diagnosticError' = \"Company One API Client Error (402): Insufficient credits\"`): 28 organizations / 32 submissions all time (first 2026-05-12T15:49:34Z, most recent 2026-09-18T18:31:06Z), of which 24 organizations / 28 submissions fell in the trailing 48 hours. Counted independently from the campaign_creator-submission grouping used in the original count, which agreed (24 orgs / 27 submissions at 2026-09-18T17:37Z). A second independent customer report is frequency evidence for the same cause, not a new defect.\n\nPotentially exposed (upper bound, not cause-filtered): 26 organizations / 44 failed lead_scrape submissions on active system_provisioned Company One providers in the 7 days to 2026-09-18T17:37:28Z. This counts every failed lead scrape on that population regardless of cause.\n\nDenominator: 2697 active Company One providers are system_provisioned.\n\nNot a global provider outage: on 2026-09-18, 23 system_provisioned organizations completed 27 lead scrapes, and the busiest single organization completed 46 runs that day; steady completions continued through 17:44Z.\n\nLimitations: the Company One workspace read API exposes no credit or plan balance, so the exact exhausted figure is not directly measurable; the 402 is the authoritative provider statement. Axiom log corroboration was unavailable.\n\nObservability gap seen in the second report: on the same organization, only one of several failed submissions carried the 402 diagnostic, while sibling failures recorded a null `diagnosticError`. The condition is therefore under-reported in the diagnostic field and the cause-confirmed count above is a lower bound, not a ceiling.\n\n## Proposed fix\n\nMake enrichment-credit exhaustion on a provisioned Company One workspace a visible, actionable state end to end: detect the 402 on the lead-search dispatch path the same way other Company One callers do, surface a message that names the real condition instead of the generic retry prompt, and ensure the provisioning/billing gap is alerted and remedied by the owner of those workspaces. The user should either get a working search or a clear statement of what Acquisity is doing about it, not an unexplained failure.\n\n## What's included\n\nIn scope: 402 detection and handling on the AI lead-search dispatch path; a user-visible state that names credit exhaustion; the alert/remedy path for provisioned workspaces; a regression test at the dispatch seam.\n\nOut of scope: changing the provider's credit pricing; customer-owned Company One workspaces (they administer their own credit).\n\nSeparately deliverable work: backfill/retry for the campaigns already left empty by this failure; an observability signal that reports how many provisioned workspaces are credit-exhausted over time.\n\n## Regression seam\n\nPublic boundary: the AI lead-search dispatch step (`start-scrape-run` in the lead-generator function). Trigger: the configured Company One enrichment workspace returns HTTP 402. Observable red-before, green-after: before, the step throws a generic non-retriable error and the submission is failed with only \"Unable to complete your request\"; after, the 402 is classified, the workspace is flagged as credit-exhausted, and the user-facing state and the internal alert both reflect that condition.\n\n## Done when\n\n* A lead search on a provisioned workspace that is out of Company One credit produces a user-visible state that names credit exhaustion rather than a generic retry prompt.\n* The provisioning/billing gap is alerted for affected workspaces, by the same path other Company One callers already use.\n* The affected campaigns can be recovered once credit is restored, without the user re-creating them.\n* A regression test at the dispatch seam proves the 402 is classified and handled rather than failing generically.\n\n## Reports\n\n* ENG-14042 Company Two - leads won't scrape\n* ENG-14049 Company Four - campaign setup fails with \"We could not finish this request\" on every attempt"
+    },
+    {
+      "id": "ENG-14355",
+      "createdAt": "2026-09-28T02:17:51.120Z",
+      "title": "Customer report: Cold Email campaign setup fails with the generic setup error and is left stuck in Draft",
+      "state": "Todo",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": ["Customer reported", "intercom-sourced"],
+      "description": "**Source**: Intercom conversation <url:app.intercom.com>\n\n**Conversation context (bounded)**: Customer (workspace `<workspace-slug>`) reports that setting up a cold email campaign called \"Discovery Calls\" reaches 100% and then shows, in red, \"We could not finish this request. Try again, or contact support if it keeps happening.\" Retries over a day did not help; the campaign stayed in Draft. After switching from Edge to Chrome and rebuilding, the customer reports the same failure during the lead step (\"Finding and Verifying Leads\": Configuring Search Parameters, Initiating Lead Scraping, Collecting Lead Data, Verifying Email Addresses, Processing Lead Results, Uploading to Database) while importing 8,000 of \\~35,441 matching leads. The customer asked whether anything on the account or platform side needs correcting; the conversation is open with a teammate and awaiting a human follow-up.\n\n**Finding**: The 2026-09-20 failure is platform-side. The lead-scrape child failed at the `start-scrape-run` step of `processLeadGenerator` with `Company One API Client Error (402): Insufficient credits` from the enrichment call, and the campaign creator cascaded the failure to its parent submission (\"Unable to complete your request. Please try again later.\"). The enrichment runs on a system-provisioned Company One workspace (provider `system_provisioned`, workspace `<workspace-slug>`), so the customer cannot see or fix the exhausted credit pool. This matches the already-tracked Instantly-enrichment-credit failure pattern (ENG-14088 / ENG-14049 / master ENG-14030).\n\n**Current state (2026-09-28)**: The failure is not reproducing. The customer's 2026-09-27 retry dispatched successfully and delivered 7,872 leads to the campaign, and the campaign now holds 7,880 lead rows. However the campaign is still `status=draft` with `wizard_completed_at` null, and the parent campaign_creator submission is still `status=failed` (last touched 2026-09-27), so the setup never finalizes and the customer is blocked/unsure. Platform-wide the cohort peaked on 2026-09-18 (41 orgs on the lead-scrape submission, 31 on the campaign creator) and fell to zero affected organizations from 2026-09-25 onward.\n\n**Human action**: Confirm with the customer what the wizard shows now, help him finish/launch the existing \"Discovery Calls\" draft (its leads are already present), and reply with the outcome. Reopen if the setup error is showing again or the campaign still will not finalize."
+    },
+    {
+      "id": "ENG-8207",
+      "createdAt": "2026-04-30T11:38:04.005Z",
+      "title": "Lead search fails with processing error",
+      "state": "Done",
+      "assignee": "James Keeble",
+      "parent": null,
+      "labels": [],
+      "description": "user: <email>\n\nA campaign was set up and when  it scrapes leads it shows the message: `Something went wrong while processing your request. Please try again or contact support if the issue persists.`\n\nThe issue persisted after trying a different browser. Afterwards, the previously found leads were no longer visible. Running the lead search again still produced the same error."
+    },
+    {
+      "id": "ENG-4539",
+      "createdAt": "2026-01-14T16:18:44.720Z",
+      "title": "Lead scrape fails at final upload to database step",
+      "state": "Canceled",
+      "assignee": "Blaise Gulaj",
+      "parent": null,
+      "labels": ["Lead Scraping Fails"],
+      "description": "Customer reports a bug where lead scraping completes all initial steps (search, scraping, verification, processing) but repeatedly fails at the final \"Uploading to Database\" step.\n\nFrom the conversation context:\n\n* Customer is running scrapes for automotive dealership leads (AL, FL, TN, GA, MS)\n* The UI shows the scrape pipeline completing until the last upload stage, which fails\n* Customer retried the scrape at least three times with the same result\n* A Loom recording was provided demonstrating the behavior: <loom>\n\nThe issue appears isolated to this customer’s workspace but blocks successful lead imports despite the scrape pipeline otherwise completing."
+    },
+    {
+      "id": "ENG-8071",
+      "createdAt": "2026-04-23T15:46:29.401Z",
+      "title": "Lead scraping times out after 41 attempts",
+      "state": "Canceled",
+      "assignee": "James Keeble",
+      "parent": null,
+      "labels": [],
+      "description": "user: <email>\n\nLead scraping failed with the error `Failed Lead scraping timed out after 41 attempts`.\n\nThe scrape was retried and later stayed stuck on processing for the rest of the morning. This was reported in Name 3' Workspace for the campaign `Design-Build Firms | Leadership | ONT 1-50 | Name 4`, and the scrape could not be stopped to try a smaller run."
+    },
+    {
+      "id": "ENG-4098",
+      "createdAt": "2026-01-02T18:47:23.521Z",
+      "title": "Lead scraping progress page crashes and shows failed status",
+      "state": "Canceled",
+      "assignee": "Anthony Adewale",
+      "parent": null,
+      "labels": ["Lead Scraping Fails"],
+      "description": "Customer in the Company Three workspace reports repeated failures when running AI lead scraping.\n\nObserved behavior:\n\n* Configuration completes to 100% but a red error notice appears and status shows as failed instead of completed\n* In some runs, the page shuts down or crashes partway through (one example around mid-progress)\n* In the most recent run, the process started well and then failed again, showing a red error banner on the progress view\n\nTechnical notes from investigation so far:\n\n* The issue is not traced to a backend error; it appears to be a browser memory issue\n* The \"Finding and Verifying Leads\" progress page refreshes too frequently and holds too much data in memory during longer runs (5–15 minutes)\n* The leads may continue processing in the background, but the progress page itself becomes unstable and can crash or show failure\n\nImpact:\n\n* User is unable to reliably complete lead scraping for a 15-email purchase in the Company Three workspace\n\nSuggested direction from support:\n\n* Optimize the progress page so it does not overload browser memory during longer lead scraping runs (e.g. reduce refresh frequency or data retained in the client during processing)\n\nScreenshot of the error state:\n\n <image> "
+    },
+    {
+      "id": "ENG-6540",
+      "createdAt": "2026-03-10T17:14:20.898Z",
+      "title": "Lead scraping fails after final processing step",
+      "state": "Canceled",
+      "assignee": "Beth Newton",
+      "parent": null,
+      "labels": [],
+      "description": "A lead scraping attempt failed 6 times for one customer. The process appears to complete search, scraping, verification, and upload, then fails at the end with `Something went wrong while processing your request.`\n\nThe same error also occurred in another browser.\n\nAdditional context: Loom screenshot"
+    },
+    {
+      "id": "ENG-4426",
+      "createdAt": "2026-01-11T22:13:02.630Z",
+      "title": "Error when scraping leads in Cold Email Agent",
+      "state": "Canceled",
+      "assignee": "Anthony Adewale",
+      "parent": null,
+      "labels": ["Lead Scraping Fails"],
+      "description": "A user reports that attempting to scrape leads in the Cold Email Agent consistently results in an error.\n\nThe user tried logging out, clearing cache, and logging back in, but still encounters the same error when trying again.\n\nRelevant screenshots are attached.\n\n <image> \n\n <image> "
+    },
+    {
+      "id": "ENG-3777",
+      "createdAt": "2025-12-15T11:32:18.194Z",
+      "title": "Lead scraping stuck in processing for over 24 hours",
+      "state": "Done",
+      "assignee": "Jared Stauffer",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "Customer GP - Name 5 reports that lead scraping/processing has been running for over 24 hours and is still stuck on the \"Processing\" state.\n\nThe screenshot shows the \"Manufacturing Outreach 12-10-25\" campaign on the Leads tab, with the status banner reading \"Lead scraping is in progress. This may take a few minutes to complete.\" No leads have been uploaded or completed.\n\nPlease investigate why the lead scraping job is not completing and whether there is a backend error or stalled job for this campaign.\n\n <image> "
+    },
+    {
+      "id": "ENG-14220",
+      "createdAt": "2026-09-24T10:44:08.400Z",
+      "title": "Master: Add Leads submits the AI Search text as the campaign niche, so a search over the 120-character label cap fails the scrape with a raw validation error",
+      "state": "Backlog",
+      "assignee": "Anthony Adewale",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "## Overview\n\nThe Add Leads lead scraper and the campaign write path disagree about how long a campaign niche may be. The scraper's AI Search box accepts up to 200 characters and submits that text as the campaign's niche label, while the create/update schema rejects any niche over 120. A search falling in that gap blocks lead scraping outright and shows the user a serialized validation array instead of a field message.\n\n## Problem\n\nIn Cold Email Agent, an operator adding leads to an existing campaign types a description into the AI Search box, clicks through to Add Leads, confirms, and gets `Failed to start lead scraping: [{\"code\":\"too_big\",\"maximum\":120,...,\"message\":\"Niche must be 120 characters or less\",\"path\":[\"niche\"]}]`. Nothing is dispatched, no lead scrape run is created, and the message does not read like something the operator can act on in the form. The same defect was reported in July 2026 by a different organization and was closed by asking the customer to shorten the niche, so the cause has been left in place.\n\n## Root cause\n\nTwo maximums apply to one string on the Add Leads path.\n\n* `apps/web/components/campaigns/new/steps/ai-search-inline-view.tsx` renders the AI Search input with `maxLength={MAX_NICHE_SEARCH_PROMPT_LENGTH}`, which is 200 (`apps/web/lib/outreach/campaign-niche-intent.ts`).\n* `apps/web/components/campaigns/new/steps/lead-scraper-filters.tsx`: `handleSearch()` copies the box text into `submittedNiche`, and `buildFormData()` returns it as `niche`; `handleConfirmLeads()` passes that to `onNext`.\n* `apps/web/components/campaigns/campaign-scrape-leads-client.tsx` `handleScrapeLeads()` sends it to `outreach.campaigns.createOrUpdateCampaign`, and its `onError` renders `Failed to start lead scraping: ${error.message}`.\n* `apps/web/lib/outreach/schemas/campaigns.ts` `createCampaignInputSchema` caps `niche` at `MAX_CAMPAIGN_NICHE_LABEL_LENGTH` = 120. The comment there records the intent that UI paths cap the input and the server guard only covers API and direct-tRPC callers, and `campaign-niche-intent.ts` line 110 states the cap is \"Enforced at every niche input\". The Add Leads path honours neither.\n* The same submitted string is accepted up to 200 by `outreach.providers.inferFromNiche` (`apps/web/trpc/routers/outreach/providers.ts`), so one flow validates the identical value at two different maximums.\n\nThis descends from the work that made a niche a short label and set the acceptance criterion that every niche input enforces the 120-character cap; the add-leads entry point was left uncapped.\n\nNot the cause: the approval-targeting seed (`buildApprovalFormData`) is only used in approval mode, which submits `saveApprovalLeadSearchTargeting` with its own 120 cap and a different toast, and the ordinary campaign seed passes through `sanitizeTransientNiche`, which blanks anything over 120. An approval-seeded or stored niche cannot produce the observed toast.\n\n## Blast radius\n\nConfirmed affected, counted 2026-09-24: 2 organizations two months apart, 1 user in each, from two independent customer reports (the July 2026 report and the September 2026 one).\n\nPotentially exposed: not countable from production. A rejection in input validation writes no row and leaves no run, so the blocked-organization count needs error instrumentation or support-side reports.\n\nLegacy data that is context, not exposure: 76 campaigns across 64 organizations hold a niche of 121-200 characters and 259 campaigns across 167 organizations hold any niche over 120, all created between 2025-10 and 2026-06-22, before this cap shipped on 2026-06-26. Those values are blanked on seed by `sanitizeTransientNiche`, so they cannot reproduce this failure, and they do not indicate the write guard being bypassed.\n\nQueries: `SELECT count(*) AS n, count(DISTINCT organization_id) AS orgs FROM outreach_campaign WHERE length(niche) > 120 AND length(niche) <= 200;` and the same with `length(niche) > 120` alone, plus a `date_trunc('month', created_at)` grouping that shows the newest over-cap row is 2026-06.\n\n## Proposed fix\n\nMake the Add Leads path and the write schema agree on one maximum for the niche: cap the AI Search input that feeds the niche at the label limit, or stop using the AI Search prompt as the niche label at all, and answer an over-long value with a field-level message on the search box rather than the serialized validator output. The behaviour should hold for every entry point that funnels into `createOrUpdateCampaign`.\n\n## What's included\n\nIn scope: the Add Leads scraper to `createOrUpdateCampaign` path, the AI Search input, and the field-level error. Excluded: the legacy stored over-cap niches, which a documented cleanup already treats as values the current write policy cannot produce. Related, not part of this fix: the approval save mutation caps the same field at 120 with the default validator message, which is unfriendly but not the observed failure.\n\n## Regression seam\n\nThe boundary between the scraper's submit payload and `createCampaignInputSchema` on `niche`: a 121-200 character AI Search text must either be capped in the input or answered with a field-level message, and must never reach the operator as a serialized validation array with the scrape blocked.\n\n## Done when\n\n* An AI Search text between 121 and 200 characters can no longer block a scrape: it is either prevented at the input or reported as a field error.\n* A failed submit leaves the operator with an actionable message rather than a serialized validator payload.\n* A regression test covers the seam above with a red-before, green-after assertion.\n\n## Reports\n\n* ENG-14219"
+    },
+    {
+      "id": "ENG-2738",
+      "createdAt": "2025-11-14T16:27:19.408Z",
+      "title": "Add Programmatic Lead Ingestion Monitoring and Fallback Solutions",
+      "state": "Backlog",
+      "assignee": "Anthony Adewale",
+      "parent": null,
+      "labels": ["Bug", "Improvement"],
+      "description": "## Issue Identified:\n\nFailed lead scrape processes occur silently, without visibility or remediation.\n\nTypical failed lead scrape process goes like:\n\n* User creates a new campaign\n* Lead scrape process is initiated\n* Lead scrape process fails, either in Verification or Uploading to Company One stage\n* Many hours go by and the user wonders what's taking so long\n* With a question to Support or maybe stumbling on it themselves, they eventually discover the lead scrape process didn't work and now they can't run their campaign\n* There was a new button added to the lead process card where users can \"Regenerate Leads\" and hope for the best, however this is a manual step\n* The user then needs to come back later and check to see if the lead scrape process worked\n* If the process worked, then they can launch their campaign\n\nThis process is inefficient and needlessly manual, and we need a programmatic way to detect failures, retry automatically, and notify the user only when action is actually required.\n\n <image> \n\n## Proposed Solution:\n\nAdd programmatic monitoring across all four ingestion stages, with automated remediation paths for each:\n\n1. Submission\n   1. Detect submission failures\n   2. If failed, programmatically resubmit\n   3. If failed three consecutive times, stop retry and add alert with reason\n2. **Lead Scraping**\n   * Detect timeout, empty payload, or other errors from lead provider\n   * If failed, retry scrape automatically\n   * If failed three consecutive times, stop retry and add alert with reason\n3. **Email Verification**\n   * Detect stalled or incomplete verification\n   * If failed, restart verification job or re-submit batch\n   * If failed three consecutive times, stop retry and add alert with reason\n4. **Uploading to Company One**\n   * Detect failed upload to Company One\n   * If failed, reattempt upload process\n   * If failed three consecutive times, stop retry and add alert with reason\n\nEach stage should emit success/failure states, log the outcome, and attempt automated self-correction before requiring any manual input.\n\n## Assumptions:\n\n* The entire lead scrape process should only take 5-10 minutes when working normally\n* When users set up new campaigns, they want to get started right away\n  * Therefore, UI feedback is critical\n  * If a process is failing, show them that the agent is taking action on their behalf\n\n<!-- preview-url-start -->\n**Preview:** <url:1772277796-aiacquisition.vercel.app> — PR #2787\n<!-- preview-url-end -->"
+    },
+    {
+      "id": "ENG-2575",
+      "createdAt": "2025-11-04T18:49:39.870Z",
+      "title": "Lead Scrape Stuck in Status: Uploading to Company One",
+      "state": "Done",
+      "assignee": "Anthony Adewale",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "Some customers are seeing lead scrapes stuck at the last stage: Uploading to Company One. It's not always the case that the associated Company One account is too full to accept new leads. See example customer details below.\n\nAlso, there used to be a way to take actions on lead-scrape submissions, including selecting \"Retry\" when they were also shown on the Submissions section. However, right now when a lead scrape gets stuck, it doesn't look like users have any options to try anything. It just remains stuck.\n\n**Example Customer Details**: \n\n* Name: Name 6\n* Company One Capacity: Only 9,500 out of 25,000 used\n* Campaign Name: **Law Practice | CEO, Chief Executive Officer, Founder, Co-founder, Owner | 51-100,11-20,21-50 | United States**\n* Slack thread: LINK\n\n <image> "
+    },
+    {
+      "id": "ENG-14219",
+      "createdAt": "2026-09-24T10:28:38.567Z",
+      "title": "Customer report: Add Leads scraper submits the AI Search text as the campaign niche, so a search over the 120-character label cap fails with a raw validation error",
+      "state": "Todo",
+      "assignee": "Anthony Adewale",
+      "parent": "ENG-14220",
+      "labels": ["Bug", "Customer reported", "intercom-sourced"],
+      "description": "**Intercom source**: <url:app.intercom.com>\n\n**Conversation context**: A long-running agency thread with an operator who runs several workspaces. Name 7 reports in the same thread are already handled: the campaign lead-count question was closed (ENG-13866, Done) and the \"Slots Sent\" thread with no slots email behind it is tracked as ENG-14110 under master ENG-14111. On 2026-09-23 the customer posted a screenshot captioned \"can't scrape leads..\" showing the **Add Leads To Campaign** dialog in the Cold Email Agent over a lead preview, with the toast: `Failed to start lead scraping: [ { \"code\": \"too_big\", \"maximum\": 120, \"type\": \"string\", \"inclusive\": true, \"exact\": false, \"message\": \"Niche must be 120 characters or less\", \"path\": [ \"niche\" ] } ]`. The same dialog showed 9,136 estimated available leads, 10,132 lead credits remaining, and the campaign leads badge \"Within Limit\", so neither credits nor lead capacity was the blocker. The customer replied \"still the same\" on 2026-09-24 after being told to refresh.\n\n**Claim**: In the Add Leads lead scraper, the text typed into the AI Search box is submitted as the campaign's niche label, but that box accepts 200 characters while the campaign write path caps the niche at 120, so any search between 121 and 200 characters fails the scrape and the user is shown the raw server validation dump instead of a field error.\n\n**Evidence** (read at commit b8321a38cd373c0837eec2fe0e2bc8317d14fc69):\n\n* The AI Search input caps input at `MAX_NICHE_SEARCH_PROMPT_LENGTH = 200` (apps/web/components/campaigns/new/steps/ai-search-inline-view.tsx, and the same 200 in ai-search-dialog.tsx).\n* The scraper turns that typed text into the niche: `apps/web/components/campaigns/new/steps/lead-scraper-filters.tsx` keeps `nicheInput`/`submittedNiche` state and `buildFormData()` returns `niche: isPlaceholderNiche(submittedNiche) ? '' : submittedNiche`; `handleConfirmLeads()` passes it to `onNext`.\n* `apps/web/components/campaigns/campaign-scrape-leads-client.tsx` `handleScrapeLeads()` sends that niche to `outreach.campaigns.createOrUpdateCampaign`, and its `onError` renders `Failed to start lead scraping: ${error.message}`.\n* The write schema caps the niche at `MAX_CAMPAIGN_NICHE_LABEL_LENGTH = 120` (apps/web/lib/outreach/schemas/campaigns.ts, `createCampaignInputSchema`), with the stated intent that \"UI paths also cap input length\" and the server guard only covers API and direct-tRPC callers. The same submission reaches `outreach.providers.inferFromNiche`, which accepts up to 200 (apps/web/trpc/routers/outreach/providers.ts), so the product itself validates the identical string at two different maximums.\n* A second uncapped entry point exists: `buildApprovalFormData()` in the same client seeds the scraper's search box from the campaign agent's stored targeting with `niche: targeting.niche?.trim()`, and that targeting type has no length cap (apps/web/lib/inngest/functions/campaign/types.ts, `niche: z.string()`, and `saveCampaignInputSchema`).\n\n**Blast radius** (counted 2026-09-24 against production): 76 live campaigns across 64 organizations hold a niche between 121 and 200 characters, and 259 campaigns across 167 organizations hold any niche over the 120-character label cap, so the value class that triggers this error is already stored in production despite the write guard.\n\n**Unverified**: the exact string the customer submitted and which entry point produced it (typed AI Search text or an agent-seeded niche) are visible only in the customer's session, so the failing value itself is not in production data.\n\n**Excluded**: the \"No email accounts connected\" banner the customer also raised in the same thread is the known display-only defect ENG-10717; the campaign's sending is healthy (3,210 of 6,107 leads contacted with the newest contact event at 2026-09-23T20:56:17Z)."
+    },
+    {
+      "id": "ENG-6668",
+      "createdAt": "2026-03-12T17:08:12.185Z",
+      "title": "Leads scraped via Add Leads do not appear",
+      "state": "Canceled",
+      "assignee": "Jared Stauffer",
+      "parent": null,
+      "labels": [],
+      "description": "On March 10, leads were scraped using the **Add Leads** button under a campaign, but the leads did not appear in the account.\n\nSupport observed a message that 324 leads were skipped during upload and 330 leads were successfully uploaded. The issue needs investigation to confirm whether the scrape job or upload logs show skipped leads due to duplication, campaign requirements, or another backend problem.\n\nRelevant context: Loom link"
+    },
+    {
+      "id": "ENG-3928",
+      "createdAt": "2025-12-19T20:03:52.579Z",
+      "title": "Fix Company One lead scraping: Set skip_owned_leads to false for shared workspaces",
+      "state": "Done",
+      "assignee": "Anthony Adewale",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "## Problem\n\nLead scraping with Company One was returning 0 leads despite the count API showing 92,000+ available leads. Users would see \"Lead Search Complete\" but enrichment would fail with `has_no_leads: true`.\n\n## Root Cause\n\nThe `skip_owned_leads: true` filter was being sent to Company One for ALL scrape requests, including organizations using the shared system workspace. This filtered out leads that other organizations had already scraped, effectively limiting available leads to zero in competitive niches.\n\n## Solution\n\nModified `getInstantlyClient` to conditionally set `skip_owned_leads` based on workspace type:\n\n* **Shared workspace**: `skip_owned_leads: false` (allows scraping leads other orgs have scraped)\n* **Name 8's own workspace**: `skip_owned_leads: true` (filters duplicates within their workspace)\n\n## Impact\n\n* Users on shared Company One workspace were completely blocked from scraping leads\n* Count API showed 92k+ leads but enrichment returned 0\n* Users saw \"Something went wrong\" error after preview showed available leads\n\n## Related PR\n\n<url:github.com>"
+    },
+    {
+      "id": "ENG-4997",
+      "createdAt": "2026-01-30T15:47:31.699Z",
+      "title": "Lead scraping job stuck in processing with 0 results",
+      "state": "Done",
+      "assignee": "Jared Stauffer",
+      "parent": null,
+      "labels": ["Lead Scraping"],
+      "description": "user: <email>\n\nUser reports that a lead scraping job has been stuck in `processing` for 5–6 hours with 0 leads uploaded.\n\nThey previously had another scrape that took \\~48 hours and only returned 960 leads before being cancelled and restarted. The current scrape has been running for several hours with no leads produced.\n\nA Loom video with more context was shared: Loom recording.\n\nSupport has confirmed this is longer than expected and that the scrape appears stuck rather than actively running, and requested escalation for investigation or restart."
+    },
+    {
+      "id": "ENG-3611",
+      "createdAt": "2025-12-10T03:39:38.755Z",
+      "title": "Campaign lead scraping stuck in processing since yesterday",
+      "state": "Duplicate",
+      "assignee": "Tyler Olsen",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "A lead scraping campaign has been stuck in the \"processing\" state since yesterday and has not completed.\n\nThe customer reports that the campaign was started yesterday and is still processing without finishing, and they are unable to proceed.\n\nScreen recording of the issue is available here: Jam recording."
+    },
+    {
+      "id": "ENG-13232",
+      "createdAt": "2026-08-27T22:35:03.918Z",
+      "title": "Prevent Company One lead scrapes failing before populated lists are ready",
+      "state": "To Code Review",
+      "assignee": "James Keeble",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "## Overview\n\nCampaign lead scraping should wait until Company One's exact generated list is readable before Acquisity treats the scrape as ready. This prevents users seeing a false failed scrape and \"No valid leads to upload\" while Company One is still populating a list that later contains the requested leads.\n\n## Problem\n\nOn 27 August 2026, 12 lead-scrape runs across 7 organizations failed with \"No leads found matching the search criteria\". In every same-day case, the exact Company One list later contained leads. Acquisity currently treats an enrichment as successful as soon as Company One reports `<stripe-id>=false` and `exists=true`, then reads the list once. Company One can report those flags before its list endpoint exposes the leads, so the import sees zero rows and records a false failure.\n\nThe zero-row branch then continues into the completion and upload path after marking the scrape failed. This allows contradictory terminal state and makes recovery harder to reason about.\n\nThis appears to be newly observed provider timing exposing a pre-existing Acquisity race, not a recent Acquisity code regression. The vulnerable readiness condition has been present since 10 November 2025 and was unchanged by the deployment active during the incident. Provider-side timing is the strongest evidence-backed explanation, but Company One has not independently confirmed it.\n\n## User experience\n\nWhen a user starts a second or later campaign scrape, the workflow should remain in progress while Company One is still making the generated list readable. A genuinely empty search should still end with a clear no-matches result. Once the list is readable, Acquisity should import and upload that scrape's leads exactly once, then show one consistent completed state and deduct only provider-confirmed usage.\n\n## Proposed fix\n\n* Use the exact Company One `resource_id` and require the generated list to be readable before returning `SUCCEEDED`.\n* Treat `has_no_leads=true` as a genuine terminal empty result. Treat a finished enrichment with `has_no_leads=false` and an empty list page as still propagating, then retry through the existing polling budget.\n* Add a defensive retry in the import function if the exact list is unexpectedly empty but Company One has not declared it empty.\n* Return immediately after a genuine empty failure so failed state cannot be overwritten by completion or upload steps.\n* Wait for every lead-save batch to finish, tag rows with this import's existing batch scope, and restrict the upload to that batch so a retry cannot sweep unrelated unsent leads from the same campaign.\n* Add structured readiness-lag logging and a multi-organization failure signal.\n\n## What's included\n\n* Backend readiness, import, state-transition, idempotency, and observability changes for Company One SuperSearch campaign scrapes.\n* Focused unit and Inngest regression tests at the provider-readiness, import, and upload-scope seams.\n* No database migration and no intended UI redesign.\n* Preserve the existing rule that lead credits are settled only from provider-confirmed uploads.\n\nIncident recovery is already complete for the safe cases. We replayed the existing provider lists only, with no new scrapes, credit grants, list deletion, or capacity changes. Eight campaigns across six workspaces recovered 18,712 provider-confirmed new uploads and finished in a consistent completed state. One 2,000-lead list was intentionally not replayed because only 1,795 Company One slots remained, so at least 205 slots must be added or freed before replaying that existing list. One run without a campaign target was excluded because it could not be safely attributed.\n\n## How it should work\n\n* `<stripe-id>=true`: keep polling.\n* `<stripe-id>=false`, `exists=true`, `has_no_leads=false`, exact list still empty: keep polling and record propagation lag.\n* Exact list has at least one readable row: continue to import.\n* `has_no_leads=true`: record one genuine no-matches failure and stop.\n* Unexpected empty import without `has_no_leads=true`: retry as provider propagation, never complete or upload.\n* Successful import: finish all save batches, upload only the rows associated with this import, settle only confirmed provider uploads, then write one completed terminal state.\n\n## Done when\n\n* A finished Company One enrichment cannot be marked ready until the exact generated list is readable, unless Company One explicitly reports a genuine empty result.\n* A delayed list remains in progress and is imported automatically when rows become readable within the existing polling budget.\n* A genuinely empty result fails once with clear no-matches state and cannot continue into completion or upload.\n* A successful run cannot have both failed and completed terminal state.\n* Save batches complete before upload starts, and the upload is scoped to the exact rows from that import.\n* Replaying the same import is idempotent and does not duplicate provider membership or credit usage.\n* Concurrent or newer unsent campaign leads are not swept into the recovering scrape's upload.\n* Logs expose readiness lag, retry count, exact scrape/list correlation using non-sensitive IDs, and multi-organization spikes.\n* Focused tests cover delayed population, genuine empty results, provider errors, replay, concurrent campaign activity, scoped upload, consistent terminal state, and provider-confirmed billing.\n\n## Implementation context\n\nThe full source-anchored investigation, recovery record, regression verdict, and ordered file-by-file implementation plan are in AI context.md."
+    }
+  ]
+}

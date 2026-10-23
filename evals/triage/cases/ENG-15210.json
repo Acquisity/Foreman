@@ -1,0 +1,220 @@
+{
+  "id": "ENG-15210",
+  "provenance": "seeded",
+  "createdAt": "2026-10-12T15:19:31.313Z",
+  "lane": "triage",
+  "stratum": "platform_limitation",
+  "ticket": {
+    "title": "Feature Inquiry: Day-specific calendar conflict rules for AI SDR",
+    "description": "#### Customer Name\n\nName 20\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nCompany One\n\n#### Screenshot\n\n#### What are you trying to achieve?\n\nConfigure the AI SDR agent to check a specific secondary calendar ((c)Name 21) for conflicts only on Tuesdays and Saturdays, while ignoring it on M/W/F so both partners sharing one email address can take calls.\n\n#### What are you doing to achieve it?\n\nReviewing AI SDR Agent calendar conflict settings under Settings → AI SDR Agent → Calendar Settings\n\n#### What is happening instead?\n\nSelected calendars currently apply conflict checking universally across all days, rather than allowing day-of-week conditional rules per calendar.\n\n#### What is the expected outcome?\n\nClarify if day-specific calendar conflict filtering is currently supported/planned, or if a backend workaround exists for shared-inbox accounts.",
+    "attachmentKinds": ["slack"]
+  },
+  "repoCommitAtCreate": "076050116c5fc541c66506bdfc065207adb86b64",
+  "flags": {
+    "descriptionEditedAfterCreate": false,
+    "needsProductionData": false,
+    "alreadyFixedAtTriage": false
+  },
+  "relatedSnapshot": [
+    {
+      "id": "ENG-5138",
+      "createdAt": "2026-02-04T22:03:48.580Z",
+      "title": "AI SDR v2: Calendar Conflicts",
+      "state": "Done",
+      "assignee": "Tyler Olsen",
+      "parent": null,
+      "labels": [],
+      "description": "The AI currently can't gracefully handle schedule conflicts - let's say the AI suggests a meeting at 9am, it's open on the calendar at the time - but then another meeting is scheduled at the same time before the user accepts that 9am timeslot.\n\nFurthermore, the agent doesn't handle alternative suggestions by the user - it does handle OOO events (ie, user requests to meet on a Saturday, but the user has that set as OOO) but if a user suggests meeting at a time not listed, the slot matchmaker fails\n\n <image> \n\nCurrently, the AI will fail and escalate to the user - instead, it should gracefully be able to handle this and redirect to suggesting new meeting times"
+    },
+    {
+      "id": "ENG-4101",
+      "createdAt": "2026-01-02T19:08:00.800Z",
+      "title": "Appointment calendar day label and cancellation inconsistencies",
+      "state": "Done",
+      "assignee": "Anuj Bhatt",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "A user reports two issues with the appointment calendar:\n\n1. On the appointment calendar, the day label at the top is off by one day, even though the underlying appointments are on the correct dates and times.\n2. An appointment scheduled for 1pm EST on January 5th with Name 1 was canceled via the dashboard. It was removed from Name 2 Calendar but still appears under appointments in the dashboard.\n\nBoth issues appear to be specific to this user’s account and current calendar setup."
+    },
+    {
+      "id": "ENG-4317",
+      "createdAt": "2026-01-08T19:37:33.581Z",
+      "title": "Calendar view shows mismatched date and weekday",
+      "state": "Duplicate",
+      "assignee": "Anuj Bhatt",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "Users report a glitch in the calendar where the selected date and the day of week do not match between the left-hand date picker and the main calendar grid.\n\nScreenshot shows January 2026 in the America/New_York timezone:\n\n <image> \n\nThe left mini calendar highlights Monday the 12th, while the main calendar grid displays the 12th under Sunday, causing appointments to appear on an incorrect weekday. This bug has been observed before but is difficult to reproduce consistently."
+    },
+    {
+      "id": "ENG-14404",
+      "createdAt": "2026-09-28T16:43:47.879Z",
+      "title": "Date filters mean the whole picked day, in each rep's time zone",
+      "state": "Done",
+      "assignee": "Jil Patel",
+      "parent": "ENG-14113",
+      "labels": [],
+      "description": "## Overview\n\nPicking \"1 to 15 January\" in a date filter can miss records from 15 January, and call and meeting date filters use UTC instead of the rep's own day. A rep outside UTC gets different answers depending on which date field they filtered on.\n\n## Problem\n\n* The date picker saves a UTC timestamp at midnight, so \"between\" and \"on or before\" stop at the start of the last picked day instead of the end.\n* Call, meeting and email date filters read dates in UTC, while other date filters use the rep's time zone.\n\n## What's included\n\n* \"On or before\", \"after\", \"between\" and a single picked date all mean the whole picked day, in the rep's time zone.\n* Call, meeting and email date filters use the same day boundary as every other date filter.\n* Custom date fields behave the same.\n* Before shipping, count the saved views whose results will change and write down the new behaviour.\n* Impossible dates such as 30 February are refused everywhere.\n\nThe new filter popover (ENG-14393) should save dates the same way, so this should land first if possible.\n\n## Done when\n\n* Picking 1 to 15 January returns records from 15 January, in the rep's own day, wherever the view was built.\n* \"On or before\", \"after\" and a single picked date mean the whole picked day.\n* Call, meeting and email date filters use the same day boundary as every other date filter.\n* Saved views affected by the change are counted and the change is noted in the PR.\n* Existing saved values with an explicit time keep their meaning.\n\n## Implementation context\n\nAI context.md"
+    },
+    {
+      "id": "ENG-12878",
+      "createdAt": "2026-08-18T14:25:02.784Z",
+      "title": "A date range built from the calendar can miss the day you picked",
+      "state": "Duplicate",
+      "assignee": "Ebubeker Rexha",
+      "parent": "ENG-12836",
+      "labels": [],
+      "description": "## Overview\n\nPicking dates from the calendar can quietly exclude records on the last day of the range, and pins the filter to whatever timezone the rep's laptop was in when they built it.\n\n## Problem\n\nTwo things go wrong with a date picked from the calendar. First, \"between 1 January and 15 January\" currently excludes everything on 15 January, because the end of the range lands on midnight rather than the end of the day. Second, the day is stored as an exact moment in the rep's browser timezone, so a shared view means a different local boundary for every person who opens it, and changing your profile timezone does not move it.\n\n## Proposed fix\n\nDecide what picking a day from a calendar means, then make all three calendar paths agree: the range picker, the single date picker, and custom date fields.\n\nThe recommended meaning is a plain calendar day, resolved per rep in their own timezone, so a shared view says \"midnight local\" for everyone.\n\n## What's included\n\nThe three calendar entry points, the end-of-day question, and a decision about views already saved in the old format.\n\n## Blocked by\n\n* ENG-12841: the shared planner has to resolve plain calendar days in the rep's timezone before the picker can safely emit them.\n\n## How it should work\n\nA rep picks 15 January and gets everything on 15 January, in their own day, whoever built the view.\n\n## Who can do what\n\nNo permission change.\n\n## What the user sees\n\nRanges stop dropping their final day. A shared view built by a colleague in another timezone reads as the rep's own local day.\n\n## Done when\n\n- [ ] A range ending on a given day includes records on that day.\n- [ ] The meaning of a picked day is written down in one place the editor and both engines read.\n- [ ] Changing a profile timezone moves the boundary of a picker-built filter, or provably does not, by decision.\n- [ ] Views already saved in the old format have a stated and tested behaviour.\n- [ ] Tests use the value the real picker produces, not a hand-written one.\n\n## Open questions\n\nDo views already saved keep their old behaviour or get migrated? Recommended default: leave them as they are and document it, so nobody's existing list silently changes twice.\n\n## Expected outcome\n\nA date picked from the calendar means the day the rep clicked.\n\n## Implementation context\n\nThis corrects a premise carried in the parent epic, which assumed the picker emitted plain calendar days. It does not: all three calendar paths serialize an exact instant, so the reach of ENG-12841 is narrower than its description implies. That ticket lands on AI-built views and on older hand-seeded values, not on filters built with the picker.\n\nThis was kept out of the ENG-12841 work on purpose: it changes the stored value format, so existing saved views and new ones would diverge without a compatibility decision that the executor should not make alone."
+    },
+    {
+      "id": "ENG-7827",
+      "createdAt": "2026-04-15T02:27:25.251Z",
+      "title": "Improve calendar scheduling with buffer and conflict detection",
+      "state": "Done",
+      "assignee": "Koppany Kondricz",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "#### Customer Name\n\nName 3\n\n#### Customer Email\n\n<email> <email>\n\n#### Workspace name\n\nName 3\n\n#### Screenshot\n\n#### What are you trying to achieve?\n\nEnsure reliable calendar scheduling in AIA SDR with correct buffer enforcement, multi-calendar conflict detection, and accurate timezone handling so meetings are booked without conflicts or missed calls.\n\n#### What are you doing to achieve it?\n\nConnected Name 2 Calendar(s) to AIA SDR. Configured availability and attempted to use buffer settings. Tested scheduling through the AI SDR campaign booking flow. Attempted a workaround using <domain> for buffer management. Manually reviewed and adjusted scheduled meetings to avoid conflicts. Observed scheduling behavior across multiple booked calls over time, including follow-ups and podcast or discovery calls.\n\n#### What is happening instead?\n\nMeetings are being booked back-to-back without respecting buffer times. Calendar conflicts occur due to inadequate multi-calendar sync or checking. Timezone handling is unreliable, resulting in scheduling errors and at least one missed or no-show call. External calendar tools are not reliably respected or integrated. This requires manual intervention for nearly every booking and is creating churn risk.\n\n#### What is the expected outcome?\n\nEnforced buffer time between all meetings, consistent and configurable. Accurate conflict detection across all connected calendars. Reliable timezone conversion and scheduling accuracy. Proper native buffer logic or compatibility with external scheduling tools. A fully autonomous scheduling system that does not require manual verification of each booking.\n\n---\n\n#### Additional scope from ENG-2574\n\nThe earlier request captures a narrower but overlapping feature request around configurable scheduling buffers:\n\n* Buffer time is currently hardcoded to `0`.\n* Buffer behavior should be configurable, likely in scheduling or availability settings.\n* A sensible default such as a 15 minute after-call buffer was suggested.\n* The UX should make buffer-driven availability clear so skipped slots are understandable.\n* The implementation should clarify whether this is padding around each event or only a gap between adjacent meetings, with gap-between likely the better default.\n* There was also discussion about optionally allowing users to disable AI SDR pre-call meetings.\n\nThis narrower request should be treated as part of the broader scheduling reliability work on this issue."
+    },
+    {
+      "id": "ENG-11715",
+      "createdAt": "2026-07-16T17:02:26.891Z",
+      "title": "Never show the copywriter a raw timestamp (wrong-weekday fix + weekday post-check)",
+      "state": "Done",
+      "assignee": "Koppany Kondricz",
+      "parent": "ENG-11706",
+      "labels": [],
+      "description": "## Review corrections (2026-07-16)\n\nThese notes supersede any conflicting implementation language below.\n\nKeep deterministic prospect-timezone formatting as the primary fix. The weekday/date validator must be timezone-aware, year-aware, and tested for ambiguous formats. It should reject or regenerate uncertain pairs rather than guessing.\n\n---\n\n## Overview\n\nProspects were told \"Tuesday, July 15\" when July 15 was a Wednesday. That kills trust exactly when a meeting is close, and wrong dates are the top trigger for prospects realizing they are talking to an AI (\"This must be AI, as you keep sending me incorrect dates. No human is that dense.\"). The model is not bad at scheduling; we hand it raw machine timestamps and force it to work out the weekday itself, which language models are documented to get wrong roughly a third of the time.\n\n## The prod data\n\n* Raindrop issue \"July dates paired with wrong weekdays\" confirmed on the copywriter (claude-sonnet-4.5).\n* AI-suspicion escalations tripled in one day (+245%) with wrong dates named as the primary trigger; that bucket is 1,142 escalations/30d.\n\n## Root cause (three code paths, all verified live)\n\nSlot display strings are computed correctly elsewhere (dayjs `dddd, MMMM Do [at] h:mm A` in `steps/slot-matchmaking.ts:144`), but three paths hand the model raw UTC ISO with no weekday:\n\n1. `workflow/helpers/context-pack-helpers/reply-directive.ts:58-70`: the CONFIRM_BOOKING directive falls back to raw ISO when slot-matchmaking's display_time is absent:\n\n```typescript\nconst slotDisplay =\n  chosenDisplayTime ??\n  `${booking.data.slot.start} - ${booking.data.slot.end}`;\n```\n\n2. `workflow/helpers/context-pack-helpers/booking-section.ts:52-56`: always renders `Booked Slot: <UTC ISO> - <UTC ISO>`.\n3. `workflow/helpers/context-pack.ts:1065-1067`: `## Current Time\\n${new Date().toISOString()}` (no weekday, no prospect timezone).\n\nThe only prompt rule is \"Use the display_time as your source of truth\", which is meaningless when no display_time is supplied. There is no rule \"never state a weekday you were not given\".\n\n## What to build (exactly this, one PR)\n\n1. Format `booking.data.slot` through the same `formatSlotForDisplay` helper (prospect timezone) in both reply-directive.ts and booking-section.ts. No raw ISO may reach the copywriter context.\n2. Render Current Time as e.g. \"Wednesday, July 16, 2026, 3:04 PM EDT (prospect local time)\" in the prospect's timezone.\n3. Copywriter prompt rule (new agent-table version, prod runs v9; sync repo): \"Copy weekday+date pairs verbatim from the context. If a weekday is not provided for a date, do not write one.\"\n4. Deterministic post-generation check in code: extract every weekday+date pair from the draft; if any pair does not match a real calendar pairing (compute with dayjs), block the send and feed it back as review feedback for regeneration.\n\n## Acceptance criteria\n\n- [ ] Unit test: no code path can place a bare ISO timestamp in the copywriter context (assert on the three paths above)\n- [ ] Unit test: a draft containing \"Tuesday, July 15, 2026\" (a Wednesday) is blocked and regenerated\n- [ ] Replay of booked-slot confirmations shows weekday+date+prospect-local time in every draft\n\n## Sequencing\n\nNot hard-blocked, but ideally lands after ENG-11711 (fail-closed copy review): step 4's block-and-regenerate loop feeds into the review machinery, which should already fail closed by then. Do not wait on it if ENG-11711 slips."
+    },
+    {
+      "id": "ENG-11883",
+      "createdAt": "2026-07-20T14:17:41.692Z",
+      "title": "AI SDR agrees to an unavailable day (e.g. Saturday) when asking prospect for their times",
+      "state": "Done",
+      "assignee": "Koppany Kondricz",
+      "parent": null,
+      "labels": ["Bug", "intercom-sourced"],
+      "description": "BUG: Yes\n\nEVIDENCE:\nCustomer report (client Name 4, workspace via <domain>). Saturday is marked unavailable in Settings → Availability. Name 5 wrote: \"Sounds great, maybe we can connect Saturday.\" The AI SDR replied: \"Saturday could work. Could you send over a couple of specific times that suit you, and I'll get something locked in with Name 6?\" — verbally agreeing to a day the workspace marked unavailable.\n\nCode-path analysis (apps/web/lib/ai-sdr-v2):\n\n* Availability is respected for slot GENERATION: slot-matchmaking fetches bookable slots from the calendar user's availability window, so no Saturday slot is ever generated/offered. This part is correct.\n* The defect is in reply COPY. When no open slots are found, the reply directive falls back to ASK_FOR_PREFERENCES (`workflow/helpers/context-pack-helpers/reply-directive.ts`, generateBookingDirective Case 5 / no-slots), instructing the copywriter to \"Ask the prospect to share times that work for them\" with no constraint about which days are (un)available.\n* The copywriter context pack (`workflow/steps/copywriter.ts`) does NOT include the workspace's available/unavailable days. The `calendarUser` section in `workflow/helpers/context-pack.ts` only surfaces Calendar User ID + timezone — never the working-days/availability schedule.\n* Result: the LLM copywriter naturally mirrors the prospect's proposed day (\"Saturday could work\"), affirming an unavailable day. The copywriter prompt (`agents/copywriter/default-agent.ts`) guards against false booking CONFIRMATIONS but has no rule against affirming a prospect-proposed day/time that is outside availability.\n* Note: existing context-pack logic at the proposed-slots section already emits \"Do NOT confirm or acknowledge that their requested time/day works...\" but ONLY when `!match_found && alternatives_suggested && proposed_slots.length > 0`. It does not fire on the no-slots / ask-for-preferences fallback, which is the path here.\n\nPOTENTIAL FIX:\n\n* Surface the calendar user's available days (and hours) to the copywriter context pack, and add a copywriter rule: never affirm/agree to a prospect-proposed day or time that falls outside availability — steer to available days instead.\n* Extend the \"Do NOT confirm or acknowledge their requested time/day works\" guard to the ASK_FOR_PREFERENCES / no-slots directive branches (reply-directive.ts), so the fallback reply asks for the prospect's times without echoing an unavailable day.\n\nWHATS NEEDED TO RESOLVE:\n\n* Confirm the exact route/directive that fired for this thread via runtime logs (Axiom / execution trace) to validate the code-path hypothesis.\n* Decide where to enforce: reply-directive constraints, copywriter prompt rule, and/or passing availability days into the context pack (recommend all three for defense in depth).\n* Add regression coverage: prospect proposes an unavailable day with no specific time -> reply must not affirm that day.\n\nINTERCOM: <url:app.intercom.com>\nSLACK THREAD: <url:acquisityworkspace.slack.com>\nDEVIN SESSION: <url>\n\nRelated (not duplicates): ENG-11758, ENG-11199, ENG-2028 (scheduling cluster — offering unavailable/past times); this ticket is specifically about verbally agreeing to an unavailable DAY in the ask-for-preferences fallback."
+    },
+    {
+      "id": "ENG-10011",
+      "createdAt": "2026-06-11T13:52:34.955Z",
+      "title": "Outlook calendar conflicts are not detected reliably",
+      "state": "Backlog",
+      "assignee": "Koppany Kondricz",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "**User Details:**\n\n* Name 7\n* <email>\n* Name 7's Workspace\n\n**Issue Summary:**\n\n* Outlook conflict checking is enabled and the Outlook account is connected, but appointments are not being reflected for conflict detection.\n* During testing, neither events from the primary Outlook calendar nor events from a shared calendar were recognized as conflicts.\n* Reconnecting the Outlook calendar and re-enabling conflict checking did not resolve the issue.\n* Customer also reports duplicate AIA-created calendar entries appearing on the shared calendar.\n* Account reviewed by support; issue appears reproducible and not attributable to calendar configuration alone.\n\n <image> \n\n <image> "
+    },
+    {
+      "id": "ENG-6207",
+      "createdAt": "2026-03-04T21:54:56.786Z",
+      "title": "AI SDR uses wrong date and double-books calendar events",
+      "state": "Done",
+      "assignee": "Koppany Kondricz",
+      "parent": "ENG-5832",
+      "labels": ["Bug"],
+      "description": "User: <email>\nCustomer reports AI SDR is confused about dates/times when scheduling and can create multiple bookings/invites.\n\nExample email suggests the AI treats “tomorrow” as “Thursday, March 12th” (sent on Mar 4):\n\n> Unfortunately, Thursday at 2 PM Eastern Time is no longer available. How about one of these times tomorrow, Thursday, March 12th...\n\nAlso observed:\n\n* Meetings booked during blocked-out times.\n* Two calls booked for the same prospect (Name 8) for “tomorrow”, with multiple calendar invites.\n\nContext: “podcast method” campaign; host is Name 9; Name 2 Calendar + Calendly are linked. (Campaign salesperson was initially left as default and later assigned to Name 9.)\n\n <image> \n\n <image> \n\n <image> "
+    },
+    {
+      "id": "ENG-4543",
+      "createdAt": "2026-01-14T18:39:52.679Z",
+      "title": "CRM appointments calendar shows bookings one day earlier",
+      "state": "Done",
+      "assignee": "Anuj Bhatt",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "Customer reports that the appointments calendar in the CRM consistently shows bookings one day off.\n\nObserved behavior:\n\n* In the appointments calendar, the main calendar view and the mini sidebar calendar can show different days (e.g. main view on Name 10 22 while Name 10 23 is highlighted in the sidebar).\n* When manually adding a booking for Friday the 23rd and saving, the booking is saved for Thursday the 22nd instead.\n* Issue persists after confirming timezone settings, aligning Cold Email Agent schedule (Mon–Name 11 9am–6pm EST) with calendar availability days (Mon–Name 11 with specific time slots), disconnecting/reconnecting Name 2 Calendar, clearing browser cache, and cleaning up/hiding extra calendars in Name 2/CRM.\n* Calendar list still mirrors multiple Name 2 calendars in the CRM UI even after disconnecting, but the main problem is that saved bookings are shifted to the previous day.\n\nThe support team has confirmed this as a calendar ↔ CRM sync bug where the booking date is written incorrectly on save, despite the UI initially showing the correct day.\n\nRelevant screenshots:\n\n <image> \n\n <image> "
+    },
+    {
+      "id": "ENG-4866",
+      "createdAt": "2026-01-26T20:29:33.680Z",
+      "title": "Scheduling configuration rules for AI SDR meetings",
+      "state": "Done",
+      "assignee": "Beth Newton",
+      "parent": null,
+      "labels": ["Feature"],
+      "description": "A customer requested more granular control over how the AI SDR schedules meetings.\n\nRequested capabilities:\n\n* Configure specific days and time ranges that the AI SDR is allowed to use for meetings, instead of using any open slot on the connected calendar.\n* Add scheduling rules similar to Calendly, such as:\n  * Maximum number of meetings per day\n  * Avoid back-to-back meetings\n  * Enforce a 15-minute (or configurable) buffer between meetings"
+    },
+    {
+      "id": "ENG-2687",
+      "createdAt": "2025-11-11T19:57:20.367Z",
+      "title": "Appointment Booked at Incorrect Time/Day",
+      "state": "Canceled",
+      "assignee": "Mahmut Jomaa",
+      "parent": null,
+      "labels": [],
+      "description": "## Issue Identified:\n\n* AI SDR agent told customer one day but placed the meeting on a different day in Name 2 Calendar\n\n## Steps to Reproduce:\n\n* Name 12 account, and navigate to AI SDR\n* Find the conversation with Name 13, and read through the exchanges\n* Observe:\n  * The agent confirms the time with the prospect: \"Thursday, November 20th at 1:00 PM CT (12:00 PM your time MST).\"\n  * The prospect notes that time is incorrect: \"The invite says 6pm on my end?\"\n  * The agent tries to fix it: \"I've updated the calendar invite for Thursday, November 20th at 1:00 PM CT (12:00 PM your time MST). That should show the correct time on your calendar now.\"\n  * Name 14 notices the invite on the wrong day in his Calendar and informs the prospect: \"It appears its on my calendar for Wednesday 11/12 at 2:00 PM CT. Will this work for you?\"\n\n <image> \n\n## Customer Name 15:\n\n* Name: Name 14\n* AI SDR conversation: Name 13\n\n---\n\nThe same user gave another example of the calendar booking mismatch:\n\nAgent confirms call with prospect at 11am EST on November 13th\n\n <image> \n\nAppointment shows up on Name 2 Calendar at 2pm Central time (3pm EST)\n\n <image> "
+    },
+    {
+      "id": "ENG-3860",
+      "createdAt": "2025-12-17T18:02:09.557Z",
+      "title": "Support multiple calendar connections for conflict checking",
+      "state": "Duplicate",
+      "assignee": "Anuj Bhatt",
+      "parent": null,
+      "labels": ["Feature"],
+      "description": "A user who manages multiple businesses, each with a different domain and email/calendar, requested support for connecting multiple calendars and checking each for conflicts.\n\nThis is similar to how Calendly/<domain> handle multiple calendar connections, and is the primary reason the user currently uses those platforms."
+    },
+    {
+      "id": "ENG-929",
+      "createdAt": "2025-09-01T12:21:30.322Z",
+      "title": "Date-specific availability overrides (time-off and custom hours)",
+      "state": "Canceled",
+      "assignee": null,
+      "parent": null,
+      "labels": ["Feature"],
+      "description": "Availability is weekly-only. `scheduling_work_hours` stores day-of-week entries (Monday-Sunday) per user, with `scheduling_work_time_slot` for start/end times. No date-specific override table exists. The `AvailabilityConverter` (`lib/scheduling/converters/availability-converter.ts`) repeats the weekly pattern for each week — no mechanism to substitute a specific date's hours.\\\\n\\\\nThe existing `BusyTime` system (used for calendar conflicts and appointment buffers) could be leveraged: a date override marking a day \"unavailable\" would just add a full-day busy block.\\\\n\\\\n**Scope:**\\\\n- Create `scheduling_availability_override` table with userId, date, isAvailable, optional custom timeSlots (JSONB)\\\\n- Add tRPC CRUD endpoints for overrides\\\\n- Integrate overrides into `AvailabilityConverter.toBusyTimes()` — if override marks day unavailable, add full-day busy block; if custom hours, convert non-available slots to busy times\\\\n- Add UI panel in availability settings with calendar date picker, available/unavailable toggle, and optional custom hours\\\\n- Merge override busy times via existing `busyTimeManager.merge()`\\\\n\\\\n**Key files:**\\\\n- `lib/db/schema/scheduling.ts` — add override table\\\\n- `lib/scheduling/converters/availability-converter.ts` — integrate overrides\\\\n- `lib/scheduling/services/busy-time-manager.ts` — merge logic (already exists)\\\\n- `components/user/schedule-card.tsx` — add override UI section\\\\n- `trpc/routers/user.ts` — add override CRUD\\\\n- `schemas/user/schedule-schema.ts` — add validation schemas"
+    },
+    {
+      "id": "ENG-4039",
+      "createdAt": "2025-12-28T22:45:58.680Z",
+      "title": "Email sequence sends conflicting scheduling messages",
+      "state": "Done",
+      "assignee": "Koppany Kondricz",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "An email sequence from Name 16 is sending conflicting messages around a scheduled meeting time.\n\nName 17 reported that after selecting and confirming a time of 10:00 am on Monday, December 29, the system replied that the time was taken (even though it was available), then still sent a calendar invite for that same time. After that, another email in the sequence went out stating \"we haven't heard from you, should we close the file\" despite the previous confirmation flow.\n\nA screen recording of the issue is available here: Jam recording."
+    },
+    {
+      "id": "ENG-4223",
+      "createdAt": "2026-01-06T18:26:31.108Z",
+      "title": "SDR calendar allows multiple bookings on same day",
+      "state": "Canceled",
+      "assignee": "Koppany Kondricz",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "Customer reports that the SDR calendar is allowing multiple bookings on the same day for the same SDR, even though only one calendar is connected and all existing events are marked as Busy.\n\nThere is a supporting screen recording showing the behavior: Jam recording\n\nRelevant notes from support investigation:\n\n* Only one calendar is connected for the SDR.\n* All appointments on that calendar are set as Busy, not Free.\n* Issue appears to be related to calendar sync/availability polling not respecting existing events."
+    },
+    {
+      "id": "ENG-8620",
+      "createdAt": "2026-05-15T19:59:16.395Z",
+      "title": "AI SDR does not block google holidays",
+      "state": "Done",
+      "assignee": "Koppany Kondricz",
+      "parent": null,
+      "labels": [],
+      "description": "User: <email>\nAI SDR offered meeting times outside the configured availability for one account.\n\nConfigured availability is 9:00–14:30 MST in `America/Denver`. The connected Name 2 calendar is also set to MST, and US holidays are enabled for conflict checking.\n\nIn the reported thread, the AI SDR proposed Monday, May 18 at 8:00 AM MST and Monday, May 25 at 8:30 AM or 9:00 AM MST. The customer indicated May 25 is a US holiday and availability should not start before 9:00 AM.\n\n <image> \n\n <image> \n\n <image> \n\n <image> \n\n<!-- preview-url-start -->\n**Preview:** <url:block-holiday-calendars-aiacquisition.vercel.app> — PR #4284\n<!-- preview-url-end -->"
+    },
+    {
+      "id": "ENG-3314",
+      "createdAt": "2025-12-02T20:38:28.855Z",
+      "title": "Support multiple calendars and enable iCloud calendars",
+      "state": "Canceled",
+      "assignee": null,
+      "parent": null,
+      "labels": ["Feature"],
+      "description": "Customer requests support for using multiple calendars with different roles:\n\n* Ability to add multiple calendars to the scheduling system.\n* Use one calendar specifically for scheduling the event.\n* Use additional calendars only to check for conflicts (availability), without scheduling onto them.\n* Enable iCloud calendars as supported calendar sources.\n\nThis is based on an Intercom feature request conversation. See attached conversation for full context and examples."
+    },
+    {
+      "id": "ENG-10401",
+      "createdAt": "2026-06-17T20:40:02.645Z",
+      "title": "AI SDR scheduling on those busy dates (blocked schedule)",
+      "state": "Canceled",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "Customer Name\nName 19\n\nCustomer Email\n<email>\n\nCustomer Email\n<email>\n\nWorkspace name\nName 18's Workspace\n\nScreenshot\n\n <image> \n\n <image> \n\nWhat is the user trying to achieve?\nThe user wants the AI SDR to avoid offering meeting times during days that are blocked off on their Name 2 Calendar due to travel.\n\nWhat is the user doing to achieve it?\nThe user created all-day blocked events on their Name 2 Calendar and expects the AI SDR to recognize those days as unavailable when proposing meeting times.\n\nWhat is happening instead?\nDespite the days being blocked on Name 2 Calendar, the AI SDR is still offering meeting times during the blocked travel period.\n\nWhat is the expected outcome?\nThe AI SDR should recognize the all-day blocked events on the connected Name 2 Calendar and exclude those days from any meeting time suggestions. The user also suggested that if this is expected behavior, a knowledge base article clarifying how all-day events are handled would be helpful."
+    }
+  ]
+}

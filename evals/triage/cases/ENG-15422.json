@@ -1,0 +1,230 @@
+{
+  "id": "ENG-15422",
+  "provenance": "seeded",
+  "createdAt": "2026-10-14T21:19:18.103Z",
+  "lane": "triage",
+  "stratum": "bug_master",
+  "ticket": {
+    "title": "Name 19 inbox payment issue",
+    "description": "#### Customer Name\n\nName 19\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 19's Workspace\n\n#### Screenshot\n\n#### What are you trying to achieve?\n\nhey Name 20 i got a message saying 18 of my mailboxes aren't paid for. i clicked on the review and resubscribe paid for 144.00 now its giving me a message box saying your mailboxes don't have an active subscribtion\n\n#### What are you doing to achieve it?\n\nhey Name 20 i got a message saying 18 of my mailboxes aren't paid for. i clicked on the review and resubscribe paid for 144.00 now its giving me a message box saying your mailboxes don't have an active subscribtion\n\n#### What is happening instead?\n\nhey Name 20 i got a message saying 18 of my mailboxes aren't paid for. i clicked on the review and resubscribe paid for 144.00 now its giving me a message box saying your mailboxes don't have an active subscribtion\n\n#### What is the expected outcome?\n\nhey Name 20 i got a message saying 18 of my mailboxes aren't paid for. i clicked on the review and resubscribe paid for 144.00 now its giving me a message box saying your mailboxes don't have an active subscribtion",
+    "attachmentKinds": []
+  },
+  "repoCommitAtCreate": "3170b60c090b6aec5f518f7edaa992041223a393",
+  "flags": {
+    "descriptionEditedAfterCreate": false,
+    "needsProductionData": true,
+    "alreadyFixedAtTriage": false
+  },
+  "relatedSnapshot": [
+    {
+      "id": "ENG-8112",
+      "createdAt": "2026-04-25T17:30:13.746Z",
+      "title": "Handle failed inbox payments with warning and auto-cancel",
+      "state": "Done",
+      "assignee": "Tyler Olsen",
+      "parent": null,
+      "labels": [],
+      "description": "Define handling for failed user payments on inboxes. The requested approach is to show a red warning banner using the existing notification pattern, send an email notification, keep the warning in place for 7 days, and then cancel the inboxes to avoid ongoing provider cost."
+    },
+    {
+      "id": "ENG-15305",
+      "createdAt": "2026-10-13T15:36:30.665Z",
+      "title": "Recurring $144 Inbox Payment Failing / Open Invoice",
+      "state": "Todo",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": ["Credits", "Internal reported"],
+      "description": "#### Customer Name\n\nName 1\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nCompany One\n\n#### Screenshot\n\n#### What are you trying to achieve?\n\nProcess the client's $144 monthly subscription payment for his 18 email inboxes.\n\n#### What are you doing to achieve it?\n\nThe client contacted his bank and confirmed that they have removed the block for this recurring charge on their end.\n\n#### What is happening instead?\n\nHis invoice from October 9th (<stripe-id>) is still sitting in an \"open\" (unpaid) status and the system has not retried or cleared the payment.\n\n#### What is the expected outcome?\n\nThe $144 payment is successfully re-processed and cleared so his inbox subscription stays active."
+    },
+    {
+      "id": "ENG-14633",
+      "createdAt": "2026-10-02T12:08:47.566Z",
+      "title": "Inbox Billing Issue",
+      "state": "Todo",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": ["Customer reported", "Refund"],
+      "description": "#### Customer Name\n\nName 2\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 2\n\n#### Screenshot\n\n <image> \n\n#### What are you trying to achieve?\n\nworkspace is saying 18 inboxes aren't paid for. Client is saying that he paid it last night, but still saying they are not and campaigns are paused.\n\n#### What are you doing to achieve it?\n\nSubmitting a ticket\n\n#### What is happening instead?\n\nCampaigns are paused\n\n#### What is the expected outcome?\n\nResolve issue"
+    },
+    {
+      "id": "ENG-15049",
+      "createdAt": "2026-10-09T15:36:24.279Z",
+      "title": "Credit review for $96 inbox charge, errored inboxes (Name 3)",
+      "state": "Done",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": ["Customer reported", "Internal reported", "Refund"],
+      "description": "#### User Email\n\n<email>\n\n#### Workspace Name\n\nName 3’s Workspace\n\n#### Request Type\n\nRefund\n\n#### Reason for request\n\nClient was charged $96 this month for inboxes across four domains that errored out. Tech (Name 101) confirmed the cause: our inbox provider doesn’t allow renewal after the first year, so the inboxes stopped working and he now has to buy a new set. Client requested a credit on Oct 7. Please review whether we can credit the $96, or part of it, toward the new inboxes."
+    },
+    {
+      "id": "ENG-14706",
+      "createdAt": "2026-10-05T09:44:34.228Z",
+      "title": "Mailbox billing dispute: $54 monthly inbox charge after five months without a collected payment",
+      "state": "Todo",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": ["Customer reported", "Refund", "intercom-sourced"],
+      "description": "**Intercom source**: <url:app.intercom.com> (opened 2026-10-04, assigned to Ellaine Fuente; the customer asked for a human on 2026-10-05)\n\n**Customer**: <email>, owner of workspace \"Name 4's Workspace\" (org <uuid>, billing account <uuid>, native Autumn).\n\n**Ask**: why he has to pay monthly for the mailboxes/domains. He says he opened them in May, that this is the first time since May he has paid, and asks whether $54 will recur every month. Taxonomy bucket: overcharged. No refund was requested.\n\n**Finding**: the charge is correct and the customer paid it himself. He holds 9 live inboxes (3 domains x 3, DFY, all active and connected) at $6 per inbox per month = $54 per month; the three domains are billed yearly at $15.16 each, paid on 2026-04-29 through 2027-04-29. He paid $99.48 on 2026-04-29 and $54.00 on 2026-05-31. From 2026-06-29 his card declined repeatedly with insufficient funds, nothing more was collected, and the domain+inbox subscription was canceled for payment_failed on 2026-07-13. The mailbox audit flagged the 9 mailboxes unpaid on 2026-09-10; a human sent the unpaid-mailbox reminder on 2026-09-29 naming $54.00 a month and a 6 October deadline; the customer paid $54.00 from his own billing page on 2026-10-05 (audit trail cmr_domain_charge.create, actor = his own user id; the $54.00 charge was captured at 08:39 after one insufficient-funds decline at 08:38). No double billing: the earlier $54.00 invoice (2026-06-29) and the $185.00 Pro invoice (2026-09-11) remain open on canceled subscriptions and cover earlier periods.\n\n**Exposure**: $54.00 collected 2026-10-05 for the period 2026-10-05 to 2026-11-05, matching the 9 paid inboxes. Nothing in the evidence supports a refund or a credit. Two invoices remain collectible on canceled subscriptions: $54.00 (2026-06-29) and $185.00 (2026-09-11).\n\n**Proposed human action**: support explains the pricing to the customer (mailboxes are $6 per inbox per month, domains are yearly) and, if he wants the recurring charge stopped, cancels the three inbox add-ons on the billing account; separately decide what to do with the two open invoices on canceled subscriptions and make sure the mailbox audit re-runs so the workspace stops reading as unpaid. This is a proposal, not a promise.\n\n**Also noted**: in the conversation the assistant told him the October charge was the \"first monthly billing cycle catching up\" and that June-October were renewals \"happening in the background\". That does not match the records (April and May were paid, June onward failed).\n\nFull readout and evidence in the Billing investigation document on this ticket."
+    },
+    {
+      "id": "ENG-12201",
+      "createdAt": "2026-07-31T10:41:46.373Z",
+      "title": "Payment error when purchasing Inboxes",
+      "state": "Triage",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": ["Bug", "intercom-sourced"],
+      "description": "**Customer Name**\nName 100\n\n**Customer Email**\n<email>\n\n**Customer Email**\n<Enter text>\n\n**Workspace name**\nName 5 Engineering Workspace\n\n**Screenshot**\n<url:jam.dev>\n\n**What is the user trying to achieve?**\npurchasing domains and inboxes\n\n**What is the user doing to achieve it?**\npurchased a couple of times but hits an error\n\nupdate: client can purchase 1 domain only but gets an error when purchasing multiple domains.\n\n**What is happening instead?**\npurchase not going through\n\n**What is the expected outcome?**\nto be able to purchase successfully"
+    },
+    {
+      "id": "ENG-4017",
+      "createdAt": "2025-12-24T22:43:13.042Z",
+      "title": "Nine purchased inbox inboxes not reflected after payment",
+      "state": "Done",
+      "assignee": "Tyler Olsen",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "User's Email: <email>\n\nCustomer reports that 9 inboxes purchased yesterday around 8AM PST for the Cold Email Agent never appeared.\n\n* Initial 9-inbox purchase yesterday showed as \"pending\" in the UI, then disappeared after a few hours.\n* No receipt or confirmation email was received for that purchase.\n* Subsequent orders today: first attempt was not debited, second attempt was debited and those inboxes appeared after a page refresh.\n* Bank statement shows the amount for yesterday’s purchase was debited and is still pending.\n* A total of 9 paid inboxes have not been provisioned/reflected in the account.\n\nRelevant screenshots:\n\n <image> \n\n <image> \n\n <image> \n\n <image> "
+    },
+    {
+      "id": "ENG-6677",
+      "createdAt": "2026-03-12T23:05:42.256Z",
+      "title": "Renewal payment failed but canceled inboxes remain active",
+      "state": "Done",
+      "assignee": "Tyler Olsen",
+      "parent": null,
+      "labels": [],
+      "description": "Customer email: <email>.\n\nThe renewal payment failed and the plan was canceled, but the inboxes are still available for use in the account and need to be removed."
+    },
+    {
+      "id": "ENG-8045",
+      "createdAt": "2026-04-22T22:23:24.652Z",
+      "title": "Paid inboxes are not showing after purchase",
+      "state": "Done",
+      "assignee": "Tyler Olsen",
+      "parent": null,
+      "labels": [],
+      "description": "User: <email>\nA customer reported that after adding inboxes and making the payment, nothing appeared in the product. Support checked and said the inbox setup seems to have failed and may need to be reinitiated.\n\n\n <image> "
+    },
+    {
+      "id": "ENG-15142",
+      "createdAt": "2026-10-11T13:54:18.585Z",
+      "title": "Paid done-for-you inbox orders stay on \"waiting for payment\" when the user doesn't return from checkout",
+      "state": "Done",
+      "assignee": "James Keeble",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "## Overview\n\nWhen a user pays for done-for-you domains and inboxes but doesn't land back on our page after checkout, the order stays on \"waiting for payment\" even though the money has left their account. We want the app to notice the payment by itself, so paying users get their inboxes without contacting support and don't lose trust in the purchase.\n\n## Problem\n\nOn 11 Oct 2026 the owner of the Company Ten workspace paid $99.32 at 5:19 pm Name 6 for 3 domains and 9 inboxes, and Autumn recorded the payment. The email accounts page still said \"Your inbox order is waiting for payment\". When he clicked \"Complete payment\" at 5:24 pm, he got \"Something went wrong\". If he'd clicked \"Cancel order\" instead, he could have cancelled an order he'd already paid for, which is what happened in ENG-14226. We marked his order paid by hand at 5:35 pm and it's now setting up.\n\n## Root cause\n\nOnly the user's browser confirms a done-for-you order after checkout, so a closed tab or lost redirect leaves a paid order pending, and every button on the pending card then does the wrong thing.\n\n```mermaid\nflowchart TD\n  subgraph Today\n    A[User pays in Autumn checkout] --> B{Browser returns to our page?}\n    B -- yes --> C[confirmDfyOrder marks paid, setup starts]\n    B -- no --> D[Order stays waiting for payment]\n    D --> E[Complete payment: new checkout with same subscription IDs]\n    E --> F[Autumn rejects: already in use. User sees Something went wrong]\n    D --> G[Cleanup job after 30 min: cancels it without checking payment]\n    G --> H[Reconcile job: can bring it back, but only on its own schedule and without renewal prices]\n  end\n  subgraph After\n    A2[User pays in Autumn checkout] --> B2{Browser returns?}\n    B2 -- yes --> C2[confirmDfyOrder, unchanged]\n    B2 -- no --> D2[Order waiting for payment]\n    D2 --> E2[Complete payment or Cancel order: check this order's own Autumn subscriptions]\n    D2 --> G2[Cleanup job: checks this order's subscriptions before cancelling]\n    E2 -- all active --> P[Mark paid once, set renewal prices, start setup]\n    G2 -- all active --> P\n    E2 -- none --> K[Open checkout or cancel, as today]\n  end\n```\n\nThe check uses the order's own Autumn subscriptions, not the account's overall balance, because leftover balance from an earlier failed order could otherwise make an unpaid order look paid.\n\n## Who's affected\n\nIn the last 30 days, 42 Autumn done-for-you orders completed and 1 got stuck like this (the Company Ten order), counted from the read-only production replica on 11 Oct 2026. We don't know how many past orders the cron confirmed without setting renewal prices, because nothing records which path confirmed an order. That count is a follow-up.\n\n## Proposed fix\n\n* Add a reader that checks a done-for-you order's own Autumn subscriptions: one per domain, plus one inbox subscription per domain that has inboxes. It says whether they're all active and not past due.\n* Use it in \"Complete payment\", \"Cancel order\", the 30-minute cleanup job and the reconcile job. When the order is paid, mark it paid once (guarded so only one caller wins), set the renewal prices and start setup.\n* When Autumn can't be read or the subscriptions are only partly there, don't cancel and don't confirm. Show a clear message instead of \"Something went wrong\".\n* Stop `confirmDfyOrder` from re-sending setup for an order that's already setting up, so we can't place a second supplier order.\n\n## Out of scope\n\n* Pre-warmed orders: ENG-14227 owns them.\n* A guard against duplicate starts inside the supplier setup job, and repairing renewal prices on past orders. Both are follow-ups.\n\n## Done when\n\n* \"Complete payment\" on a paid done-for-you order marks it paid and starts setup, opens no new checkout, and shows \"Payment received. Setting up your inboxes.\"\n* \"Cancel order\" on a paid done-for-you order doesn't cancel it.\n* The cleanup job doesn't cancel a paid done-for-you order, and still cancels one with no Autumn subscriptions.\n* An order whose only \"proof\" is leftover account balance from another order is never marked paid.\n* Two callers confirming the same order at once start setup once.\n* Regression tests cover each of these at the confirm, checkout and cleanup seams.\n\n## Implementation context\n\n* Code at dcb9d1b1a4: `createDfyCheckout`, `confirmDfyOrder` and `cancelDomainPurchaseOrder` in `apps/web/trpc/routers/billing.ts`, `cleanup-stale-orders-cron.ts` and `reconcile-domain-orders-cron.ts` in `apps/web/lib/inngest/functions/billing/`, and the pending card in `apps/web/components/campaigns/email-accounts/domain-provisioning-status.tsx`.\n* Evidence: Sentry ACQUISITY-3XD for the \"already in use\" checkout error.\n* The full plan and the review of it are in AI context.md."
+    },
+    {
+      "id": "ENG-15299",
+      "createdAt": "2026-10-13T15:03:02.662Z",
+      "title": "Clients inboxes not populating in the platform",
+      "state": "Todo",
+      "assignee": "Aaron Fraga",
+      "parent": "ENG-15304",
+      "labels": ["Bug", "Customer reported", "Internal reported"],
+      "description": "#### Customer Name\n\nName 7\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nCompany Two\n\n#### Screenshot\n\n#### What are you trying to achieve?\n\nClient bought DFY domains but inboxes not populating or haven't populated yet\n\n#### What are you doing to achieve it?\n\nGet the clients inboxes populating into there account\n\n#### What is happening instead?\n\nClient bought domains on the 7th of October but no domains NOR inboxes have populated in their account\n\n#### What is the expected outcome?\n\nGet the inboxes into their account asap"
+    },
+    {
+      "id": "ENG-10932",
+      "createdAt": "2026-06-26T18:16:59.755Z",
+      "title": "Cold Email Agent inboxes stuck provisioning after purchase",
+      "state": "Todo",
+      "assignee": "Koppany Kondricz",
+      "parent": null,
+      "labels": ["intercom-sourced"],
+      "description": "## Problem\\nAfter purchasing domains and pre-warmed inboxes, they do not appear in the Cold Email Agent or stay stuck in a provisioning state indefinitely. Users cannot begin sending.\\n\\n## Context\\n- Reported from March 2026 through June 22, 2026\\n- Lifecycle state: <stripe-id>\\n- Affects new customers who can't start using the platform after payment\\n\\n## What users are saying\\n> \"Users report purchased domains and pre-warmed inboxes not appearing or stuck while provisioning after payment.\"\\n\\n## Acceptance Criteria\\n- [ ] Inbox provisioning completes within expected timeframe after purchase\\n- [ ] Users see clear status/progress during provisioning\\n- [ ] If provisioning fails, error is surfaced and recovery path provided\\n\\n## Resources\\n- Name 8\\n\\n## Name 9 Used\\n- \"cold email inboxes stuck provisioning warmup error\"\\n- Note: ENG-8323 (Done), ENG-9834 (Done), ENG-7733 (Backlog - billing investigation). ENG-10707 (In Progress - help article). No current active bug tracking ticket."
+    },
+    {
+      "id": "ENG-12166",
+      "createdAt": "2026-07-30T21:20:48.153Z",
+      "title": "[Component/Feature] - Unable to process payment for new inboxes",
+      "state": "Triage",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": ["Bug", "intercom-sourced"],
+      "description": "**Customer Name**\nName 10\n\n**Customer Email**\n<email>\n\n**Customer Email**\n<Enter text>\n\n**Workspace name**\nCompany Seven workspace\n\n**Screenshot**\n\n <image> \n\n**What is the user trying to achieve?**\nTrying to purchase inboxes\n\n**What is the user doing to achieve it?**\nThey tried to process it\n\n**What is happening instead?**\nThey are getting an error message: Something went wrong\n\n**What is the expected outcome?**\nThey should be able to process a payment"
+    },
+    {
+      "id": "ENG-14020",
+      "createdAt": "2026-09-18T11:54:41.262Z",
+      "title": "Self-serve white-label workspaces cannot buy inboxes or domains: checkout fails before payment",
+      "state": "Done",
+      "assignee": "James Keeble",
+      "parent": null,
+      "labels": ["Bug", "Payments"],
+      "description": "## Overview\n\nClient workspaces under a self-serve white-label partner can't buy pre-warmed inboxes and domains. Every checkout attempt shows \"payment failed\", no payment is taken, and the setup step sits on \"In progress\" until the order expires. After this fix the checkout opens on our Whop store, the client pays, and the inboxes are set up like any other order.\n\n## Problem\n\nReported on 18 September 2026 by Company Three (<domain>) while onboarding their first client workspace, Company Eight. The client picked 6 domains with 3 Name 11 inboxes each and pressed pay four times between 11:24 and 11:30 UTC. Each attempt failed before reaching Whop, so nothing was charged. The order was then auto-cancelled at 11:40 when the domain reservation expired.\n\nNo self-serve partner workspace has ever completed an inbox order. Past Whop inbox orders all came from big-client partners (Customer Workspace, Name 12 AI) that have their own Whop store set up with us. Self-serve partners are meant to use our own Whop store, which already works for their subscriptions, credit top-ups and website domains (ENG-11291). The inbox checkout was never updated to do the same.\n\n## User experience\n\n* Today: Cold Email Agent setup > Setup inboxes > choose domains > pay shows \"payment failed\". The step stays \"In progress\" and retrying doesn't help.\n* After: the same flow opens a Whop checkout for the order total. After payment, the order moves to provisioning and the inboxes appear as usual.\n* If our store isn't configured for this purchase, the customer sees a clear \"not available\" message, not a generic payment failure.\n\n## Done when\n\n* A self-serve partner's client workspace can check out a pre-warmed inbox order, and the payment starts provisioning.\n* Big-client partners' inbox checkout behaves exactly as before.\n* After payment, cancelling, repricing and refunding the order use the same store the customer paid in.\n* One real low-cost order in a self-serve test workspace completes in production and is refunded afterwards (preview environments cannot complete Whop payments).\n\n## Implementation context\n\n* Failure: `Whop is not configured for this billing provider config` (Sentry ACQUISITY-547). The inbox order checkout only reads partner or platform Whop settings saved in the database. Self-serve partners have none, and no platform Whop row exists.\n* Our webhook ignores payments on our own store unless it recognises the product. So the per-order plan must be created under our existing Email product, which the webhook maps to the email slot.\n* Follow the self-serve rule from ENG-11291: self-serve partners always use our store, big clients always use their own, with no fallback between them.\n* Don't add a platform Whop row in the database as a hotfix. It changes store selection for every partner."
+    },
+    {
+      "id": "ENG-13213",
+      "createdAt": "2026-08-27T18:52:02.359Z",
+      "title": "DFY domain orders that fail leave names claimed and un-cancellable, blocking re-purchase and leaving the domain store inconsistent",
+      "state": "Todo",
+      "assignee": "Anthony Adewale",
+      "parent": null,
+      "labels": ["Bug", "fast-lane", "master"],
+      "description": "## Root cause\n\nWhen a Done-For-You domain order fails to provision at the provider, the domain rows are written to `mail_domain` (which has a global unique index `mail_domain_domain_unique` on `domain`) and left in a `failed` or `pending` state. Those rows are never released, so they keep holding the name for the original organization. A later order for the same name throws \"Unable to claim domains for this organization\" at the claim step, silently drops the overlapping domains, and leaves the new order stuck in `provisioning`.\n\nSeparately, a domain that failed still renders in Billing with no Cancel option, and the domain store availability check reads the registrar/provider (which never registered the failed name) instead of `mail_domain`. The result is a failed domain that shows as \"available to purchase\" while its name is actually still claimed internally.\n\n## Evidence\n\n* `apps/web/lib/inngest/functions/mail/process-create-order.ts` `processCreateColdMailOrder`: claims domains into `mail_domain` (unique on `domain`), throws \"Unable to claim domains for this organization: ...\" when a name is already held, and on provider failure writes domains to `status='failed'` with the order left `requires_attention` or `provisioning`.\n* `apps/web/lib/inngest/functions/billing/reconcile-domain-orders-cron.ts`: retries failed inboxes on `requires_attention` orders, but does not release a domain name that failed at the provider and does not recover the duplicate-domain-claim collision.\n\n## Blast radius (counted 2026-08-27)\n\nDomain orders stuck in a non-terminal provisioning state: 17 `provisioning` across 17 organizations, 66 `requires_attention` across 66 organizations, 17 `failed` across 16 organizations. Done-For-You specifically: 3 `provisioning`, 26 `requires_attention`.\n\nDomains in `failed` status with at least one `active` inbox (counted 2026-09-05): 106 domains across 41 organizations.\n\nPaid `requires_attention` orders older than 7 days that hold `failed` domains (counted 2026-09-11): 26 orders across 25 organizations, holding 51 failed domains. Never-retried `error` inboxes on failed domains older than 7 days: 33, across 5 organizations. A 2026-09-10 count of the same cohort returned identical figures.\n\nDFY orders stranded by a stale cross-organization `mail_domain` claim, with no saved provider order id and stale beyond 24 hours (counted 2026-09-23): 5 orders across 5 organizations and 5 users, from the ENG-14139 report. Collision cascade as of 2026-09-23: one stale failed claim is a foreign claim on 4 later DFY orders across 4 organizations, and pending claims written by two stuck orders block 4 further organizations' orders. The wider stuck-in-`provisioning` population is 9 orders across 9 organizations, of which 4 belong to ENG-13308's stall mechanism.\n\n## Fix direction\n\n* Release a failed domain's claim so the name can be re-purchased, and reconcile the domain store's availability check against owned-but-failed domains.\n* Stop silently dropping overlapping domains from a new DFY order; fail fast with a clear message to the customer instead."
+    },
+    {
+      "id": "ENG-14330",
+      "createdAt": "2026-09-27T16:18:47.937Z",
+      "title": "Name 13 purchased 5 domains and inboxes on August 29th but they are still stuck provisioning and in billing doesn't show payment for these inboxes only the domains. client said he submitted a request through intercom chat and havent heard back",
+      "state": "Todo",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [
+        "Bug",
+        "Credits",
+        "Customer reported",
+        "Internal reported",
+        "intercom-sourced"
+      ],
+      "description": "#### Customer Name\n\nName 13\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nCompany Four\n\n#### Screenshot\n\n#### What are you trying to achieve?\n\nneed to get the inboxes provisioned so we can get campaigns up and running\n\n#### What are you doing to achieve it?\n\n.\n\n#### What is happening instead?\n\nstuck in provisioniong\n\n#### What is the expected outcome?\n\ninboxes would reflect in his account"
+    },
+    {
+      "id": "ENG-13178",
+      "createdAt": "2026-08-26T22:47:54.040Z",
+      "title": "ColdMailReseller pre-warmed inboxes stuck in Error: reconnect sends mailboxId=undefined (\"Mailbox not found\")",
+      "state": "Todo",
+      "assignee": "Anthony Adewale",
+      "parent": null,
+      "labels": ["Bug", "fast-lane"],
+      "description": "## Overview\n\nPre-warmed mailboxes provisioned through ColdMailReseller get stuck in an Error state and cannot send, because no reconnect path resolves a mailbox id the provider will accept.\n\n## Problem\n\nWhen a ColdMailReseller pre-warmed inbox disconnects or needs reconnecting, the account-error reconnect flow fires with `mailboxId: providerId ?? undefined`. These inboxes have `mail_inbox.provider_id = NULL`, so the provider receives `mailboxId=undefined` and the OAuth connect returns \"Mailbox not found\", leaving the inbox permanently in Error.\n\n## Root cause\n\n`apps/web/lib/inngest/functions/campaign/workspaces/process-account-error-reconnect.ts` invokes `processConnectOAuth` with `mailboxId: inboxLookup.providerId ?? undefined`. `processConnectOAuth` (`process-connect-oauth.ts`, `connect-mailbox-oauth` step) forwards that `mailboxId` to ColdMailReseller `POST /mailboxes/oauth` via `apps/web/lib/mail/providers/coldmailreseller/client.ts#connectMailboxOAuth`, which rejects it with \"Mailbox not found\". The inboxes have `mail_inbox.provider_id = NULL`, so the id is never resolved. The reconcile cron (`reconcile-domain-orders-cron.ts`) already looks up the mailbox from ColdMailReseller and passes `mailbox.id` correctly, so the resolution pattern exists.\n\nThe failing invariant is one gap across every entry point: no reconnect path resolves the mailbox id from ColdMailReseller before calling the provider. The webhook path forwards the stored `mail_inbox.provider_id`; the customer Reconnect action (`email-accounts.ts`, `triggerOAuthReconnect`) and the admin reconnect (`admin-domain-orders.ts`) both send `mailboxId: undefined`; `processConnectOAuth` never re-resolves. An inbox carrying a named but no-longer-valid id fails identically to one with a NULL id, which is why both counts below sit in this one class.\n\n## Blast radius\n\n5,762 inboxes across 444 organizations carry a `connection_error` containing \"Mailbox not found\" (query: `SELECT count(*), count(DISTINCT organization_id) FROM mail_inbox WHERE connection_error ILIKE '%Mailbox not found%'`, counted 2026-09-24: 5,762 inboxes / 444 organizations, and 7,071 reconnect sessions across 461 organizations failed the same way in the 30 days to 2026-09-24; was 5,763 / 445 on 2026-09-23, 5,660 / 439 on 2026-09-22, 4,364 / 323 on 2026-09-10 and 294 / 39 on 2026-08-28). None of the 5,762 is connected now. 2,391 of them carry the exact `mailboxId=undefined` signature (and all of those have `provider_id IS NULL`); the larger 3,371 carry a named mailbox id and fail the same way. Named-id rows arrive in platform waves (2026-09-04 to 09-06 roughly 2,118 rows across 95+ organizations; 2026-09-19 to 09-20 roughly 1,148 rows across 103 organizations), so the shape is systematic rather than org-specific. A further 2,872 connected pre-warmed inboxes across 228 organizations sit at `provider_id IS NULL` and would fail the same way on their next reconnect.\n\n## Proposed fix\n\nResolve the provider mailbox id before reconnecting: look up the mailbox from ColdMailReseller (as the reconcile cron already does) instead of passing `provider_id` or `undefined`, and backfill `provider_id` for the affected inboxes so they reconnect successfully.\n\n## Done when\n\n* No reconnect path hands ColdMailReseller an unresolved id: the webhook path stops forwarding the stored `provider_id` unresolved, the customer Reconnect and admin reconnect stop sending `undefined`, and both shapes (NULL `provider_id` and stale named id) reconnect successfully.\n* The stuck inboxes are recovered or re-provisioned and resume sending.\n* Provider accounts with no local `mail_inbox` row are covered too: Reconnect refuses them outright (`email-accounts.ts#triggerOAuthReconnect` throws PRECONDITION_FAILED \"Only managed inboxes can be reconnected.\") while their inbox entitlements are still consumed, so the backfill and re-provision step must create or link the missing rows, not only repair a NULL or stale `provider_id`.\n\n## Reports\n\n* ENG-13156\n* ENG-13255\n* ENG-13511\n* ENG-14104\n* ENG-14131\n* ENG-14197 Customer report: all 15 pre-warmed inboxes stuck in Error; Reconnect returns Mailbox not found; campaigns cannot send\n* ENG-14201 Customer report: 15 of 36 pre-warmed inboxes stuck in Error; Reconnect returns Mailbox not found and never clears the inbox"
+    },
+    {
+      "id": "ENG-14668",
+      "createdAt": "2026-10-02T20:31:12.724Z",
+      "title": "Name 14 - inboxes burned",
+      "state": "Duplicate",
+      "assignee": "Anthony Adewale",
+      "parent": null,
+      "labels": ["Bug", "Customer reported"],
+      "description": "#### Customer Name\n\nName 14\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nCompany Five\n\n#### Screenshot\n\n#### What are you trying to achieve?\n\nsend emails\n\n#### What are you doing to achieve it?\n\nSetup correct\n\n#### What is happening instead?\n\nall inboxes burned\n\n#### What is the expected outcome?\n\nsending as expected"
+    },
+    {
+      "id": "ENG-4508",
+      "createdAt": "2026-01-13T22:59:20.234Z",
+      "title": "Investigate Acquisity inbox disconnection vs Company Six campaign state",
+      "state": "Done",
+      "assignee": "Jared Stauffer",
+      "parent": null,
+      "labels": ["Instantly Sync Failure"],
+      "description": "Company Nine (Name 16 & Name 15 Name 17) is seeing issues with their cold email inboxes:\n\n* In Acquisity, multiple email accounts under their workspace are showing an `Error` status and appear disconnected.\n* The related campaign in Acquisity says it is running.\n* In Company Six, the same inboxes appear to be fine, but the campaign was paused; resuming it there may not be reflected clearly in Acquisity.\n\nThis may be an Company Six integration issue where Acquisity is not correctly interpreting or displaying the inbox/connection and campaign status coming from Company Six.\n\nRelevant screenshots:\n\n <image> \n\n <image> "
+    },
+    {
+      "id": "ENG-15397",
+      "createdAt": "2026-10-14T14:57:00.734Z",
+      "title": "Name 18 - Inboxes errored out even though payment has gone through",
+      "state": "Todo",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [
+        "Credit/Billing Mismatch",
+        "Customer reported",
+        "Internal reported"
+      ],
+      "description": "#### Customer Name\n\nName 18\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\n<domain>\n\n#### Screenshot\n\n <image> \n\n#### What are you trying to achieve?\n\nInboxes errored out even though payment has gone through\n\n#### What are you doing to achieve it?\n\nInboxes errored out even though payment has gone through\n\n#### What is happening instead?\n\nInboxes errored out even though payment has gone through\n\n#### What is the expected outcome?\n\nInboxes errored out even though payment has gone through"
+    }
+  ]
+}

@@ -1,0 +1,220 @@
+{
+  "id": "ENG-15317",
+  "provenance": "seeded",
+  "createdAt": "2026-10-13T17:41:57.558Z",
+  "lane": "billing+triage",
+  "stratum": "billing",
+  "ticket": {
+    "title": "Acquisity Plan automatically went back to base",
+    "description": "#### Customer Name\n\nName 15\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 15 Workspace\n\n#### Screenshot\n\n <image> \n\n#### What are you trying to achieve?\n\nShe is getting billed for 185 per month but the plan reverted to base instead of paid and this has paused her cold email campaigns\n\n#### What are you doing to achieve it?\n\nShe is getting billed for 185 per month but the plan reverted to base instead of paid and this has paused her cold email campaigns\n\n#### What is happening instead?\n\nShe is getting billed for 185 per month but the plan reverted to base instead of paid and this has paused her cold email campaigns\n\n#### What is the expected outcome?\n\nShe is getting billed for 185 per month but the plan reverted to base instead of paid and this has paused her cold email campaigns",
+    "attachmentKinds": ["image", "slack"]
+  },
+  "repoCommitAtCreate": "5141109084fdd5fd7aede33f7c9e54ade0754bed",
+  "flags": {
+    "descriptionEditedAfterCreate": false,
+    "needsProductionData": true,
+    "alreadyFixedAtTriage": false
+  },
+  "relatedSnapshot": [
+    {
+      "id": "ENG-4849",
+      "createdAt": "2026-01-26T16:09:23.352Z",
+      "title": "Acquisity access blocked after Name 1 campaign, plan shows Basic",
+      "state": "Canceled",
+      "assignee": "Jared Stauffer",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "User reports being blocked from proceeding in Cold Email Agent and SDR due to \"Acquisity integration required\" and a prompt to join Acquisity again for $185 while starting a second email campaign.\n\nThe account previously ran a full campaign during Name 1 with Acquisity and AI SDR active (statuses like \"AI replied\" and \"escalated\" were shown). Now the workspace is showing on the Basic plan, which does not include Cold Email Agent or AI SDR, even though the user believes they should still have access from their Name 1 setup.\n\nThis needs investigation into why the workspace plan/entitlements reverted to Basic after the first campaign and why the UI is still surfacing Acquisity and SDR flows but blocking progress behind an \"integration required\" and upgrade/paywall state.\n\nPlease review this workspace's subscription history, Launchpad-related access, and Acquisity/Cold Email Agent entitlements to confirm whether the current plan is correct and ensure the UI and access state are consistent."
+    },
+    {
+      "id": "ENG-15131",
+      "createdAt": "2026-10-10T12:44:40.575Z",
+      "title": "Acquisity Pro Payment Not Reflected – Account Showing Base Plan",
+      "state": "Triage",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [],
+      "description": "#### User Email\n\n<email>\n\n#### Workspace Name\n\nCompany One\n\n#### Request Type\n\nRefund\n\n#### Reason for request\n\nClient: Name 2\nProgram: Accelerator – October 2026 Cohort\nPlatform: Acquisity\n\nIssue: Client reports paying for Acquisity Pro ($185/month), but his account currently shows Base (Free), preventing him from starting his cold email campaigns.\n\nBilling findings:\n\nSeptember 7, 2026: $185 Pro payment marked Paid.\n\nOctober 7, 2026: $185 charge labeled Domain/Inbox, marked Paid.\n\nOctober 7, 2026: -$66.08 Domain/Inbox adjustment.\n\nCurrent subscription: Base (Free).\n\nNext billing date: None.\n\nCredit balance: 0.\n\nFour active paid domains and 12 inboxes ($72/year for domains and $96/month for inboxes).\n\nRequested action:\n\nVerify whether the client's $185/month Pro subscription renewed successfully.\n\nInvestigate why the account currently shows Base despite the previous Pro payment.\n\nConfirm what the October 7 transactions covered.\n\nRestore Pro access if the subscription is valid.\n\nConfirm whether the subscription status is preventing campaign activation."
+    },
+    {
+      "id": "ENG-13133",
+      "createdAt": "2026-08-25T20:50:33.496Z",
+      "title": "Expose Growth in onboarding with conversion tracking",
+      "state": "Done",
+      "assignee": "James Keeble",
+      "parent": "ENG-13107",
+      "labels": [],
+      "description": "## Overview\n\nShow the verified Growth plan at the end of Acquisity onboarding and record which plan customers choose.\n\n## Problem\n\nOnboarding offers Base, Pro, and unavailable Ultra. It has no Growth selection, and the funnel cannot distinguish the selected plan.\n\n## Proposed fix\n\nAdd Growth immediately left of Pro, persist the exact selection through checkout and recovery, and extend the existing onboarding analytics with the stable plan identity.\n\n## What's included\n\n* Card order Base, Growth, Pro, Ultra for Acquisity onboarding only.\n* Growth copy: $99/month, Start automating your outbound, `0 credits included`, the agreed features, and clear 5,000 campaign-lead capacity.\n* Pro replaces `Campaigns run on autopilot` with `Store up to 25,000 campaign leads`, remains selected by default, and keeps the Most popular badge.\n* Four-card desktop and one-column narrow layouts.\n* The existing onboarding event family gains `selected_plan`.\n* This PR keeps the server sales flag off; enabling Growth remains an explicit post-ENG-13132 launch action.\n* Partner and Whop onboarding remain unchanged.\n\n## Blocked by\n\n* Priority 3: Configure and prove the Growth billing contract.\n\n## How it should work\n\nSelecting Growth begins the exact $99 monthly checkout and preserves `growth` across refresh, cancellation, retry, delayed provider confirmation, and completion. Unknown, annual, or Ultra selections fail closed instead of becoming Pro.\n\n## Who can do what\n\nAcquisity-billed onboarding customers can choose Growth. Partner onboarding continues to show only its configured plan.\n\n## What the user sees\n\nGrowth appears left of Pro with `0 credits included` and `Store up to 5,000 campaign leads` using Base's existing treatment. Pro shows `Store up to 25,000 campaign leads`. Campaign-lead capacity is separate from credits, only the selected card shows progress, and the layout remains readable on desktop and mobile.\n\n## Done when\n\n- [ ] Growth persists and activates as the exact plan through every onboarding recovery path.\n- [ ] Card order, copy, Pro emphasis, responsive layout, and partner control pass browser QA.\n- [ ] The existing onboarding event lands in PostHog with `selected_plan: growth` and tracking failure never blocks checkout.\n- [ ] The server gate and UI agree, so hidden Growth cannot be purchased directly.\n\n## Open questions\n\nNone: all required decisions are settled.\n\n## Expected outcome\n\nNew Acquisity customers can safely choose Growth during onboarding, and conversion reporting identifies their selected plan.\n\n## Implementation context\n\nAI context.md contains the verified onboarding state, analytics, QA, and control-flow direction. This issue is related natively to ENG-7977."
+    },
+    {
+      "id": "ENG-7670",
+      "createdAt": "2026-04-09T21:08:57.042Z",
+      "title": "Active Pro plan still prompts Acquisity upgrade",
+      "state": "Done",
+      "assignee": "Jared Stauffer",
+      "parent": null,
+      "labels": [],
+      "description": "An account with an active Pro plan cannot access Acquisity and is prompted to enable or upgrade the integration again. Clicking through shows that there is already an active subscription and no upgrade is available, so access remains blocked.\n\nThis persisted after logging out, clearing browser cache, and logging back in.\n\nAffected account: <email>\nWorkspace: Name 3's Workspace\n\n <image> \n\n <image> "
+    },
+    {
+      "id": "ENG-13073",
+      "createdAt": "2026-08-24T15:50:51.435Z",
+      "title": "Keep Growth Plans focused on offers Acquisity can deliver",
+      "state": "Done",
+      "assignee": "James Keeble",
+      "parent": null,
+      "labels": [],
+      "description": "## Overview\n\nKeep the current Growth Plan Creator focused on the offers and delivery mechanisms Acquisity can actually support. Cold email should be the normal recommendation, LinkedIn should support small or concentrated markets, and B2B Sales Accelerator should be used when an existing sales team or pipeline needs improvement.\n\n## Problem\n\nThe current prompts explicitly tell the model that cold email is not the default. As a result, plans can recommend workflow automation and other services that Acquisity clients cannot yet deliver through the platform and the team cannot reliably support.\n\nThis leaves outbound teams without the offer they joined Acquisity to deliver, while presenting clients with fulfilment commitments that are difficult or impossible to honour.\n\n## Proposed fix\n\nAdd a single supported-offer routing policy to the current Growth Plan Creator and make every downstream generation step preserve it.\n\nThe routing policy should:\n\n* Prefer **AI Growth Engine**, delivered mainly through cold email, for most suitable plans.\n* Use **LinkedIn Authority Accelerator** for small or concentrated reachable markets, normally alongside personalised named-account email.\n* Use **B2B Sales Accelerator** when the evidence points to an existing sales team, pipeline or conversion problem.\n* Allow AI Growth Engine and B2B Sales Accelerator to appear together when both acquisition and sales conversion need work.\n* Prevent Workflow Creator, custom workflows and unsupported automation from being sold as paid delivery.\n* Preserve an explicitly selected supported offer when the discovery evidence supports it.\n* Require an internal operator-review outcome only in the rare case where none of the supported routes is credible.\n\n## What's included\n\n* Canonical definitions for the supported offers and their delivery mechanisms.\n* Prompt changes for offer selection, strategic pillars, investment options and final review.\n* Exact-name preservation so the chosen supported offer survives every generation step.\n* Focused regression tests covering normal, small-market, sales-team and unsupported-workflow scenarios.\n* Existing honesty, evidence and pricing safeguards from the recent prompt overhaul remain in place.\n\nNot included:\n\n* Rolling back the recent Growth Plan Creator quality and safety improvements.\n* Making Workflow Creator available to clients.\n* Building new fulfilment capabilities.\n* Changing Growth Plan Creator V2.\n\n## How it should work\n\n1. Use the selected niche, market size, buyer behaviour, discovery answers and transcript evidence to choose the supported route.\n2. Default to AI Growth Engine when evidence is incomplete but outbound remains credible.\n3. For a small or concentrated market, recommend high-touch named-account email and LinkedIn instead of high-volume cold email.\n4. For an existing sales team with pipeline, follow-up or closing problems, recommend B2B Sales Accelerator.\n5. Carry the exact selected offer name and delivery mechanism into the strategic pillars and commercial options.\n6. Reject or replace any downstream draft that turns unsupported workflow or custom automation into the paid offer.\n7. If the discovery evidence explicitly makes every supported route unsuitable, flag the plan for operator review instead of inventing another service.\n\nThis uses AI judgement rather than a fixed market-size threshold because reachable-market quality and buyer behaviour matter more than a single number.\n\n## Who can do what\n\nAny user who can currently generate a Growth Plan can receive the supported recommendation. No permissions or roles change.\n\nThe operator can still edit the generated plan before presenting it to the client.\n\n## What the user sees\n\nThe generated plan names at least one supported offer and explains the matching delivery mechanism:\n\n* AI Growth Engine with cold email as the main route.\n* LinkedIn Authority Accelerator with high-touch LinkedIn and named-account outreach for smaller markets.\n* B2B Sales Accelerator for sales-team and conversion improvement.\n\nOther tactics may appear as supporting advice, but unsupported services are not presented as the main paid delivery.\n\n## Done when\n\n* Every non-exception test plan contains at least one of AI Growth Engine, LinkedIn Authority Accelerator or B2B Sales Accelerator.\n* AI Growth Engine is selected for the normal B2B outbound case and when discovery is incomplete but outbound is still credible.\n* Small or concentrated markets receive high-touch named-account email plus LinkedIn rather than being routed away from outbound.\n* Existing sales-team or conversion cases receive B2B Sales Accelerator.\n* A combined acquisition and sales-conversion case can use AI Growth Engine plus B2B Sales Accelerator.\n* Workflow Creator, custom workflows and unsupported automation never appear as the paid delivery.\n* The exact selected offer name survives strategic pillars, investment options and final review.\n* The exceptional no-fit path records why operator review is required.\n* Existing prompt-integrity, evidence, honesty and pricing regression tests still pass.\n* No Growth Plan Creator V2 files or behaviour change.\n\n## Open questions\n\nNone for this fix. The product routing decisions above are settled.\n\n## Expected outcome\n\nOutbound teams consistently receive plans they can fulfil using Acquisity, clients see offers the team can support, and rare genuine no-fit cases are made explicit rather than hidden behind an unsupported recommendation.\n\n## Implementation context\n\nThis is a forward fix for the current Growth Plan Creator. It is related to ENG-12362 and Acquisity/Acquisity#5926, but it must preserve that work's safety and quality improvements rather than rolling them back.\n\nOpen the AI context document for the evidence, settled routing policy, code map, test scenarios and review risks."
+    },
+    {
+      "id": "ENG-4772",
+      "createdAt": "2026-01-23T00:08:59.685Z",
+      "title": "Manually switch workspace from Acquisity back to Company Two",
+      "state": "Done",
+      "assignee": "Beth Newton",
+      "parent": null,
+      "labels": [],
+      "description": "user: <email>\n\nCustomer workspace is currently configured with Acquisity as the Cold Email Agent on a Legacy Pro plan. The customer wants to stop using Acquisity for sending and instead connect their own Company Two account again.\n\nRequested outcome:\n\n* Manually remove Acquisity as the sending engine for this workspace\n* Re-enable support for connecting Company Two (via API key) for the Cold Email Agent\n* Ensure the workspace is in a clean state for setting up Company Two before running any campaigns\n\nThe customer is asking for this to be done as soon as possible and for an ETA once the change is scheduled or completed."
+    },
+    {
+      "id": "ENG-2749",
+      "createdAt": "2025-11-17T02:08:32.645Z",
+      "title": "Keep Growth Plan Progress, Even If User Navigates to Another Page",
+      "state": "Canceled",
+      "assignee": null,
+      "parent": null,
+      "labels": ["Bug", "Improvement"],
+      "description": "## Issue Identified:\n\nUser's nearly complete Growth Plan was erased and reset to step 1 after clicking to the AI SDR and back.\n\n* User was on the Growth Plan Creator, almost finished with the process\n* User then navigated to the AI SDR to edit a personal email\n* When they returned to the Growth Plan Creator, all progress was lost, losing all completed questions and transcript without error messages.\n\nJam Video: <url:jam.dev>\n\n*\\*Note: the video is not of the actual event; it's a recreation of what they did.*\n\n## Solution:\n\n* Save partially filled out Growth Plans, so that users can return later to finish.\n* Partially-saved plans could be saved in the History section with a status of \"Incomplete\"\n  * Then users can click on that partially complete plan to finish it.\n\n---\n\nConversation:\nName 4: <p>Hi I had a nearly complete growth plan and it seems to be gone</p>\n\nbot: Our AI Growth Plan Creator generates comprehensive growth plans with strategic roadmaps, channel prioritization, and resource alignment. The platform provides step-by-step growth roadmaps tailored to your specific business model and current stage. However, the available information doesn't cover technical details about data storage, saving mechanisms, or recovery options for growth plans that may have disappeared from your account. Were you working on your growth plan within our platform when it disappeared, or were you using a different tool or method to create it? Sources: AI Growth Plan Creator | AI Acquisition AI Growth Consultant | AI Acquisition\n\nName 4: yes\n\nbot: Our AI Growth Plan Creator generates comprehensive growth plans with strategic roadmaps, channel prioritization, and resource alignment. However, the current information doesn't include specific details about data recovery options, backup systems, or technical support procedures for retrieving lost growth plans from our platform. For immediate assistance with recovering your nearly complete growth plan, you'll need to contact our technical support team directly through the platform or by signing into your account at <domain> to check if there are any auto-saved versions or recovery options available. Can you tell me approximately how long ago you were last working on the growth plan before it disappeared? Source: AI Growth Plan Creator | AI Acquisition\n\nName 4: 5vb minutes ago\n\nbot: Since you were working on your growth plan just minutes ago, there may be auto-save features or temporary data that could help recover your work. You'll want to check your account immediately by signing into the platform at <domain> to see if there are any saved versions or recovery options available. You can also get access to our AI Growth Consultant through the contact page for additional assistance with your growth plan needs. Did you notice any error messages or unusual behavior on the platform when your growth plan disappeared, or did it simply vanish without any warning? Sources: AI Growth Plan Creator | AI Acquisition Contact | AI Acquisition\n\nName 4: No. I noticed it had an email I wanted to edit and when I tried it was deleted everything gone.\n\nbot: I'm sorry, but I couldn't find any information related to your issue with the growth plan disappearing. Could you please rephrase your question or let me know if there's another way I can assist you?\n\nName 4: Can you connect me to Technical support\n\nbot: I'll connect you with someone from our team right away! Meanwhile, could you please share any additional details about the issue? This will help them assist you more efficiently.\n\nName 4: Yea it has me on step1\n\nName 5: \\[Name 6: Jam for Customer Support\\]\n\nName 4: The issue is completed the items are deleted.\n\nName 5: Your recording is in progress. Navigate back to the Jam tab when you're finished.\n\nName 5:\n\nName 4: it is in progress\n\n🟡 Note from Name 5: ⚠ User closed tab before submitting\n\nName 5: Your recording is in progress. Navigate back to the Jam tab when you're finished.\n\nName 5:\n\n🟡 Note from Name 5: ↑ Upload started... Screen recording uploading (5.5 MB)\n\n🟡 Note from Name 5: Jam created! View the screen recording here: <url:jam.dev>\n\nName 4: Screen recorded successfully!\n\nName 5: Thank you for the recording, Name 7. Could you let me know which step you’re working on when it disappears? I can see that you’ve already completed Step 1.\n\nName 4: It was nearly complete it was the final review and I saw my personal email on the growth plan an di click the button to edit it and it took me to the very beginning.\n\nName 4: It seems to have erased the transcript and all of the completed questions.\n\nName 4: I just want to get to the last saved version that wa nearly complete.\n\nName 5: Got it, thank you for the details, Name 7. It looks like there may be a technical issue. I’ll report this to the team right away and have them check the backend to see if your progress can be restored.\n\nName 4: Yes please.\n\nName 4: How would I know if restored\n\nName 5: I’ll get back to you as soon as I have an update from them."
+    },
+    {
+      "id": "ENG-9832",
+      "createdAt": "2026-06-08T18:54:54.155Z",
+      "title": "Fail open when Autumn API errors",
+      "state": "In Progress",
+      "assignee": "Tyler Olsen",
+      "parent": null,
+      "labels": ["Chore"],
+      "description": "A spike of errors from Autumn API caused paid users to be gated from the feature they paid for and get stuck at the Subscribe step.\n\nRecommended change is to fail open when Autumn errors so paid users are not locked out during provider outages. See Autumn docs."
+    },
+    {
+      "id": "ENG-10930",
+      "createdAt": "2026-06-26T18:16:27.110Z",
+      "title": "Acquisity enablement fails with generic \"Something went wrong\" error",
+      "state": "Duplicate",
+      "assignee": "Tyler Olsen",
+      "parent": null,
+      "labels": [],
+      "description": "## Problem\\nUsers attempting to enable Acquisity from the setup/activation flow receive a generic \"Something went wrong\" error. Setup does not complete and users remain locked out of the platform.\\n\\n## Context\\n- Reported from June 8 through June 26, 2026\\n- Lifecycle state: open\\n- Intercom source: multiple conversations spanning ~18 days\\n\\n## What users are saying\\n> \"User cannot enable Acquisity; setup returns 'Something went wrong' after activation attempt.\"\\n\\n## Acceptance Criteria\\n- [ ] Acquisity enablement flow completes successfully without generic errors\\n- [ ] On error, user receives actionable error message (not generic)\\n- [ ] Error is surfaced and logged so engineering can diagnose root cause\\n\\n## Resources\\n- Name 8\\n\\n## Name 9 Used\\n- \"Acquisity enablement fails something went wrong activation error\"\\n- Note: ENG-6544 (Canceled), ENG-7677 (Done) covered earlier versions. ENG-9803 was knowledge/guidance issue (Canceled). No current active ticket."
+    },
+    {
+      "id": "ENG-5946",
+      "createdAt": "2026-02-25T20:56:01.197Z",
+      "title": "Cold Email Agent campaign creation fails with \"Something went wrong\"",
+      "state": "Done",
+      "assignee": "Anthony Adewale",
+      "parent": null,
+      "labels": ["Bug", "Campaign State"],
+      "description": "user: <email>\n<email>\n<email>\n<email>\n\nA customer is unable to create a Cold Email Agent campaign; clicking New Campaign results in a \"Something went wrong\" error.\n\n <image> \n\n <image> "
+    },
+    {
+      "id": "ENG-13049",
+      "createdAt": "2026-08-23T13:49:06.738Z",
+      "title": "Add evidence-backed investigation memory to Foreman triage",
+      "state": "Done",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [],
+      "description": "Build a Foreman-owned investigation memory for the `triage-investigate` intake path.\n\nCompleted investigations should become structured, evidence-backed cases organized under Acquisity and its live product areas. Initial areas include Cold Email Agent, AI SDR, CRM, AI Name 10 Creator/Name 10, and Core Platform. The exact scope mapping should be checked against Acquisity's current live feature taxonomy so key platform features are not missed as the product grows. Shopify Store Builder is explicitly excluded because it is not live and is no longer part of Acquisity. Acquisity Agent may be included as a planned scope, clearly marked as not yet live.\n\nStore each investigation once. Give it one primary feature derived from the Name 11 project, zero or more evidence-backed affected features, and zero or more shared dependency keys. For example, a Cold Email Agent issue that also affects AI SDR is one case with `cold_email_agent` as primary, `ai_sdr` as affected, and dependencies such as `Company Two`, `webhooks`, or `inngest`. Do not duplicate the case across feature buckets and do not use a generic `shared` scope. Core Platform remains available only when it is genuinely the primary owning area.\n\nFuture investigations should retrieve similar cases only after the current claim and product scope are pinned, use them as candidate analogies rather than truth, verify them against current code, production data, and runtime evidence, and recognize clusters that may indicate a wider incident. Related features must be supported by current evidence, and cross-feature matches are possible-incident signals rather than proof.\n\nForeman already has direct access to Name 11, Sentry, repositories, production data, and its other investigation tools. This work must not add a duplicate correlation step or depend on Acquisity's separate Linear-to-Sentry pipeline. The Acquisity codebase is a taxonomy and stable-identifier reference only.\n\nCorrections must supersede prior conclusions without deleting history. The shared case store must exclude customer-identifying details and raw production rows, remain separate from repository knowledge, user preferences, pipeline state, and the existing read-only Neon MCP connection, and deny unattended writes.\n\nA detailed, issue-scoped Name 11 design document is attached as this ticket's implementation resource. It contains the completed Eve/Foreman specification audit, proposed data model and flow, security boundaries, implementation outline, tests, documentation changes, acceptance criteria, and open decisions."
+    },
+    {
+      "id": "ENG-7049",
+      "createdAt": "2026-03-25T05:37:39.586Z",
+      "title": "Promotions CRUD (automatic + code-based)",
+      "state": "Canceled",
+      "assignee": null,
+      "parent": null,
+      "labels": ["Feature"],
+      "description": "## Context\n\nThe promotions system supports two distinct types: **automatic promotions** (evaluated and applied whenever cart conditions match, requiring no customer input) and **code-based promotions** (requiring the customer to enter a valid promo code at checkout). Automatic promotions are re-evaluated on every cart mutation (add item, remove item, quantity change). This task builds the full CRUD lifecycle for both types, including creation, retrieval, listing with advanced filters, updating, activation/deactivation, archival via soft delete, and hard deletion with usage guards.\n\nPromotion rules (ENG-7032), usage limits (ENG-7034), and stacking logic (ENG-7036) are handled in subsequent tasks and depend on the data model established here.\n\n---\n\n## Schema Reference\n\nThe `commercePromotionTable` from the commerce schema defines:\n\n| Column | Type | Notes |\n| -- | -- | -- |\n| `id` | `uuid` | PK, `defaultRandom()` |\n| `organizationId` | `uuid` | FK to `organization.id`, cascade delete |\n| `name` | `text` | Required, 1-200 chars |\n| `description` | `text` | Optional, max 1000 chars |\n| `type` | `promotionTypeEnum` | `'automatic'` or `'code'` |\n| `discountType` | `discountTypeEnum` | `'fixed_amount'` or `'percentage'` |\n| `discountValue` | `bigint` | Cents for fixed_amount, 1-100 for percentage |\n| `isExclusive` | `boolean` | Default `false` |\n| `priority` | `integer` | Default `0`, higher wins |\n| `isActive` | `boolean` | Default `false` |\n| `startDate` | `timestamp(tz)` | When promotion becomes eligible |\n| `endDate` | `timestamp(tz)` | Nullable, when promotion expires |\n| `maxTotalUses` | `integer` | Nullable, global redemption cap |\n| `maxUsesPerCustomer` | `integer` | Nullable, per-customer cap |\n| `deletedAt` | `timestamp(tz)` | Soft delete marker |\n| `deletedBy` | `uuid` | FK to `user.id`, set null on delete |\n| `createdAt` / `updatedAt` | `timestamp(tz)` | Auto-managed |\n\nRelated tables queried by `getById`:\n\n* `commercePromotionRuleTable` (promotionId FK) -- rules attached to this promotion\n* `commercePromotionCodeTable` (promotionId FK) -- codes for code-based promotions\n* `commercePromotionUsageTable` (promotionId FK) -- usage tracking records\n\n---\n\n## Zod Schemas\n\n```typescript\nconst promotionTypeSchema = z.enum(['automatic', 'code']);\nconst discountTypeSchema = z.enum(['fixed_amount', 'percentage']);\n\nconst createPromotionInput = z.object({\n  organizationId: z.string().uuid(),\n  name: z.string().min(1).max(200),\n  description: z.string().max(1000).optional(),\n  type: promotionTypeSchema,\n  discountType: discountTypeSchema,\n  discountValue: z.number().int().positive(),\n  isExclusive: z.boolean().optional().default(false),\n  priority: z.number().int().min(0).optional().default(0),\n  startDate: z.string().datetime(),\n  endDate: z.string().datetime().optional(),\n  maxTotalUses: z.number().int().positive().optional(),\n  maxUsesPerCustomer: z.number().int().positive().optional(),\n}).refine(\n  (data) => !data.endDate || new Date(data.endDate) > new Date(data.startDate),\n  { message: 'End date must be after start date', path: ['endDate'] },\n);\n\nconst updatePromotionInput = z.object({\n  organizationId: z.string().uuid(),\n  promotionId: z.string().uuid(),\n  name: z.string().min(1).max(200).optional(),\n  description: z.string().max(1000).nullable().optional(),\n  discountType: discountTypeSchema.optional(),\n  discountValue: z.number().int().positive().optional(),\n  isExclusive: z.boolean().optional(),\n  priority: z.number().int().min(0).optional(),\n  startDate: z.string().datetime().optional(),\n  endDate: z.string().datetime().nullable().optional(),\n  maxTotalUses: z.number().int().positive().nullable().optional(),\n  maxUsesPerCustomer: z.number().int().positive().nullable().optional(),\n});\n\nconst listPromotionsInput = z.object({\n  organizationId: z.string().uuid(),\n  type: promotionTypeSchema.optional(),\n  status: z.enum(['active', 'inactive', 'expired', 'scheduled']).optional(),\n  search: z.string().max(200).optional(),\n  limit: z.number().int().min(1).max(100).default(20),\n  offset: z.number().int().min(0).default(0),\n});\n```\n\n---\n\n## tRPC Procedures\n\nAll procedures live in `trpc/routers/commerce/promotions.ts` and use `protectedFeatureMutationProcedure(FEATURES.ECOMMERCE_STORE_BUILDER)` for mutations and `protectedFeatureProcedure(FEATURES.ECOMMERCE_STORE_BUILDER)` for queries.\n\n### `create` (mutation)\n\n* Call `assertUserIsOrgMember(input.organizationId, ctx.user.id, ctx.isImpersonating)`\n* Validate discount value via `validateDiscountValue(input.discountType, input.discountValue)` from `lib/commerce/discounts.ts` -- throw `BAD_REQUEST` if invalid (e.g., percentage > 100)\n* Insert into `commercePromotionTable` with `isActive: false`\n* Return the created promotion row\n\n### `getById` (query)\n\n* Relational query: `db.query.commercePromotionTable.findFirst({ where: ..., with: { codes: true, rules: true } })`\n* Add usage count via subquery: `SELECT COUNT(*) FROM commerce_promotion_usage WHERE promotion_id = ?`\n* Filter by `organizationId` and `isNull(deletedAt)`\n* Throw `NOT_FOUND` if missing\n\n### `list` (query)\n\n* Always filter: `eq(organizationId, orgId)` + `excludeSoftDeleted(commercePromotionTable)`\n* Status filters:\n  * `active`: `eq(isActive, true) AND (endDate IS NULL OR endDate > NOW())`\n  * `inactive`: `eq(isActive, false)`\n  * `expired`: `isNotNull(endDate) AND lt(endDate, new Date())`\n  * `scheduled`: `gt(startDate, new Date()) AND eq(isActive, true)`\n* Type filter: `eq(type, input.type)`\n* Search: `ilike(name, '%search%')`\n* Computed fields per row: `isExpired` boolean, `usageCount` integer (subquery on `commercePromotionUsageTable`)\n* Pagination: `limit`/`offset` with `SELECT COUNT(*)` for total\n* Sort: `desc(createdAt)`\n\n### `update` (mutation)\n\n* Validate org membership\n* Reject `type` changes: `\"Cannot change promotion type after creation\"`\n* If `discountType` or `discountValue` changed, re-validate via `validateDiscountValue()`\n* If `endDate` provided alongside `startDate`, validate `endDate > startDate`\n* Update row, return updated promotion\n\n### `activate` (mutation)\n\n* Validate date window: if `endDate` exists and `endDate < now`, throw `BAD_REQUEST: \"Cannot activate an expired promotion\"`\n* Set `isActive = true`\n\n### `deactivate` (mutation)\n\n* Set `isActive = false`\n\n### `archive` (mutation)\n\n* Use `softDelete(db, commercePromotionTable, whereCondition, ctx.user.id)` from `lib/db/soft-delete.ts`\n* Also set `isActive = false` in the same update\n\n### `delete` (mutation)\n\n* Count rows in `commercePromotionUsageTable` for this promotionId\n* If count > 0: throw `BAD_REQUEST: \"Cannot delete a promotion with existing usage. Archive it instead.\"`\n* If count === 0: hard delete cascade (rules, codes, then promotion)\n\n---\n\n## Codebase Reference\n\n| What | File Path | Notes |\n| -- | -- | -- |\n| Commerce schema | `lib/db/schema/commerce.ts` | `commercePromotionTable`, `commercePromotionRuleTable`, `commercePromotionCodeTable`, `commercePromotionUsageTable` |\n| Discount utilities | `lib/commerce/discounts.ts` | `calculateDiscount(type, value, targetAmount)`, `validateDiscountValue()` |\n| Soft delete helpers | `lib/db/soft-delete.ts` | `softDelete()`, `excludeSoftDeleted()`, `restoreSoftDeleted()` |\n| Base table columns | `lib/db/schema/base-table.ts` | `getBaseColumnsWithOrganization()`, `getBaseColumnsWithOrganizationAndSoftDelete()` |\n| tRPC init | `trpc/init.ts` | `protectedFeatureProcedure()`, `protectedFeatureMutationProcedure()`, `publicProcedure` |\n| Router registration | `trpc/routers/_app.ts` | Add `commerce: lazy(() => import('./commerce/promotions'))` |\n| Feature constants | `lib/features.ts` | `FEATURES.ECOMMERCE_STORE_BUILDER` |\n| Name 12 helper | `lib/auth/server.ts` | `assertUserIsOrgMember(organizationId, userId, isImpersonating)` |\n| Logger | `lib/logger.ts` | `<domain>(obj, message)` -- object first, message second |\n| CRUD pattern reference | `trpc/routers/announcements.ts` | Similar query + mutation patterns with pagination |\n| Cart promotion join | `commerceCartPromotionTable` | `cartId`, `promotionId`, `promotionCodeId`, `discountAmount` |\n\n---\n\n## Implementation Steps\n\n 1. Create directory `trpc/routers/commerce/` if it does not exist.\n 2. Create `trpc/routers/commerce/promotions.ts` with router export.\n 3. Define all Zod input schemas at the top of the file (createPromotionInput, updatePromotionInput, listPromotionsInput, single-id inputs).\n 4. Implement `create` mutation with org membership assertion, discount validation, insert with `isActive: false`, and return.\n 5. Implement `getById` query with relational `with: { codes: true, rules: true }` and usage count subquery.\n 6. Implement `list` query with dynamic condition builder array, status/type/search filters, pagination, computed `isExpired` and `usageCount`.\n 7. Implement `update` mutation with type-change guard, discount re-validation, and partial update via spread.\n 8. Implement `activate` mutation with expiration check before enabling.\n 9. Implement `deactivate` mutation setting `isActive = false`.\n10. Implement `archive` mutation using `softDelete()` from `lib/db/soft-delete.ts` plus setting `isActive = false`.\n11. Implement `delete` mutation with usage count guard (BAD_REQUEST if usage > 0, hard delete otherwise).\n12. Register the router in `trpc/routers/_app.ts` with `commerce: lazy(() => import('./commerce/promotions'))`.\n13. Run `bun db:generate` if any schema changes were made in this task.\n14. Run `bun typecheck` to verify type safety across all procedures.\n15. Run `bun fix` and `bun format` for Biome compliance.\n\n---\n\n## Acceptance Criteria\n\n- [ ] `commercePromotionTable` exists in schema with all columns (name, description, type, discountType, discountValue, isExclusive, priority, isActive, startDate, endDate, maxTotalUses, maxUsesPerCustomer, soft delete)\n- [ ] tRPC router at `trpc/routers/commerce/promotions.ts` with named export\n- [ ] All query procedures use `protectedFeatureProcedure(FEATURES.ECOMMERCE_STORE_BUILDER)`\n- [ ] All mutation procedures use `protectedFeatureMutationProcedure(FEATURES.ECOMMERCE_STORE_BUILDER)`\n- [ ] `create` mutation validates discount value, defaults `isActive` to `false`, returns created row\n- [ ] `create` mutation validates `endDate > startDate` when both provided\n- [ ] `getById` query returns promotion with nested codes, rules, and computed usage count\n- [ ] `getById` throws `NOT_FOUND` for missing or soft-deleted promotions\n- [ ] `list` query supports `type` filter (automatic/code)\n- [ ] `list` query supports `status` filter (active/inactive/expired/scheduled) with correct SQL conditions\n- [ ] `list` query supports `search` via `ilike` on name\n- [ ] `list` returns paginated results with total count, computed `isExpired`, and `usageCount` per row\n- [ ] `update` mutation rejects `type` changes with `BAD_REQUEST`\n- [ ] `update` mutation re-validates discount value when discountType/discountValue change\n- [ ] `activate` mutation rejects activation of expired promotions\n- [ ] `deactivate` mutation sets `isActive = false`\n- [ ] `archive` mutation soft-deletes and deactivates in one operation\n- [ ] `delete` mutation guards against deletion when usage records exist\n- [ ] `delete` mutation hard-deletes promotion, rules, and codes when no usage exists\n- [ ] All queries filter by `organizationId` for tenant isolation\n- [ ] Router registered in `_app.ts` via lazy import\n\n---\n\n## Verification Checklist\n\n- [ ] `bun typecheck` passes with zero errors\n- [ ] `bun fix` and `bun format` produce no changes\n- [ ] Creating an automatic promotion with valid inputs returns the promotion with `isActive: false`\n- [ ] Creating a promotion with `endDate` before `startDate` returns Zod validation error\n- [ ] Creating a promotion with percentage > 100 returns discount validation error\n- [ ] Listing promotions with `status: 'active'` excludes inactive, expired, and soft-deleted\n- [ ] Listing promotions with `search` returns only name-matching results\n- [ ] `getById` on a soft-deleted promotion returns `NOT_FOUND`\n- [ ] Updating a promotion's `type` from `automatic` to `code` is rejected\n- [ ] Activating an expired promotion is rejected with clear error message\n- [ ] Archiving a promotion sets both `deletedAt` and `isActive = false`\n- [ ] Deleting a promotion with usage records returns `BAD_REQUEST` with guidance to archive instead\n- [ ] Deleting a promotion with zero usage successfully removes promotion, rules, and codes"
+    },
+    {
+      "id": "ENG-4221",
+      "createdAt": "2026-01-06T17:54:50.656Z",
+      "title": "Pro plan not automatically granting domain and inboxes",
+      "state": "Done",
+      "assignee": "Tyler Olsen",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "User `<email>` is on a Pro plan but is missing the included 1 domain and 3 inboxes.\n\nThis has been seen multiple times for some clients where they do not automatically receive the 1 domain and 3 inboxes that come with the Pro plan. In this specific case, attempts to purchase additional domains and inboxes also failed when the provider was down for about 10 hours.\n\nRelevant screenshots:\n\n <image> \n\n <image> "
+    },
+    {
+      "id": "ENG-3659",
+      "createdAt": "2025-12-11T11:08:54.499Z",
+      "title": "User request - AI SDR automatically reengage when user comes back from OOO",
+      "state": "Canceled",
+      "assignee": "Koppany Kondricz",
+      "parent": null,
+      "labels": ["Customer reported"],
+      "description": "AI SDR is not automatically reengaging with the prospect eventho knowing when prospect comes back from OOO.\n\nSolution would be a 'smart followup system'. Instead of setting up a static followup in 24 hours, we should have an intermediate AI powered step which dynamically calculates the time when the followup should occur based on OOO messages."
+    },
+    {
+      "id": "ENG-7166",
+      "createdAt": "2026-03-25T09:41:34.285Z",
+      "title": "Fix domain purchase on Acquisity saying \"something went wrong\"",
+      "state": "Duplicate",
+      "assignee": "Blaise Gulaj",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "It works just fine on Name 13, but on Acquisity \"something went wrong\" message shows up in the UI when choosing \"Continue to secure checkout\"\n\n <image> "
+    },
+    {
+      "id": "ENG-2762",
+      "createdAt": "2025-11-17T11:47:16.343Z",
+      "title": "Change rename campaign title to dialog-based, then add truncate jobs back in",
+      "state": "Done",
+      "assignee": "Mahmut Jomaa",
+      "parent": null,
+      "labels": ["Improvement"],
+      "description": " <image> "
+    },
+    {
+      "id": "ENG-10612",
+      "createdAt": "2026-06-22T08:40:45.885Z",
+      "title": "Replicate partner knowledge base management at Acquisity level",
+      "state": "Done",
+      "assignee": "Anuj Bhatt",
+      "parent": null,
+      "labels": [],
+      "description": "Replicate the knowledge base feature from the partner panel at the core Acquisity level for AI Consultant.\n\nThe feature should reuse the existing functionality and allow uploading, editing, and deleting the parts of the knowledge base used in AI Consultant.\n\nIt should support any file format and be implemented at the Acquisity/core entity level rather than the partner level."
+    },
+    {
+      "id": "ENG-6544",
+      "createdAt": "2026-03-10T18:05:16.911Z",
+      "title": "Paid Acquisity enablement loops back to setup screen",
+      "state": "Canceled",
+      "assignee": "Jared Stauffer",
+      "parent": null,
+      "labels": [],
+      "description": "In the Company Three workspace, enabling Acquisity appears to charge $1 successfully but keeps redirecting back to the \"enable acquisity\" / subscription screen instead of completing setup.\n\nLogging out, logging back in, and refreshing the workspace did not resolve it. The charge was visible in the bank account."
+    },
+    {
+      "id": "ENG-13441",
+      "createdAt": "2026-09-03T18:32:03.765Z",
+      "title": "Something went wrong isue",
+      "state": "Done",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": ["Customer reported"],
+      "description": "#### Customer Name\n\nName 14\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 14\n\n#### Screenshot\n\n#### What are you trying to achieve?\n\nTrying to buy 6 domains on acquisity\n\n#### What are you doing to achieve it?\n\nclickimg next\n\n#### What is happening instead?\n\nsomething went wrong issue\n\n#### What is the expected outcome?\n\ndomains would be purchased"
+    },
+    {
+      "id": "ENG-5287",
+      "createdAt": "2026-02-02T09:27:23.449Z",
+      "title": "Make whop slot mapping per tier product instead of plan based",
+      "state": "Done",
+      "assignee": "Mahmut Jomaa",
+      "parent": null,
+      "labels": ["Feature", "Improvement"],
+      "description": "Our partner is extremely sloppy, we would ask them to create a product per tier instead because they created like 12 different plans for the product already."
+    }
+  ]
+}

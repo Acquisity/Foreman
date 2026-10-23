@@ -1,4 +1,12 @@
-import { BlobNotFoundError, del, get, head, put } from "@vercel/blob";
+import {
+  BlobNotFoundError,
+  BlobPreconditionFailedError,
+  del,
+  get,
+  head,
+  list,
+  put,
+} from "@vercel/blob";
 
 /**
  * Foreman's shared Blob layer: the reserved-namespace registry and the document helpers
@@ -48,6 +56,9 @@ export const MODEL_OVERRIDES_PREFIX = "model-overrides/";
 /** Blob path prefix holding the daily SLA report's last successful dispatch marker. */
 export const SLA_REPORT_PREFIX = "sla-report/";
 
+/** Blob path prefix holding triage replay state, admission ledgers and repository archives (ENG-16049). */
+export const TRIAGE_REPLAY_PREFIX = "triage-replay/";
+
 /**
  * A Blob path prefix that a general-purpose Blob tool must not touch.
  *
@@ -86,6 +97,11 @@ const RESERVED_NAMESPACES: Readonly<Record<string, ReservedNamespace>> = {
     label: "the daily SLA report dispatch marker",
     readTool: "no tool; the sla-report schedule owns this namespace",
     writeTool: "no tool; the sla-report schedule owns this namespace",
+  },
+  [TRIAGE_REPLAY_PREFIX]: {
+    label: "triage replay state",
+    readTool: "no tool; the triage replay owns this namespace",
+    writeTool: "no tool; the triage replay owns this namespace",
   },
   [REPOSITORY_KNOWLEDGE_PREFIX]: {
     label: "repository knowledge",
@@ -245,4 +261,79 @@ export const deleteDocument = async (
   }
   await del(key, { abortSignal: AbortSignal.timeout(BLOB_TIMEOUT_MS) });
   return { existed: true };
+};
+
+export const readPrivateDocument = async (
+  key: string
+): Promise<
+  { found: false } | { content: string; etag: string; found: true }
+> => {
+  const result = await get(key, {
+    abortSignal: AbortSignal.timeout(BLOB_TIMEOUT_MS),
+    access: "private",
+    useCache: false,
+  });
+  if (!result?.stream) {
+    return { found: false };
+  }
+  return {
+    content: await new Response(result.stream).text(),
+    etag: result.blob.etag,
+    found: true,
+  };
+};
+
+export const readPrivateBytes = async (
+  urlOrKey: string,
+  timeoutMs: number
+): Promise<Uint8Array> => {
+  const result = await get(urlOrKey, {
+    abortSignal: AbortSignal.timeout(timeoutMs),
+    access: "private",
+  });
+  if (!result?.stream) {
+    throw new BlobNotFoundError();
+  }
+  return new Uint8Array(await new Response(result.stream).arrayBuffer());
+};
+
+export const writePrivateDocument = async (
+  key: string,
+  contents: string,
+  options: { contentType: string; ifMatch: string | null }
+): Promise<"conflict" | "written"> => {
+  try {
+    await put(key, contents, {
+      abortSignal: AbortSignal.timeout(BLOB_TIMEOUT_MS),
+      access: "private",
+      addRandomSuffix: false,
+      allowOverwrite: options.ifMatch !== null,
+      contentType: options.contentType,
+      ...(options.ifMatch === null ? {} : { ifMatch: options.ifMatch }),
+    });
+    return "written";
+  } catch (error) {
+    if (error instanceof BlobPreconditionFailedError) {
+      return "conflict";
+    }
+    if (options.ifMatch === null && (await readPrivateDocument(key)).found) {
+      return "conflict";
+    }
+    throw error;
+  }
+};
+
+export const listPrivateDocuments = async (
+  prefix: string,
+  cursor?: string
+): Promise<string[]> => {
+  const page = await list({
+    abortSignal: AbortSignal.timeout(BLOB_TIMEOUT_MS),
+    cursor,
+    prefix,
+  });
+  const keys = page.blobs.map((blob) => blob.pathname);
+  return page.hasMore && page.cursor
+    ? [...keys, ...(await listPrivateDocuments(prefix, page.cursor))]
+    : keys;
 };

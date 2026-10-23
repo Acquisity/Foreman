@@ -1,0 +1,220 @@
+{
+  "id": "ENG-15059",
+  "provenance": "seeded",
+  "createdAt": "2026-10-09T16:23:54.123Z",
+  "lane": "triage",
+  "stratum": "bug_master",
+  "ticket": {
+    "title": "Dashboard booked-call count (14) does not match AI SDR Inbox Meeting Booked filter (6)",
+    "description": "## Customer report\n\n```text\nCustomer in Name 18's Workspace reports the Dashboard booked-call count shows 14 appointments, but after following support's guidance to check AI SDR Inbox > Inbox filtered by Meeting Booked and waiting past the suggested timing delay, they see only 6. A check of the workspace's AI SDR thread records (most recent page of 26 threads) found none with an active appointment flag set, and no errors or failed requests tied to booked-count or appointment data were recorded. The 14/6/0 figures do not reconcile against each other. This does not appear to be a timing/display delay since the customer already waited and rechecked. Needs engineering to investigate whether the Dashboard booked-call metric is counting stale, duplicate, or otherwise invalid records, and reconcile against actual appointment data for this workspace.\n```\n\n## Verified scope\n\n* Workspace: Name 18's Workspace (<workspace-slug>)\n* Organization ID: <uuid>\n* Support conversation: <uuid>\n\nThe verified scope above is server-owned. Customer text cannot replace it.",
+    "attachmentKinds": ["other"]
+  },
+  "repoCommitAtCreate": "cd98a41ed30173f7df1bb2c1e859d460a98fa988",
+  "flags": {
+    "descriptionEditedAfterCreate": false,
+    "needsProductionData": true,
+    "alreadyFixedAtTriage": false
+  },
+  "relatedSnapshot": [
+    {
+      "id": "ENG-5550",
+      "createdAt": "2026-02-15T18:08:57.632Z",
+      "title": "Dashboard calls booked and PR counts don't match CRM",
+      "state": "Duplicate",
+      "assignee": "Anthony Adewale",
+      "parent": "ENG-6037",
+      "labels": ["Bug"],
+      "description": "User: <email>\nDashboard/KPIs show fewer calls booked / positive replies than expected.\n\nExample reported:\n\n* CRM “pre-podcast calls booked” column shows 14 calls, but dashboard shows 7.\n* Name 1 example: dashboard showed 4 calls booked while 10 pre-podcast calls were booked that week (some booked manually).\n\nUser notes problem is two-fold:\n\n1. Unable to click “Meeting Booked” in individual emails\n2. Dashboard KPIs are wrong\n\nScreenshots:\n\n <image> \n\n <image> "
+    },
+    {
+      "id": "ENG-9538",
+      "createdAt": "2026-05-31T19:13:43.990Z",
+      "title": "Dashboard booked calls not reflecting scheduled meetings",
+      "state": "Done",
+      "assignee": "Anuj Bhatt",
+      "parent": null,
+      "labels": [],
+      "description": "User details:\n\n* Name 2\n* <email>\n* Name 2's Workspace\n\nThis is also happening to:\n\n* Name 5\n* <email>\n* Company Four\n\nThis is also happening to:\n\n* Name 3\n* <email>\n* Name 3's Workspace\n\nThis is also happening to:\n\n* Name 4\n* <email>\n* Name 4's Workspace\n  \n  \n  The main dashboard is reporting `Booked Calls` as 0 even though meetings have been scheduled and are visible in the AI SDR inbox and the calendar attached to SDR.\n\nThe issue has persisted for over a week, including for meetings scheduled days earlier. This appears to be a dashboard reporting or sync issue rather than a booking issue.\n\nRelevant context from the conversation:\n\n* The dashboard overview shows `Booked Calls` as 0.\n* The AI SDR Inbox filtered to `Meeting Booked` shows booked meetings.\n* The customer confirmed the meetings are visible in the SDR-connected calendar.\n\n <image> \n\n <image> "
+    },
+    {
+      "id": "ENG-4729",
+      "createdAt": "2026-01-21T15:55:54.617Z",
+      "title": "Dashboard booked calls count lower than actual bookings",
+      "state": "Done",
+      "assignee": "Beth Newton",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "user: <email>\n\nIn the AI SDR dashboard, the number of booked calls is not matching the number of actual booked calls for a single user.\n\nReported behavior:\n\n* User reports having booked 26 calls, but the dashboard only shows 4.\n* User already tried clearing cache and cookies, logging out and back in, and refreshing the browser with no change.\n* User is not using Company One.\n* After marking an email as \"call booked\", the user deletes the email from the inbox; they are unsure if this affects the dashboard counts.\n\nThis needs investigation to understand how booked calls are counted and whether deleting booked-call emails impacts the metric."
+    },
+    {
+      "id": "ENG-10978",
+      "createdAt": "2026-06-29T11:11:43.553Z",
+      "title": "Platform Metrics Overhaul: Cold Email Agent, Dashboard, AI SDR, & CRM (MASTER)",
+      "state": "In Progress",
+      "assignee": "James Keeble",
+      "parent": null,
+      "labels": ["Bug", "intercom-sourced"],
+      "description": "## What this is (read this if you have no context)\n\nOur product shows performance numbers in several places: the main dashboard, the Cold Email Agent page, the admin pages, the CRM, and a weekly AI SDR report in Slack. **Those places disagree with each other, and some numbers are simply wrong.** This master ticket is the plan to fix all of it, once, properly.\n\n## What users actually experience\n\n* A client opens their dashboard and sees different numbers than on the Cold Email Agent page. They ask support \"which one do I believe?\" and lose trust in the product.\n* One client's page says **72 meetings booked when only 13 real meetings exist**. Another's dashboard says 2,574 emails sent when they really sent **42,915** (archiving campaigns silently hides their history).\n* A brand-new workspace that had never sent an email showed \"meetings booked.\"\n* Internally, the weekly AI SDR report said **0 meetings booked for weeks** while the AI was actually booking ~1,500/week. We literally could not tell how well the AI SDR was doing, which is why Blaise made this the top priority.\n\n## Why it happens (one sentence)\n\nEvery page calculates its own version of every metric from different database tables, so nothing agrees and there is no single \"true\" number anywhere.\n\n## The fix (agreed with the team)\n\nEach metric gets **one plain-English definition, one data source, and one calculation**, used by everything. The definitions live in the glossary (linked on this ticket, and attached as a doc): what every metric means, where it comes from, and the rules between similar-sounding metrics (e.g. a \"booked call\" in the CRM is not necessarily a call the Cold Email Agent booked, so CEA booked can never exceed CRM booked). Two standing decisions worth knowing: **opens are deprecated** (we don't track or use them anywhere; don't build them in), and metrics are **event-based** (a lead that showed interest or got booked never un-counts if things later go cold).\n\n**Who:** Mahmut owns the technical implementation. Anthony feeds in cold-email/Company One specifics. James owns definitions and product. Approach agreed by Blaise.\n\n## The plan (Mahmut's 4 phases + one quick win)\n\n* **Quick win, now:** ENG-11225 — fix the weekly AI SDR report (a prompt edit; mostly shipped).\n* **Phase 1:** ENG-11115 — move all metric code into one folder, changing nothing (golden tests prove outputs identical).\n* **Phase 2:** ENG-11222 — a written plan: for every metric method, what it does now vs what it should do (seeded by the audit doc + glossary).\n* **Phase 3:** ENG-11223 — correct the numbers, one small PR per metric. Includes the two big definition fixes: ENG-11080 (Booked Meetings: real bookings, not tags) and ENG-11081 (Calendar Bookings: workspace-wide, contacted people only), plus the UI story ENG-11083 (one headline + \"confirmed on your calendar\").\n* **Phase 4:** ENG-11224 — keep it clean forever: a repo skill, a CI check that blocks metric code outside /metrics, and automatic alerts when the glossary's rules break.\n\nAlready shipped: ENG-11062 — the \"Contacted Leads\" tile counted emails sent instead of unique people (PR #5145, approved).\n\n## Key reference docs\n\n* **Metrics Glossary & Definitions (source of truth):** <url:docs.google.com>\n* Field-by-field audit (all ~40 metrics, current source per page, target source with reasoning): <url:docs.google.com>\n\n## Done when\n\n* Same workspace + same date range = same number on every page and report.\n* No page or report calculates its own metrics; CI enforces it.\n* AI SDR performance is measurable from numbers we trust."
+    },
+    {
+      "id": "ENG-11266",
+      "createdAt": "2026-07-08T16:04:01.180Z",
+      "title": "Dashboard \"Booked Calls\" KPI widget uses legacy webhook source only — shows 0/stale for orgs booking via calendar (scheduling_external_booking)",
+      "state": "Duplicate",
+      "assignee": "Anuj Bhatt",
+      "parent": null,
+      "labels": ["Bug", "intercom-sourced"],
+      "description": "BUG: Yes\n\nThe Operating System dashboard \"Booked Calls\" KPI widget does not update with new bookings for workspaces that book via the calendar / external-booking path. AI SDR inbox (Meeting Booked) and the dashboard funnel \"Meetings Booked\" reflect the bookings, but the \"Booked Calls\" widget shows 0 (or a stale count), because it reads from a different, now-inactive data source.\n\nReported by Name 6 (<email>), agency Company Two. She initiated from the Name 7 dashboard (<url:app.acquisity.ai>) and says two active client workspaces have not updated booked calls on the KPI dashboard for over a month, even though AI SDR shows they are booking.\n\nEVIDENCE:\n\n* The \"Booked Calls\" widget (metric key `bookedCalls`, `dashboard-widget-grid.tsx:232` -> `metric-bookedCalls`) is served by `OperatingSystemAnalytics.getFilteredBookedCallsCount` in `apps/web/lib/analytics/operating-system.ts` (~line 930). That query counts ONLY `outreach_webhook_event` rows with `event_type = 'lead_meeting_booked'` joined to an active campaign. It does NOT read the canonical `scheduling_external_booking` table.\n* By contrast, the funnel \"Meetings Booked\" metric `getTotalMeetingBookedForDateRange` (~line 2148) was already updated (see ENG-9538) to prefer the canonical `scheduling_external_booking` (status='scheduled', not deleted, active campaign) and fall back to the legacy webhook events. So within the SAME dashboard the two \"booked\" metrics diverge.\n* Production read-only DB (all-time, joined to active campaigns):\n  * Name 7 (org `<uuid>`): canonical scheduled bookings = 65; legacy webhook (widget source) = 36.\n  * Company Three (org `<uuid>`): canonical scheduled bookings = 63; legacy webhook (widget source) = 34.\n* Recent activity (last 40 days): both orgs have 62 / 61 new `scheduling_external_booking` (status=scheduled) rows tied to active campaigns, but ZERO new `lead_meeting_booked` webhook events. Latest `lead_meeting_booked` events are 2026-04-26 (Name 7) and 2026-05-12 (Company Three). So for any recent date range the widget returns 0 while bookings continue.\n* Pattern holds across all of this owner's 13 workspaces: recent bookings land in `scheduling_external_booking`, none in `outreach_webhook_event`. The two most active client workspaces (Name 7, Company Three) match the customer's \"two active client workspaces\" report.\n* AI SDR inbox \"Meeting Booked\" is driven by lead status (`outreach_campaign_lead` status = 'meeting_booked') — a third source — which is why the customer sees bookings there but not on the widget.\n\nPOTENTIAL FIX:\n\n* Update `getFilteredBookedCallsCount` (the `bookedCalls` widget metric) to use the same canonical `scheduling_external_booking` source (with legacy `outreach_webhook_event` fallback) that `getTotalMeetingBookedForDateRange` already uses, so the \"Booked Calls\" widget and the funnel \"Meetings Booked\" agree and reflect real calendar bookings.\n* Consider consolidating all \"booked\" metrics onto one canonical definition to prevent further divergence (related to ENG-9576, which documents multiple unreconciled \"booked\" sources).\n\nWHATS NEEDED TO RESOLVE:\n\n* Confirm intended definition of the dashboard \"Booked Calls\" widget (real calendar bookings vs legacy webhook tag).\n* Point the widget metric at the canonical source, add regression coverage, and verify the affected workspaces show the expected recent counts.\n\nRELATED:\n\n* ENG-9538 (Done) — \"Dashboard booked calls not reflecting scheduled meetings\" (same symptom, same agency Company Two / <email>); its fix covered the funnel metric but not this widget.\n* ENG-9576 (Triage) — documents multiple unreconciled \"booked meetings\" data sources.\n\nINTERCOM: <url:app.intercom.com>\nSLACK THREAD: <url:acquisityworkspace.slack.com>\nDEVIN SESSION: <url>"
+    },
+    {
+      "id": "ENG-5740",
+      "createdAt": "2026-02-20T15:58:36.788Z",
+      "title": "Dashboard overreports calls booked count",
+      "state": "Done",
+      "assignee": "Anthony Adewale",
+      "parent": "ENG-6037",
+      "labels": ["Bug", "Dashboard Metrics"],
+      "description": "user: <email>\n\nDashboard shows 12 calls booked, but only 2 calls are actually booked.\n\nAI SDR Inbox filter “Meeting Booked” shows 2 items, matching the connected calendar. Only one calendar is connected (no additional calendars/workspaces)."
+    },
+    {
+      "id": "ENG-6037",
+      "createdAt": "2026-02-28T09:35:09.455Z",
+      "title": "Investigate dashboard metrics inaccuracies",
+      "state": "Canceled",
+      "assignee": "Anthony Adewale",
+      "parent": null,
+      "labels": ["Bug", "Dashboard Metrics"],
+      "description": "Check all linked subissues and investigate their cases one by one. Use Axiom logs MCP, database readonly and access to the codebase to find what the root cause was in each case and if / how they overlap.\n\n<!-- preview-url-start -->\n**Preview:** <url:1772297700-aiacquisition.vercel.app> — PR #2792\n<!-- preview-url-end -->"
+    },
+    {
+      "id": "ENG-15017",
+      "createdAt": "2026-10-09T02:25:46.523Z",
+      "title": "Speed up two dashboard queries that read whole workspaces",
+      "state": "In Progress",
+      "assignee": "James Keeble",
+      "parent": null,
+      "labels": [],
+      "description": "## Overview\n\nMake two dashboard queries cheaper, so the primary database spends less time on work nobody is waiting for. The goal is lower database load, which keeps the CRM, Conversations and webhooks responsive. Both queries run on every Operating System dashboard load, and each reads every matching row in the workspace instead of a small slice. That's from PlanetScale Insights for the 24 hours to 5:05 am Name 8 on 9 Oct 2026.\n\n## Problem\n\n* **Booked-meeting check.** When a workspace has no bookings in the period, the dashboard checks whether it has ever had a booked-meeting webhook. It counts every one instead of stopping at the first, and it runs twice per load, once for each period. It read 67,256 rows per call over 2,903 calls, which was 1.47% of primary time.\n* **AI SDR thread counts.** The dashboard counts threads by lifecycle and by AI SDR status for the chosen dates. No index covers the workspace plus the creation date, so each call reads every thread in the workspace. Each query read 26,714 rows per call over 2,431 calls, about 0.65% of primary time each. For the biggest workspace, 848,280 threads are read when only 49,200 fall in the last 30 days (read-only count, 9 Oct 2026).\n\n## How it works\n\nThe two dashboard queries today and after this change:\n\n```mermaid\nflowchart TD\n  A[Dashboard load] --> B[Booked-meeting check]\n  A --> C[Thread counts]\n  B --> D[CHANGED: stop at first match, once per load]\n  C --> E[NEW: index on workspace and date]\n```\n\nThe check now stops at its first match and runs once per load, and a small index covers only booked-meeting events. The thread counts read only the threads in the chosen dates.\n\n## What's included\n\n* Change the booked-meeting check to stop at the first match, run it once per dashboard load, and add a small index that covers only booked-meeting events.\n* Add an index on threads by workspace and creation date.\n* Keep every number the dashboard shows exactly the same, with tests that compare old and new results.\n\n## How it should work\n\n* The dashboard shows the same values as before.\n\n## Who can do what\n\nNo permissions change.\n\n## Out of scope\n\n* The stuck CRM last-date job, now its own PR: <issue id=\"<uuid>\" href=\"ENG-14883\">ENG-14883</issue>.\n* Dropping unused indexes: <issue id=\"<uuid>\" href=\"ENG-15015\">ENG-15015</issue>.\n* The leads table stats recount: <issue id=\"<uuid>\" href=\"ENG-15002\">ENG-15002</issue>.\n\n## Name 9 and rollback\n\nRelease: the PR merges at night in Name 8, after a real approval and green checks, because the release builds two indexes online.\n\nRollback: revert the PR for the query change, and drop either new index through a follow-up migration.\n\n## Done when\n\n* The dashboard returns the same values as before for the same workspace and dates. How to check: tests that run the old and new queries on the same seeded data.\n* After release, the booked-meeting check and both thread counts read far fewer rows per call in PlanetScale Insights over 24 hours than the numbers above.\n\n## Implementation context\n\n* Evidence: round 3 review, 9 Oct 2026. The queries are fingerprints e9229c2b, 73a4fa44 and 45d32acb.\n* The leads page query from the same review (1325c76f) was the lead-status cutover script, which has finished. The CRM last-date query (3ba34edb) was the stuck job in <issue id=\"<uuid>\" href=\"ENG-14883\">ENG-14883</issue>. James decided on 9 Oct to leave the read-only login's query limit as it is."
+    },
+    {
+      "id": "ENG-5706",
+      "createdAt": "2026-02-19T17:28:41.091Z",
+      "title": "Dashboard shows 6 booked calls but calendar shows 1",
+      "state": "Done",
+      "assignee": "Anthony Adewale",
+      "parent": "ENG-6037",
+      "labels": ["Bug", "Dashboard Metrics"],
+      "description": "user: <email>\n\nA workspace reports the dashboard showing 6 booked calls, while only 1 meeting exists on the connected calendar.\n\nThe AI SDR reportedly confirmed it would send a calendar invite at a proposed time, but the invite did not appear on the calendar.\n\nLoom: video"
+    },
+    {
+      "id": "ENG-5716",
+      "createdAt": "2026-02-19T21:20:33.911Z",
+      "title": "Dashboard shows incorrect booked calls count",
+      "state": "Done",
+      "assignee": "Anthony Adewale",
+      "parent": "ENG-6037",
+      "labels": ["Dashboard Metrics"],
+      "description": "user: <email>\n\nworkspace: Company Five Workspace\n\nA customer reports a dashboard reporting mismatch: the dashboard shows 6 booked calls for a cold email client, but there has only been 1 booked call on the calendar. The campaign was launched on Monday.\n\nNeed the workspace or client name to investigate the dashboard metric counting logic (possible historical/duplicate events or data pulled from multiple campaigns)."
+    },
+    {
+      "id": "ENG-9576",
+      "createdAt": "2026-06-01T22:17:27.511Z",
+      "title": "Booked meetings mismatch: campaign reports 24 vs dashboard reports 5 (all time)",
+      "state": "unknown",
+      "assignee": "Anuj Bhatt",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "## Summary\n\nThere is a large discrepancy between the **booked meetings** count shown on the **campaign** view and the **booked meetings** count shown on the **dashboard** for the same workspace, filtered to **All Time** on both screens.\n\n* **Campaign view (\"Booked Calls\")**: **24**\n* **Dashboard (\"Meetings Booked\", All Time)**: **5** (now 7 — the count grew as new real meetings were booked during investigation)\n\nThe two numbers do not reconcile because the campaign metric and the dashboard metric are derived from **completely different data sources** with different definitions of \"meeting booked\". This is confusing for customers — the same labelled metric shows wildly different values depending on the screen.\n\n## Affected workspace\n\n* **Workspace:** Name 10's Workspace\n* **Workspace slug:** `<workspace-slug>`\n* **Organization ID:** `<uuid>`\n* **Owner / user email:** `<email>`\n* **Campaign:** \"Name 12 | Renewable Energy | US | 1-50 employees (AIA created)\\*\" (`<uuid>`, active)\n\n---\n\n## Analysis\n\n### 1\\. Dashboard \"Meetings Booked (All Time)\" = 5 → counts real calendar bookings\n\nSource: `getTotalMeetingBookedForDateRange` in `apps/web/lib/analytics/operating-system.ts` (\\~line 1904).\n\nIt counts canonical rows in `scheduling_external_booking` where `status = 'scheduled'`, not soft-deleted, **inner-joined to an active campaign**. These are *actual calendar meetings* (Calendly / Name 11 Calendar sync), de-duped per booking.\n\nThis workspace currently has **7** such bookings. **Exactly 5 existed at the time the discrepancy was reported** — the 6th and 7th bookings were created later the same day (created_at `2026-06-01 18:46` and `19:49` UTC; the first 5 were all created on/before `2026-06-01 15:27`). So \"5\" was the correct count of *real scheduled meetings* at that moment.\n\n### 2\\. Campaign \"Booked Calls\" = 24 → counts Company One interest-status \"Meeting Booked\" tags\n\nSource: `campaignMetrics.totalMeetingBooked` (`apps/web/components/campaigns/detail/tabs/analytics/campaign-metrics-grid.tsx:46`), backed by `outreach_campaign_overview.total_meeting_booked`.\n\nThat column is set as `Math.max(instantlyMeetingBooked, crmBookedCount)` in `apps/web/lib/outreach/db/campaign.ts` (\\~line 7826).\n\nConfirmed in DB for this campaign:\n\n* Company One overview API reported `total_meeting_booked = 24` (`metadata.overviewData.total_meeting_booked = 24`, source `instantly-overview-api`)\n* CRM booked threads (`crm_message_thread` lifecycle in `booked`/`completed`) = 23\n* `max(24, 23) = 24`\n\nThis counts **leads whose Company One interest-status = \"Meeting Booked\"** (a tag set in Company One / by the SDR), **not** actual calendar events.\n\n### 3\\. \"Meetings booked\" has at least 5 unreconciled values for this org\n\n| Source | Count | Used by |\n| -- | -- | -- |\n| Real calendar bookings — `scheduling_external_booking` (status=scheduled) | 7 (was 5) | **Dashboard** |\n| Company One interest-status \"meeting booked\" (overview API) | 24 | **Campaign card** |\n| CRM threads in `booked`/`completed` lifecycle | 23 | feeds campaign `max()` |\n| `lead_meeting_booked` webhook events | 30 | admin metrics |\n| Leads with `status = meeting_booked` | 8 | leads table |\n\n### Root cause\n\nThe campaign \"Booked Calls\" (24) reflects leads *tagged* as meeting-booked in Company One (generous / inflated — Company One's interest status is set well before, or independent of, an actual calendar booking), while the dashboard (5) reflects *actual scheduled calendar meetings*. Same label, different definition and different table — so they will rarely agree.\n\n### Suggested fix (for triage discussion)\n\n1. **Preferred:** make the campaign \"Booked Calls\" metric use the canonical `scheduling_external_booking` source so the campaign and dashboard agree, OR\n2. Relabel the two metrics to make the distinction explicit (e.g. \"Interested — Meeting Booked\" for the Company One tag count vs \"Meetings Scheduled\" for real calendar bookings).\n\n---\n\n*Reported via internal investigation. DB figures pulled from production read-only replica.*"
+    },
+    {
+      "id": "ENG-6608",
+      "createdAt": "2026-03-11T12:45:52.081Z",
+      "title": "Dashboard shows booked call with no inbox evidence",
+      "state": "Canceled",
+      "assignee": "Tyler Olsen",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "<email>\n\nIn the \"Name 13 Client Workpace\" workspace, the dashboard shows one booked call, but there is no corresponding evidence in the AI SDR inbox or calendar. Access to AI SDR and Cold Email Agent was initially slow, but that improved in Chrome; the remaining issue is the discrepancy between the positive reply and the reported booking."
+    },
+    {
+      "id": "ENG-5705",
+      "createdAt": "2026-02-19T17:23:31.489Z",
+      "title": "Dashboard and Cold Email Agent show incorrect booked calls",
+      "state": "Done",
+      "assignee": "Anthony Adewale",
+      "parent": null,
+      "labels": ["Bug", "Dashboard Metrics"],
+      "description": "user: <email>\n\nDashboard and Cold Email Agent analytics show 13 booked calls for the month, but the combined total across two campaigns is reported as 3.\n\nCampaigns mentioned:\n\n* SaaS | Leadership | US | Name 14 (launched)\n* High-Growth B2B SaaS Companies | High‑growth B2B SaaS companies (1‑30 employees) (paused but still receiving replies)"
+    },
+    {
+      "id": "ENG-5720",
+      "createdAt": "2026-02-19T22:12:51.877Z",
+      "title": "Booked calls count shows 6 when only 1 booked",
+      "state": "Duplicate",
+      "assignee": "Anthony Adewale",
+      "parent": null,
+      "labels": ["Dashboard Metrics"],
+      "description": "Reported discrepancy: UI shows 6 booked calls, but there is actually 1 booked call.\n\nVideo: awesomescreenshot recording\n\nIssue was also shown to Name 15 during a drop-in session."
+    },
+    {
+      "id": "ENG-5539",
+      "createdAt": "2026-02-13T23:43:19.570Z",
+      "title": "Dashboard shows 6 booked calls but only 1 exists",
+      "state": "Canceled",
+      "assignee": "Koppany Kondricz",
+      "parent": "ENG-5835",
+      "labels": ["Bug"],
+      "description": "user: <email>\n\nBooked calls count appears inconsistent: dashboard shows 6 booked calls, but AI SDR shows only 1 booked call.\n\nExpected: booked calls count matches between dashboard and AI SDR.\n\n <image> \n\n <image> "
+    },
+    {
+      "id": "ENG-11080",
+      "createdAt": "2026-07-02T13:46:15.397Z",
+      "title": "Booked Meetings: count real bookings, not tags (kill the Math.max)",
+      "state": "Done",
+      "assignee": "Mahmut Jomaa",
+      "parent": "ENG-10978",
+      "labels": [],
+      "description": "Part of ENG-10978 (metrics rework). Lands in Phase 3. Full definition in the glossary doc on the master.\n\n## The problem, simply\n\nThe \"Booked Calls\" number on the Cold Email Agent page is inflated. One real client sees **72 booked when only 13 real meetings exist**. Clients compare that to their calendar, realize it can't be true, and stop trusting the product.\n\n## Why it's wrong\n\nToday's number is a patch from May: take Company One's count and our CRM's count and show whichever is **bigger** (a literal `Math.max`). Both inputs count leads that got *tagged* interested/booked, which happens before any real meeting exists. It also can't be filtered by date.\n\n## The new definition (already validated in production)\n\nA meeting counts when a conversation **actually reached \"booked\"** (or \"completed\", because users often skip marking booked and just mark the meeting done). We read this from each CRM thread's history, count each thread once, and date it by when it happened. That means:\n\n* Filterable by any date range.\n* A no-show that rebooks counts once, not twice.\n* A later cancellation never erases the fact the AI booked the meeting.\n\nProduction check: 1,552 real booked events in one week, vs 0 on the dead column the dashboard chart used, and ~1,440 if you naively count current status (which drifts).\n\n## Also in this ticket\n\nStore a `booked_at` timestamp on the thread (backfilled from history) so this is fast to query, and log whenever Company One's number disagrees with ours instead of hiding it (feeds drift alerting, ENG-10069)."
+    },
+    {
+      "id": "ENG-12407",
+      "createdAt": "2026-08-07T17:04:32.532Z",
+      "title": "Dashboard report discrepency",
+      "state": "Canceled",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [],
+      "description": "#### Customer Name\n\nName 16\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 16 workspace\n\n#### Screenshot\n\n#### What are you trying to achieve?\n\nGet the dashboard reporting to accurately reflect the campaign data\n\n#### What are you doing to achieve it?\n\nfiling a ticket\n\n#### What is happening instead?\n\nthe dashboard reporting is vastly different and the client raised it as a concern to be looked at\n\n#### What is the expected outcome?\n\nthe dashboard is accurate"
+    },
+    {
+      "id": "ENG-5700",
+      "createdAt": "2026-02-19T15:42:01.649Z",
+      "title": "Dashboard booked calls metric does not match actual calls",
+      "state": "Done",
+      "assignee": "Jared Stauffer",
+      "parent": "ENG-6037",
+      "labels": ["Bug", "Dashboard Metrics"],
+      "description": "#### Customer Name\n\nName 17\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 17's workspace\n\n#### Screenshot\n\n <image> \n\n#### What are you trying to achieve?\n\nAccurate reporting of booked calls on the dashboard that matches the actual number of calls on the calendar and in the CRM pipeline.\n\n#### What are you doing to achieve it?\n\nRunning AI SDR-led cold email campaigns, allowing the system to auto-book calls and update deal stages, then checking the “booked calls” metric on the main dashboard.\n\n#### What is happening instead?\n\nThe main dashboard shows 12 booked calls even though there is only 1 real booked call in the calendar/pipeline, so the booked-calls metric is clearly incorrect while the underlying bookings are accurate.\n\n#### What is the expected outcome?\n\nThe “booked calls” count on the dashboard should exactly match the number of real booked calls in the CRM/pipeline and calendar, updating correctly as calls are added, canceled, or moved."
+    },
+    {
+      "id": "ENG-6862",
+      "createdAt": "2026-03-19T12:50:21.345Z",
+      "title": "Fix: Admin Dashboard Booked Call Rate metric is inaccurate with time filters",
+      "state": "Done",
+      "assignee": "Anthony Adewale",
+      "parent": null,
+      "labels": [],
+      "description": "## Problem\n\nThe **Booked Call Rate** metric on the admin dashboard displays **62.53%** when filtered for \"Last 30 Days\", which is significantly inflated. The actual rate for the last 30 days is **\\~29.5%**.\n\n### Root Cause\n\nThe numerator and denominator in the booked call rate calculation are filtered by **different date semantics**:\n\n1. **Positive replies (denominator)** — Sourced from `outreachCampaignOverview.totalOpportunities`, filtered by `outreachCampaignTable.createdAt` (campaign creation date). This sums **all-time** opportunities, but only for campaigns **created** within the selected time window.\n2. **Meetings booked (numerator)** — Sourced from `outreachWebhookEventTable` where `eventType = 'lead_meeting_booked'`, filtered by `outreachWebhookEventTable.createdAt` (event timestamp). This counts meetings actually **booked** in the time window, across **all** campaigns (including older ones not in the denominator).\n\nThis mismatch inflates the rate because meetings from older campaigns are counted in the numerator but their positive replies aren't in the denominator.\n\n## Fix\n\nWhen a date range is selected (Last 7/14/30/90 Days), the `getMetrics()` method now delegates to a new `getMetricsFromDailyTable()` method that:\n\n* Uses `outreachCampaignMetricsTable` (daily-bucketed data) for emails sent, replies, and positive replies — all filtered by the same `date` column\n* Uses `outreachWebhookEventTable` for meetings booked — filtered by `createdAt` with the same date boundaries (normalized to start-of-day / end-of-day UTC)\n* Applies all campaign-level filters (org, status, display status, setup filters, campaign origin, etc.) consistently to both queries via LEFT JOINs\n\nFor **\"All Time\"** (no date range), the original behavior using `outreachCampaignOverview` is preserved since cumulative totals are accurate when there's no time window.\n\nAdditionally, a **\"Last 2 Weeks\" (14 days)** filter option was added to the frontend time range selector.\n\n### Key technical details\n\n* The `meetings_scheduled` column in `outreachCampaignMetricsTable` is always 0 (never populated by the sync pipeline), so meetings must come from webhook events\n* Date boundaries are normalized: `startDate` → 00:00:00.000 UTC, `endDate` → 23:59:59.999 UTC to match `buildConditions()` date-only string normalization\n* All campaign-level filters from `buildConditions()` are replicated in the meetings query via LEFT JOINs from `outreachWebhookEventTable` → `outreachCampaignLeadTable` → `outreachCampaignTable`\n\n### Production data verification\n\n| Filter | Positive Replies | Meetings | Booked Call Rate |\n| -- | -- | -- | -- |\n| **All Time** | 112,659 | 13,964 | **12.4%** |\n| **Last 30 Days** | 21,173 | 6,241 | **\\~29.5%** |\n\n## Preview Deployment Note\n\nThe preview deployment at <url:fix-admin-dashboard-booked-rate-aiacquisition.vercel.app> shows **0 booked meetings** — this is expected and **not a bug**. The preview database bootstrap script (`scripts/dump-preview-data.sh`) does not include the `outreach_webhook_event` table (which stores meeting booking events). The original code on `main` would also show 0 meetings on this preview DB.\n\nThe preview DB only contains a subset of production data:\n\n* `outreach_campaign_overview` ✅ (campaign summaries — this is why emails/replies/opportunities show correctly)\n* `outreach_webhook_event` ❌ (not bootstrapped — this is why meetings = 0)\n\nOnce merged and deployed to production, the metrics will be accurate because production has the full `outreach_webhook_event` table with 13,964+ meeting records.\n\n## PR\n\n<url:github.com>\n\n## Preview Deployment\n\n<url:fix-admin-dashboard-booked-rate-aiacquisition.vercel.app>"
+    },
+    {
+      "id": "ENG-9084",
+      "createdAt": "2026-05-21T10:05:23.984Z",
+      "title": "Dashboard shows incorrect booked call count",
+      "state": "Canceled",
+      "assignee": "Jared Stauffer",
+      "parent": null,
+      "labels": [],
+      "description": "#### Customer Name\n\nName 4\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 4's Workspace\n\n#### Screenshot\n\n#### What are you trying to achieve?\n\nAccurate tracking of booked-call count. currently shows 1 when 5 have been booked\n\n#### What are you doing to achieve it?\n\nI inspected the clients workspace\n\n#### What is happening instead?\n\nThe dashboard shows 1 instead of 5\n\n#### What is the expected outcome?\n\nThe dashboard should show the correct number of booked calls (5)"
+    }
+  ]
+}

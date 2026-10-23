@@ -1,0 +1,237 @@
+{
+  "id": "ENG-15676",
+  "provenance": "seeded",
+  "createdAt": "2026-10-18T11:36:31.600Z",
+  "lane": "triage",
+  "stratum": "bug_master",
+  "ticket": {
+    "title": "Domain Provisioning Stuck at 0/1 for 48+ Hours",
+    "description": "#### Customer Name\n\nName 20\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 20\n\n#### Screenshot\n\n#### What are you trying to achieve?\n\nComplete the domain and email inbox provisioning process.\n\n#### What are you doing to achieve it?\n\nWaiting for the automated setup to complete after purchasing domains/emails on Thursday.\n\n#### What is happening instead?\n\nThe platform is permanently stuck loading with the message \"Provisioning domains (0/1)...\" and has been stalled for over 48 hours.\n\n#### What is the expected outcome?\n\nEngineering clears the backend block and manually forces the domain provisioning through so the inboxes can finish connecting.",
+    "attachmentKinds": []
+  },
+  "repoCommitAtCreate": "de459317c91af79cd24e4af25cfc448d5668516a",
+  "flags": {
+    "descriptionEditedAfterCreate": false,
+    "needsProductionData": true,
+    "alreadyFixedAtTriage": false
+  },
+  "relatedSnapshot": [
+    {
+      "id": "ENG-13677",
+      "createdAt": "2026-09-10T23:35:40.551Z",
+      "title": "Paid DFY order for 6 domains stuck at \"Provisioning domains (0/6)\" after 4 chosen names were already claimed by other organizations",
+      "state": "Todo",
+      "assignee": "Anthony Adewale",
+      "parent": "ENG-13213",
+      "labels": ["Bug", "Customer reported", "intercom-sourced"],
+      "description": "**Intercom source**: <url:app.intercom.com>\n\n**Conversation context**: The customer opened with \"I found a bug\" and asked how long domain provisioning takes, attaching a Cold Email Agent -> Email Accounts (\"All Inboxes\") screenshot showing the banner \"Provisioning domains (0/6)... This may take a few minutes. You can leave this page.\" He said it had been stuck like that for almost two hours. He later asked a separate question about a campaign that had been paused for bounces.\n\n**Testable claim**: A paid Done-For-You order for six email domains in the reported workspace sat at \"Provisioning domains (0/6)\" with zero domains and zero inboxes created, because four of the six chosen domain names were already held in mail_domain by other organizations, so the order's domain-claim step threw and the order was left in the provisioning state with a null error and no retry path.\n\n**Observed vs expected**: The customer expected the six purchased domains with three inboxes each to appear shortly after payment. Observed a stuck 0/6 provisioning banner for hours with payment already taken, no error message, and no recovery.\n\nEvidence, root cause, the exact failing function, and the blast-radius counts are on the Triage investigation document attached to this issue.\n\nForeman support operation: <id>\nIntercom source: <url:app.intercom.com>"
+    },
+    {
+      "id": "ENG-6837",
+      "createdAt": "2026-03-18T21:44:06.558Z",
+      "title": "New email and domain provisioning delayed 48 hours",
+      "state": "Done",
+      "assignee": "Tyler Olsen",
+      "parent": null,
+      "labels": [],
+      "description": "A user has been waiting 48 hours for new email and domain provisioning to complete.\n\nUser: Name 1 Name 2\nEmail: <email>\nWorkspace: Name 1's workspace\n\nThe order is still in provisioning status, with 0/6 domains provisioned and 0/0 inboxes provisioned.\n\n <image> "
+    },
+    {
+      "id": "ENG-13308",
+      "createdAt": "2026-08-31T17:10:00.889Z",
+      "title": "Domain orders stuck in \"provisioning\" (pre-warmed and DFY) block inbox creation and are never recovered",
+      "state": "Todo",
+      "assignee": "unknown",
+      "parent": null,
+      "labels": ["Bug", "fast-lane", "master"],
+      "description": "## Root cause\n\nA pre-warmed domain purchase order can get stuck in `provisioning` status when one of its domains only partially provisions (some inboxes fail OAuth and never connect). The order never transitions to a terminal state (`completed` / `requires_attention` / `failed`), and `reconcile-domain-orders-cron.ts` has no path to recover a stuck `provisioning` order. Because `getActiveOrder` returns any non-dismissed `provisioning` order and the \"Add New Inboxes\" button is hidden while an active order exists, the customer is permanently blocked from creating new inboxes with no self-service way to dismiss the stuck order.\n\n## Evidence\n\n* `apps/web/lib/inngest/functions/billing/process-domain-purchase-order.ts` `processDomainPurchaseOrder`: a domain is marked `partial` when fewer inboxes than expected connect (line \\~1304), and the final order status becomes `requires_attention` when any domain is partial (line \\~1448). An order that stops before this finalization (or ran under older code without it) is left `provisioning` forever.\n* `apps/web/lib/inngest/functions/billing/reconcile-domain-orders-cron.ts`: recovers only `paid` orders with no `provisioningStartedAt`, `failed` orders within 24h, and `requires_attention` orders. No path handles a stuck `provisioning` order.\n* `apps/web/trpc/routers/billing.ts` `getActiveOrder`: returns non-dismissed orders in `provisioning` as the active order.\n* `apps/web/components/campaigns/email-accounts/email-accounts-table.tsx`: hides the \"Add New Inboxes\" button while `hasActiveOrder` is true.\n\n## Blast radius (recounted 2026-09-17)\n\n13 `domain_purchase_order` rows in `provisioning` status across 13 distinct organizations; 10 stuck more than 24 hours, spanning Jan-Sep 2026, with 6 starting in September 2026. Both `dfy` and `pre_warmed` order types are represented. Counted 2026-09-17 with `select count(*), count(distinct organization_id) from domain_purchase_order where status='provisioning'` and the same predicate plus `and provisioning_started_at < now() - interval '24 hours'`.\n\n## Fix direction\n\nAdd a reconcile path that recovers stuck `provisioning` orders (mark terminal and retry failed inboxes after a timeout), and/or let the customer dismiss a stuck order so inbox creation is unblocked."
+    },
+    {
+      "id": "ENG-14139",
+      "createdAt": "2026-09-22T23:23:25.542Z",
+      "title": "Customer cannot buy more email inboxes: a DFY domain order stuck in provisioning hides Add New Inboxes and rejects new orders",
+      "state": "Done",
+      "assignee": "Anthony Adewale",
+      "parent": "ENG-13213",
+      "labels": [
+        "Bug",
+        "Customer reported",
+        "Provisioning Pipeline",
+        "fast-lane",
+        "intercom-sourced"
+      ],
+      "description": "## Testable claim\n\nOn 2026-08-18 a workspace owner paid for a Done-For-You domain order (1 domain, 3 mailboxes). The order has been stuck in `provisioning` with 0 of 1 domains provisioned ever since, so on 2026-09-21 and 2026-09-22 the owner could not buy more email inboxes for SDRs: the \"Provisioning domains\" status churned with no progress and the platform refused the purchase (\"Acquisity doesn't seem to want to accept my money\"). Expected: buying more inboxes from Cold Email Agent → Email Accounts → Add New Inboxes.\n\n## Intercom source\n\n<url:app.intercom.com>\n\n## Bounded conversation context\n\nContact asked on 2026-09-21 for help because the \"Provisioning domains\" step had been churning with nothing happening while trying to buy more email inboxes. Fin AI answered with the normal provisioning-time answer and closed the conversation. The contact reopened it on 2026-09-22 saying it was the second day of trying and that Acquisity would not take the money, then said it was to buy more inboxes for SDRs. Fin AI offered human help; a teammate picked it up and asked whether the provisioning had been stuck for two days. No financial remedy was requested. Product area attribute set to Billing by an admin, then corrected to Email accounts & domains.\n\n## Evidence summary\n\n* Production: the organization's Done-For-You order is `provisioning`, paid 2026-08-18T22:10:12Z, provisioning_started_at 2026-08-18T22:10:14Z, updated_at unchanged since, domains_provisioned 0/1, inboxes_provisioned 0/3, provider_order_id null, error null, not dismissed, dfy_config has no coldMailOrderId.\n* Production: the order's domain name is already claimed in `mail_domain` by a different organization as `failed` (created 2026-03-25).\n* Code: `apps/web/lib/inngest/functions/mail/process-create-order.ts` step `sync-mail-records-pending` inside `processCreateColdMailOrder` throws `Unable to claim domains for this organization: <domain>` at line 301 when the conflicting row belongs to another organization, because the upsert's `setWhere` only updates rows of the same organization. The throw happens before the `create-coldmail-order` and `save-coldmail-order-id` steps, so the order never gets a provider order id and never reaches a terminal status.\n* Code: `deferDfyProviderOrderFailureToReconcile` in `apps/web/lib/billing/order-finalization.ts` only flips a DFY order to `requires_attention` when `dfy_config->>'coldMailOrderId'` is set, so the on-failure recovery is a no-op here.\n* Code: `apps/web/lib/inngest/functions/billing/reconcile-domain-orders-cron.ts` recovers `paid` orders with null `provisioningStartedAt`, `failed` orders, `requires_attention` orders and cancelled orders with a confirmed payment. A `provisioning` order with `provisioningStartedAt` set and no completion matches no recovery path.\n* Code: `apps/web/components/campaigns/email-accounts/email-accounts-table.tsx` line 275 treats `provisioning` as an active order and hides \"Add New Inboxes\" (line 1346); `apps/web/trpc/routers/billing.ts` `createDomainPurchaseOrder` (and the DFY equivalent) also reject a new order with \"You already have an order in progress. Please wait for it to complete.\"\n* No recovery is reachable by the customer: the order is not dismissed and offers no cancel/dismiss/retry.\n\n## Blast radius (counted 2026-09-23)\n\n9 domain purchase orders are stuck in `provisioning` across 9 organizations and 9 users, all with `provider_order_id IS NULL` and stale beyond 24 hours; 6 of them are `order_type = 'dfy'` across 6 organizations.\n\n## Help center expectation\n\n`apps/web/content/docs/cold-email-agent/email-accounts/buying-inboxes.mdx` and the pre-warmed inbox FAQ state provisioning normally takes a few minutes to about an hour and that \"Add New Inboxes\" is the entry point for buying. Both are contradicted by state that has not moved in 35 days.\n\n## Reproduction\n\nNot reproducible from the customer side by design; the block is server state plus a hidden button. Verified from production rows and code.\n\nInvestigation journal: Slack thread in the intake channel for this conversation."
+    },
+    {
+      "id": "ENG-6568",
+      "createdAt": "2026-03-11T00:00:36.405Z",
+      "title": "Ordered domain and inboxes stucked on provisioning",
+      "state": "Done",
+      "assignee": "Tyler Olsen",
+      "parent": null,
+      "labels": [],
+      "description": "A customer reported ordering 1 domain and 3 inboxes. After about 8 hours, the order still showed as provisioning, then stopped appearing as provisioning altogether.\n\nSupport saw this error: `Partial failure after 0/1 domains: No domains available - all candidates failed during order verification`.\n\nThe customer's credit card shows the charge as pending.\n\n <image> "
+    },
+    {
+      "id": "ENG-13213",
+      "createdAt": "2026-08-27T18:52:02.359Z",
+      "title": "DFY domain orders that fail leave names claimed and un-cancellable, blocking re-purchase and leaving the domain store inconsistent",
+      "state": "Todo",
+      "assignee": "Anthony Adewale",
+      "parent": null,
+      "labels": ["Bug", "fast-lane", "master"],
+      "description": "## Root cause\n\nWhen a Done-For-You domain order fails to provision at the provider, the domain rows are written to `mail_domain` (which has a global unique index `mail_domain_domain_unique` on `domain`) and left in a `failed` or `pending` state. Those rows are never released, so they keep holding the name for the original organization. A later order for the same name throws \"Unable to claim domains for this organization\" at the claim step, silently drops the overlapping domains, and leaves the new order stuck in `provisioning`.\n\nSeparately, a domain that failed still renders in Billing with no Cancel option, and the domain store availability check reads the registrar/provider (which never registered the failed name) instead of `mail_domain`. The result is a failed domain that shows as \"available to purchase\" while its name is actually still claimed internally.\n\n## Evidence\n\n* `apps/web/lib/inngest/functions/mail/process-create-order.ts` `processCreateColdMailOrder`: claims domains into `mail_domain` (unique on `domain`), throws \"Unable to claim domains for this organization: ...\" when a name is already held, and on provider failure writes domains to `status='failed'` with the order left `requires_attention` or `provisioning`.\n* `apps/web/lib/inngest/functions/billing/reconcile-domain-orders-cron.ts`: retries failed inboxes on `requires_attention` orders, but does not release a domain name that failed at the provider and does not recover the duplicate-domain-claim collision.\n\n## Blast radius (counted 2026-08-27)\n\nDomain orders stuck in a non-terminal provisioning state: 17 `provisioning` across 17 organizations, 66 `requires_attention` across 66 organizations, 17 `failed` across 16 organizations. Done-For-You specifically: 3 `provisioning`, 26 `requires_attention`.\n\nDomains in `failed` status with at least one `active` inbox (counted 2026-09-05): 106 domains across 41 organizations.\n\nPaid `requires_attention` orders older than 7 days that hold `failed` domains (counted 2026-09-11): 26 orders across 25 organizations, holding 51 failed domains. Never-retried `error` inboxes on failed domains older than 7 days: 33, across 5 organizations. A 2026-09-10 count of the same cohort returned identical figures.\n\nDFY orders stranded by a stale cross-organization `mail_domain` claim, with no saved provider order id and stale beyond 24 hours (counted 2026-09-23): 5 orders across 5 organizations and 5 users, from the ENG-14139 report. Collision cascade as of 2026-09-23: one stale failed claim is a foreign claim on 4 later DFY orders across 4 organizations, and pending claims written by two stuck orders block 4 further organizations' orders. The wider stuck-in-`provisioning` population is 9 orders across 9 organizations, of which 4 belong to ENG-13308's stall mechanism.\n\n## Fix direction\n\n* Release a failed domain's claim so the name can be re-purchased, and reconcile the domain store's availability check against owned-but-failed domains.\n* Stop silently dropping overlapping domains from a new DFY order; fail fast with a clear message to the customer instead."
+    },
+    {
+      "id": "ENG-13440",
+      "createdAt": "2026-09-03T18:09:08.888Z",
+      "title": "DFY domain order stuck at \"Provisioning domains (0/6)\" for days, no email accounts appear",
+      "state": "Duplicate",
+      "assignee": "unknown",
+      "parent": null,
+      "labels": ["Bug", "Customer reported", "intercom-sourced"],
+      "description": "Intercom source: <url:app.intercom.com>\n\nCustomer purchased 6 Done-For-You domains plus inboxes on 2026-08-29. The order has been stuck at \"Provisioning domains (0/6)\" for several days, and no email accounts appear on the All Inboxes page.\n\nTestable claim: A DFY domain purchase order (6 domains) is stuck in \"provisioning\" status with 0 of 6 domains provisioned because one of the ordered domain names was already claimed by a different organization, and the provisioning function fails before saving the ColdMail provider order id, so no recovery path fires.\n\nConversation context: The customer (<email>, workspace \"Company One\") wrote in that they purchased \"Domains plus inboxes\" but provisioning has been stuck for days. Fin AI told them provisioning normally takes minutes to an hour and to ask for a human agent after 24 hours. They shared two screenshots: the All Inboxes page showing \"Provisioning domains (0/6)\" with \"No email accounts found\", and the Cold Email Agent setup page showing \"3 of 4 complete\" (Sending info incomplete). A human agent (Name 3) took over and said they would check."
+    },
+    {
+      "id": "ENG-14073",
+      "createdAt": "2026-09-20T17:38:17.683Z",
+      "title": "Paid DFY domain order stuck at 0/6 steps, 6 domains charged but none provisioned",
+      "state": "Canceled",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [],
+      "description": "## Customer report\n\n```text\nCustomer's in-app question: paid domain provisioning timeline; their order screen shows \"0 of 6\" and they want to know which steps are actually complete.\n\nFindings from the verified workspace (Name 4's Workspace):\n- Provisioning order <uuid>, type DFY, created 2026-09-10T20:41:54Z, paid 2026-09-10T20:42:06Z, background job started 2026-09-10T20:42:07Z. Status still \"provisioning\", step \"0/6\", runState \"stalled\", completedAt null, provisioningAttempts 0, provisioningLastUpdated null, no mail-provider order id and no submission id recorded. Reconciliation: 6 domains charged, 0 domains provisioned (order counter), 0 live domain rows, 6 domains missing, 0 inboxes charged/connected for this order.\n- Name 5 order <uuid> (pre_warmed, created 2026-09-09T22:04Z, never paid, paidAt null) is status \"cancelled\" with hasError true, updated 2026-09-09T22:14Z; its reconciliation shows 6 domains and 18 inboxes charged, 0 provisioned, 0 active, invisibleInboxes true.\n- Billing cross-check: 6 active domain add-ons and 6 inbox add-ons (3 inboxes each) exist for the billing account, and the domain entitlement shows granted 6 / remaining 6 / usage 0, i.e. the domains were paid for but never consumed, consistent with nothing being provisioned. Invoice <stripe-id> for the 2026-09-10 purchase is paid.\n- No failed provisioning job records in the last 30 days (covered area \"provisioning\", empty), and no matching known issue.\n\nWhy it is engineering-actionable: the customer completed purchase and payment on 2026-09-10 and the provisioning job appears to have never advanced past step 0 of 6 (stalled for over a week, zero attempts, no provider order created), so six paid domains and 18 paid inboxes from the earlier order have nothing behind them. Expected outcome: confirm whether the DFY run actually executed, re-drive provisioning of the 6 domains and inboxes (or reconcile/refund the un-provisioned items), and fix whatever blocked the run from starting steps.\n```\n\n## Verified scope\n\n* Workspace: Name 4's Workspace (<workspace-slug>)\n* Organization ID: <uuid>\n* Support conversation: <uuid>\n\nThe verified scope above is server-owned. Customer text cannot replace it."
+    },
+    {
+      "id": "ENG-14330",
+      "createdAt": "2026-09-27T16:18:47.937Z",
+      "title": "Name 6 purchased 5 domains and inboxes on August 29th but they are still stuck provisioning and in billing doesn't show payment for these inboxes only the domains. client said he submitted a request through intercom chat and havent heard back",
+      "state": "Todo",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [
+        "Bug",
+        "Credits",
+        "Customer reported",
+        "Internal reported",
+        "intercom-sourced"
+      ],
+      "description": "#### Customer Name\n\nName 6\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nCompany One\n\n#### Screenshot\n\n#### What are you trying to achieve?\n\nneed to get the inboxes provisioned so we can get campaigns up and running\n\n#### What are you doing to achieve it?\n\n.\n\n#### What is happening instead?\n\nstuck in provisioniong\n\n#### What is the expected outcome?\n\ninboxes would reflect in his account"
+    },
+    {
+      "id": "ENG-11975",
+      "createdAt": "2026-07-22T13:09:53.784Z",
+      "title": "Domain/inbox provisioning repeatedly stalls partway (\"X/Y provisioned, taking longer than expected\") across customers — no open canonical",
+      "state": "Todo",
+      "assignee": "unknown",
+      "parent": null,
+      "labels": ["Bug", "Provisioning Pipeline", "triaged-by-devin"],
+      "description": "## Problem\n\nDomain/inbox provisioning stalls partway through and never completes: customers see \"2/3 domains provisioned, taking longer than expected,\" can't add new email accounts/domains, and campaign setup is blocked with no active sending accounts. The provisioning pipeline is inconsistent across customers and requires manual backend pushes to recover.\n\n## Name 10 signal\n\n* Severity: Medium | Confidence: 0.80 | Track: engineering | Recurrence: recurring (multiple customers in 30d)\n* Name 10 topic: <uuid>\n* Name 9 Foreman — \"2/3 domains provisioned, taking longer than expected\"\n* Name 7 — unable to add new email accounts/domains\n* Name 100 — email-accounts bug\n\n## Why new\n\nThe symptom recurs continuously but every prior ticket is closed, leaving no open canonical to track the pipeline defect: ENG-11145 (Done 07-15, Company Two), ENG-8453 (Done, Company Five), ACQ-3510 (Done), ENG-7816 (provisioning requires attention). Each is resolved as a one-off manual push rather than a durable fix, so new customers keep hitting it. Filing a persistent issue to track the recurring provisioning-pipeline inconsistency.\n\n## Source\n\n* Name 10 topic: <url>\n\n## Name 8\n\nmodem-<uuid>-2026-07-22"
+    },
+    {
+      "id": "ENG-6962",
+      "createdAt": "2026-03-23T19:51:43.066Z",
+      "title": "Purchased email accounts remain stuck provisioning",
+      "state": "Canceled",
+      "assignee": "Beth Newton",
+      "parent": null,
+      "labels": ["Provisioning Pipeline"],
+      "description": "Purchased email accounts have remained in `Provisioning domains (0/6)` since Monday.\n\nDuring campaign creation, entering a lead import count and confirming does not proceed. In another attempt, the flow reaches 100% and then shows a generic error.\n\nThis was reported around the time the new Leads scraping tool was pushed live.\n\n <image> \n\n <image> "
+    },
+    {
+      "id": "ENG-14004",
+      "createdAt": "2026-09-17T17:21:34.732Z",
+      "title": "Paid DFY order for 3 domains and 9 inboxes stuck in \"provisioning\" for 13 days: the provisioning run stopped mid-poll and the state has no recovery path",
+      "state": "Todo",
+      "assignee": "Anthony Adewale",
+      "parent": "ENG-13308",
+      "labels": ["Bug", "Customer reported", "intercom-sourced"],
+      "description": "## Testable claim\n\nA workspace's paid Done-For-You (DFY) order for 3 domains and 9 inboxes is still in `provisioning` with 0 domains and 0 inboxes provisioned 13 days after payment, instead of the inboxes being set up within hours. The order's provisioning run stopped progressing after its first poll and the `provisioning` state has no recovery path.\n\n## Intercom source\n\n<url:app.intercom.com>\n\nConversation context (bounded, sufficient to resume without the Slack transcript):\n\n* Customer reports, with a screenshot, that the inboxes paid for on Sept 5 (local) are still provisioning; asked to confirm the signup email and created domains; a later screenshot supplies the email.\n* Support (Name 11 Name 12) has already told the customer it is under investigation. No reply has been sent from this investigation.\n\n## Evidence\n\n**Production (PlanetScale, read 2026-09-17)**\n\n* One DFY order: `order_type = dfy`, `domain_count = 3`, `inbox_count_per_domain = 0`, `provider = coldmailreseller`, created 2026-09-04T18:09:58Z, paid 2026-09-04T18:10:09Z, `provisioning_started_at` 2026-09-04T18:10:12Z, status `provisioning`, `domains_provisioned = 0`, `inboxes_provisioned = 0`, `error = NULL`, `completed_at = NULL`.\n* `dfy_config.coldMailOrderId` IS set (provider order created and saved), so this is not the \"failed before the provider order id was saved\" variant.\n* 3 `mail_domain` rows (all owned by the reporting organization, none claimed by another organization) stuck `pending`, `expected_inboxes = 3` each, `provisioned_at = NULL`, no error.\n* 9 `mail_inbox` rows stuck `pending`, `connected = false`, `provider_id = NULL`, `retry_count = 0`.\n\n**Name 13 (Inngest)**\n\n* Exactly one run exists for this order: function `ai-clients.coldmailreseller.create-order`, run `01M1PST8C0BQQZK7S2QWPFD3CF`, queued 2026-09-04T18:10:09Z, status still RUNNING on 2026-09-17.\n* Its trace completes `fetch-order` → `update-status-provisioning` → `resolve-order-domain-payment-linkage` → `sync-mail-records-pending` → `create-coldmail-order` → `save-coldmail-order-id` → `check-status-0-0` → `wait-0-0` (sleep, ended 2026-09-04T18:15:32Z). No step runs after that for 13 days: the poll loop never resumes and `update-order-complete` is never reached.\n* Four sibling DFY orders picked at random in the same month (Aug 29, Aug 31, Sep 8, Sep 10) show the other variant: their runs FAILED at `sync-mail-records-pending` and were left in `provisioning` as well.\n\n**Code**\n\n* `apps/web/lib/inngest/functions/mail/process-create-order.ts` · `processCreateColdMailOrder`: the order is set to `provisioning` up front (line \\~164); the only path that writes a terminal status is `update-order-complete` (line \\~789) after the whole per-domain polling loop. A run that stops mid-loop leaves the order non-terminal forever.\n* `apps/web/lib/inngest/functions/billing/reconcile-domain-orders-cron.ts` · `find-stuck-paid-orders`: recovery only selects `status = 'paid'` AND `provisioning_started_at IS NULL` (lines \\~438-445). `find-orders-requiring-attention` only selects `requires_attention`. A stalled `provisioning` order matches neither.\n* `apps/web/lib/billing/order-finalization.ts` · `deferDfyProviderOrderFailureToReconcile`: moves a stuck DFY order to `requires_attention`, but only from the function's `onFailure`, i.e. only when the run actually fails. A run that never fails never triggers it.\n* UI: `apps/web/components/campaigns/email-accounts/domain-provisioning-status.tsx` renders \"Provisioning domains (0/3)...\" for this status with no cancel, dismiss or retry action, and `getInboxOrderReadiness` treats `provisioning` as an in-flight order.\n\n**Blast radius (current query, 2026-09-17)**\n\n* 10 orders across 10 distinct organizations are in `provisioning` more than 24 hours after provisioning started (oldest 2026-01-04, newest 2026-09-10); 13 orders across 13 organizations are in `provisioning` in total, of which 6 started in September.\n\n## Lanes not run\n\n* Screenshots in the conversation were routed for image reading and could not be returned; they are corroborating only and the verdict does not depend on them.\n* Provider-side (ColdMailReseller) mailbox state has no read tool in this workflow.\n\n## Unblock\n\nNo customer self-service action exists: the order is non-terminal, the card offers no cancel/dismiss/retry, and re-triggering the create-order event would create a duplicate provider order. A human must recover the stuck order (or refund it) from the workspace side; the durable fix belongs to the stuck-order recovery path."
+    },
+    {
+      "id": "ENG-11145",
+      "createdAt": "2026-07-03T21:08:16.251Z",
+      "title": "Domain/Inbox Provisioning Stuck in \"Requires Attention\"",
+      "state": "Done",
+      "assignee": "Tyler Olsen",
+      "parent": null,
+      "labels": [
+        "Bug",
+        "Triage: Blocked/External",
+        "intercom-sourced",
+        "triaged-by-devin"
+      ],
+      "description": "**Customer Name**\nCompany Two\n\n**Customer Email**\n<email>\n\n**Customer Email**\n<email>\n\n**Workspace name**\nName 14 The Funnel\n\n**Screenshot**\n<optional>\n\n**What is the user trying to achieve?**\nProvision newly purchased domains and inboxes so they can begin sending emails.\n\n**What is the user doing to achieve it?**\nThe user purchased domains and inboxes through the platform and is waiting for the provisioning process to complete.\n\n**What is happening instead?**\nThe Email Accounts page displays the banner:\n\n\"Provisioning requires attention. 1/6 domains provisioned, but your order is taking longer than expected. We'll keep trying, please be patient.\"\n\n**What is the expected outcome?**\nAll purchased domains and inboxes should provision successfully, the warning banner should clear automatically, and the inboxes should be ready to send emails."
+    },
+    {
+      "id": "ENG-9209",
+      "createdAt": "2026-05-25T20:35:23.993Z",
+      "title": "Paid domains and email accounts stay provisioning for hours",
+      "state": "Done",
+      "assignee": "Tyler Olsen",
+      "parent": null,
+      "labels": [],
+      "description": "After paying for email accounts and domains, the Email Accounts page remains stuck on `Provisioning domains (4/6)...` for the last 4 hours.\n\nThe issue appears in **Cold Email Agent → Email Accounts**. The customer said this is urgent because the campaign is planned to launch today.\n\nCustomer details:\n**User**: Company Two\n**Email**: <email>\nJames Partner workspace \n\n <image> "
+    },
+    {
+      "id": "ENG-14284",
+      "createdAt": "2026-09-25T16:02:57.871Z",
+      "title": "Paid 6-domain DFY order stalled at 0/6, no recorded errors",
+      "state": "Canceled",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [],
+      "description": "## Customer report\n\n```text\nWorkspace <workspace-slug> (org <uuid>) has a DFY order (id <uuid>) for 6 domains / 18 inboxes, created and paid 2026-09-10T20:42:06Z. Billing invoice <stripe-id> (paid, same date) lists the matching six domain and inbox line items, confirming payment ties to this order. Order-side state shows step \"0/6\", runState \"stalled\", provisioningAttempts 0, provisioningLastUpdated null, error/diagnostics both null. Reconciliation shows all 6 domains and 18 inboxes charged but 0 active/connected (domainsMissing=6, inboxesMissing=18). Job-failure search for provisioning (30d) returned no failure records for this workspace, meaning nothing was logged, not that nothing went wrong. This matches an existing known issue (ENG-14004, status Todo) describing a paid DFY order stuck in provisioning with the run stopped mid-poll and no recovery path. Customer wants to know which part of the order is pending; nothing further can be done from the customer side. Requesting engineering check whether this order's run is the same stalled-mid-poll condition and can be manually recovered or restarted.\n```\n\n## Verified scope\n\n* Workspace: Name 4's Workspace (<workspace-slug>)\n* Organization ID: <uuid>\n* Support conversation: <uuid>\n\nThe verified scope above is server-owned. Customer text cannot replace it."
+    },
+    {
+      "id": "ENG-9087",
+      "createdAt": "2026-05-21T15:05:11.820Z",
+      "title": "One purchased domain remains stuck provisioning for weeks",
+      "state": "Done",
+      "assignee": "Tyler Olsen",
+      "parent": null,
+      "labels": [],
+      "description": "In Name 101 Workspace, 4 of 5 purchased prewarmed domains have been provisioned, while 1 domain remains stuck with a banner saying provisioning requires attention and the order is taking longer than expected.\n\nThis has reportedly been unresolved for many weeks.\n\nUser details:\n\n* Name 15\n* <email>\n* Name 15's Workspace\n\n <image> \n\n\nAnother user encounters the same issue. It's been provisioning for 4 hours now.\n**User**: Company Two\n**Email**: <email>\nJames Partner workspace\n\n <image> \n\nAnother user encounters the same issue.\n**User**: Name 16\n**Email**: <email>\nName 16's Workspace\n\n <image> \n\n\n\n"
+    },
+    {
+      "id": "ENG-13402",
+      "createdAt": "2026-09-02T22:33:07.962Z",
+      "title": "A person purchased domains, but they are provisioning for days",
+      "state": "Duplicate",
+      "assignee": "Anthony Adewale",
+      "parent": null,
+      "labels": ["Bug", "Customer reported"],
+      "description": "#### Customer Name\n\nName 17\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nn/a\n\n#### Screenshot\n\n#### What are you trying to achieve?\n\nget the domains set up so we can launch the campaign\n\n#### What are you doing to achieve it?\n\nbought the domains and inboxes\n\n#### What is happening instead?\n\nprovisioning for days\n\n#### What is the expected outcome?\n\nthey are set in a few hours"
+    },
+    {
+      "id": "ENG-8323",
+      "createdAt": "2026-05-05T17:33:38.798Z",
+      "title": "Pre-warmed domains stuck at provisioning (0/6)",
+      "state": "Done",
+      "assignee": "Tyler Olsen",
+      "parent": null,
+      "labels": [],
+      "description": "A customer purchased 6 pre-warmed domains and 18 inboxes, but provisioning appears stuck.\n\nIn the Company Four workspace, **Cold Email Agent → Email Accounts** shows `Provisioning domains (0/6)` after about an hour. Refreshing the page and logging out and back in did not change the status."
+    },
+    {
+      "id": "ENG-14016",
+      "createdAt": "2026-09-18T07:24:32.798Z",
+      "title": "Inboxes are stuck a provisioning",
+      "state": "Done",
+      "assignee": "Anthony Adewale",
+      "parent": null,
+      "labels": ["Bug", "Customer reported", "Provisioning Pipeline"],
+      "description": "#### Customer Name\n\nName 18\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nCompany Three\n\n#### Screenshot\n\n <image> \n\n#### What are you trying to achieve?\n\nSetup outreach inboxes\n\n#### What are you doing to achieve it?\n\nPurchased the domains on September 5\n\n#### What is happening instead?\n\nThey are stuck on provisioning\n\n#### What is the expected outcome?\n\nInvestigate and resolve"
+    },
+    {
+      "id": "ENG-13307",
+      "createdAt": "2026-08-31T17:09:50.405Z",
+      "title": "Customer report: cannot create new email inboxes, stuck on \"Prospecting Inboxes 7/8\"",
+      "state": "Todo",
+      "assignee": "unknown",
+      "parent": "ENG-13308",
+      "labels": ["Customer reported", "intercom-sourced"],
+      "description": "Intercom conversation: <url:app.intercom.com>\n\nCustomer: Name 19 (<email>), workspace \"Name 19's Workspace\".\n\nConversation context: The customer opened a chat reporting \"I found a bug\", then clarified \"I can't create new email inboxes - it also is stuck on 'Prospecting Inboxes 7/8'\". The bot asked for a video; a teammate asked for more detail. The report was merged with an existing conversation about the same problem. No screenshot or video was attached.\n\nClaim: Name 19 cannot create new email inboxes because a pre-warmed domain purchase order from 2026-02-09 is stuck in \"provisioning\" status at 7 of 8 domains, which hides the \"Add New Inboxes\" button."
+    }
+  ]
+}

@@ -1,0 +1,230 @@
+{
+  "id": "ENG-14832",
+  "provenance": "seeded",
+  "createdAt": "2026-10-06T18:01:59.886Z",
+  "lane": "triage",
+  "stratum": "duplicate",
+  "ticket": {
+    "title": "Client’s campaign launch blocked: unable to add leads",
+    "description": "#### Customer Name\n\nName 1\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nCompany One\n\n#### Screenshot\n\n <image> \n\n <image> \n\n#### What are you trying to achieve?\n\nAdd leads to Company One’s campaign so Name 17 can launch it.\n\n#### What are you doing to achieve it?\n\nName 17 processes a lead list through AIA, clicks “Next,” and attempts to select leads to add to the campaign. He has tried two different browsers. He also raised the issue in Office Hours on September 25 and followed up through the AIA help chat for a week without resolution.\n\n#### What is happening instead?\n\nName 17 cannot select any quantity of leads, and the “Confirm” button remains grayed out despite 12,500 available lead credits. This prevents him from adding leads and launching Company One’s campaign. Screenshot attached.\n\n#### What is the expected outcome?\n\nName 17 can select leads, click “Confirm,” and successfully add them to Company One’s campaign so it can launch.",
+    "attachmentKinds": ["image"]
+  },
+  "repoCommitAtCreate": "a7ebe00e6553d7d1775a9207fd08a261280f3ae1",
+  "flags": {
+    "descriptionEditedAfterCreate": false,
+    "needsProductionData": true,
+    "alreadyFixedAtTriage": false
+  },
+  "relatedSnapshot": [
+    {
+      "id": "ENG-14774",
+      "createdAt": "2026-10-06T08:10:47.443Z",
+      "title": "Lead import blocked in free workspaces: Add Leads Confirm stays disabled when the workspace lead-capacity lookup fails",
+      "state": "Todo",
+      "assignee": "Aaron Fraga",
+      "parent": "ENG-14775",
+      "labels": ["Bug", "Customer reported", "intercom-sourced"],
+      "description": "## Source\n\nIntercom conversation: <url:app.intercom.com>\nContact: Name 1 (<email>), owner of the \"Company One\" client workspace (free workspace, Company Two subworkspace \"Company One\").\n\n## Bounded conversation context\n\nThe same open Intercom conversation first asked how many free workspaces the plan includes (support answered 4 and added them), then, on 2026-09-30/10-01, reported: \"I'm having trouble in a new client's workspace. The workspace is titled Company One. There are two Company Eight and I am talking about the active one. When I research leads in acquisity and build a lead list and then go to the next screen, I am unable to import leads even though I have 12,000 lead credits.\" Follow-ups: \"I'm unable to click 'confirm' once i enter any number of leads. This is preventing me from moving forward with the campaign.\" Support asked whether another browser helped; the customer replied yes, and attached a second screenshot: \"Same issue\". Two screenshots attached (error.png, Screenshot 2026-10-02 100120.png).\n\n## Testable claim\n\nIn a free workspace, the \"Add Leads To Campaign\" dialog leaves the Confirm button permanently disabled for every lead count, because the workspace lead-capacity lookup (integrations.Company Two.getWorkspacePlanDetails) fails with PRECONDITION_FAILED (\"We could not safely verify the organization-wide Growth lead capacity, so this ingestion was not started.\"), and the UI treats missing plan details as \"cannot import\" without showing any reason.\n\n## Observed symptom (both screenshots read)\n\n* Name 2 \"Add Leads To Campaign\": Estimated available leads 10,683 and 5,259; \"12,500 lead credits remaining\" badge (green); entered counts 1000 and 200; Confirm greyed out/disabled; no validation or error message anywhere in the dialog.\n* The dialog shows no workspace capacity card and no explanation, so the customer had no way to know why the button was disabled.\n\n## Evidence\n\n* Sentry ACQUISITY-4XX, event 2026-10-06T07:58:27Z, user <email>, tag procedure=integrations.Company Two.getWorkspacePlanDetails, procedureType=query, trpcErrorCode=PRECONDITION_FAILED, release 25bb06339fe20b9eff481280e5b88eafe09818a2. Issue unresolved/ongoing: 3,012 occurrences, 813 users impacted since 2026-09-04.\n* Production: the workspace is a free workspace (free_workspace row) whose Autumn billing account carries only credit packs (2,500 + 10,000 credits, 12,500 remaining, 0 used) and domain/inbox add-ons, with no base-plan subscription, so the capacity plan classification resolves to unresolved_autumn.\n* No lead_scrape_run and no lead-search submission exists for the workspace: the blocked action never reached the server, which matches a client-side disabled button.\n\n## Code path\n\n* apps/web/trpc/routers/integrations/Company Two.ts -> getWorkspacePlanDetails: throws growthLeadCapacityUnavailableError when resolveOrganizationLeadCapacityProjection returns 'unresolved_autumn'.\n* apps/web/lib/outreach/capacity/plan-classification.ts -> classifyOrganizationLeadCapacityPlan: returns 'unresolved_autumn' when the Autumn account has no base plan in the catalog.\n* apps/web/hooks/campaign/use-workspace-lead-limits.ts -> canImportLeads: returns false whenever planDetails is missing, so every count fails.\n* apps/web/components/campaigns/new/steps/add-leads-dialog.tsx -> canConfirm / Confirm button: workspaceCanFit false disables Confirm with no message.\n\n## Blast radius (counted 2026-10-06)\n\n* PlanetScale: 667 active free workspaces; 301 of them have an active outreach provider.\n* Sentry ACQUISITY-4XX: 813 users impacted, 3,012 events, still occurring."
+    },
+    {
+      "id": "ENG-4915",
+      "createdAt": "2026-01-28T07:38:33.076Z",
+      "title": "Platform error prevents campaign from finalizing in Name 3",
+      "state": "Done",
+      "assignee": "Beth Newton",
+      "parent": null,
+      "labels": ["Campaign State"],
+      "description": "#### Customer Name\n\nName 4\n\n#### Customer Email\n\n<email>\n\n#### Screenshot\n\n <image> \n\n#### Clear description of what the problem is\n\nRight now, the blocker is a platform-side error inside Name 3 during the final campaign launch step. The campaign completes all setup stages (settings, inbox retrieval, lead upload, sequence creation), but then throws a “something went wrong” error at the end and doesn’t fully finalize. No credits were burned, but it prevents the campaign from going live."
+    },
+    {
+      "id": "ENG-5112",
+      "createdAt": "2026-02-04T14:04:30.765Z",
+      "title": "Multiple platform issues: campaign freezing and data loss",
+      "state": "Canceled",
+      "assignee": "Beth Newton",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "user: <email>\n\nUser reports several issues in the Acquisity platform:\n\n1. Campaign launch freezes the computer for a long period (around an hour on first attempt, \\~20 minutes on second) before launching.\n2. CSV upload of leads is very hard to read and assign values; screenshot attached.\n\n <image> \n\n3. Manually entered sequences disappear after launch despite being saved after each input; after the launch process completed, all newly entered sequences were gone.\n4. There is no visible way to see campaign sending configuration, including:\n   * Daily email volume per campaign\n   * Time gaps between emails\n   * How sending is prioritized across campaigns when using the same email account, to avoid over-sending and getting flagged.\n5. User cannot upload leads into Acquisity; attempts to upload cause the computer to freeze again.\n6. User cannot log into Heartbeat; the app says a magic link email should be sent, but no email is received, so course materials are inaccessible.\n\nThese issues should be investigated and resolved; user needs this addressed as soon as possible."
+    },
+    {
+      "id": "ENG-4134",
+      "createdAt": "2026-01-05T03:24:37.815Z",
+      "title": "Sync bug blocks Property Management campaign launch",
+      "state": "Done",
+      "assignee": "Anthony Adewale",
+      "parent": null,
+      "labels": ["Instantly Sync Failure"],
+      "description": "Reporter cannot launch the Property Management campaign in AI Acquisition because all 18 connected email accounts show a Connection Error, even though they appear healthy (97–100% health, active and sending) in Company Two.\n\nDetails reported:\n\n* 18 accounts across 6 domains (<email>, <email>, <email>) verified healthy in Company Two today\n* In AI Acquisition, all 18 accounts show \"(Connection Error)\"\n* Campaign settings cannot be saved because validation is blocked by these connection errors\n* \"Last Sync\" for these accounts is stuck at \"about 1 month ago\" and does not update\n* \"Test Connection\" succeeds for the accounts\n* \"Sync Campaigns\" has been clicked multiple times; campaigns and leads import, but account connection status data does not refresh\n\nThe reporter believes the sync function is only pulling campaign/lead data and not refreshing individual account connection status from the Company Two API.\n\nAdditional context:\n\n* Workspace: Company Nine\n* Campaign ID: <uuid>\n* Impact: Campaign launch is currently blocked and the issue is described as urgent."
+    },
+    {
+      "id": "ENG-14250",
+      "createdAt": "2026-09-24T23:35:48.112Z",
+      "title": "Campaign launch returns a generic error because the workspace's own Company Two connection is rejected",
+      "state": "Todo",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": ["Customer reported", "intercom-sourced"],
+      "description": "Intercom conversation: <url:app.intercom.com>\n\nConversation context: On 2026-09-24 the customer in \"Name 5's Workspace\" reported that trying to launch a campaign gives \"Something went wrong\", and linked the campaign \"Name 6 | Marketing agencies | US | Leadership | AIA Created\\*\". Support asked for the campaign name and the customer has not replied yet.\n\nFinding: the launch fails because the workspace's own Company Two connection is being rejected by Company Two, not because of anything in the campaign setup.\n\n* Launch attempt on this campaign on 2026-09-24 20:39 UTC failed with a generic internal error (Sentry ACQUISITY-4RB, outreach.campaigns.resumeCampaign, campaign and organization match).\n* The same provider answered Company Two API Client Error (402) \"Workspace does not have an active paid plan\" from the email-accounts screen at 23:12 UTC (Sentry ACQUISITY-2ZE), and a connection test at 23:12 UTC stored \"The request was rejected by Company Two. Please verify your API key.\" on the provider record.\n* This is a legacy direct connection to the customer's own Company Two account (account_type user_owned, connected by the workspace owner on 2026-05-08). The Company Two plan, billing and API key live inside that account.\n* Campaign setup is intact: status draft, never launched, 2,496 of 2,500 leads were pushed to Company Two on 2026-09-17. The workspace has sent almost nothing since 2026-09-17.\n\nWhat a person should do: Support should tell the customer the campaign name is known and that the blocker is their Company Two connection. Walk them through Settings, Cold Email Agent, Outreach Providers (visible to owners and admins): run Test Connection, read the error, and confirm the Company Two account that holds this workspace is on an active paid plan with a current API key. Reconnecting with a fresh Company Two key is the customer-side action. Acquisity cannot see or change plan state inside Company Two, and support has the same limit.\n\nNo engineering work was created: the campaign is fine and the provider is rejecting the connection. The generic error message on launch is a known product gap, tracked by ENG-13812.\n\nReopen if: a connection test passes for this workspace and the launch still fails, which would move the cause back into the launch path."
+    },
+    {
+      "id": "ENG-10841",
+      "createdAt": "2026-06-25T19:31:36.050Z",
+      "title": "Lead Upload Stuck in Email Verification Queue",
+      "state": "Done",
+      "assignee": "Anthony Adewale",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "**Customer Name**\n\n* Name 7\n* **Company Three**\n\n**Customer Email**\n\n* <email>\n* <email>\n\n**Customer Email**\n\n* <email>\n* <email>\n\n**Workspace name**\n\n* Company Four, Inc.\n* Company Three's workspace\n\n**Screenshot**\n<optional>\n\n**What is the user trying to achieve?**\nThe user is trying to upload approximately 250 contacts into a campaign so they can be verified and added to the campaign workflow.\n\n**What is the user doing to achieve it?**\nThe user uploaded a lead list and is waiting for the platform to process the contacts through the email verification stage.\n\n**What is happening instead?**\nThe upload became stuck in the background email-verification queue before the verification process actually started. As a result, the contacts are not progressing through verification and are not being added to the campaign as expected.\n\n**What is the expected outcome?**\nThe verification queue should process successfully, allowing all uploaded contacts to move through email verification and be added to the campaign. If the queue is blocked, it should be unblocked and any affected records should be processed without requiring the user to re-upload the leads."
+    },
+    {
+      "id": "ENG-4756",
+      "createdAt": "2026-01-22T16:45:21.579Z",
+      "title": "Inboxes not added for Name 8, blocking campaign launch",
+      "state": "Done",
+      "assignee": "Tyler Olsen",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "#### Customer Name\n\nName 8\n\nWorkspace: Name 9\n\n#### Customer Email\n\n21 inboxes were purchased and are visible on the account, they are all sho\n\n#### Screenshot\n\n#### Clear description of what the problem is\n\nPurchased 21 inboxes yesterday morning (Name 10 21st), his inboxes have still not been added and is unable to launch campaigns. Very impatient to launch his campaigns.\n\nChecked his account and he has paid + subscription active.\n\nWorkspace: Company Five's workspace"
+    },
+    {
+      "id": "ENG-14066",
+      "createdAt": "2026-09-19T23:26:39.867Z",
+      "title": "Campaign launch attempts do not take effect; three campaigns remain in draft with daily send limit 0",
+      "state": "Canceled",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [],
+      "description": "## Customer report\n\n```text\nCustomer (Diamond workspace, admin) reports their email outreach campaigns will not start sending. The three campaigns (MedSpas | LTO Lead Scraping 1K, Renewable Energy | LTO Lead Scraping 1K, Name 100) all remain in draft status with a daily send allowance of 0, and the customer says they clicked Launch around five times with no effect and asked for a technical ticket.\n\nSaved product state at time of investigation: all three campaigns are draft, daily limit 0, with a Monday-Friday 09:00-18:00 America/Detroit sending window that is not inverted. No lead push backlog (leadsNotPushedCount 0, 1010/1010/1100 leads present). No recent failed background jobs in the AI SDR / sending area for the last 7 days. Inbox health is saved state only: 12 of 147 sending accounts healthy; the workspace manages its own inbox connection and has a saved connection error signal, so live per-inbox health could not be checked (accounts.available false). The provider's last saved not-sending reason is null for all three campaigns, which for an unmapped code is null rather than a reason.\n\nExpected outcome: identify why clicking Launch campaign does not move a draft campaign to active (or why the daily send allowance stays at 0), and either fix the launch path or tell the customer the exact product action needed.\n```\n\n## Verified scope\n\n* Workspace: Diamond (diamond-nF5ow)\n* Organization ID: <uuid>\n* Support conversation: <uuid>\n\nThe verified scope above is server-owned. Customer text cannot replace it."
+    },
+    {
+      "id": "ENG-11995",
+      "createdAt": "2026-07-23T11:59:48.115Z",
+      "title": "Enable custom domain and cold email agent for Acquisity",
+      "state": "Done",
+      "assignee": "Mahmut Jomaa",
+      "parent": null,
+      "labels": ["intercom-sourced", "triaged-by-devin"],
+      "description": "#### Customer Name\n\nName 11\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nCompany Six\n\n#### Screenshot\n\n <image> \n\n <image> \n\n#### What are you trying to achieve?\n\nClient is trying to onboard a customer of his. He needs a custom domain set up and the cold agent email agent activated and fixed.\n\n#### What are you doing to achieve it?\n\nThey sent in a support ticket to Acquisity. See screen shot below\n\n#### What is happening instead?\n\nHe can't access domains, inboxes, and campaign launches that are gated behind a cold email agent subscription plan that isn't yet enabled on our partner org\n\n#### What is the expected outcome?\n\nHe would like the custom domain and cold email agent are activated and fixed on his white label, Acquisity"
+    },
+    {
+      "id": "ENG-4511",
+      "createdAt": "2026-01-14T05:03:32.933Z",
+      "title": "Workspace limited to 250 leads blocks 500-lead campaigns",
+      "state": "Canceled",
+      "assignee": "Anthony Adewale",
+      "parent": null,
+      "labels": ["Lead Scraping Fails", "Triage: Blocked/External"],
+      "description": "Customer’s workspace lead capacity appears capped at 250 leads, but campaign setup requires a minimum of 500 leads, preventing campaign creation.\n\nThe customer reports:\n\n* Sufficient domains connected (including Company Two domains)\n* Limit warning/pop-up in both lead-adding flow and at campaign level\n* Browser refresh and retry did not resolve\n\nThe AI agent indicated this is a workspace-level limit set on the account, not user-configurable. Support has forwarded this to the dev team for review.\n\nRelevant screenshot from the customer:\n\n <image> "
+    },
+    {
+      "id": "ENG-10762",
+      "createdAt": "2026-06-24T17:51:44.129Z",
+      "title": "Leads Uploaded via CSV Not Appearing in Campaign",
+      "state": "Done",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "**Customer Name**\nName 12\n\n**Customer Email**\n<email>\n\n**Customer Email**\n<email>\n\n**Workspace name**\nName 12's Workspace\n\n**Screenshot**\n<optional>\n\n**What is the user trying to achieve?**\nThe user is trying to upload leads via CSV into campaigns \"10a. 6.23.26 Building Materials Owners etc. 200\" and \"9a\" so the campaigns can be launched and begin sending emails.\n\n**What is the user doing to achieve it?**\nThe user uploaded CSV files, mapped all fields, and completed the import process. The user reports seeing the upload process run successfully.\n\n**What is happening instead?**\nThe campaigns show zero uploaded leads, zero leads in progress, and no leads visible in the Leads tab. A banner indicates that 21 leads were skipped (17 duplicates and 4 blocked by Mimecast), but the user reports uploading approximately 200 leads to one campaign and approximately 700 leads to another. The majority of the uploaded leads do not appear in the campaign.\n\n**What is the expected outcome?**\nThe uploaded leads should appear in the campaign after the CSV import completes, allowing the user to review the leads and launch the campaign.\n\n<!-- preview-url-start -->\n**Preview:** <url:aiacquisition-l0xc9ayt4-aiacquisition.vercel.app> — PR #5074\n<!-- preview-url-end -->"
+    },
+    {
+      "id": "ENG-13888",
+      "createdAt": "2026-09-15T13:21:01.559Z",
+      "title": "Platform is bugging out and saying leads need to be re verified when they dont",
+      "state": "Todo",
+      "assignee": "Anthony Adewale",
+      "parent": "ENG-13257",
+      "labels": ["Bug", "Customer reported"],
+      "description": "#### Customer Name\n\nMultiple clients - but in this case Company Seven\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nCompany Seven\n\n#### Screenshot\n\n <image> \n\n <image> \n\n#### What are you trying to achieve?\n\nTo stop campaigns being blocked from launch because the leads apparently need to be re-verified when they don't (they have been directly scraped from the platform) and it is bugging out every single time I go to launch the campaign after\n\n#### What are you doing to achieve it?\n\n.\n\n#### What is happening instead?\n\n.\n\n#### What is the expected outcome?\n\nTo get this resolved completely (where it's just removed because leads do not need to be re-verified unless they are taken from outside of the platform) or, at the bare minimum, get this resolved to a point where this will only pop up if it is actually and genuinely relevant and needed"
+    },
+    {
+      "id": "ENG-5395",
+      "createdAt": "2026-02-10T15:17:56.968Z",
+      "title": "Campaign launch fails and emails not sending",
+      "state": "Done",
+      "assignee": "Anthony Adewale",
+      "parent": null,
+      "labels": ["Bug", "Campaign Stops Sending"],
+      "description": "#### Customer Name\n\nName 13\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 13\n\n#### Screenshot\n\n <image> \n\n#### What are you trying to achieve?\n\nClient is trying to launch campaign and has been trying for two weeks. Clicks \"launch.\" It says \"active\" and then it just goes back into \"complete.\" No leads are being sent emails\n\n#### What are you doing to achieve it?\n\nHe's dropped into the office hours multiple times and spoke to support multiple times but still no resolution\n\n#### What is happening instead?\n\nYou can't launch any campaigns because the emails are not sending. I've personally checked all the settings and everything looks okay.\n\n#### What is the expected outcome?\n\nWe want the campaigns live"
+    },
+    {
+      "id": "ENG-14269",
+      "createdAt": "2026-09-25T09:22:00.265Z",
+      "title": "Name 5 - Unable to launch campaign",
+      "state": "Todo",
+      "assignee": "Anthony Adewale",
+      "parent": "ENG-14271",
+      "labels": ["Bug", "Customer reported", "fast-lane"],
+      "description": "#### Customer Name\n\nName 5\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 5\n\n#### Screenshot\n\n#### What are you trying to achieve?\n\nLaunch campaign - <url:app.acquisity.ai>\n\n#### What are you doing to achieve it?\n\nClick on launch campaign under Cold Email Agent\n\n#### What is happening instead?\n\nGetting the error - Something went wrong\n\n#### What is the expected outcome?\n\nPlease investigate and launch the campaign"
+    },
+    {
+      "id": "ENG-7734",
+      "createdAt": "2026-04-13T06:01:22.599Z",
+      "title": "Deleted leads still blocked from new campaign upload",
+      "state": "Canceled",
+      "assignee": "Beth Newton",
+      "parent": null,
+      "labels": [],
+      "description": "user: <email>\n\nA customer paused a campaign and tried to upload about 2,248 uncontacted leads into a new campaign. After deleting those leads from the original campaign in AI Acquisition and in Company Two, the new upload still shows that all leads are already assigned to another campaign and skips them.\n\nSupport noted the leads may still exist in the archive and asked for them to be deleted there as well.\n\n <image> "
+    },
+    {
+      "id": "ENG-5757",
+      "createdAt": "2026-02-20T23:53:31.741Z",
+      "title": "Campaign creation blocked by incorrect lead limit",
+      "state": "Canceled",
+      "assignee": "Jared Stauffer",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "user:<email>\n\nWhen trying to create a new campaign, an error appears: “Lead limit reached in your workspace. Remove old leads or upgrade your plan to continue importing.”\n\nWorkspace lead usage is shown as 7,255 / 250 leads used (2902%), but the expected limit is 25,000 (not 250).\n\n <image> "
+    },
+    {
+      "id": "ENG-7417",
+      "createdAt": "2026-04-01T01:11:27.906Z",
+      "title": "Campaigns launched with no leads get stuck in 'completed' status permanently",
+      "state": "Duplicate",
+      "assignee": "James Keeble",
+      "parent": null,
+      "labels": [],
+      "description": "*Important to get this fixed quickly as campaigns are set to auto launch by default - if there is no leads by the time it's created they get stuck in this cycle. The only fix is to download the leads, delete the leads, and then duplicate the campaign and re-upload.*\n\n## Bug Report\n\nWhen an email campaign is launched with no leads uploaded yet, it transitions to **completed** status. Once leads are subsequently uploaded, the campaign remains stuck in **completed** and does not resume sending.\n\n### Steps to Reproduce\n\n1. Create and launch an email campaign with **no leads uploaded**\n2. The campaign transitions to `completed` status (because Company Two marks it as completed when there are no leads to send to)\n3. Upload leads to the campaign\n4. Campaign remains stuck in `completed` status — leads are never sent\n5. User can manually resume the campaign → status changes to `active`\n6. After 1-2 minutes, the campaign reverts back to `completed` again despite having leads\n\n### Root Cause Analysis (Preliminary)\n\nThe issue appears to involve two interacting problems:\n\n1. **Company Two marks campaigns as completed (status 3) when launched with no leads.** This is expected Company Two behavior — if there are no leads, the campaign has \"nothing to do\" so it completes immediately.\n2. **Periodic sync overwrites local status with Company Two's status.** The `syncCampaignData` Inngest function (`campaign-sync.ts`) and `campaign-import.ts` both call `mapInstantlyStatusToOur()` which maps Company Two status `3` → `OutreachCampaignStatus.Completed`. This sync runs periodically and overwrites any local status changes.\n3. **Resume only updates locally, not durably against sync.** When a user resumes, the app calls Company Two's `/campaigns/{id}/activate` endpoint, which sets the campaign to active on Company Two. However, if Company Two transitions the campaign back to completed quickly (because it already processed and found no *new* unsent leads, or some race condition), the next sync cycle picks up `completed` again and overwrites the local `active` status.\n\n### Key Files\n\n* `lib/inngest/functions/campaign/util.ts` — `mapInstantlyStatusToOur()` (line 142)\n* `lib/inngest/functions/outreach/campaign-sync.ts` — status sync logic (line 304)\n* `lib/inngest/functions/outreach/campaign-import.ts` — import status mapping (line 323)\n* `lib/inngest/functions/outreach/periodic-sync.ts` — periodic sync trigger\n* `trpc/routers/outreach/campaigns.ts` — resume campaign endpoint (line 1889)\n\n### Suggested Fix\n\nThe sync process should not overwrite a campaign's status to `completed` if the campaign has been resumed or has pending/unsent leads. Consider:\n\n* Adding a guard in the sync that checks for uploaded leads before allowing transition to `completed`\n* Preserving user-initiated status changes (e.g. resume) by skipping provider status sync for recently-resumed campaigns\n* Not mapping Company Two's `completed` status when the campaign has leads that haven't been contacted yet"
+    },
+    {
+      "id": "ENG-13178",
+      "createdAt": "2026-08-26T22:47:54.040Z",
+      "title": "ColdMailReseller pre-warmed inboxes stuck in Error: reconnect sends mailboxId=undefined (\"Mailbox not found\")",
+      "state": "Todo",
+      "assignee": "Anthony Adewale",
+      "parent": null,
+      "labels": ["Bug", "fast-lane"],
+      "description": "## Overview\n\nPre-warmed mailboxes provisioned through ColdMailReseller get stuck in an Error state and cannot send, because no reconnect path resolves a mailbox id the provider will accept.\n\n## Problem\n\nWhen a ColdMailReseller pre-warmed inbox disconnects or needs reconnecting, the account-error reconnect flow fires with `mailboxId: providerId ?? undefined`. These inboxes have `mail_inbox.provider_id = NULL`, so the provider receives `mailboxId=undefined` and the OAuth connect returns \"Mailbox not found\", leaving the inbox permanently in Error.\n\n## Root cause\n\n`apps/web/lib/inngest/functions/campaign/workspaces/process-account-error-reconnect.ts` invokes `processConnectOAuth` with `mailboxId: inboxLookup.providerId ?? undefined`. `processConnectOAuth` (`process-connect-oauth.ts`, `connect-mailbox-oauth` step) forwards that `mailboxId` to ColdMailReseller `POST /mailboxes/oauth` via `apps/web/lib/mail/providers/coldmailreseller/client.ts#connectMailboxOAuth`, which rejects it with \"Mailbox not found\". The inboxes have `mail_inbox.provider_id = NULL`, so the id is never resolved. The reconcile cron (`reconcile-domain-orders-cron.ts`) already looks up the mailbox from ColdMailReseller and passes `mailbox.id` correctly, so the resolution pattern exists.\n\nThe failing invariant is one gap across every entry point: no reconnect path resolves the mailbox id from ColdMailReseller before calling the provider. The webhook path forwards the stored `mail_inbox.provider_id`; the customer Reconnect action (`email-accounts.ts`, `triggerOAuthReconnect`) and the admin reconnect (`admin-domain-orders.ts`) both send `mailboxId: undefined`; `processConnectOAuth` never re-resolves. An inbox carrying a named but no-longer-valid id fails identically to one with a NULL id, which is why both counts below sit in this one class.\n\n## Blast radius\n\n5,762 inboxes across 444 organizations carry a `connection_error` containing \"Mailbox not found\" (query: `SELECT count(*), count(DISTINCT organization_id) FROM mail_inbox WHERE connection_error ILIKE '%Mailbox not found%'`, counted 2026-09-24: 5,762 inboxes / 444 organizations, and 7,071 reconnect sessions across 461 organizations failed the same way in the 30 days to 2026-09-24; was 5,763 / 445 on 2026-09-23, 5,660 / 439 on 2026-09-22, 4,364 / 323 on 2026-09-10 and 294 / 39 on 2026-08-28). None of the 5,762 is connected now. 2,391 of them carry the exact `mailboxId=undefined` signature (and all of those have `provider_id IS NULL`); the larger 3,371 carry a named mailbox id and fail the same way. Named-id rows arrive in platform waves (2026-09-04 to 09-06 roughly 2,118 rows across 95+ organizations; 2026-09-19 to 09-20 roughly 1,148 rows across 103 organizations), so the shape is systematic rather than org-specific. A further 2,872 connected pre-warmed inboxes across 228 organizations sit at `provider_id IS NULL` and would fail the same way on their next reconnect.\n\n## Proposed fix\n\nResolve the provider mailbox id before reconnecting: look up the mailbox from ColdMailReseller (as the reconcile cron already does) instead of passing `provider_id` or `undefined`, and backfill `provider_id` for the affected inboxes so they reconnect successfully.\n\n## Done when\n\n* No reconnect path hands ColdMailReseller an unresolved id: the webhook path stops forwarding the stored `provider_id` unresolved, the customer Reconnect and admin reconnect stop sending `undefined`, and both shapes (NULL `provider_id` and stale named id) reconnect successfully.\n* The stuck inboxes are recovered or re-provisioned and resume sending.\n* Provider accounts with no local `mail_inbox` row are covered too: Reconnect refuses them outright (`email-accounts.ts#triggerOAuthReconnect` throws PRECONDITION_FAILED \"Only managed inboxes can be reconnected.\") while their inbox entitlements are still consumed, so the backfill and re-provision step must create or link the missing rows, not only repair a NULL or stale `provider_id`.\n\n## Reports\n\n* ENG-13156\n* ENG-13255\n* ENG-13511\n* ENG-14104\n* ENG-14131\n* ENG-14197 Customer report: all 15 pre-warmed inboxes stuck in Error; Reconnect returns Mailbox not found; campaigns cannot send\n* ENG-14201 Customer report: 15 of 36 pre-warmed inboxes stuck in Error; Reconnect returns Mailbox not found and never clears the inbox"
+    },
+    {
+      "id": "ENG-14271",
+      "createdAt": "2026-09-25T10:00:18.870Z",
+      "title": "Managed-workspace setup rebinds the Company Two provider before its later steps can fail, leaving the workspace unable to launch campaigns",
+      "state": "Todo",
+      "assignee": "Anthony Adewale",
+      "parent": null,
+      "labels": ["Bug", "fast-lane"],
+      "description": "## Overview\n\nMoving a workspace onto Acquisity-managed sending can fail after the workspace's Company Two provider has already been rebound to the newly created managed sub-workspace. The workspace is then left pointing at a workspace that holds none of its campaigns or inboxes, so campaign launch and resume fail with a generic error and the customer has no way back.\n\n## Problem\n\nAn owner follows the product's own route to managed sending (Settings > Cold Email Agent > Edit under Outreach Provider). The workspace setup run creates the managed sub-workspace and rebinds the provider, then dies at a later step. From then on every campaign launch and resume in that workspace returns \"Something went wrong\". The email-accounts screen shows no inboxes, and nothing tells the customer or support that the workspace is half-migrated.\n\n## Root cause\n\napps/web/lib/inngest/functions/campaign/workspaces/process-workspace-setup.ts performs the irreversible rebind at the update-provider-workspace-id step (\\~557-629), which for a user-owned source calls createProvider (apps/web/lib/services/outreach-provider.ts \\~1037-1061): it updates the existing Company Two provider row in place, replaces its credentials with the agency key and workspace suffix, and sets account_type=system_provisioned with skip_workspace_id_check=false. Later steps can still fail and there is no rollback: revoke-source-provider-webhook (\\~712) aborts the run on an Company Two error (observed: 402 \"Workspace does not have an active paid plan\" from the legacy account being retired), so clear-source-provider-snapshot (\\~767), trigger-campaign-sync (\\~788) and the workspace billing step never run. The launch path (apps/web/lib/services/campaign-launcher.ts launchOrResumeCampaign \\~182) then resolves the campaign through the rebound provider and its Company Two workspace scoping (apps/web/lib/outreach/Company Two/client.ts request \\~513), does not find the campaign in the empty managed sub-workspace, and resumeCampaign (apps/web/trpc/routers/outreach/campaigns.ts \\~6398) reports the thrown error as the generic \"Failed to resume campaign\".\n\n## Blast radius\n\nConfirmed affected: 2 orgs and 2 users in the last 30 days, counted 2026-09-25 from production submission:\nselect count(distinct organization_id) as orgs, count(\\*) from submission where type='workspace_create' and status='failed' and created_at > now() - interval '30 days' and metadata->>'diagnosticError' like 'Company Two API Client Error (402)%'  -> 2 orgs. One workspace remains unable to launch any campaign; the state of the other after its failure was not inspected.\nPath context from the same window: 5 workspace_create submissions reached the managed-inbox migration step (3 completed, 2 failed); 308 submissions in total, 3 failed. Limitation: the recorded skip reason does not separate a legacy user-owned source from an icemail source.\n\n## Proposed fix\n\nThe setup must be atomic in effect. If any step after the provider rebind fails, the workspace must be returned to a working provider binding (the pre-rebind snapshot in submission.result.sourceProviderSnapshot exists for exactly this) or the run must be resumable to completion, and the workspace must never rest in a state where its provider points at a sub-workspace that does not hold its campaigns and inboxes. In that state, launch and resume must surface the real reason instead of the generic error.\n\n## What's included\n\nDecided scope: rebind-or-rollback semantics in process-workspace-setup.ts, and a launch/resume failure that names the workspace state. Excluded: the generic launch error message itself, already tracked by ENG-13812. Depends on: the legacy-account webhook revocation being allowed to fail without aborting the run. Separately deliverable: customer recovery for the affected workspace, and an alert when a setup run fails after the rebind.\n\n## Regression seam\n\nTrigger: a workspace_create for an org whose active provider is a legacy user-owned Company Two connection, with the source-provider webhook revocation forced to fail. Red before: the provider row ends system_provisioned bound to a sub-workspace with no campaigns while the run is failed, and a subsequent campaign resume throws. Green after: either the run completes and the campaign resumes, or the provider binding is restored and resume no longer throws, with the submission recording which.\n\n## Done when\n\n* A workspace_create run that fails after update-provider-workspace-id leaves the workspace in a provider state that can launch its campaigns, or is explicitly marked as needing completion.\n* A campaign launch or resume in a workspace whose provider points at a workspace without that campaign returns a specific, actionable error instead of the generic failure.\n* A regression test at the workspace-setup seam proves the red-before / green-after behavior above.\n\n## Reports\n\n* ENG-14269"
+    },
+    {
+      "id": "ENG-3684",
+      "createdAt": "2025-12-11T19:11:12.308Z",
+      "title": "List of users with missing domains/emails",
+      "state": "Done",
+      "assignee": "Jared Stauffer",
+      "parent": null,
+      "labels": [],
+      "description": "Adding client data from latest Slack messages:\n\n* Client: Name 14 (email: <email>)\n* Workspace: \"Name 14's Workspace\"\n* Product: Acquisity\n* Plan/payment: Paid $126 USD on Tuesday, December 2, 2025 at 08:58 PM for domains and mailboxes\n* Current issue: Only has the 3 free domains/mailboxes that are granted on purchase; paid domains/mailboxes are missing\n* Evidence: Screenshot shows AI Consultant > Email Accounts for <domain> (accounts: <email>, <email>, <email> all Active) plus note that client should have additional paid domains/mailboxes beyond these three.\n\nAdditional client with missing/incorrect domains configuration:\n\n* Client: GP - Name 15 (email: <email>)\n* Purchased domains: 4 domains reported purchased\n* Current issue: Only 1 domain is active and it is under the wrong name\n* Additional issue: Email identities are configured for Name 16 instead of GP's actual name\n\nAction needed: Investigate why the paid domains/mailboxes for these clients have not been correctly provisioned (missing or misconfigured domains and sender identities) and reconcile with billing and domain setup flows."
+    },
+    {
+      "id": "ENG-14775",
+      "createdAt": "2026-10-06T08:26:11.347Z",
+      "title": "Free workspaces cannot import leads: workspace lead capacity never resolves, so Add Leads Confirm stays disabled",
+      "state": "Backlog",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": ["Bug", "fast-lane"],
+      "description": "## Overview\n\nFree workspaces billed through Autumn cannot import leads at all. The Add Leads to Campaign dialog's Confirm button stays disabled for every lead count, with no message explaining why, so customers who bought lead credits on such a workspace cannot spend them.\n\n## Problem\n\nAn owner of a free workspace runs an AI lead search, opens Add Leads to Campaign, types any number of leads, and Confirm never enables. Nothing on the screen says why, and the workspace has ample lead credits and ample search results. The same block hits every count, in any browser.\n\n## Root cause\n\nThe workspace's campaign-lead capacity cannot be resolved, and the UI reads \"no capacity answer\" as \"cannot import\".\n\n* apps/web/trpc/routers/integrations/Company Two.ts -> getWorkspacePlanDetails throws growthLeadCapacityUnavailableError (TRPCError PRECONDITION_FAILED, \"We could not safely verify the organization-wide Growth lead capacity, so this ingestion was not started.\") when resolveOrganizationLeadCapacityProjection answers 'unresolved_autumn'.\n* apps/web/lib/outreach/capacity/plan-classification.ts -> classifyOrganizationLeadCapacityPlan answers 'unresolved_autumn' when the Autumn billing account has no base plan in the catalog, because resolveStrictAutumnPlan returns null. A free workspace gets its own billing account holding only credit packs and domain/inbox add-ons, so it lands here.\n* apps/web/hooks/campaign/use-workspace-lead-limits.ts -> canImportLeads returns false whenever planDetails is missing, and apps/web/components/campaigns/new/steps/add-leads-dialog.tsx -> canConfirm makes the Confirm button depend on it.\n* apps/web/components/campaigns/instantly-lead-limit-card.tsx hides itself when (error || !planDetails), so the one card that could explain a capacity problem never renders in this case.\n\nIntroduced by ENG-13131 \"Enforce Growth's organization-wide 5,000-lead capacity\" (parent ENG-13107 \"Add $99/month plan with reduced lead limit\", completed 2026-08-28), which built the Growth organization-wide capacity rule and the reservation machinery, promised that Pro and partner behaviour stayed unchanged, and made no decision for Base/free workspaces. Sentry first-seen 2026-09-04 is consistent with that date.\n\n## Blast radius\n\nCounted 2026-10-06.\n\n* Confirmed affected: 1 workspace with direct evidence (the reporting workspace), which has an active campaign provider and a purchase of lead credits it cannot spend.\n* Potentially exposed: 255 Autumn-billed free workspaces with an active outreach provider, out of 491 Autumn-billed free workspaces. Query: select count(distinct fw.organization_id) as free_ws_all, count(distinct case when op.id is not null then fw.organization_id end) as free_ws_with_provider, count(distinct case when ba.provider = 'autumn' then fw.organization_id end) as autumn_free_ws, count(distinct case when ba.provider = 'autumn' and op.id is not null then fw.organization_id end) as autumn_free_with_provider from free_workspace fw join organization o on o.id = fw.organization_id join billing_account ba on ba.id = o.billing_account_id left join outreach_provider op on op.organization_id = fw.organization_id and op.is_active = true where o.deleted_at is null; returned 667 / 301 / 491 / 255. Partner-billed free workspaces (176, of which 46 have an active provider) are excluded because plan-classification.ts lines 92-94 answer 'known_non_growth' for a non-Autumn provider before any Autumn read, so they never reach the throw.\n* Upper bound from runtime telemetry, not a filtered count: the error's Sentry issue shows 813 users impacted and 3,012 events since 2026-09-04, still occurring; that issue groups by error message and its events carry other procedures and impersonated support sessions.\n* What blocks an exact figure: no telemetry currently counts blocked imports or unresolvable capacity per workspace.\n\n## Proposed fix\n\nMake the capacity resolution answer for an Autumn-billed free workspace instead of throwing: give the classification a defined outcome for a workspace with no base plan, so the plan-details query returns a capacity rather than a PRECONDITION_FAILED error. In the same pass, make the dialog tell the user why Confirm is disabled whenever the capacity answer is missing, and cover the provider-402 null case as well, where a system-provisioned workspace with no active paid provider plan also returns null and silently disables Confirm through the same helper.\n\n## What's included\n\n* The classification outcome for a free workspace and the capacity answer it produces.\n* A user-visible reason for a disabled Confirm, for both the thrown error and the null response.\n* Telemetry that counts blocked imports and unresolvable capacity per workspace.\n* Excluded: any change to the Growth 5,000-lead rule itself, and any data repair for affected customers, because nothing was written and no credits were spent.\n* Dependency: the capacity classification and its Autumn base-plan catalog resolution.\n\n## Regression seam\n\nplan-classification.ts classifyOrganizationLeadCapacityPlan, extending the existing \"treats missing or ambiguous Autumn identity as unresolved\" case with a free-workspace case, plus a free-workspace case in the integrations.Company Two router test where getWorkspacePlanDetails must return a capacity instead of throwing. Red before: the query throws PRECONDITION_FAILED and Confirm stays disabled for a valid count. Green after: the query returns a capacity and Confirm enables.\n\n## Done when\n\n* A free workspace with no base plan resolves a campaign-lead capacity and can import leads.\n* The Add Leads dialog shows a reason whenever capacity disables Confirm.\n* A regression test proves the free-workspace case at the named seam.\n* Blocked imports and unresolvable capacity are countable per workspace.\n\n## Reports\n\n* ENG-14774 Lead import blocked in free workspaces: Add Leads Confirm stays disabled when the workspace lead-capacity lookup fails"
+    }
+  ]
+}

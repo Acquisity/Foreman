@@ -1,0 +1,220 @@
+{
+  "id": "ENG-14554",
+  "provenance": "seeded",
+  "createdAt": "2026-10-01T06:38:29.469Z",
+  "lane": "billing",
+  "stratum": "billing",
+  "ticket": {
+    "title": "Name 10 - continues to get billed",
+    "description": "#### Customer Name\n\nName 10\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 10's Workspace & Company One, Inc.\n\n#### Screenshot\n\n#### What are you trying to achieve?\n\nClient has cancelled all subscriptions to Acquisity on both workspaces as well as all domains + inboxes yet he continues to get notified that he will be billed. Please see loom video he shared: <loom>\n\n#### What are you doing to achieve it?\n\nwalked him through cancellation - confirmed cancellation done on Company Four workspace but we continue to attempt to charge him\n\n#### What is happening instead?\n\n* \n\n#### What is the expected outcome?\n\ncancelling all subs",
+    "attachmentKinds": ["loom", "slack"]
+  },
+  "repoCommitAtCreate": "2d1ce63fa0ea910d7f73285d6e1dfc19d314da55",
+  "flags": {
+    "descriptionEditedAfterCreate": false,
+    "needsProductionData": true,
+    "alreadyFixedAtTriage": false
+  },
+  "relatedSnapshot": [
+    {
+      "id": "ENG-13564",
+      "createdAt": "2026-09-08T15:22:47.279Z",
+      "title": "Banning a user does not cancel their subscription, so billing continues",
+      "state": "unknown",
+      "assignee": "Anuj Bhatt",
+      "parent": null,
+      "labels": ["Bug", "fast-lane"],
+      "description": "## Overview\n\nBanning or offboarding a user blocks app access but does not cancel their Autumn/Stripe subscription, so a locked-out customer keeps being billed until someone cancels billing manually.\n\n## Problem\n\nA customer whose account is banned cannot log in to cancel their subscription, and support cannot impersonate the banned account. The subscription keeps charging (e.g. $185/month Pro) until a billing admin cancels it separately.\n\n## Root cause\n\nAdmin ban (apps/web/trpc/routers/admin/admin-users.ts banUser) sets only banned/banReason/banExpires and records an audit event; it never calls Autumn or Stripe. Cancellation is a separate flow (apps/web/trpc/routers/billing.ts cancelSubscription).\n\n## Blast radius\n\n488 banned users; 204 banned users across 237 organizations have billing history (billing_account.first_paid_observed_at not null). Exact count with currently-active subscriptions requires cross-referencing Autumn. Counted 2026-09-08.\n\n## Proposed fix\n\nUpdate the ban flow to offer \"Cancel all and Ban\" vs \"Only Ban\", actually cancelling active subscriptions with the provider before banning, and surfacing provider errors (do not ban when cancellation fails).\n\n## What's included\n\nBan flow change to reconcile billing on ban. Prior art: ENG-10782 (same root cause, created 2026-06-24, outside the 30-day Slack intake window).\n\n## Regression seam\n\nbanUser: banning a user with an active subscription must cancel it with the provider, or the admin must explicitly choose \"Only Ban\". Observable: a banned user has no active Autumn/Stripe subscription.\n\n## Done when\n\n* Banning a user with an active subscription cancels it with the provider (or prompts \"Cancel all and Ban\").\n* Provider cancellation failure surfaces an error and does not ban the user.\n* A regression test proves the ban flow cancels billing at the named seam.\n\n## Reports\n\n* ENG-13563"
+    },
+    {
+      "id": "ENG-14551",
+      "createdAt": "2026-10-01T00:13:41.153Z",
+      "title": "Charged twice for the same domain and inbox bundle; one bundle was never delivered and its subscription is still billing",
+      "state": "Todo",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": ["intercom-sourced"],
+      "description": "Intercom conversation: <url:app.intercom.com>\n\nConversation context: customer-initiated Intercom conversation, opened 2026-09-30, contact Name 1 <email>, workspace \"Name 2 Workspace\", owner role. Initial message: \"I have a billing issue that isn't being sorted. Please escalate to someone asap!\" Asked for detail: \"I've been billed twice for emails and domains for the last 3 months when that's not what I'm using.\" Declined the self-serve answer: \"No, I still need help.\" No attachments.\n\nBucket: overcharged.\n\nFinding: the customer bought the same DFY bundle (1 domain + 3 inboxes) twice about 17 hours apart and was charged for both; only one bundle was ever delivered. Order <uuid> (domain <domain>, created 2026-07-23 14:01Z) was cancelled for \"Payment timeout - order automatically cancelled after 30 minutes\" with nothing provisioned, but its Autumn subscription and its Stripe charges landed anyway. Order <uuid> (domain <domain>, created 2026-07-24 06:47Z) completed and is the bundle the customer actually uses (3 active connected inboxes). The cancelled order's subscription was never cancelled, so it has kept invoicing every month since.\n\nExposure (Stripe, smallest currency unit, all succeeded and unrefunded, no credit notes):\n\n* 2026-07-23, 3276 cents ($32.76), charge <stripe-id>, invoice EKGUJ5YE-0017\n* 2026-08-23, 1800 cents ($18.00), charge <stripe-id>, invoice EKGUJ5YE-0021\n* 2026-09-23, 1800 cents ($18.00), charge <stripe-id>, invoice EKGUJ5YE-0025\n  Total already collected for the undelivered bundle: $68.76, and $18.00/month continues until the orphan subscription is cancelled. The delivered bundle's own charges are legitimate and are not part of this ask.\n\nProposed human action (proposal, not a promise): refund the $68.76 collected for the undelivered bundle, and cancel the orphan domain and inbox line items on the billing account so the recurring $18.00/month stops. A Stripe customer credit is the alternative if the customer would rather have it applied forward (the Legacy Pro plan bills monthly, so there is a future invoice to consume it). The customer has not yet said which they want. No money has been moved and nothing has been cancelled.\n\nFull readout, systems of record, and the code path are in the Billing investigation document on this ticket."
+    },
+    {
+      "id": "ENG-10980",
+      "createdAt": "2026-06-28T13:11:59.272Z",
+      "title": "Recurring billing charges continue after subscription cancellation (multiple customers)",
+      "state": "Canceled",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [],
+      "description": "## Problem\n\nMultiple customers report ongoing monthly charges for inboxes/domains after canceling their subscription. They are requesting refunds and billing log reviews.\n\n## Context\n\n* Name 5 topic: `<uuid>`\n* Severity: Low | Confidence: 0.82\n* Recurring: multiple customers in 30d\n* Track: Financial\n\n## Why New\n\nPrior individual refund tickets (ACQ-3386, ACQ-3460, ACQ-3406, ACQ-3463, ACQ-3464, ACQ-3462) are all resolved. The systemic engineering issue ENG-7411 was Canceled. ENG-5574 (harden billing cancellation paths) was completed in Feb 2026 but the pattern persists. No currently open ticket tracks the ongoing recurrence of billing-after-cancellation reports.\n\n## Source\n\n* Name 3\n\n## Evidence\n\nCustomers cancel subscriptions through the platform UI but continue receiving monthly charges. Support confirms charges should have stopped. This pattern has recurred across multiple customers over the past 30 days despite prior individual resolutions.\n\n## Name 4\n\n`modem-<uuid>-2026-06-28`"
+    },
+    {
+      "id": "ENG-14388",
+      "createdAt": "2026-09-28T14:48:20.021Z",
+      "title": "Name 6 - Continued billing after account cancelled",
+      "state": "Done",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": ["Customer reported", "Refund"],
+      "description": "#### User Email\n\n<email>\n\n#### Workspace Name\n\nName 6\n\n#### Request Type\n\nRefund\n\n#### Reason for request\n\nCharged since cancelling subscription.\n\nPlease cancel ongoing sub and refund last installment."
+    },
+    {
+      "id": "ENG-14493",
+      "createdAt": "2026-09-29T23:41:38.415Z",
+      "title": "Name 7 — billed $1,436 for 18 inboxes never created, $144/month still renewing",
+      "state": "Todo",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": ["Customer reported", "Refund", "intercom-sourced"],
+      "description": "Intercom conversation: <url:app.intercom.com>\n\nBounded context: customer opened with \"cancel all subscriptions and billing\", then reported he has never had any inboxes or domains but is being charged for both; cancelling his legacy plan lowered the next bill by only $1; Manage Billing shows no subscription list to cancel; the remaining line item is labelled \"inbox - inboxes - 18 x 8\". He was escalated to a human and has had no answer.\n\nClaim: 18 inboxes were charged at $8/month from 2025-12-03 to date, and $107.77 for 6 pre-warmed domains, but the workspace holds no domains or inboxes, has no outreach account connected, and the purchase record shows 0 of 18 mailbox creations succeeded, so the customer paid for a year of inbox capacity that never existed and has no self-serve control to stop the recurring charge.\n\nAsk bucket: overcharged (money).\n\nVerified money (Stripe, <stripe-id>): $1,554.08 USD collected across 12 paid invoices; nothing refunded; no credit notes; balance 0; no dispute. Of that, $1,436.31 is the 18-inbox charge (first month prorated $140.31 plus nine months at $144.00) and $107.77 is the domain year; $10.00 is the Legacy plan.\n\nForward exposure: $145.00 due 2026-10-02 and $108.00 due 2026-12-02, then $145.00 monthly, with no in-product cancellation path.\n\nWhy there is no cancel path (current code): the Billing page card renders from org mail_domain rows only and shows \"No managed domains\" when there are none, offering no Cancel control; cancellation runs through cancelManagedDomains, which returns \"Domain is not managed by this workspace\" when no mail_domain row exists. Cancelling the named plan product cancels only that product, which is the $1 reduction the customer saw. Repository HEAD read: f0228bab1e57b287a17a66e2e042abc3de8191dd.\n\nDiscretion: needs-human. All three systems of record agree the add-ons are live and paid, so this is not a sync fault; the divergence is between what was paid for and what exists in the workspace. No prior approval or promise exists in the conversation or the request, so the amount decision is a person's.\n\nProposed human action (proposal, not a promise):\n\n1. Cancel the live Inbox add-on ($8 x 18) and the Domain add-on on billing account 7de4ed09.../Stripe subscription <stripe-id> before the 2026-10-02 renewal, so the October and December charges cannot land.\n2. Decide the refund: $1,436.31 for inbox capacity never created plus an amount for the domain year the customer never had visible, out of $1,554.08 collected. No refund or credit has been issued.\n3. Tell the customer, because he has had no answer since Fin AI escalated him on 2026-09-29.\n\nUnverified on this ticket: the customer's purchase intent at signup; whether the December 2025 order flow code matches today's HEAD, so no failing function is attributed; the provider-side cancellation record for these six domains (the cancellation log table starts 2026-08-01 and holds no row for them)."
+    },
+    {
+      "id": "ENG-8303",
+      "createdAt": "2026-05-04T16:06:35.490Z",
+      "title": "Billing charges for unprovisioned domains and inboxes",
+      "state": "Done",
+      "assignee": "Tyler Olsen",
+      "parent": null,
+      "labels": [],
+      "description": "A customer reports being charged for 6 domains / 15 additional inboxes, but only 1 of the ordered domains appears to have provisioned.\n\nThe issue was escalated after confirming the workspace currently shows 18 inboxes and the customer says they never received the additional capacity they were billed for. The latest directive is that 6 domains were ordered on March 26, only 1 is provisioned, and billing is still applying charges for all 6.\n\nThis needs triage to verify provisioning status versus billing records and determine whether the customer was overcharged."
+    },
+    {
+      "id": "ENG-5376",
+      "createdAt": "2026-02-10T10:44:34.866Z",
+      "title": "Investigate billing after cancellation (Feb 1 charge)",
+      "state": "Done",
+      "assignee": "Tyler Olsen",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "Customer reports canceling Acquisity on 2026-01-13 but still being billed on 2026-02-01. Investigate why the charge occurred."
+    },
+    {
+      "id": "ENG-9078",
+      "createdAt": "2026-05-20T23:51:28.276Z",
+      "title": "Inboxes not provisioned",
+      "state": "Done",
+      "assignee": "Tyler Olsen",
+      "parent": null,
+      "labels": [],
+      "description": "#### Customer Name\n\nName 8\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 8\n\n#### Screenshot\n\n#### What are you trying to achieve?\n\nGP has only 3 inboxes active but has been paying for 15 ($120 + the 3 included in the WS - he should have a total of 18 active inboxes)\n\n#### What are you doing to achieve it?\n\n* \n\n#### What is happening instead?\n\n* \n\n#### What is the expected outcome?\n\n* "
+    },
+    {
+      "id": "ENG-13337",
+      "createdAt": "2026-09-01T11:06:10.950Z",
+      "title": "Intercom: repeated declined payment attempts reported after subscription cancellation",
+      "state": "Todo",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [],
+      "description": "Intercom conversation: <url:app.intercom.com>\n\nCustomer Name 9 (<email>) reports that payment attempts are still being made on their bank account after they cancelled their subscription and tried deleting the workspace. Fin AI answered generically in a loop and closed the conversation while the customer remained unresolved.\n\nBucket: overcharged (perceived continued charge after cancellation)\n\nFinding: No money was actually collected after the customer's last successful renewal in July. The entries the customer sees are declined automatic retry attempts (insufficient funds) on two unpaid August renewal invoices, not successful charges. Both subscriptions are now cancelled (cancellation reason \"payment_failed\") and no further payment attempt is scheduled. Billing has effectively stopped.\n\nExposure: $0 collected after July. Two open/unpaid invoices remain (Pro $185.00 + 24 inboxes $192.00 = $377.00) in a non-retrying state.\n\nProposed action (Support):\n\n1. Reassure the customer that no money was taken (the entries were declined) and billing is now stopped.\n2. Void or mark uncollectible the two open invoices to clear the delinquent flag and prevent any future collection.\n\nFull evidence is in the Billing investigation document on this ticket."
+    },
+    {
+      "id": "ENG-14496",
+      "createdAt": "2026-09-30T00:51:45.226Z",
+      "title": "Customer's cancellation request left a $129 past-due subscription with a retry scheduled, on the billing account they never cancelled",
+      "state": "Todo",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": ["Customer reported", "Refund", "intercom-sourced"],
+      "description": "Intercom source: <url:app.intercom.com>\n\nConversation context: Contact (Name 10, <email>) opened on 2026-09-30 asking to cancel his domains and Cold Email Agent (AI SDR) client and to stop being billed. Fin AI answered with self-serve cancellation steps and closed the conversation; the contact reopened it and asked for a human. His final message: \"I've gone through the process of cancelling one of the subaccouts (Company One) and the domains/inboxes and further billing. However, I was attempted to be billed yesterday and it did not go through. I want the charges to be cancelled and not attempted to bill me again.\" No amount, invoice id, or date was named. No prior approval, promise, coupon, or discretionary credit appears anywhere in the thread.\n\nAccount: this contact is the owner of two workspaces. Company One, Inc. (created 2026-05-20) carries the domains, inboxes and paid plan. Name 10's Workspace (created 2025-07-14) is the personal $1 Legacy workspace he enrolled first.\n\nAsk (classify_ask): money, bucket 'overcharged'. Two distinct things are mixed in one message: stopping a failed charge and its retry, and a prior billing discrepancy he has never itemized.\n\n## Evidence\n\nSystems of record, read in order.\n\nPlanetScale (acquisity / main):\n\n* Company One billing account 10e96d6f-...: subscriptionStatus null, subscriptionPlan null, domains balance 0, inboxes balance 0, no credit transactions. Its 10 mail_domain rows are all suspended as of 2026-09-30T00:26:57Z.\n* The suspended domains sit under domain_purchase_order d9aaa5e6-... (created 2026-05-27, 10 domains ordered, 29/30 inboxes provisioned, completed 2026-05-28). A second order d0d8aa9b-... (2026-07-25, 20 domains) was cancelled by the user and never paid, so it never billed.\n* Name 10's Workspace, billing account 32f7330c-..., is unchanged and still active.\n\nAutumn:\n\n* Company One (billing account 10e96d6f-...): one subscription, plan legacy_pro at $129/month, status active, past_due true, canceled_at 1790727969812 (2026-09-30, about 22:26 UTC, roughly 18 minutes before the contact's last Intercom message), expires_at 1793135024000, current_period_end 2026-10-27. The cancel was requested inside the product. No cancellations exist for the 10 domain line items or the 10 inbox line items, which is why the domains show suspended rather than cancelled.\n* Name 10's Workspace (billing account 32f7330c-...): plan legacy at $1/month, active, its own Stripe customer <stripe-id>. It kept billing $1/month in Aug and Sep 2026.\n\nStripe:\n\n* Company One, <stripe-id>, is delinquent and carries two subscriptions and two separate billing streams:\n  * <stripe-id>, Legacy Pro $129/month. cancel_at 1793135024, so its next charge has already been stopped. Invoice <stripe-id> (OPDYCP6F-0010), 12900 USD, status open, amount_paid 0, attempt_count 1, next_payment_attempt 1790769908. That scheduled retry is the billing attempt the contact is asking us to stop. The period 2026-08-28 to 2026-09-27 was already collected earlier on charge <stripe-id> on 2026-09-08 after eight declines.\n  * A second Legacy Pro subscription stream under a separate Stripe subscription, invoice OPDYCP6F-0009 (18000 USD, open, attempt_count 9) plus a domain/inbox stream that last billed 18000 USD on invoice OPDYCP6F-0007 (paid 2026-08-24).\n  * Every open charge on this customer is a failed attempt: status failed, card_declined, insufficient_funds (issuer decline code 51), amount_captured 0. No money was collected on any of them.\n  * Total actually taken from this account in Aug and Sep 2026: 18000 + 12900 = 30900 USD. No refunds and no credit notes exist on the account.\n* Name 10's Workspace, <stripe-id>, is current and not delinquent.\n\nName 11:\n\n* No Inngest or Sentry lane was needed to explain the charge itself; the divergence is fully explained by the reads above.\n\n## First divergent hop\n\nNot a system-to-system break: Stripe, Autumn and the workspace disagree about nothing. The gap is between the contact's belief about what he cancelled and what the product cancelled. He cancelled the plan on the Company One workspace, which set the subscription to cancel at period end, and the domains/inboxes were suspended, but the already-issued open invoice for the running period still has a retry scheduled, and the domain/inbox line items were never cancelled as subscriptions.\n\n## Verification\n\nThe in-app billing page he was looking at shows the open $129 charge while the plan already reads as cancelled, which is exactly the \"billing error/discrepancy\" he reported. That reading is consistent with the Stripe state and is a product presentation issue, not a data error.\n\n## What is not established\n\nWhat the earlier discrepancy he referred to on 2026-09-30 consisted of. He never named an amount, invoice, or date, and nothing in the account shows a charge that overstates what he was entitled to for the periods billed. The outstanding retry and the residual domain/inbox subscription state are the only unresolved money items.\n\n## Unblock and open human decision\n\nTwo separate things need a human, and neither is money we can move automatically:\n\n1. Stop the next charge. Cancel the two open invoices' retry (next_payment_attempt 1790769908 on invoice <stripe-id>) and cancel the domain/inbox line items that are still live on the Company Five billing account so nothing is attempted again.\n2. Decide the old discrepancy. Once he names what he believes is wrong, decide whether any refund is owed. Nothing collected after the cancellation date is refundable, because nothing was collected after it."
+    },
+    {
+      "id": "ENG-4440",
+      "createdAt": "2026-01-12T08:35:15.308Z",
+      "title": "billing",
+      "state": "Done",
+      "assignee": "Mahmut Jomaa",
+      "parent": "ENG-4434",
+      "labels": ["Feature"],
+      "description": " <image> "
+    },
+    {
+      "id": "ENG-7008",
+      "createdAt": "2026-03-24T21:12:13.148Z",
+      "title": "Canceled workspaces remain active and continue billing",
+      "state": "Done",
+      "assignee": "Beth Newton",
+      "parent": null,
+      "labels": [],
+      "description": "A customer reports that two Basic-plan workspaces were canceled but still appear active in the system and continue to be billed.\n\nSupport confirmed the account still shows 2 active workspaces on the Basic plan. The customer says both were canceled, does not want the workspaces, and wants access only to already-purchased resources. The latest update is that the system still shows the Basic plan after the customer confirmed the workspaces were canceled.\n\nRequested outcome: cancel the active workspaces so billing stops, and then review/process the refund request for the duplicate charges.\n\n <image> \n\n <image> "
+    },
+    {
+      "id": "ENG-14258",
+      "createdAt": "2026-09-25T03:50:18.072Z",
+      "title": "Flag inactive CMR domains that are still billed as overcharged",
+      "state": "Done",
+      "assignee": "Anthony Adewale",
+      "parent": null,
+      "labels": [],
+      "description": "## Problem\n\nSince Acquisity/Acquisity#6595, the CMR Domain Subscription Audit records domains that are INACTIVE or EXPIRED at ColdMailReseller as `cmr_inactive`. It doesn't check whether the customer is still being billed for them, so a customer paying for a domain that no longer exists at CMR looks identical to one who stopped paying.\n\nThere is also a quieter bug: a dedicated billing subscription for an inactive domain went into the group's shared pool and could count as coverage for an active domain, hiding an unpaid active domain.\n\n## Root cause\n\nClassification only matched billing subscriptions against active domains. Anything attached to an inactive domain was treated as unmatched pool coverage, and inactive domains were never compared against billing.\n\n## Solution\n\n* Match subscriptions against every domain in a billing group. A subscription dedicated to an inactive domain stays with that domain and no longer covers active ones.\n* New payment state `overcharged` for an inactive domain that is still billed. It applies when either:\n  * its dedicated domain/inbox subscription is active and not scheduled to end, or\n  * pooled (unmatched) billing covers more domains/inboxes than the group's active domains need. Surplus is assigned to inactive domains alphabetically: one domain each, inboxes up to each domain's inbox count. If the surplus comes from the billing feature ledger, the note says it may include comped grants.\n* Billing already scheduled to end is not flagged. The domain stays `cmr_inactive` with \"billing ends YYYY-MM-DD\" in the note.\n* Groups where every domain is inactive now get a billing lookup (Acquisity/Acquisity#6595 skipped this).\n* `overcharged` has severity 3, is included in \"Action needed\", the run summary's actionable list, and a new \"Overcharged\" tab with an amber badge. It is not a CMR-cancellable state (the domain is already dead at CMR; the fix is on the billing side) but it can be dismissed.\n* Migration widens `cmr_domain_audit_finding_payment_state_check` with `overcharged` using `NOT VALID` then `VALIDATE`, following Acquisity/Acquisity#6595.\n\n## Impact\n\n* **User:** none directly. Admins can now find customers paying for dead domains and refund/cancel that billing.\n* **Business:** catches overbilling before it becomes a support ticket or chargeback, and stops inactive domains hiding underpayment on active ones.\n\n## Testing\n\n7 new unit tests covering: a dedicated subscription still billing an inactive domain; an inactive domain's subscription no longer covering an active one; surplus from pooled domain billing; surplus from pooled inbox billing split across inactive domains; billing scheduled to end; surplus from the billing feature ledger; and groups where every domain is inactive. Audit, admin, renewal, cancel suites and the snapshot DB test (which applies the migration) also pass.\n\n## Notes\n\n* Expect some active domains to move from `paid` to `unpaid`/`underpaid` on the first run.\n* When overcharge comes from pooled billing, which inactive domain carries it is arbitrary; the group total is correct.\n* Not covered: billing for domains that have disappeared from CMR entirely (no finding row to attach it to).\n* Rollback: revert the PR. The widened constraint is harmless if left in place.\n\nFollows Acquisity/Acquisity#6595."
+    },
+    {
+      "id": "ENG-13550",
+      "createdAt": "2026-09-07T20:08:57.487Z",
+      "title": "3 Months Acquisity , Inboxes & Domains + 10 000 Lead Credits",
+      "state": "Done",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [],
+      "description": "#### User Email\n\n<email>\n\n#### Workspace Name\n\n#Name 100\n\n#### Request Type\n\nDiscount code\n\n#### Reason for request\n\nRefund save with the 90 Day Challenge\n\n3 Months Acquisity , Inboxes & Domains + 10 000 Lead Credits"
+    },
+    {
+      "id": "ENG-14374",
+      "createdAt": "2026-09-28T12:06:08.799Z",
+      "title": "Billing card shows CMR-ended domains as Active while they are still billed",
+      "state": "Done",
+      "assignee": "Anthony Adewale",
+      "parent": null,
+      "labels": [],
+      "description": "## Problem\n\nThe CMR domain audit marks a domain `overcharged` when CMR has ended it but Autumn/Whop billing still renews (e.g. a domain cancelled in CMR on Sep 25 with inbox billing still renewing Oct 25).\n\nThe **customer** billing card had no case for `overcharged`, so those domains showed:\n\n* no billing badge\n* inboxes labelled **Active**\n* a **\"Payment due\"** countdown\n\nSo a customer paying for a domain that no longer exists saw the opposite of the truth, with no signal that anything was wrong. The admin side has flagged this since ENG-14258; the customer side never did.\n\n## Solution\n\n* `DomainBillingBadge`: `overcharged` renders **\"Ended <date> · Still billed\"** (warning) with a tooltip telling the customer to cancel to stop billing.\n* New `isOverchargedDomainBilling` and `isEndedDomainBilling` helpers.\n* `EmailAccountsDomainsCard`: for ended domains (inactive or overcharged), inboxes show **\"Ended\"** and the payment-due column is hidden.\n* The **Cancel button stays** for overcharged domains — `cancelManagedDomainInProvider` already treats CMR \"already cancelled / not found\" as success, so cancelling proceeds to cancel the billing. This is the customer's self-serve fix.\n\n## Regression guard\n\nAdds a test that **every** audit payment state renders a badge except the internal `unlinked` and `error`, so a newly added state cannot silently render nothing again — which is exactly how this bug arose when `overcharged` was introduced.\n\n## Testing\n\n* `bunx vitest run tests/components/billing/domain-billing-badge.test.tsx` — 11 passed.\n* Biome, tsc on changed files, `check-v2 --changed` clean.\n\n## Coordination note\n\nAcquisity/Acquisity#6642 (ENG-14340) also edits `email-accounts-domains-card.tsx` and is still open. The two are logically consistent — ENG-14340 hides Cancel for `cmr_inactive` (nothing left to cancel), this one deliberately keeps it for `overcharged` (billing is still running, so cancelling is the fix) — but they will likely conflict in that file. Worth landing them in a deliberate order.\n\n## Notes\n\n3 files, +55/-4. Part of the CMR domain audit series."
+    },
+    {
+      "id": "ENG-11113",
+      "createdAt": "2026-07-02T20:24:29.358Z",
+      "title": "Refund request for charges after subscription cancellation",
+      "state": "Done",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": ["intercom-sourced"],
+      "description": "#### User Email\n\n<email>\n\n#### Workspace Name\n\nName 12's Workspace\n\n#### Request Type\n\nRefund\n\n#### Reason for request\n\nName: Name 12\nIntercom Chat: <url:app.intercom.com>\nReason for refund: The subscriptions were canceled at the end of May, but the customer continued to be charged afterward.\nThis is for acquisity, inboxes, and domains\n\nCharged: $24 + $120 + $129\nTotal: $273\n\nScreenshot\n\n <image> \n\n <image> \n\n <image> \n\n <image> "
+    },
+    {
+      "id": "ENG-14548",
+      "createdAt": "2026-09-30T20:58:50.943Z",
+      "title": "Refund request from Name 13",
+      "state": "Todo",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": ["Customer reported", "Refund"],
+      "description": "#### User Email\n\n<email>\n\n#### Workspace Name\n\n<workspace-slug>\n\n#### Request Type\n\nRefund\n\n#### Reason for request\n\nDear Acquisity Team,\n\nI am extremely disappointed and frustrated with my experience with Acquisity. Despite repeated attempts to get my business launched, my marketing campaign has still not started, yet I have continued to be charged.\n\nTo date, I have been charged $185 for Acquisity Pro, an additional $72, followed by two separate charges of $197.93, including one today. Other amounts: $185 and $126. Total refund: $963.89. (This is a alot of money to be deducted for a business that has not started or launched yet).\n\nI have also repeatedly requested support in developing an AI Voice/Receptionist Agent for Company Two—an important part of demonstrating AI solutions to prospective clients. Unfortunately, these requests have resulted in little meaningful communication or progress.\n\nAt this point, I have lost confidence in the service and have decided to discontinue my relationship with Acquisity.\n\nI am therefore requesting immediate cancellation of my account and a full refund of all amounts charged. Please also ensure that no further charges are made to my account.\n\nPlease confirm in writing that my account has been canceled, the total amount being refunded, and when I can expect the refund.\n\nI had hoped for a successful partnership, but the repeated charges without a successful launch or adequate support have left me with no reasonable alternative.\nI wish you all the best in your future endeavors.\n\nSincerely,\n\nName 13\nCompany Three (Company Two)"
+    },
+    {
+      "id": "ENG-13761",
+      "createdAt": "2026-09-13T14:23:28.156Z",
+      "title": "Refund request",
+      "state": "unknown",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": ["Customer reported", "Refund", "intercom-sourced"],
+      "description": "#### User Email\n\n<email>\n\n#### Workspace Name\n\n#### Request Type\n\nRefund\n\n#### Reason for request\n\nI am writing to formally request an immediate refund of two charges in the amounts of $185 and $72 that were deducted from my bank account.  At this time, I have not launched my campaign, commenced business operations through your platform, or activated my website. Therefore, I was surprised to discover that these charges had been processed.  Furthermore, I did not receive an invoice or prior billing documentation explaining or authorizing these deductions. As I did not knowingly authorize these charges, I am requesting that the full amount of $257 be refunded immediately to the original method of payment.  I also request an itemized invoice or billing statement showing the nature and basis of both charges for my accounting and tax records.  Unfortunately, these unexpected deductions have disrupted other payments that were scheduled to be processed from the same account. I would therefore appreciate your treating this matter with urgency and confirming:      - That the full $257 refund has been initiated;      - The expected timeframe for the funds to be returned;      - An itemized invoice or statement for the charges; and      - Confirmation that no additional charges will be processed without my    authorization.  I would appreciate your prompt attention and written confirmation once the refund has been processed.  Thank you for your immediate assistance.  Kind regards,\n\n#### Intercom source\n\n<url:app.intercom.com> (conversation 215475918223546)\n\n#### Workspace name\n\nName 13's Workspace (slug `<workspace-slug>`, org `<uuid>`)\n\n#### Investigation\n\nAll three systems of record agree: the Pro plan ($185/mo) and the 3 domains ($18/yr each) plus 9 inboxes ($8 each/mo, billed as three $24 bundles) are active and correct. Four charges totalling $568.00 were captured, none refunded, no credit notes, customer balance $0.00. The two charges the customer disputes ($185 and $72) are the 12 September renewals. See the attached Billing investigation document.\n\n#### Proposed human action\n\nReply to the customer to confirm the disputed charges and refund decision. No approval or promise is on record, so this is a human discretion call."
+    },
+    {
+      "id": "ENG-12055",
+      "createdAt": "2026-07-26T13:01:35.194Z",
+      "title": "Docs Gap: Help Center does not explain unpaid/\"Open\" invoices appearing as a second Pro charge",
+      "state": "Done",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": ["Docs Gap", "intercom-sourced"],
+      "description": "DOCS GAP: The Billing docs (`apps/web/content/docs/workspace-settings/billing.mdx`) have an \"I was charged twice\" troubleshooting entry, but it only covers prorated plan changes and credit-pack overlap. Nothing explains billing-history invoice statuses — specifically that an invoice marked **Open** is an *unpaid/failed* charge, not money collected, and that a failed Pro renewal can sit as an Open invoice while a later successful re-subscription creates a second Pro line item on a different date. Customers (and Fin) read this as two active Pro subscriptions. The \"My payment failed\" entry also says \"the system will try again automatically\" but does not say what happens after retries are exhausted (subscription canceled, invoice left Open, resubscribe required).\n\nCUSTOMER CONTEXT: Name 14 (<email>, workspace `<workspace-slug>`) saw a Pro charge dated Jul 8 ($185, status Open) and another Pro charge dated Jul 25 ($184.25) and believed he was paying for two Pro subscriptions. Evidence: Stripe customer `<stripe-id>` — invoice `<stripe-id>` (Jul 8, $185) is still **open** with 9 failed payment attempts (\"The connection to the user's Link account has been closed\"); the original Pro subscription `<stripe-id>...` was canceled 2026-07-22 after dunning; a new Pro was purchased 2026-07-25 (`<stripe-id>...`, $184.25, paid). Autumn shows exactly one active `pro` product plus inbox/domain add-ons. Only one Pro payment was ever collected per period — no duplicate subscription.\n\nSUGGESTED CONTENT: Add a Help Center section \"Understanding your billing history statuses\" (Paid / Open / Void / Uncollectible) with an explicit note that Open = never charged, and extend the \"My payment failed\" accordion with what happens when retries run out (plan canceled, unpaid invoice stays visible, how to resubscribe). Also add a bullet to \"I was charged twice\": \"If one of the charges is marked Open, it was never collected.\"\n\nRELATED DOC(S):\n\n* <url:app.acquisity.ai> (Troubleshooting → \"I was charged twice\", \"My payment failed\")\n* Fin answered this conversation with an incorrect \"prorated adjustment\" explanation; the source content should be corrected so Fin stops asserting proration for failed-payment cases.\n\nINTERCOM: <url:app.intercom.com>\nSLACK THREAD: <url:acquisityworkspace.slack.com>\nDEVIN SESSION: <url>"
+    },
+    {
+      "id": "ENG-7268",
+      "createdAt": "2026-03-27T11:47:14.468Z",
+      "title": "Cancel all V1 domains while keeping V2 domains",
+      "state": "Done",
+      "assignee": "Tyler Olsen",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "#### Customer Name\n\nName 15\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 15\n\n#### Screenshot\n\n <image> \n\n#### What are you trying to achieve?\n\nCanceling V1 domains\n\n#### What are you doing to achieve it?\n\nTrying to see if I can cancel all domains showed in the screenshot for him\n\n#### What is happening instead?\n\non the plattform it only shows V2 domains\n\n#### What is the expected outcome?\n\nCancel all V1 domains and keep V2 - he has 5 V2 domains"
+    }
+  ]
+}

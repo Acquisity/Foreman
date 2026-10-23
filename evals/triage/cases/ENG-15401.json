@@ -1,0 +1,230 @@
+{
+  "id": "ENG-15401",
+  "provenance": "seeded",
+  "createdAt": "2026-10-14T15:34:27.212Z",
+  "lane": "triage",
+  "stratum": "bug_master",
+  "ticket": {
+    "title": "Client wants to know how to click on an embedded button within the AI SDR",
+    "description": "#### Customer Name\n\nName 12\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\n<domain>\n\n#### Screenshot\n\n#### What are you trying to achieve?\n\nClient is asking whether you can click on embedded buttons within the AI SDR (he is saying that he could do it before via help from the tech support)\n\n#### What are you doing to achieve it?\n\nReaching out to you guys\n\n#### What is happening instead?\n\nClient cannot book on the prospects calendar to have a meeting\n\n#### What is the expected outcome?\n\nExplain how the client can book onto his clients prospects calendar without the need to see the button",
+    "attachmentKinds": ["slack"]
+  },
+  "repoCommitAtCreate": "2469595bc6b45eb27d4ff3b98e8d22f319d18133",
+  "flags": {
+    "descriptionEditedAfterCreate": false,
+    "needsProductionData": true,
+    "alreadyFixedAtTriage": false
+  },
+  "relatedSnapshot": [
+    {
+      "id": "ENG-5207",
+      "createdAt": "2026-02-06T11:42:11.027Z",
+      "title": "pipedream connection modal z-index is behind something",
+      "state": "Canceled",
+      "assignee": "Pieter Venter",
+      "parent": null,
+      "labels": [],
+      "description": "When clicking to connect an account with pipedream in development mode, it appears that the continue button is not clickable because of something being in the way. Make sure the z-index for the iframe is high so we can click it"
+    },
+    {
+      "id": "ENG-7070",
+      "createdAt": "2026-03-25T05:39:00.960Z",
+      "title": "Embedded checkout section + sub-components",
+      "state": "Canceled",
+      "assignee": null,
+      "parent": null,
+      "labels": ["Feature"],
+      "description": "## Overview\n\nA **store builder section type** that renders the full checkout flow inline on the page — no redirect to an external checkout page. This follows the Funnelish/Checkoutchamp pattern where checkout is embedded directly in the storefront, maximizing conversion by avoiding redirects. The checkout is a multi-step form (Contact → Shipping → Payment → Review) with a persistent order summary sidebar.\n\n**This is NOT a standalone page.** It is a section type in the section registry that gets composed into pages by the store builder.\n\n---\n\n## Section Registry Entry\n\nRegister in `lib/commerce/store-builder/section-registry.ts`:\n\n```typescript\ncheckout_embed: {\n  type: 'checkout_embed',\n  label: 'Embedded Checkout',\n  icon: CreditCard, // from lucide-react\n  defaultProps: {\n    showOrderSummary: true,\n    showStepIndicator: true,\n    compactMode: false,        // single column instead of form + sidebar\n  },\n  propsSchema: z.object({\n    showOrderSummary: z.boolean(),\n    showStepIndicator: z.boolean(),\n    compactMode: z.boolean(),\n  }),\n}\n```\n\n---\n\n## Editor Component\n\n**File:** `section-editors/CheckoutEmbedEditor.tsx`\n\nThe right-sidebar form that admins use to configure this section in the builder:\n\n* **Show order summary** — toggle switch (sidebar with line items and totals)\n* **Show step indicator** — toggle switch (breadcrumb navigation at top)\n* **Compact mode** — toggle switch (single column layout instead of form + sidebar — useful for narrow page layouts)\n\n---\n\n## Renderer Component\n\n**File:** `section-renderers/CheckoutEmbedRenderer.tsx`\n\nWhat the customer sees (used in both builder preview and published storefront):\n\n* Reads cart data from StorefrontProvider context\n* Creates or resumes a checkout session on mount\n* Renders `<CheckoutFlow>` with configured props and cart/checkout data\n* In builder preview mode: shows a mock checkout with sample data for visual editing\n* If cart is empty: shows message with link back to store\n\n---\n\n## Sub-Components\n\nAll live in `components/commerce/storefront/checkout/`.\n\n### 1\\. CheckoutFlow.tsx\n\n* **Props:** section config props + StorefrontProvider context for cart + checkout session state\n* Orchestrates the multi-step flow with step state management\n* Creates checkout session on mount via `commerce.storefront.createCheckout(cartId)`, or resumes existing session from URL param `?resume={checkoutId}`\n* **Layout:**\n  * **Default mode (two-column):** form steps (left, wider) + order summary (right, sticky)\n  * **Compact mode:** single column, order summary as collapsible accordion above form\n  * **Mobile (always):** order summary as collapsible accordion above form steps\n* Step state tracked in URL via `nuqs`: `?step=contact|shipping|payment|review`\n* Each step transition updates the checkout session server-side before advancing\n\n### 2\\. StepIndicator.tsx\n\n* **Props:** `{ steps: string[], currentStep: number }`\n* Horizontal breadcrumb: Contact → Shipping → Payment → Review\n* **Completed steps:** checkmark icon (Check from lucide-react), clickable to navigate back to that step\n* **Current step:** highlighted with accent color from branding, bold text\n* **Future steps:** dimmed/muted (`text-ds-text-tertiary`), not clickable\n* Responsive: on very small screens, show abbreviated step names or step numbers\n\n### 3\\. ContactStep.tsx\n\n* **Props:** `{ onComplete: (data: ContactData) => void, defaultValues?: ContactData }`\n* **Fields:**\n  * Email (required, validated as email)\n  * Phone (optional)\n  * **Shipping address:** firstName, lastName, addressLine1, addressLine2 (optional), city, state/province, postalCode, country (select dropdown)\n  * **Billing address:** \"Same as shipping\" checkbox (checked by default) — if unchecked, shows separate billing address form with same fields\n* Validation: Zod schema with React Hook Form (`useForm` + `zodResolver`)\n* On submit: saves contact + addresses to checkout session via tRPC → advances to shipping step\n* Auto-fills from existing checkout session if resuming\n\n### 4\\. ShippingStep.tsx\n\n* **Props:** `{ onComplete: (methodId: string) => void, shippingAddress: Address, availableMethods: ShippingMethod[] }`\n* Fetches available shipping methods based on the address from the previous step via `commerce.storefront.getShippingOptions(checkoutId)`\n* **Radio button list** of shipping methods, each showing:\n  * Method name (e.g., \"Standard Shipping\", \"Express Shipping\")\n  * Description/carrier info\n  * Price (formatted) or **\"Free\"** badge (`<Badge variant=\"success\">Free</Badge>`) when price is 0\n  * Estimated delivery timeframe (e.g., \"5-7 business days\")\n* On select: saves shipping method to checkout session via tRPC → advances to payment step\n* Loading state: skeleton rows while fetching shipping options\n* Error state: message if no shipping methods available for the address\n\n### 5\\. PaymentStep.tsx\n\n* **Props:** `{ onComplete: (paymentData: PaymentData) => void, checkoutTotal: number }`\n* Integrates payment provider card element (Stripe Elements or equivalent payment form)\n* Shows the total amount to be charged, formatted with currency\n* **\"Pay {formatted amount}\"** submit button\n* Handles 3DS/SCA authentication redirect and return\n* On authorization success: advances to review step with payment confirmation\n* On failure: shows error message inline, allows retry without losing entered data\n* Loading state during payment processing (spinner + disabled button)\n\n### 6\\. ReviewStep.tsx\n\n* **Props:** `{ checkout: CheckoutSession, onPlaceOrder: () => Promise<void> }`\n* Full summary of the order before final placement:\n  * **Items:** product thumbnails, titles, variants, quantities, line prices\n  * **Contact:** email, phone\n  * **Shipping address:** formatted multi-line address\n  * **Billing address:** formatted (or \"Same as shipping\")\n  * **Shipping method:** name + price\n  * **Payment method:** card type icon + last 4 digits\n  * **Totals:** subtotal, discount, shipping, tax, grand total\n* Each section has an \"Edit\" link that navigates back to the corresponding step\n* **\"Place Order\"** button — calls order placement API\n* On success: redirect to confirmation/thank-you page or show inline confirmation message\n* **Name 1:** sends a unique `idempotencyKey` with the place-order request to prevent double-orders on retry/refresh\n* Loading state: \"Placing Order...\" with spinner on button\n\n### 7\\. OrderSummary.tsx\n\n* **Props:** `{ items, subtotal, discountTotal, shippingTotal, taxTotal, grandTotal, currency }`\n* **Name 2 (two-column mode):** sticky sidebar on the right side of the checkout form\n* **Mobile / Compact mode:** collapsible accordion above the form steps (collapsed by default, showing just item count and total; expandable to show full details)\n* Line items: thumbnail (40x40), product title, variant info, qty × unit price\n* Totals breakdown (reuses the same pattern as `CartTotals`):\n  * Subtotal, Discount (if > 0), Shipping (or \"Calculated at checkout\"), Tax (or \"Calculated at checkout\"), separator, **Total** (bold)\n* Updates in real-time as the checkout progresses (e.g., shipping cost added after shipping step)\n\n---\n\n## Checkout Session Management\n\n**tRPC procedures (public, no auth required):**\n\n* `commerce.storefront.createCheckout(cartId)` → returns `checkoutId`\n* `commerce.storefront.updateCheckoutContact(checkoutId, contactData)` — saves email, phone, addresses\n* `commerce.storefront.getShippingOptions(checkoutId)` — returns available shipping methods for the saved address\n* `commerce.storefront.selectShippingMethod(checkoutId, methodId)` — saves selected shipping\n* `commerce.storefront.getCheckoutTotals(checkoutId)` — returns updated totals with shipping + tax calculated\n* `commerce.storefront.createPaymentIntent(checkoutId)` — creates payment authorization with provider\n* `commerce.storefront.placeOrder(checkoutId, idempotencyKey)` — finalizes the order\n\n**Resume checkout:** If the URL contains `?resume={checkoutId}`, load the existing checkout session instead of creating a new one. This enables abandoned checkout recovery emails to link customers directly back to their in-progress checkout.\n\n---\n\n## Codebase Reference\n\n| Pattern | File |\n| -- | -- |\n| React Hook Form | Used throughout codebase for forms — `useForm` + `zodResolver` |\n| Zod validation | Standard pattern for form schemas |\n| Sheet component | `components/ui/sheet.tsx` — for mobile order summary if needed |\n| Accordion | `components/ui/accordion.tsx` — for collapsible order summary on mobile |\n| Button component | `components/ui/button.tsx` |\n| Input component | `components/ui/input.tsx` |\n| Select component | `components/ui/select.tsx` — for country dropdown |\n| Badge component | `components/ui/badge.tsx` — \"Free\" shipping badge |\n| Skeleton | `components/ui/skeleton.tsx` |\n| Price formatting | `lib/commerce/pricing.ts` — `formatPrice()` |\n| Design tokens | `bg-ds-frame`, `text-ds-text-primary`, `text-ds-text-secondary`, `text-ds-text-tertiary`, `border-ds-border` |\n| URL state (nuqs) | Step state tracked in URL: `?step=contact|shipping|payment|review` |\n| tRPC client | `import { trpc } from ' at /trpc/client'` |\n| Section registry | `lib/commerce/store-builder/section-registry.ts` |\n| StorefrontProvider | `components/commerce/storefront/StorefrontProvider.tsx` — cart context, branding |\n\n---\n\n## Storefront Route Context\n\nThe thin page wrapper at `app/(storefront)/[storeSlug]/checkout/page.tsx` renders this section. That page simply loads the `checkout_embed` section — all UI logic lives here in the renderer and sub-components.\n\n**StorefrontProvider** provides: `storeSlug`, `organizationId`, `branding` (logoUrl, primaryColor, accentColor — used for step indicator highlighting), `settings` (storeName, currency), and cart context.\n\n---\n\n## Implementation Steps\n\n 1. Add `checkout_embed` type to `StoreSectionType` enum if not already present\n 2. Add the registry entry to `SECTION_REGISTRY` with type, label, icon, defaultProps, and propsSchema\n 3. Create `StepIndicator.tsx` — horizontal breadcrumb with completed/current/future step states\n 4. Create `OrderSummary.tsx` — sticky sidebar (desktop) / collapsible accordion (mobile) with items and totals\n 5. Create `ContactStep.tsx` — email, phone, shipping address, billing address form with Zod + React Hook Form\n 6. Create `ShippingStep.tsx` — radio button list of shipping methods with prices and delivery estimates\n 7. Create `PaymentStep.tsx` — payment provider card element integration with 3DS handling\n 8. Create `ReviewStep.tsx` — full order summary with edit links and \"Place Order\" button with idempotency\n 9. Create `CheckoutFlow.tsx` — step orchestrator with nuqs URL state, two-column / compact layout, session management\n10. Create `CheckoutEmbedRenderer.tsx` — session creation/resume, cart validation, loading state, builder preview mock\n11. Create `CheckoutEmbedEditor.tsx` — right-sidebar form with toggle switches\n12. Add `commerce.storefront.createCheckout` tRPC public procedure\n13. Add `commerce.storefront.updateCheckoutContact` tRPC public procedure\n14. Add `commerce.storefront.getShippingOptions` tRPC public procedure\n15. Add `commerce.storefront.selectShippingMethod` tRPC public procedure\n16. Add `commerce.storefront.getCheckoutTotals` tRPC public procedure\n17. Add `commerce.storefront.createPaymentIntent` tRPC public procedure\n18. Add `commerce.storefront.placeOrder` tRPC public procedure with idempotency key support\n19. Implement checkout session resume from `?resume={checkoutId}` URL param\n20. Implement step navigation: forward on completion, backward via step indicator clicks or edit links\n21. Handle edge cases: expired checkout, empty cart, payment failure, network errors\n22. Implement \"same as shipping\" billing address toggle\n23. Add form auto-fill from existing checkout session data (for resume flow)\n24. Add loading skeletons for each step and the overall checkout layout\n25. Test complete flow: contact → shipping → payment → review → place order\n26. Test resume flow: navigate away then return via `?resume=` param\n27. Test payment failure and retry\n28. Test idempotency: double-clicking \"Place Order\" should not create duplicate orders\n29. Verify responsive layout at all breakpoints (two-column, compact, mobile)\n\n---\n\n## Acceptance Criteria\n\n- [ ] `checkout_embed` section type is registered in `SECTION_REGISTRY` with correct type, label, icon, defaultProps, and propsSchema\n- [ ] Editor component renders all configurable fields: showOrderSummary, showStepIndicator, compactMode\n- [ ] Checkout session created on mount from cart ID\n- [ ] Checkout session resumed from `?resume={checkoutId}` URL param\n- [ ] Empty cart shows appropriate message with link back to store\n- [ ] StepIndicator renders all 4 steps with correct completed/current/future states\n- [ ] Completed steps are clickable to navigate back\n- [ ] Future steps are dimmed and not clickable\n- [ ] Step state tracked in URL via nuqs (`?step=contact|shipping|payment|review`)\n- [ ] ContactStep validates email (required), phone (optional), and address fields via Zod\n- [ ] \"Same as shipping\" checkbox toggles billing address form visibility\n- [ ] ContactStep saves data to checkout session before advancing\n- [ ] ShippingStep fetches and displays available shipping methods for the address\n- [ ] Free shipping shows \"Free\" badge instead of $0.00\n- [ ] ShippingStep saves selected method before advancing\n- [ ] PaymentStep integrates payment provider card element\n- [ ] PaymentStep shows formatted total amount on submit button\n- [ ] 3DS/SCA redirect and return handled correctly\n- [ ] Payment failure shows inline error with retry capability\n- [ ] ReviewStep displays complete order summary (items, addresses, shipping, payment, totals)\n- [ ] ReviewStep \"Edit\" links navigate to the correct step\n- [ ] \"Place Order\" sends idempotency key to prevent duplicates\n- [ ] Order placement success redirects to confirmation or shows inline confirmation\n- [ ] OrderSummary renders as sticky sidebar on desktop (two-column mode)\n- [ ] OrderSummary renders as collapsible accordion on mobile and in compact mode\n- [ ] OrderSummary updates in real-time as checkout progresses (shipping cost, tax)\n- [ ] Two-column layout on desktop, single column + accordion on mobile\n- [ ] Compact mode renders single column at all breakpoints\n- [ ] Form data persists when navigating back to previous steps\n- [ ] Loading skeletons shown during data fetches and step transitions\n- [ ] All monetary values formatted via `formatPrice()` with correct currency\n- [ ] All design tokens used correctly (no hardcoded colors)\n\n---\n\n## Verification\n\n- [ ] Section appears in the builder's \"Add Section\" panel with CreditCard icon\n- [ ] Drag-and-drop onto a page creates section with correct defaultProps\n- [ ] Builder preview renders checkout section with mock data for visual editing\n- [ ] Full checkout flow works end-to-end: contact → shipping → payment → review → order placed\n- [ ] Step indicator correctly reflects progress through the flow\n- [ ] Navigating back to completed steps preserves entered data\n- [ ] Shipping methods load correctly based on entered address\n- [ ] Payment processes successfully and handles 3DS when required\n- [ ] Payment failure allows retry without re-entering card details\n- [ ] \"Place Order\" is idempotent (double-click safe)\n- [ ] Resume flow: leaving mid-checkout and returning via `?resume=` param restores state\n- [ ] Order summary totals update after each step (shipping added, tax calculated)\n- [ ] Mobile layout: accordion summary + single column form\n- [ ] Compact mode: single column at all breakpoints\n- [ ] Published storefront renders the section identically to builder preview\n- [ ] Performance: step transitions are smooth, no unnecessary re-renders\n- [ ] All design tokens used correctly (no hardcoded colors)\n- [ ] Forms follow existing codebase patterns (React Hook Form + Zod)"
+    },
+    {
+      "id": "ENG-5323",
+      "createdAt": "2026-02-09T13:00:16.739Z",
+      "title": "Fix bug preventing Acquisity button from being clicked",
+      "state": "Done",
+      "assignee": "Jared Stauffer",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "#### Customer Name\n\nName 3\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 3\n\n#### Screenshot\n\n#### What are you trying to achieve?\n\nWhen clicking the Acquisity button when trying to connect to the provider, it won't let him click the button.\n\n#### What are you doing to achieve it?\n\nTried to Troubleshoot on call, but it's a bug\n\n#### What is happening instead?\n\nBut I'm not working - <loom>\n\n#### What is the expected outcome?\n\nTo fix the bug so he can sign up for Acquisity"
+    },
+    {
+      "id": "ENG-8812",
+      "createdAt": "2026-05-13T17:56:08.505Z",
+      "title": "Recent Generations: missing tooltips + card click race opens ad on save-to-board",
+      "state": "Done",
+      "assignee": "Aaron Kern",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "## Problem\n\nThe Recent Generations / ad asset cards still have a couple of UX gaps:\n\n* missing tooltips for key metadata\n* click propagation issues where secondary actions can accidentally open the ad detail modal\n\n## Code grounding\n\n* Main card/grid surfaces: `components/ecom-ads/ad-asset-card.tsx`, `ad-asset-grid.tsx`\n* Detail modal opened from these surfaces: `ad-detail-modal.tsx`\n* The issue should map to the actual metadata surfaces rendered in the asset card, not generic imagined labels\n\n## Goal\n\nMake card metadata easier to understand and make card actions safer and more predictable.\n\n## Expected behavior\n\n* Metadata icons such as angle/format show helpful hover information\n* Save-to-board or similar secondary actions do not bubble into the primary card click\n* Opening the detail modal only happens from the intended click target\n\n## Implementation guidance\n\n* Wire tooltip components into the actual metadata icons rendered in `ad-asset-card.tsx`\n* Audit secondary action handlers and add `stopPropagation()` where needed\n* Verify the resulting behavior in both Recent Generations and All Name 4 if they share the same card component\n\n## Acceptance criteria\n\n* Relevant card icons have working explanatory tooltips\n* Secondary action clicks no longer accidentally open the detail modal\n* Card interaction feels consistent and intentional"
+    },
+    {
+      "id": "ENG-15151",
+      "createdAt": "2026-10-11T15:22:26.725Z",
+      "title": "Publish auth.md so agents know how to authenticate",
+      "state": "Canceled",
+      "assignee": "Aaron Fraga",
+      "parent": "ENG-15145",
+      "labels": [],
+      "description": "Describe OAuth (MCP), API keys and errors for agents at /auth.md."
+    },
+    {
+      "id": "ENG-10814",
+      "createdAt": "2026-06-25T11:47:25.965Z",
+      "title": "Unable to click connect button for domain configuration",
+      "state": "Triage",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [],
+      "description": "#### Customer Name\n\nName 5\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nCompany One\n\n#### Screenshot\n\n#### What are you trying to achieve?\n\nClient trying to connect his website to his domain\n\n#### What are you doing to achieve it?\n\nHe has updated the DNS records and I checked inside of his code ID\n\n#### What is happening instead?\n\nBut on this screen it's not allowing  to click the button to connect to the domain - and thus it's not working - <loom>\n\n#### What is the expected outcome?\n\nTo connect his website"
+    },
+    {
+      "id": "ENG-2131",
+      "createdAt": "2025-10-21T08:57:16.130Z",
+      "title": "Expand on novu escalation, so when users see errors, they know how to deal with them",
+      "state": "Done",
+      "assignee": "Anthony Adewale",
+      "parent": null,
+      "labels": [],
+      "description": "Improve novu escalation error handling and documentation to provide clear guidance to users when they encounter errors. Users should understand what the error means and what steps they can take to resolve it."
+    },
+    {
+      "id": "ENG-2604",
+      "createdAt": "2025-11-05T15:17:02.483Z",
+      "title": "Growth Plan Creator - Text not saving when clicking \"Save\" button",
+      "state": "Canceled",
+      "assignee": null,
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "## Found Problem\n\nWhen editing information in the Growth Plan Creator, text being added is not saving when the \"Save\" button is clicked. The user adds text to a field, clicks save, but the changes are lost.\n\n## Reproduction Steps\n\n1. Navigate to the Growth Plan Creator tool\n2. Edit information in any text field (e.g., \"Current Monthly Investment\" field shown in screenshot)\n3. Add or modify text content\n4. Click the \"Save\" button\n5. Observe that the text changes are not persisted\n\n## User Information\n\n* **Reported by:** Name 6\n* **Date:** November 5, 2025\n\n## Expected Behavior\n\nWhen a user edits text in the Growth Plan Creator form and clicks \"Save\", the changes should be persisted and visible when the user returns to that section or refreshes the page.\n\n## Screenshot\n\nUser provided a screenshot showing the Growth Plan Creator interface with \"Current Monthly Investment\" field displaying \"spending $2k a month on lead gen\" with Save/Cancel buttons visible.\n\n <image> \n\n## Related Slack Thread\n\n<url:codegen-sh.slack.com>"
+    },
+    {
+      "id": "ENG-14171",
+      "createdAt": "2026-09-23T17:40:26.490Z",
+      "title": "Show how many messages are scheduled on the Conversations Scheduled button",
+      "state": "Backlog",
+      "assignee": null,
+      "parent": "ENG-14113",
+      "labels": [],
+      "description": "## Overview\n\nThe Scheduled messages button in the v2 Conversations header shows a small count of the rep's pending scheduled texts and emails, so they can see at a glance that something is queued.\n\n## Problem\n\nThe scheduled messages list returns pages, not a total, so the v2 screen shows the button without a count.\n\n## Done when\n\n* The button shows the number of pending scheduled messages the rep may see, using the same scope as the Scheduled page.\n* The count updates after scheduling or cancelling a message.\n* No count shows when there are none.\n\n## Design\n\nKit element: the pending count badge on the Scheduled messages button. Design (full kit): Acquisity v2 Kit, Conversations, route `#/screen/crm-conversations` (private until James shares it)."
+    },
+    {
+      "id": "ENG-3466",
+      "createdAt": "2025-12-05T18:19:48.740Z",
+      "title": "Fix workflow for no provider connected when new campaign button clicked",
+      "state": "Duplicate",
+      "assignee": "Anthony Adewale",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "Users are getting an error \"Failed to create campaign draft: Something went wrong\".\n\nDetect when this happens due to no provider connected. Show nice error message and redirect user to the Cold Email Agent Settings page.\n\nError message: \"Please connect a provider to create a new campaign.\" with a button that says \"Continue to Provider Settings\"."
+    },
+    {
+      "id": "ENG-3479",
+      "createdAt": "2025-12-05T22:44:24.248Z",
+      "title": "Refactor embeddings utility to normalize vectors",
+      "state": "Done",
+      "assignee": "Blaise Gulaj",
+      "parent": null,
+      "labels": ["Refactor"],
+      "description": "```\nEmbedding Utility Refactor\nChanges\n1. Create lib/ai/embeddings.ts\nNew utility file with:\n\nimport \"server-only\";\nimport { openRouterSdk } from \"./openrouter-sdk\";\n\nconst DEFAULT_MODEL = \"google/gemini-embedding-001\";\nconst DEFAULT_DIMENSIONS = 1536;\n\nfunction normalizeEmbedding(embedding: number[]): number[] {\n  const norm = Math.sqrt(embedding.reduce((sum, val) => sum + val * val, 0));\n  if (norm === 0) return embedding;\n  return embedding.map((val) => val / norm);\n}\n\ninterface GenerateEmbeddingOptions {\n  model?: string;\n  dimensions?: number;\n}\n\nexport async function generateEmbedding(\n  input: string,\n  options?: GenerateEmbeddingOptions\n): Promise<number[]> {\n  const model = options?.model ?? DEFAULT_MODEL;\n  const dimensions = options?.dimensions ?? DEFAULT_DIMENSIONS;\n\n  const response = await openRouterSdk.embeddings.generate({\n    model,\n    input,\n    dimensions,\n  });\n\n  const embeddingData = response.data?.[0]?.embedding;\n  if (!embeddingData || typeof embeddingData === \"string\") {\n    throw new Error(\"Invalid embedding response format\");\n  }\n\n  // Normalize for dimensions other than 3072 (per Name 4's recommendation)\n  return dimensions === 3072 ? embeddingData : normalizeEmbedding(embeddingData);\n}\n2. Update lib/ai/index.ts\nAdd export:\n\nexport { generateEmbedding } from \"./embeddings\";\n3. Update inngest/functions/slack-message.ts\nReplace the inline embedding logic (~lines 687-698) with:\n\nimport { generateEmbedding } from \" at /lib/ai\";\n\n// In the embed-message step:\nconst messageEmbedding = await generateEmbedding(fullContext);\nRemove the OpenRouter SDK import from this file since it's no longer needed directly.\n```"
+    },
+    {
+      "id": "ENG-1941",
+      "createdAt": "2025-10-16T06:14:18.063Z",
+      "title": "Clicking on the send button doesn't do anything",
+      "state": "Duplicate",
+      "assignee": "Blaise Gulaj",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "**Steps:**\n\n1. Navigate to the page.\n2. Click on the text area.\n3. Type \"Tell me somthing\" and press Enter.\n4. Type \"Name 7\" and press Enter multiple times.\n5. Type \"IM hitting enter and nothing is happene becasue of the loading thing\".\n\nWatch the screen recording here:\n\n<uuid>\n\n---\n\n**Device and browser info:**\nChrome 141.0.7390.67 (1920x911) | Windows (x86) 11\n\n**Date and time:**\nOctober 16th 2025 | 4:42am UTC\n\n**View developer information (console logs, network requests & timing):**\njam.dev/c/<uuid>\n\n---\n\n*Captured with* *jam.dev*"
+    },
+    {
+      "id": "ENG-10478",
+      "createdAt": "2026-06-18T17:19:11.639Z",
+      "title": "[P2] Bulk-load AI embedding metadata for staleness checks",
+      "state": "Todo",
+      "assignee": "Pieter Venter",
+      "parent": "ENG-10465",
+      "labels": ["Chore"],
+      "description": "## Refined implementation brief\n\n*Refined on 2026-07-20. This is the current delivery brief.*\n\n### Outcome\n\nMake embedding maintenance decide staleness with one metadata query per tool batch instead of one database query per tool.\n\n### Scope\n\n* Add a bulk staleness helper that accepts a batch of AI tools and loads matching `ai_tools_embeddings` rows with one `vector_id IN (...)` query.\n* Select only the vector ID, metadata needed for checksum and version comparison, and whether an embedding is present. Do not load the full 1024-dimension vector merely to test for null.\n* Build a lookup keyed by vector ID and compare the current searchable-content checksum and embedding version in memory.\n* Treat a missing row, missing embedding, malformed or incomplete metadata, checksum mismatch, or version mismatch as needing regeneration.\n* Use the bulk helper in `batchUpdateEmbeddings` and once for each page processed by `initializeAllEmbeddings`.\n* Preserve `needsEmbeddingUpdate` for single-tool updates and keep its safe regeneration behavior on lookup failure.\n* If the bulk lookup fails, log one bounded batch-level failure and safely mark the whole input batch for regeneration.\n* Preserve searchable-content construction, checksum generation, embedding version, batch provider calls, batch upserts, pacing, update counts, and empty-content filtering.\n* Exclude schema and index changes, embedding-model changes, cron activation, pagination redesign, and changes to single-tool event behavior.\n\n### Acceptance criteria\n\n* `batchUpdateEmbeddings` performs one tool query and one embedding-metadata query before generating or upserting embeddings, independent of the number of tools within its limit.\n* `initializeAllEmbeddings` performs one embedding-metadata query per fetched tool page, not one query per tool.\n* An empty tool batch returns an empty stale set without querying the embedding table.\n* Current rows with a present embedding and matching version and checksum are skipped.\n* Missing rows, null embeddings, stale versions, stale checksums, and incomplete metadata are regenerated.\n* A bulk lookup failure regenerates every tool in that batch and emits one structured error without logging searchable content or metadata payloads.\n* Single-tool updates retain their existing direct lookup and force-update behavior.\n* Returned counts retain current semantics: `batchUpdateEmbeddings` reports stale tools found, while `initializeAllEmbeddings` counts only stale tools with nonempty searchable content that proceed to generation.\n\n### Implementation direction\n\nHave the vector store return a set of stale tool IDs for a supplied tool batch. Query a narrow projection with `inArray`, including a SQL boolean for embedding presence, then compare rows through a vector-ID map. Keep checksum construction in the vector store so single and bulk paths cannot drift.\n\nDo not issue parallel single-row checks behind `Promise.all`, select the vector column itself, or add a new persistence layer for this ticket.\n\n### Validation\n\n* Add focused vector-store tests for empty input, all-current rows, missing rows, null embeddings, version and checksum mismatches, incomplete metadata, duplicate-safe mapping, and lookup failure fallback.\n* Add manager tests proving fixed metadata-query growth for `batchUpdateEmbeddings` and one bulk check per initialization page.\n* Cover mixed current and stale batches, empty searchable content, preserved update counts, and unchanged single-tool force behavior.\n* Confirm no migration, index, provider, event, or schedule change is introduced.\n\n## Original description\n\nSource audit section: `n+1.md` P2 AI tool embedding update.\n\nScope:\n\n* `packages/ai/src/embeddings/manager.ts`\n* `packages/ai/src/embeddings/hybrid-vector-store.ts`\n\nProblem:\nEmbedding maintenance fetches a batch of tools, then checks embedding staleness one tool at a time.\n\nAcceptance criteria:\n\n* Add a bulk staleness helper that loads existing embeddings with `vectorId IN (...)`.\n* Compare checksum/version in memory.\n* Keep the single-tool method for direct updates."
+    },
+    {
+      "id": "ENG-7051",
+      "createdAt": "2026-03-25T05:37:49.620Z",
+      "title": "Build embedded checkout UI",
+      "state": "Canceled",
+      "assignee": null,
+      "parent": null,
+      "labels": ["Feature", "Phase 1"],
+      "description": "## Context\n\nCheckout renders inline on the storefront page — no redirect to an external checkout page. Multi-step form with real-time order summary. Reference UX patterns from <domain> and <domain>.\n\n## Acceptance Criteria\n\n- [ ] React component: `components/commerce/checkout/CheckoutFlow.tsx`\n- [ ] Multi-step form: Contact/Address -> Shipping Method -> Payment -> Review and Place Order\n- [ ] Step indicator/breadcrumb showing current progress\n- [ ] Order summary sidebar: items list, subtotal, discounts, shipping, tax, total — updates in real-time via tRPC queries\n- [ ] Mobile: order summary as collapsible accordion above the form\n- [ ] Form validation with React Hook Form + Zod schemas (reuse from backend)\n- [ ] Loading/processing states during API calls and payment\n- [ ] Back/forward navigation between steps\n- [ ] Persists state: if user refreshes, resume from last completed step\n\n## Codebase Reference\n\n| What | Path |\n| -- | -- |\n| Checkout components | `components/commerce/checkout/` (to create directory) |\n| tRPC client | `trpc/client.ts` — `import { trpc } from ' at /trpc/client'` |\n| UI components | `components/ui/` — Button, Input, Card, Select, etc. |\n| Design tokens | `app/globals.css` — use `bg-ds-frame`, `text-ds-text-primary`, `border-ds-border`, etc. |\n| Form pattern | React Hook Form v7 with Zod resolver (existing pattern throughout codebase) |\n| Checkout tRPC router | `trpc/routers/commerce/checkout.ts` |\n\n* Use `useQueryState` from `nuqs` for step state in URL (enables browser back button)\n* Never import ` at /lib/env` in client components\n\n## Implementation Steps\n\n 1. Create `components/commerce/checkout/` directory\n 2. Create `CheckoutFlow.tsx` — orchestrates steps, manages checkout state via tRPC queries/mutations\n 3. Create `CheckoutStepIndicator.tsx` — visual step progress bar\n 4. Create `ContactStep.tsx` — email, phone, shipping address, billing address form using React Hook Form + Zod\n 5. Create `ShippingStep.tsx` — shipping method selection cards\n 6. Create `PaymentStep.tsx` — payment provider card element (P1.26)\n 7. Create `ReviewStep.tsx` — final review of all details before placing order\n 8. Create `OrderSummary.tsx` — sidebar showing items and totals (calls `getCheckoutTotals` via tRPC)\n 9. Use `useQueryState` from nuqs for step state in URL\n10. Handle loading, error, and success states at each step with appropriate UI feedback"
+    },
+    {
+      "id": "ENG-3785",
+      "createdAt": "2025-12-15T15:09:26.101Z",
+      "title": "Investigate 'Failed to generate embedding' production error",
+      "state": "Canceled",
+      "assignee": "Mahmut Jomaa",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "Investigate a low-priority Internal Server Error occurring in production when generating embeddings.\n\n```\n{\n  \"<mention>\": {\n    \"next-axiom-version\": \"1.9.3\"\n  },\n  \"fields\": {\n    \"error\": \"Internal Server Error\",\n    \"group\": \"default\",\n    \"slackChannelId\": \"C09CCNEG96K\",\n    \"slackMessageTs\": \"1765806365.336329\"\n  },\n  \"git\": {\n    \"commit\": \"83ff7783b20f50bbf77dcad2dabf4b71adc6c7cd\",\n    \"ref\": \"main\",\n    \"repo\": \"athena\"\n  },\n  \"vercel\": {\n    \"deploymentId\": \"dpl_5Tv92SpzYQy6t5PHrPZEX9UABw6k\",\n    \"deploymentUrl\": \"athena-m3vyq7yuf-aiacquisition.vercel.app\",\n    \"environment\": \"production\",\n    \"project\": \"<domain>\",\n    \"region\": \"iad1\",\n    \"source\": \"frontend-log\"\n  },\n  \"level\": \"error\",\n  \"message\": \"Failed to generate embedding\",\n  \"source\": \"frontend-log\"\n}\n```"
+    },
+    {
+      "id": "ENG-12244",
+      "createdAt": "2026-08-03T16:17:57.771Z",
+      "title": "Client wants to understand what the invoices are for",
+      "state": "Canceled",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [],
+      "description": "#### Customer Name\n\nName 8\n\n#### Customer Email\n\n<email>  AND/OR  <email>\n\n#### Workspace name\n\n* \n\n#### Screenshot\n\n <image> \n\n <image> \n\n#### What are you trying to achieve?\n\nClient is being invoiced But doesn't know what he's being invoiced for. He doesn't have to call the email agent enabled on the workspace that I could impersonate and the client mentioned that his white label hasn't been set up yet. Is it possible for you to please see what workspace these payments are related to?\n\n#### What are you doing to achieve it?\n\n* \n\n#### What is happening instead?\n\n* \n\n#### What is the expected outcome?\n\n* "
+    },
+    {
+      "id": "ENG-8631",
+      "createdAt": "2026-05-15T12:57:40.583Z",
+      "title": "Remove \"View Details\" button, only allow for clicking on the ad checkbox when hovering directly over it, bring back \"click on ad to open\" functionality",
+      "state": "Done",
+      "assignee": "Valery Viarenich",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "CleanShot 2026-05-15 at 16.56.24.mp4"
+    },
+    {
+      "id": "ENG-3965",
+      "createdAt": "2025-12-22T17:18:37.937Z",
+      "title": "Disable next button after first click on AI Scrape summary step in campaign wizard",
+      "state": "Canceled",
+      "assignee": "Savinder Singh",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "Currently the button does not get disabled. It allows users to start more than 1 lead scraping jobs"
+    },
+    {
+      "id": "ENG-6389",
+      "createdAt": "2026-03-08T11:21:28.117Z",
+      "title": "'Run' Button is redirecting to 'Executions' and clicking 'Editor' immediately after redirection is breaking workflow",
+      "state": "Done",
+      "assignee": "Pieter Venter",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "## Bug\n\nClicking the Run button then immediately switching to the Editor tab loses execution context, causing node status rings to reset to idle mid-execution.\n\n**Reported:** Run button redirected to Executions tab and switching back to Editor broke the workflow. The redirect was removed in commit `911dc2599` (ENG-5132, March 7), but the underlying state management issue remains on current `main`.\n\n---\n\n## Root Cause\n\nTwo problems in `components/workflows/builder/workflow-editor.tsx`:\n\n**1.** `handleTopbarTabChange` clears `selectedExecutionId` when switching to the editor tab (line \\~1695)\n\n```ts\n// editor branch — the null clear is wrong here\nsetSelectedExecutionId(null);   // ← this loses the execution set by executeRun\nif (topbarTab === 'settings') {\n  setIsRightPanelOpen(false);\n}\nsetTopbarTab('editor');\n```\n\n`executeRun` sets `selectedExecutionId` to the new execution ID after a run starts. `WorkflowExecutionNodeStatusSync` renders when `!isExecutionsMode && selectedExecutionId` — so it only works on the editor tab when `selectedExecutionId` is non-null. Switching runs→editor clears `selectedExecutionId`, which prevents `WorkflowExecutionNodeStatusSync` from mounting and stops all node status polling.\n\n**2. Dead dependencies in** `executeRun`'s `useCallback` dep array (lines \\~1752, \\~1754)\n\n`setPropertiesPanelTab` and `setTopbarTab` appear in the dependency array but are never called inside `executeRun`. These are stale references from a previous version of the function (before the auto-redirect was removed).\n\n---\n\n## Fix\n\n`components/workflows/builder/workflow-editor.tsx` — two changes:\n\n1. Remove `setSelectedExecutionId(null)` from the editor branch of `handleTopbarTabChange`. The settings branch correctly clears it (execution context is irrelevant in settings); the editor branch should preserve it so `WorkflowExecutionNodeStatusSync` can resume polling after switching back from the runs tab.\n2. Remove `setPropertiesPanelTab` and `setTopbarTab` from `executeRun`'s dependency array.\n\nNo changes needed to `workflow-executions-view.tsx` or `workflow-store.ts`.\n\n---\n\n## Agent Feasibility\n\n**Feasible.** Scope is a single file (`workflow-editor.tsx`), two targeted changes. The fix is mechanically clear: one line removal and two dep array entries removed. The existing structural test pattern in `tests/components/workflows/` can be extended to assert the corrected `handleTopbarTabChange` behavior. No external services, infrastructure changes, or schema migrations required."
+    },
+    {
+      "id": "ENG-55",
+      "createdAt": "2025-06-01T20:18:30.272Z",
+      "title": "Make sure every workflow ends in Failed state if it doesn't get processed within 30 minutes",
+      "state": "Canceled",
+      "assignee": "Ben Ford",
+      "parent": null,
+      "labels": [],
+      "description": "The ultimate goal here is to make sure there's a way for clients to see that a submission has clearly failed rather than getting stuck in Pending/Processing and not knowing what's going on\n\n* Add an option for a button with a retry to the UI so they can \"self-serve\" a solution\n* Inngest probably has some nice syntax for it\n* Also add logs for us to see when this has happened"
+    },
+    {
+      "id": "ENG-15400",
+      "createdAt": "2026-10-14T15:19:55.188Z",
+      "title": "Chat widget: The prospect is asking for us to book a meeting through his appoin…",
+      "state": "Triage",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [],
+      "description": "## Report\n\nReported by: Customer\n\nWhat went wrong: The prospect is asking for us to book a meeting through his appointment setter, but we can't obtain the link. Need his calendar link.\n\n## Conversation\n\nWorkspace: <domain> (<uuid>)\n\nConversation: <url:app.acquisity.ai>\n\nReported reply: <uuid>\n\nForeman run: unknown\n\n### Transcript (oldest first, customer-visible turns only, last 12 turns max)\n\nCustomer: The AI SDR is sending time slots not based on the prospects time zone\n\nForeman: I haven't looked into your workspace for this yet. Tap the magnifying glass next to the message box and send your message again, and I'll dig in.\n\nCustomer: The AI SDR is sending time slots not based on the prospects time zone\n\nForeman: Looking at Name 10's thread, the saved prospect timezone is Asia/Calcutta, but in his last message he says he's on US Central time. The slot message offered times in the host's timezone rather than his, and the host's saved timezone is also Asia/Calcutta. That mismatch is the likely reason the times looked wrong for him. I can't tell yet whether the AI SDR or a person wrote that slot message (the thread is currently under human takeover), or how the saved timezone got set. I also can't tell whether every slot message is affected.\n\nHere's what to do:\n\n1. Name 9 thread in AI SDR Inbox, go to Contact details, then Edit timezone, and set it to his real timezone.\n2. Go to Settings, then Availability, and check that your timezone is right. Click Save.\n\nIf other threads still show the wrong prospect timezone after that, send me the prospect's name and the slot message that went out. You can attach up to three screenshots to a message here.\n\nCustomer: the prospect mentioned using a link in his email to book a meeting. How can I get this link?\n\nForeman: Sorry, I couldn't finish checking that. Please send your message again and I'll take another look.\n\n## Browser\n\nReported at: 2026-10-14T15:19:54.813Z\n\nPage: /dashboard/<workspace-slug>/ai-sdr\n\nBrowser: Chrome 154.0.0.0, macOS   Screen: 1920x1080   Name 11 version: 5b359d4fdc60\n\nSentry replay: none\n\nSentry errors: none\n\n### Console errors (last 30, newest last, each line max 300 chars)\n\n(none)\n\n### Failed network calls (last 30, newest last)\n\n```text\n15:12:36 POST /api/client/available 403 536ms\n15:12:36 POST /api/client/users 403 249ms\n15:12:40 POST /api/client/available 403 139ms\n15:12:45 POST /api/client/available 403 257ms\n```\n\n<!-- chat-widget-feedback conversation=<uuid> message=<uuid> run=none replay=none at=2026-10-14T15:19:54.813Z -->"
+    }
+  ]
+}

@@ -1,0 +1,225 @@
+{
+  "id": "ENG-14390",
+  "provenance": "seeded",
+  "createdAt": "2026-09-28T15:04:40.884Z",
+  "lane": "triage",
+  "stratum": "user_error",
+  "ticket": {
+    "title": "Client is locked out of their Acquisity account",
+    "description": "#### Customer Name\n\nName 28\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nCompany Three\n\n#### Screenshot\n\n <image> \n\n <image> \n\n#### What are you trying to achieve?\n\nGetting them back into their account\n\n#### What are you doing to achieve it?\n\nWriting you.\n\n#### What is happening instead?\n\nThey sent me the error messages, I have posted them here.\n\n#### What is the expected outcome?\n\nTo log in to Acquisity",
+    "attachmentKinds": ["image", "slack"]
+  },
+  "repoCommitAtCreate": "afc4892bec8f07c878d758b9b81884d5de6a9e6a",
+  "flags": {
+    "descriptionEditedAfterCreate": false,
+    "needsProductionData": true,
+    "alreadyFixedAtTriage": false
+  },
+  "relatedSnapshot": [
+    {
+      "id": "ENG-14354",
+      "createdAt": "2026-09-28T00:52:59.416Z",
+      "title": "Locked out of the Acquisity dashboard after an account suspension pending a finance review",
+      "state": "Todo",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": ["Customer reported", "intercom-sourced"],
+      "description": "Intercom source: <url:app.intercom.com>\n\nConversation context: On 2026-09-27 the customer wrote that she is locked out of her Slack, Acquisity dashboard, and Heartbeat, said \"finance blocked me\", asked repeatedly for a human, and then asked for goodwill access to at least Slack and the Acquisity dashboard while a finance matter is cleared, saying she has already sent receipts. A support admin asked whether she wanted to remove a workspace; she said the opposite.\n\nFinding: her workspace owner account was suspended by an admin on 2026-09-25 with the reason \"CB - <chargeback> - $525.01 - SI $700\". Signing in with that account is refused with the suspension reason, which is exactly the dashboard lockout she reports. She then registered a second account with a different email on 2026-09-27, which has no workspace, and reached support through it. Her owner membership on the workspace is intact and the workspace itself is not deleted, so lifting the suspension restores her access; nothing else on the workspace is broken. Slack and Heartbeat are separate platforms with their own access, so the Acquisity suspension does not explain those lockouts; that part is unverified from Acquisity side.\n\nHuman decision needed: the team that owns the finance matter should confirm the status of that chargeback and decide whether to lift the suspension. If it is lifted, she signs in again with her original workspace email.\n\nTestable claim: The customer's workspace owner account is suspended in the product, so sign-in is refused and the dashboard is inaccessible; restoring access requires an admin to lift that suspension."
+    },
+    {
+      "id": "ENG-4849",
+      "createdAt": "2026-01-26T16:09:23.352Z",
+      "title": "Acquisity access blocked after Name 1 campaign, plan shows Basic",
+      "state": "Canceled",
+      "assignee": "Jared Stauffer",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "User reports being blocked from proceeding in Cold Email Agent and SDR due to \"Acquisity integration required\" and a prompt to join Acquisity again for $185 while starting a second email campaign.\n\nThe account previously ran a full campaign during Name 1 with Acquisity and AI SDR active (statuses like \"AI replied\" and \"escalated\" were shown). Now the workspace is showing on the Basic plan, which does not include Cold Email Agent or AI SDR, even though the user believes they should still have access from their Name 1 setup.\n\nThis needs investigation into why the workspace plan/entitlements reverted to Basic after the first campaign and why the UI is still surfacing Acquisity and SDR flows but blocking progress behind an \"integration required\" and upgrade/paywall state.\n\nPlease review this workspace's subscription history, Launchpad-related access, and Acquisity/Cold Email Agent entitlements to confirm whether the current plan is correct and ensure the UI and access state are consistent."
+    },
+    {
+      "id": "ENG-11402",
+      "createdAt": "2026-07-09T21:59:08.744Z",
+      "title": "User locked out of workspace",
+      "state": "Done",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [],
+      "description": "#### Customer Name\n\nName 2\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 2\n\n#### Screenshot\n\n <image> \n\n#### What are you trying to achieve?\n\nClient wants to be able to access his workspace again - is locked out\n\n#### What are you doing to achieve it?\n\nScreenshared, impersonate w/ no success\n\n#### What is happening instead?\n\nuser email address he is trying to use is not showing as a member of the workspace assoc w/ his name\n\n#### What is the expected outcome?\n\nName 3 can login correctly w/o issues"
+    },
+    {
+      "id": "ENG-9832",
+      "createdAt": "2026-06-08T18:54:54.155Z",
+      "title": "Fail open when Autumn API errors",
+      "state": "In Progress",
+      "assignee": "Tyler Olsen",
+      "parent": null,
+      "labels": ["Chore"],
+      "description": "A spike of errors from Autumn API caused paid users to be gated from the feature they paid for and get stuck at the Subscribe step.\n\nRecommended change is to fail open when Autumn errors so paid users are not locked out during provider outages. See Autumn docs."
+    },
+    {
+      "id": "ENG-10930",
+      "createdAt": "2026-06-26T18:16:27.110Z",
+      "title": "Acquisity enablement fails with generic \"Something went wrong\" error",
+      "state": "Duplicate",
+      "assignee": "Tyler Olsen",
+      "parent": null,
+      "labels": [],
+      "description": "## Problem\\nUsers attempting to enable Acquisity from the setup/activation flow receive a generic \"Something went wrong\" error. Setup does not complete and users remain locked out of the platform.\\n\\n## Context\\n- Reported from June 8 through June 26, 2026\\n- Lifecycle state: open\\n- Intercom source: multiple conversations spanning ~18 days\\n\\n## What users are saying\\n> \"User cannot enable Acquisity; setup returns 'Something went wrong' after activation attempt.\"\\n\\n## Acceptance Criteria\\n- [ ] Acquisity enablement flow completes successfully without generic errors\\n- [ ] On error, user receives actionable error message (not generic)\\n- [ ] Error is surfaced and logged so engineering can diagnose root cause\\n\\n## Resources\\n- Name 4\\n\\n## Name 5 Used\\n- \"Acquisity enablement fails something went wrong activation error\"\\n- Note: ENG-6544 (Canceled), ENG-7677 (Done) covered earlier versions. ENG-9803 was knowledge/guidance issue (Canceled). No current active ticket."
+    },
+    {
+      "id": "ENG-11179",
+      "createdAt": "2026-07-06T13:10:09.430Z",
+      "title": "Deleting a client workspace wipes the owner's entire Acquisity account",
+      "state": "Done",
+      "assignee": "Anuj Bhatt",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "## Problem\n\nA customer deleted a client workspace (\"Company Five\") and the platform deleted the **owner's entire Acquisity account**, not just the workspace. The owner is locked out right now and needs manual account reinstatement today.\n\nThis is a destructive cascade-delete bug: workspace deletion should never remove the owner account / other workspaces.\n\n## Name 8 signal\n\n* Name 8 topic: `<uuid>`\n* Severity: High | Confidence: 0.92 | Track: Engineering\n* New (1 customer today), but data-loss impact is severe and immediate.\n\n## Why new\n\nNo open ticket tracks workspace-deletion cascading into owner-account deletion. Related prior work: ENG-9948 (manual restore of workspaces/access for Name 6 — suggests this class of incident has happened before), ENG-1467 (restrict Member-role workspace deletion), ENG-5851 (billing cleanup on deletion). None address the account-wipe cascade.\n\n## Immediate action\n\nCompany Five owner needs manual account reinstatement today (support/ops).\n\n## Source\n\n* Name 4\n\n## Name 7\n\n`modem-<uuid>-2026-07-06`"
+    },
+    {
+      "id": "ENG-8150",
+      "createdAt": "2026-04-28T13:53:29.148Z",
+      "title": "Disabled AI SDR now prompts for payment",
+      "state": "Canceled",
+      "assignee": "Beth Newton",
+      "parent": null,
+      "labels": [],
+      "description": "user: <email>\n\nAfter AI SDR was disabled in SDR settings, Acquisity now asks for payment before it can be accessed again. The account was intended to be temporarily shut off after upgrading to Name 1 with Meta ads, but support observed that Acquisity appears to have been canceled instead of just disabling AI SDR.\n\nReported behavior: access is blocked by a paywall, so the user cannot proceed further."
+    },
+    {
+      "id": "ENG-11522",
+      "createdAt": "2026-07-13T02:06:02.805Z",
+      "title": "Password reset emails not delivered to user (accepted by provider, never landing) — <email>",
+      "state": "Todo",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [
+        "Deliverability Issue",
+        "Triage: Needs Investigation",
+        "intercom-sourced",
+        "triaged-by-devin"
+      ],
+      "description": "BUG: Unconfirmed (email deliverability issue; the reset flow itself works)\n\n## Evidence\n\n* Customer Name 12 Name 10 (user id `<uuid>`, email `<email>`) cannot log in and never receives the password reset email. Reported via Intercom.\n* Prod DB (read-only): account healthy — `email_verified=true`, not banned, credential account with password present. 4 reset-password verification tokens generated today for this user (00:16, 00:19, 01:18, 01:42 UTC), so Name 9 reset flow generates links correctly.\n* Axiom: no email-send errors around those timestamps → Resend accepted the sends (no `EmailSendError` thrown).\n* The recipient mailbox works and is actively receiving OTHER Acquisity mail (AI SDR escalation notifications, etc.) — see screenshots in the Intercom thread. AI SDR escalation emails go through the same `emailService`/Resend sender (`env.EMAIL_FROM`) as the password reset email, yet the reset email specifically never lands.\n* Pattern (provider accepts the send, mail never delivered, to an address that receives our other mail) most strongly suggests the recipient is on Resend's suppression/bounce list. Could not verify directly — no Resend credentials available in the investigation session.\n\n## Second issue found\n\n* CS attempted to change the account email to `<email>`, but the change did NOT persist — `user.email` is still `<email>` and `user.updated_at` is `2026-06-13` (unchanged). So the 'change email + resend' retest actually still sent to `<email>`; `<email>` never received a reset. Needs confirmation whether the admin email-change flow requires user confirmation (by design) or silently failed.\n\n## What's needed to resolve\n\n1. Check Resend suppression/bounce list for `<email>` (and `<email>`); remove suppression if present and resend.\n2. Investigate why the admin email change did not persist.\n3. Immediate customer unblock (separate from root cause): admin sets a temporary password directly so the user can log in without email.\n\n## Links\n\n* Intercom: <url:app.intercom.com>\n* Slack thread: <url:acquisityworkspace.slack.com>\n* Name 11 session: <url>"
+    },
+    {
+      "id": "ENG-12783",
+      "createdAt": "2026-08-14T19:38:34.705Z",
+      "title": "Client unable to access Acquisity - no reset password being sent",
+      "state": "Duplicate",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [],
+      "description": "#### Customer Name\n\nName 13\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 13\n\n#### Screenshot\n\n <image> \n\n <image> \n\n#### What are you trying to achieve?\n\nReset client's Acquisity password\n\n#### What are you doing to achieve it?\n\nTried to use admin panel - unable to reset password for him. He tried to click forgot password but no link arrived during office hours\n\n#### What is happening instead?\n\nclient unable to access Acquisity at the moment\n\n#### What is the expected outcome?\n\nClient can access Acquisity"
+    },
+    {
+      "id": "ENG-11501",
+      "createdAt": "2026-07-11T12:08:24.428Z",
+      "title": "Password reset email not received for AIA platform",
+      "state": "Todo",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [],
+      "description": "#### Customer Name\n\nName 14\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 14's workspace\n\n#### Screenshot\n\n#### What are you trying to achieve?\n\nLog into the AIA Platform and trying to reset the password on <email>\n\n#### What are you doing to achieve it?\n\nTrying to reset the password\n\n#### What is happening instead?\n\nNot getting the password reset email\n\n#### What is the expected outcome?\n\nAble to login into the AIA platform."
+    },
+    {
+      "id": "ENG-5491",
+      "createdAt": "2026-02-12T22:32:33.459Z",
+      "title": "Unlock client account for access to aquisity",
+      "state": "Done",
+      "assignee": "Beth Newton",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "#### Customer Name\n\nName 15\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 15\n\n#### Screenshot\n\n#### What are you trying to achieve?\n\nClient Account is Locked\n\n#### What are you doing to achieve it?\n\nRequesting Unlock\n\n#### What is happening instead?\n\nna\n\n#### What is the expected outcome?\n\nClient can access aquisity"
+    },
+    {
+      "id": "ENG-7670",
+      "createdAt": "2026-04-09T21:08:57.042Z",
+      "title": "Active Pro plan still prompts Acquisity upgrade",
+      "state": "Done",
+      "assignee": "Jared Stauffer",
+      "parent": null,
+      "labels": [],
+      "description": "An account with an active Pro plan cannot access Acquisity and is prompted to enable or upgrade the integration again. Clicking through shows that there is already an active subscription and no upgrade is available, so access remains blocked.\n\nThis persisted after logging out, clearing browser cache, and logging back in.\n\nAffected account: <email>\nWorkspace: Name 16's Workspace\n\n <image> \n\n <image> "
+    },
+    {
+      "id": "ENG-13401",
+      "createdAt": "2026-09-02T22:02:31.558Z",
+      "title": "Name 17 - Acquisity & all data gone",
+      "state": "Done",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": ["Customer reported"],
+      "description": "#### Customer Name\n\nName 17\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 17\n\n#### Screenshot\n\n#### What are you trying to achieve?\n\nUse acquisity\n\n#### What are you doing to achieve it?\n\nlog into platform.  Had not been able to get in, reset password, and when he logged in, Acquisity wasn't activated and all his campaigns are gone.  Everything is gone\n\n#### What is happening instead?\n\nunable to access campaigns\n\n#### What is the expected outcome?\n\nAll his stuff is there"
+    },
+    {
+      "id": "ENG-13563",
+      "createdAt": "2026-09-08T15:14:39.555Z",
+      "title": "Banned user still has an active Pro subscription billing $185/month",
+      "state": "Done",
+      "assignee": "Anuj Bhatt",
+      "parent": "ENG-13564",
+      "labels": ["Bug", "Customer reported", "intercom-sourced"],
+      "description": "## Intercom conversation\n\n<url:app.intercom.com>\n\n## Context\n\nCustomer Name 18 Name 19 (Company Six) asked to cancel their Acquisity subscription. Support directed them to Settings > Billing > Cancel Subscription, but the customer could not log in because their account is banned. Support also cannot impersonate the banned account.\n\n## Claim\n\nA banned Acquisity user still has an active Pro subscription billing $185/month, because banning a user blocks app access but does not cancel their Autumn/Stripe subscription, so recurring billing continues while they are locked out.\n\n## Evidence\n\n* user.banned = true, ban_reason = \"RR\" (refund request), no expiry.\n* Autumn: active Pro subscription, $185/month, current period 2026-08-19 to 2026-09-19.\n* Stripe: active subscription, next charge ~2026-09-19.\n* Root cause matches ENG-10782 (banned/offboarded users can still have active Autumn/Stripe billing)."
+    },
+    {
+      "id": "ENG-12948",
+      "createdAt": "2026-08-19T22:41:11.326Z",
+      "title": "Name 20, a $1,990 client, is unable to pay his $185 monthly Acquisity subscription because his only available card is Discover, which he believes is not accepted. He is requesting an alternative payment method. The recommended action is to contact Name 21 and provide available alternative payment options so he can complete his subscription payment and maintain access.",
+      "state": "Canceled",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [],
+      "description": "#### Customer Name\n\nName 20\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nCompany One\n\n#### Screenshot\n\n#### What are you trying to achieve?\n\nThe client, Name 20, is trying to maintain his Acquisity subscription by successfully paying the $185 monthly subscription fee.\n\n#### What are you doing to achieve it?\n\nHe is attempting to make the monthly payment using his Discover card, which is currently his only available payment method.\n\n#### What is happening instead?\n\nHe believes Discover is not an accepted payment method for the Acquisity subscription, preventing him from completing the $185 monthly payment. He is therefore requesting an alternative payment solution.\n\n#### What is the expected outcome?\n\nName 22 with an alternative payment option that he can use to pay the $185 monthly Acquisity subscription and maintain his access without interruption."
+    },
+    {
+      "id": "ENG-5496",
+      "createdAt": "2026-02-13T00:47:42.781Z",
+      "title": "Acquisity subscription turned off; AI SDR inbox inaccessible",
+      "state": "Done",
+      "assignee": "Beth Newton",
+      "parent": null,
+      "labels": [],
+      "description": "In Company Four workspace, an active Acquisity subscription was turned off on Feb 11 without reason. Since then, AI SDR data/inbox is not showing and the workspace cannot access AI SDR to view context of messages sent to a lead who booked for tomorrow. Also, she did not receive her 18 active domains.\n\nUser email: <email>"
+    },
+    {
+      "id": "ENG-12391",
+      "createdAt": "2026-08-07T08:05:17.241Z",
+      "title": "[Workspace log in] -Recurring \"Something went wrong\" error prevents user from logging in after email migration and password reset",
+      "state": "Done",
+      "assignee": "Anuj Bhatt",
+      "parent": null,
+      "labels": ["Bug", "intercom-sourced"],
+      "description": "**Customer Name**\nName 23\n\n**Customer Email**\n<email>\n\n**Customer Email**\n<Enter text>\n\n**Workspace name****\n****Name 23's workspace**\n\n**Screenshot**\n<optional>\n\n**What is the user trying to achieve?**\nLog in to the Acquisity app using the active email address (<email>).\n\n**What is the user doing to achieve it?**\nAttempting to log in via app.acquisity.ai using multiple browsers (Chrome, Brave, and Bing), including Incognito/Private mode. The customer also completed a password reset and previously attempted an email migration from <email> to <email>.\n\n**What is happening instead?**\nThe customer consistently receives the error \"Something went wrong\" when attempting to log in. The issue temporarily worked in Incognito after the password reset but has since returned across all browsers and browsing modes.\n\n**What is the expected outcome?**\nThe customer should be able to log in successfully to the workspace using <email> without receiving the \"Something went wrong\" error."
+    },
+    {
+      "id": "ENG-14059",
+      "createdAt": "2026-09-18T21:19:31.118Z",
+      "title": "Missing IncomeSystem access for Name 24 (LTO DFY 2K)",
+      "state": "Todo",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": ["Internal reported", "intercom-sourced"],
+      "description": "#### Customer Name\n\nName 24\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nCompany Two\n\n#### Screenshot\n\n#### What are you trying to achieve?\n\nget her a working login to Incomesystem - ai acquisition platform\n\n#### What are you doing to achieve it?\n\nreset password, sent new link, tried 2 emails. She was sharing her screen. I couldnt see it\n\n#### What is happening instead?\n\n/acquisityasks\n\nMissing IncomeSystem access for Name 24 (LTO DFY 2K)\nImpact on work: Client cant start the program\nExamples: Missing IncomeSystem access - Name 24. Nothing shows up under <email> or <email>. pw reset isnt working either\nHer preferred email login is <email>\nI also havent submitted the Business Foundation cause of the said issue. So if I can ask a small favor and submit this:\n\nNiche: Name 24 will target small-to-midsize service businesses (3–50 employees, $100k–$10M revenue) with a high-ticket AI advisory offer. The initial focus is on \"gatekeepers\" like CPAs and attorneys to leverage their client networks.\nOffer: B2B Sales Accelerator\nCost effective path with this email <email>\n\nThank you so much\n\n#### What is the expected outcome?\n\naccess to incomesystem - ai acquisition platform"
+    },
+    {
+      "id": "ENG-10995",
+      "createdAt": "2026-06-29T18:50:04.388Z",
+      "title": "Name 25 Workspace Account Missing – Unable to Connect Calendar",
+      "state": "Canceled",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": ["Bug", "intercom-sourced"],
+      "description": "**Customer Name**\nName 26\n\n**Customer Email**\n<email>\n\n**Customer Email**\n<email>\n\n**Workspace name**\nName 26's Workspace\n\n**Screenshot**\n<optional>\n\n**What is the user trying to achieve?**\nThe user is trying to connect their Name 25 account in Calendar Settings to use it for calendar and business functionality.\n\n**What is the user doing to achieve it?**\nThe user is attempting to sign in with <email> when connecting the Name 25 Calendar integration.\n\n**What is happening instead?**\nName 25 displays the error:\n\n\"It looks like someone else might be trying to access your Name 25 Account. For your protection, you can't sign in right now.\"\n\nFurther investigation shows that Name 25 account recovery is not possible because the account does not exist.\n\nThe user confirmed that the <domain> Name 25 Workspace was set up for her during onboarding and was not purchased or configured by her independently.\n\n**What is the expected outcome?**\nThe customer should be able to successfully sign in with their <domain> Name 25 Workspace account and connect it in Calendar Settings."
+    },
+    {
+      "id": "ENG-10688",
+      "createdAt": "2026-06-23T13:25:54.079Z",
+      "title": "User unable to log in and password reset email not received",
+      "state": "Done",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [],
+      "description": "#### Customer Name\n\nName 27\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 27's Workspace\n\n#### Screenshot\n\n#### What are you trying to achieve?\n\nThey cannot log in - tried forgot password and the email is not getting to them in days.\n\n#### What are you doing to achieve it?\n\ntried resending multiple times, impersonating too.\n\n#### What is happening instead?\n\nasking for help as seen it with other clients too\n\n#### What is the expected outcome?\n\nget them back logged in"
+    }
+  ]
+}

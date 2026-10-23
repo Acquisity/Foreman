@@ -1,0 +1,220 @@
+{
+  "id": "ENG-15399",
+  "provenance": "seeded",
+  "createdAt": "2026-10-14T15:14:20.623Z",
+  "lane": "triage",
+  "stratum": "user_error",
+  "ticket": {
+    "title": "Onboarding loop and calendars disconnected after completing new onboarding in two workspaces",
+    "description": "#### Customer Name\n\nName 27\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 28, Company Two\n\n#### Screenshot\n\n#### What are you trying to achieve?\n\nGet both workspaces active with their calendars connected, so Name 28 and Company Three can take bookings again.\n\n#### What are you doing to achieve it?\n\nName 28 completed the new onboarding (Start Onboarding) in both workspaces, Name 28 Company Two, as instructed. Before that, whenever she connected her calendar it attached to Company Three’s workspace instead of her own. Company Three has also set up her calendar in her workspace.\n\n#### What is happening instead?\n\nAfter finishing onboarding, both workspaces show the onboarding prompt again. Company Three’s calendar shows as not connected even though she set it up, and Name 28 now has no calendar connected at all. Neither of them can book appointments.\n\n#### What is the expected outcome?\n\nOnboarding stays complete in both workspaces, each user’s calendar connects to and stays on the correct workspace, and bookings work for both.",
+    "attachmentKinds": ["slack"]
+  },
+  "repoCommitAtCreate": "5b359d4fdc60d0c74359c688a6c987db58558855",
+  "flags": {
+    "descriptionEditedAfterCreate": false,
+    "needsProductionData": true,
+    "alreadyFixedAtTriage": false
+  },
+  "relatedSnapshot": [
+    {
+      "id": "ENG-3452",
+      "createdAt": "2025-12-05T13:58:31.790Z",
+      "title": "Client Role Broken (Infinite Loop) & Missing Calendar Integration",
+      "state": "Canceled",
+      "assignee": null,
+      "parent": null,
+      "labels": ["Feature"],
+      "description": "**Description:** **Context:** The \"Client\" (or Member) user role is currently non-functional.\n\n1. **Infinite Loop:** When a Client logs in, they are prompted to \"Complete Onboarding.\" Clicking this (or Settings) redirects them back to the Dashboard repeatedly. They cannot access any settings.\n2. **Calendar Blocking:** Because they cannot access Settings, they cannot connect their **Name 2/Outlook Calendar** or **Zoom Link**.\n\n**Critical Impact:**\n\n* **No Call Routing:** The AI SDR cannot book calls for specific clients because their calendars are not connected.\n* **Security Risk:** The only workaround currently is to give clients \"member access\" to the agency account, which exposes all other data.\n* **Global Calendar Bug:** If an Agency Admin adds a client's calendar to *their* own profile, it overrides the calendar for **ALL** workspaces.\n\n**Requirement:**\n\n1. **Fix the Redirect Loop:** Name 1 users to access their **Profile/Settings** page.\n2. **Enable Integration:** Ensure Client users can connect their own Calendar, Meeting Links and Availability independently of the Agency Admin.\n   \n   \n   OR we can add options for users to change calendar connection based on workspace if thats an easier fix"
+    },
+    {
+      "id": "ENG-11340",
+      "createdAt": "2026-07-09T16:17:31.249Z",
+      "title": "Docs Gap: Onboarding answers don't carry over to a new workspace / white-label account (no guidance on reusing prior niche & offer answers)",
+      "state": "Done",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": ["Docs Gap", "intercom-sourced"],
+      "description": "DOCS GAP: There is no Help Center article explaining that onboarding answers do NOT carry over when a user starts fresh in a new workspace or a separate (white-label / partner) account, and no guidance on how to retrieve and reuse previously entered answers. Existing onboarding FAQs cover \"can I run onboarding again\", \"wrong workspace\", and \"each workspace has its own onboarding progress\", but none tell the user (a) that a separate account/instance requires re-onboarding, or (b) that they can view/copy their prior Niche & Offer answers from Settings → \"Your Niche & Offer\" in the original workspace and paste them into the new onboarding.\n\nCUSTOMER CONTEXT: Customer (Name 3, <email>) completed onboarding on his original Acquisity account (under the Platform partner), then set up \"his own Acquisity\" — a separate white-label partner instance (\"Company Five\"). Signing into the new instance created a distinct account/workspace, so onboarding is prompted again. He asked whether there is any way to access his previous answers so he can copy/paste them into the new onboarding.\n\nSUGGESTED CONTENT: Add an onboarding FAQ such as \"I already onboarded — why do I have to do it again in my new workspace/account, and can I reuse my previous answers?\" It should explain: (1) onboarding is scoped per workspace/account and does not automatically transfer, especially across separate/white-label accounts; (2) users can open their original workspace → Settings → \"Your Niche & Offer\" to view and copy their prior niche and offer responses, then paste them into the new onboarding; (3) note that separate white-label/partner accounts are distinct tenants even when they share the same email.\n\nRELATED DOC(S):\n\n* /docs/onboarding/faq/can-i-run-onboarding-again\n* /docs/onboarding/faq/i-am-seeing-the-wrong-workspace\n* /docs/onboarding/faq/what-gets-created-when-onboarding-finishes\n* /docs/niche-researcher/faq/can-i-change-my-niche-later\n  (Settings surface: /dashboard/[organizationSlug]/settings/niche-offer — \"Your Niche & Offer\", added in ENG-1723 / PR #1668)\n\nFINDING: Not a bug. Expected behavior — onboarding and its answers (stored in organization_knowledge per org; also onboarding_session per user+org) are scoped per workspace/account and do not carry across a separate white-label/partner account. Verified in prod DB: the original account (Platform partner) has a completed onboarding with fully-populated organization_knowledge (niche/offer answers); the new \"Company Five\" partner account has an empty organization_knowledge and onboarding_status=reset, hence the re-prompt.\n\nINTERCOM: <url:app.intercom.com>\nSLACK THREAD: <url:acquisityworkspace.slack.com>\nDEVIN SESSION: <url>"
+    },
+    {
+      "id": "ENG-4254",
+      "createdAt": "2026-01-07T15:06:18.091Z",
+      "title": "Onboarding data appears missing after completion",
+      "state": "Canceled",
+      "assignee": "Bartek Brejna",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "A user completed the full onboarding flow for at least two workspaces (\"Company Four\" and \"Name 4\"), but afterward there is no visible trace of the onboarding inputs.\n\nSupport confirmed:\n\n* Onboarding data should not disappear once submitted.\n* This is being treated as a potential data persistence issue rather than a visibility or user-error problem.\n* There is currently no single screen that shows all onboarding inputs as a unified \"brain\"; data is distributed across sections, which may add to the confusion, but in this case there appears to be no sign of any inputs in the workspace.\n\nThe requested follow-up is to investigate whether the onboarding session(s) failed to save or were dropped before being fully committed, for the affected workspaces mentioned above."
+    },
+    {
+      "id": "ENG-12643",
+      "createdAt": "2026-08-12T22:54:33.896Z",
+      "title": "Cannot get out of onboarding",
+      "state": "Done",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [],
+      "description": "#### Customer Name\n\nName 5 - but true for anyone.\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 6\n\n#### Screenshot\n\n <image> \n\n#### What are you trying to achieve?\n\nwork in the workspace\n\n#### What are you doing to achieve it?\n\nlogging in\n\n#### What is happening instead?\n\nstuck in onboarding loop\n\n#### What is the expected outcome?\n\nAccess workspace/can exit onboarding - get the message \"Cannot exit onboarding\""
+    },
+    {
+      "id": "ENG-3047",
+      "createdAt": "2025-11-26T21:40:18.283Z",
+      "title": "Users are stick in loop when they try to exit and have one workspace",
+      "state": "Done",
+      "assignee": "Savinder Singh",
+      "parent": null,
+      "labels": [],
+      "description": "The issue and cause is described in this thread <url:fegrowthpartner.slack.com>"
+    },
+    {
+      "id": "ENG-2955",
+      "createdAt": "2025-11-24T22:58:50.611Z",
+      "title": "Prevent duplicate workspace setup on repeated onboarding runs",
+      "state": "Done",
+      "assignee": "Mahmut Jomaa",
+      "parent": null,
+      "labels": [],
+      "description": "Users can reset onboarding multiple times and repeat the workspace setup process. This may create duplicate workspaces and unnecessary costs. Consider preventing duplicates (e.g., enforce a unique workspaceId based on the user slug) so reruns fail gracefully if a workspace already exists."
+    },
+    {
+      "id": "ENG-11310",
+      "createdAt": "2026-07-09T08:52:18.245Z",
+      "title": "Completing onboarding puts us in a seemingly stuck loop until refresh",
+      "state": "Done",
+      "assignee": "Mahmut Jomaa",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "Watch the screen recording here:\n\n<uuid>\n\n---\n\n**Name 7 URL:**\n<url:app.acquisity.ai>\n\n**Device and browser info:**\nChrome 149.0.7827.200 (2298x1198) | macOS (arm) 26.5.1\n\n**Date and time:**\nJuly 9th 2026 | 8:52am UTC\n\n**View developer information (console logs, network requests & timing):**\njam.dev/c/<uuid>\n\n---\n\n*Captured with* *jam.dev*"
+    },
+    {
+      "id": "ENG-10928",
+      "createdAt": "2026-06-26T18:16:08.959Z",
+      "title": "Onboarding workspace redirect fails to exit screen — users stuck in loop",
+      "state": "unknown",
+      "assignee": "Mahmut Jomaa",
+      "parent": null,
+      "labels": ["Bug", "intercom-sourced"],
+      "description": "## Problem\\n\n\nUsers get stuck on the Acquisity onboarding workspace page with no navigation path back to the dashboard. Clicking \"Complete Onboarding\" or similar CTAs loops them back to the same screen.\\n\\n## Context\\n- Reported across multiple users since March 2026; still active as of June 25, 2026\\n- Lifecycle state: <stripe-id> in Name 10\\n- Intercom source: multiple conversations\\n\\n## What users are saying\\n> \"User gets stuck on Acquisity onboarding workspace page with no way back to dashboard.\"\\n\\n## Acceptance Criteria\\n- [ ] Onboarding workspace page has a clear exit/back path to the main dashboard\\n- [ ] Clicking \"Complete Onboarding\" correctly completes setup and redirects to dashboard\\n- [ ] No navigation loop for users with a single workspace\\n\\n## Resources\\n- Name 8\\n\\n## Name 9 Used\\n- \"onboarding workspace redirect loop\", \"exit onboarding button\", \"workspace onboarding stuck\"\\n- Note: ENG-3047, ENG-3064, ENG-3248 covered similar issues but are all Done/Duplicate. This is a recurrence."
+    },
+    {
+      "id": "ENG-11572",
+      "createdAt": "2026-07-13T13:14:12.301Z",
+      "title": "Onboarding business/background inputs not persisted — users must re-enter everything on next login (recurring)",
+      "state": "Todo",
+      "assignee": "Blaise Gulaj",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "## Problem\n\nUsers complete onboarding but their business and background inputs are not persisted; on next login the data is gone and they must re-fill everything from scratch. Distinct from the tools/preset reset issue (ENG-11441) — this is loss of the onboarding form data itself, on the same account.\n\n## Name 10 signal\n\n* Name 10 topic: `<uuid>`\n* Severity: Medium | Confidence: 0.70 | Track: Engineering | Recurring — 2 customers this week.\n* Window: 2026-07-12 → 2026-07-13.\n\n## Why new\n\nNo open canonical. Prior onboarding-persistence tickets are closed: ENG-4315 (Done — \"Workspace onboarding data not saved after setup\") and ENG-4254 (Canceled — \"Onboarding data appears missing after completion\"). ENG-11340 (Docs Gap) covers the *expected* behavior that answers don't carry to a NEW workspace/white-label account — different from this same-account data loss. Recurring again with no open ticket.\n\n## Source\n\n* Name 8\n\n## Name 11\n\n`modem-<uuid>-2026-07-13`"
+    },
+    {
+      "id": "ENG-4262",
+      "createdAt": "2026-01-07T18:51:30.099Z",
+      "title": "Onboarding completion not persisting for Name 101 and Name 12 workspace",
+      "state": "Done",
+      "assignee": "Jared Stauffer",
+      "parent": null,
+      "labels": [],
+      "description": "Onboarding was completed for the workspace \"Name 101 and Name 12 (Name 13)\" but the system still treats the workspace as incomplete and forces the user back into onboarding when they open it.\n\nDetails shared:\n\n* Workspace: \"Name 101 and Name 12 (Name 13)\"\n* Onboarding completed on 2026-01-07 around 10:30–10:40 Pacific\n* UI showed \"Completed\" but backend state appears not to have persisted, so reopening the workspace restarts onboarding\n* User has been asked not to redo onboarding again to avoid further confusion of the state\n\nRequested actions:\n\n* Check whether onboarding data for this workspace was saved\n* Manually mark the workspace as completed if needed\n* Restore any captured inputs so the user does not have to re-enter them\n\nRelated account/workspace and billing issue:\n\n* A previous workspace \"Name 101 and Name 12\" was created when a payment attempt initially errored, then a new workspace \"Name 101 and Name 12 (Name 13)\" was created and paid successfully\n* The user cannot delete \"Name 101 and Name 12\" from the UI\n* Two $297 charges are currently showing as pending on the user’s card\n\nAdditional requested actions:\n\n* Remove the duplicate workspace \"Name 101 and Name 12\" so only \"Name 101 and Name 12 (Name 13)\" remains active\n* Verify billing so that only a single $297 charge is ultimately captured for this account"
+    },
+    {
+      "id": "ENG-13644",
+      "createdAt": "2026-09-10T11:31:52.850Z",
+      "title": "Onboarding a new workspace overwrites the account owner's name",
+      "state": "Done",
+      "assignee": "Anuj Bhatt",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "## Overview\n\nCompleting onboarding for a new workspace overwrites the account-level user name. An agency or reseller owner who onboards a client workspace ends up with the client's name on their own account, and searching for the owner's name in the Admin Panel returns nothing.\n\n## Problem\n\nWhen an owner adds a client workspace and completes onboarding with the client's name, their own account name is replaced with the client's name. The owner then appears under the wrong name and their real name is not findable.\n\n## Root cause\n\n`apps/web/lib/onboarding/finalize-onboarding.ts` (lines 186-197) unconditionally sets `user.name = completedDraft.fullName` on every onboarding finalization. The account-level name should be set once and not overwritten by a secondary workspace's onboarding.\n\n## Blast radius\n\n115 users / 125 workspaces (counted 2026-09-10). Query: distinct users whose `name` equals the `organization_knowledge.business_info_form_data.fullName` of a workspace created after their earliest workspace, joined through `member` with `deleted_at IS NULL`.\n\n## Proposed fix\n\n`finalize-onboarding.ts` must not overwrite the account-level `user.name` when finalizing a secondary workspace's onboarding. Scope `fullName` to the workspace, or only set the account name on first onboarding.\n\n## What's included\n\nCode fix in the onboarding finalize transaction. Immediate name correction for affected accounts is a support data fix, handled separately.\n\n## Regression seam\n\nOnboarding finalization for a second workspace: the account owner's `user.name` must remain unchanged after finalizing a new workspace's onboarding.\n\n## Done when\n\n* Finalizing onboarding for a secondary workspace leaves the account owner's `user.name` unchanged.\n* A regression test proves the name is not overwritten on secondary workspace onboarding.\n\n## Reports\n\n* ENG-13643"
+    },
+    {
+      "id": "ENG-3592",
+      "createdAt": "2025-12-09T17:02:51.423Z",
+      "title": "Onboarding stuck on final Completing step after migration",
+      "state": "Done",
+      "assignee": "Ellaine Dela Fuente",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "User from workspace \"Company Six\" cannot complete onboarding after migration.\n\nBehavior:\n\n* User previously had two workspaces: \"Company Six\" (all data) and \"Name 14's Workspace\" (campaigns)\n* After migration, duplicate workspaces caused campaign issues\n* User used \"reset workspace\" to stop duplication; this appears to have reset both workspaces\n* Logging in with beta password succeeds but always routes to onboarding\n* During onboarding, on the \"Best clients\" step, after adding a client the tool refreshed and wiped the entered data\n* At the last onboarding page, clicking **Complete** leaves the user stuck on a \"Completing...\" state and never finishes\n* User is therefore blocked from accessing their workspace and cannot verify whether the AI SDR is still sending emails\n\nReference video from user: Loom recording of being stuck on final onboarding step\n\nThis appears to be related to prior issue ENG-3477 (User stuck in onboarding) but is still reproducible for this workspace after that ticket was marked Done."
+    },
+    {
+      "id": "ENG-3202",
+      "createdAt": "2025-11-30T23:01:52.797Z",
+      "title": "User redirected to onboarding screen instead of login, losing access to existing account",
+      "state": "Done",
+      "assignee": "Savinder Singh",
+      "parent": null,
+      "labels": [],
+      "description": "Name 16 cannot log into their account and is redirected to the new joiner onboarding screen, losing access to existing data and integrations like Company One; issue persists despite password resets.\n\nSlack: <url:fegrowthpartner.slack.com>\n\n---\n\nConversation:\nName 17: <p>I am trying to log in but it appears I have to restart from creating my profile from scratch. I have already done this a few time and I would like to just get to the log-in page</p>\n\nbot: Thanks for your patience with this login issue. It sounds like you're being redirected to account creation instead of the login page. First, make sure you're using the correct URL: <url> The old staging link no longer works, so if you have an old bookmark or link, that could be causing the redirect to account creation. To help resolve this quickly, can you share: The exact URL you're trying to access Whether this is blocking your workflow or just unexpected behavior If you continue having trouble after confirming the correct URL, I'll connect you with our team to get this sorted out.\n\nName 17: <url>\n\nbot: Thanks for sharing the URL! That helps me understand what's happening. Since you shared just \"\\[URL\\]\" without the actual link, I need to confirm you're using the correct one: <url> If you're using any other URL (especially an old staging link), that would explain why you're being redirected to account creation instead of the login page. Can you confirm: The exact URL you're trying to access Whether this is blocking your workflow or just unexpected behavior Once I know the specific URL, I can help get this sorted quickly.\n\nName 17: <url>\n\nbot: Thanks for your patience with this login issue. Since you're still not sharing the specific URL, let me help you get to the right place. Use this correct login URL: <url> If you're using any other URL (especially old staging links), that's why you're being redirected to account creation instead of the login page. Can you confirm: What you were trying to do when this started Whether this is blocking your workflow or just unexpected behavior Once I know you're using the correct URL, we can get this sorted quickly.\n\nName 17: I am using this exact URL <url>\n\nbot: Thanks for your patience with this login issue. I need to collect a few details to help resolve this quickly: What were you trying to do when this started? Can you share a screenshot of what you're seeing when you go to the URL? Is this blocking your workflow or just unexpected behavior? Since you mentioned \"\\[URL\\]\" but I can't see the actual link, please confirm you're using <url> and not any old staging links. Once I have these details, I can get this sorted for you.\n\nName 17:\n\nbot: Thanks for your patience and the screenshot. That welcome screen suggests the platform might still be loading or there's a browser issue preventing the full login interface from appearing. Since you're using the correct URL, try these steps: • Clear your browser cache and cookies for the site • Disable any ad-blockers - they often prevent login elements from loading properly • Try a different browser or incognito/private mode • Hard refresh the page (Name 18+F5 or Name 19+Shift+R) If you still see just the welcome screen after trying these steps, I'll connect you with our team to investigate further.\n\nbot: Did that answer your question?\n\nName 17: No, I still get the same page\n\nbot: Thanks for your patience with this login issue. Since the troubleshooting steps didn't resolve it and you're still seeing just the welcome screen, this appears to be a platform access issue that needs direct investigation. Based on our platform documentation, if you were in the private beta, your data should have been automatically migrated on November 25th. However, some users may need to complete additional steps to activate their accounts. I'm going to pass this to a human teammate to help you as soon as possible. We're working through a higher than usual support load, but we'll get back to you as quickly as we can. Source: How to Get Access to AI Clients | Help Center - AI Acquisition\n\nbot: Did that answer your question?\n\nbot: I’m sorry this issue is still causing trouble and appreciate your patience. Would you like to share more details about what you’re trying to achieve so I can assist you further?\n\nbot: I understand you're stuck at the welcome screen and need to access your login. Since you were likely in the private beta, your account may need activation after the November 25th migration. Try using the password reset option to reactivate your account: Go to the sign-in page Click Forgot password? below the password field Enter your email and click Send instructions Check your email (including spam) for the reset link This should help activate your migrated account and get you past the welcome screen. If the reset email doesn't arrive or you still see the welcome screen after resetting, I'll connect you with our team for direct account assistance. Source: How to reset your password | Help Center - AI Acquisition\n\nName 17: I have tried the link but I still end up here\n\nbot: I see you're still stuck at that welcome screen. Since you were likely in the private beta, this suggests your account may need activation after the November 25th migration. The welcome screen without any login options typically means your account hasn't been fully activated yet. You might need to look for an activation email from our team to complete the signup flow. Check your email (including spam) for any activation instructions we may have sent. If you can't find an activation email or continue seeing just the welcome screen, I'm going to pass this to a human teammate to help you as soon as possible. We're working through a higher than usual support load, but we'll get back to you as quickly as we can. Source: How to Get Access to AI Clients | Help Center - AI Acquisition\n\nbot: Did that answer your question?\n\nName 17: I already reactinated and signed in after the migration and was using my account yesterday but just can't log back in today, what changed from yesterday?\n\nbot: Thanks for your patience with this login issue. Since you were working fine yesterday but can't access today, this sounds like a platform-specific issue that needs investigation. Nothing should have changed overnight that would affect your access. The migration completed on November 25th, and if you were using your account successfully yesterday, your activation was working properly. Since you're still seeing just the welcome screen despite having working access yesterday, I'm going to pass this to a human teammate to help you as soon as possible. We're working through a higher than usual support load, but we'll get back to you as quickly as we can. Sources: How to reset your password | Help Center - AI Acquisition How to Get Access to AI Clients | Help Center - AI Acquisition\n\nbot: Was that helpful?\n\nName 17: Not at all\n\nbot: I'm sorry this is still so frustrating for you. Would you like me to connect you with a human agent? Or if you want, you can share more details about what you’re experiencing, and I’ll do my best to help!\n\nName 17: I need a human helper\n\nbot: I'll connect you with someone from our team right away. Meanwhile, could you please share any additional details about the issue? This will help them assist you more efficiently.\n\nName 17: I am trying to log into my account but can't. It gives the welcome screen\n\nName 17:\n\nName 17: Hi Name 15\n\nName 17: I seem to have been logged out of my account and when I try to log back I am taken back to a new joiner screen\n\nName 15: Name 20. Looks like the onboarding was reset. Let me check with the team\n\nName 17: Yes please because I don't want to start from scratch. I have a lot of my work there already and had even connected my Company One just waiting to kick off my campaign\n\nName 15: I understand Name 21. Waiting on the feedback from our team.\n\nName 17: Any update? I am still stuck"
+    },
+    {
+      "id": "ENG-3733",
+      "createdAt": "2025-12-12T22:23:10.973Z",
+      "title": "Name 2 Calendar toggle switches re-enable themselves in workspace",
+      "state": "Canceled",
+      "assignee": "Savinder Singh",
+      "parent": null,
+      "labels": ["Bug", "Power User Request"],
+      "description": "Users report that when turning off a Name 2 Calendar inside a workspace, the calendar toggle automatically turns itself back on after being disabled. This occurs after disconnecting one Name 2 account and adding another for a specific workspace.\n\nContext: reported while configuring calendars for multiple client workspaces (e.g. Company Seven, Company Eight).\n\nUser: <email>\n\nSlack: <url:fegrowthpartner.slack.com>\n\n---\n\nAfter some discussion we found that we have a problem where email-calendar connections and settings are scoped to the user, but being updated on workspace settings.\n\nThe solution to this is the following:\n\n### **Solution Overview**\n\nCreate a new workspace_member_settings table that stores workspace-specific overrides for user settings. The application will check this table first and fall back to the user's profile settings if no override exists.\n\n**Key principle:** Calendar account connections remain at the user level. The new table only stores *preferences* about which existing accounts to use per workspace, not the account credentials themselves.\n\n---\n\n### **Implementation Steps**\n\n#### 1\\. Database Schema\n\nCreate a new table called workspace_member_settings in lib/db/schema/organization.ts with the following columns:\n\n* id (UUID, primary key)\n* memberId (UUID, foreign key to member table, unique, cascade delete)\n* timezone (text, nullable) - Overrides user.timezone\n* calendarAccountIds (UUID array, nullable) - References which integration_email_calendar_account records to use for this workspace. Null means use all.\n* conferencingAccountId (UUID, nullable) - References which integration_conferencing_account to use\n* conferencingLinkType (text, nullable) - Overrides user.conferencingLinkType\n* conferencingStaticLink (text, nullable) - Overrides user.conferencingStaticLink\n* Standard timestamps (createdAt, updatedAt)\n\nAdd appropriate relations to the member table.\n\n#### 2\\. Helper Service\n\nCreate a new service file lib/services/workspace-member-settings-service.ts with a function getEffectiveUserSettings(userId, organizationId) that:\n\n1. Looks up the member record for the user + organization\n2. Queries workspace_member_settings for that member\n3. Queries the user table for default settings\n4. Returns merged settings where workspace overrides take precedence over user defaults\n5. Returns null for calendar account IDs if no preference is set (meaning \"use all\")\n\n#### 3\\. Update Scheduling Repository\n\nModify lib/scheduling/repositories/scheduling-repository.ts:\n\n* Update getUserWithIntegrations to accept an optional organizationId parameter\n* When organizationId is provided, use the helper service to get effective settings\n* Filter calendar accounts based on workspace preferences if set\n* Use workspace timezone if set, otherwise user timezone\n\n#### 4\\. Update Services That Use Timezone/Calendar Settings\n\nUpdate the following files to pass organizationId and use effective settings:\n\n* lib/scheduling/services/booking-service.ts\n* lib/scheduling/services/calendar-integration.ts\n* lib/scheduling/services/calendar-event-builder.ts\n* lib/scheduling/services/availability-scheduler.ts\n\nReview and update as needed:\n\n* trpc/routers/appointments.ts\n* trpc/routers/integrations/email-calendar.ts\n* trpc/routers/integrations/conferencing.ts\n* Inngest functions that reference timezone (search for .timezone in the codebase)\n\n#### 5\\. Create tRPC Router\n\nCreate a new router trpc/routers/workspace-member-settings.ts with procedures:\n\n* get - Fetch current workspace settings for the authenticated user in the active organization\n* update - Create or update workspace settings (upsert by memberId)\n* reset - Delete workspace settings to revert to profile defaults\n\nAdd the router to the main router index.\n\n#### 6\\. Settings UI\n\nCreate a new settings page at app/(saas)/dashboard/(sidebar)/(organization-settings)/\\[organizationSlug\\]/settings/calendar-preferences/page.tsx with:\n\n**Timezone Section:**\n\n* Show current effective timezone with indicator if using profile default\n* Dropdown to select workspace-specific timezone\n* Option to reset to profile default\n\n**Calendar Accounts Section:**\n\n* List all connected calendar accounts from the user's profile\n* Name 23 to select which accounts are active for this workspace\n* When none selected or all selected, use profile default (all accounts)\n* Clear indication of which accounts are active\n\n**Conferencing Section:**\n\n* Show current conferencing preference with indicator if using profile default\n* Options to select workspace-specific conferencing account\n* Static link field if applicable\n* Option to reset to profile default\n\nAdd navigation link to the settings sidebar in the settings layout.\n\n#### 7\\. Name 22\n\nModify components/calendar/timezone-change-dialog.tsx to:\n\n* Check workspace settings first when comparing timezones\n* When user confirms timezone change, update workspace settings (not user profile) if in a workspace context\n\n---\n\n### **Acceptance Criteria**\n\n- [ ] User can set a different timezone per workspace\n- [ ] User can select which calendar accounts are active per workspace\n- [ ] User can set different conferencing preferences per workspace\n- [ ] When no workspace preference is set, user profile settings are used (backward compatible)\n- [ ] Settings UI clearly indicates when using profile defaults vs. workspace overrides\n- [ ] User can reset workspace settings to use profile defaults\n- [ ] Existing users with no workspace settings continue to work as before\n- [ ] Scheduling/booking flow respects workspace-specific settings\n- [ ] Calendar availability checks use correct accounts per workspace\n\n---\n\n### **Out of Scope**\n\n* Migrating existing user settings to workspace settings\n* Work hours per workspace (can be added later using same pattern)\n* Bulk management of settings across workspaces\n\n---\n\n### **Testing Notes**\n\n* Test with a user in multiple workspaces with different settings\n* Test fallback behavior when workspace settings don't exist\n* Test that calendar connections still work at user level\n* Test scheduling flow uses correct timezone and calendar accounts per workspace"
+    },
+    {
+      "id": "ENG-3248",
+      "createdAt": "2025-12-02T01:07:31.211Z",
+      "title": "Workspace Onboarding Stuck on 'Completing' After Reset",
+      "state": "Done",
+      "assignee": "Savinder Singh",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "Customer's workspace onboarding remains stuck on 'Completing' status after accidentally resetting the workspace and attempting to link Company One; page reloads and refreshes do not resolve the issue.\n\nIt is stucked in on \"completing\". She tried refreshing but nothing happens.\n\n---\n\nConversation:\nName 100: <p>I completed the onboarding and it has been \"Completing\" for over an hour. Do you know how long the process is supposed to take?</p>\n\nbot: Thanks for your patience with the platform update! Processing times can vary depending on what you're setting up. For pre-warmed assets, it typically takes 5-30 minutes. For integrations like Company One imports, it may take several minutes depending on your campaign volume. Since it's been over an hour, try refreshing the page first - sometimes completed processes don't update automatically. To help resolve this quickly, can you share: What specific onboarding step you completed The page/URL where you're seeing \"Completing\" A screenshot if possible This will help determine if it's just a display issue or needs further attention. Source: What are Pre-Warmed Domains and Inboxes | Help Center - AI Acquisition\n\nbot: Did that answer your question?\n\nName 100: This is a workspace onboarding. See the attached screenshot\n\nbot: Thanks for your patience with the platform update and for sharing that screenshot! I can see you're stuck on the workspace onboarding \"Completing...\" step. This looks like a processing issue that's gone beyond normal timeframes. Try refreshing the page first - sometimes completed processes don't update automatically. If refreshing doesn't work, this appears to be blocking your workflow, so I'm going to pass this to a human teammate to help you as soon as possible. We're working through a higher than usual support load, but we'll get back to you as quickly as we can. The team will be able to check what's happening with your workspace setup and get you moving forward. Source: Growth Plan Creator Guide | Help Center - AI Acquisition\n\nbot: Is that what you were looking for?\n\nName 100: Yes, it will be helpful to have someone take a look and get this resolved\n\nbot: I'll connect you with someone from our team right away. Meanwhile, could you please share any additional details or concerns you have? This will help them assist you more efficiently.\n\nName 100: Hi Name 24. Please see the attached\n\nName 100: I was trying to link Company One to my original workspace and accidently reset it. If there a way to get the original workspace back, I would prefer that.\n\nName 24: Hi Name 100 were you able to access it now?\n\nName 100: It still has the same status\n\nName 100: I tried to reload the page as well\n\nName 24: the one in your\\` screenshot? Can you try to refresh it?\n\nName 100: I'll try again\n\nName 24: Name 25 if it does not work i need to report it it must be a bug\n\nName 100: I get the prompt to \"Complete Onboarding\" and then it stays stuck on \"Completing\"\n\nName 24: I'll have this reported .\n\nName 100: Thank you."
+    },
+    {
+      "id": "ENG-3400",
+      "createdAt": "2025-12-04T15:14:32.005Z",
+      "title": "Workspace signup loops onboarding for user",
+      "state": "Duplicate",
+      "assignee": "Savinder Singh",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "A user (Name 100) tried to sign up for the Workspace. After completing onboarding, the product asks to complete onboarding again instead of proceeding. The email address was not captured, but future occurrences should have the email collected.\n\nInvestigate why onboarding can get stuck in a loop for new Workspace signups and identify any affected users."
+    },
+    {
+      "id": "ENG-4972",
+      "createdAt": "2026-01-29T20:42:14.416Z",
+      "title": "Onboarding prompt still shown after completion in Name 26 workspace",
+      "state": "Done",
+      "assignee": "Anuj Bhatt",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "Customer continues to see the onboarding prompt in **Name 26's Workspace** after completing onboarding twice.\n\nThe workspace was previously marked as completed for onboarding under ENG-4502, and a fix was deployed. After inbox provisioning issues were resolved and inboxes moved to \"Name 26's Workspace\", the onboarding prompt is still appearing.\n\nRequested outcome: manually clear the onboarding/onboarding funnel state for this workspace so the prompt no longer appears.\n\nRelevant screenshot of the recurring prompt:\n\n <image> "
+    },
+    {
+      "id": "ENG-13918",
+      "createdAt": "2026-09-16T00:54:39.131Z",
+      "title": "Customer report: \"Your Niche & Offer\" says to complete onboarding despite completed onboarding",
+      "state": "Todo",
+      "assignee": "Anthony Adewale",
+      "parent": "ENG-13353",
+      "labels": ["Bug", "Customer reported", "fast-lane", "intercom-sourced"],
+      "description": "Source: Intercom conversation <url:app.intercom.com>\n\nClaim: In a workspace whose onboarding is already completed, Settings -> Your Niche & Offer shows \"No niche selected. Please complete the onboarding process first.\" instead of the niche/offer form, so the customer cannot set her own niche, even though Niche Researcher and Offer Creator runs succeed.\n\nBounded conversation context: Customer opened the conversation on 2026-09-15 23:25 UTC reporting that the Niche Researcher keeps returning niches she does not want and that Settings -> Your Niche & Offer will not let her set her own niche because it says onboarding is incomplete. She says she finished onboarding at least three times, used Reset Workspace Onboarding, and once saw \"could not save onboarding progress\"; the support agent also told her onboarding \"was not successfully completed\". Screenshots of the settings and onboarding screens are attached to the conversation. Two workspaces of the same user are involved.\n\nCurrent production evidence (read 2026-09-16): for both workspaces organization.onboarding_status = 'completed' while organization_knowledge.niche_agent_status = 'pending', selected_niche_id is NULL and generated_niches is NULL. In the same window 9 niche_researcher and 4 offer_creator submissions for those workspaces completed successfully, with results saved.\n\nSuspected path: apps/web/lib/onboarding/finalize-onboarding.ts writes only businessInfoFormData and sets onboarding_status = completed, so no niche is ever generated into organization_knowledge; apps/web/trpc/routers/organizations.ts getNicheOfferSettings returns selectedNiche null whenever selected_niche_id is null; apps/web/components/organization/niche-offer-settings-card.tsx renders the misleading onboarding message on that null."
+    },
+    {
+      "id": "ENG-4163",
+      "createdAt": "2026-01-05T15:37:13.261Z",
+      "title": "Onboarding completion message keeps reappearing after completion",
+      "state": "Done",
+      "assignee": "Anuj Bhatt",
+      "parent": null,
+      "labels": ["Bug", "Workspace Setup Issues"],
+      "description": "A user reports that the onboarding completion message continues to appear despite completing onboarding multiple times.\n\nReported behavior:\n\n* Onboarding completed 3 times in the old system.\n* Onboarding completed 2 times in the new system.\n* The platform still prompts to complete onboarding.\n* Another team member previously mentioned that this is a recurring bug for this user.\n\nThe user joined during the transition between the old and new onboarding systems and is still seeing the prompt after completing the new onboarding flow."
+    },
+    {
+      "id": "ENG-3064",
+      "createdAt": "2025-11-27T10:54:30.134Z",
+      "title": "Exit Onboarding button is unresponsive and causes navigation loops",
+      "state": "Duplicate",
+      "assignee": "Savinder Singh",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "**Steps:**\n\n1. Navigate to the 'Complete Your Workspace Setup' page.\n2. Click the 'Upgrade & Create Workspace' button.\n3. Observe that the user is redirected back to the same page or a previous state.\n\nWatch the screen recording here:\n\n<uuid>\n\n---\n\n**Device and browser info:**\nChrome 142.0.7444.176 (1920x958) | macOS (arm) 15.4.1\n\n**Date and time:**\nNovember 27th 2025 | 8:46am UTC\n\n**View developer information (console logs, network requests & timing):**\njam.dev/c/<uuid>\n\n---\n\n*Captured with* *jam.dev*"
+    }
+  ]
+}

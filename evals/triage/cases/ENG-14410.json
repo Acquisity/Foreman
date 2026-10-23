@@ -1,0 +1,220 @@
+{
+  "id": "ENG-14410",
+  "provenance": "seeded",
+  "createdAt": "2026-09-28T17:40:18.096Z",
+  "lane": "triage",
+  "stratum": "duplicate",
+  "ticket": {
+    "title": "Email inboxes deactivated randomly and will not turn back on",
+    "description": "#### Customer Name\n\nName 15\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 15\n\n#### Screenshot\n\n#### What are you trying to achieve?\n\nTo reactivate this client's email inboxes so we can continue sending\n\n#### What are you doing to achieve it?\n\nI tried reactivating the inboxes in the platform but it just wouldn't work. It would work for like 5 minutes and then they would just deactivate again\n\n#### What is happening instead?\n\nNo email campaigns are sending so the client has no volume and is booking no meetings and contacting no people\n\n#### What is the expected outcome?\n\nFor the email inboxes to be reactivated so we can continue sending",
+    "attachmentKinds": []
+  },
+  "repoCommitAtCreate": "0bd3a89d0f01cffaa77118fcfb9a42eaeaeebae8",
+  "flags": {
+    "descriptionEditedAfterCreate": false,
+    "needsProductionData": true,
+    "alreadyFixedAtTriage": false
+  },
+  "relatedSnapshot": [
+    {
+      "id": "ENG-14409",
+      "createdAt": "2026-09-28T17:37:02.977Z",
+      "title": "Email inboxes deactivated randomly and will not turn back on",
+      "state": "Triage",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [],
+      "description": "#### Customer Name\n\nName 1\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 1\n\n#### Screenshot\n\n <image> \n\n#### What are you trying to achieve?\n\nI'm trying to make this client's inboxes active again\n\n#### What are you doing to achieve it?\n\nI tried reactivating the inboxes but it says that they are not connected via this provider anymore\n\n#### What is happening instead?\n\nInboxes are staying inactive regardless of attempts to try and make them active again\n\n#### What is the expected outcome?\n\nTo get the inboxes active and working so we can resume campaigns as soon as humanly possible"
+    },
+    {
+      "id": "ENG-14197",
+      "createdAt": "2026-09-23T23:47:00.246Z",
+      "title": "Customer report: all 15 pre-warmed inboxes stuck in Error, Reconnect returns \"Mailbox not found\", campaigns cannot send",
+      "state": "Todo",
+      "assignee": "Anthony Adewale",
+      "parent": "ENG-13178",
+      "labels": ["Bug", "Customer reported", "fast-lane", "intercom-sourced"],
+      "description": "## Source\n\nIntercom conversation: <url:app.intercom.com>\n\n## Bounded conversation context\n\nCustomer reports (2026-09-22) that every pre-warmed inbox in the workspace shows an Error status, that reconnect attempts stay at \"Reconnect in Progress\" for over 48 hours, and that toggling an inbox to enabled briefly shows Active before it returns to Error. On 2026-09-23 she adds that her campaign stopped running and that she cannot start any new campaigns. Frontline agent reactivated the inboxes on 2026-09-22 and confirmed they still failed, then escalated to the tech team.\n\n* Product area named on the conversation: Email accounts & domains\n* Workspace: cold email agent email-accounts page, 15 pre-warmed inboxes across 5 domains (5 completed pre-warmed orders, all provisioned 2026-03-30)\n\n## Testable claim\n\nEvery pre-warmed inbox in the workspace is in Error and cannot be reconnected: the Reconnect path sends a mailbox id ColdMailReseller does not resolve, so the provider answers \"Mailbox not found\" and the inbox never returns to Active, which leaves the workspace with no sending accounts and blocks campaign sending.\n\n## Current evidence\n\n* 15/15 mail_inbox rows status=error, connected=false; 14 carry \"Disconnected via Company One account_error webhook\", 1 carries the \"Mailbox not found\" OAuth exception.\n* 53 Company One account_error webhook events between 2026-09-19T15:07Z and 2026-09-23T05:57Z for these accounts.\n* 15 failed cea_oauth_sessions, each with \"Mailbox OAuth connection threw an exception: Mailbox not found. Context: mailboxId=<stored provider_id>, email=<address>\", between 2026-09-20 and 2026-09-22.\n* Last email_sent webhook for the workspace: 2026-09-18T19:37Z. One campaign is still \"active\" with no sends; three campaigns sit in draft.\n* Provider side: the corresponding Company One accounts exist in the workspace sub-workspace and report warmup activity, so the durable failure is the Acquisity reconnect path, not a missing provider account.\n\n## Suspected code path\n\n* apps/web/lib/inngest/functions/campaign/workspaces/process-account-error-reconnect.ts (processAccountErrorReconnect) marks the inbox Error and invokes processConnectOAuth with mailboxId = stored mail_inbox.provider_id.\n* apps/web/trpc/routers/outreach/email-accounts.ts (triggerOAuthReconnect) sends mailboxId: undefined for a customer-initiated Reconnect.\n* apps/web/lib/inngest/functions/campaign/workspaces/process-connect-oauth.ts forwards that id to ColdMailReseller POST /mailboxes/oauth."
+    },
+    {
+      "id": "ENG-13178",
+      "createdAt": "2026-08-26T22:47:54.040Z",
+      "title": "ColdMailReseller pre-warmed inboxes stuck in Error: reconnect sends mailboxId=undefined (\"Mailbox not found\")",
+      "state": "Todo",
+      "assignee": "Anthony Adewale",
+      "parent": null,
+      "labels": ["Bug", "fast-lane"],
+      "description": "## Overview\n\nPre-warmed mailboxes provisioned through ColdMailReseller get stuck in an Error state and cannot send, because no reconnect path resolves a mailbox id the provider will accept.\n\n## Problem\n\nWhen a ColdMailReseller pre-warmed inbox disconnects or needs reconnecting, the account-error reconnect flow fires with `mailboxId: providerId ?? undefined`. These inboxes have `mail_inbox.provider_id = NULL`, so the provider receives `mailboxId=undefined` and the OAuth connect returns \"Mailbox not found\", leaving the inbox permanently in Error.\n\n## Root cause\n\n`apps/web/lib/inngest/functions/campaign/workspaces/process-account-error-reconnect.ts` invokes `processConnectOAuth` with `mailboxId: inboxLookup.providerId ?? undefined`. `processConnectOAuth` (`process-connect-oauth.ts`, `connect-mailbox-oauth` step) forwards that `mailboxId` to ColdMailReseller `POST /mailboxes/oauth` via `apps/web/lib/mail/providers/coldmailreseller/client.ts#connectMailboxOAuth`, which rejects it with \"Mailbox not found\". The inboxes have `mail_inbox.provider_id = NULL`, so the id is never resolved. The reconcile cron (`reconcile-domain-orders-cron.ts`) already looks up the mailbox from ColdMailReseller and passes `mailbox.id` correctly, so the resolution pattern exists.\n\nThe failing invariant is one gap across every entry point: no reconnect path resolves the mailbox id from ColdMailReseller before calling the provider. The webhook path forwards the stored `mail_inbox.provider_id`; the customer Reconnect action (`email-accounts.ts`, `triggerOAuthReconnect`) and the admin reconnect (`admin-domain-orders.ts`) both send `mailboxId: undefined`; `processConnectOAuth` never re-resolves. An inbox carrying a named but no-longer-valid id fails identically to one with a NULL id, which is why both counts below sit in this one class.\n\n## Blast radius\n\n5,762 inboxes across 444 organizations carry a `connection_error` containing \"Mailbox not found\" (query: `SELECT count(*), count(DISTINCT organization_id) FROM mail_inbox WHERE connection_error ILIKE '%Mailbox not found%'`, counted 2026-09-24: 5,762 inboxes / 444 organizations, and 7,071 reconnect sessions across 461 organizations failed the same way in the 30 days to 2026-09-24; was 5,763 / 445 on 2026-09-23, 5,660 / 439 on 2026-09-22, 4,364 / 323 on 2026-09-10 and 294 / 39 on 2026-08-28). None of the 5,762 is connected now. 2,391 of them carry the exact `mailboxId=undefined` signature (and all of those have `provider_id IS NULL`); the larger 3,371 carry a named mailbox id and fail the same way. Named-id rows arrive in platform waves (2026-09-04 to 09-06 roughly 2,118 rows across 95+ organizations; 2026-09-19 to 09-20 roughly 1,148 rows across 103 organizations), so the shape is systematic rather than org-specific. A further 2,872 connected pre-warmed inboxes across 228 organizations sit at `provider_id IS NULL` and would fail the same way on their next reconnect.\n\n## Proposed fix\n\nResolve the provider mailbox id before reconnecting: look up the mailbox from ColdMailReseller (as the reconcile cron already does) instead of passing `provider_id` or `undefined`, and backfill `provider_id` for the affected inboxes so they reconnect successfully.\n\n## Done when\n\n* No reconnect path hands ColdMailReseller an unresolved id: the webhook path stops forwarding the stored `provider_id` unresolved, the customer Reconnect and admin reconnect stop sending `undefined`, and both shapes (NULL `provider_id` and stale named id) reconnect successfully.\n* The stuck inboxes are recovered or re-provisioned and resume sending.\n* Provider accounts with no local `mail_inbox` row are covered too: Reconnect refuses them outright (`email-accounts.ts#triggerOAuthReconnect` throws PRECONDITION_FAILED \"Only managed inboxes can be reconnected.\") while their inbox entitlements are still consumed, so the backfill and re-provision step must create or link the missing rows, not only repair a NULL or stale `provider_id`.\n\n## Reports\n\n* ENG-13156\n* ENG-13255\n* ENG-13511\n* ENG-14104\n* ENG-14131\n* ENG-14197 Customer report: all 15 pre-warmed inboxes stuck in Error; Reconnect returns Mailbox not found; campaigns cannot send\n* ENG-14201 Customer report: 15 of 36 pre-warmed inboxes stuck in Error; Reconnect returns Mailbox not found and never clears the inbox"
+    },
+    {
+      "id": "ENG-14149",
+      "createdAt": "2026-09-23T11:36:01.641Z",
+      "title": "Clients inboxes get disabled multiple times",
+      "state": "Duplicate",
+      "assignee": "Anthony Adewale",
+      "parent": null,
+      "labels": ["Bug", "Customer reported"],
+      "description": "#### Customer Name\n\nName 2\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 2' Workspace\n\n#### Screenshot\n\n#### What are you trying to achieve?\n\nName 3 all his available inboxes\n\n#### What are you doing to achieve it?\n\nEnabled the inboxes again twice but they keep going back to error\n\n#### What is happening instead?\n\nInboxes show error and can't be used - reply rates are also very low even on a test campaign with podcast angle\n\n#### What is the expected outcome?\n\nBeing able to use all his inboxes with a normal reply rate"
+    },
+    {
+      "id": "ENG-10581",
+      "createdAt": "2026-06-19T18:27:20.342Z",
+      "title": "14 Email Inboxes Stuck in Error State and Cannot Be Reactivated",
+      "state": "Done",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "**Customer Name**\nName 4\n\n**Customer Email**\n<email>\n\n**Customer Email**\n<email>\n\n**Workspace name**\nName 4' Workspace\n\n**Screenshot**\n<optional>\n\n**What is the user trying to achieve?**\nRestore all connected email inboxes so the campaign can send at full capacity.\n\n**What is the user doing to achieve it?**\nThe user has connected multiple email accounts and is running an active campaign. Support attempted to reactivate the affected inboxes from the platform.\n\n**What is happening instead?**\n14 email accounts are currently in an error state. Attempts to reactivate the inboxes were unsuccessful, as they immediately returned to the error status. This suggests an underlying issue affecting the affected inboxes. The remaining 9 inboxes are active and have resumed sending emails successfully.\n\n**What is the expected outcome?**\nThe 14 affected inboxes should remain active after reactivation and be able to send emails normally alongside the other active inboxes. The user would like the root cause of the recurring error state identified and resolved."
+    },
+    {
+      "id": "ENG-8260",
+      "createdAt": "2026-05-01T15:04:09.315Z",
+      "title": "Email inboxes remain in error after reconnect",
+      "state": "Done",
+      "assignee": "Tyler Olsen",
+      "parent": null,
+      "labels": [],
+      "description": "Three of 18 inboxes are still showing **Error** after reconnecting. The affected inboxes were purchased over a week ago. The issue was first noticed on Wednesday when six inboxes showed an error message; after reconnecting, some returned to active but three did not.\n\nSupport made admin-side changes and reported the inboxes as active internally, but the customer still sees the three inboxes in error and not syncing.\n\nAffected examples shown in the conversation include:\n\n* <email>\n* <email>\n* <email>\n\n <image> \n\n <image> "
+    },
+    {
+      "id": "ENG-14131",
+      "createdAt": "2026-09-22T20:19:40.188Z",
+      "title": "Name 5 - 24 inboxes burned",
+      "state": "Todo",
+      "assignee": "Anthony Adewale",
+      "parent": "ENG-13178",
+      "labels": ["Bug", "Customer reported"],
+      "description": "#### Customer Name\n\nName 5\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 5\n\n#### Screenshot\n\n#### What are you trying to achieve?\n\nSend cold email\n\n#### What are you doing to achieve it?\n\nAll settings correct\n\n#### What is happening instead?\n\nall 24 inboxes bunred\n\n#### What is the expected outcome?\n\nsend normal"
+    },
+    {
+      "id": "ENG-14201",
+      "createdAt": "2026-09-24T02:35:11.498Z",
+      "title": "Customer report: 15 of 36 pre-warmed inboxes stuck in Error, Reconnect returns \"Mailbox not found\" and never clears the inbox",
+      "state": "Todo",
+      "assignee": "Anthony Adewale",
+      "parent": "ENG-13178",
+      "labels": ["Bug", "Customer reported", "intercom-sourced"],
+      "description": "## Source\n\nIntercom conversation: <url:app.intercom.com>\n\n## Bounded conversation context\n\nCustomer reports (2026-09-21/22) that several mailboxes have shown an error and have not been sending for over a month; the count has grown from 6 to 15. He has opened several support tickets for the same issue over the past month or two without resolution. A frontline agent reactivated the inboxes on 2026-09-22 and it did not work. He asks for the 15 failing inboxes to be deleted and replaced with working ones and for one month of all 15 being down to be refunded / credited. Three screenshots of the Cold Email Agent email-accounts page were attached. Product area named on the conversation: Email accounts & domains.\n\n## Testable claim\n\n15 of the workspace's 36 pre-warmed sending inboxes are stuck in Error and have sent nothing because the Reconnect path asks the mail provider for a mailbox id it does not resolve, so the provider answers \"Mailbox not found\" and the inbox never returns to Active, leaving the workspace sending from only 21 inboxes.\n\n## Current evidence\n\n* Production: 33 mail_inbox rows for the workspace, 21 active/connected and 12 status=error, connected=false. The 12 carry three distinct connection errors: 6 \"Mailbox OAuth connection threw an exception: Mailbox not found\" with the stored provider id echoed in the message, 3 \"Disconnected via Company One account_error webhook\", 3 \"Waiting on zapmail oauth connection\".\n* Provider: the workspace sub-workspace holds all 36 sending accounts; exactly 15 report a failed status with autofix_failed, timestamped between 2026-08-19 and 2026-09-21. Three of those 15 have no local mail_inbox row at all, which is why the local count reads 12 and the customer's count of 15 is the accurate one.\n* OAuth session history for the workspace: 16 failed sessions, all \"Mailbox OAuth connection threw an exception: Mailbox not found\" between 2026-09-19 and 2026-09-22; 50 expired sessions, including repeated \"Waiting on zapmail oauth connection\" for three inboxes from 2026-08-19/20/21; 30 completed sessions earlier in 2026.\n* Sending: the 21 healthy inboxes are still sending; a healthy inbox in the same workspace sent mail on 2026-09-22, the day of the report. An inbox in the failed group last sent on 2026-08-12.\n* Name 6: failed process-account-error-reconnect runs in the last week, with the invoke-connect-oauth step failing.\n\n## Suspected code path\n\n* apps/web/lib/inngest/functions/campaign/workspaces/process-account-error-reconnect.ts (processAccountErrorReconnect) marks the inbox Error and invokes processConnectOAuth with mailboxId = the stored mail_inbox.provider_id.\n* apps/web/trpc/routers/outreach/email-accounts.ts (triggerOAuthReconnect) sends mailboxId, orderId and domain as undefined for a customer-initiated Reconnect.\n* apps/web/lib/inngest/functions/campaign/workspaces/process-connect-oauth.ts forwards that id to ColdMailReseller POST /mailboxes/oauth and records \"Mailbox OAuth connection threw an exception: Mailbox not found. Context: mailboxId=<id>, email=<address>\".\n* apps/web/lib/inngest/functions/campaign/workspaces/poll-oauth-session.ts records \"Waiting on zapmail oauth connection\".\n\n## Blast radius\n\nCounted from production on 2026-09-24: 16,058 inboxes in Error across 1,167 organizations. Of those, 5,762 inboxes / 444 organizations carry the \"Mailbox not found\" reconnect error, 497 / 87 the account_error webhook state, and 339 / 174 the zapmail oauth class."
+    },
+    {
+      "id": "ENG-14200",
+      "createdAt": "2026-09-24T02:34:37.135Z",
+      "title": "Refund/credit request: 15 of 36 paid inboxes in Error and not sending, one month of compensation requested",
+      "state": "Todo",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [],
+      "description": "## Source\n\nIntercom conversation: <url:app.intercom.com>\n\n## Bounded conversation context\n\nCustomer reports (2026-09-21/22) that several mailboxes have shown an error and have not been sending for over a month; the count has grown from 6 to 15. He says he has opened several support tickets for the same issue without resolution, that a teammate's fix (reactivating the inboxes) did not work, and that the problem is consuming his time. He asks to have the 15 failing inboxes deleted and replaced with working ones, and to be refunded / credited for one month of all 15 being down. He sent screenshots of the Cold Email Agent email-accounts page.\n\n## Ask\n\nTaxonomy bucket: refund. Requested financial remedy: be compensated for one month of 15 paid inboxes that were in Error and not sending. Alternative remedy the customer may prefer: a credit on the account rather than money back. Open human decision.\n\n## Finding\n\n15 of the workspace's 36 paid sending inboxes are in provider error and silent; the 21 healthy inboxes still send normally. The 15 carry the known ColdMailReseller / Zapmail reconnect defect: the reconnect path cannot resolve a mailbox the provider accepts (\"Mailbox not found\"), so the inbox never returns to Active. Four of them had already failed by mid-August 2026 and the rest failed from 19 September 2026. The workspace keeps paying the monthly fee for all 36.\n\n## Exposure\n\nVerified from billing records: 36 inbox spend items are active on the account at 8 USD per inbox per month (two active inbox subscriptions, 18 on each, with 36 of 36 inbox entitlements consumed). One month of 15 inboxes is about 120 USD of the account's monthly spend. The monthly plan fee and the healthy inboxes are unaffected. No refund or credit note has previously been issued on this account for these charges.\n\n## Proposed action (proposal, never a promise)\n\nA person on the support/billing side should decide and, if approved, issue a one-month compensation for the 15 affected inboxes (about 120 USD), in the form the customer wants: money back on the card, or an account credit consumed by the next invoice. Separately, a person should arrange the repair or replacement of the 15 inboxes, because replacing them is a paid provisioning action. Do not move money from this investigation.\n\n## Systems of record\n\n* Production workspace state: 33 inbox rows, 21 active/connected and 12 in Error; three further provider accounts exist with no local row. All 36 provider accounts are present in the workspace sub-workspace; 15 report a failed status with autofix_failed.\n* Provider state: the 15 accounts are flagged errored at the provider itself, so the durable failure is not a missing provider account.\n* Provisioning and entitlements: both inbox subscriptions are active, 36 of 36 inbox entitlements consumed; plan is Legacy Pro plus inbox and domain add-ons. No cancellation or deletion is in flight.\n* Money movement: monthly invoices for 36 inboxes have been paid continuously; no refunds or credit notes exist on the account.\n* First divergent hop: none. All three systems agree, so the remaining question is human discretion on the remedy.\n\n## Approval trail\n\nnone found. No prior approval or promise to compensate, and no prior refund or credit for this outage, appears in the conversation or in the account's billing records.\n\n## Justification checklist\n\n1. The charge matches real invoices and active subscriptions - verified.\n2. The disputed amount is quantified from primary billing data - verified (about 120 USD for one month of 15 inboxes at 8 USD each).\n3. Plan and add-on state matches the account and production - verified.\n4. Product-credit balance and prior-credit history were read from production - verified; no compensation credit is present.\n5. A prior approval or promise is quoted, or explicitly absent - verified absent.\n6. The ask is one taxonomy bucket - refund, with an account credit named as the customer's possible preference; unresolved.\n7. The customer's account was weighed against all systems, with contradictions named - verified; the only contradiction is the customer's count of 15 versus the 12 local Error rows, settled by the provider showing exactly 15 failed accounts.\n\n## Unverified\n\n* The customer's preferred remedy (money back versus account credit) has not been stated in the conversation. It decides the form of the proposal, not its merit.\n* Whether he wants the 15 inboxes replaced after all, given that replacement is a new paid provisioning action while his account already bills for 36 inboxes.\n* The exact start date of lost sending for each of the 15; local webhook history is empty and provider timestamps are the closest available signal.\n\n## Observations\n\nThe product defect behind this ask is confirmed and already tracked as an open engineering master; a customer report for this conversation is raised separately and parented to that master. Do not bury the defect inside this billing record."
+    },
+    {
+      "id": "ENG-5446",
+      "createdAt": "2026-02-11T22:07:51.159Z",
+      "title": "Auto-reconnect disconnected Name 7 inboxes via Company One account_error webhook",
+      "state": "Done",
+      "assignee": "Anuj Bhatt",
+      "parent": null,
+      "labels": [],
+      "description": "**Problem**                                                                                                                                             \n\nName 7 randomly disconnects inboxes from Company One, requiring manual reconnection. \n\n**Current** **State**\n\n* The existing reconcileDomainOrdersCron only retries inboxes that failed during **initial** **provisioning** (orders with requires_attention status)\n* There is no mechanism to detect or fix inboxes that disconnect **after** successful initial connection\n* Company One provides an account_error webhook event that fires when a connected email account has a connection issue, authentication failure, or is paused due to plan expiration\n\n**Proposed** **Solution**\n\n**1.** **Register** **account_error** **webhooks**\n\n* For all existing organizations with an Company One provider, register an account_error webhook pointing to a new API endpoint in our app\n* Register the webhook automatically for new organizations when their Company One provider is set up\n\n  **2.** **Name 8** **handler** **endpoint**\n\n* Receives account_error events from Company One\n* Identifies the affected email account\n* Checks our provisioning logs to confirm it's an inbox we own (ignore accounts users connected directly through Company One)\n* Triggers the existing reconnection flow: initGoogleOAuth() → ColdMail completes OAuth → pollOAuthSession polls until connected\n* Deduplication: skip if an OAuth session is already in-flight for that inbox\n\n  **3.** **Backfill** **cron** **(one-time** **or** **infrequent)**\n\n* A one-time migration to register account_error webhooks on all existing organization workspaces\n* Optionally keep a low-frequency daily cron as a safety net to catch any missed webhook events\n\n  **Considerations**\n\n* **Deduplication:** Avoid triggering reconnection if an OAuth session is already active for that inbox\n* **Retry** **limits:** Cap reconnection attempts per inbox to avoid infinite loops\n* **Provider** **filtering:** Only attempt reconnection for Name 7 inboxes (provider_code: 2) provisioned through ColdMail\n* **Name 8** **verification:** Validate incoming webhook requests are from Company One\n* **Name 9:** Handle duplicate webhook deliveries gracefully"
+    },
+    {
+      "id": "ENG-6675",
+      "createdAt": "2026-03-12T22:15:47.974Z",
+      "title": "Fix or replace inbox to eliminate errors",
+      "state": "Done",
+      "assignee": "Jared Stauffer",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "#### Customer Name\n\nName 10 & Name 11\n\n#### Customer Email\n\n<email> - wrong — correct one is <email>\n\n#### Workspace name\n\nName 10's Workspace\n\n#### Screenshot\n\n <image> \n\n#### What are you trying to achieve?\n\nInbox with no Error\n\n#### What are you doing to achieve it?\n\nna\n\n#### What is happening instead?\n\nNA\n\n#### What is the expected outcome?\n\nFix or replace inbox"
+    },
+    {
+      "id": "ENG-9834",
+      "createdAt": "2026-06-08T20:45:48.670Z",
+      "title": "Three purchased inboxes stay at 0 warmup emails",
+      "state": "Done",
+      "assignee": "Tyler Olsen",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "User: <email>\nThree purchased inboxes are not sending warmup emails after multiple reactivation and reconnect attempts.\n\nAffected inboxes:\n\n* <email>\n* <email>\n* <email>\n\nThe inboxes were showing an error, reconnect was tried multiple times, and the issue was still present after more than 48 hours each from multiple attempts. \n\n <image> "
+    },
+    {
+      "id": "ENG-4842",
+      "createdAt": "2026-01-26T15:01:11.183Z",
+      "title": "Cold Email Agent inboxes missing after account email change",
+      "state": "Duplicate",
+      "assignee": "Tyler Olsen",
+      "parent": null,
+      "labels": ["Inbox/Domain Not Created"],
+      "description": "User: <email>\n\nUser purchased domains and inboxes for the Cold Email Agent while the account was using a personal email address. After switching the account email in settings to a business email, the previously purchased inboxes no longer appear in the Cold Email Agent, so campaigns cannot be started.\n\nDetails:\n\n* Original account email: <email>\n* Current account email: <email>\n* Inboxes were visible initially under the personal-email account but disappeared after changing the login email.\n* Some sending credits appear as used even though no campaigns were started, because setup could not be completed without the missing inboxes.\n\nExpectation: Previously provisioned domains, inboxes, and associated credits should carry over or be migrated when the account email is changed, so the Cold Email Agent can be used normally under the new email.\n\nUser expecting to see 9 inboxes in account - has been billed "
+    },
+    {
+      "id": "ENG-13511",
+      "createdAt": "2026-09-04T21:07:29.459Z",
+      "title": "Two pre-warmed inboxes stuck in Error — reconnect does not clear the error",
+      "state": "Todo",
+      "assignee": "Anthony Adewale",
+      "parent": "ENG-13178",
+      "labels": ["Bug", "Customer reported", "intercom-sourced"],
+      "description": "Intercom conversation: <url:app.intercom.com>\n\n## Context\n\nName 12 (Company Two workspace) reported on 2026-09-01 that two of his 18 pre-warmed sending inboxes show \"Error\" status and that he is receiving no replies. The two inboxes are `<email>` and `<email>`. Support reconnected them three times, but the Error state persists.\n\n## Testable claim\n\nOn 2026-09-01, in the Company Two workspace, two of 18 pre-warmed ColdMailReseller inboxes (`<email>` and `<email>`) show \"Error\" connection status, and reconnecting them three times does not clear the error, while the other 16 inboxes across the same domains remain connected and sending.\n\nRoot cause matches the ColdMailReseller pre-warmed inbox OAuth reconnect failure tracked under master ENG-13178: the reconnect path sends `mailboxId=undefined` to the provider (`POST /mailboxes/oauth`), which returns \"Mailbox not found\", so the inbox remains in Error.\n\n\n <image> "
+    },
+    {
+      "id": "ENG-8510",
+      "createdAt": "2026-05-12T22:56:44.991Z",
+      "title": "AI SDR Inbox shows no emails found",
+      "state": "Canceled",
+      "assignee": "Koppany Kondricz",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "User: <email>\nAI SDR Inbox shows `No emails found` for this workspace even though the inbox count shows emails are present.\n\nThe issue persists after logging out, clearing browsing data, refreshing repeatedly, trying Chrome and Edge, and trying a different computer.\n\nObserved behavior:\n\n* Inbox and Needs Attention can show no emails.\n* AI SDR Disabled shows emails.\n* Emails can briefly appear under other statuses, but after refreshing the page or clicking into an email, the view returns to `No emails found`.\n* The inbox was reported as showing 82/151 emails while the main panel still displayed no emails.\n\nA Jam recording was provided: Jam recording\n\n <image> \n\n <image> "
+    },
+    {
+      "id": "ENG-9720",
+      "createdAt": "2026-06-04T19:09:58.443Z",
+      "title": "Campaign stays active but follow-ups stop sending and some inboxes has 0 warmup emails and no health score",
+      "state": "Done",
+      "assignee": "Koppany Kondricz",
+      "parent": null,
+      "labels": ["intercom-sourced"],
+      "description": "User: <email>\nCampaign `PH3_7GAPS #2_MAY26` in the `Company Three` workspace shows as active.\n\nReported behavior:\n\n* Only 26 of 4,000 leads received the final sequence.\n* Most leads appear stalled before step 2.\n* This does not appear to be due to unsubscribes, bounces, or replies.\n* Sending schedule and inbox status were described as all green.\n* The AI agent kept recommending stopping the campaign, but the campaign remained active without sending remaining sequences.\n\nAdditional context from review:\n\n* Some sending inboxes showed zero warmup activity which maybe need a fix.\n* Flag deliverability: spf, dkim, dmarc, warmup, bounce_rate\n\n <image> "
+    },
+    {
+      "id": "ENG-4829",
+      "createdAt": "2026-01-25T21:26:56.392Z",
+      "title": "Purchased email inboxes not provisioned to account",
+      "state": "Done",
+      "assignee": "Beth Newton",
+      "parent": null,
+      "labels": [],
+      "description": "user: <email>\n\nCustomer purchased 1 domain and 3 email inboxes \\~3+ hours ago. The inboxes have not been applied to the account despite multiple refreshes.\n\nSupport has checked and sees the provisioning attempt failing repeatedly. This needs investigation on the backend so the purchase can be correctly applied and the inboxes/domains provisioned.\n\n <image> "
+    },
+    {
+      "id": "ENG-8075",
+      "createdAt": "2026-04-23T18:55:07.516Z",
+      "title": "Acquisity integration disappears and asks to reactivate",
+      "state": "Done",
+      "assignee": "Beth Newton",
+      "parent": null,
+      "labels": [],
+      "description": "The Acquisity integration disappeared and the app prompted to enable Acquisity again.\n\nSupport noted this is a known issue.\n\n <image> "
+    },
+    {
+      "id": "ENG-8287",
+      "createdAt": "2026-05-04T06:29:01.887Z",
+      "title": "Purchased domains and inboxes not appearing",
+      "state": "Done",
+      "assignee": "Tyler Olsen",
+      "parent": null,
+      "labels": [],
+      "description": "Name 14\n<email>\nName 13's workspace\n\nPayment was accepted for email domains and inboxes, but they do not appear in the system. After waiting about an hour, there are still zero domains and zero credits visible.\n\nThe reported checks did not resolve it: the accounts were not visible under Cold Email Agent → Email Accounts or Campaigns, there was no sync option available, and the issue persisted after reviewing provider connection guidance."
+    },
+    {
+      "id": "ENG-3569",
+      "createdAt": "2025-12-08T22:41:28.407Z",
+      "title": "Customer sees developer test campaigns in Cold Email Agent",
+      "state": "Duplicate",
+      "assignee": "Jared Stauffer",
+      "parent": null,
+      "labels": [],
+      "description": "Customer reports seeing campaigns and data that are not theirs in the Cold Email Agent.\n\nContext:\n\n* Customer has not connected their own Company One account yet.\n* Cold Email Agent shows multiple campaigns that appear to be developer test data.\n* Customer explicitly states \"this is not my data. these are not my campaigns\".\n* Internal review notes that these look like developer test campaigns showing up in the customer workspace.\n\nScreenshots from the customer:\n\n <image> \n\n <image> \n\nInternal-only reference screenshot of suspected test campaigns:\n\n <image> "
+    }
+  ]
+}

@@ -3,6 +3,11 @@ import { z } from "zod";
 import { LINEAR_ISSUE_ID_PATTERN } from "#lib/investigation-memory/scope.js";
 import { decideTriage } from "#lib/jev-decisions.js";
 import { logOpsEvent } from "#lib/ops-log.js";
+import {
+  decisionFields,
+  settleDecision,
+  triageDecisions,
+} from "#lib/triage-log.js";
 
 const identifier = z.string().trim().regex(LINEAR_ISSUE_ID_PATTERN);
 const text = (max: number) => z.string().trim().min(1).max(max);
@@ -25,6 +30,14 @@ export default defineTool({
         outcome: decision.outcome === "route" ? decision.path : "unproven",
         sessionId: ctx.session.id,
         tool: "decide_triage",
+      });
+      const fields = decisionFields(input.identifier, decision);
+      const settled = settleDecision(triageDecisions.get(), fields);
+      triageDecisions.update(() => settled.decisions);
+      logOpsEvent("triage.decision", {
+        ...fields,
+        decision: settled.stage,
+        sessionId: ctx.session.id,
       });
       return { decided: true as const, decision };
     } catch (error) {
@@ -85,12 +98,16 @@ export default defineTool({
     projects: z
       .array(z.object({ description: text(300).optional(), name: text(120) }))
       .min(1)
-      .max(40)
-      .describe("The team's active product projects, read from Linear now."),
+      .max(60)
+      .describe(
+        "The team's active product projects, read from Linear now; in a triage replay, from list_triage_replay_catalog."
+      ),
     rootCauseLabels: z
       .array(text(120))
       .max(40)
-      .describe("The team's Root Cause label names, read from Linear now."),
+      .describe(
+        "The team's Root Cause label names, read from Linear now; in a triage replay, from list_triage_replay_catalog."
+      ),
     sourceLabels: z
       .array(text(120))
       .max(3)

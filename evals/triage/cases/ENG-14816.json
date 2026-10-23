@@ -1,0 +1,230 @@
+{
+  "id": "ENG-14816",
+  "provenance": "seeded",
+  "createdAt": "2026-10-06T15:53:05.533Z",
+  "lane": "triage",
+  "stratum": "bug_master",
+  "ticket": {
+    "title": "Only 45 of 54 inboxes showing in clients worksapce",
+    "description": "#### Customer Name\n\nName 19\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nCompany Seven\n\n#### Screenshot\n\n <image> \n\n#### What are you trying to achieve?\n\nActivate the remaining 9 inboxes\n\n#### What are you doing to achieve it?\n\nWent into billing says there are 54 inboxes, then went into the cold email agent and there are only 44\n\n#### What is happening instead?\n\nOnly 45 inboxes are showing up\n\n#### What is the expected outcome?\n\nGet the client access to all 54 of his inboxes",
+    "attachmentKinds": ["image", "slack"]
+  },
+  "repoCommitAtCreate": "a7ebe00e6553d7d1775a9207fd08a261280f3ae1",
+  "flags": {
+    "descriptionEditedAfterCreate": false,
+    "needsProductionData": true,
+    "alreadyFixedAtTriage": false
+  },
+  "relatedSnapshot": [
+    {
+      "id": "ENG-8968",
+      "createdAt": "2026-05-18T18:32:05.284Z",
+      "title": "Only 8 of 18 purchased inboxes were provisioned",
+      "state": "Done",
+      "assignee": "Tyler Olsen",
+      "parent": null,
+      "labels": [],
+      "description": "A workspace shows 18 total inboxes purchased across 6 domains, but only 8 inboxes were successfully provisioned and visible after activation more than 2 weeks ago.\n\nThe inbox list shows 9 active inboxes visible in the screenshot, while billing shows 18 total inboxes purchased. Campaigns remain in draft with no active campaigns.\n\nWorkspace name: Name 100's Workspace\nEmail: <email>\nContext provided: recently activated Acquisity after previously using Company One.ai for 10 months.\n\n <image> \n\n <image> "
+    },
+    {
+      "id": "ENG-14781",
+      "createdAt": "2026-10-06T11:24:16.160Z",
+      "title": "Inboxes missing since 3 months - Refund",
+      "state": "Todo",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": ["Customer reported", "Refund"],
+      "description": "#### User Email\n\n<email>\n\n#### Workspace Name\n\nName 2 Workspace\n\n#### Request Type\n\nRefund\n\n#### Reason for request\n\n\"I was just looking at my billing. See the attached screenshot. I'm paying for 24 inboxes - 2 which each have an email that has not worked in 3 1/2 months, without any explanation despite my continuously asking. When I look at my cold email I only see 18. The domains \"<domain>\" and \"<domain>\" do not even show up as belonging to my account. I have one other workspace (Name 1) - but zero domains or emails are showing there, so that just means they are completely missing from what I can tell.  I probably don't have to tell you how frustrating this is for me.\""
+    },
+    {
+      "id": "ENG-13672",
+      "createdAt": "2026-09-10T18:49:14.941Z",
+      "title": "Billing shows 6 domains with 3 inboxes each but only 6 email accounts are selectable after 4 domains failed provisioning",
+      "state": "Todo",
+      "assignee": "Anthony Adewale",
+      "parent": "ENG-13213",
+      "labels": ["Bug", "Customer reported", "intercom-sourced"],
+      "description": "Customer report from Intercom conversation #215475885980963.\n\n**Intercom source**: <url:app.intercom.com>\n\n**Conversation context**: The customer (agency owner, workspace Company Two) opened with \"I found a bug\", then described the observable mismatch: \"In the billing setting, it shows we have 6 domains with 3 emails each. However, in the campaigns, in the email accounts button, we only have 6.\" She attached a screenshot of the cold email campaign \"Recruiting & Name 3 - Sept 2026\" showing the warning \"No email accounts connected. Add one to start sending.\"\n\n**Testable claim**: A workspace that bought 6 done-for-you email domains with 3 inboxes each (18 inboxes) sees all 6 domains with 3 inboxes each in its billing settings, but only the 6 inboxes on the 2 domains that provisioned are available to its cold email campaigns, because the purchase order has sat in requires_attention since 2026-08-16 and its 12 failed inboxes have never been retried.\n\n**Observed vs expected**: Expected 18 usable email accounts; observed 6 selectable, with no customer-facing explanation or action beyond \"your order is taking longer than expected, we'll keep trying, please be patient\".\n\nEvidence, root cause and blast radius are documented in the Triage investigation document attached to this issue.\n\nForeman support operation: <id>\nIntercom source: <url:app.intercom.com>"
+    },
+    {
+      "id": "ENG-4653",
+      "createdAt": "2026-01-19T15:27:37.224Z",
+      "title": "Add 18 inboxes for Name 4 not showing in Acquisity",
+      "state": "Duplicate",
+      "assignee": "Tyler Olsen",
+      "parent": null,
+      "labels": ["Inbox/Domain Not Created"],
+      "description": "#### Customer Name\n\nName 4\n\n#### Customer Email\n\n<email>\n\n#### Screenshot\n\n#### Clear description of what the problem is\n\nEmails purchased on workspace \"Name 4's Workspace\" on 16th/01. Not showing up in account (18 emails and 6 domains). \n\nBilling account id is identical for 2 workspaces  :\n\n <image> \n\n <image> \n\nWorkspace 1 onboarding not completed\n\nJust moved to Acquisity, bought 18 inboxes 3+ hours ago - not showing progress etc. in inboxes section. Also not showing active subscription for domains which is very odd. Please could we get the inboxes added for him? This was flagged by him on Friday"
+    },
+    {
+      "id": "ENG-9434",
+      "createdAt": "2026-05-28T21:02:36.102Z",
+      "title": "Billing shows 18 inboxes but charges for 27",
+      "state": "Todo",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "Customer details: \n\n* Name 6\n* <email>\n* Name 5's Workspace\n\nCustomer reports being charged for 9 domains / 27 inboxes, while Settings → Billing shows only 6 domains / 18 inboxes. This user only wants 18 inboxes.\n\n\nWe found unprovisioned inboxes from the purchases made on April 2 and May 6.\n\n <image> "
+    },
+    {
+      "id": "ENG-4525",
+      "createdAt": "2026-01-14T13:23:28.928Z",
+      "title": "Customer billed for 15 inboxes but only 12 active",
+      "state": "Done",
+      "assignee": "Tyler Olsen",
+      "parent": null,
+      "labels": ["Inbox/Domain Not Created"],
+      "description": "Customer (<email>) reports being billed for 15 inboxes but only having 12 inbox/email accounts available in the app.\n\nBilling view shows subscription for 15 inboxes, while the email accounts view lists only 12 active accounts for the workspace.\n\n <image> \n\n <image> "
+    },
+    {
+      "id": "ENG-14783",
+      "createdAt": "2026-10-06T11:46:28.791Z",
+      "title": "Name 7 - A total of 18 inboxes sending only 120 emails per day when they should be sending more",
+      "state": "Done",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": ["Customer reported", "Data/Config Mismatch"],
+      "description": "#### Customer Name\n\nName 7\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nCompany Three\n\n#### Screenshot\n\n#### What are you trying to achieve?\n\nAll the inboxes should be working and sending more than just 100 emails.\n\n#### What are you doing to achieve it?\n\nRaising the ticket.\n\n#### What is happening instead?\n\nClient is incredibly frustrated and has paused all his campaigns.\n\n#### What is the expected outcome?\n\nDeliverability should be high. This issue should be resolved."
+    },
+    {
+      "id": "ENG-14272",
+      "createdAt": "2026-09-25T10:14:42.109Z",
+      "title": "blacklabel Client has 36 inboxes but is only sending 294 a day",
+      "state": "Todo",
+      "assignee": "Anthony Adewale",
+      "parent": "ENG-13502",
+      "labels": ["Bug", "Customer reported"],
+      "description": "#### Customer Name\n\nName 8\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nCompany Four\n\n#### Screenshot\n\n#### What are you trying to achieve?\n\nName 9 the clients full volume that he can send on a daily basis\n\n#### What are you doing to achieve it?\n\nAdding all inboxes to the campaign, checking if they are active, checked if the campaign still has leads enough, and checked if there are any other campaigns live that can take volume away\n\n#### What is happening instead?\n\nIt's only sending 294 a day instead of 1080\n\n#### What is the expected outcome?\n\nSending the full amount we can send instead of the 290 a day now"
+    },
+    {
+      "id": "ENG-6063",
+      "createdAt": "2026-03-02T09:23:50.230Z",
+      "title": "Add one missing inbox to client's workspace",
+      "state": "Done",
+      "assignee": "Tyler Olsen",
+      "parent": null,
+      "labels": ["Bug", "Inbox/Domain Not Created"],
+      "description": "#### Customer Name\n\nName 10\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 10's workspace\n\n#### Screenshot\n\n <image> \n\n <image> \n\n#### What are you trying to achieve?\n\nClient paid for 18 inboxes but only has 17\n\n#### What are you doing to achieve it?\n\n.\n\n#### What is happening instead?\n\n.\n\n#### What is the expected outcome?\n\nAdd 1 missing email to their workspace"
+    },
+    {
+      "id": "ENG-4255",
+      "createdAt": "2026-01-07T16:10:04.397Z",
+      "title": "Missing one purchased inbox in campaigns selection",
+      "state": "Done",
+      "assignee": "Tyler Olsen",
+      "parent": null,
+      "labels": [],
+      "description": "Customer purchased 18 inboxes yesterday but only 17 appear when selecting inboxes for sending in campaigns. The Email Accounts page shows 18 purchased inboxes, but the campaign inbox selection only lists 17.\n\nPlease investigate why one inbox from the recent purchase is not available for campaign sending and ensure it is provisioned and selectable in campaigns."
+    },
+    {
+      "id": "ENG-8510",
+      "createdAt": "2026-05-12T22:56:44.991Z",
+      "title": "AI SDR Inbox shows no emails found",
+      "state": "Canceled",
+      "assignee": "Koppany Kondricz",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "User: <email>\nAI SDR Inbox shows `No emails found` for this workspace even though the inbox count shows emails are present.\n\nThe issue persists after logging out, clearing browsing data, refreshing repeatedly, trying Chrome and Edge, and trying a different computer.\n\nObserved behavior:\n\n* Inbox and Needs Attention can show no emails.\n* AI SDR Disabled shows emails.\n* Emails can briefly appear under other statuses, but after refreshing the page or clicking into an email, the view returns to `No emails found`.\n* The inbox was reported as showing 82/151 emails while the main panel still displayed no emails.\n\nA Jam recording was provided: Jam recording\n\n <image> \n\n <image> "
+    },
+    {
+      "id": "ENG-14716",
+      "createdAt": "2026-10-05T13:06:42.366Z",
+      "title": "Master: unpaid mailboxes from a refunded DFY order cannot be paid from the billing page",
+      "state": "Backlog",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": ["Bug", "fast-lane"],
+      "description": "## Overview\n\nThe billing page cannot take payment for mailboxes that the platform still bills the provider for. When a Done-For-You domain order is refunded because the provider failed to provision it, the mailboxes it created are still live and in use, the audit flags them unpaid and warns they will be cancelled on a dated deadline, and the resubscribe control that would settle them never renders. Customers see a warning they cannot act on, and the mailboxes are removed while they are willing to pay.\n\n## Problem\n\nAn owner opens Settings -> Billing from the \"Review billing\" banner, expecting to pay for the mailboxes the banner names. The page shows no managed domains for that workspace, so there is no \"Review and resubscribe\" and no per-domain \"Resubscribe\", and no other surface opens the pay dialog. Support then tells the customer a payment failed, when the only inbox charge was refunded.\n\n## Root cause\n\n`apps/web/trpc/routers/outreach/email-accounts.ts` `listManagedDomains` inner-joins the domain's purchase order and filters `ne(domainPurchaseOrderTable.status, 'refunded')` (and `ne(mailDomainTable.status, 'suspended')`). A refunded order therefore removes its domain from the managed list even while an open unpaid audit finding exists for it. `apps/web/components/billing/email-accounts-domains-card.tsx` `EmailAccountsDomainsCard` returns its \"No managed domains\" empty state before rendering the \"Review and resubscribe\" and per-domain \"Resubscribe\" buttons, and those are the only entry points to the pay flow (`apps/web/trpc/routers/cmr-domain-charges.ts` `listUnpaid` already returns the domain for an owner or admin, regardless of order status). When the card does render for a workspace with other domains, the refunded domain is still hidden from the list, so its per-domain control is missing too.\n\n## Blast radius\n\nCounted 2026-10-05 against production. 4 organizations and 9 open `unpaid` findings belong to a refunded purchase order; 2 of those organizations have an empty managed list, where the control is unreachable (6 findings), and the other 2 keep 3 and 4 visible managed domains, where only the per-domain control is missing (3 findings). All 4 organizations have a sent unpaid reminder dated 2026-09-29, so all 4 face a 2026-10-06 cancellation date. Distinct affected users were not counted: the audit rows carry no user id.\n\n```\nWITH f AS (SELECT fa.organization_id FROM cmr_domain_audit_finding fa\n  JOIN domain_purchase_order o ON o.id = fa.order_id\n  WHERE fa.payment_state = 'unpaid' AND fa.resolved_at IS NULL\n    AND fa.dismissed_at IS NULL AND o.status = 'refunded')\nSELECT f.organization_id::text, count(*) AS open_findings,\n  (SELECT count(*) FROM mail_domain md\n     JOIN domain_purchase_order o2 ON o2.id = md.order_id\n    WHERE md.organization_id = f.organization_id\n      AND md.status <> 'suspended' AND o2.status <> 'refunded') AS visible_managed_domains,\n  (SELECT min(r.created_at)::text FROM cmr_renewal_reminder r\n    WHERE r.organization_id = f.organization_id\n      AND r.kind = 'unpaid' AND r.status = 'sent') AS first_sent_reminder\nFROM f GROUP BY f.organization_id\n```\n\nConfirmed affected: 2 organizations with the control unreachable. Potentially exposed: the further 2 organizations whose refunded domain is hidden from the list while their pay-all control is reachable.\n\n## Proposed fix\n\nMake the unpaid-mailbox notice actionable for every workspace that carries an open unpaid finding. A workspace whose DFY order was refunded but whose provider mailboxes are still live should be able to pay for them from the billing page: the pay control should be reachable from the unpaid findings themselves rather than only from the managed domain list, and a refunded order's domain should stay visible to the billing card while an open unpaid finding exists so its per-domain \"Resubscribe\" renders as well. The customer-facing outcome is that the banner's deadline can be met from the billing page, without an operator making a production or billing change by hand.\n\n## What's included\n\nBoth variants found in the blast radius (empty card, and refunded domain hidden beside visible ones). Not included: the upstream provisioning failure that leaves mailboxes live after a refunded order (owned by the DFY provisioning family tracked under ENG-13213), and the wording of the reminder emails. Related umbrella work: ENG-13358, whose child ENG-14423 covers giving customers a clear date to act by. Separately filed work needed for the current cohort: an operator must make the affected mailboxes payable, or decide they are removed, before 2026-10-06.\n\n## Regression seam\n\nThe billing page's managed-domain list and its pay control. Red before: for a workspace whose only mail domain belongs to a refunded order while an open unpaid finding exists, `listManagedDomains` returns nothing and the billing card renders its empty state with no pay control. Green after: the same workspace offers a working resubscribe path that charges for the live mailboxes and clears the finding.\n\n## Done when\n\n* An owner of a workspace whose DFY order was refunded but whose provider mailboxes are live can open Settings -> Billing and pay for those mailboxes from the page.\n* A workspace that also has other managed domains shows the per-domain resubscribe control for the refunded domain while its unpaid finding is open.\n* A regression test at the list/pay seam proves both cases red before and green after.\n\n## Reports\n\n* ENG-14710 (customer report, Company Five workspace; carries the full investigation document)."
+    },
+    {
+      "id": "ENG-7528",
+      "createdAt": "2026-04-05T13:31:21.774Z",
+      "title": "Inboxes not showing in Name 11's workspace despite payment",
+      "state": "Done",
+      "assignee": "Beth Newton",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "#### Customer Name\n\nName 12\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 12's Workspace\n\n#### Screenshot\n\n#### What are you trying to achieve?\n\nShe bought inboxes with Name 13 together but they don't show in her account\n\n#### What are you doing to achieve it?\n\nChecked billing and she did pay for them but it shows some weird 0usd billing as well. Checked with james as well.\n\n#### What is happening instead?\n\nInboxes are not showing in her workspace\n\n#### What is the expected outcome?\n\nThat she has inboxes in her workspace and the correct amount - she is high risk bcs her OB was messed up and we need to get this sorted quickly."
+    },
+    {
+      "id": "ENG-6024",
+      "createdAt": "2026-02-27T19:33:33.573Z",
+      "title": "Paid purchase only provisions 4/8 domains and 12/24 inboxes",
+      "state": "Done",
+      "assignee": "Beth Newton",
+      "parent": null,
+      "labels": [],
+      "description": "User: <email>\nCustomer reports purchasing 8 domains and 24 inboxes for their Company Nine workspace (purchase completed Feb 26), but after more than a day the dashboard still shows 4/8 domains and 12/24 inboxes.\n\nInternal note from support: error shown as “Partial failure after 4/8 domains: Insufficient balance for 4 domains and 19 inboxes”, despite customer stating payment was completed in full.\n\n <image> \n\n <image> "
+    },
+    {
+      "id": "ENG-14706",
+      "createdAt": "2026-10-05T09:44:34.228Z",
+      "title": "Mailbox billing dispute: $54 monthly inbox charge after five months without a collected payment",
+      "state": "Todo",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": ["Customer reported", "Refund", "intercom-sourced"],
+      "description": "**Intercom source**: <url:app.intercom.com> (opened 2026-10-04, assigned to Ellaine Fuente; the customer asked for a human on 2026-10-05)\n\n**Customer**: <email>, owner of workspace \"Name 14's Workspace\" (org <uuid>, billing account <uuid>, native Autumn).\n\n**Ask**: why he has to pay monthly for the mailboxes/domains. He says he opened them in May, that this is the first time since May he has paid, and asks whether $54 will recur every month. Taxonomy bucket: overcharged. No refund was requested.\n\n**Finding**: the charge is correct and the customer paid it himself. He holds 9 live inboxes (3 domains x 3, DFY, all active and connected) at $6 per inbox per month = $54 per month; the three domains are billed yearly at $15.16 each, paid on 2026-04-29 through 2027-04-29. He paid $99.48 on 2026-04-29 and $54.00 on 2026-05-31. From 2026-06-29 his card declined repeatedly with insufficient funds, nothing more was collected, and the domain+inbox subscription was canceled for payment_failed on 2026-07-13. The mailbox audit flagged the 9 mailboxes unpaid on 2026-09-10; a human sent the unpaid-mailbox reminder on 2026-09-29 naming $54.00 a month and a 6 October deadline; the customer paid $54.00 from his own billing page on 2026-10-05 (audit trail cmr_domain_charge.create, actor = his own user id; the $54.00 charge was captured at 08:39 after one insufficient-funds decline at 08:38). No double billing: the earlier $54.00 invoice (2026-06-29) and the $185.00 Pro invoice (2026-09-11) remain open on canceled subscriptions and cover earlier periods.\n\n**Exposure**: $54.00 collected 2026-10-05 for the period 2026-10-05 to 2026-11-05, matching the 9 paid inboxes. Nothing in the evidence supports a refund or a credit. Two invoices remain collectible on canceled subscriptions: $54.00 (2026-06-29) and $185.00 (2026-09-11).\n\n**Proposed human action**: support explains the pricing to the customer (mailboxes are $6 per inbox per month, domains are yearly) and, if he wants the recurring charge stopped, cancels the three inbox add-ons on the billing account; separately decide what to do with the two open invoices on canceled subscriptions and make sure the mailbox audit re-runs so the workspace stops reading as unpaid. This is a proposal, not a promise.\n\n**Also noted**: in the conversation the assistant told him the October charge was the \"first monthly billing cycle catching up\" and that June-October were renewals \"happening in the background\". That does not match the records (April and May were paid, June onward failed).\n\nFull readout and evidence in the Billing investigation document on this ticket."
+    },
+    {
+      "id": "ENG-6480",
+      "createdAt": "2026-03-09T17:21:46.678Z",
+      "title": "Process refund request for March charge from Name 15 Name 16",
+      "state": "Done",
+      "assignee": "Beth Newton",
+      "parent": null,
+      "labels": ["Refund"],
+      "description": "#### Workspace Name\n\n#### Request Type\n\nRefund\n\n#### Reason for request\n\nEmail: <email>\nUser: Name 15 Name 16\nLink to Intercom: <url:app.intercom.com>\n\nWant a refund to his workspace and email charge for March. They cancelled it March 2nd and now since been kicked out of the platform, he did not received a confirmation on the March Credit"
+    },
+    {
+      "id": "ENG-6018",
+      "createdAt": "2026-02-27T15:43:55.721Z",
+      "title": "Refund request due to low email sending limits",
+      "state": "Canceled",
+      "assignee": "Beth Newton",
+      "parent": null,
+      "labels": ["Refund"],
+      "description": "#### Workspace Name\n\nCompany Ten\n\n#### Request Type\n\nRefund\n\n#### Reason for request\n\nEmail: <email>\nUser: Name 15 Name 16\nReason for Refund: For their email inboxes. Not satisfied on the numbers of email it is sending. They are only sending 70 emails a day with 12 email address. They are expecting to send at least 35 emails per address. He would be better off having 2 instead of 12 and get the same pathetic output\nIntercom Link: <url:app.intercom.com>"
+    },
+    {
+      "id": "ENG-7442",
+      "createdAt": "2026-04-01T22:40:12.379Z",
+      "title": "Only 3 inboxes populated instead of 18 in GP cold email agent",
+      "state": "Done",
+      "assignee": "Beth Newton",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "#### Customer Name\n\nName 5\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 5\n\n#### Screenshot\n\n <image> \n\n#### What are you trying to achieve?\n\nPurchase and activte 18 inboxes in GP cold email agent\n\n#### What are you doing to achieve it?\n\nWent throught onboarding process and walk-through purchasing 6 domains / 18 inboxes with GP.  Name 17 check that the number was correct and the transaction went through\n\n#### What is happening instead?\n\nonly 3 inboxes populated in GP's cold email agent, and not 18 as we purchased\n\n#### What is the expected outcome?\n\nHaving the full 6 Domains / 18 inboxes in GP's workspace"
+    },
+    {
+      "id": "ENG-8453",
+      "createdAt": "2026-05-09T06:39:56.806Z",
+      "title": "Company Eight provisioning requires attention after multiple days",
+      "state": "Done",
+      "assignee": "Tyler Olsen",
+      "parent": null,
+      "labels": [],
+      "description": "Workspace: Company Eight.\n\nuser: <email>\n\nA customer reports that email account provisioning has been stuck for multiple days with a `Provisioning requires attention` banner in Cold Email Agent → Email Accounts.\n\nThe order includes 2 domains with 3 inboxes each:\n\n* `<domain>`\n* `<domain>`\n\nThe UI shows: \"1/2 domains provisioned, but your order is taking longer than expected. We'll keep trying, please be patient!\"\n\n <image> "
+    },
+    {
+      "id": "ENG-6628",
+      "createdAt": "2026-03-11T20:12:23.295Z",
+      "title": "Replace burnt inboxes as only 5 are active",
+      "state": "Canceled",
+      "assignee": "Tyler Olsen",
+      "parent": null,
+      "labels": ["Chore"],
+      "description": "#### Customer Name\n\nName 18\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nCompany Six\n\n#### Screenshot\n\n#### What are you trying to achieve?\n\nReplace burn inboxes\n\n#### What are you doing to achieve it?\n\nna\n\n#### What is happening instead?\n\nonly 5 inboxes are active\n\n#### What is the expected outcome?\n\nburnt inboxes replaced"
+    },
+    {
+      "id": "ENG-14187",
+      "createdAt": "2026-09-23T21:05:22.215Z",
+      "title": "Pre-warmed mailbox connect conflicts are retried to exhaustion and the unconnected seats stay billed after finalization",
+      "state": "Todo",
+      "assignee": "Anthony Adewale",
+      "parent": null,
+      "labels": ["Bug", "fast-lane"],
+      "description": "## Overview\n\nPre-warmed Done-For-You mailboxes that the mail provider already reports as owned by another workspace can never be connected, and the seats are billed anyway. Operators pay for inboxes that have never worked, and the orders they belong to are closed out without releasing the charge.\n\n## Problem\n\nAn operator buys pre-warmed domains with three inboxes each. Some of the mailboxes in the assignment cannot be connected to the buyer's workspace, so those domains are left half-built: the domain is provisioned, its inboxes sit in an error state, and the order is eventually closed out with the seats still granted and still billed. There is no customer-side reconnect for a managed inbox in this state, and nothing in the finalization path releases the charge.\n\n## Root cause\n\nA permanent provider conflict is treated as a transient connect failure, and finalization releases no seats on Autumn accounts.\n\n* `apps/web/lib/inngest/functions/billing/process-domain-purchase-order.ts`, `processDomainPurchaseOrder`: invokes `processConnectOAuth` per mailbox; on a failure result it logs and pushes `{success:false, error}` and continues, and the domain is later written as `partial` when any inbox did not connect.\n* `apps/web/lib/inngest/functions/campaign/workspaces/process-connect-oauth.ts`, `processConnectOAuth`: surfaces the provider's failure text (\"OAuth connection failed: account_exists - Account already exists in another workspace\") and consumes retry budget.\n* `apps/web/lib/mail/db/mail-repository.ts`: `MAX_INBOX_RETRY_ATTEMPTS = 24`, and `isEligibleForRetry: row.retryCount < MAX_INBOX_RETRY_ATTEMPTS`.\n* `apps/web/lib/inngest/functions/billing/reconcile-domain-orders-cron.ts`, `reconcileDomainOrdersCron`: the `find-orders-requiring-attention` loop re-invokes the connect for every still-eligible failed inbox each cycle, so a conflict that can never succeed burns \\~24 cycles over several weeks; once `eligibleForRetry.length === 0 && failedInboxes.length > 0` it calls `finalizeUnfulfillableOrderAfterRetries`.\n* `apps/web/lib/billing/order-finalization.ts`, `finalizeUnfulfillableOrderAfterRetries`: for an order with provisioned items it writes `status: 'requires_attention'`, `completedAt` and `errorDetails.retriesExhausted = true`, and calls `applyManagedDomainCancellationAdjustment` only inside `if (billingProvider === 'whop' ...)`. On Autumn billing accounts no seats are released or refunded, so the never-connected inboxes stay granted and billed after the order terminalizes.\n\nThe upstream contributing cause is that the pipeline assigns mailboxes to a paying order without checking that they are free at the provider.\n\n## Blast radius\n\n122 inboxes across 11 organizations on 15 orders share the `account_exists` connect signature (max retry_count 25, earliest inbox row 2026-03-05, most recent 2026-08-27). 81 of those inboxes sit on 8 orders still in `requires_attention` with `completed_at` null; 41 sit on 7 orders already `completed` (3 organizations), where the seats remain billed after finalization; 20 are at or above the 24-attempt cap. Query: `SELECT count(*), count(DISTINCT organization_id), max(retry_count), min(created_at), max(created_at) FROM mail_inbox WHERE status='error' AND connection_error LIKE '%account_exists%'`, counted 2026-09-23. Confirmed affected: 11 organizations. Not settled: the population that traversed the path without confirmed failure (every pre-warmed order that assigned a mailbox already claimed at the provider), because no query separates it.\n\n## Proposed fix\n\nA mailbox that the provider reports as already owned elsewhere is a permanent conflict: detect it at connect time, stop retrying it, and surface it as a terminal, operator-visible failure instead of burning the retry budget. When an order is finalized with unconnected inboxes, release or refund those seats for every billing provider, not only Whop. Prevent the conflict upstream by not assigning a mailbox that is already claimed at the provider.\n\n## What's included\n\nDetecting the permanent conflict as non-retryable, terminal finalization that releases unconnected seats on Autumn, and a provider-availability check before assignment. Not included: reclaiming a mailbox from the workspace that already holds it, and the general billing reconciliation between supplier inventory and customer entitlements, which belongs to the existing billing-drift master.\n\n## Regression seam\n\nEntry: a pre-warmed order whose mailbox the provider reports as already owned by another workspace. Observable red-before behavior: the reconcile loop keeps re-invoking the connect until `MAX_INBOX_RETRY_ATTEMPTS` is exhausted, then finalizes with the seats still granted. Green-after: the permanent conflict is classified immediately and the unconnected seats are released or refunded at finalization for an Autumn account. A test at `finalizeUnfulfillableOrderAfterRetries` and one at the connect-result handling in the provider-agnostic path prove it.\n\n## Done when\n\n* A provider-reported `account_exists` conflict stops being retried rather than consuming the 24-attempt budget.\n* Finalizing an order with unconnected inboxes releases or refunds those seats on an Autumn billing account, and the granted-seat count on the billing account matches the number of connected inboxes.\n* A regression test proves the causal mechanism at the named seam.\n\n## Reports\n\n* ENG-14185"
+    }
+  ]
+}

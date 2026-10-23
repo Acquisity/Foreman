@@ -1,0 +1,220 @@
+{
+  "id": "ENG-14491",
+  "provenance": "seeded",
+  "createdAt": "2026-09-29T22:07:34.943Z",
+  "lane": "billing",
+  "stratum": "billing",
+  "ticket": {
+    "title": "Name 15",
+    "description": "#### User Email\n\n<email>\n\n#### Workspace Name\n\nName 15\n\n#### Request Type\n\nDiscount code\n\n#### Reason for request\n\nRefund save\n3 months acquisity and up to 18 inboxes we cover\n3 campaign launches\n10k lead credits\n1 Re-onboarding call\n1 milestone call - EG: 1st client",
+    "attachmentKinds": ["slack"]
+  },
+  "repoCommitAtCreate": "6686a56a354ee256ac85eb8d7ef40dc76210ae03",
+  "flags": {
+    "descriptionEditedAfterCreate": false,
+    "needsProductionData": true,
+    "alreadyFixedAtTriage": false
+  },
+  "relatedSnapshot": [
+    {
+      "id": "ENG-5655",
+      "createdAt": "2026-02-18T18:22:17.519Z",
+      "title": "Add 7 free workspaces to customer account",
+      "state": "Done",
+      "assignee": "Beth Newton",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "#### Customer Name\n\nName 1 / Name 2\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nCompany One workspace\n\n#### Screenshot\n\n#### What are you trying to achieve?\n\nCan you add the additional 7 free workspaces to his account please\n\n#### What are you doing to achieve it?\n\nRequesting\n\n#### What is happening instead?\n\nRequesting\n\n#### What is the expected outcome?\n\n7 free workspace"
+    },
+    {
+      "id": "ENG-10635",
+      "createdAt": "2026-06-22T12:36:56.858Z",
+      "title": "[Component/Feature] - remove <domain> domain from the landing page",
+      "state": "Done",
+      "assignee": "James Keeble",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "**Customer Name**\n<Enter text> Name 2\n\n**Customer Email**\n<Enter text><email>\n\n**Customer Email**\n<Enter text>\n\n**Workspace name**\n<Enter text>Name 2's workspace\n\n**Screenshot**\n<optional>\n\n**What is the user trying to achieve?**\n<Enter text> they want to remove the <domain> domain in Name 2 website and replace it with <domain> but it is not letting them publish on it. It is still showing <domain>\n\n**What is the user doing to achieve it?**\n<Enter text> replace the domain\n\n**What is happening instead?**\n<Enter text> it won't let them replace it\n\n**What is the expected outcome?**\n<Enter text> they should be able to change it\n\n <image> \n\n<url:jam.dev>"
+    },
+    {
+      "id": "ENG-7268",
+      "createdAt": "2026-03-27T11:47:14.468Z",
+      "title": "Cancel all V1 domains while keeping V2 domains",
+      "state": "Done",
+      "assignee": "Tyler Olsen",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "#### Customer Name\n\nName 3\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 3\n\n#### Screenshot\n\n <image> \n\n#### What are you trying to achieve?\n\nCanceling V1 domains\n\n#### What are you doing to achieve it?\n\nTrying to see if I can cancel all domains showed in the screenshot for him\n\n#### What is happening instead?\n\non the plattform it only shows V2 domains\n\n#### What is the expected outcome?\n\nCancel all V1 domains and keep V2 - he has 5 V2 domains"
+    },
+    {
+      "id": "ENG-7835",
+      "createdAt": "2026-04-15T15:46:42.260Z",
+      "title": "Error when trying to create a campaign in workspace",
+      "state": "Canceled",
+      "assignee": "Beth Newton",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "#### Customer Name\n\nName 2\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nCompany Two\n\n#### Screenshot\n\n#### What are you trying to achieve?\n\nTrying to create a campaighn\n\n#### What are you doing to achieve it?\n\nTried using workspace to create it\n\n#### What is happening instead?\n\nGetting this error message - - <loom>\n\n#### What is the expected outcome?\n\nTo be able to create a campaighn and for the screen to load"
+    },
+    {
+      "id": "ENG-6949",
+      "createdAt": "2026-03-23T13:39:01.467Z",
+      "title": "Unable to cancel emails/domains separately from Acquisity subscription",
+      "state": "Canceled",
+      "assignee": "Beth Newton",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "#### Customer Name\n\nName 3\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 3\n\n#### Screenshot\n\n#### What are you trying to achieve?\n\nCancel existing emails/domains before buying fresh ones\n\n#### What are you doing to achieve it?\n\nIf trying to cancel through billing it shows it's coupled with Acquisity subscription so canceling it will cancel everything unnecessarily\n\n#### What is happening instead?\n\nIf trying to cancel through billing it shows it's coupled with Acquisity subscription so canceling it will cancel everything unnecessarily\n\n#### What is the expected outcome?\n\nUnable to cancel emails/domains separately"
+    },
+    {
+      "id": "ENG-11148",
+      "createdAt": "2026-07-04T02:01:47.118Z",
+      "title": "High bounce rates on Acquisity leads despite valid emails",
+      "state": "Todo",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [],
+      "description": "#### Customer Name\n\nName 2\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 2\n\n#### Screenshot\n\n#### What are you trying to achieve?\n\nClient reports bounce rates exceeding 5% on campaigns using Acquisity-purchased leads. Despite leads being \"verified,\" campaign emails are bouncing at rates that threaten sender reputation. Additional symptoms include zero positive replies and only out-of-office responses across all active campaigns.  Critical finding: When testing the same \"bouncing\" email addresses via personal Gmail, emails delivered successfully, indicating valid addresses and shifting investigation to sending infrastructure.\n\n#### What are you doing to achieve it?\n\nDiagnostic Steps Completed Bounce Rate Verification Client identified >5% bounce rate across multiple campaigns using Acquisity leads Lead Validity Test (Name 1 - 3 Jul, 3:49 PM)  Sent blank test emails from personal Gmail to sample bounced addresses Result: All test emails delivered successfully without bounce-back Conclusion: Email addresses themselves are valid Name 4 Check  All domains show healthy warm-up percentages No reputation decay indicators from warm-up data Client Isolation Protocol (Name 5 - 2 Jul, 11:02 PM)  Exported bounced email addresses from campaign Leads tab Conducted external verification test using Gmail Results confirm addresses are deliverable from Gmail infrastructure\n\n#### What is happening instead?\n\n* \n\n#### What is the expected outcome?\n\n* "
+    },
+    {
+      "id": "ENG-3220",
+      "createdAt": "2025-12-01T18:14:20.034Z",
+      "title": "Prevent AI Growth Consultant from mentioning PGPs",
+      "state": "Done",
+      "assignee": "Savinder Singh",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "Update the AI Growth Consultant so it no longer references PGPs in any of its messaging or responses."
+    },
+    {
+      "id": "ENG-2428",
+      "createdAt": "2025-10-01T12:39:38.187Z",
+      "title": "Review the list of client/community questions that JordanAI has been unable to answer in AIAA and prioritise and fix",
+      "state": "Todo",
+      "assignee": "Savinder Singh",
+      "parent": null,
+      "labels": [],
+      "description": "Name 6 AI Name 7"
+    },
+    {
+      "id": "ENG-2375",
+      "createdAt": "2025-10-28T08:16:34.464Z",
+      "title": "Pointing to broken links when giving answers",
+      "state": "Done",
+      "assignee": "Savinder Singh",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "This example is with JordanAI linking to Name 8 links that are not valid anymore <url:thegrowthpartner.slack.com>\n\nI have also seen it myself linking to Skool links that do not work"
+    },
+    {
+      "id": "ENG-3535",
+      "createdAt": "2025-12-08T12:24:11.110Z",
+      "title": "Investigate missing niche settings after onboarding",
+      "state": "Done",
+      "assignee": "Savinder Singh",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "A growth partner reports that Name 9 cannot see a selected niche in Settings → Your Niche & Offer. When impersonating the GP, the page shows the message \"No niche selected. Please complete the onboarding process first\" even though onboarding was reportedly completed and niche fields were filled in.\n\nUser: <email>\n\nSlack: <url:fegrowthpartner.slack.com>\n<url:fegrowthpartner.slack.com>\n\nRelevant screenshot:\n\n <image> "
+    },
+    {
+      "id": "ENG-8474",
+      "createdAt": "2026-05-11T09:19:52.748Z",
+      "title": "Integrate inbound calling and texting",
+      "state": "Done",
+      "assignee": "Savinder Singh",
+      "parent": null,
+      "labels": ["rep-command-center"],
+      "description": "Currently calls and texts sent to our phone numbers are not being logged on Acquisity \n\nI can call and send text messages, but when someone calls back or sends a message back, we do not receive it (or at least it's not showing in the UI)"
+    },
+    {
+      "id": "ENG-5463",
+      "createdAt": "2026-02-12T10:06:42.767Z",
+      "title": "Name 6 AI incorrectly states clients receive a PGP instead of support",
+      "state": "Done",
+      "assignee": "Savinder Singh",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "#### Customer Name\n\nName 10\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nCompany Three & Name 10\n\n#### Screenshot\n\n <image> \n\n#### What are you trying to achieve?\n\nAsking for the right benefits that AIA provides using Name 6 AI\n\n#### What are you doing to achieve it?\n\nAsking Name 6 AI\n\n#### What is happening instead?\n\nName 6 AI along with the right benefits also says that clients get a PGP which is incorrect\n\n#### What is the expected outcome?\n\nName 6 AI must state that the clients get a support system in their dedicated slack channel instead of a PGP"
+    },
+    {
+      "id": "ENG-2672",
+      "createdAt": "2025-11-10T11:05:25.605Z",
+      "title": "Investigate missing UI error events in Sentry (staging)",
+      "state": "Backlog",
+      "assignee": "Savinder Singh",
+      "parent": null,
+      "labels": [],
+      "description": "A UI error in the Admin Panel occurred recently but did not appear in Sentry within the last hour. Review Sentry configuration and UI error reporting for the app. Confirm whether UI errors are captured by an error boundary, if any try/catch blocks swallow errors, whether the Sentry React error boundary wrapper is applied where needed, and whether sampling or default env-based settings suppress events.\n\n <image> "
+    },
+    {
+      "id": "ENG-8376",
+      "createdAt": "2026-05-07T14:20:16.254Z",
+      "title": "Force reset client's dashboard to clear frozen loading screen",
+      "state": "Duplicate",
+      "assignee": "Beth Newton",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "#### Customer Name\n\nName 11\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 11\n\n#### Screenshot\n\n <image> \n\n#### What are you trying to achieve?\n\nClear a permanently frozen loading screen for a client (Name 11) on the Acquisity platform so he can purchase pre-warmed domains and launch his campaigns.\n\n#### What are you doing to achieve it?\n\nEscalating the issue directly to the tech team. The client attempted to buy domains, and after reaching out to Intercom support 24 hours ago with no resolution, he posted in Heartbeat because he is completely blocked.\n\n#### What is happening instead?\n\nThe client's initial payment for the domains failed, triggering a glitch. His dashboard is permanently stuck on a \"Processing domains... Awaiting payment\" loading screen. He cannot navigate away, select different domains, or access his campaigns.\n\n#### What is the expected outcome?\n\nThe tech team forcefully resets his dashboard on the backend, clearing the frozen loading screen so he can successfully purchase domains and unblock his campaigns."
+    },
+    {
+      "id": "ENG-5238",
+      "createdAt": "2026-02-06T19:01:00.907Z",
+      "title": "Add “Refund Saved” toggle in Name 12",
+      "state": "Done",
+      "assignee": "Savinder Singh",
+      "parent": null,
+      "labels": [],
+      "description": "Add a “Refund Saved” toggle in Name 12 that works the same way as the existing refund request toggle."
+    },
+    {
+      "id": "ENG-4324",
+      "createdAt": "2026-01-08T22:14:36.469Z",
+      "title": "Cold email agent uses sender name instead of recipient",
+      "state": "Done",
+      "assignee": "Anuj Bhatt",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "Cold email agent sends emails using the account owner's name \"Name 3\" instead of the intended recipient's name.\n\nThe issue started occurring today.\n\nA screen recording of the issue is available here: Jam recording."
+    },
+    {
+      "id": "ENG-3033",
+      "createdAt": "2025-11-26T14:27:03.372Z",
+      "title": "TRPCError: Invalid or expired API key for provider <uuid>. Please update your Company Four credentials.",
+      "state": "Done",
+      "assignee": "Savinder Singh",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": ""
+    },
+    {
+      "id": "ENG-4265",
+      "createdAt": "2026-01-07T20:32:08.107Z",
+      "title": "AI Growth Consultant not reflecting updated niche",
+      "state": "Done",
+      "assignee": "Anuj Bhatt",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "**Problem:**\n\nThe AI Growth Consultant reads the user's niche from a stale data source (onboardingAIChatSessionTable) that is never updated when users change their niche via Settings or re-submit onboarding. Updates go to organizationKnowledgeTable, but the AI chat still reads from the legacy table.\n\n**Root Cause:**\n\n* lib/chat/onboarding-context.ts (lines 61-63) queries onboardingAIChatSessionTable\n* updateNicheOfferSettings in trpc/routers/organizations.ts updates organizationKnowledgeTable\n* These are different tables - no sync between them\n* Additionally, Redis cache (30min TTL) is not cleared on niche updates\n\n**Fix Required:**\n\n1. Update getUserOnboardingContext() in lib/chat/onboarding-context.ts to read from organizationKnowledgeTable instead of onboardingAIChatSessionTable\n2. Clear the onboarding context cache (clearOnboardingContextCache) after niche updates in updateNicheOfferSettings"
+    },
+    {
+      "id": "ENG-6370",
+      "createdAt": "2026-03-07T11:10:01.004Z",
+      "title": "TypeError: Cannot read properties of null (requestAnimationFrame) on quality-control page",
+      "state": "Done",
+      "assignee": "Pieter Venter",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "## Error\n\n`TypeError: Cannot read properties of null (reading 'requestAnimationFrame')`\n\n**Sentry:** ATHENA-Z | **Culprit:** `/dashboard/:organizationSlug/quality-control`\n\n## Name 13\n\n| Field | Value |\n| -- | -- |\n| Events | 640 |\n| Affected users | 17 |\n| First seen | 2026-03-07 |\n\n---\n\n## Root Cause\n\nThe crash originates in `components/ai-sdr/email-list.tsx` (`EmailListVirtualized`), not a quality-control page. No `/quality-control` route exists in this repository — the Sentry culprit is a routing alias for the AI SDR inbox.\n\n**Crash sequence:**\n\n1. `EmailListVirtualized` mounts, emails load\n2. `useEffect` fires → `rowVirtualizer.scrollToIndex(0, { align: 'start' })`\n3. `scrollToIndex` → `tryScroll` → `this.targetWindow.requestAnimationFrame(callback)` — RAF is now pending\n4. User navigates away → component unmounts\n5. `useLayoutEffect` cleanup → `cleanup()` → `this.targetWindow = null` (but `elementsCache` is NOT cleared)\n6. RAF callback fires next frame → `isDynamicMode()` returns `true` (because `elementsCache.size > 0`) → `this.targetWindow!.requestAnimationFrame(verify)` → **CRASH**\n\nTwo `<mention>/virtual-core` v3.13.18 defects combine: non-null assertion inside async RAF callback, and `cleanup()` nulling `targetWindow` without clearing `elementsCache`.\n\n## Fix\n\n`components/ai-sdr/email-list.tsx` — remove the redundant `scrollToIndex` call. The `parentRef.current.scrollTop = 0` line already resets scroll position; `scrollToIndex(0)` is redundant and schedules the crashing RAF.\n\n```tsx\n// Before:\nReact.useEffect(() => {\n  if (parentRef.current && emails.length > 0) {\n    parentRef.current.scrollTop = 0;\n    rowVirtualizer.scrollToIndex(0, { align: 'start' }); // ← remove\n  }\n}, [emails.length, rowVirtualizer]);\n\n// After:\nReact.useEffect(() => {\n  if (parentRef.current && emails.length > 0) {\n    parentRef.current.scrollTop = 0;\n  }\n}, [emails.length]);\n```\n\n## Codebase Verification\n\nConfirmed in codebase:\n\n* `components/ai-sdr/email-list.tsx` lines 138–145: `useEffect` calls both `scrollTop = 0` and `scrollToIndex(0)` with `rowVirtualizer` in deps — exact match\n* No open PR on branch `pieter/eng-6370-*`\n* No existing unit tests for this component (browser lifecycle issue — not unit-testable)\n* Fix is 1 file, 2 lines changed\n\n## Agent Feasibility\n\n**Selected for implementation.**\n\nRequirements are unambiguous, scope is 1 file, 2 lines. The fix eliminates the RAF scheduling that causes the crash on unmount. No tests can be written (RAF timing requires a real browser). No external services involved.\n\n<!-- preview-url-start -->\n**Preview:** <url:typeerror-cannot-read-properties-of-null-aiacquisition.vercel.app> — PR #3054\n<!-- preview-url-end -->"
+    },
+    {
+      "id": "ENG-3775",
+      "createdAt": "2025-12-15T06:05:33.816Z",
+      "title": "Error approving QC message shows 'something went wrong'",
+      "state": "Canceled",
+      "assignee": "Blaise Gulaj",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "Approving QC for a message in the Quality Control Review view shows a generic \"Something went wrong\" error and the approval does not go through.\n\nContext from the screenshot:\n\n* Seen in a Review panel for a contact named Name 14.\n* Banner at the top of the screen shows \"Something went wrong\" when trying to approve QC.\n\n <image> "
+    }
+  ]
+}

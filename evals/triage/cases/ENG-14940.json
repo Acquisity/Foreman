@@ -1,0 +1,220 @@
+{
+  "id": "ENG-14940",
+  "provenance": "seeded",
+  "createdAt": "2026-10-08T01:31:29.256Z",
+  "lane": "triage",
+  "stratum": "platform_limitation",
+  "ticket": {
+    "title": "Name 19 / Name 20 – Personal Emails and Contacts Appearing in CRM",
+    "description": "#### Customer Name\n\n**Issue Report: Name 19 / Name 20 – Personal Emails and Contacts Appearing in CRM**  Name 19 raised a privacy concern during Office Hours (OH) regarding personal emails and contacts appearing under **CRM > People**.  **1. Client Workspace – Company Two** - Name 21 shared that his client flagged an issue where personal contacts, including personal email conversations, are appearing in the CRM. - The client does not want personal contacts or emails visible in the workspace.  **2. Name 21's Workspace – Company Three** - After hearing the concern, Name 21 checked their own workspace and noticed a similar issue. - His brother Name 20's contacts and personal messages are also appearing in the dashboard, including private messages involving their mother. - Name 21 expressed concern about these personal conversations being visible and does not want them appearing in the CRM.  **3. Initial Findings** - Upon checking, these contacts appear in the CRM when they are added as members and have the **\"Client\" tag** assigned. - This may explain why personal contacts are showing under CRM > People, but further investigation is needed to confirm why personal email conversations are also visible.  **Action Needed:** Please investigate how personal contacts and email conversations are being synced into the CRM and whether there is a way to exclude or hide them without affecting legitimate client records.  **Priority:** Potential data privacy concern affecting multiple workspaces.\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nCompany Three/ a customer workspace\n\n#### Screenshot\n\n#### What are you trying to achieve?\n\nEnsure personal contacts and private email conversations are not visible in CRM > People or the workspace dashboard.\n\n#### What are you doing to achieve it?\n\nReviewed the issue reported during Office Hours and checked the CRM behavior. Initial findings show that contacts appear when added as members and assigned the \"Client\" tag.\n\n#### What is happening instead?\n\nPersonal contacts and private email conversations are appearing in the CRM for Company Two and Company Three.\n\n#### What is the expected outcome?\n\nOnly relevant business contacts and conversations should appear in the CRM. Personal contacts and private messages should remain hidden and inaccessible to other workspace members, without affecting legitimate client records.",
+    "attachmentKinds": ["slack"]
+  },
+  "repoCommitAtCreate": "beebc4ae6ebdaa22fd8be2aab7e08cfdf4bfa8d9",
+  "flags": {
+    "descriptionEditedAfterCreate": false,
+    "needsProductionData": false,
+    "alreadyFixedAtTriage": false
+  },
+  "relatedSnapshot": [
+    {
+      "id": "ENG-1536",
+      "createdAt": "2025-09-30T06:59:22.441Z",
+      "title": "Check that emails from AI SDR are populating in the person pages",
+      "state": "Done",
+      "assignee": "David Shostack",
+      "parent": null,
+      "labels": ["Chore"],
+      "description": "* Go into Emails tab inside a Person page in the CRM\n* Check if the emails sent by the AI SDR are correctly associated with it"
+    },
+    {
+      "id": "ENG-14166",
+      "createdAt": "2026-09-23T17:39:26.794Z",
+      "title": "CRM v2 Conversations: emails in the inbox, one row per person",
+      "state": "Done",
+      "assignee": "James Keeble",
+      "parent": "ENG-14113",
+      "labels": [],
+      "description": "## Overview\n\nIn the v2 Conversations inbox, emails with people in the CRM join texts and calls, and each person appears once in the list with their latest message across every channel. Reps get per-rep unread and needs-reply for email, and can Mark done.\n\n## Problem\n\nToday Conversations lists only texts and calls, one row per text thread and one per call. Email, the main channel with most contacts, lives only on record pages. Email volume is large (6.78 million threads platform-wide, 4,830 contact-linked Gmail threads in the pilot workspace), so the inbox needs clear rules on which email counts before it can be shown.\n\n## User experience\n\n* The channel menu gains Emails. Each person is one row; the preview, time and channel mark come from their latest item on any channel.\n* A person is unread when any of their visible sources is unread. Email counts as unread only when it arrived after the rep last opened that person and within the last 7 days, or when the rep marked it unread.\n* A person needs a reply when their latest text or email is inbound, under 14 days old and not an out-of-office. Calls never set it. Mark done clears it until they write again.\n* \"Mine\" means the rep owns the contact. Rows with no contact (unknown numbers) keep today's rule, the phone line's assignee.\n* Counts include email under the same rules.\n\n## What's included\n\n* Email threads that are linked to a CRM contact, from Gmail, Outlook or manual entry, whose last message is within 90 days. The person's thread still shows their full email history.\n* Left out: email from people not in the CRM, and cold-campaign (Company One) threads, which the AI SDR inbox owns.\n* One additive read-state migration: per-rep read state for email threads, and a person-level row holding Mark done. Opening a person marks all their visible sources read in one step.\n* Any new index goes in its own small change first, chosen from the final query plan on the read replica.\n* Gmail first. Outlook follows ENG-12972 (Microsoft 365 live sync).\n* This is the v2 home of ENG-13342; agree with Elis whether that ticket carries the implementation.\n\n## Blocked by\n\n* ENG-14165 (the v2 Conversations screen).\n\n## Who can do what\n\nEmail rows need thread-view permission and access to the contact under the existing owner scope, the same rule as the record Emails tab. The preview is hidden without email-content permission. Access follows the contact, not the mailbox, as it does on records today.\n\n## Done when\n\n* The pilot workspace sees contact emails in the v2 list, one row per person, with texts and calls folded in.\n* Unread, needs-reply and Mark done follow the rules above, per rep.\n* Restricted emails and previews never appear through the list, search or counts.\n* With `CRM v2` off, today's Conversations page and query are unchanged.\n* The final list query is measured on the replica for the pilot workspace and the largest contact-linked workspace, with the plan recorded on the PR.\n\n## Design\n\n* Design (full kit): Acquisity v2 Kit, Conversations, route `#/screen/crm-conversations`.\n* Production cut: see ENG-14165. This ticket un-gates the list parts marked for it.\n* The design artifacts are private until James shares them.\n\n## Implementation context\n\nHigh risk: list query rewrite, a read-state migration and a cursor version bump. The data rules and rollback notes are in the Conversations parity plan, section 2, which James holds."
+    },
+    {
+      "id": "ENG-12669",
+      "createdAt": "2026-08-13T13:13:54.547Z",
+      "title": "Find a new contact's past emails in every rep's inbox",
+      "state": "Done",
+      "assignee": "Ebubeker Rexha",
+      "parent": "ENG-13976",
+      "labels": [],
+      "description": "## Overview\n\nWhen a contact is added to the CRM, by hand, by import or by a workflow, their past email conversations from every rep's connected inbox should appear on their record automatically. Reps and managers then see the full history with that person, not only mail that arrives after they were added.\n\n## Problem\n\nGmail sync now saves only mail that involves an existing contact (Stop saving Gmail mail that does not involve a CRM contact). A person added later has no history, even when several reps have been emailing them for weeks. Our sales team is B2C, so most contacts use personal addresses and can only be matched by exact email address. Searching every inbox in Gmail for every new contact would also be slow for bulk imports.\n\n## User experience\n\nA rep adds a contact, or a manager imports a list. Within a few minutes, the contact's record shows their email conversations with any rep in the workspace who has connected Gmail, from the last 90 days. Nothing is created for people who are not contacts.\n\n## Proposed fix\n\nLook the new contact's email addresses up in the address index that Gmail sync keeps for every mailbox. Download from Gmail only the threads that match, save them and link them to the contact. Use the same normalized, unambiguous matching for mail arriving through live sync.\n\n## What's included\n\n* Trigger on contact creation, a new email address added to a contact, and bulk import.\n* One database lookup per address against the address index across all connected mailboxes in the workspace, then fetch only matched threads from Gmail.\n* Background processing that paces each mailbox's Gmail usage, so large imports finish without failing.\n* Shared normalized email matching (trim and lowercase) for live sync and history lookup.\n* Linking to one unambiguous Person, and showing the conversation on one unambiguous Deal.\n* Progress that can be retried after failure without duplicating messages.\n\nNot included: creating People, Leads, Companies or Deals (Create the right People from real sales conversations), history older than the 90-day index window, and Microsoft mailboxes.\n\n## How it should work\n\n* Trim and lowercase addresses.\n* Exclude the connected mailbox and workspace members' own addresses.\n* Public email provider domains (Gmail, Outlook, Yahoo, iCloud and similar) only ever match by exact address.\n* One match links. Zero or multiple matches remain unlinked.\n* One unambiguous active Deal may show the conversation.\n* Never write the legacy singular Deal thread field.\n* A thread already saved from another rep's mailbox is not saved again (see Show one conversation when several reps got the same email).\n* A mailbox that has lost Gmail access is skipped and reported, without blocking other mailboxes.\n* Reprocessing remains idempotent.\n\n## Who can do what\n\nMatching never crosses the workspace. A user sees linked conversations only on records they are allowed to open, following Share all communications on records (Close visibility model).\n\n## Blocked by\n\n* Stop saving Gmail mail that does not involve a CRM contact\n* Sync rep inboxes automatically\n\n## Done when\n\n- [ ] Adding a contact shows their matching threads from every connected rep mailbox in the workspace.\n- [ ] Adding an email address to an existing contact brings in that address's threads.\n- [ ] A bulk import of 10,000 contacts completes without Gmail rate-limit failures.\n- [ ] Case and whitespace variants match.\n- [ ] Mailbox self-addresses never become the customer.\n- [ ] Zero, multiple and cross-workspace matches remain unlinked.\n- [ ] Deal visibility requires one unambiguous relationship.\n- [ ] No CRM record is created.\n- [ ] Reprocessing creates no duplicate or incorrect change.\n\n## Open questions\n\nConfirm the exact definition of an active Deal. Recommended default: use the existing CRM active/open relationship contract.\n\n## Implementation context\n\nMatching and relationship seams, plus the address index design, are in AI context.md."
+    },
+    {
+      "id": "ENG-6570",
+      "createdAt": "2026-03-11T02:53:07.625Z",
+      "title": "Fix Various UI Bugs in CRM",
+      "state": "Done",
+      "assignee": "Anuj Bhatt",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "See the attached images.\n\n1. Last name missing for a lead in the People tab.\n2. When title is missing for a lead, an arbitrary title is inserted. Why? Where did this come from?\n3. When you click on a lead, the lead is shown as \"Unknown User\" and \"sent:\" is prefixed to the email subject line.\n4. When you click on the email, the to field shows as \"\\[object Object\\]\".\n5. The number of messages is not displayed well and shows 5 and then \"messages\" on the following  line.\n6. The subject line appears to be repeated in the third screenshot, see the two arrows together.\n\n <image> \n\n <image> \n\n <image> \n\n---\n\n## Implementation Plan (Name 2)\n\n### Summary of Current Code\n\n**Background Context**: The CRM contact record view displays contact information across several tabs (Activity, Emails, Calls, Notes, Tasks). Email threads are fetched from two sources (Company One CRM and Gmail) via `useContactEmailThreads` hook, merged/deduped, and rendered in the Emails tab. Activity events are fetched via `useActivityEvents` hook using `getContactEvents` tRPC endpoint which LEFT JOINs to the user table for actor info. Contact name and title originate from AI analysis (Gemini via OpenRouter) during the `createContact` pipeline.\n\n**Current Behavior**:\n\n* **Bug 1**: Contact name stored as single `name` field (no first/last split). AI generates names that may be incomplete (first name only).\n* **Bug 2**: Contact title generated by AI (`contactAnalysisSchema.title`) can produce fabricated titles like \"Key Voice in Real Estate\" from email content rather than actual job titles.\n* **Bug 3**: `timeline.tsx` falls back to \"Unknown User\" when `event.user?.name` is null (LEFT JOIN fails if actorId doesn't match a user). `email-event.tsx` renders direction prefix producing \"sent: {subject}\".\n* **Bug 4**: Component types `Email.to` and `EmailMessage.to` declared as `string[]` but actual tRPC data is `Array<{email, name?}>`. Calling `.join(',')` on objects produces \"\\[object Object\\]\".\n* **Bug 5**: Message count text wraps to a new line due to CSS layout constraints in the flex container.\n\n**Key Components**:\n\n* `EmailsTabContent` — `components/crm/contact-record/contact-tabs/emails/index.tsx`\n* `ActivityTimeline` — `components/crm/shared/activity-stream/timeline.tsx`\n* `EmailEvent` — `components/crm/shared/activity-stream/email-event.tsx`\n* `ContactNameProperty` / `ContactTitleProperty` — `components/crm/contact-record/contact-meta/details/`\n* `useContactEmailThreads` — `hooks/use-contact-email-threads.tsx`\n* `createContact` — `lib/services/ai-crm-entity-create/contact.ts`\n\n### Affected Files\n\n| File | Changes Needed |\n| -- | -- |\n| `components/crm/contact-record/contact-tabs/emails/index.tsx` | Fix `Email` and `EmailMessage` types: `to: string[]` → `to: Array<{email: string, name?: string}>`. Fix `.to.join(',')` rendering. Fix message count wrapping CSS. |\n| `components/crm/shared/activity-stream/timeline.tsx` | Improve \"Unknown User\" fallback to use `event.user?.email` before generic label. |\n| `components/crm/shared/activity-stream/email-event.tsx` | Adjust \"sent:/received:\" prefix display. |\n| `components/ai-sdr/ai-sdr-inbox.tsx` | Fix `email.to.join(',')` (same \\[object Object\\] bug). |\n| `lib/services/ai-crm-entity-create/contact.ts` | Improve AI prompt to require full names and only set title for confirmed job titles. |\n\nNo existing test files for affected components.\n\n### System Overview\n\n* Email threads flow from Gmail API + Company One API → tRPC endpoints → `useContactEmailThreads` hook (merge/dedupe) → `EmailsTabContent`\n* Activity events flow from DB (`crm_event` table) → `getContactEvents` tRPC (LEFT JOIN user/contact) → `useActivityEvents` hook → `ActivityTimeline` → `EmailEvent`\n* Contact metadata flows from AI (Gemini) → `createContact` → `crmContactTable` → `getContactById` tRPC → `ContactRecord` → `ContactMeta`\n\n### Edge Cases and Name 1\n\n* **Type mismatch propagation**: The hook's `getSubjectParticipantKey` already uses the correct type (`to: Array<{email, name?}>`), confirming the actual data shape.\n* **Gmail vs Company One data shapes**: Both sources return objects for `to` — Gmail transforms at `use-contact-email-threads.tsx:164,177`.\n* **\"Unknown User\" edge cases**: Could occur when user was deleted, actorId is null, or event created by system process without valid user context.\n* **AI prompt changes**: Only affect future contacts, not existing bad data.\n* **Backwards compatibility**: Changing \"sent:\" prefix is a UX decision.\n\n### Key Considerations\n\n* Use `ds-` prefixed design system color variables for styling changes.\n* Prefer inferring types from tRPC `RouterOutputs` rather than manual type definitions.\n* `userTable.name` is `NOT NULL` — \"Unknown User\" occurs when LEFT JOIN fails, not null name.\n\n### Suggested Approach\n\n1. **Bug 4** (highest impact): Fix types and `.to.join()` in `emails/index.tsx` + `ai-sdr-inbox.tsx`.\n2. **Bug 5** (quick CSS fix): Add `whitespace-nowrap` to message count container.\n3. **Bug 3** (two sub-fixes): Fall back to `event.user?.email` in timeline. Adjust direction text in email-event.\n4. **Bugs 1-2** (AI pipeline): Improve AI prompt for full names and validated job titles.\n\n**Testing**: Via Vercel preview deployment after PR creation.\n\n### Open Questions\n\n1. Should \"sent:/received:\" prefix be removed entirely or reformatted?\n2. Should existing contacts with bad AI-generated names/titles be cleaned up?\n3. Should `Email`/`EmailMessage` types be replaced with tRPC `RouterOutputs` inference?\n\n### Confidence Assessment\n\n* **Overall Confidence**: High — all 5 bugs have clearly identified root causes.\n* **Completeness**: \\~90% of relevant code reviewed.\n* **Open-endedness**: \"sent:\" prefix removal and AI prompt improvements are design decisions not explicitly specified."
+    },
+    {
+      "id": "ENG-6534",
+      "createdAt": "2026-03-10T12:08:17.371Z",
+      "title": "Stop unrelated emails from appearing in interested inbox",
+      "state": "Done",
+      "assignee": "Jared Stauffer",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "#### Customer Name\n\nName 3\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 3\n\n#### Screenshot\n\n#### What are you trying to achieve?\n\nThe “interested” inbox has emails in there where people have not even replied to the first email.\n\n#### What are you doing to achieve it?\n\nThe “interested” inbox has emails in there where people have not even replied to the first email.\n\n#### What is happening instead?\n\nThe “interested” inbox has emails in there where people have not even replied to the first email. <loom>\n\n#### What is the expected outcome?\n\nTo stop the emails appearing in the \"interested\" section whne they are not actually \"interested\""
+    },
+    {
+      "id": "ENG-9382",
+      "createdAt": "2026-05-28T10:51:50.279Z",
+      "title": "Get Contact returns multiple records for a single email.",
+      "state": "Done",
+      "assignee": "Nathan Foster",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "**Steps:**\n\n1. Add a 'Get Contact' step (00:03)\n2. In the 'Get Contact' step, under 'INPUT', set the 'email' field to <email>' (00:06)\n3. Execute the 'Get Contact' step (00:10)\n4. Observe that only one record is returned (00:11)\n5. Navigate to the CRM 'People' section (00:17)\n6. Search for contacts using the email <email>' (00:19)\n7. Observe that two contacts are listed with this email address (00:20)\n\nWatch the screen recording here:\n\n8db566cce689e260e686faf2827e65d96efaf937461e756e1afe94deb03a4bab\n\n---\n\n**Name 4 URL:**\n<url:app.acquisity.ai>\n\n**Device and browser info:**\nChrome 147.0.7727.102 (1936x1110) | macOS (arm) 26.3.1\n\n**Date and time:**\nMay 28th 2026 | 10:51am UTC\n\n**View developer information (console logs, network requests & timing):**\njam.dev/c/<uuid>\n\n---\n\n*Captured with* *jam.dev*\n\n<!-- preview-url-start -->\n**Preview:** <url:aiacquisition-oavfljqed-aiacquisition.vercel.app> — PR #4294\n<!-- preview-url-end -->"
+    },
+    {
+      "id": "ENG-2561",
+      "createdAt": "2025-11-04T13:43:52.632Z",
+      "title": "CRM Contact Record: Incomplete email history - most recent emails missing",
+      "state": "Canceled",
+      "assignee": "Pieter Venter",
+      "parent": null,
+      "labels": [],
+      "description": "## Found Problem\n\nThe email history for specific contacts within the CRM is incomplete. The most recent email exchanges with contacts are not being displayed on their record in the CRM People section.\n\n**Example:** The contact \"Name 5\" has a recent reply visible in Company One, but this reply is missing from the CRM contact's Emails tab. Only older messages are visible.\n\n## Reproduction Steps\n\n1. Ensure a contact has replied recently (visible in Company One)\n2. Navigate to the `People` section of the CRM\n3. Search for and open the profile of that contact\n4. Click on the `Emails` tab\n5. **Observe:** Compare the displayed email history with the source inbox (Company One) and note that the latest reply is missing\n\n## User Information\n\n* **Reporter:** Name 6 (<email>)\n* **Date Reported:** October 31, 2025\n* **Example Contact:** Name 5\n* **Video Evidence:** Screenshare - 2025-10-31 12:31:31 PM.mp4\n\n## Expected Behavior\n\nThe `Emails` tab on a contact's record should display a complete history of all email correspondence with that individual, including the most recent replies. Email synchronization should ensure all messages from the source inbox appear in the CRM contact record.\n\n## Additional Context\n\nThis is related to the broader email synchronization issues between Company One and the CRM platform. It appears that recent email replies are not being synced to contact records in the CRM.\n\n## Related Issues\n\n* ENG-2552: Positive replies in Company One not syncing to CRM and AI SDR\n* ENG-2500: AI SDR - Multiple critical issues: Manual replies not syncing from Company One\n\n## Slack Reference\n\nSlack conversation: <url:ai-acquisition.slack.com>"
+    },
+    {
+      "id": "ENG-1209",
+      "createdAt": "2025-09-17T23:23:29.059Z",
+      "title": "#3 Inbound Email Routing by Contact",
+      "state": "Done",
+      "assignee": "Mahmut Jomaa",
+      "parent": "ENG-1206",
+      "labels": ["Feature"],
+      "description": "Set up infrastructure to receive and route emails to correct contacts:\n\n* Configure CloudFlare Email Routing (or AWS SES 🙂) for subdomain\n* Set up catch-all rule for \\* at {org}.inbox.aiacquisition.com\n* Create email parser to extract contact UUID from recipient address\n* Implement routing logic to match email to contact record\n* Handle bounces for non-existent contact addresses\n* Set up fallback for emails sent directly to contact's real email\n* Configure SPF, DKIM, and DMARC records for deliverability\n* Set up S3 bucket for raw email storage (backup)\n\n**Acceptance Criteria:**\n\n* Emails to contact addresses are received successfully\n* Contact UUID correctly extracted from recipient\n* Non-existent addresses handled gracefully\n* DNS records configured properly"
+    },
+    {
+      "id": "ENG-6659",
+      "createdAt": "2026-03-12T14:52:11.198Z",
+      "title": "Email Sent filter shows zero contacted leads",
+      "state": "Backlog",
+      "assignee": "Anthony Adewale",
+      "parent": null,
+      "labels": ["Dashboard Metrics"],
+      "description": "For the campaign `SaaS | Leadership | UK | Direct`, Analytics reports 156 leads contacted, but applying the `Email Sent = Contacted` filter in the Leads tab shows zero results.\n\nThe issue persisted after clearing filters, refreshing, and logging out and back into the workspace. The mismatch makes it unclear whether emails were actually sent from the campaign or whether the leads table filter is not reflecting campaign activity."
+    },
+    {
+      "id": "ENG-4959",
+      "createdAt": "2026-01-29T13:30:05.187Z",
+      "title": "Contacts not appearing in CRM for user",
+      "state": "Done",
+      "assignee": "Beth Newton",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "user: <email>\n\nReporter says that none of their contacts are showing up in their CRM.\n\nThey captured a screen recording of the issue from the app: <url:jam.dev>"
+    },
+    {
+      "id": "ENG-6718",
+      "createdAt": "2026-03-13T20:02:40.605Z",
+      "title": "Booked meetings appear in calendar but not CRM",
+      "state": "Done",
+      "assignee": "Anuj Bhatt",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "User: <email>\n\nA calendar/CRM sync discrepancy was reported where appointments appear on the calendar but the corresponding contact or deal cannot be found in the CRM.\n\nOne confirmed example is Name 7. The contact is visible in the AI SDR inbox and is marked **Meeting Booked** and **Very High Interest**, but does not appear in the CRM. Several other contacts were reported with the same issue.\n\nThis appears to affect cases where a meeting is booked and shows on the calendar, but the CRM record is not created or synced.\n\n <image> "
+    },
+    {
+      "id": "ENG-4484",
+      "createdAt": "2026-01-13T11:16:46.713Z",
+      "title": "Duplicate leads appearing in CRM from cold email outreach",
+      "state": "Done",
+      "assignee": "Anuj Bhatt",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "User: <email>\n\nCustomer reports seeing duplicate lead records in the CRM created from cold email outreach.\n\nThe platform is expected to prevent exact duplicate email addresses across the workspace when importing leads, but duplicates are still present in this case.\n\nAdditional context and specific examples are shown in this screen recording: Jam recording."
+    },
+    {
+      "id": "ENG-2651",
+      "createdAt": "2025-11-07T06:39:46.744Z",
+      "title": "Bug: Unrecognized contacts appearing in \"Deal Lost\" status in CRM",
+      "state": "Canceled",
+      "assignee": "Pieter Venter",
+      "parent": null,
+      "labels": [],
+      "description": "## Found Problem\n\nUser (Name 8) has 6 contacts showing under \"Deal Lost\" status in the CRM that she has never talked to or interacted with. She does not recognize any of the names:\n\n* Name 9 - Company Four\n* Name 10 - Name 12\n* Name 11 - Focusmate\n\nAll three contacts show $0 value and are marked as \"external\" source.\n\n## Reproduction Steps\n\n1. Login as user Name 8\n2. Navigate to CRM > Deals\n3. View \"Deal Lost\" column\n4. Observe 6 unrecognized contacts appearing in the list\n\n## User Information\n\n* **Name:** Name 8\n* **Slack:** <slack-user>\n\n## Expected Behavior\n\nUsers should only see contacts in their \"Deal Lost\" status that they have actually interacted with or created themselves. Contacts they've never communicated with should not appear in their pipeline.\n\n## Additional Context\n\nScreenshot shows the CRM interface with the Interview Funnel view displaying these unrecognized contacts in the \"Deal Lost\" stage. This may indicate:\n\n* Data leakage between user accounts\n* Incorrect contact assignment logic\n* Issues with contact creation/import process\n\n## Slack Thread\n\nOriginal report: [<url:ai-acquisition.slack.com>]/p1762472403536489](<url:ai-acquisition.slack.com>)"
+    },
+    {
+      "id": "ENG-1208",
+      "createdAt": "2025-09-17T23:23:04.447Z",
+      "title": "#2 Contact Email Address Generation",
+      "state": "Done",
+      "assignee": "Mahmut Jomaa",
+      "parent": "ENG-1206",
+      "labels": ["Feature"],
+      "description": "Implement automatic email address generation for contacts:\n\n* Create utility function generateContactInboxAddress(contactId, orgDomain)\n* Format: 'contact-{contactUuid} at {orgDomain}.inbox.aiacquisition.com'\n* Add database trigger to auto-generate on contact creation\n* Ensure addresses are URL-safe and email-compliant\n* Handle edge cases (deleted contacts, duplicates)\n\n**Acceptance Criteria:**\n\n* All new contacts automatically get inbox address (db!)\n* Existing contacts have addresses generated\n* No duplicate addresses exist"
+    },
+    {
+      "id": "ENG-7389",
+      "createdAt": "2026-03-31T13:28:12.803Z",
+      "title": "Purchased mailboxes appear twice",
+      "state": "Done",
+      "assignee": "Tyler Olsen",
+      "parent": null,
+      "labels": [],
+      "description": "user: <email>\n\nA customer is preparing to purchase 12 new pre-warmed mailboxes but duplicate email accounts. Name 13 in the conversation, the billing page showed 6 mailboxes while the email accounts page appeared to show more, which added to the confusion about the current active accounts."
+    },
+    {
+      "id": "ENG-11062",
+      "createdAt": "2026-07-02T10:05:58.726Z",
+      "title": "Cold Email Agent \"Contacted Leads\" tile shows emails sent instead of unique leads",
+      "state": "Done",
+      "assignee": "James Keeble",
+      "parent": "ENG-10978",
+      "labels": ["Bug"],
+      "description": "## Overview\n\nThe \"Contacted Leads\" number on the Cold Email Agent page was counting emails sent (every follow-up included), not the number of unique people contacted, so it was inflated. Users think they have reached far more people than they actually have.\n\n## Problem\n\n`getTotalContactedLeads` (feeds the \"Contacted Leads\" tile via `getAllCampaignDashboardMetrics`) summed Company One's `contacted_count`. In prod that field is identical to `emails_sent` (it counts every send including follow-ups), so it is a sends count, not a people count. The genuine unique-people field is `new_leads_contacted_count`.\n\nThe rest of the app already prefers `new_leads_contacted_count` (campaigns-list sort/display, leads tab); this one call site was never migrated, because the \"prefer new-leads, fall back to contacted\" rule was copy-pasted and one copy went stale.\n\n## Solution (shipped in PR #5145)\n\n* Extract the \"unique leads contacted\" SQL into one shared helper `leadsContactedFromMetadataSql()` (prefer `new_leads_contacted_count`, fall back to `contacted_count`).\n* Use it at both the campaigns-list `ORDER BY` and the `getTotalContactedLeads` aggregate, so the tile and the list read one identical expression and cannot drift again.\n* Deliberately reads provider metadata, not the typed `new_leads_contacted_count`/`contacted_leads_count` columns: prod shows those columns diverge from metadata for ~25-40% of campaigns, so switching the source is a behavior change that belongs in the ENG-10978 metrics-source consolidation.\n\n## Verification (prod read-only, active-only)\n\n| Workspace | Before (≈ emails sent) | After (unique leads) |\n| -- | -- | -- |\n| Name 14 | 32,555 | 23,131 |\n| Name 15 | 16,296 | 13,330 |\n\nDisplay-only value; the Positive Reply Rate already used `new_leads_contacted_count`, so this also removes a latent tile-vs-rate inconsistency.\n\n## Out of scope\n\n* Reply-rate / booking-rate denominators intentionally keep `contacted_count` (documented in code).\n* Broader dashboard-vs-CME reconciliation stays in ENG-10978.\n\n## Acceptance criteria\n\n* CME \"Contacted Leads\" tile reflects unique leads contacted, not emails sent.\n* Tile matches the \"Leads Contacted\" column in the campaigns list.\n* No change to Positive Reply Rate, Booked Call Rate, or other tiles."
+    },
+    {
+      "id": "ENG-6616",
+      "createdAt": "2026-03-11T15:42:19.478Z",
+      "title": "Handle auto-replies with replacement contact emails",
+      "state": "Done",
+      "assignee": "Koppany Kondricz",
+      "parent": "ENG-11724",
+      "labels": [],
+      "description": "Inbox replies can include automatic responses saying a contact has left a company and listing a new email address. The new address cannot be added directly to the lead list, and forwarding only captures the auto-reply instead of the original outreach message.\n\nRequested behavior:\n\n* Allow the replacement email address in the auto-reply to be added directly to the lead list.\n* Allow forwarding the original request to the replacement contact instead of only forwarding the auto-reply.\n\nCurrent workaround is to manually copy the new email address, then go back to scripts and paste an original script into a forwarded email. Without the workaround, the company and lead are lost."
+    },
+    {
+      "id": "ENG-3454",
+      "createdAt": "2025-12-05T14:20:18.563Z",
+      "title": "Incoming Attachments Not Visible in Inbox",
+      "state": "Backlog",
+      "assignee": null,
+      "parent": null,
+      "labels": ["Feature"],
+      "description": "Context:\n\nIf a prospect sends an email containing file attachments (PDFs, Images, Docs), these files do not render or appear anywhere in the AI SDR Inbox.\n\nImpact:\n\nUsers are missing critical context (RFPs, screenshots, signed docs) and have to login to Company One to see them. If they are just on acquisity they'll never see them and think the prospect didn't attach them.\n\nRequirement:\n\nRender incoming attachments in the Inbox conversation view.\n\nExample Account for Logs:\n\n<email>\n\nCompany One account to find Attachment if needed:\n<email>\n<password>"
+    },
+    {
+      "id": "ENG-13513",
+      "createdAt": "2026-09-04T21:31:36.025Z",
+      "title": "Prospect email attachments never appear in the AI SDR inbox",
+      "state": "Canceled",
+      "assignee": null,
+      "parent": null,
+      "labels": ["Bug", "Customer reported", "intercom-sourced"],
+      "description": "Intercom conversation: <url:app.intercom.com>\n\nCustomer (Name 16, <email>, workspace \"Name 16's Workspace\") reported \"I found a bug\" with two screenshots.\n\nClaim: A prospect attached a file (Entrepreneurial_Journey_to_Success.docx) to their AI SDR reply, but the attachment does not appear anywhere in the inbox, so the customer cannot find or download the file the client shared.\n\nEvidence (production, read 2026-09-04):\n\n* Thread \"Re: Name 17, can we feature your take?\" (<email>, sending inbox <email>) has has_attachments = false even though the prospect's reply carried a .docx attachment.\n* The Company One email thread schema (apps/web/lib/Company One/schemas/emails.ts, emailThreadSchema) declares no `attachments` field for inbound/outbound emails; only the outbound `sendReplySchema` carries attachments.\n* No code path sets crm_message_thread.has_attachments = true; it defaults false and is only ever read, or hardcoded false in external-booking-tracking-service.ts.\n* Across all of production, has_attachments is false on every thread: ~5.0M Company One, 914 Gmail, 72 Outlook, 1589 manual, and the rest. Inbound prospect attachments are never surfaced.\n\nRelated finding (same conversation, flagged separately): the AI SDR marked a prospect \"Meeting Booked\" after the prospect replied \"Tuesday at 12 CST. Again, not interested in an interview.\" Production thread \"Re: Interview invitation for Name 18\" is lifecycle=booked, interest_level=medium. The intent classifier (apps/web/lib/ai-sdr-v2/agents/intent-classification/default-agent.ts) treats an explicit time as a booking signal that can override \"not interested\", so it books rather than declining."
+    },
+    {
+      "id": "ENG-3431",
+      "createdAt": "2025-12-05T06:37:17.563Z",
+      "title": "Design badges for Contacted Leads per variant",
+      "state": "Done",
+      "assignee": "Augustas Armalis",
+      "parent": "ENG-3430",
+      "labels": ["Feature"],
+      "description": "Sub-task of `ENG-3430`.\n\nScope:\n\n* Design visual badge treatment for contacted-lead counts at the variant level.\n* Ensure badge style is consistent with the Cold Email Agent design system.\n\nDeliverable:\n\n* Finalized design spec/components for variant-level \"Sent\" badges used by engineering implementation."
+    }
+  ]
+}

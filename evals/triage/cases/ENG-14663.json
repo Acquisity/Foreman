@@ -1,0 +1,220 @@
+{
+  "id": "ENG-14663",
+  "provenance": "seeded",
+  "createdAt": "2026-10-02T18:47:59.866Z",
+  "lane": "triage",
+  "stratum": "platform_limitation",
+  "ticket": {
+    "title": "Multi-Closer Workspace with Siloed Performance Data",
+    "description": "#### Customer Name\n\nName 24\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 24\n\n#### Screenshot\n\n#### What are you trying to achieve?\n\nScale our sales operation by hiring multiple closers who all work from the same lead pool, without creating visibility or performance tracking conflicts. We need to track individual closer performance independently while they pull leads from unified email campaigns running across shared domains/inboxes. Essentially, add another access point that would likely be  custom access point\n\n#### What are you doing to achieve it?\n\nCurrently, we have one closer (Name 25) assigned as a workspace member pulling leads from our unified Acquisity campaigns. We're about to hire a second closer and need them both to access the same lead queue without seeing each other's activity, call outcomes, or performance metrics. We tried adding the new closer as a \"Client\" role, but that restricts their access too much and breaks closer functionality.\n\n#### What is happening instead?\n\nThere's no middle ground between \"Full Workspace Member\" (sees everything, including other closers' data) and \"Client\" (too restricted). When we add multiple people as full members, they can see each other's leads, calls, and performance data, which creates confusion about who owns what and makes individual performance tracking impossible. We can't scale to 2+ closers without a way to silo their visibility.\n\n#### What is the expected outcome?\n\nA custom \"Closer\" role that allows:\n\nAccess to the shared lead pool (leads from unified campaigns)\nFull closer capabilities (claiming leads, logging calls, updating outcomes, viewing their own follow-up sequences)\nVisibility restricted to only their own activity, leads, and performance metrics\nNo visibility into other closers' data, call outcomes, or comparative metrics",
+    "attachmentKinds": ["slack"]
+  },
+  "repoCommitAtCreate": "6c2c801bba7730c529b11b3f9f93f4aa77410857",
+  "flags": {
+    "descriptionEditedAfterCreate": false,
+    "needsProductionData": false,
+    "alreadyFixedAtTriage": false
+  },
+  "relatedSnapshot": [
+    {
+      "id": "ENG-12090",
+      "createdAt": "2026-07-28T13:23:46.890Z",
+      "title": "Recording attribution: closers' meetings land in other workspaces they belong to; prefer the workspace holding the matching appointment",
+      "state": "Backlog",
+      "assignee": null,
+      "parent": null,
+      "labels": [],
+      "description": "## Overview\n\nThe LT workspace's Closer Scoreboard shows no Show-Ups and no Close Rate, and Meeting Recordings is empty, even though every closer's sales call is being recorded. The recordings all attribute to the legacy diamond workspace because the closers are also members there. Removing them from those workspaces (or demoting them to the client role) is not acceptable: they actively work in them. We need recordings for booked sales calls to land in the workspace that owns the booking, while people keep their memberships everywhere.\n\n## Problem\n\n`getTargetOrganizationIdsForEvent` (`apps/web/lib/services/recall-calendar-recording-service.ts:1308`) picks the recording's workspace like this:\n\n1. Candidates = every org where the calendar owner has role owner/admin/member (`getOrganizationIdsForAccount`, `:1286`).\n2. Winner = the candidate whose CRM has the most contact/lead matches for the meeting attendees.\n3. Exact ties are skipped entirely (no recording anywhere).\n\nAll 5 LT closers are members of `diamond-nF5ow` (Name 3 and Name 2 also of `<workspace-slug>`). Diamond's CRM contains the same leads, so diamond wins the scoring, or it ties with LT and the recording is dropped. Result: 1,445+ upcoming recordings pointed at diamond, zero in LT. Feature flags cannot fix this: the `SCA_LIVE_CONNECT` check runs after org selection (`:707`), so disabling recordings in diamond just cancels them rather than rerouting.\n\n## Solution\n\nAdd an appointment-based attribution step: when there are multiple candidate orgs, prefer the org that has an active `scheduling_appointment` matching the calendar event (same host user, overlapping time, attendee email present in the appointment's attendees). LT is the only workspace with appointment rows for these calls (created by the Calendly booking workflows), so booked sales calls deterministically attribute to LT while memberships stay untouched. Fall back to the existing CRM-match scoring when no org has a matching appointment (personal meetings, ad-hoc calls keep today's behavior).\n\nOptional complement if product wants an explicit control: a per-user \"record my meetings into this workspace\" preference consulted first. Not required for the LT case.\n\n## Scope / phasing\n\n1. **Core fix (small, \\~1-2 days incl. tests):** one query + preference ordering inside `getTargetOrganizationIdsForEvent`, unit tests for: multi-org member with appointment in one org; appointment in none (fallback to scoring); tie previously skipped now resolved by appointment.\n2. **Repoint upcoming (small):** re-run attribution for scheduled/pending `crm_recall_calendar_recording` rows whose event hasn't happened yet and update `organization_id` where the new logic differs. Low risk, nothing recorded yet.\n3. **Historical backfill (optional phase 2, medium):** moving past recordings from diamond to LT touches `crm_recall_calendar_recording` plus its ~9 child tables (transcripts, summaries, speakers, chapters, action items, comments, linked records) and requires re-running contact/deal matching in the destination org. Propose shipping 1+2 first; decide on 3 once forward data is flowing, since the scoreboard mainly needs go-forward data.\n\n## Acceptance\n\n* A closer who is a member of LT and diamond takes a booked LT call: the recording attributes to LT.\n* Meetings with no matching appointment anywhere behave exactly as today.\n* No recording is skipped as an attribution tie when an appointment match exists.\n* Upcoming scheduled recordings for LT-booked calls are repointed to LT after deploy.\n* LT Name 1 and Close Rate begin populating without any membership changes.\n\n## Context\n\n* Same workstream as ENG-12061; different subsystem than ENG-12081 but coordinate on anything shared in calendar-account handling.\n* Verified read-only: all 5 closers hold `member` role in diamond; org candidates ignore feature flags; ties are logged as \"ambiguous organization ownership\" and skipped."
+    },
+    {
+      "id": "ENG-13765",
+      "createdAt": "2026-09-13T15:45:56.586Z",
+      "title": "Constrain Fin investigation evidence reads to authorized workspace data",
+      "state": "Done",
+      "assignee": "Aaron Fraga",
+      "parent": "ENG-13762",
+      "labels": [],
+      "description": "## Start here: implementation handoff\n\nRead the attached ENG-13765 handoff — scoped evidence reads and Preview test setup before starting in a new worktree. It records the completed ENG-13764 boundary, current Preview/Executor/Intercom/Slack configuration, known quirks, implementation constraints, and required live tests. Recheck every dated configuration detail before testing.\n\nKeep the useful evidence Foreman already investigates, while ensuring each read can return only data permitted by the verified customer scope.\n\nThe Preview Executor toolkit currently allows selected read operations; that does not restrict which customer records those operations return. Reuse its integrations and credentials, adding ownership enforcement at the existing provider/dispatch seams.\n\n## Work\n\n* Inventory customer-reachable operations and map each to its workspace/resource ownership checks and allowed returned fields. Cover relevant product DB, Company One/provider connections, Sentry, jobs and logs, plus any billing/support evidence included in v1.\n* Apply the same boundary to Name 4 reads used to file, match or follow up on the authorized case. Ticket status and permitted update reads require verified case access; raw internal comments or shared engineering-master content must not leak through a customer follow-up. Existing internal triage's broad duplicate searches and global blast-radius queries cannot run unchanged in the customer context. Scoped internal ticket creation is permitted by the ticketing issue; it does not broaden evidence-read access.\n* Derive workspace filters and provider account mappings from trusted scope. Validate campaign, account, job and other object IDs against that scope before fetching or returning their data.\n* Use existing product resource permissions, including workspace/team/own restrictions. Do not expand access merely because a person is a workspace member.\n* Replace unrestricted customer SQL with constrained reads, unless the backing data layer provides demonstrable enforced isolation. A prompt or SQL-text pattern check is insufficient.\n* Handle shared provider resources and mixed-customer logs explicitly. Email matching or company-account access alone does not establish workspace ownership.\n* Remove unrelated customer records, credentials and unauthorized fields before evidence reaches the model. Fin's final wording is not the data-isolation boundary.\n* Distinguish public product documentation/code from tenant data. Name 5 customer evidence must be unavailable through this flow, with the gap recorded; do not fall back to a broader query or silently claim full coverage.\n\n## Acceptance\n\nFor every supported v1 evidence path, an authorized read succeeds and an outside-workspace/resource read is rejected or returns no unauthorized data. Test raw provider calls and helpers through the session boundary, including delegates. Prove live grants for included providers, and identify unsupported or unauthenticated paths separately.\n\nUse representative investigation cases to confirm the scoped evidence still supports the diagnosis, with explicit limitations where needed.\n\nRelevant source includes `agent/tools/planetscale_execute_read_query.ts`, `agent/tools/read_instantly_subworkspace.ts`, and `agent/lib/executor/`. No new customer write endpoints or separate per-workspace toolkits."
+    },
+    {
+      "id": "ENG-13636",
+      "createdAt": "2026-09-10T05:45:43.343Z",
+      "title": "Floor Command: open nested closer and activity details",
+      "state": "Done",
+      "assignee": "Anuj Bhatt",
+      "parent": "ENG-13093",
+      "labels": [],
+      "description": "## Overview\n\nManagers can open the exact closer, chart period, or action record behind a Floor Command summary and return to the same report without losing their place.\n\n## Problem\n\nMetric-detail closer rows and cash bars do not open nested detail. Existing closer scorecards and floor entries switch the manager to a closer page, which does not provide the requested report-scoped nested experience. Happening now currently summarizes reps rather than carrying a unique action-record target.\n\n## Proposed fix\n\nProvide a shared nested-detail navigation model and connect the four non-unattributed entry points: metric closer rows, cash-by-closer bars, closer scorecards, and Being missed/Happening now records.\n\n## What's included\n\n* Closer-scoped detail from every currently supported metric-card breakdown.\n* Closer and exact displayed-period detail from Cash collected by closer bars.\n* Closer-specific detail from scorecards.\n* Correct underlying record detail from supported Being missed and Happening now entries.\n* Shared inherited context, return state, loading/retry behavior, record resolution, and reconciliation.\n\n## Blocked by\n\nNone: can start immediately. Pickup rank 2 of 3. This supplies the nested navigation used by the Refunds issued and Name 6 rate follow-up.\n\n**Delivery order:** Wave 1, pickup rank 2. May overlap ENG-13635 with coordinated ownership of shared Floor Command router and manager-view integration. Own the shared nested closer/activity navigation. ENG-13637 depends on this ticket; do not make competing edits to its metric integration before this navigation contract is ready.\n\n## How it should work\n\nCarry the active organization, reporting-view identity/version, pipeline or built-in view, allowed closer scope, saved conditions, date range, comparison context, timezone, and other report filters. Select the source metric and closer on entry; cash bars also preserve their displayed chart period and exact cash definition.\n\nKeep the first-level dialog, chart grain/mode/window, filters, selections, and scroll available while nested content is open. Back restores that state; closing all detail returns to the unchanged Floor Command view. Explain stale or expired context and offer refresh when values no longer reconcile.\n\nUse permission-aware typed record resolution for action entries. Reuse available source entity identifiers for missed work. Supply actual permitted action targets where needed for Happening now; do not infer a record from a rep ID or route an aggregate to an arbitrary appointment. Unsupported, missing, deleted, stale, and inaccessible targets fail safely.\n\n## Who can do what\n\nExisting Floor Command, payment, and CRM record permissions apply. Recheck the active organization, reporting-view access, tenant boundary, allowed closer scope, and record permissions on every request, including direct URLs and identifiers. Denied results must not disclose restricted names, amounts, counts, or record existence. This adds viewing and navigation only; existing permitted actions keep their existing authorization.\n\n## What the user sees\n\nUse the closer and cash-bar screenshots in the parent ticket's reference comment as the layout reference: selected closer and period in the header, metric tabs and chart controls, a closer chart, supporting metrics/funnel where available, and relevant missed-work entries. Use current configured metric definitions and honest unavailable states, not screenshot demo numbers or obsolete formulas. Provide clear Back/Close controls and keyboard-accessible rows and bars.\n\n## Done when\n\n- [ ] All four entry-point families open the correct scoped closer, period, or record; existing unrelated My Day navigation still works.\n- [ ] Opening from a metric preserves that metric; opening from a cash bar reconciles to its exact value and period.\n- [ ] Being missed and Happening now use verified record targets and handle unsupported or stale targets explicitly.\n- [ ] Back restores first-level chart settings, scroll, and filters; closing leaves the dashboard context unchanged.\n- [ ] Tests and browser QA cover each entry point, custom/built-in/configured reporting views, restricted closer scope, direct requests, deleted targets, stale context, loading, empty, error, and retry states.\n- [ ] No new record mutations or permissions are added and no ticket identifier or URL is rendered in the product.\n\n## Open questions\n\nNone: product scope is settled. Reuse current metric definitions; the design reference does not authorize new metrics or bulk actions.\n\n## Expected outcome\n\nManagers can follow a summary into useful detail without rebuilding filters or navigating to an unrelated record.\n\n## Implementation context\n\n* Parent contract and screenshots: second-level detail views.\n* Extend existing first-level drilldowns and existing closer scoreboard behavior.\n* Current-main implementation handoff: AI context.md."
+    },
+    {
+      "id": "ENG-12114",
+      "createdAt": "2026-07-29T11:48:53.468Z",
+      "title": "Name 1 ignores appointment attendance, and counts meetings that were never sales calls",
+      "state": "Done",
+      "assignee": "Arthur Li",
+      "parent": null,
+      "labels": [],
+      "description": "## Overview\n\nA sales manager opens the Closer Scoreboard to answer one question: of the calls we booked, how many did the prospect turn up to, and what did each closer convert. Today the board cannot answer it. Show-Ups reads from meeting recordings and Sales Call Analyzer rows, never from the appointment record itself, so a workspace that books calls through the CRM and tracks who attended sees Show-Ups of zero or near-zero, and a Close Rate calculated against that zero.\n\nIn the LT workspace there are 484 sales calls in July with a confirmed attendance outcome on the appointment. The scoreboard can see 13 of them. Name 3 has 111 confirmed attended calls and 92 closed-won deals; the board shows him 10 show-ups, which computes to a close rate of over 900%. That is not a display bug, it is the query reading the wrong source.\n\nFixing this is what makes per-closer show rate and close rate trustworthy enough to run a sales team from.\n\n## Problem\n\n`getCloserScoreboard` (`apps/web/lib/analytics/operating-system.ts:2567`) computes:\n\n```\nshowUps = MAX(completed sales_call rows for the user, completed crm_recall_calendar_recording rows for the user)\ncloseRate = closedWon / showUps\n```\n\nThree separate defects:\n\n**1.** `scheduling_appointment.attendance` **is never read.** It is a native, non-null column on every appointment in every workspace, defaulting to `unknown` and already written by the platform's own `syncAppointmentAttendance` job. It is the most direct record of whether a booked call happened, and the scoreboard ignores it entirely. Workspaces that book through the CRM get an empty board.\n\n**2.** `MAX` **silently prefers the least reliable source.** A recording completing does not mean the prospect attended. A host who opens the room, waits alone and has cloud recording on produces a completed recording. In LT, 26 July calls had a completed recording where participant data proves nobody but the host was ever present. `MAX` picks the larger of the two counts, so wherever the sources disagree it picks the inflated one. Adding attendance as a third input to the same `MAX` would leave this in place and quietly re-inflate the numbers.\n\n**3. Recordings with no CRM match still count.** Any completed recording on a calendar owner's account counts toward Show-Ups, including internal one-to-ones, vendor calls and anything else on their calendar. Show-Ups is a funnel metric — of the leads we booked, how many showed — and a manager's weekly one-to-one should not move it. `crm_recall_calendar_recording` already carries `matched_contact_id` and `matched_deal_id`, populated on completion, so the information needed to exclude these is already there and unused.\n\nDefect 2 and 3 are currently masked in LT because almost no recordings attribute to the workspace. Both become live the moment ENG-12090 ships and recordings start landing correctly, so fixing 1 alone would make the board confidently wrong rather than blank.\n\n## Solution\n\nReplace `MAX` with an explicit precedence rule.\n\n1. **The appointment decides.** Where a `scheduling_appointment` exists for the meeting, its `attendance` determines whether it counts as a show. `took_place` counts; `prospect_no_show`, `host_no_show` and `unknown` do not. The booking is the authoritative record of the meeting; a recording is evidence about it.\n2. **Recordings and sales calls fill gaps only.** Count a completed recording or Sales Call Analyzer row only when no appointment matches it, so genuine ad-hoc sales calls booked outside the CRM are not lost.\n3. **Gap-filled meetings must be CRM-linked.** A recording with no appointment counts only when `matched_contact_id` or `matched_deal_id` is set. Unmatched meetings are not sales calls and must not appear in a funnel metric.\n\nClose Rate then becomes `closedWon / showUps` against a denominator that means something.\n\nMatching a recording to an appointment should use the same signal ENG-12090 introduces for attribution (host, overlapping time window, attendee email), so the two features stay consistent rather than each inventing their own definition of \"the same meeting\".\n\n## Scope\n\n* Rework the Show-Ups computation in `getCloserScoreboard`\n* Apply the same precedence anywhere else Show-Ups or show rate is derived, so the scoreboard and the dashboard widgets cannot disagree\n* Unit tests: appointment present and attended; appointment present and no-show; no appointment with a CRM-matched recording; no appointment with an unmatched recording; both sources present and disagreeing; neither present\n\n## Acceptance\n\n* A workspace that books calls through the CRM sees Show-Ups matching its attended appointments, with no recordings connected at all.\n* A booked call that was recorded counts exactly once, not twice.\n* A call with a completed recording but an appointment marked `prospect_no_show` does **not** count as a show.\n* An internal meeting with no CRM contact or deal match does **not** count as a show.\n* An ad-hoc sales call with no appointment but a matched CRM contact **does** count.\n* Close Rate for a closer with more closed-won deals than show-ups is investigated as a data problem, not rendered as a four-figure percentage.\n\n## Context\n\n* Same workstream as ENG-12090. That ticket makes recordings land in the right workspace; this one makes the scoreboard read the right source. Shipping 12090 without this produces close rates above 1,000% for LT closers, which is more damaging to trust than the current blank board.\n* Verified read-only against production: LT has 484 July appointments with a confirmed attendance outcome, 13 completed recordings, and 0 rows in `sales_call`.\n* The 26 false shows referenced above were identified by comparing completed recordings against per-participant meeting data; in 19 of them no second participant was ever present."
+    },
+    {
+      "id": "ENG-4645",
+      "createdAt": "2026-01-19T13:24:02.650Z",
+      "title": "Workspace data not isolated across customer workspaces",
+      "state": "Canceled",
+      "assignee": "Beth Newton",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "Workspace-specific settings appear to affect other workspaces.\n\nAn external user reports the following behavior:\n\n* Multiple workspaces are in use (own workspace and customer workspaces).\n* A Name 7 Meet link and calendar configured in one workspace are visible in another workspace.\n* Deleting the meeting link and calendar in a customer workspace also removes them from the user’s own workspace.\n\nThis suggests a workspace data sync or scoping issue where meeting links/calendars are not properly isolated per workspace.\n\nAdditional context:\n\n* The behavior and steps can be seen in this screen recording: Jam recording."
+    },
+    {
+      "id": "ENG-12957",
+      "createdAt": "2026-08-20T11:36:28.559Z",
+      "title": "Floor Command: built-in pipeline views (All / Closer / SDR / Consultancy)",
+      "state": "Done",
+      "assignee": "Anuj Bhatt",
+      "parent": "ENG-12447",
+      "labels": [],
+      "description": "## Overview\n\nOne switcher at the top of Floor Command with four built-in views: **All, Closer, SDR, Consultancy**. Every card on the dashboard recomputes for the selected view, so a manager always knows which population a number describes.\n\n## Problem\n\nToday the dashboard is one fixed scope, and it mixes populations: call cards count the configured call types, while deals and cash count the Closer Pipeline. Consultancy and SDR numbers have no home, and there is no \"All\" view. That's how we ended up with call metrics polluted by consultancy calls and a close rate whose numerator and denominator describe different sets of people.\n\n## Solution\n\n1. Give each view its own metric scope: call types, pipelines, and closer-credit cash rules. The query layer already takes a scope object everywhere; this ticket makes the scope come from the selected view instead of one global setup.\n2. Today's dashboard becomes the **Closer** view and stays the default. Its numbers must not change when this ships.\n3. Ship the **All** view here too. Definition agreed with Name 8 (2026-08-19 call): every tracked call type including Payment Support, excluding dials.\n4. **SDR** and **Consultancy** views ship in their own tickets (ENG-12490, ENG-12491) — after this lands they are mostly per-view configuration plus their special cards.\n\nDecision, included in scope: unattributed cash (payments with no live deal) shows in the All and Closer views with the existing attribution banner, and not in SDR or Consultancy — otherwise the same cash appears in every view.\n\n## Scope\n\nFloor Command report/scoreboard scope plumbing and the view switcher UI. No schema change. Saved custom views (ENG-12489) build on top of this later and are not part of this ticket.\n\n## Acceptance\n\n- [ ] Switcher shows All / Closer / SDR / Consultancy; SDR and Consultancy can show their honest placeholder until their tickets land.\n- [ ] Closer view is the default and matches today's dashboard exactly.\n- [ ] All view: every card recomputes for the wider population, and categories + Unmapped + exclusions still sum to the headline.\n- [ ] No call, deal, or cash appears in a view it doesn't belong to.\n- [ ] Per-view scope is data, not code branches, so ENG-12490/91 are configuration plus view-specific cards."
+    },
+    {
+      "id": "ENG-12450",
+      "createdAt": "2026-08-10T12:14:15.421Z",
+      "title": "Floor Command: make the call, show and close numbers add up",
+      "state": "Done",
+      "assignee": "Anuj Bhatt",
+      "parent": "ENG-12447",
+      "labels": ["rep-command-center"],
+      "description": "## What is wrong\n\nThe dashboard currently mixes different sources for calls and attendance.\n\nThis causes several problems:\n\n* cancelled calls can disappear;\n* recordings and general phone calls can be mixed into booked sales calls;\n* built-in Sales Calls can be dropped because they have no workspace call-type row;\n* Booked, Taken and the rates can use different groups of calls;\n* SDR wins can leak into Closer Closed;\n* valid close rates above 100% can be hidden.\n\n## What we are fixing\n\nUse scheduled appointments as the source for booked sales calls.\n\nA call belongs to the period based on when it was scheduled to happen, not when the database row was created.\n\nCount only the configured Closer call types, including both workspace-created call types and built-in Sales Calls.\n\nCancelled bookings must still count, including cancellation records that were soft-deleted.\n\nFor every report:\n\n`Booked = Taken + No-show + Cancelled + Unmarked`\n\nCalculate both show rates:\n\n* **Main show rate:** Taken / Booked\n* **Show rate excluding cancelled:** Taken / (Booked - Cancelled)\n\nThe main rate is the large number. The excluding-cancelled rate is shown underneath in smaller text. Both use the same calls, date range and filters.\n\nOnly mature appointments count in attendance metrics: stop at 48 hours before the report was run.\n\n## Closed and close rate\n\nClosed means a real won deal in the configured Closer pipeline.\n\nDo not include SDR Payment Support wins.\n\nUnowned deals appear as Unattributed instead of disappearing.\n\nENG-12343 must fix and review false payment-created wins before Closed can be trusted.\n\nCalculate both close rates:\n\n* **Main close rate:** Closed / Taken\n* **Booked close rate:** Closed / Booked\n\nThe main rate is the large number and is labelled **Closed ÷ showed**. The booked rate is shown underneath in smaller text and labelled **÷ booked**.\n\nBoth rates use the same Closed count, date range and filters. A period close rate can be above 100% because deals closed this week may have been booked earlier. Show the number with an explanation instead of hiding it.\n\n## Done when\n\nEvery call sits in exactly one outcome, the totals add up, built-in Sales Calls and cancellations are included, SDR deals stay out of Closer numbers, both versions of each rate are returned, and the headline matches the closer rows."
+    },
+    {
+      "id": "ENG-12134",
+      "createdAt": "2026-07-29T20:45:57.074Z",
+      "title": "Aggregate Sales Performance Close Rate is not covered by the closer-scoreboard data-quality guard",
+      "state": "unknown",
+      "assignee": null,
+      "parent": "ENG-12447",
+      "labels": [],
+      "description": "Superseded by ENG-12450.\n\nThe old approach extends the guard that hides close rates above 100%. The settled Floor Command contract renders valid period-flow rates normally with a caveat and fixes the underlying call/closed populations instead."
+    },
+    {
+      "id": "ENG-7304",
+      "createdAt": "2026-03-28T11:02:16.673Z",
+      "title": "Email campaign performance data is inaccurate and identical",
+      "state": "Canceled",
+      "assignee": "Beth Newton",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "#### Customer Name\n\nGeneral issue\n\n#### Customer Email\n\nNA\n\n#### Workspace name\n\nNA\n\n#### Screenshot\n\n#### What are you trying to achieve?\n\nview the performance of an email campaign of  client\n\n#### What are you doing to achieve it?\n\nI log into their campaign workspace\n\n#### What is happening instead?\n\nI saw their campaign but it doesn't match what they have to say about their campaigns and the dashboard of two clients are basically identical?\n\n#### What is the expected outcome?\n\nIt to be accurate"
+    },
+    {
+      "id": "ENG-2928",
+      "createdAt": "2025-11-24T11:05:40.948Z",
+      "title": "Delete 0-submission workspaces for multi-workspace users",
+      "state": "Canceled",
+      "assignee": "unknown",
+      "parent": null,
+      "labels": ["Chore"],
+      "description": "Delete all workspaces with 0 submissions among users with multiple workspaces identified in the recent analysis (96 of 247)."
+    },
+    {
+      "id": "ENG-11162",
+      "createdAt": "2026-07-05T13:12:15.445Z",
+      "title": "AI SDR books meetings on wrong workspace calendar/email in multi-workspace setups",
+      "state": "Todo",
+      "assignee": "Koppany Kondricz",
+      "parent": null,
+      "labels": ["Bug", "intercom-sourced", "triaged-by-devin"],
+      "description": "## Problem\n\nIn multi-workspace setups, AI SDR appointments are routing to the wrong workspace's calendar and email account. Meetings booked in one workspace land on another workspace's connected calendar/email.\n\n## Name 13 signal\n\n* Name 13 topic: `<uuid>`\n* Severity: Medium | Confidence: 0.78 | Track: Engineering\n* Recurring: 2 customers in 30d\n* Name 10 filed a new calendar booking bug (attachments included in the Intercom thread) while Name 9's Outlook meeting-sync thread just closed after 24 days open.\n\n## Why new\n\nNo currently-open ticket tracks cross-workspace calendar/email routing. The two closest matches are both closed:\n\n* ENG-6712 (Workspace email and calendar bleed across workspaces) — Canceled + archived.\n* ENG-9918 (Fix AI SDR Outlook calendar sync and timezone issues, Name 9) — Canceled 2026-06-19.\n\nActive calendar tickets (ENG-9429 external-sync recreates appointments, ENG-9600 Outlook delta) cover different root causes, not multi-workspace calendar bleed.\n\n## Source\n\n* Name 11\n* Reporters: Name 10 (new), Name 9 (recurring, prior ENG-9918)\n\n## Name 12\n\n`modem-<uuid>-2026-07-05`"
+    },
+    {
+      "id": "ENG-5247",
+      "createdAt": "2026-02-06T22:55:59.089Z",
+      "title": "TRPCError: Closer access required",
+      "state": "Canceled",
+      "assignee": "Jared Stauffer",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": ""
+    },
+    {
+      "id": "ENG-6381",
+      "createdAt": "2026-03-07T11:11:04.745Z",
+      "title": "TRPCError: Closer access required",
+      "state": "Duplicate",
+      "assignee": "Beth Newton",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "## Error\n\n`TRPCError: Closer access required`\n\n**Sentry:** AI-CLIENTS-27Q | **Culprit:** `w.listAssignedWorkspaces(trpc/routers/closer)`\n\n## Name 14\n\n| Field | Value |\n| -- | -- |\n| Events | 117 |\n| Affected users | 11 |\n| First seen | 2026-02-05 |\n| Last seen | 2026-03-05 |\n\n---\n\n## Root Cause\n\n`listAssignedWorkspaces` in `trpc/routers/closer.ts` (line 29) checks `ctx.user.role !== 'closer'` and throws if the condition is true. The 11 affected users are reaching this endpoint but their `role` field in the session does not equal `'closer'`.\n\nThe code path itself is correct. Two possible causes:\n\n1. **Data issue**: These users have the closer role in the UI/admin but their `role` column in the `user` table is not set to `'closer'` — a data migration or admin assignment bug.\n2. **Session staleness**: The session was created before the role was assigned. `disableCookieCache: true` in `getSession` should prevent this, but there may be an edge case.\n\n## Codebase Verification\n\nConfirmed in codebase:\n\n* `trpc/routers/closer.ts` line 29: role guard is `ctx.user.role !== 'closer'` — code is correct\n* `role` is a plain `text` column in `lib/db/schema/auth.ts` (line 186) — no enum constraint\n* Role assignment happens via `app/api/webhooks/team-member/route.ts` which calls `db.update(userTable).set({ role })` — the webhook path is correct\n* The webhook only runs in `production` environment (guarded at line 26) — so role assignment cannot be tested or triggered in staging/dev\n* No application-level fix is possible without first inspecting the `user` table for the 11 affected user IDs from Sentry\n* `getSession` uses `disableCookieCache: true` — session staleness is unlikely but not ruled out\n\n## Agent Feasibility\n\n**Recommended for human.** Requires live DB inspection of 11 specific user records to determine root cause before any code or data change can be made. No code fix is possible without that data. Once the root cause is confirmed (data vs. code), the fix is either a targeted DB update or a patch to the role assignment flow. Not suitable for agent — no deterministic code change can be made without first seeing the affected rows."
+    },
+    {
+      "id": "ENG-13146",
+      "createdAt": "2026-08-26T14:18:54.954Z",
+      "title": "Acquisity Zoom connection EU Block",
+      "state": "Done",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": ["Customer reported"],
+      "description": "#### Customer Name\n\nName 15\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nCompany Two\n\n#### Screenshot\n\n <image> \n\n#### What are you trying to achieve?\n\ncoming here, need help with getting this fixed\n\n#### What are you doing to achieve it?\n\n* \n\n#### What is happening instead?\n\nMy client Name 15 has a new client (Company Two) that he is trying to onboard into acquisity, he had a bunch of problems inviting him to his workspace as client view & believe they just had to set up a new workspace together from Name 16 laptop on a call. Upon trying to connect his zoom to acquisity - it's saying it's blocked in the EU, is this true & if so, what is the workaround????\n\n#### What is the expected outcome?\n\nclarity on solution"
+    },
+    {
+      "id": "ENG-13423",
+      "createdAt": "2026-09-03T13:09:56.834Z",
+      "title": "Name 18 (the closer) can't connect his Zoom to the workspace of the client Name 17",
+      "state": "Duplicate",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": ["Customer reported"],
+      "description": "#### Customer Name\n\nName 17\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nCompany Three\n\n#### Screenshot\n\n <image> \n\n#### What are you trying to achieve?\n\nName 18 (the closer) can't connect his Zoom to the workspace of the client Name 17. He gets a message saying \"You cannot add Acquisity. This app is not currently available to EU users.\"\n\nDoes this mean he can't connect his Zoom to any of the clients' workspaces???\n\n#### What are you doing to achieve it?\n\n* \n\n#### What is happening instead?\n\n* \n\n#### What is the expected outcome?\n\n* "
+    },
+    {
+      "id": "ENG-78",
+      "createdAt": "2025-06-09T10:34:35.372Z",
+      "title": "Add a directory for closers",
+      "state": "Canceled",
+      "assignee": null,
+      "parent": null,
+      "labels": ["Feature"],
+      "description": ""
+    },
+    {
+      "id": "ENG-11704",
+      "createdAt": "2026-07-16T16:21:41.668Z",
+      "title": "My Day v2 PR 2: closer switcher endpoint (getTeamMembers + needs-attention counts)",
+      "state": "Done",
+      "assignee": "Arthur Li",
+      "parent": "ENG-11703",
+      "labels": ["rep-command-center"],
+      "description": "## What (one PR)\n\nThe endpoint that powers the manager's closer switcher: the list of closers with a light \"needs attention\" read per rep, so Name 19/Name 8 see who to check before switching.\n\n🚩 **MY_DAY flag:** the endpoint uses the existing `crm.myDay.*` feature gate AND the PR 1 authorization resolver — callable only by users the resolver grants team/workspace scope. Nothing outside flagged workspaces.\n\n## How\n\n* New `crm.myDay.getTeamMembers({ organizationId })`\n* **Eligibility:** members holding active `closer` / `sales_lead` role templates (`memberWorkspaceRoleTable` join `workspaceRoleTable.templateKey`, `packages/db/src/schema/workspace-rbac.ts`); de-duplicate multi-role members; exclude client-role and deleted members. Fallback when the `workspace_rbac` flag is off: all non-client org members, and only org owner/admin may call (per the PR 1 resolver rules)\n* **Per member return:** `{ userId, name, avatar, callsToday, actionCount }`\n* **Counts:** computed in ONE aggregate query sharing the ENG-11585 action-queue derivation (not N per-member endpoint calls), counted **after each rep's own dismissals**. Managers see a rep's dismissal state; they cannot dismiss on a rep's behalf\n* Team-scope managers get only their team's members; workspace scope gets all eligible\n\n## Acceptance\n\n* Each eligible closer appears exactly once with correct counts\n* A closer/member calling this gets FORBIDDEN\n* Counts match what the target rep sees on their own My Day\n\nParent: ENG-11703 · Blocked by: ENG-11590 (PR 1 resolver) · Consumed by: ENG-11593 (PR 4 FE)"
+    },
+    {
+      "id": "ENG-12989",
+      "createdAt": "2026-08-20T20:40:08.356Z",
+      "title": "Call getting booked on the client's calendar as opposed to the closer's",
+      "state": "unknown",
+      "assignee": "Koppany Kondricz",
+      "parent": null,
+      "labels": [],
+      "description": "#### Customer Name\n\nName 20\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\n* \n\n#### Screenshot\n\n <image> \n\n <image> \n\n <image> \n\n#### What are you trying to achieve?\n\nWhy did the call get booked on Name 100's calendar, when it should have been booked on the closer's calendar??\n\nYou can see on the screenshots that the assigned salesperson on that campaign is the closer Name 18 , and still the call got booked on Name 100's calendar. This needs to be fixed as soon as possible because there is already another call booked for next week with the same issue, and we need to make sure that this is fixed.\n\n#### What are you doing to achieve it?\n\n* \n\n#### What is happening instead?\n\n* \n\n#### What is the expected outcome?\n\n* "
+    },
+    {
+      "id": "ENG-13147",
+      "createdAt": "2026-08-26T14:46:41.866Z",
+      "title": "Name 21 - Calls not booking to closer calendar",
+      "state": "Duplicate",
+      "assignee": "Koppany Kondricz",
+      "parent": "ENG-12989",
+      "labels": ["Bug", "Customer reported"],
+      "description": "#### Customer Name\n\nName 21\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nCompany Four Workspace\n\n#### Screenshot\n\n <image> \n\n <image> \n\n#### What are you trying to achieve?\n\nWe have has calls that are not booking to his closers calendar (Name 22)  as seen in the screenshot. We need to have all calls book to the closers calendar\n\n#### What are you doing to achieve it?\n\nI tried changing settings and I think everything is setup correctly but I would like to double check\n\n#### What is happening instead?\n\ncalls booking to client calendar (Name 101) instead of closers calendar (Name 102)\n\n#### What is the expected outcome?\n\nall calls book to Name 102's calendar"
+    },
+    {
+      "id": "ENG-13461",
+      "createdAt": "2026-09-04T12:29:30.048Z",
+      "title": "Let permitted closers record manual payments",
+      "state": "Done",
+      "assignee": "James Keeble",
+      "parent": null,
+      "labels": [],
+      "description": "## Overview\n\nLet workspace admins grant a specific “Record manual payment” permission so closers can log payments received outside Acquisity without becoming workspace admins.\n\n## Problem\n\nIn AI Acquisition LT, Name 23 has the Closer role but cannot see “Record payment” on a deal. The current feature restricts both the button and the save action to owners and admins.\n\n## User experience\n\nA permitted closer opens a deal’s Payments tab, selects Record payment, chooses the linked contact, enters the existing payment details, and saves. The payment appears in the existing history with its recorder attribution.\n\n## What's included\n\nA dedicated role permission, matching UI and backend enforcement, and a controlled grant to the existing AI Acquisition LT Closer role after the code is deployed. Preserve existing payment validation, activity, totals, and workflow behavior.\n\n## Who can do what\n\nOwners and admins retain access. Other non-client members require the new permission and must remain within its deal and workspace scope. Members without permission and client accounts cannot record manual payments. Refunds, reassignment, provider settings, and other payment administration retain their existing restrictions.\n\n## Done when\n\n* The permission is editable in Roles & Permissions and controls both button visibility and saving.\n* A permitted Closer can record a manual payment on an allowed deal and see the saved result.\n* Missing or revoked grants, out-of-scope deals, and cross-workspace attempts are denied.\n* Owner/admin recording and existing payment validation still work.\n* The LT Closer grant is verified after deployment, with no promotion to Admin.\n\nInitial scope, subject to refinement after implementation research.\n\n## Implementation context\n\nAI context.md"
+    }
+  ]
+}

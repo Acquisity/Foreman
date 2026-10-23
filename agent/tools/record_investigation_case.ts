@@ -10,13 +10,24 @@ import {
   NO_FEATURE_REASON,
 } from "#lib/investigation-memory/scope.js";
 import { recordCase } from "#lib/investigation-memory/store.js";
+import { recordReplayMemory } from "#lib/triage-replay/client.js";
+import { replaySessionOf } from "#lib/triage-replay/mode.js";
 import { canUseInvestigationMemory } from "#lib/trust.js";
 
 export default defineTool({
-  approval: investigationMemoryWritePolicy,
+  approval: (ctx) =>
+    replaySessionOf(ctx.session.auth.initiator)
+      ? "not-applicable"
+      : investigationMemoryWritePolicy(ctx),
   description:
     "Record one settled investigation as a sanitized case: a completed Linear triage, a ticketless Intercom or Slack investigation, or a conclusion a trusted human corrected in the thread. For a Linear ticket, record after the Triage investigation document is attached, the classification is final, and final Linear handling has saved the evidence-backed product project; re-read the issue and pass that resulting project id. For a ticketless source, use `intercom:<conversation id>` or `slack:<channel id>/<thread ts>` as the source id, omit the project id, and name the live product area the evidence points at in `primaryFeatureKey`. When a human overturned an earlier conclusion of yours that was never recorded, record the corrected conclusion here and put the overturned one in `ruledOut`. Store the pattern, not the customer: no email addresses, organization or user ids, raw production rows, logs, or credentials. If a case already exists for this source and the conclusion has changed, use `correct_investigation_case` instead. A failure here never changes the verdict or holds the ticket.",
   async execute(input, ctx) {
+    if (replaySessionOf(ctx.session.auth.initiator)) {
+      return {
+        ...(await recordReplayMemory(ctx.session.auth.initiator, input)),
+        primaryFeatureKey: featureForCase(input) ?? undefined,
+      };
+    }
     if (!canUseInvestigationMemory(ctx.session.auth.current)) {
       return {
         reason: "This session is not authorized to write investigation memory.",

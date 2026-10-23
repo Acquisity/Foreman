@@ -1,0 +1,220 @@
+{
+  "id": "ENG-14795",
+  "provenance": "seeded",
+  "createdAt": "2026-10-06T12:33:37.465Z",
+  "lane": "triage",
+  "stratum": "platform_limitation",
+  "ticket": {
+    "title": "URGENT FIX CAMPAIGNS ASAP",
+    "description": "#### Customer Name\n\nName 20\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 20\n\n#### Screenshot\n\n <image> \n\n#### What are you trying to achieve?\n\nI raised this last week but he received an error message saying his inboxes had a payment issue. I told him that and he paid the for the inboxes and was charged for it but still the campaigns are not running. Please fix this ASAP as this is a client Nuclear at Risk\n\n#### What are you doing to achieve it?\n\nSubmitting this ticket and escalating\n\n#### What is happening instead?\n\nCampaigns are not sending out\n\n#### What is the expected outcome?\n\nFix it",
+    "attachmentKinds": ["image", "slack"]
+  },
+  "repoCommitAtCreate": "cca3b2740046731a1abce89a96ce68bacb1a9b34",
+  "flags": {
+    "descriptionEditedAfterCreate": false,
+    "needsProductionData": true,
+    "alreadyFixedAtTriage": false
+  },
+  "relatedSnapshot": [
+    {
+      "id": "ENG-2974",
+      "createdAt": "2025-11-25T12:19:08.035Z",
+      "title": "Remove campaigns linked to deleted legacy user_owned provider",
+      "state": "Canceled",
+      "assignee": "Mahmut Jomaa",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "After migrating a workspace from Legacy to Legacy Pro, campaigns associated with the old `user_owned` provider remain visible and accessible. Any action on these campaigns fails since the old provider is deleted.\n\nTask: remove or otherwise clean up campaigns that are still attached to the old provider so that users do not see or interact with broken campaigns.\n\nHow did this happen?\n\n* when user migrates workspace while having healthy Company One connection (and campaigns in our db), provisioning now works, but campaigns are not cleared:\n\nCEA page after migration:\n\n <image> \n\nProviders in db:\n\n <image> \n\nNew provisioned Company One workspace has 0 campaigns:\n\n <image> \n\nThey are from my testing account:\n\n <image> \n\n "
+    },
+    {
+      "id": "ENG-1279",
+      "createdAt": "2025-09-19T13:47:54.851Z",
+      "title": "fix transaction issues when creating campaigns",
+      "state": "Done",
+      "assignee": "Anthony Adewale",
+      "parent": null,
+      "labels": [],
+      "description": "Add get provider within the same transaction to limit usage to one connection per request to prevent connection error while saving campaigns\n\n <image> "
+    },
+    {
+      "id": "ENG-1161",
+      "createdAt": "2025-09-15T16:43:28.239Z",
+      "title": "Update Sample Campaigns for 2025 Demo - Urgent for Name 1 Name 2",
+      "state": "Done",
+      "assignee": "Declan Lupari",
+      "parent": null,
+      "labels": [],
+      "description": "Update the sample campaigns in the Cold Email Campaign Agent to show 2025 dates and adjust campaign states to include variety (1 paused, completed, etc.) for Name 1 Name 3's webinar demo tomorrow night.\n\nCurrent sample campaigns visible:\n\n* B2B MarTech SaaS (Active)\n* Ed-tech Companies (Active)\n* Consulting Firms (Active)\n* Insurance Agencies (Active)\n* Financial Services (Active)\n* Marketing Agencies (Active)\n\n**Requirements:**\n\n* Change all campaign dates from 2024 to 2025\n* Adjust campaign states to show variety: 1 paused, 1 completed, others active\n* Ensure demo looks realistic for webinar presentation"
+    },
+    {
+      "id": "ENG-8316",
+      "createdAt": "2026-05-05T10:43:14.257Z",
+      "title": "Domains not warming up as expected for campaign launch",
+      "state": "Done",
+      "assignee": "Tyler Olsen",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "#### Customer Name\n\nName 4\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nCompany Two\n\n#### Screenshot\n\n <image> \n\n#### What are you trying to achieve?\n\nClient purchased domains on Apr 30\n\n#### What are you doing to achieve it?\n\nLet it warm for 14 days, to be used by May 14 and launch the campaign asap\n\n#### What is happening instead?\n\nOn May 5 - It's showing that it's not in warmup yet, it still haven't propagated the domains.\n\n#### What is the expected outcome?\n\nThe Domains & Inboxes should have been populated by now and getting warmed."
+    },
+    {
+      "id": "ENG-8162",
+      "createdAt": "2026-04-28T19:48:46.753Z",
+      "title": "Fix campaign analytics uploaded leads denominator",
+      "state": "Done",
+      "assignee": "James Keeble",
+      "parent": null,
+      "labels": [],
+      "description": "## Issue\n\nOn the campaign Analytics tab, draft campaigns can show `0 / 1000 leads uploaded` in the Leads Contacted card even after leads have been uploaded. The denominator is currently derived from campaign analytics metadata/provider sync and falls back to `1000` when the metadata count is missing or zero.\n\n <image> \n\n <image> \n\n## Expected behavior\n\nThe denominator should always reflect the true current number of leads uploaded to the campaign:\n\n* Adding/importing leads should increase/update the denominator.\n* Lead imports append/upsert and do not replace existing campaign leads.\n* Deleting campaign leads should decrease/update the denominator.\n* Draft campaigns should not depend on provider analytics sync to show the uploaded lead count.\n\n## Proposed fix\n\nUse the campaign lead relationship table count as the source of truth for the uploaded-leads denominator in the existing campaign metrics fetch, while keeping contacted/reply/positive/booked metrics sourced from analytics metadata/provider sync. Also invalidate the campaign detail metrics query after lead membership mutations so the UI refreshes immediately.\n\nPR: Institute-of-Business-Growth/ai-clients#3639"
+    },
+    {
+      "id": "ENG-2839",
+      "createdAt": "2025-11-20T21:19:18.148Z",
+      "title": "Active Campaigns Marked Completed, No AI Agent Analysis Provided",
+      "state": "Done",
+      "assignee": "Koppany Kondricz",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "## Issue Identified:\n\nUser had active campaigns stopped and marked completed before all leads were contacted. No AI Agent analysis was provided—nor could there be since only \\~150 emails were sent from each campaign.\n\n <image> \n\nThis wasn't caused by a low Minimum threshold:\n\n <image> \n\n## Expected Behavior:\n\nCampaigns should run until AT LEAST the Minimum Threshold of emails have run, but preferably closer to the Base Threshold for thorough analysis.\n\nCustomer Name 6:\n\n* Name: Name 5\n* Loom video:\n\nCold Email Campaign Update: Questions on Completion Status 🤔"
+    },
+    {
+      "id": "ENG-7417",
+      "createdAt": "2026-04-01T01:11:27.906Z",
+      "title": "Campaigns launched with no leads get stuck in 'completed' status permanently",
+      "state": "Duplicate",
+      "assignee": "James Keeble",
+      "parent": null,
+      "labels": [],
+      "description": "*Important to get this fixed quickly as campaigns are set to auto launch by default - if there is no leads by the time it's created they get stuck in this cycle. The only fix is to download the leads, delete the leads, and then duplicate the campaign and re-upload.*\n\n## Bug Report\n\nWhen an email campaign is launched with no leads uploaded yet, it transitions to **completed** status. Once leads are subsequently uploaded, the campaign remains stuck in **completed** and does not resume sending.\n\n### Steps to Reproduce\n\n1. Create and launch an email campaign with **no leads uploaded**\n2. The campaign transitions to `completed` status (because Company One marks it as completed when there are no leads to send to)\n3. Upload leads to the campaign\n4. Campaign remains stuck in `completed` status — leads are never sent\n5. User can manually resume the campaign → status changes to `active`\n6. After 1-2 minutes, the campaign reverts back to `completed` again despite having leads\n\n### Root Cause Analysis (Preliminary)\n\nThe issue appears to involve two interacting problems:\n\n1. **Company One marks campaigns as completed (status 3) when launched with no leads.** This is expected Company One behavior — if there are no leads, the campaign has \"nothing to do\" so it completes immediately.\n2. **Periodic sync overwrites local status with Company One's status.** The `syncCampaignData` Inngest function (`campaign-sync.ts`) and `campaign-import.ts` both call `mapInstantlyStatusToOur()` which maps Company One status `3` → `OutreachCampaignStatus.Completed`. This sync runs periodically and overwrites any local status changes.\n3. **Resume only updates locally, not durably against sync.** When a user resumes, the app calls Company One's `/campaigns/{id}/activate` endpoint, which sets the campaign to active on Company One. However, if Company One transitions the campaign back to completed quickly (because it already processed and found no *new* unsent leads, or some race condition), the next sync cycle picks up `completed` again and overwrites the local `active` status.\n\n### Key Files\n\n* `lib/inngest/functions/campaign/util.ts` — `mapInstantlyStatusToOur()` (line 142)\n* `lib/inngest/functions/outreach/campaign-sync.ts` — status sync logic (line 304)\n* `lib/inngest/functions/outreach/campaign-import.ts` — import status mapping (line 323)\n* `lib/inngest/functions/outreach/periodic-sync.ts` — periodic sync trigger\n* `trpc/routers/outreach/campaigns.ts` — resume campaign endpoint (line 1889)\n\n### Suggested Fix\n\nThe sync process should not overwrite a campaign's status to `completed` if the campaign has been resumed or has pending/unsent leads. Consider:\n\n* Adding a guard in the sync that checks for uploaded leads before allowing transition to `completed`\n* Preserving user-initiated status changes (e.g. resume) by skipping provider status sync for recently-resumed campaigns\n* Not mapping Company One's `completed` status when the campaign has leads that haven't been contacted yet"
+    },
+    {
+      "id": "ENG-5035",
+      "createdAt": "2026-02-01T16:09:05.570Z",
+      "title": "Resolve email sequence error to launch campaign by 9am EST",
+      "state": "Canceled",
+      "assignee": "Anuj Bhatt",
+      "parent": null,
+      "labels": ["Sequence/Variant Lost"],
+      "description": "#### Customer Name\n\nName 7\n\n#### Customer Email\n\n<email>\n\n#### Screenshot\n\n <image> \n\n#### Clear description of what the problem is\n\nTrying to launch the client's campaign - managed to scrape the list, however an error is appearing when generating the email sequences - need to get his campaign launched by 9am EST tomorrow"
+    },
+    {
+      "id": "ENG-956",
+      "createdAt": "2025-09-04T06:08:25.451Z",
+      "title": "Fix 'Resume' Campaign Button Functionality",
+      "state": "Done",
+      "assignee": "Declan Lupari",
+      "parent": null,
+      "labels": [],
+      "description": "Resume button currently not hooked up - fix this."
+    },
+    {
+      "id": "ENG-1553",
+      "createdAt": "2025-09-30T14:32:04.122Z",
+      "title": "fix: optimize submission polling to prevent UI freeze after campaign creation",
+      "state": "Done",
+      "assignee": "Koppany Kondricz",
+      "parent": null,
+      "labels": [],
+      "description": "## Problem\n\nAfter creating a campaign, the submission details page (`/dashboard/{workspace-slug}/submissions/{submissionId}`) freezes and becomes completely unresponsive, preventing users from navigating away or interacting with the UI. This affects the user experience for 15-20 minutes while campaigns are processing.\n\n### Root Causes\n\n1. **Excessive polling** - `ProcessingState` component polls every 2 seconds indefinitely\n2. **No cleanup** - Polling continues even after component unmount or navigation\n3. **Multiple queries** - `OutreachCreatorDisplay` adds another continuous query on top\n4. **Background polling** - Polling continues even when tab is inactive\n\n## Solution\n\nImplemented multiple optimizations to fix the polling freeze:\n\n### 1\\. Optimized Polling Interval\n\n* Changed from aggressive 2-second polling to 10 seconds initially\n* Implemented exponential backoff: 10s → 15s → 30s → 60s (max)\n* Reduces API calls by 80-95% while maintaining status updates\n\n### 2\\. Proper Cleanup Mechanisms\n\n* Added `isMounted` ref to track component lifecycle\n* Disabled React Query when component unmounts\n* Removed polling in background tabs\n\n### 3\\. Visibility Detection\n\n* Pause polling when tab is inactive using `document.visibilityState`\n* Resume polling when user returns to tab\n* Prevents unnecessary load when page isn't visible\n\n### 4\\. Conditional Query in OutreachCreatorDisplay\n\n* Stop campaign query once submission is completed\n* Only query while submission is still processing\n* Eliminates redundant continuous queries\n\n## Impact\n\n✅ Dramatically reduced API call frequency (10-60s instead of 2s)  \n✅ UI remains responsive during campaign processing  \n✅ Users can navigate away without issues  \n✅ Polling stops completely when component unmounts  \n✅ No polling in inactive/background tabs\n\n## Related PR\n\nPR #831: <url:github.com>\n\n## Files Modified\n\n* `components/ai-tools/processing-state.tsx`\n* `components/submissions/submission-displays/outreach-creator-display.tsx`"
+    },
+    {
+      "id": "ENG-2396",
+      "createdAt": "2025-10-28T14:22:53.250Z",
+      "title": "Company One API 400 when creating campaigns on staging",
+      "state": "Done",
+      "assignee": "Anthony Adewale",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "Creating a new campaign is failing with repeated `Company One API Error (400): Bad Request`.\n\nObserved both locally during QA and on staging. To reproduce, try creating a new campaign on staging.\n\nRun for reference: Inngest run"
+    },
+    {
+      "id": "ENG-10717",
+      "createdAt": "2026-06-23T18:35:30.524Z",
+      "title": "Campaign header says no accounts connected despite selected external Company One accounts",
+      "state": "Backlog",
+      "assignee": "Koppany Kondricz",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "BUG: Yes\nEVIDENCE:\nIntercom conversation 215474815491860 shows Company Six campaign <uuid> displaying the header warning \"No email accounts connected. Add one to start sending\" while the Options tab shows 18 selected email accounts. Prod DB confirms outreach_campaign.settings.emailAccounts contains 18 addresses, campaign status/display_status are active, provider is active with no connection_error, and mail_inbox has 0 rows because these are external/user-owned Company One inboxes. Axiom logs at 2026-06-23T18:22:26-18:22:27Z show Updating campaign settings, Updating campaign in provider, Database update completed, and Triggered daily email limit recalculation for the same campaign, but the customer still saw the header warning. Customer also hit a generic Application Error after trying support's pause/remove/re-add/resume workaround; Axiom at 2026-06-23T18:24:24Z logs Failed to initiate campaign resume because the campaign was already active, which appears covered separately by ENG-9785. Prior completed tickets ENG-7810/ENG-8081/ENG-8101 had the same symptom, suggesting regression or incomplete fix.\nPOTENTIAL FIX:\nAudit campaign detail header status derivation for external Company One campaigns. If provider sending status returns no_accounts_available while the campaign has selected settings.emailAccounts and provider update succeeded, reconcile with provider campaign email_list and/or surface a sync-specific warning instead of saying no accounts are connected. Also avoid sending users into resume when campaign is already active.\nWHATS NEEDED TO RESOLVE:\nReproduce with org <uuid> / campaign <uuid>, inspect Company One campaign <uuid> email_list and status response, then fix header/resync behavior for external inbox campaigns.\nDEVIN SESSION:\n<url>"
+    },
+    {
+      "id": "ENG-6612",
+      "createdAt": "2026-03-11T13:24:31.337Z",
+      "title": "Fix issue preventing new cold email campaign creation",
+      "state": "Done",
+      "assignee": "Tyler Olsen",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "# Issue: Needs Niche Research process reset. See screenshot, endless spinning.\n\n#### Customer Name\n\nName 8\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nCompany Three - AI Agency\n\n <image> \n\n#### Screenshot\n\n <image> \n\n <image> \n\n#### What are you trying to achieve?\n\nCreate a new cold email campaign\n\n#### What are you doing to achieve it?\n\ncannot add a \"New Campaign\" in my workspace (Company Three - AI Agency). The New Campaign button is there but it is grayed out. The AIA agent (help) gives me four things to try. See attached image. I have verified or tried each of these four items. I have those items set correctly. The only, slight exception is requirement three (3) - \"Verify you’ve connected a cold email provider in Settings > Cold Email Agent (Acquisity or Company One)\". I don't see the provider connection in my settings. I disconnected Company One about 7-8 days ago, following the procedure to do that. In the \"Cold Email Agent screen I have also had a process running, and not completing, for the last 7-8 days. The \"Niche Research in Progress\"  has a spinning dial that says \"Processing\"...again this has been spinning / processing for the last 7-8 days, see screen shot attached. What can be done to fix these 2 issues? What can I try on my side? Does something need to be restarted on the system end?\n\n#### What is happening instead?\n\nunable to create new campaign\n\n#### What is the expected outcome?\n\nCreate new campaign"
+    },
+    {
+      "id": "ENG-3801",
+      "createdAt": "2025-12-15T21:20:46.323Z",
+      "title": "Missing purchased domains/emails for Name 9 campaign",
+      "state": "Done",
+      "assignee": "Anthony Adewale",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "Customer Name 10 Name 11 purchased domains/emails about a month ago and they are not appearing as available to add to a campaign in Name 9.\n\nBilling email: <email>\nMissing: 6 domains, 18 inboxes\nRecent invoices for Inbox, Domain, Legacy Pro, and Legacy are visible in the attached screenshot.\n\nScreenshot:\n\n <image> "
+    },
+    {
+      "id": "ENG-1549",
+      "createdAt": "2025-09-30T12:58:06.677Z",
+      "title": "fix(campaign): fix the step sequence breakdown UI",
+      "state": "Done",
+      "assignee": "Anthony Adewale",
+      "parent": null,
+      "labels": [],
+      "description": "## Issue Description\n\nFix the step sequence breakdown UI to properly display step indices and variants.\n\n## Technical Changes\n\nAdjusts `getStepVariantCounts` to decrement step indices and recompute `stepVariant` for UI-aligned zero-based steps.\n\n### Backend — campaign repository\n\n* Updates `lib/outreach/db/campaign.ts` `getStepVariantCounts` to post-process DB results:\n  * Decrements `step` by 1 (convert to zero-based) and rebuilds `stepVariant` as `${step}-${variant}`\n  * Keeps ordering/grouping the same; now returns normalized counts for UI sequence breakdown\n\n## Related PR\n\n<url:github.com>"
+    },
+    {
+      "id": "ENG-3907",
+      "createdAt": "2025-12-18T22:16:30.706Z",
+      "title": "AI SDR main toggle does not disable campaigns",
+      "state": "Done",
+      "assignee": "Koppany Kondricz",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "Turning off AI SDR in the main AI SDR settings does not actually stop the AI SDR from following up with prospects.\n\nCompany Four's workspace, AI SDR was switched off in the main AI SDR settings (AI auto agent toggled off), but follow‑ups are still being sent. In the \"configure AI SDR for campaigns\" screen, the AI SDR is still shown as enabled.\n\nClient: Name 12 (<email>)\nWorkspace: Company Five's workspace\n\n <image> "
+    },
+    {
+      "id": "ENG-2219",
+      "createdAt": "2025-10-23T16:06:42.649Z",
+      "title": "Fix campaign analytics issues in Inngest (incorrect time, no niche found, errors)",
+      "state": "Canceled",
+      "assignee": "Anthony Adewale",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "Fix multiple issues with campaign analytics in Inngest:\n\n**Issues to address:**\n\n1. Incorrect time being displayed or recorded\n2. \"No niche found\" errors occurring\n3. Various other errors in campaign analytics processing\n\n**Context:**\nThese issues are affecting the reliability of campaign analytics data and need to be resolved to ensure accurate reporting.\n\n**Related:**\n\n* Links to ENG-2131 (Name 13 escalation improvement) as these analytics errors should be properly escalated to users with clear guidance"
+    },
+    {
+      "id": "ENG-8971",
+      "createdAt": "2026-05-18T20:55:19.450Z",
+      "title": "Fix campaign 'Name 100 TEST' and remove lead",
+      "state": "Done",
+      "assignee": "James Keeble",
+      "parent": null,
+      "labels": [],
+      "description": "#### Customer Name\n\nName 14\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 14's workspace\n\n#### Screenshot\n\n <image> \n\n#### What are you trying to achieve?\n\nName 15 campaign \"Name 100 TEST\"\n\n#### What are you doing to achieve it?\n\nI have a client that wants us to send them a test email, I deleted the contract from y podcast campaign but I am still getting this error.\n\n#### What is happening instead?\n\nIssue persisting\n\n#### What is the expected outcome?\n\nfix campaign and remove lead"
+    },
+    {
+      "id": "ENG-6487",
+      "createdAt": "2026-03-09T18:16:39.247Z",
+      "title": "Fix automation errors in AI-SDR cold email campaign",
+      "state": "Done",
+      "assignee": "Jared Stauffer",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "#### Customer Name\n\nName 16\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 16\n\n#### Screenshot\n\n#### What are you trying to achieve?\n\nRun a standard AI-SDR cold email campaign with automated meeting booking so prospects who reply can easily schedule calls using the connected calendar and Zoom meeting link.  The goal is for the AI to respond to replies and allow prospects to book one valid meeting within the allowed calendar window (9am–5pm CST).\n\n#### What are you doing to achieve it?\n\nThe client launched an AI-SDR campaign inside Acquisity.  Steps taken:  • Configured AI campaign using the standard AI configuration template • Connected calendar for automated meeting booking • Set calendar rules to allow booking 9am–5pm CST only • Added Zoom meeting link inside AI configuration • Assigned the correct salesperson calendar (Name 17) • Campaign was turned on and began receiving replies  Campaign produced 14 positive replies within the first week.\n\n#### What is happening instead?\n\nMultiple automation and booking errors are occurring:  • AI sending multiple meeting invites to the same prospect • Prospects receiving duplicate booking links in the same thread • Prospects receiving multiple calendar invites across different days • AI referencing incorrect dates in emails • AI offering calendar times that are actually blocked • Calls being booked outside the allowed time window • Zoom link sometimes sending <domain> instead of the configured meeting link  Additional UI / workflow issues:  • If a prospect CCs another person, the CC contact does not appear in the Acquisity UI • One email thread is locked and cannot be opened or replied to • AI responded to a thread even though it was flagged for manual response  The client paused the campaign because these issues were causing confusion with prospects.\n\n#### What is the expected outcome?\n\nExpected behavior:  • AI should send one booking link only • Prospects should receive one meeting invite • Calendar should only offer available times within the allowed window • Meeting invite should include the correct Zoom link • If a thread is flagged for manual response, AI should not reply automatically • CC recipients should be visible in the Acquisity UI • Email threads should remain clickable and editable  Campaign should run normally without sending duplicate invites or incorrect scheduling information."
+    },
+    {
+      "id": "ENG-8325",
+      "createdAt": "2026-05-05T18:58:58.317Z",
+      "title": "Campaign fails to connect inboxes for email sending",
+      "state": "Done",
+      "assignee": "Tyler Olsen",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "#### Customer Name\n\nName 18\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 18 Workspace\n\n#### Screenshot\n\n <image> \n\n <image> \n\n <image> \n\n#### What are you trying to achieve?\n\nClient is trying to launch his MedTech cold email campaign (Name 19 | MedTech | US | 1-50 Employees | AIA Created) and start sending outbound emails to his lead list.\n\n#### What are you doing to achieve it?\n\nCampaign is marked Active (started April 28) but shows \"No email accounts connected. Add one to start sending.\" Attempted to connect inboxes from the campaign settings page and clicked Save.\n\n#### What is happening instead?\n\nWhen clicking Save after attempting to connect inboxes, a banner appears saying \"something went wrong.\" Campaign remains with no inboxes connected. Only 10 out of 6,862 leads have been contacted despite the campaign being active since April 28.\n\n#### What is the expected outcome?\n\nInboxes should connect to the campaign successfully and the campaign should begin sending at the expected daily volume across all connected inboxes."
+    }
+  ]
+}

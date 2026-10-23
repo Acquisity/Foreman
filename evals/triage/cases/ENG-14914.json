@@ -1,0 +1,220 @@
+{
+  "id": "ENG-14914",
+  "provenance": "seeded",
+  "createdAt": "2026-10-07T20:39:19.802Z",
+  "lane": "billing",
+  "stratum": "billing",
+  "ticket": {
+    "title": "Name 2 is being charged while on 3 months free Acquisity",
+    "description": "#### User Email\n\n<email>\n\n#### Workspace Name\n\nName 2\n\n#### Request Type\n\nRefund\n\n#### Reason for request\n\nShe needs the last charges for Acquisity and Domains refunded \nAND 10 000 Lead credits added to her account",
+    "attachmentKinds": ["slack"]
+  },
+  "repoCommitAtCreate": "c618268e9e496874fbb4c6fd14c032fbd0f844fd",
+  "flags": {
+    "descriptionEditedAfterCreate": false,
+    "needsProductionData": true,
+    "alreadyFixedAtTriage": false
+  },
+  "relatedSnapshot": [
+    {
+      "id": "ENG-13675",
+      "createdAt": "2026-09-10T20:57:27.308Z",
+      "title": "3 Months Acquisity , Inboxes and Domains + 10 000 Lead Credits",
+      "state": "Todo",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": ["Billing", "Credits", "Internal reported"],
+      "description": "#### User Email\n\n<email>\n\n#### Workspace Name\n\n#a customer contact\n\n#### Request Type\n\nDiscount code\n\n#### Reason for request\n\n3 Months Acquisity , Inboxes and Domains + 10 000 Lead Credits\nName 2 will join the 90DC with Name 1\nShe is a $25,000 ticket save"
+    },
+    {
+      "id": "ENG-13221",
+      "createdAt": "2026-08-27T20:34:59.618Z",
+      "title": "Name 2 - Lead credit discrepancy",
+      "state": "Canceled",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [],
+      "description": "#### User Email\n\n<email>\n\n#### Workspace Name\n\nName 2's Workspace\n\n#### Request Type\n\nLead credit\n\n#### Reason for request\n\nClient was promised 20k lead credits during the sales call. \nShe was automatically credited 10k when she signed up for the platform and then a manual request was submitted and approved for the second 10k. \n2 campaigns were created by the team in the meantime and she has now disputed that she has gotten the full 20k which has escalated to her now requesting a full refund of her $25k investment. While we de-escalate, kindly approve an additional 10k lead credits as a goodwill gesture as well as provide an itemized list of transactions showing clearly how many credits added and each time leads were scraped and how many leads were used each time."
+    },
+    {
+      "id": "ENG-12575",
+      "createdAt": "2026-08-12T01:29:54.492Z",
+      "title": "GP was promised 20k leads in the sales call - only got 10k",
+      "state": "Done",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [],
+      "description": "#### User Email\n\n<email>\n\n#### Workspace Name\n\nName 2's Workspace\n\n#### Request Type\n\nLead credit\n\n#### Reason for request\n\nPlease issue 10k leads as a part of a refund save strategy"
+    },
+    {
+      "id": "ENG-12833",
+      "createdAt": "2026-08-17T16:11:56.325Z",
+      "title": "3 Months Free Acquisity , Domains & Inboxes",
+      "state": "Done",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [],
+      "description": "#### User Email\n\n<email>\n\n#### Workspace Name\n\nName 100\n\n#### Request Type\n\nDiscount code\n\n#### Reason for request\n\nRefund Save\nSigned off by Name 3\n\nClient is joining the Name 1 90 Day Challenge Cohort\n\nNeeds 3 months of Acquisity, Domains & Inboxes & 10 000 Lead Credits"
+    },
+    {
+      "id": "ENG-6035",
+      "createdAt": "2026-02-27T23:22:11.070Z",
+      "title": "Apply discount code for 3 months free Acquisity and Inboxes",
+      "state": "Done",
+      "assignee": "Beth Newton",
+      "parent": null,
+      "labels": ["Refund"],
+      "description": "#### Workspace Name\n\nName 4\n\n#### Request Type\n\nDiscount code\n\n#### Reason for request\n\nRefund Save - Updated terms with 3 months Free Acquisity + Inboxes\nHas an active sub, needs to be applied in the backend.\n\nHigh Priority"
+    },
+    {
+      "id": "ENG-12747",
+      "createdAt": "2026-08-14T15:49:33.003Z",
+      "title": "3 Months Free Acquisity & mailboxes , Domains + 10 000 Lead Credits",
+      "state": "Todo",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [],
+      "description": "#### User Email\n\n<email>\n\n#### Workspace Name\n\nCompany One\n\n#### Request Type\n\nLead credit\n\n#### Reason for request\n\nRefund Save onto 90Day Challenge with Name 5.\n\nNeeds 3 Months Free Acquisity & mailboxes , Domains + 10 000 Lead Credits"
+    },
+    {
+      "id": "ENG-11579",
+      "createdAt": "2026-07-13T14:12:55.309Z",
+      "title": "Refund 437 dollars and provide 3 months of free service",
+      "state": "Done",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [],
+      "description": "#### Customer Name\n\nName 6\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 6's Workspace\n\n#### Screenshot\n\n#### What are you trying to achieve?\n\nClient paid $185+$252 for Acquisity and inboxes/domains. Can we refund this that was paid (total of $437) and then upload 3 months of free Acquisity and inboxes/domains covered. This is due to the client being extremely risky and was promised we would cover for a while.\n\n#### What are you doing to achieve it?\n\nMessaging here.\n\n#### What is happening instead?\n\n/\n\n#### What is the expected outcome?\n\nClient is reimbursed $437 and covered 3 months of free Acquisity + inboxes/domains afterwards."
+    },
+    {
+      "id": "ENG-14433",
+      "createdAt": "2026-09-29T01:32:54.602Z",
+      "title": "Charged $99/month for a Whitelabel Partner subscription while the app shows the Free plan (Intercom: <email>)",
+      "state": "Todo",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": ["Customer reported", "Refund", "intercom-sourced"],
+      "description": "Intercom conversation: <url:app.intercom.com>\n\n**Source**: Intercom contact <email> (\"Name 9\", free workspace, plan shows Free).\n\n**Ask (bucket: overcharged)**: \"I've been getting charged $99 since June even though I'm on the free plan.\" Manage Billing shows no invoices; Current Plan = Free; no credits, no managed domains or inboxes. A bank screenshot shows the descriptor \"Whop\\*acquisity\" for $99.\n\n**Finding**: The $99/month charge is a real, still-active Whitelabel Partner subscription bought on 2026-06-27 through Acquisity's own Whop store (product route acq-whitelabel-partner-iz3, plan slot partner_subscription), under the buyer account <email>. Whop payments of $99 succeeded on 2026-06-27, 2026-07-27, 2026-08-26 and 2026-09-25 (four cycles, $396 charged, nothing refunded, no dispute). The purchase provisioned the partner \"Name 7\" (self-serve) and the workspace \"Name 8\", which the customer is not signed into and has never used (no client workspace, no plans, no campaign). The workspace he wrote from is a different, free workspace, so the app correctly shows Free with no invoices: the workspace plan and the Whop partner subscription are separate billing layers on separate accounts.\n\n**Exposure**: $396.00 charged across four cycles; a fifth $99 charge is due around 2026-10-25 unless the subscription is cancelled. Nothing refunded to date.\n\n**Proposed human action (not a promise)**: A person with access to the partner billing account should confirm with the customer whether he intended to buy the Whitelabel Partner subscription, then either keep it and explain the separate billing layer, or cancel the Whop membership and refund the unused cycles it never delivered. No customer self-service fix exists because the paid subscription lives on a different account and is billed outside the app.\n\n**Unconfirmed**: Autumn plan/add-on state for the paid partner account (it is partner-governed and has no Acquisity Autumn customer), and the customer's intent."
+    },
+    {
+      "id": "ENG-10989",
+      "createdAt": "2026-06-29T15:53:25.857Z",
+      "title": "Request for 3 months free White Label discount",
+      "state": "Done",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [],
+      "description": "#### User Email\n\n<email>\n\n#### Workspace Name\n\nCompany Five\n\n#### Request Type\n\nDiscount code\n\n#### Reason for request\n\nDiscount code for 3 months free of White Label for Name 10"
+    },
+    {
+      "id": "ENG-11194",
+      "createdAt": "2026-07-07T10:18:08.794Z",
+      "title": "Customer requesting 12 months free Acquisity membership",
+      "state": "Todo",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [],
+      "description": "#### Customer Name\n\nName 11\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nCompany Two\n\n#### Screenshot\n\n#### What are you trying to achieve?\n\n3 months free Acquisity membership (hoping for 12 months free)\n\n#### What are you doing to achieve it?\n\nClient has been complaining for weeks, stating that the sales rep (Name 12) told him that there would be no future costs and that the DFY sales deck shows that our AI proprietary system is included in the membership. This is not a matter of cost. It is a matter of integrity and trust between what was portrayed in the sales process and what is actually being delivered in the program.\n\n#### What is happening instead?\n\nHe would like his first 12 months of his membership - Acquisity for free, as stated on the sales call and in the DFY sales deck.\n\n#### What is the expected outcome?\n\n12 months free but he's willing to start with 3 months free for now but it doesn't feel good to him and he's losing trust in us. I would personally recommend just giving him 12 months but let me know what Jared says. He is looking to upsell if we get him results and things are moving along."
+    },
+    {
+      "id": "ENG-8308",
+      "createdAt": "2026-05-04T17:43:58.235Z",
+      "title": "Process $185 refund and prevent future charges for 3 months",
+      "state": "Done",
+      "assignee": "Beth Newton",
+      "parent": null,
+      "labels": ["Refund"],
+      "description": "#### Workspace Name\n\nName 13 (<email>)\n\n#### Request Type\n\nRefund\n\n#### Reason for request\n\nRR save - 3 months of acquisity and inboxes covered with 10,000 lead credits.\n\nGP had already cancelled his autobilling before our call last week on April 29th.\n\nHe claims to have been charged $185 today for Acquisity membership. Within his workspace, there is no subscription setup.\n\nNonetheless, please refund $185 and ensure he is not charged for the next 3 months."
+    },
+    {
+      "id": "ENG-12104",
+      "createdAt": "2026-07-28T21:01:04.833Z",
+      "title": "Provide one free month of Acquisity to client",
+      "state": "Triage",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [],
+      "description": "#### Customer Name\n\nName 14's\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 14's Workspace\n\n#### Screenshot\n\n#### What are you trying to achieve?\n\nOffer 1 month of free Acquisity\n\n#### What are you doing to achieve it?\n\n* \n\n#### What is happening instead?\n\n* \n\n#### What is the expected outcome?\n\nShe is a risky client for whom we already provided a free month of acquisity but because there was a bug on her account she coulnd!'t use her account and that already cause a delay. Providing her with the same 1 free month of acquisity will keep her stable."
+    },
+    {
+      "id": "ENG-5059",
+      "createdAt": "2026-02-02T18:42:20.479Z",
+      "title": "Request for 1 month free Acquisity code",
+      "state": "Done",
+      "assignee": "Beth Newton",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "#### Customer Name\n\nName 15 & Name 16\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 15's workspace\n\n#### Screenshot\n\n#### What are you trying to achieve?\n\nWe need a 1 month free Acquisity code\n\n#### What are you doing to achieve it?\n\nsubmitting this\n\n#### What is happening instead?\n\nn/a\n\n#### What is the expected outcome?\n\n1 month free Acquisity code to avoid refund issue"
+    },
+    {
+      "id": "ENG-14570",
+      "createdAt": "2026-10-01T14:46:51.859Z",
+      "title": "Name 17 - promised 2 free months of acquisity",
+      "state": "Done",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [],
+      "description": "#### Customer Name\n\nName 17\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 17 Workspace\n\n#### Screenshot\n\n#### What are you trying to achieve?\n\nWe promised him 2 free months of cold email and acquisity - please set him up with 6 domains and 18 inboxes and free acquisity for the next 2 months - this is part of a refund save and Name 18 signed off on this/promised it to him - he will not put his card on file until after the free 2 months\n\n#### What are you doing to achieve it?\n\nWe promised him 2 free months of cold email and acquisity - please set him up with 6 domains and 18 inboxes and free acquisity for the next 2 months - this is part of a refund save and Name 18 signed off on this/promised it to him - he will not put his card on file until after the free 2 months\n\n#### What is happening instead?\n\nWe promised him 2 free months of cold email and acquisity - please set him up with 6 domains and 18 inboxes and free acquisity for the next 2 months - this is part of a refund save and Name 18 signed off on this/promised it to him - he will not put his card on file until after the free 2 months\n\n#### What is the expected outcome?\n\nWe promised him 2 free months of cold email and acquisity - please set him up with 6 domains and 18 inboxes and free acquisity for the next 2 months - this is part of a refund save and Name 18 signed off on this/promised it to him - he will not put his card on file until after the free 2 months"
+    },
+    {
+      "id": "ENG-13336",
+      "createdAt": "2026-09-01T11:02:37.496Z",
+      "title": "Request for 3 months Acquisity for Name 19",
+      "state": "Done",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [],
+      "description": "#### User Email\n\n<email>\n\n#### Workspace Name\n\nName 19\n\n#### Request Type\n\nDiscount code\n\n#### Reason for request\n\nNeed to provide Name 19 with 3 months' Acquisity access because of a stall in his campaigns, which was previously connected to his Company Three account. When the sync between Company Three and Acquisity ended, no campaigns were run for 2 months and the process was stalled. After speaking with the cold email team, we will need to comment on new campaigns via Acquisity and we'll need to get these campaigns launched ASAP. Requesting a code to provide 3 months of Acquisity for free"
+    },
+    {
+      "id": "ENG-12271",
+      "createdAt": "2026-08-03T19:57:10.360Z",
+      "title": "Providing 1 month free acquisity uage",
+      "state": "Done",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [],
+      "description": "#### User Email\n\n<email>\n\n#### Workspace Name\n\nName 14's Workshop\n\n#### Request Type\n\nDiscount code\n\n#### Reason for request\n\nWe have initially provided her with a free month of acquisity but because of the bugs her account had we couldn't use it at all. Can we provide her with another free month so we can actually use it after bugs are fixed."
+    },
+    {
+      "id": "ENG-5216",
+      "createdAt": "2026-02-06T13:31:37.158Z",
+      "title": "Request for 6 months free subscription for inboxes and acquisity",
+      "state": "Done",
+      "assignee": "Beth Newton",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "#### Customer Name\n\nName 20\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nCompany Four\n\n#### Screenshot\n\n <image> \n\n#### What are you trying to achieve?\n\nGP needs 6 months free sub for inboxes and acquisity\n\n#### What are you doing to achieve it?\n\nGP needs 6 months free sub for inboxes and acquisity\n\n#### What is happening instead?\n\nGP needs 6 months free sub for inboxes and acquisity\n\n#### What is the expected outcome?\n\nGP needs 6 months free sub for inboxes and acquisity"
+    },
+    {
+      "id": "ENG-14523",
+      "createdAt": "2026-09-30T15:14:13.703Z",
+      "title": "Refund request 1 month of free Acquisity and Inboxes",
+      "state": "Done",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": ["Customer reported", "Discount", "Internal reported"],
+      "description": "#### User Email\n\n<email>\n\n#### Workspace Name\n\nName 21 workspace\n\n#### Request Type\n\nDiscount code\n\n#### Reason for request\n\nName 22 has a error in his workspace and emails that took 3 weeks to resolve and he lost time on having a functioning campaign.  He is a black label client and i am working to get this as a good will gesture to avoid refund requests."
+    },
+    {
+      "id": "ENG-13515",
+      "createdAt": "2026-09-05T01:35:48.550Z",
+      "title": "Name 23 - 1 Month free Acquisity + inboxes",
+      "state": "Done",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": ["Credits", "Internal reported"],
+      "description": "#### User Email\n\n<email>\n\n#### Workspace Name\n\nName 23's Workspace\n\n#### Request Type\n\nRefund\n\n#### Reason for request\n\nClient escalated during onboarding - to save him, Name 24 approved and I have offered him 1 month free of Acquisity + inboxes. Kindly issue credit on Stripe"
+    },
+    {
+      "id": "ENG-5325",
+      "createdAt": "2026-02-09T14:01:42.644Z",
+      "title": "Request for 1 month free for Acquisity approved by Name 18",
+      "state": "Canceled",
+      "assignee": "Beth Newton",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "#### Customer Name\n\nName 25\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 25\n\n#### Screenshot\n\n#### What are you trying to achieve?\n\n1 month free for Acquisity\n\n#### What are you doing to achieve it?\n\nApproved by Name 18\n\n#### What is happening instead?\n\nna\n\n#### What is the expected outcome?\n\nna"
+    }
+  ]
+}

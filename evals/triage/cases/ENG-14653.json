@@ -1,0 +1,254 @@
+{
+  "id": "ENG-14653",
+  "provenance": "seeded",
+  "createdAt": "2026-10-02T17:14:36.622Z",
+  "lane": "billing",
+  "stratum": "billing",
+  "ticket": {
+    "title": "Name 100 - paid for a month and hasn't had any campaigns run",
+    "description": "#### User Email\n\n<email>\n\n#### Workspace Name\n\nCompany Four\n\n#### Request Type\n\nRefund\n\n#### Reason for request\n\nPlease issue a 1 month credit of acquisity and inboxes. GP has had a VERY rocky onboarding and was left with no comms/direction for over 3 weeks. He has paid for Acquisity and inboxes but nothing is initiated for him. campaigns will be ready for monday.",
+    "attachmentKinds": ["slack"]
+  },
+  "repoCommitAtCreate": "03523347020b78d58f8c53c1b6518633a6c04c10",
+  "flags": {
+    "descriptionEditedAfterCreate": false,
+    "needsProductionData": true,
+    "alreadyFixedAtTriage": false
+  },
+  "relatedSnapshot": [
+    {
+      "id": "ENG-6356",
+      "createdAt": "2026-02-20T11:33:12.728Z",
+      "title": "Cancel old payment for refund request due to card error",
+      "state": "Done",
+      "assignee": "Jared Stauffer",
+      "parent": null,
+      "labels": ["Refund"],
+      "description": "#### Workspace Name\n\nName 1's Workspace\n\n#### Request Type\n\nRefund\n\n#### Reason for request\n\nThe client was on call with Name 2 when he bought new inboxes and domains as he moved from Company One to Acquisity. By mistake, he used a card to make the payment that he wasn't supposed to use. He switched back his default payment method to a new card but wants the old payment to be declined or cancelled so that he can pay using the new card. I called him over the phone and he sounded distressed, didn't give any reason for this but we want to take care of him because he came in as serious and nuclear risk earlier.\n\nTHIS CUSTOMER IS BILLED FOR LEGACY PRO BUT HIS ACCOUNT REFLECTS BASIC \n\n <image> \n\n <image> "
+    },
+    {
+      "id": "ENG-12445",
+      "createdAt": "2026-08-10T08:08:46.831Z",
+      "title": "Client had a medical emergency and starting after a month of onboarding call, asking for a refund of the previous month as they didn't use the platform at all",
+      "state": "Done",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [],
+      "description": "#### User Email\n\n<email>, <email>, <email>\n\n#### Workspace Name\n\n#### Request Type\n\nRefund\n\n#### Reason for request\n\nClient had a medical emergency and starting after a month of onboarding call, asking for a refund of the previous month as they didn't use the platform at all"
+    },
+    {
+      "id": "ENG-14547",
+      "createdAt": "2026-09-30T20:55:23.796Z",
+      "title": "Refund request - 2 months, campaigns didn't run due to platform issue",
+      "state": "Done",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [],
+      "description": "#### User Email\n\n<email>\n\n#### Workspace Name\n\nName 3's Workspace\n\n#### Request Type\n\nRefund\n\n#### Reason for request\n\nClient said, sending accounts disappeared from her own workspace and campaigns too, due to which she is moving to Company One now.\n\nI have on record that starting date was July 31st"
+    },
+    {
+      "id": "ENG-12795",
+      "createdAt": "2026-08-15T12:09:55.809Z",
+      "title": "Campaign stops with an error suggesting all leads have been contacted when in reality it hasn't contacted a single lead",
+      "state": "Canceled",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [],
+      "description": "#### Customer Name\n\nName 4\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\n<domain>\n\n#### Screenshot\n\n <image> \n\n#### What are you trying to achieve?\n\nGet the campaign to send emails\n\n#### What are you doing to achieve it?\n\nGet the campaign to send emails\n\n#### What is happening instead?\n\nCampaign stops with an error suggesting all leads have been contacted when in reality it hasn't contacted a single lead\n\n#### What is the expected outcome?\n\nThe campaign should contact all leads"
+    },
+    {
+      "id": "ENG-4232",
+      "createdAt": "2026-01-06T21:27:50.635Z",
+      "title": "Client portal shows campaign data before any campaigns run",
+      "state": "Done",
+      "assignee": "Anuj Bhatt",
+      "parent": null,
+      "labels": ["Wrong Dashboard Numbers"],
+      "description": "Client reports that a newly created client workspace shows existing campaign metrics in the client portal even though no campaigns have been started for that client yet.\n\nWhen logging into the client’s portal account, the dashboard displays stats such as emails sent, opens, and replies as if there were active or historical campaigns. Support checked the main account and did not see an obvious configuration issue, but the client continues to see this data from their side.\n\nThis appears to be a data mismatch or leakage between workspaces/client portals.\n\nScreen recording: <url:jam.dev>\n\nScreenshot from client portal:\n\n <image> "
+    },
+    {
+      "id": "ENG-2058",
+      "createdAt": "2025-10-18T14:25:41.128Z",
+      "title": "Add internal slack notifications for if Name 5 hasn't uploaded leads within 24 and 48hrs",
+      "state": "Done",
+      "assignee": "Anthony Adewale",
+      "parent": null,
+      "labels": ["Feature"],
+      "description": "* Use our internal Slack Service\n* Send notifs in #ai-acquisition-notifications\n* Tag <mention> "
+    },
+    {
+      "id": "ENG-14615",
+      "createdAt": "2026-10-02T08:23:04.606Z",
+      "title": "Company Two - Error - Mailboxes aren't paid for",
+      "state": "Triage",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [],
+      "description": "#### Customer Name\n\nCompany Two\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nCompany Two\n\n#### Screenshot\n\n <image> \n\n <image> \n\n#### What are you trying to achieve?\n\nClient is a refund save and addendum mentioned that client wont pay for Acquisity or Inboxes for the next 3 months.\n\n#### What are you doing to achieve it?\n\nClient is being charged for Acquisity and there is an error that 15 Mailboxes are not paid for\n\n#### What is happening instead?\n\nError - 15 mailboxes are not paid for\n\n#### What is the expected outcome?\n\nPlease investigate the mailbox error and get it resolved"
+    },
+    {
+      "id": "ENG-14625",
+      "createdAt": "2026-10-02T10:42:04.167Z",
+      "title": "Match older AI SDR escalations to their run when the run didn't record its campaign",
+      "state": "Done",
+      "assignee": "Elis Bushaj",
+      "parent": "ENG-13772",
+      "labels": ["CRM migration"],
+      "description": "## Overview\n\nThe older-notification backfill can't link AI SDR escalations sent before 31 August 2026, because the AI SDR runs from that period never recorded their campaign in the column the match reads. The campaign is saved elsewhere on the same run. Reading it from there would let about 32,000 older escalations be linked and stop holding about 1,050 people on Name 6.\n\n## Problem\n\nThe report-only run of the backfill from ENG-14408 finished on 2 October 2026. Its biggest blocker is 32,450 older AI SDR escalations with no matching run, keeping 1,055 people on Name 6.\n\nAn escalation is linked only when exactly one escalated run fits its campaign, prospect and send time. Production shows that AI SDR runs started before 31 August 2026 13:35 UTC have an empty campaign column. It was empty for every run from May until then. So no escalation from before then can match, even though its run exists.\n\n## Proposed fix\n\nWhen a run's campaign column is empty, the backfill uses the campaign recorded in that run's saved starting state. Everything else in the match stays the same. Then run the report-only pass again and review it before the real run.\n\n## What's included\n\n* The escalation match in the backfill job, and a fresh report-only run in production with its results posted here.\n* Excludes: writing to `execution_runs` (no data repair), changing other match rules, campaigns that were deleted (still blocked as missing), the real (writing) run, and ENG-13839 step D.\n* Related: ENG-11733 owns recording the campaign on runs going forward.\n\n## How it should work\n\n* A run with an empty campaign column counts for the campaign in its saved starting state.\n* A run with the column filled uses the column, as today. Production shows both agree for every newer escalated run (11,996 of 11,996).\n* The rest of the rule is unchanged: same workspace, same prospect, started in the 15 minutes before the notification, still running when it was sent, exactly one such run. Zero or more than one fitting run still leaves the item blocked with its reason.\n* Report-only by default, one person at a time, nothing sent, nothing written to Name 6.\n\n## Who can do what\n\nNot applicable: an internal job run by engineering, with no new access.\n\n## What the user sees\n\nNothing directly. After the real run, older escalations move to the new list with their original time and state, and far fewer people stay on Name 6.\n\n## Done when\n\n* An escalation whose run has an empty campaign column but a matching campaign in its starting state is linked, and a test covers it.\n* A run whose starting-state campaign belongs to another workspace is not used.\n* The new report-only run shows `legacy_escalation_run_missing` down from 32,450 to a small remainder, and its results are posted here.\n\n## Open questions\n\nNone: all required decisions are settled.\n\n## Expected outcome\n\nMost older AI SDR escalations can be linked, so the real run moves most of the people this blocker holds on Name 6.\n\n## Implementation context\n\n* Evidence, all read-only, 2 October 2026:\n  * Escalated runs started 31 May to 31 August 13:35 UTC: 37,224. All have a campaign in `initial_state.campaignId`; 34,894 of them point to a campaign that still exists in the run's workspace.\n  * Sample of 508 older escalations from owners of the 12 workspaces with the most older escalations: 0 match today, 505 match exactly one run with the fallback, 0 match more than one.\n  * Newer escalations in the same sample: 152 of 152 match either way.\n* Code: `listEscalatedRunCandidates` in `packages/db/src/repositories/legacy-receipt-candidate-repository.ts` reads `execution_runs.campaign_id`; `selectEscalationRun` in `apps/web/lib/notifications/personal/legacy-receipt-match.ts` compares it.\n* AI context.md holds the production evidence, the match simulation, the suggested change and the test plan as of 2 October 2026."
+    },
+    {
+      "id": "ENG-9664",
+      "createdAt": "2026-06-03T13:57:16.556Z",
+      "title": "\"Amount Paid\" Name 7 the Refund Status",
+      "state": "Backlog",
+      "assignee": "James Keeble",
+      "parent": null,
+      "labels": [],
+      "description": "The status is **Payment partially refunded**, amount is **$330**, and **Refunded = $165**.\n\nHowever, the footer shows:\n\n**Amount paid: 330.00 USD**\n****\n**Impact:**\nThis can be misleading because after a partial refund, the customer has effectively paid **$165 net**, not $330.\n\n**Suggestion:**\nConsider showing:\n\n* Original Amount: $330\n* Refunded: $165\n* Net Paid: $165\n\nor relabel the footer as **Original Payment Amount** if that's the intended meaning.\n\n <image> "
+    },
+    {
+      "id": "ENG-7472",
+      "createdAt": "2026-04-02T12:07:51.200Z",
+      "title": "Campaign did not contact any leads",
+      "state": "Canceled",
+      "assignee": "Beth Newton",
+      "parent": null,
+      "labels": [],
+      "description": "<email>\n\nA campaign launched earlier this week was running, but no leads were contacted. The leads, settings, and email addresses appeared to be set up correctly and active, but emails were not sent.\n\nBackend review was requested to determine why the campaign did not start sending."
+    },
+    {
+      "id": "ENG-6651",
+      "createdAt": "2026-03-12T13:15:36.588Z",
+      "title": "Credits used before any campaign was sent",
+      "state": "Done",
+      "assignee": "Jared Stauffer",
+      "parent": null,
+      "labels": [],
+      "description": "<email>\n\nA customer reported that 4,356 of 10,000 Name 9 credits were already used even though no campaign had gone out and email setup was not completed at that time.\n\nSupport noted the credits were taken on 02/12 and surfaced workspace entries including Name 8's Workspace, Company Five, and Test 1. The customer said they are solo and do not know Name 8.\n\nNeed to determine why these credits were consumed and whether they were attributed to the correct workspace.\n\n <image> \n\n <image> "
+    },
+    {
+      "id": "ENG-3099",
+      "createdAt": "2025-11-28T20:40:31.195Z",
+      "title": "Campaign not running showing there is not enough Limit",
+      "state": "Canceled",
+      "assignee": "Koppany Kondricz",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "Name 13 purchased Acquisity and ran 3 campaign. His main campaign did not run because it says he does not have enough limit. I checked on his limit he has around 5k left// the campaign leads is around 9k. It seems that we cannot remove the leads. also, client dont want to lose the leads because he paid for it\n\n---\n\nConversation:\nName 10: <p>Can I speak with the team please?</p>\n\nbot: Sure, I will transfer you to our team member. Someone will contact you very shortly.\n\nName 10: I have this error message. Short quick backstory. Name 14 the API key I started using Company One over on the new platform yesterday. Running it all from here. I wanted to add domains from acquisity to start warming up new emails. The moment I clicked on acquisity from Company One and paid the $129 this error popped up. I have no email boxes right now on this platform\n\nEllaine Fuente: Just to confirm, Name 13, you are working on <url> and you mentioned that you were running Company One already, meaning it was fully connected with no issues, correct?\n\nName 10: Yes that is correct for both questions. I do not have an option to go back and connect Company One right now either.\n\nName 10: A little better screenshot if that helps.\n\nName 10: Any idea what this may be and why it went to this state of not being able to connect emails at all?\n\nEllaine Fuente: My apologies for the inconvenience, Name 13. I understand how important that you have your data now. We were migrating from the beta and it seems that we encounter hiccups along the way. We really appreciate your patience as we fix the issues.\n\nName 10: I understand completely. Any new rollout comes with unforseen issues along the way. Name 15't know if this was an issue others were seeing as well. Also didn't know if you knew when the issue might be fixed. Want to make sure to keep running my campaign. Just worried if I turn it back on in Company One it may contact some of the same people already contacted from when it was transferred here.\n\nName 10: Wanted to check in and see if there are any updates on this yet? Really want to get my campaign back up and running\n\n🟡 Note from Ellaine Fuente: Name 11 can you check on this as well?\n\nName 11: Hi Name 13, this seems like a bug we'll need to report to the developers. Can you help me understand part of the process you described? You mentioned \"The moment I clicked on acquisity from Company One....\" Can you give me a little bit more of a breakdown here? Do you mean, you went to Company One and bought more domains on Company One, and then when you returned to the AI Acquisition platform, you're now seeing that error screen?\n\nName 10: Name 12, To walk you through I inserted my API key and had Company One running all day on the new platform. Through a series of chats with the AI agents on the site I was inquiring about using Company One for my campaigns while launching Acquisity with domains to warm up for 2 weeks before I started using them. Then long term cancel Company One and only use the Acquisity so I don't have both of them running. I was told this would be ok but I am hearing today that we can't have both active. Quick list of bullet points of series that triggered it. This has currently stalled my campaigns from running. \\* Used API key and loaded Company One in new platform \\* Ran Company One all day in new platform and it worked. \\* Went to settings and clicked on Acquisity and paid the $129.00 fee \\* The payment processed for Acquisity and gave me the error on the screen kicking me out of all my email inboxes. Have tried \\* Hitting the fix button on the screen \\* Clearing Cache \\* Clearing Cookies \\* Clearing History \\* Logging out and Logging back in \\* Restarting my computer If I hit the fix button it takes me to this page. From the settings page I no longer have access to choose Acquisity or Company One. Let me know if you have additional questions. Thank you in advance for the help with this. ​\n\nName 10: A couple more screens if this helps. If I click email accounts obviously nothing is linked or click new campaign I get an error with both assuming because it doesn't have emails to attach to it.\n\nName 10: When I click on the email accounts this is the error I get.\n\nName 10: I have been able to use the Sales Call Analyzer, Growth Plan Creator, Offer Creator and they all work. So it seems the hang up is just in the emails. Let me know if any additional information is needed to help get this fixed. Really appreciate your help with it.\n\nName 10: Wanted to see if you had an update on this?\n\nEllaine Fuente: Hi Name 13. Just checking here if this still occurs or was this fixed already?\n\nName 10: Hey Ellaine. This was fixed. BIG WIN!! Thank you very much for the help with this. Launching the campaigns this morning. I do have a quick question though. In my main Campaign New Campaign Construction Owners 11-27-2025. I have 9197 leads after being scraped. On the main page here it shows 0 of 0 For the campaign Private Golf Clubs & Hospitality Market I have 4805 Leads but on the main page it shows 0 of 0. Trying to figure out how all this works.\n\nName 10:\n\nName 10:\n\nName 10:\n\nName 10: I think this is the problem here. Can you get me a higher limit at least just for this month because of switching from Company One to Acquisity so my campaigns can run?\n\nEllaine Fuente: I can see numbers from your dashboard. Can you see them on your end?\n\nName 10: This is what I see from my main dashboard but it is only running out of one of my sub niche campaigns.\n\nName 10: Is this what you are referring to in your question?\n\nEllaine Fuente: Yes, I see the same number from your Dashboard and your campaign (157 leads)\n\nName 10: I guess my question is my Main Niche of New Campaign Construction Owners 11-27-2025 is not currently running or contacting Leads. Trying to understand why it is not running. This is my all campaign page under the AI consultant that shows 3 Active campaigns but only one making contacts or showing leads.\n\nEllaine Fuente: Can you try to pause the other campaigns for now?\n\nName 10: Pause the 2 that do not have any action currently?\n\nName 10: I can pause the other 2\n\nEllaine Fuente: Name 16. why did you pause the main niche - New Campaign Construction Owners 11-27-2025? I thought this is the one you want to run?\n\nName 10: That is the one I want to run. Yes but on the main page it is showing me that there are not any leads in there but there is 9197 loaded in there.\n\nName 10: I only have the main one active now\n\nName 10: I guess my question is if that is the only one active but it is showing 0 of 0 in the Leads Contacted I am assuming that means it is not going to send any emails because it is saying there are not any leads to contact even though there are 9197 loaded in there successfully.\n\nEllaine Fuente: Lets try to reduce the number of leads to 5k. Would you be able to do this?\n\nName 10: I am not sure how to do this? We could try to do this to see if it works. I really don't want to delete leads I have already paid for and scraped. Is there a way I can split this list into 2?\n\nEllaine Fuente: Do you have a csv copy of these leads?\n\nName 10: I do not. These were all done automated through this new system"
+    },
+    {
+      "id": "ENG-5257",
+      "createdAt": "2026-02-07T10:19:31.943Z",
+      "title": "Prevent running a workflow if any steps are missing connections",
+      "state": "Done",
+      "assignee": "Pieter Venter",
+      "parent": null,
+      "labels": ["Improvement"],
+      "description": " <image> \n\nShow a modal warning about missing connections with buttons to add them (but without \"Run anyway\" button)\n\n <image> "
+    },
+    {
+      "id": "ENG-7562",
+      "createdAt": "2026-04-06T19:30:48.963Z",
+      "title": "Add third inbox for <domain> and process refund",
+      "state": "Duplicate",
+      "assignee": "Tyler Olsen",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "#### Customer Name\n\nName 17\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 17's Workspace\n\n#### Screenshot\n\n <image> \n\n#### What are you trying to achieve?\n\nAdd the third inbox for <domain> domain. The inbox doesn't show up in his email accounts section, and he's had the domain for 2 months. He wants a refund for the cost of the inbox for the 2 months he hasn't had it ($16)\n\n#### What are you doing to achieve it?\n\nN/A\n\n#### What is happening instead?\n\nN/A\n\n#### What is the expected outcome?\n\n3 inboxes under <domain> domain"
+    },
+    {
+      "id": "ENG-13658",
+      "createdAt": "2026-09-10T14:52:26.238Z",
+      "title": "Name 18 - paid for Acquisity and inboxes but can't access it",
+      "state": "Done",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [
+        "Credit/Billing Mismatch",
+        "Customer reported",
+        "Internal reported"
+      ],
+      "description": "#### Customer Name\n\nName 19\n\n#### Customer Email\n\n<email>, <email>\n\n#### Workspace name\n\nName 18's Workspace\n\n#### Screenshot\n\n <image> \n\n <image> \n\n#### What are you trying to achieve?\n\n/\n\n#### What are you doing to achieve it?\n\n/\n\n#### What is happening instead?\n\n/\n\n#### What is the expected outcome?\n\nNeed Acquisity and inboxes/domains re-instated"
+    },
+    {
+      "id": "ENG-14200",
+      "createdAt": "2026-09-24T02:34:37.135Z",
+      "title": "Refund/credit request: 15 of 36 paid inboxes in Error and not sending, one month of compensation requested",
+      "state": "Todo",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [],
+      "description": "## Source\n\nIntercom conversation: <url:app.intercom.com>\n\n## Bounded conversation context\n\nCustomer reports (2026-09-21/22) that several mailboxes have shown an error and have not been sending for over a month; the count has grown from 6 to 15. He says he has opened several support tickets for the same issue without resolution, that a teammate's fix (reactivating the inboxes) did not work, and that the problem is consuming his time. He asks to have the 15 failing inboxes deleted and replaced with working ones, and to be refunded / credited for one month of all 15 being down. He sent screenshots of the Cold Email Agent email-accounts page.\n\n## Ask\n\nTaxonomy bucket: refund. Requested financial remedy: be compensated for one month of 15 paid inboxes that were in Error and not sending. Alternative remedy the customer may prefer: a credit on the account rather than money back. Open human decision.\n\n## Finding\n\n15 of the workspace's 36 paid sending inboxes are in provider error and silent; the 21 healthy inboxes still send normally. The 15 carry the known ColdMailReseller / Zapmail reconnect defect: the reconnect path cannot resolve a mailbox the provider accepts (\"Mailbox not found\"), so the inbox never returns to Active. Four of them had already failed by mid-August 2026 and the rest failed from 19 September 2026. The workspace keeps paying the monthly fee for all 36.\n\n## Exposure\n\nVerified from billing records: 36 inbox spend items are active on the account at 8 USD per inbox per month (two active inbox subscriptions, 18 on each, with 36 of 36 inbox entitlements consumed). One month of 15 inboxes is about 120 USD of the account's monthly spend. The monthly plan fee and the healthy inboxes are unaffected. No refund or credit note has previously been issued on this account for these charges.\n\n## Proposed action (proposal, never a promise)\n\nA person on the support/billing side should decide and, if approved, issue a one-month compensation for the 15 affected inboxes (about 120 USD), in the form the customer wants: money back on the card, or an account credit consumed by the next invoice. Separately, a person should arrange the repair or replacement of the 15 inboxes, because replacing them is a paid provisioning action. Do not move money from this investigation.\n\n## Systems of record\n\n* Production workspace state: 33 inbox rows, 21 active/connected and 12 in Error; three further provider accounts exist with no local row. All 36 provider accounts are present in the workspace sub-workspace; 15 report a failed status with autofix_failed.\n* Provider state: the 15 accounts are flagged errored at the provider itself, so the durable failure is not a missing provider account.\n* Provisioning and entitlements: both inbox subscriptions are active, 36 of 36 inbox entitlements consumed; plan is Legacy Pro plus inbox and domain add-ons. No cancellation or deletion is in flight.\n* Money movement: monthly invoices for 36 inboxes have been paid continuously; no refunds or credit notes exist on the account.\n* First divergent hop: none. All three systems agree, so the remaining question is human discretion on the remedy.\n\n## Approval trail\n\nnone found. No prior approval or promise to compensate, and no prior refund or credit for this outage, appears in the conversation or in the account's billing records.\n\n## Justification checklist\n\n1. The charge matches real invoices and active subscriptions - verified.\n2. The disputed amount is quantified from primary billing data - verified (about 120 USD for one month of 15 inboxes at 8 USD each).\n3. Plan and add-on state matches the account and production - verified.\n4. Product-credit balance and prior-credit history were read from production - verified; no compensation credit is present.\n5. A prior approval or promise is quoted, or explicitly absent - verified absent.\n6. The ask is one taxonomy bucket - refund, with an account credit named as the customer's possible preference; unresolved.\n7. The customer's account was weighed against all systems, with contradictions named - verified; the only contradiction is the customer's count of 15 versus the 12 local Error rows, settled by the provider showing exactly 15 failed accounts.\n\n## Unverified\n\n* The customer's preferred remedy (money back versus account credit) has not been stated in the conversation. It decides the form of the proposal, not its merit.\n* Whether he wants the 15 inboxes replaced after all, given that replacement is a new paid provisioning action while his account already bills for 36 inboxes.\n* The exact start date of lost sending for each of the 15; local webhook history is empty and provider timestamps are the closest available signal.\n\n## Observations\n\nThe product defect behind this ask is confirmed and already tracked as an open engineering master; a customer report for this conversation is raised separately and parented to that master. Do not bury the defect inside this billing record."
+    },
+    {
+      "id": "ENG-8295",
+      "createdAt": "2026-05-04T12:50:38.806Z",
+      "title": "Client paid for 15 extra inboxes not showing up",
+      "state": "Done",
+      "assignee": "Tyler Olsen",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "#### Customer Name\n\nName 20\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 20\n\n#### Screenshot\n\n <image> \n\n <image> \n\n#### What are you trying to achieve?\n\nGet the client inboxes that he paid for.\n\n#### What are you doing to achieve it?\n\nSubmitted this request.\n\n#### What is happening instead?\n\nHe paid for 15 extra inboxes and nothing is showing up outside of the standard 18 that he is also paying for\n\n#### What is the expected outcome?\n\n15 inboxes to be and stated as soon as possible. They are done for you inboxes. He's paying $120 and just got charged yesterday. Again, for these inboxes for the second month and has not had them since he paid for them last month."
+    },
+    {
+      "id": "ENG-5074",
+      "createdAt": "2026-02-03T10:53:14.599Z",
+      "title": "Fix \"Can't perform a React state update on a component that hasn't mounted yet\" error when creating a new workflow through a pre-made prompt",
+      "state": "Done",
+      "assignee": "Pieter Venter",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "```\n## Error Type\nConsole Error\n\n## Error Message\nCan't perform a React state update on a component that hasn't mounted yet. This indicates that you have a side-effect in your render function that asynchronously tries to update the component. Move this work to useEffect instead.\n\n\n    at AIPrompt.useCallback[executeGeneration] (components/workflows/builder/workflow-prompt.tsx:568:7)\n    at <unknown> (components/workflows/builder/workflow-prompt.tsx:658:7)\n    at WorkflowEditor (components/workflows/builder/workflow-editor.tsx:1612:15)\n    at WorkflowBuilderPage (.next/dev/server/chunks/ssr/[root-of-the-server]__c7a069ce._.js:1197:278)\n\n## Code Frame\n  566 |\n  567 |       setIsGenerating(true);\n> 568 |       setPrompt(promptText);\n      |       ^\n  569 |       setIsExpanded(true);\n  570 |\n  571 |       try {\n\nNext.js version: 16.1.5 (Turbopack)\n```"
+    },
+    {
+      "id": "ENG-1066",
+      "createdAt": "2025-09-07T21:56:43.243Z",
+      "title": "(Scheduling) Selected border in month view cell doesn't change",
+      "state": "Done",
+      "assignee": "David Shostack",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": " <image> "
+    },
+    {
+      "id": "ENG-6773",
+      "createdAt": "2026-03-16T18:49:16.009Z",
+      "title": "Switching the theme doesn't work on any subpages of /workflows",
+      "state": "Done",
+      "assignee": "Pieter Venter",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "Open workflows page or any of the tabs or any workflow and press \"T\" on the keyboard to switch the theme. Nothing happens\n\nTry anywhere else, the theme will switch\n\nI remember I merged a PR that was explicitly disabling switching theme when an input field was highlighted but I made sure it worked outside (and it did) so it might've regressed somehow\n\n---\n\n## Implementation Plan (Name 22)\n\n### Summary of Current Code\n\n**Background Context:** The app has a global `CommandPaletteProvider` (mounted at dashboard layout level) that registers keyboard shortcuts via a custom `useHotkeys` hook. The 'T' key toggles the theme between light/dark using `next-themes`. The hook delegates to `isEditableElement()` in `keyboard-utils.ts` to skip hotkeys when the user is typing in form controls or interacting with Radix UI overlays.\n\n**Current Behavior:**\n\n* On workflow editor pages (`/dashboard/{slug}/workflows/{id}`): The 'T' hotkey is completely disabled via `isWorkflowEditorPage` in the `enabled` option. This was added in ENG-6118 (commit `e59c458c2`) to prevent shortcuts from hijacking dropdown/menu interactions. However, the workflow editor only handles Ctrl/Cmd combos + Backspace/Delete/Enter — no 'T' key conflict exists.\n* On the workflow list page (`/dashboard/{slug}/workflows`): The hotkey IS enabled, but group expand/collapse buttons have `aria-expanded=\"true\"`. The `isEditableElement` function treats any element with `aria-expanded=\"true\"` as editable, blocking the hotkey when these buttons have focus.\n\n**Key Components:**\n\n* `CommandPaletteProvider` — registers all keyboard shortcuts including theme toggle\n* `useHotkeys` hook — manages keydown listeners with `enabled` gate + `isEditableElement` guard\n* `isEditableElement()` — determines if focused element should suppress hotkeys\n* `isWorkflowEditorPage` regex — URL-based check that blanket-disables shortcuts on editor pages\n\n### Affected Files\n\n| File | Change Needed |\n| -- | -- |\n| `components/command-palette/command-palette-provider.tsx` | Remove `isWorkflowEditorPage` from the theme toggle's `enabled` condition (line 161). Consider whether navigation shortcuts (g→s, g→u, g→o) should also be re-enabled on editor pages since they don't conflict either. |\n| `lib/keyboard-utils.ts` | Narrow the `aria-expanded=\"true\"` check (lines 70-73) so it only blocks hotkeys for actual Radix UI trigger elements with open popups, not generic expand/collapse buttons. Also remove dead code on line 72 (`return false` after `return true`). |\n| `tests/lib/command-registry.test.ts` | Existing tests — no changes needed but consider adding `isEditableElement` unit tests |\n\n### System Overview\n\n```\nUser presses 'T'\n  → window keydown event\n  → useHotkeys handler (command-palette-provider.tsx)\n    → Gate 1: enabled check — !(open || isOnboarding || isWorkflowEditorPage)\n    → Gate 2: isEditableElement(event.target) via use-hotkeys.tsx\n    → Gate 3: callback checks activeElement for INPUT/TEXTAREA/contentEditable\n  → setTheme(newTheme) via next-themes\n  → toast notification\n```\n\n**Connections:** `CommandPaletteProvider` wraps the entire dashboard layout. `useHotkeys` attaches a global `window.addEventListener('keydown')`. `isEditableElement` is shared across the hotkey system. The workflow editor has its own independent keydown handler on `window` that does NOT interfere with the theme toggle.\n\n**External deps:** `next-themes` v0.4.6 (theme state), Radix UI (component library, source of `aria-expanded` attributes)\n\n### Edge Cases and Name 21\n\n1. **Radix UI overlays must still be protected:** The `aria-expanded` check exists to prevent hotkeys from firing when a Select dropdown or DropdownMenu is open. Any fix must preserve this behavior. The key distinction: Radix triggers with open popups vs. generic expand/collapse buttons.\n2. **Multiple hotkey registrations use** `isWorkflowEditorPage`: Lines 161, 176, 187, 202 all reference it. The ticket is specifically about theme toggle, but the same blanket disable affects navigation shortcuts (g→s, g→u, g→o). Consider fixing all four or just the theme toggle.\n3. **Dead code in keyboard-utils.ts:** Line 72 has unreachable `return false` after `return true` on line 71. This should be cleaned up.\n4. **No auto-focus on workflow pages:** Verified that no elements auto-focus on either workflow page, so the issue only manifests after user interaction (clicking expand/collapse buttons).\n5. **Command palette Name 23+K path unaffected:** Theme toggle via the command palette search (Name 23+K → \"Toggle Theme\") works independently and is not affected by this bug.\n\n### Key Considerations\n\n* **Pattern:** The codebase already has the `isEditableElement` function as the canonical way to detect when hotkeys should be suppressed. The `isWorkflowEditorPage` blanket disable was a shortcut that bypassed this pattern.\n* **Constraint:** The `useHotkeys` hook already has `allowInInput` option and `isEditableElement` guard — the fix should leverage these existing mechanisms rather than adding more URL-based checks.\n* **Backwards compat:** The Radix overlay detection (role checks, `data-radix-popper-content-wrapper`, etc.) must continue working correctly.\n* **Performance:** No performance concerns — all checks are synchronous DOM queries on keydown events.\n\n### Suggested Approach\n\n1. **Fix** `keyboard-utils.ts` first: Narrow the `aria-expanded=\"true\"` check to only match elements that are actual Radix UI triggers with open overlays (e.g., check if element has `data-radix-*` attributes or if a `[data-radix-popper-content-wrapper]` exists in the DOM). Remove the dead code on line 72.\n2. **Fix** `command-palette-provider.tsx`: Remove `isWorkflowEditorPage` from the theme toggle's `enabled` condition. Evaluate whether to also remove it from navigation shortcuts (g→s, g→u, g→o) since they also don't conflict with editor shortcuts.\n3. **Testing strategy:**\n   * Unit test `isEditableElement` with various element types (expand button with aria-expanded, Radix Select trigger with aria-expanded, input, textarea, contentEditable)\n   * Manual E2E: verify theme toggle works on both workflow pages, verify it's still blocked inside Radix Select/DropdownMenu overlays, verify it's blocked while typing in inputs\n\n### Open Questions\n\n1. Should we remove `isWorkflowEditorPage` from ALL hotkey registrations (theme + navigation shortcuts) or just the theme toggle? The ticket specifically mentions theme, but the same issue affects g→s, g→u, g→o.\n2. What's the best heuristic to distinguish Radix trigger elements (should block) from generic expand/collapse buttons (should not block)? Options: check for `data-radix-*` attributes, check if a popper wrapper exists in DOM, or check for specific roles.\n3. Should we add unit tests for `isEditableElement` as part of this fix? No tests currently exist for it.\n\n### Confidence Assessment\n\n* **Overall Confidence:** High — both root causes are clearly identified with exact line numbers and the fix is straightforward\n* **Completeness:** \\~95% — reviewed all affected files, traced full control flow, verified no conflicts with editor shortcuts, checked git history\n* **Open-endedness:** The main design decision is how to narrow the `aria-expanded` check — multiple valid approaches exist (Radix attribute detection, DOM sibling check, role-based filtering)"
+    },
+    {
+      "id": "ENG-13515",
+      "createdAt": "2026-09-05T01:35:48.550Z",
+      "title": "Name 24 - 1 Month free Acquisity + inboxes",
+      "state": "Done",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": ["Credits", "Internal reported"],
+      "description": "#### User Email\n\n<email>\n\n#### Workspace Name\n\nName 24's Workspace\n\n#### Request Type\n\nRefund\n\n#### Reason for request\n\nClient escalated during onboarding - to save him, Name 25 approved and I have offered him 1 month free of Acquisity + inboxes. Kindly issue credit on Stripe"
+    },
+    {
+      "id": "ENG-14221",
+      "createdAt": "2026-09-24T11:24:08.841Z",
+      "title": "Name 26 - Cover costs for 1 month of Acquisity and inboxes",
+      "state": "Todo",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": ["Credits", "Internal reported"],
+      "description": "#### User Email\n\n<email>\n\n#### Workspace Name\n\nName 26's Workspace\n\n#### Request Type\n\nDiscount code\n\n#### Reason for request\n\nRR save,  Cover costs for 1 month of Acquisity and inboxes"
+    },
+    {
+      "id": "ENG-14361",
+      "createdAt": "2026-09-28T11:00:33.466Z",
+      "title": "Name 27 & Name 28 - Cover costs for 1 month of Acquisity and inboxes",
+      "state": "Todo",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": ["Discount", "Internal reported"],
+      "description": "#### User Email\n\n<email>\n\n#### Workspace Name\n\nCompany Three\n\n#### Request Type\n\nDiscount code\n\n#### Reason for request\n\nClient needs 1 month cover for Acquisity and inboxes because of how long their onboarding process took and the full month being finished without anything launched. Their first free month was completed with very little movement on their account so we will need to provide a 1 month code to compensate for this."
+    }
+  ]
+}

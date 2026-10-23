@@ -1,0 +1,235 @@
+{
+  "id": "ENG-15539",
+  "provenance": "seeded",
+  "createdAt": "2026-10-15T20:59:33.917Z",
+  "lane": "triage",
+  "stratum": "user_error",
+  "ticket": {
+    "title": "Name 17 - SDR will not book meetings - states screen share not connected",
+    "description": "#### Customer Name\n\nName 17\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nCompany Four\n\n#### Screenshot\n\n#### What are you trying to achieve?\n\nSDR book meetings\n\n#### What are you doing to achieve it?\n\nAll settings correct,  screen share and calendar connected\n\n#### What is happening instead?\n\nErrors, and sends to needs attention inbox\n\n#### What is the expected outcome?\n\nSDR book meetings",
+    "attachmentKinds": []
+  },
+  "repoCommitAtCreate": "5a3313499c0846ec25532802647b2103ab3bb489",
+  "flags": {
+    "descriptionEditedAfterCreate": false,
+    "needsProductionData": true,
+    "alreadyFixedAtTriage": false
+  },
+  "relatedSnapshot": [
+    {
+      "id": "ENG-14421",
+      "createdAt": "2026-09-28T20:21:52.919Z",
+      "title": "Master: Resuming AI SDR does not re-run it, so the response-timeout monitor re-escalates the thread",
+      "state": "Done",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": ["Bug", "fast-lane"],
+      "description": "## Overview\n\nWhen an operator returns an AI SDR thread to automation - Resume AI SDR after an escalation, dismissing an escalation back to automated, or re-enabling the AI SDR toggle - the AI SDR never processes the prospect reply that is still waiting. The response-timeout monitor escalates the thread again within about 15 minutes, it reads as AI SDR Disabled / Needs Attention again, and prospects stay unanswered for days. The operator cannot hand a conversation back to the AI SDR.\n\n## Problem\n\nFrom the operator's side: they review an escalated thread, resolve the reason it escalated, resume the AI SDR, and it is escalated again within one monitor tick with no AI SDR attempt. The same thread loops however often it is resumed, which is reported by customers as the AI SDR switching itself off.\n\n## Root cause\n\n`resumeFromEscalation` and `dismissEscalation` in `apps/web/trpc/routers/ai-sdr.ts` (about lines 1588 and 1516) and the re-enable toggle (about line 860) end at `updateControlLevel` plus `escalationDismissedAt`. None of them emits `ai-sdr-v2/message.received`, the only trigger of `aiSdrV2Workflow` (`apps/web/lib/ai-sdr-v2/workflow/workflow.ts`), so the pending prospect reply is never processed.\n\n`monitor-ai-sdr-response-timeout.ts` (`check-for-timeouts`, cron `*/15 * * * *`) then escalates any `controlLevel='automated'` thread whose newest recorded message is an inbound reply older than 2 hours and which has never booked, and it never reads `escalation_dismissed_at`. The resume is therefore undone at the next tick.\n\nScope note for the fix: ENG-8377 (\"AI SDR: Allow automation to resume after escalation\", Done) defines Resume as making \"the next inbound prospect reply\" pass the eligibility check, so not re-running the AI SDR for the pending reply was the shipped intent. That points at the monitor side (honour the resume - the newest resume timestamp in `control_level_history` or `escalation_dismissed_at` - or reset the 2-hour clock on resume) unless product decides Resume should also process the pending reply.\n\n## Blast radius\n\nCounted 2026-09-28, 45-day window, all organizations: 2104 resume-then-re-escalation pairs, 1105 distinct threads, 275 distinct organizations, 258 distinct operator users. An independent recount with the same pairing logic returned a slightly higher 2802 pairs / 1208 threads / 280 organizations / 263 users, so the recorded figure is conservative. In every pair measured, zero AI SDR agent executions occur between the resume and the re-escalation.\n\nQuery: pairs where a `crm_message_thread.control_level_history` entry `to='automated'` from `'escalated'` or `'human_takeover'` is followed within 2 hours by an entry `to='escalated'` with `updatedBy='monitor-ai-sdr-response-timeout'` (jsonb_array_elements joined on thread_id, `m.ts > r.ts AND m.ts <= r.ts + interval '2 hours'`), left-checked against `agent_executions` in the interval.\n\nPotentially exposed: every thread an operator returns to automated after an escalation.\n\n## Proposed fix\n\nMake the either/or explicit and implement it: a thread returned to automated must not be re-escalated by the response-timeout monitor before the AI SDR has had a chance on it. Either honour the resume when evaluating timeout candidates, or trigger the AI SDR on resume for the pending reply.\n\n## What's included\n\nThe monitor/resume decision and its regression test. Related, not included: ENG-14111 (a sent AI SDR reply is never recorded, which the same monitor also turns into an escalation) and ENG-10060 (periodic provider-versus-local thread/message reconciliation).\n\n## Regression seam\n\n`check-for-timeouts` in `apps/web/lib/inngest/functions/monitor-ai-sdr-response-timeout.ts`. Red before: a thread whose control level returned to `automated` with no new inbound is escalated by the monitor at the next tick. Green after: such a thread is not escalated, or, if Resume is redefined, the AI SDR runs for the pending reply. `apps/web/tests/lib/inngest/functions/monitor-ai-sdr-response-timeout-db.test.ts` already exercises the candidate filters against Postgres and is the place to add the resumed-thread case.\n\n## Done when\n\n* A thread returned to automated after an escalation is not re-escalated by the response-timeout monitor before the AI SDR has acted or the resume has been honoured.\n* No prospect reply is left unanswered because a resume silently did nothing.\n* A regression test proves the behaviour at the named seam.\n\n## Reports\n\n* ENG-14415"
+    },
+    {
+      "id": "ENG-13957",
+      "createdAt": "2026-09-17T07:43:45.129Z",
+      "title": "AI SDR is not booking meetings and escalating with an Error - Meeting Location unavailable",
+      "state": "Todo",
+      "assignee": "Koppany Kondricz",
+      "parent": "ENG-13278",
+      "labels": ["Bug", "Customer reported", "fast-lane"],
+      "description": "#### Customer Name\n\nName 1\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 1\n\n#### Screenshot\n\n <image> \n\n <image> \n\n <image> \n\n <image> \n\n <image> \n\n#### What are you trying to achieve?\n\nAI SDR to book meetings as per prospects availability\n\n#### What are you doing to achieve it?\n\nZoom and email are connected.\n\n#### What is happening instead?\n\nAI SDR is escalating the threads instead of booking the call, with the error - Meeting Location Unavailable\n\n#### What is the expected outcome?\n\nPlease investigate and resolve"
+    },
+    {
+      "id": "ENG-13538",
+      "createdAt": "2026-09-07T06:36:26.089Z",
+      "title": "Show the real recording state across meeting screens",
+      "state": "Done",
+      "assignee": null,
+      "parent": "ENG-13509",
+      "labels": [],
+      "description": "## Overview\n\nUsers can tell whether they should wait, whether scheduling failed, or whether a meeting was never recorded.\n\n## Problem\n\nThe video panel currently labels every missing media URL Recording processing. This hides failed scheduling and no-capture outcomes and can leave unusable playback controls visible.\n\n## Proposed fix\n\nRender a consistent status and reason from recording state, scheduling retry state and media availability across the list, details and CRM activity.\n\n## What's included\n\nAPI presentation data, list/detail/activity messages, playback control availability, unknown duration, and transient media-load errors. The recovery button is added by the next ticket.\n\n## Blocked by\n\n* Priority 3: End bot attempts honestly when no recording was created\n* Priority 4: Retry rate-limited bot scheduling before the meeting\n* Priority 5: Reconcile stalled recording processing safely\n\n## How it should work\n\nRepresent scheduled, waiting for admission, recording, processing captured media, retrying scheduling, completed, partial media, failed scheduling, not recorded, and deleted/expired media. Do not infer the whole lifecycle from a missing URL. A network or permission failure while loading existing media remains a playback error. Preserve access-denied behavior without leaking another workspace's reason or media.\n\n## Who can do what\n\nPreserve the SCA Live Connect feature gate, current workspace membership and recording-level voice access. Resolve provider IDs from the authorized local recording. Background jobs recheck workspace ownership and settings before provider writes.\n\n## What the user sees\n\nUse concrete messages such as Waiting to schedule, Bot was not admitted, Recording processing, and Recording unavailable. Show the next attempt when applicable. Disable seeking/play when no playable media exists. Keep media playable if only transcription failed.\n\n## Done when\n\n- [ ] List, detail and CRM activity agree for every supported state.\n- [ ] A 429 failure and a never-admitted bot never display generic Recording processing.\n- [ ] Existing completed media with an expired URL or temporary proxy error displays playback failure accurately.\n- [ ] Unknown duration remains unknown; zero is shown only when measured.\n- [ ] Loading, partial media, empty, permission denied and disabled-control states have focused UI coverage.\n\n## Open questions\n\nRecommended status copy follows the examples above; final wording can be adjusted during implementation without changing the state meanings.\n\n## Expected outcome\n\nUsers can tell whether they should wait, whether scheduling failed, or whether a meeting was never recorded.\n\n## Implementation context\n\nUnconditional missing-media message.\n\nPickup priority: 6. Earliest-start wave: 3. Safe parallel overlap: None verified.\n\nAI context.md"
+    },
+    {
+      "id": "ENG-12873",
+      "createdAt": "2026-08-18T13:09:29.475Z",
+      "title": "A cancelled meeting still counts as booked",
+      "state": "Done",
+      "assignee": "Ebubeker Rexha",
+      "parent": "ENG-12233",
+      "labels": [],
+      "description": "## Simple outcome\n\nIf a customer's only future meeting is cancelled, CRM treats them as having no meeting booked so they return to the rep's follow-up list.\n\n---\n\n## Overview\n\nA contact whose only meeting was cancelled still shows as having a meeting scheduled, so they drop out of the follow-up lists that exist to catch exactly that situation.\n\n## Problem\n\nA rep books a meeting, the prospect cancels, and the CRM keeps treating that contact as booked. Filtering for people with no meeting scheduled skips them, which is the opposite of what a rep needs: a cancelled meeting is the strongest reason to reach out again.\n\nIt goes wrong in two separate ways. The booking itself is still counted even after it is cancelled, and the conversation is left marked as booked, so both routes report a meeting that is not happening.\n\n## Proposed fix\n\nStop counting cancelled bookings, on both routes, so \"has a meeting scheduled\" means a meeting that is actually still on the books.\n\n## What's included\n\nBoth halves of the check, at both the person and deal level.\n\nNot included: the other appointment filters, which already handle cancellations correctly and are the reference for what \"still on the books\" should mean.\n\n## Blocked by\n\nNone: complete and in review.\n\n## How it should work\n\nA contact whose only future meeting is cancelled reports no meeting scheduled. \"Has a meeting\" and \"has no meeting\" stay exact opposites, with nobody in both and nobody in neither.\n\n## Who can do what\n\nNo permission change.\n\n## What the user sees\n\nContacts whose meeting was cancelled reappear in the lists reps use to chase people without a meeting booked. Existing saved views using this filter return a different set afterwards.\n\n## Done when\n\n- [ ] A contact whose only future meeting is cancelled reports no meeting scheduled, at both the person and deal level.\n- [ ] A conversation left marked as booked by a cancelled meeting does not report one either.\n- [ ] \"Has a meeting\" and \"has no meeting\" remain exact opposites.\n- [ ] Database-backed coverage for both routes.\n- [ ] The change to existing saved views is called out at review with a row count.\n\n## Open questions\n\nNone: all required decisions are settled.\n\n## Expected outcome\n\nA cancelled meeting puts the contact back on the list of people to chase, where they belong.\n\n## Implementation context\n\nDelivered by Acquisity/Acquisity#6079.\n\nThis was deliberately left out of the deal-grain work rather than overlooked. That change's job was to add a grain, and this filter is already saved into live contact views, so narrowing it there would have silently re-answered existing views inside a change meant only to extend one. It was carried across unchanged instead, so the two grains could not disagree, and the gap was recorded rather than hidden.\n\nWorth noting the distinction that decided the split. That PR did widen a related check, because it was matching nobody at all in production, which moves contacts from a wrong answer to a right one. This change moves contacts the other way on a check that already works, which is a redefinition and earns its own QA pass.\n\nWhen implementing, confirm the exact cancelled status values in the schema, and check whether rescheduling leaves the old booking cancelled with a new one beside it."
+    },
+    {
+      "id": "ENG-14028",
+      "createdAt": "2026-09-18T13:44:44.457Z",
+      "title": "AI SDR pauses booking and escalates \"no calendar availability\" when the derived free-slot list is empty",
+      "state": "Blocked",
+      "assignee": "Koppany Kondricz",
+      "parent": null,
+      "labels": ["Bug", "fast-lane"],
+      "description": "## Overview\n\nWhen the AI SDR's availability lookup returns no candidate slots, the workflow escalates to a human with \"the assigned call host has no available time slots within the configured booking window\" and pauses the conversation. The list can be empty while the calendar genuinely has room, so the SDR stops answering positively-responding prospects and the operator is sent to inspect a working calendar.\n\n## Problem\n\nThe operator sees an AI SDR paused with a \"No meeting times available\" banner instructing them to review the calendar and availability limits, on a calendar that already holds meetings the AI SDR itself booked. Affected prospects receive no reply at all after a positive response. Documented behaviour for this state is to ask the prospect for their preferred times.\n\n## Root cause\n\n`offer-alternatives.ts` treats a successful `getTimeSlots` call that returns zero rows as proof the calendar is unavailable and escalates with `ESCALATION_REASONS.NO_CALENDAR_AVAILABILITY`. Added by bbf62d99 (\"escalate when calendar has no slots\", ENG-11895). The availability fetch has its own failure codes (`CALENDAR_DISCONNECTED`, `CALENDAR_SYNC_FAILED`) which slot-matchmaking already escalates on, so an empty successful result is a different condition and is not distinguished from it.\n\nThe empty result itself is arithmetic. `BookingService.getTimeSlots` builds the candidate slot at meeting duration plus the host's before/after buffers, and every existing appointment is represented as busy with its own stored `buffer_before_in_minutes` / `buffer_after_in_minutes`. In short work windows a small number of buffered bookings tiles the window completely, so the candidate set empties while the calendar still has room outside the host's configured availability hours.\n\nThe escalation also pre-empts the shipped fallback: `reply-directive.ts` `hasNoCalendarAvailability` → `ASK_FOR_PREFERENCES`, and the help centre states that when no slot passes the filters the AI SDR asks the prospect for their times. `workflow.ts` short-circuits on `ctx.state.escalate` before copywriter and send, so no reply is produced.\n\n## Who's affected\n\nUp to 6 Oct 2026, the AI SDR paused 391 conversations in 65 workspaces this way, with 399 escalation messages. The first was on 7 Sep 2026 and the latest on 6 Oct 2026, so it's still happening. When this ticket was written on 18 Sep 2026, the count was 166 messages in 26 workspaces.\n\nThe attached list, `ENG-14028-affected-workspaces.md`, gives each workspace's name and slug, its count and dates, the call host whose calendar the AI SDR checked, and the workspace owners.\n\nWe don't know how many other workspaces could hit this. We only see the problem when a conversation is paused, because we don't log how many free slots each lookup finds.\n\nWe also haven't proved the cause in every workspace. Our reproduction showed that a buffer of 30 minutes or more before each meeting can fill a short working day, so no free slot is left. When the ticket was written, 9 of the 26 workspaces had a buffer like that. Another 5 had 15-minute buffers before and after each meeting and only 4 to 8 hours of availability a week. The other 12 had smaller buffers or really were busy. We haven't rebuilt each workspace's free slots to confirm this.\n\nCounted on the read-only production replica on 6 Oct 2026:\n\n```sql\nselect count(*) as messages, count(distinct thread_id) as threads, count(distinct organization_id) as workspaces\nfrom crm_message where escalation_reason like 'No calendar availability%'\n```\n\n## Proposed fix\n\nSeparate \"the availability computation returned nothing\" from \"the calendar is unavailable\". An empty result on a successful fetch should not escalate; it should take the documented fallback and ask the prospect for their times, leaving the existing failure codes as the only setup-failure escalations. Review at the same time whether availability should be defined as availability hours minus every buffered booking, since the current definition empties short windows quickly and the banner copy then misdirects the operator.\n\n## What's included\n\nIn scope: the escalation condition in `offer-alternatives.ts` and the product decision about how buffered existing bookings reduce future availability.\nNot included: the single-slot booking-time re-check (ENG-13720) and the conferencing / meeting-location fail-closed gate (ENG-13957), which are different gates.\nContainment for the current population: the settings workaround below, applied per workspace.\n\n## Regression seam\n\nBoundary: `offer-alternatives` step output and `ctx.state.escalate`. Trigger: a booking-route turn where `getTimeSlots` succeeds with zero rows. Red before: step output carries `escalate: true` with `ESCALATION_REASONS.NO_CALENDAR_AVAILABILITY` and the workflow returns before send. Green after: no escalation, the turn routes to `ASK_FOR_PREFERENCES` and a reply is produced. Existing assertion to update: `steps/__tests__/slot-alternatives.test.ts` asserts the current escalation.\n\n## Done when\n\n* A successful availability fetch returning zero rows no longer sets `escalate` and no longer produces the no-calendar-availability banner.\n* The affected turn produces an outbound reply asking the prospect for their preferred times.\n* Genuine setup failures (`CALENDAR_DISCONNECTED`, `CALENDAR_SYNC_FAILED`, meeting-location) still escalate with their own reasons.\n* A regression test proves the empty-successful-fetch path at the `offer-alternatives` / `ctx.state.escalate` seam.\n* The help-centre statement about the fully-booked fallback matches shipped behaviour.\n\n## Reports\n\n* ENG-14008"
+    },
+    {
+      "id": "ENG-14833",
+      "createdAt": "2026-10-06T18:14:07.135Z",
+      "title": "AI SDR not booking meetings - Name 2, incredibly frustrated",
+      "state": "Duplicate",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [
+        "Bug",
+        "Customer reported",
+        "Internal reported",
+        "intercom-sourced"
+      ],
+      "description": "#### Customer Name\n\nName 2\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 2's Workspace\n\n#### Screenshot\n\n#### What are you trying to achieve?\n\nClient just came in OH incredibly frustrated. He has a closer on his team, Name 3, who we have implemented. He's saying the meetings are not being booked in his calendar or even Name 2's calendar. Last week Name 3 shared his workspace with Name 2 and we could see on the mobile that his calendar and Zoom were connected. We have been trying to reach support for days, for weeks, and nothing is being done.\n\nThe client was yelling in the OH that he's losing leads and is paying us a lot of money so please resolve this. See the mobile and desktop issue. Name 3's <domain> email was already connected but now it's not showing meetings even there as well. We need to solve this so that the meetings actually appear in both of those calendars.\n\n#### What are you doing to achieve it?\n\nRaised a ticket.\n\n#### What is happening instead?\n\nMeetings are not being booked into Closer's calendar - Name 101 or Name 100.\n\n#### What is the expected outcome?\n\nMeetings should show up and leads should not be lost."
+    },
+    {
+      "id": "ENG-4816",
+      "createdAt": "2026-01-24T02:01:20.301Z",
+      "title": "AI SDR marks already booked meeting slot as unavailable",
+      "state": "Duplicate",
+      "assignee": "Beth Newton",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "After AI SDR successfully books a meeting with a prospect, it later replies to the same prospect saying that the selected date and time is unavailable, even though the meeting was already booked.\n\nA screen recording of the behavior is available in this Jam: screen recording."
+    },
+    {
+      "id": "ENG-3374",
+      "createdAt": "2025-12-03T18:32:07.781Z",
+      "title": "\"Interested\" \"Not Interested\" and \"Meeting Booked\" buttons are not working",
+      "state": "Canceled",
+      "assignee": "Pieter Venter",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "In the AI SDR, Escalated emails has the \"Interested\" \"Not Interested\" and \"Meeting Booked\" buttons grayed out making it a challenge for clients to categorize the email."
+    },
+    {
+      "id": "ENG-3526",
+      "createdAt": "2025-12-08T08:06:32.576Z",
+      "title": "Manual meeting status buttons disabled on escalated thread",
+      "state": "Duplicate",
+      "assignee": "Pieter Venter",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "When taking over an escalated conversation where the AI SDR could not book a meeting, the manual status buttons at the top of the thread are not usable.\n\nObserved behavior:\n\n* Prospect booked via Calendly after human takeover on an escalated thread\n* The buttons **Interested**, **Not Interested**, and **Meeting Booked (📅)** at the top of the thread are all grayed out and cannot be clicked\n* This prevents manually marking the prospect as \"Meeting Booked\" and moving them to the Meeting Booked tab\n* User has already refreshed the page, signed out and back in, and is using Name 4 Chrome\n\nExpected behavior:\n\n* After taking over an escalated conversation, the manual status buttons should be clickable so the thread can be manually marked as Meeting Booked (or other statuses) when the prospect books externally (e.g. via Calendly)."
+    },
+    {
+      "id": "ENG-12429",
+      "createdAt": "2026-08-08T13:44:58.248Z",
+      "title": "AI SDR Missing Meeting Links on Some Bookings",
+      "state": "Todo",
+      "assignee": "Koppany Kondricz",
+      "parent": null,
+      "labels": ["Bug", "intercom-sourced"],
+      "description": "**Customer Name**\nName 1\n\n**Customer Email**\n<email>\n\n**Customer Email**\n<email>\n\n**Workspace name**\nName 1's Workspace\n\n**Screenshot**\n<optional>\n\n**What is the user trying to achieve?**\nEnsure that every meeting booked by the AI SDR includes the configured Zoom meeting link.\n\n**What is the user doing to achieve it?**\nThe user has a static Zoom meeting link configured, and the same salesperson is assigned to all campaigns. The setup has previously worked correctly, and the user is monitoring the calendar events created by the AI SDR.\n\n**What is happening instead?**\nTwo recently booked meetings were created without the Zoom meeting link, while other AI SDR bookings from the same setup have the link correctly included. We reviewed the conversations for both affected prospects and found nothing unusual that would explain the missing link. Both prospects simply selected available times and the AI SDR confirmed the bookings normally.\n\n**What is the expected outcome?**\nAll AI SDR-created calendar events should consistently include the configured Zoom meeting link. Please investigate why the conferencing link was omitted from these two bookings and whether this could be an intermittent issue with AI SDR event creation."
+    },
+    {
+      "id": "ENG-4069",
+      "createdAt": "2025-12-30T19:51:00.419Z",
+      "title": "Client view cannot connect own Zoom meeting link",
+      "state": "Canceled",
+      "assignee": "Jared Stauffer",
+      "parent": null,
+      "labels": [],
+      "description": "Client Zoom behavior in multi-workspace setup:\n\n* A single Zoom account appears as connected across multiple client workspaces. Disconnecting this Zoom account from the main workspace also disconnects it from client workspaces.\n* When logged in under a client-view workspace/profile and following the “configure your meeting link” prompt, the conferencing settings page loads and then times out before there is any chance to connect Zoom or set the meeting link.\n* Adding a salesperson for a campaign requires integrating calendar and Zoom first, but this flow is blocked by the timeout in the client-view workspace.\n* User is in the EU; connecting Zoom from their own account only works when using a VPN, and the Zoom UI shows that the app is not available in the EU.\n\nSee screen recording for full behavior: Jam recording.\n\nRelevant screenshot of Zoom availability message:\n\n <image> "
+    },
+    {
+      "id": "ENG-9538",
+      "createdAt": "2026-05-31T19:13:43.990Z",
+      "title": "Dashboard booked calls not reflecting scheduled meetings",
+      "state": "Done",
+      "assignee": "Anuj Bhatt",
+      "parent": null,
+      "labels": [],
+      "description": "User details:\n\n* Name 5\n* <email>\n* Name 5's Workspace\n\nThis is also happening to:\n\n* Name 8\n* <email>\n* Company Six\n\nThis is also happening to:\n\n* Name 6\n* <email>\n* Name 6's Workspace\n\nThis is also happening to:\n\n* Name 7\n* <email>\n* Name 7's Workspace\n  \n  \n  The main dashboard is reporting `Booked Calls` as 0 even though meetings have been scheduled and are visible in the AI SDR inbox and the calendar attached to SDR.\n\nThe issue has persisted for over a week, including for meetings scheduled days earlier. This appears to be a dashboard reporting or sync issue rather than a booking issue.\n\nRelevant context from the conversation:\n\n* The dashboard overview shows `Booked Calls` as 0.\n* The AI SDR Inbox filtered to `Meeting Booked` shows booked meetings.\n* The customer confirmed the meetings are visible in the SDR-connected calendar.\n\n <image> \n\n <image> "
+    },
+    {
+      "id": "ENG-14717",
+      "createdAt": "2026-10-05T13:55:33.848Z",
+      "title": "AI SDR not booking meetings",
+      "state": "Duplicate",
+      "assignee": "Koppany Kondricz",
+      "parent": null,
+      "labels": ["Customer reported", "Internal reported"],
+      "description": "#### Customer Name\n\nName 9\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 9's Workspace\n\n#### Screenshot\n\n <image> \n\n#### What are you trying to achieve?\n\nAI SDR is not booking meetings. It shows the error shown above and the client is repeatedly getting escalation emails. He had to book 5 calls manually and is angry that he's being charged full for Acquisity.\n\n#### What are you doing to achieve it?\n\nDid everything: reconnected the Zoom, the link was pasted again and again, and I resumed the AI SDR manually but it's still not working for the last 45 days\n\n#### What is happening instead?\n\nMeetings are not being booked into the calendar.\n\n#### What is the expected outcome?\n\nFor AISDR to start booking meetings automatically like it used to."
+    },
+    {
+      "id": "ENG-6398",
+      "createdAt": "2026-03-09T07:58:54.816Z",
+      "title": "Copywriter gets confused when prospect shares booking link.",
+      "state": "Canceled",
+      "assignee": "Anuj Bhatt",
+      "parent": "ENG-6573",
+      "labels": [],
+      "description": "Claims a meeting was booked after a lead shares a calendar link, but no meeting appears on the calendar; conversation shows status like “slots sent” even when no slots were sent; follow-up is scheduled anyway."
+    },
+    {
+      "id": "ENG-13019",
+      "createdAt": "2026-08-21T18:14:39.511Z",
+      "title": "AISDR booking paused with meeting location unavailable error despite Zoom showing connected",
+      "state": "Done",
+      "assignee": "Koppany Kondricz",
+      "parent": null,
+      "labels": ["Bug", "Customer reported"],
+      "description": "#### Customer Name\n\nName 10\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nCompany One\n\n#### Screenshot\n\n <image> \n\n <image> \n\n#### What are you trying to achieve?\n\nClient wants AISDR to automatically book meetings with prospects who have replied positively through the agent, so leads convert into calendared appointments without manual intervention.\n\n#### What are you doing to achieve it?\n\nRunning AISDR outreach as normal. Two prospects (Name 11 and Name 12) responded positively and indicated availability, with Name 13 offering Monday, Tuesday, or Wednesday.\n\n#### What is happening instead?\n\nClient received an AISDR escalation notification stating meeting location unavailable and that booking is paused until Zoom is reconnected or a valid static meeting link is configured. We checked Settings, Conferencing shows Zoom actively connected, and Email and Calendar shows his email connected. No visible disconnect on the client side, so the flag appears to be firing incorrectly or there is a backend sync issue.\n\n#### What is the expected outcome?\n\nAISDR recognizes the existing Zoom connection and resumes automated booking, or the team identifies what triggered the false escalation so it does not recur. Confirmation on whether a static meeting link should be configured as a fallback would also help."
+    },
+    {
+      "id": "ENG-5524",
+      "createdAt": "2026-02-13T16:21:59.505Z",
+      "title": "AI SDR confirms meeting booked without creating calendar event",
+      "state": "Canceled",
+      "assignee": "Koppany Kondricz",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "user: <email>\n\nCustomer reports the AI SDR told a lead a call was booked for a specific time, but the meeting was not actually scheduled. Calendar integration is connected and has booked other meetings before/after, so this appears intermittent.\n\nIn the same incident, once the AI SDR realized the call wasn’t scheduled, it sent what it claimed was the Zoom link, but it was a Calendly booking link instead.\n\nCustomer also reports not seeing any setting to automatically disable the AI SDR once a meeting is booked (expected behavior).\n\nWorkspace: Company Five.\n\n <image> \n\n <image> "
+    },
+    {
+      "id": "ENG-4274",
+      "createdAt": "2026-01-08T01:08:10.845Z",
+      "title": "Booking link shows slot unavailable and meeting tab unclickable",
+      "state": "Canceled",
+      "assignee": "Jared Stauffer",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "When an SDR offers time slots and the prospect selects one, the UI shows that the chosen time is no longer available even though it is still available. After this, an email is sent that again offers the same time.\n\nAdditionally, the \"Meeting booked\" tab at the top cannot be clicked.\n\nVideo walkthrough of the behavior is in this Loom: <loom>"
+    },
+    {
+      "id": "ENG-15509",
+      "createdAt": "2026-10-15T17:33:00.589Z",
+      "title": "Zoom Connection Failing / AI SDR Booking Paused (Escalated for Review Error)",
+      "state": "Duplicate",
+      "assignee": "Koppany Kondricz",
+      "parent": null,
+      "labels": ["Bug", "Customer reported", "Internal reported"],
+      "description": "#### Customer Name\n\nName 14\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nCompany Two\n\n#### Screenshot\n\n#### What are you trying to achieve?\n\nUnpause the AI SDR so it can successfully send dynamic Zoom meeting invitations for an active campaign.\n\n#### What are you doing to achieve it?\n\nInstructed the user to completely disconnect and reconnect their Zoom account in Acquisity > Conferencing, and clear the \"Escalated for Review\" error in the AI SDR Inbox.\n\n#### What is happening instead?\n\nThe connection keeps failing on the backend. The system repeatedly throws the \"Escalated for Review: Meeting location unavailable\" error, completely blocking the AI SDR from sending meeting links to prospects.\n\n#### What is the expected outcome?\n\nThe platform should successfully maintain the Zoom connection, pull the dynamic link, and resume sending meeting invitations automatically."
+    },
+    {
+      "id": "ENG-10978",
+      "createdAt": "2026-06-29T11:11:43.553Z",
+      "title": "Platform Metrics Overhaul: Cold Email Agent, Dashboard, AI SDR, & CRM (MASTER)",
+      "state": "In Progress",
+      "assignee": "James Keeble",
+      "parent": null,
+      "labels": ["Bug", "intercom-sourced"],
+      "description": "## What this is (read this if you have no context)\n\nOur product shows performance numbers in several places: the main dashboard, the Cold Email Agent page, the admin pages, the CRM, and a weekly AI SDR report in Slack. **Those places disagree with each other, and some numbers are simply wrong.** This master ticket is the plan to fix all of it, once, properly.\n\n## What users actually experience\n\n* A client opens their dashboard and sees different numbers than on the Cold Email Agent page. They ask support \"which one do I believe?\" and lose trust in the product.\n* One client's page says **72 meetings booked when only 13 real meetings exist**. Another's dashboard says 2,574 emails sent when they really sent **42,915** (archiving campaigns silently hides their history).\n* A brand-new workspace that had never sent an email showed \"meetings booked.\"\n* Internally, the weekly AI SDR report said **0 meetings booked for weeks** while the AI was actually booking ~1,500/week. We literally could not tell how well the AI SDR was doing, which is why Blaise made this the top priority.\n\n## Why it happens (one sentence)\n\nEvery page calculates its own version of every metric from different database tables, so nothing agrees and there is no single \"true\" number anywhere.\n\n## The fix (agreed with the team)\n\nEach metric gets **one plain-English definition, one data source, and one calculation**, used by everything. The definitions live in the glossary (linked on this ticket, and attached as a doc): what every metric means, where it comes from, and the rules between similar-sounding metrics (e.g. a \"booked call\" in the CRM is not necessarily a call the Cold Email Agent booked, so CEA booked can never exceed CRM booked). Two standing decisions worth knowing: **opens are deprecated** (we don't track or use them anywhere; don't build them in), and metrics are **event-based** (a lead that showed interest or got booked never un-counts if things later go cold).\n\n**Who:** Mahmut owns the technical implementation. Anthony feeds in cold-email/Company Three specifics. James owns definitions and product. Approach agreed by Blaise.\n\n## The plan (Mahmut's 4 phases + one quick win)\n\n* **Quick win, now:** ENG-11225 — fix the weekly AI SDR report (a prompt edit; mostly shipped).\n* **Phase 1:** ENG-11115 — move all metric code into one folder, changing nothing (golden tests prove outputs identical).\n* **Phase 2:** ENG-11222 — a written plan: for every metric method, what it does now vs what it should do (seeded by the audit doc + glossary).\n* **Phase 3:** ENG-11223 — correct the numbers, one small PR per metric. Includes the two big definition fixes: ENG-11080 (Booked Meetings: real bookings, not tags) and ENG-11081 (Calendar Bookings: workspace-wide, contacted people only), plus the UI story ENG-11083 (one headline + \"confirmed on your calendar\").\n* **Phase 4:** ENG-11224 — keep it clean forever: a repo skill, a CI check that blocks metric code outside /metrics, and automatic alerts when the glossary's rules break.\n\nAlready shipped: ENG-11062 — the \"Contacted Leads\" tile counted emails sent instead of unique people (PR #5145, approved).\n\n## Key reference docs\n\n* **Metrics Glossary & Definitions (source of truth):** <url:docs.google.com>\n* Field-by-field audit (all ~40 metrics, current source per page, target source with reasoning): <url:docs.google.com>\n\n## Done when\n\n* Same workspace + same date range = same number on every page and report.\n* No page or report calculates its own metrics; CI enforces it.\n* AI SDR performance is measurable from numbers we trust."
+    },
+    {
+      "id": "ENG-9576",
+      "createdAt": "2026-06-01T22:17:27.511Z",
+      "title": "Booked meetings mismatch: campaign reports 24 vs dashboard reports 5 (all time)",
+      "state": "unknown",
+      "assignee": "Anuj Bhatt",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "## Summary\n\nThere is a large discrepancy between the **booked meetings** count shown on the **campaign** view and the **booked meetings** count shown on the **dashboard** for the same workspace, filtered to **All Time** on both screens.\n\n* **Campaign view (\"Booked Calls\")**: **24**\n* **Dashboard (\"Meetings Booked\", All Time)**: **5** (now 7 — the count grew as new real meetings were booked during investigation)\n\nThe two numbers do not reconcile because the campaign metric and the dashboard metric are derived from **completely different data sources** with different definitions of \"meeting booked\". This is confusing for customers — the same labelled metric shows wildly different values depending on the screen.\n\n## Affected workspace\n\n* **Workspace:** Name 15's Workspace\n* **Workspace slug:** `<workspace-slug>`\n* **Organization ID:** `<uuid>`\n* **Owner / user email:** `<email>`\n* **Campaign:** \"Name 16 | Renewable Energy | US | 1-50 employees (AIA created)\\*\" (`<uuid>`, active)\n\n---\n\n## Analysis\n\n### 1\\. Dashboard \"Meetings Booked (All Time)\" = 5 → counts real calendar bookings\n\nSource: `getTotalMeetingBookedForDateRange` in `apps/web/lib/analytics/operating-system.ts` (\\~line 1904).\n\nIt counts canonical rows in `scheduling_external_booking` where `status = 'scheduled'`, not soft-deleted, **inner-joined to an active campaign**. These are *actual calendar meetings* (Calendly / Name 4 Calendar sync), de-duped per booking.\n\nThis workspace currently has **7** such bookings. **Exactly 5 existed at the time the discrepancy was reported** — the 6th and 7th bookings were created later the same day (created_at `2026-06-01 18:46` and `19:49` UTC; the first 5 were all created on/before `2026-06-01 15:27`). So \"5\" was the correct count of *real scheduled meetings* at that moment.\n\n### 2\\. Campaign \"Booked Calls\" = 24 → counts Company Three interest-status \"Meeting Booked\" tags\n\nSource: `campaignMetrics.totalMeetingBooked` (`apps/web/components/campaigns/detail/tabs/analytics/campaign-metrics-grid.tsx:46`), backed by `outreach_campaign_overview.total_meeting_booked`.\n\nThat column is set as `Math.max(instantlyMeetingBooked, crmBookedCount)` in `apps/web/lib/outreach/db/campaign.ts` (\\~line 7826).\n\nConfirmed in DB for this campaign:\n\n* Company Three overview API reported `total_meeting_booked = 24` (`metadata.overviewData.total_meeting_booked = 24`, source `instantly-overview-api`)\n* CRM booked threads (`crm_message_thread` lifecycle in `booked`/`completed`) = 23\n* `max(24, 23) = 24`\n\nThis counts **leads whose Company Three interest-status = \"Meeting Booked\"** (a tag set in Company Three / by the SDR), **not** actual calendar events.\n\n### 3\\. \"Meetings booked\" has at least 5 unreconciled values for this org\n\n| Source | Count | Used by |\n| -- | -- | -- |\n| Real calendar bookings — `scheduling_external_booking` (status=scheduled) | 7 (was 5) | **Dashboard** |\n| Company Three interest-status \"meeting booked\" (overview API) | 24 | **Campaign card** |\n| CRM threads in `booked`/`completed` lifecycle | 23 | feeds campaign `max()` |\n| `lead_meeting_booked` webhook events | 30 | admin metrics |\n| Leads with `status = meeting_booked` | 8 | leads table |\n\n### Root cause\n\nThe campaign \"Booked Calls\" (24) reflects leads *tagged* as meeting-booked in Company Three (generous / inflated — Company Three's interest status is set well before, or independent of, an actual calendar booking), while the dashboard (5) reflects *actual scheduled calendar meetings*. Same label, different definition and different table — so they will rarely agree.\n\n### Suggested fix (for triage discussion)\n\n1. **Preferred:** make the campaign \"Booked Calls\" metric use the canonical `scheduling_external_booking` source so the campaign and dashboard agree, OR\n2. Relabel the two metrics to make the distinction explicit (e.g. \"Interested — Meeting Booked\" for the Company Three tag count vs \"Meetings Scheduled\" for real calendar bookings).\n\n---\n\n*Reported via internal investigation. DB figures pulled from production read-only replica.*"
+    },
+    {
+      "id": "ENG-13278",
+      "createdAt": "2026-08-30T16:37:42.705Z",
+      "title": "AI SDR assigned hosts left with invalid Zoom accounts in dynamic mode — booking pauses while conferencing UI shows connected",
+      "state": "Done",
+      "assignee": "Koppany Kondricz",
+      "parent": null,
+      "labels": ["fast-lane", "master"],
+      "description": "## Root cause\n\nAI SDR assigned call handlers configured in Zoom-connect (dynamic) mode can be left with a single Zoom account marked disconnected (`integration_conferencing_account.invalid = true`) in the backend while the conferencing settings still present the connection as healthy. When the AI SDR reaches the final booking step it resolves the meeting location from that host, finds no valid Zoom account and no static fallback, and pauses/escalates with `MEETING_LOCATION_UNAVAILABLE` instead of booking.\n\nThis is a recurrence of the Zoom-credential-invalidation cluster addressed by ENG-12700 (\"Prevent AI SDR bookings without meeting links and harden Zoom OAuth refresh\", Done). The fail-closed gate is behaving as designed (it correctly refuses to book without a link), but hosts are still getting detached, so the assigned handler is left unable to book until the Zoom account is reconnected or a static link is set. A customer believing \"Zoom is connected\" does not see a backend disconnect in the UI.\n\n## Current blast radius (2026-09-17)\n\n27 call hosts are in the exact blocked state: dynamic mode, every conferencing account marked invalid, no static fallback. 10 organizations reach it through their assigned call handler, 9 of which also have an active campaign, and 11 organizations have at least one active campaign whose Assigned Salesperson is such a host. 87 Zoom accounts are marked invalid across 87 distinct hosts, oldest invalidation 2026-01-10, newest 2026-09-15, so accounts are still detaching.\n\nCounted 2026-09-17 in production: hosts with `conferencing_link_type = 'dynamic'`, a null or blank static link, and zero non-invalid conferencing rows, joined to `organization.ai_sdr_assigned_call_handler_id` and to active `outreach_campaign.sales_person_id`. Limitation: the count models those two host-resolution routes only.\n\nPrevious figure, 2026-08-30: 58 organizations / 10 assigned call handlers.\n\n## Code path\n\n* `apps/web/lib/scheduling/repositories/scheduling-repository.ts` — `getUserWithIntegrations` loads only `invalid = false` Zoom accounts, so an invalid account resolves to zero conferencing accounts.\n* `apps/web/lib/scheduling/services/video-meeting-manager.ts` — `resolveMeetingLocation` returns no location for dynamic mode with no valid account (only logs a warning).\n* `apps/web/lib/scheduling/services/booking-service.ts` — `bookAppointment` returns `MEETING_LOCATION_UNAVAILABLE` when `requireMeetingLocation` is set and no location resolved.\n* `apps/web/lib/ai-sdr-v2/workflow/steps/booking.ts` — escalates the thread on `CALENDAR_ESCALATION_CODES`, including `MEETING_LOCATION_UNAVAILABLE`.\n\n## Two things need engineering\n\n1. The invalid-Zoom-but-UI-shows-connected discrepancy: the assigned handler's backend disconnect is not surfaced reliably in Conferencing / AI SDR settings, so operators believe booking should work and cannot see the actual blocker.\n2. Detached-account recurrence and detection: hosts are still ending up invalid after the ENG-12700 Zoom OAuth work. Confirm whether reconnection/protection is holding, and surface a persistent \"assigned host not ready\" warning so ops can fix the host rather than the customer discovering it when bookings silently stop."
+    }
+  ]
+}

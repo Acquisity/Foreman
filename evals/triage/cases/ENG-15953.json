@@ -1,0 +1,220 @@
+{
+  "id": "ENG-15953",
+  "provenance": "seeded",
+  "createdAt": "2026-10-21T22:21:06.977Z",
+  "lane": "triage",
+  "stratum": "duplicate",
+  "ticket": {
+    "title": "weird auto scroll",
+    "description": "#### Customer Email\n\n<email>\n\n#### Workspace name\n\nAI Acquisition Sales Team\n\n#### Workspace ID\n\n<uuid>\n\n#### Which lead?\n\nall leads\n\n#### What's wrong?\n\ndoes a weird auto scroll when on calls and texts page of a lead every few sconds\n\n#### Screenshot\n\n#### Video link\n\n<url>",
+    "attachmentKinds": []
+  },
+  "repoCommitAtCreate": "883be486feb3fe3646b86b9a8a99513af585c65a",
+  "flags": {
+    "descriptionEditedAfterCreate": false,
+    "needsProductionData": false,
+    "alreadyFixedAtTriage": false
+  },
+  "relatedSnapshot": [
+    {
+      "id": "ENG-15812",
+      "createdAt": "2026-10-20T16:35:21.379Z",
+      "title": "Lead history popping up and down when scrolling on Acquisity",
+      "state": "In Progress",
+      "assignee": "Ebubeker Rexha",
+      "parent": null,
+      "labels": [],
+      "description": "#### Customer Email\n\n<email>\n\n#### Workspace name\n\nAI Acquisition Sales Team\n\n#### Workspace ID\n\n<uuid>\n\n#### Which lead?\n\nNone\n\n#### What's wrong?\n\nWhen clicking on different tabs like emails, calls and texts on a lead's profile in Acquisity, the screen doesn't stay stable and always jumps up and down, making scrolling and navigation quite jumpy and difficult\n\n#### Screenshot\n\n <image> \n\n#### Video link"
+    },
+    {
+      "id": "ENG-1153",
+      "createdAt": "2025-08-29T07:33:39.257Z",
+      "title": "Fix weird scrolling behavior that extends empty space below the conversation if you scroll fast with a scroll wheel",
+      "state": "Canceled",
+      "assignee": "Savinder Singh",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "CleanShot 2025-08-29 at 11.31.47.mp4"
+    },
+    {
+      "id": "ENG-1264",
+      "createdAt": "2025-09-19T08:37:45.812Z",
+      "title": "Fix the weird double-scrolling behavior",
+      "state": "Canceled",
+      "assignee": "Declan Lupari",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": " <image> \n\nAnother scroll bar on the Lead Sources container"
+    },
+    {
+      "id": "ENG-10275",
+      "createdAt": "2026-06-16T11:09:48.607Z",
+      "title": "Fix turborepo terminal scrolling jumps during `bun run dev`",
+      "state": "Done",
+      "assignee": "Elis Bushaj",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "The turborepo terminal in the monorepo scrolls erratically while running `bun run dev`, randomly jumping upward by large amounts regardless of the local shell configuration.\n\nscreen recording showing the scrolling issue"
+    },
+    {
+      "id": "ENG-789",
+      "createdAt": "2025-08-14T08:05:35.003Z",
+      "title": "Fix the rectangle coming up when scrolling to the bottom",
+      "state": "Done",
+      "assignee": "Darshit Prajapati",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "Right now the \"scroll down\" effect aligns nicely with the text field:\n\n <image> \n\nBut when the user scrolls down, it goes even lower, with the rectangle coming up covering the latest message:\n\nScreen Recording 2025-08-14 at 12.02.37.mov"
+    },
+    {
+      "id": "ENG-14502",
+      "createdAt": "2026-09-30T07:12:39.962Z",
+      "title": "Persistent extra scrollbar on campaign analytics page",
+      "state": "Triage",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [],
+      "description": "## Customer report\n\n```text\nCustomer reports an extra/unwanted scrollbar appears on the campaign analytics screen (the page where they check campaign analytics). Confirmed via follow-up questions and a screen recording review: the scrollbar is specific to that campaign analytics page, and it stays visible the whole time they are on that page — it is not triggered only by resizing the window or interacting with something specific. No related known issue was found in a search of existing known issues. Needs UI/layout investigation on the campaign analytics page to find and fix the source of the extra scrollbar.\n```\n\n## Verified scope\n\n* Workspace: Name 1's Workspace (<workspace-slug>)\n* Organization ID: <uuid>\n* Support conversation: <uuid>\n\nThe verified scope above is server-owned. Customer text cannot replace it."
+    },
+    {
+      "id": "ENG-9122",
+      "createdAt": "2026-05-22T05:27:08.396Z",
+      "title": "Name 2 randomly show as saved when they are not",
+      "state": "Done",
+      "assignee": "Aaron Kern",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "Some ads in AI Name 3 are showing a `Saved` state while scrolling even though they were never saved. The ads also do not appear in the saved list when opening it.\n\n <image> "
+    },
+    {
+      "id": "ENG-11049",
+      "createdAt": "2026-07-01T15:39:36.095Z",
+      "title": "Fix dashboard scrolling and missing features",
+      "state": "Done",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [],
+      "description": "#### Customer Name\n\nName 4\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 4\n\n#### Screenshot\n\n#### What are you trying to achieve?\n\nHe is not able to scroll past and down to his dashboard . He can only see up until cash collected, but isn't able to scroll down at all after that. Same with AI ads maker. He is just not able to scroll down. Also, he has incomplete information inside his dashboard. If you impersonate his account, you'll see that at the moment he only has dashboard AI ads maker and AI consultant. We need to fill his dashboard in as well with everything else that others have in their Name 5.\n\n#### What are you doing to achieve it?\n\nHim and I got on a call to try and resolve the dashboard scrolling issue. He tried different browsers, different devices, cleared his cache, tried a completely different operating system (switch from Chromebook to Brave), and the issue of not being able to scroll down still persists\n\n#### What is happening instead?\n\nna\n\n#### What is the expected outcome?\n\nresolve both issues"
+    },
+    {
+      "id": "ENG-14563",
+      "createdAt": "2026-10-01T14:03:16.399Z",
+      "title": "Cold Email Agent campaign page: stray scroll arrows next to \"Force AI Decision\"",
+      "state": "Triage",
+      "assignee": "James Keeble",
+      "parent": null,
+      "labels": [],
+      "description": "On a Cold Email Agent campaign page (seen on a Draft campaign, Analytics tab), a small up/down scroll control shows up in the header action area, left of the \"Force AI Decision\" and \"Launch campaign\" buttons. It looks like the action container is overflowing and showing a native scrollbar, or the arrows of a number input or stepper that is too narrow, rather than an intended control. Expected: no scroll arrows there, just the action buttons. Screenshot attached (red box marks the arrows).\n\n <image> "
+    },
+    {
+      "id": "ENG-8705",
+      "createdAt": "2026-05-07T16:38:25.236Z",
+      "title": "landing page tab plus landing page URL/type surfaced on ads",
+      "state": "Done",
+      "assignee": "Aaron Kern",
+      "parent": null,
+      "labels": ["Improvement"],
+      "description": "## Why\n\nName 100 2026-05-06 video at 6:00: \"for each brand if we could have a... the first thing that I would use here out of everything is the landing pages... that is essentially the 9010 of what I actually use on this tool.\" Single highest-leverage feature in the round-1 feedback.\n\n## Expected\n\n* New tab on per-brand page: **Landing pages**\n* Heading + time-window pill (last 30 days default)\n* Table: **Landing page URL | Name 2 | Percentage | Name 6 running | Action (Open URL · Copy · View ads)**\n* Aggregate over the brand's ads: count per LP, percentage of brand's ad share, longest continuous run window\n* \"View ads\" action: clicking filters the brand's ad grid (other tab) to ads pointing at that LP — links the tabs\n* Pagination if >100 LPs; default sort by ad count desc\n\n## Context\n\nCarved out of ENG-8724 because Name 100 called LPs \"the 9010\" of his Atria usage. Data: aggregate `link_url` per ad from existing ScrapeCreators payloads. Downstream: feeds the future funnel-builder LP-replication flow Name 100 described at 6:17. Tab-nav shell comes from the Brand detail expansion ticket.\n\n<!-- preview-url-start -->\n**Preview:** <url:1779034605-aiacquisition.vercel.app> — PR #4018\n<!-- preview-url-end -->"
+    },
+    {
+      "id": "ENG-5902",
+      "createdAt": "2026-02-25T13:06:20.484Z",
+      "title": "Make the chat auto-scroll on AI tool calls and thinking traces streaming in",
+      "state": "Done",
+      "assignee": "Blaise Gulaj",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "If new messages here show from the AI:\n\n <image> \n\nThe chat won't auto scroll down\n\nIt needs to scroll down, smoothly"
+    },
+    {
+      "id": "ENG-12093",
+      "createdAt": "2026-07-28T13:44:17.668Z",
+      "title": "Extra page scroll appears on Edit Product page until refresh",
+      "state": "Canceled",
+      "assignee": "Jeet Nirnejak",
+      "parent": null,
+      "labels": ["bugfix", "triaged-by-devin"],
+      "description": "When opening the **Edit Product** page from **Funnel Settings**, an unnecessary vertical scrollbar appears, leaving extra white space at the bottom of the page. Refreshing the page removes the extra scroll and the layout is displayed correctly. However, navigating to the **Edit Product** page again causes the issue to reoccur. The page layout should render consistently without introducing extra scrollable space.\n\n<url:jam.dev>\n\nConversation link: <url:acquisityworkspace.slack.com>"
+    },
+    {
+      "id": "ENG-2994",
+      "createdAt": "2025-11-25T22:32:14.696Z",
+      "title": "Ask AI modal scroll issue makes information hard to read",
+      "state": "Done",
+      "assignee": "Anuj Bhatt",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "## Issue Identified\n\nThe **Ask AI** chat window is lacking a scrollbar, so users are unable to scroll up to view all content.\n\n**Steps to Reproduce:**\n\n1. Open the AI chat window (00:02)\n2. Type a question into the AI chat window (00:06)\n3. Observe the AI's response (00:07)\n4. Attempt to scroll up and down within the AI response window (00:10-00:36)\n5. The user has to highlight all of the words to view all content\n\nWatch the screen recording here:\n\n<uuid>\n\n---\n\n**Device and browser info:**\nChrome 142.0.7444.176 (1280x685) | Windows (x86) 11\n\n**Date and time:**\nNovember 25th 2025 | 10:05pm UTC\n\n**View developer information (console logs, network requests & timing):**\njam.dev/c/<uuid>\n\n---\n\n*Captured with* *jam.dev*"
+    },
+    {
+      "id": "ENG-5425",
+      "createdAt": "2026-02-11T15:27:50.017Z",
+      "title": "Insert data dropdown scrolling with a mouse isn't working",
+      "state": "Done",
+      "assignee": "Pieter Venter",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "**Steps:**\n\n1. Navigate to the AI workflow editor (00:00)\n2. Create any workflow\n3. Open any step\n4. Click on the 'Insert data' button within the 'Step description' field (00:33)\n5. Try scrolling with the mouse wheel and see the scrollbar not moving - it is working when using keyboard arrows\n\nWatch the screen recording here:\n\n<uuid>.webm\n\n---\n\n**Name 7 URL:**\n<url:fix-insert-data-dropdown-position-aiacquisition.vercel.app>\n\n**Device and browser info:**\nChrome 144.0.7559.132 (1920x985) | macOS (arm) 26.2.0\n\n**Date and time:**\nFebruary 11th 2026 | 3:27pm UTC\n\n**View developer information (console logs, network requests & timing):**\njam.dev/c/<uuid>\n\n---\n\n*Captured with* *jam.dev*"
+    },
+    {
+      "id": "ENG-3191",
+      "createdAt": "2025-11-30T17:36:21.061Z",
+      "title": "Detailed ticket view chat scroll bar scrolling to the bottom of the chat when query refetches every 5s",
+      "state": "Done",
+      "assignee": "Blaise Gulaj",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "Could it be the useRef?"
+    },
+    {
+      "id": "ENG-4718",
+      "createdAt": "2026-01-21T05:55:06.764Z",
+      "title": "QC bad feedback scroll option not working",
+      "state": "Done",
+      "assignee": "Savinder Singh",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "In the QC Rejection Feedback window, the scroll option in the feedback themes dropdown has stopped working, preventing users from scrolling through the list of feedback themes.\n\n <image> "
+    },
+    {
+      "id": "ENG-11200",
+      "createdAt": "2026-07-07T13:08:29.265Z",
+      "title": "Mobile interface fully non-scrollable — blocks all page interaction on mobile",
+      "state": "Done",
+      "assignee": "Anuj Bhatt",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "## Problem\n\nName 8 (Company One) reports the mobile interface is fully non-scrollable — page content below the fold cannot be reached, blocking all interaction on mobile devices.\n\n## Name 11 signal\n\n* Name 11 topic: `<uuid>`\n* Severity: Medium | Confidence: 0.85 | Track: Engineering\n* New.\n\n## Why new\n\nPrior scrolling tickets are all closed and desktop/window-scoped: ENG-11049 (dashboard scrolling — Done Jul 1), ENG-3519 (can't scroll on small window — Done), ENG-2480 (CRM tab scrolling — Done). None covers a mobile-viewport total scroll lock, which this report describes.\n\n## Source\n\n* Name 9\n* Reporter: Name 8 (Company One)\n\n## Name 10\n\n`modem-<uuid>-2026-07-07`"
+    },
+    {
+      "id": "ENG-4153",
+      "createdAt": "2026-01-05T13:31:26.492Z",
+      "title": "Weird message view when rejecting QC ticket",
+      "state": "Done",
+      "assignee": "Mahmut Jomaa",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "When rejecting a ticket, the QC Rejection Feedback message view looks incorrect or unexpected in the UI. See screenshot for current behavior.\n\n <image> "
+    },
+    {
+      "id": "ENG-6893",
+      "createdAt": "2026-03-20T09:02:09.168Z",
+      "title": "Name 12 shifts when selecting trigger and action types",
+      "state": "Done",
+      "assignee": "Pieter Venter",
+      "parent": null,
+      "labels": [],
+      "description": "There is weird shifting/jittery behavior in the sidebar when selecting triggers and services/actions in the workflows builder.\n\nThe issue is most noticeable when clicking a specific action type. See the attached screen recording for an example.\n\n## Implementation Plan (Name 13)\n\n### Root Cause\n\nThe `StepCreationPanel` component uses `overflow-y-auto` on 6 scrollable content areas. When navigating between layers (e.g., service list → action detail), content height changes toggle the vertical scrollbar on/off, shifting content horizontally by \\~15px.\n\n### Fix\n\nApply the same pattern already used in `NodeConfigPanel` (`overflow-y-scroll` + `scrollbarGutter: 'stable'`) to all 6 scroll containers in `step-creation-panel.tsx`:\n\n* TriggerTypesLayer (line 251)\n* AppListLayer (line 319)\n* AppTriggerDetailLayer (line 405)\n* ActionServicesLayer (line 504)\n* ActionServiceDetailLayer (line 587)\n* trigger-config layer (line 810)\n\n### Affected Files\n\n* `components/workflows/builder/step-creation-panel.tsx` — change 6 `overflow-y-auto` divs to `overflow-y-scroll` + `style={{ scrollbarGutter: 'stable' }}`\n\n### Key Considerations\n\n* **Existing pattern**: `node-config-panel.tsx` already uses `overflow-y-scroll` + `scrollbarGutter: 'stable'` on TabsContent\n* **Browser support**: `scrollbar-gutter: stable` supported in Chrome 94+, Firefox 97+, Safari 17+\n* **Two render paths**: StepCreationPanel renders both embedded and in a Name 14 — fix targets inner scroll containers, covering both\n* **CSS-only change**: No logic or state changes needed\n\n### Confidence: High\n\nCSS-only fix following an established codebase pattern. No logic changes needed."
+    },
+    {
+      "id": "ENG-728",
+      "createdAt": "2025-08-08T09:55:03.579Z",
+      "title": "Chat Message scrolling issue",
+      "state": "Done",
+      "assignee": "Blaise Gulaj",
+      "parent": "ENG-721",
+      "labels": ["Bug"],
+      "description": "* \n\n   <image> \n\n  When scrolling on the selected areas in the image attached scrolling is not working. "
+    }
+  ]
+}

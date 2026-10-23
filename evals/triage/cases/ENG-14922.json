@@ -1,0 +1,230 @@
+{
+  "id": "ENG-14922",
+  "provenance": "seeded",
+  "createdAt": "2026-10-07T21:43:08.159Z",
+  "lane": "billing",
+  "stratum": "billing",
+  "ticket": {
+    "title": "Name 26 promo code and refund",
+    "description": "#### User Email\n\n<email>\n\n#### Workspace Name\n\nCompany Four\n\n#### Request Type\n\nDiscount code\n\n#### Reason for request\n\nWe had a re-onboarding call with Name 25, and during the previous refund-save call, he was promised 3 months of the Cold Email Agent at no additional charge.\n\nHowever, after upgrading his workspace, he was charged for the Cold Email Agent today.\n\nI’d like to request either of the following options:\n\nOption 1: Apply a credit/code for the next 3 months so he is not charged for the Cold Email Agent during that period.\n\nOption 2: Refund the charge that was processed today and then provide the remaining 2 months free.\n\nEither option works — we just want to make sure we honor the 3 months that were promised during the refund-save call.",
+    "attachmentKinds": ["slack"]
+  },
+  "repoCommitAtCreate": "cf13bd834a1433f3c8ab33517b0b44e7f26f813f",
+  "flags": {
+    "descriptionEditedAfterCreate": false,
+    "needsProductionData": true,
+    "alreadyFixedAtTriage": false
+  },
+  "relatedSnapshot": [
+    {
+      "id": "ENG-12029",
+      "createdAt": "2026-07-24T07:15:36.948Z",
+      "title": "Request promo code for client onboarding",
+      "state": "Done",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": ["Discount", "triaged-by-devin"],
+      "description": "#### Customer Name\n\nName 1\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 1's Workspace\n\n#### Screenshot\n\n#### What are you trying to achieve?\n\nI'm requesting a promo code to cover two months of Acquisity Plus, inboxes, and domains for the client.  This was offered to the client by the closer as an incentive to move forward and to ensure a successful onboarding experience while addressing concerns that could have led to a refund request\n\n#### What are you doing to achieve it?\n\nI confirmed with the closer and with Name 2 that this offer was promised to the client.\n\n#### What is happening instead?\n\nI don't have the promo code yet\n\n#### What is the expected outcome?\n\nTo get the promo code valid for 2 months +domains+inboxes"
+    },
+    {
+      "id": "ENG-5224",
+      "createdAt": "2026-02-06T15:18:55.782Z",
+      "title": "Request approval for promo code to complete Acquisity setup",
+      "state": "Canceled",
+      "assignee": "Beth Newton",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "#### Customer Name\n\nName 3\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 3 – Acquisity Workspace\n\n#### Screenshot\n\n#### What are you trying to achieve?\n\nCreate a standardized, company-managed Acquisity setup for Name 3 to ensure consistent campaign execution, reduce onboarding friction, and prevent refund risk.\n\n#### What are you doing to achieve it?\n\nRequesting approval for a promo code to cover full Acquisity setup, including platform access, email domains and inboxes, and initial lead allocation, so Name 4 can complete setup without one-off workarounds.\n\n#### What is happening instead?\n\nSetup is blocked pending promo code approval, causing delays, increased client anxiety, and risk of inconsistent handling outside the standard Name 4 process.\n\n#### What is the expected outcome?\n\nApproved promo code that enables full Acquisity setup, allowing Name 4 to complete onboarding, launch campaigns cleanly, and follow a repeatable, documented process."
+    },
+    {
+      "id": "ENG-11607",
+      "createdAt": "2026-07-14T04:16:16.333Z",
+      "title": "Request for Acquisity promo code for client re-onboarding",
+      "state": "Done",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [],
+      "description": "#### Customer Name\n\nName 5\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 5's Workspace\n\n#### Screenshot\n\n#### What are you trying to achieve?\n\nhe was promised 3 months of Acquisity + domains +inboxes by the refund prevention team (Name 6)\n\n#### What are you doing to achieve it?\n\nI am re-onboarding the client\n\n#### What is happening instead?\n\nAcquisity is not set up yet\n\n#### What is the expected outcome?\n\nTo get a promo code so I can upgrade his acquisity account, get domains and inboxes"
+    },
+    {
+      "id": "ENG-6991",
+      "createdAt": "2026-03-24T14:47:31.777Z",
+      "title": "Add promo code UI for inbox setup",
+      "state": "Done",
+      "assignee": "Tyler Olsen",
+      "parent": null,
+      "labels": [],
+      "description": "There is no promo code UI for inboxes on pre-warmed or normal setup."
+    },
+    {
+      "id": "ENG-12946",
+      "createdAt": "2026-08-19T22:31:03.069Z",
+      "title": "Promo Code for Name 7",
+      "state": "Todo",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [],
+      "description": "#### User Email\n\n<email>\n\n#### Workspace Name\n\nName 9's workspace\n\n#### Request Type\n\nDiscount code\n\n#### Reason for request\n\nCloser did not communicate the ongoing operating costs. I discussed the situation with my manager, Name 8, and she suggested that we offer the client 1 month of Acquisity, 1 year of domains, and 1 month of inboxes as an accommodation."
+    },
+    {
+      "id": "ENG-7030",
+      "createdAt": "2026-03-25T05:36:22.089Z",
+      "title": "Promo code generator and status controls",
+      "state": "Canceled",
+      "assignee": null,
+      "parent": null,
+      "labels": ["Feature"],
+      "description": "## Context\n\nCode-based promotions (from ENG-7049) require unique promo codes that customers enter at checkout. This task builds the code generation system, including single code creation (random or custom-prefix), bulk generation for campaigns, paginated listing, and enable/disable toggles for individual codes. Each code tracks its own usage count and active status independently of the parent promotion.\n\nCodes are scoped to the organization level for uniqueness -- two different organizations can have the same code string, but within one organization each code must be unique. The code generation utility uses `crypto.randomBytes` for cryptographically random alphanumeric strings.\n\n---\n\n## Schema Reference\n\nThe `commercePromotionCodeTable` defines:\n\n| Column | Type | Notes |\n| -- | -- | -- |\n| `id` | `uuid` | PK, `defaultRandom()` |\n| `organizationId` | `uuid` | FK to `organization.id`, cascade delete |\n| `promotionId` | `uuid` | FK to `commercePromotionTable.id`, cascade delete |\n| `code` | `text` | The actual promo code string (e.g., `SAVE20`, `SUMMER-A8K3`) |\n| `isActive` | `boolean` | Default `true`, toggleable |\n| `maxUses` | `integer` | Nullable, per-code redemption cap |\n| `usageCount` | `integer` | Default `0`, atomically incremented on redemption |\n| `createdAt` / `updatedAt` | `timestamp(tz)` | Auto-managed |\n\n**Unique constraint**: `commerce_promotion_code_code_org_idx` on `(code, organizationId)` ensures no duplicate codes within an org.\n\n---\n\n## Zod Schemas\n\n```typescript\nconst generateCodeInput = z.object({\n  organizationId: z.string().uuid(),\n  promotionId: z.string().uuid(),\n  code: z.string().min(3).max(50).regex(/^[A-Z0-9\\-_]+$/i).optional(),\n  prefix: z.string().min(1).max(20).regex(/^[A-Z0-9\\-_]+$/i).optional(),\n  maxUses: z.number().int().positive().optional(),\n});\n\nconst bulkGenerateInput = z.object({\n  organizationId: z.string().uuid(),\n  promotionId: z.string().uuid(),\n  count: z.number().int().min(1).max(500),\n  prefix: z.string().min(1).max(20).regex(/^[A-Z0-9\\-_]+$/i).optional(),\n  maxUses: z.number().int().positive().optional(),\n});\n\nconst listCodesInput = z.object({\n  organizationId: z.string().uuid(),\n  promotionId: z.string().uuid(),\n  search: z.string().max(50).optional(),\n  isActive: z.boolean().optional(),\n  limit: z.number().int().min(1).max(100).default(20),\n  offset: z.number().int().min(0).default(0),\n});\n\nconst toggleCodeInput = z.object({\n  organizationId: z.string().uuid(),\n  codeId: z.string().uuid(),\n});\n```\n\n---\n\n## Utility: `generatePromoCode()`\n\nLocated at `lib/commerce/promo-codes.ts`:\n\n```typescript\nimport crypto from 'node:crypto';\n\nconst CHARSET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // excludes confusable chars: 0/O, 1/I/L\n\nexport function generatePromoCode(options?: { prefix?: string; length?: number }): string {\n  const length = options?.length ?? 8;\n  const bytes = crypto.randomBytes(length);\n  let code = '';\n  for (let i = 0; i < length; i++) {\n    code += CHARSET[bytes[i] % CHARSET.length];\n  }\n  return options?.prefix ? `${options.prefix}-${code}` : code;\n}\n```\n\nKey design decisions:\n\n* Excludes visually confusable characters (0/O, 1/I/L) to reduce support tickets\n* Uses `crypto.randomBytes` for uniform distribution\n* Default length of 8 characters gives \\~1.1 trillion combinations (32^8)\n* Prefix separated by hyphen for readability (e.g., `SUMMER-A8K3NP2V`)\n\n---\n\n## tRPC Procedures\n\nAll procedures in `trpc/routers/commerce/promo-codes.ts` (or as part of the promotions router).\n\n### `generate` (mutation)\n\n* Call `assertUserIsOrgMember()`\n* Validate the parent promotion exists, belongs to org, and has `type: 'code'`\n* If `input.code` provided (custom code): use as-is, check uniqueness\n* If `input.prefix` provided: call `generatePromoCode({ prefix: input.prefix })`\n* If neither: call `generatePromoCode()` for fully random code\n* Uniqueness check: query `commercePromotionCodeTable` with `eq(code, generatedCode) AND eq(organizationId, orgId)`\n* On collision: retry up to 5 times with new random suffix\n* Insert row with `isActive: true` and optional `maxUses`\n* Return the created code record\n\n### `bulkGenerate` (mutation)\n\n* Call `assertUserIsOrgMember()`\n* Validate parent promotion exists and has `type: 'code'`\n* Generate `input.count` unique codes using `generatePromoCode({ prefix: input.prefix })`\n* De-duplicate generated codes against each other (Set)\n* Batch-check existing codes: `SELECT code FROM commercePromotionCodeTable WHERE code IN (...) AND organizationId = orgId`\n* Retry collisions (regenerate conflicting codes)\n* Batch insert: `db.insert(commercePromotionCodeTable).values(codes)`\n* Return `{ created: number, codes: string[] }`\n\n### `list` (query)\n\n* Filter by `promotionId` and `organizationId`\n* Optional filters: `search` (ilike on code), `isActive` (boolean)\n* Pagination: `limit`/`offset` with total count\n* Sort: `desc(createdAt)`\n* Return rows with `usageCount` and computed `isExhausted` (usageCount >= maxUses when maxUses is set)\n\n### `enable` (mutation)\n\n* Validate org membership and code ownership\n* Set `isActive = true`\n\n### `disable` (mutation)\n\n* Validate org membership and code ownership\n* Set `isActive = false`\n\n---\n\n## Codebase Reference\n\n| What | File Path | Notes |\n| -- | -- | -- |\n| Commerce schema | `lib/db/schema/commerce.ts` | `commercePromotionCodeTable` with unique constraint on `(code, organizationId)` |\n| Promo code utility | `lib/commerce/promo-codes.ts` | `generatePromoCode({ prefix?, length? })` -- to create |\n| Parent promotion table | `lib/db/schema/commerce.ts` | `commercePromotionTable` -- validate `type: 'code'` before generating |\n| Base table columns | `lib/db/schema/base-table.ts` | `getBaseColumnsWithOrganization()` |\n| tRPC init | `trpc/init.ts` | `protectedFeatureMutationProcedure()`, `protectedFeatureProcedure()` |\n| Feature constants | `lib/features.ts` | `FEATURES.ECOMMERCE_STORE_BUILDER` |\n| Name 10 helper | `lib/auth/server.ts` | `assertUserIsOrgMember()` |\n| Logger | `lib/logger.ts` | `<domain>(obj, message)` pattern |\n| Atomic increment pattern | Drizzle `sql` template | `sql\\`${table.usageCount} + 1\\`\\` used during redemption (ENG-7034) |\n| Existing CRUD pattern | `trpc/routers/announcements.ts` | Pagination, insert, update patterns |\n\n---\n\n## Implementation Steps\n\n 1. Create `lib/commerce/promo-codes.ts` with `generatePromoCode()` utility function.\n 2. Write unit tests for `generatePromoCode()` in `lib/commerce/__tests__/promo-codes.test.ts` covering: default length, custom prefix, custom length, character set validity.\n 3. Create promo code procedures (either in `trpc/routers/commerce/promo-codes.ts` or extend the promotions router).\n 4. Implement `generate` mutation: validate parent promotion type is `'code'`, generate or use custom code, uniqueness check with retry loop (max 5 attempts), insert, return.\n 5. Implement `bulkGenerate` mutation: generate N codes, de-duplicate in memory, batch-check DB for collisions, regenerate collisions, batch insert, return count and codes array.\n 6. Implement `list` query: filter by promotionId + organizationId, optional search/isActive filters, pagination with total count, sort by createdAt desc.\n 7. Implement `enable` mutation: validate ownership chain (code -> promotion -> org), set `isActive = true`.\n 8. Implement `disable` mutation: validate ownership chain, set `isActive = false`.\n 9. Add proper error handling: `NOT_FOUND` for missing promotion/code, `BAD_REQUEST` for generating codes on automatic promotions.\n10. Add structured logging with `<domain>({ promotionId, codeCount }, 'Bulk promo codes generated')`.\n11. Register procedures in the commerce router if using a separate file.\n12. Run `bun typecheck` to verify all types.\n13. Run `bun fix` and `bun format` for Biome compliance.\n14. Verify uniqueness constraint works by attempting duplicate inserts in tests.\n\n---\n\n## Acceptance Criteria\n\n- [ ] `commercePromotionCodeTable` exists with columns: `id`, `organizationId`, `promotionId`, `code`, `isActive`, `maxUses`, `usageCount`, `createdAt`, `updatedAt`\n- [ ] Unique constraint `commerce_promotion_code_code_org_idx` on `(code, organizationId)` enforced\n- [ ] `generatePromoCode()` utility exists at `lib/commerce/promo-codes.ts`\n- [ ] Generated codes use only non-confusable characters (no 0/O, 1/I/L)\n- [ ] `generate` mutation creates a single code for a code-based promotion\n- [ ] `generate` mutation accepts optional custom code string\n- [ ] `generate` mutation accepts optional prefix for `PREFIX-RANDOM` format\n- [ ] `generate` mutation retries on collision up to 5 times before failing\n- [ ] `generate` mutation rejects code generation on `automatic` type promotions with `BAD_REQUEST`\n- [ ] `bulkGenerate` mutation creates up to 500 codes in a single operation\n- [ ] `bulkGenerate` mutation de-duplicates generated codes before insert\n- [ ] `bulkGenerate` mutation returns count of created codes\n- [ ] `list` query returns paginated codes for a specific promotion with total count\n- [ ] `list` query supports search by code string (ilike)\n- [ ] `list` query supports filtering by `isActive` status\n- [ ] `enable` mutation sets `isActive = true` on a specific code\n- [ ] `disable` mutation sets `isActive = false` on a specific code\n- [ ] All procedures validate org membership via `assertUserIsOrgMember()`\n- [ ] All procedures filter by `organizationId` for tenant isolation\n- [ ] Mutation procedures use `protectedFeatureMutationProcedure(FEATURES.ECOMMERCE_STORE_BUILDER)`\n\n---\n\n## Verification Checklist\n\n- [ ] `bun typecheck` passes with zero errors\n- [ ] `bun fix` and `bun format` produce no changes\n- [ ] `bun test:unit` passes for `promo-codes.test.ts`\n- [ ] Generating a single code returns a valid alphanumeric string of expected length\n- [ ] Generating a code with prefix `SUMMER` returns format `SUMMER-XXXXXXXX`\n- [ ] Generating a code on an automatic promotion returns `BAD_REQUEST`\n- [ ] Bulk generating 100 codes returns exactly 100 unique codes\n- [ ] Attempting to insert a duplicate code within the same org fails with uniqueness error\n- [ ] Listing codes for a promotion returns only codes belonging to that promotion\n- [ ] Enabling a disabled code changes `isActive` to `true`\n- [ ] Disabling an active code changes `isActive` to `false`\n- [ ] Codes from different organizations can share the same string value"
+    },
+    {
+      "id": "ENG-3865",
+      "createdAt": "2025-12-17T18:33:44.874Z",
+      "title": "Add promo code field to domains and inboxes modal",
+      "state": "Done",
+      "assignee": "Tyler Olsen",
+      "parent": null,
+      "labels": [],
+      "description": "Add an optional promo code textbox to the \"Buy domains\" and \"Buy emails/inboxes\" purchase modals.\n\nBehavior:\n\n* Name 11 is optional and visible to all users in the modals.\n* If a promo code is entered, attempt to apply it when the purchase is submitted.\n* If the promo code is invalid, display an error in the modal and do not proceed with the purchase.\n* If the promo code is valid, proceed with billing using the discounted amount.\n\nContext:\n\n* Domains and inboxes are billed immediately because a card is already on file.\n* Discount codes are applied via Autumn today; this needs to work the same way from these modals."
+    },
+    {
+      "id": "ENG-14029",
+      "createdAt": "2026-09-18T14:00:21.983Z",
+      "title": "\"somethign went wrong\" when buying with promo code",
+      "state": "Done",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [],
+      "description": "#### Customer Name\n\nInternal\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nCompany One\n\n#### Screenshot\n\n <image> \n\n#### What are you trying to achieve?\n\nBuy with promo code\n\n#### What are you doing to achieve it?\n\nName 12 promo code\n\n#### What is happening instead?\n\nSaying \"something went wrong\" when i click confirm\n\n#### What is the expected outcome?\n\nBuy for free"
+    },
+    {
+      "id": "ENG-13447",
+      "createdAt": "2026-09-03T21:36:27.554Z",
+      "title": "Promo codes still fail at checkout: single-plan Autumn checkout sends promo code via legacy reward field",
+      "state": "In Progress",
+      "assignee": null,
+      "parent": null,
+      "labels": ["Bug", "Internal reported"],
+      "description": "## Overview\n\nUsers entering a discount code during a single-plan upgrade still get a generic \"Something went wrong\" at checkout, because that checkout path sends the code to Autumn through a legacy field Autumn no longer accepts.\n\n## Problem\n\nWhen a user enters an Autumn discount code and submits, `billing.createCheckout` fails and the UI shows \"Something went wrong\", blocking the upgrade.\n\n## Root cause\n\nIn `apps/web/lib/billing/providers/autumn/client.ts`, `createSubscriptionCheckout` passes `input.promoCode` to `autumn.attach()` through the legacy `reward` field. Autumn rejects Stripe/Autumn promotion codes sent this way with \"Reward <CODE> not found\", and the `billing.createCheckout` catch block converts that to a generic `INTERNAL_SERVER_ERROR` that tRPC masks as \"Something went wrong\". The sibling `createMultiAttachCheckout` already sends the code correctly via `discounts: [{ promotion_code }]` through `v2.multiAttach`, so the fix pattern exists; the single-plan attach path was never migrated.\n\n## Blast radius\n\n9 organizations / 9 users, ~66 \"Reward ... not found\" checkout errors over the last 30 days (codes such as AIAUTO100 and <promo-code>), counted from the Axiom `acquisity` dataset (`message contains \"attaching subscription\"`, grouped by the Autumn error message) on 2026-09-03.\n\n## Prior art\n\nRecurrence of the same root cause as [ENG-9213] (legacy `reward` field); that fix covered the multi-attach path but not the single-plan `createSubscriptionCheckout` path.\n\n## Proposed fix\n\nMigrate `createSubscriptionCheckout` off the legacy `reward` field to Autumn's current discount shape (`discounts: [{ promotion_code }]`), matching `createMultiAttachCheckout`, and surface a promo-code-specific error instead of the generic \"Something went wrong\".\n\n## Done when\n\n* Entering a valid Autumn promo code on a single-plan upgrade creates the checkout with the discount applied.\n* An invalid/expired promo code shows a clear promo-code error, not \"Something went wrong\".\n* A regression test proves the attach payload sends the promo code via the discount field, not `reward`."
+    },
+    {
+      "id": "ENG-11939",
+      "createdAt": "2026-07-21T18:52:10.203Z",
+      "title": "Promo code aiauto100 not applying to domains and inboxes",
+      "state": "Todo",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": ["triaged-by-devin"],
+      "description": "#### Customer Name\n\nName 13\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 13\n\n#### Screenshot\n\n#### What are you trying to achieve?\n\nattemting to apply aiauto100 promo code to domains/inbox purchase however it is still attempting to process $252 for 6 domains/18 inboxes\n\n#### What are you doing to achieve it?\n\napplied it to enable acquisity successfully\n\n#### What is happening instead?\n\ncode is not applying at check out for domains/inboxes\n\n#### What is the expected outcome?\n\n1st momth fees zero'd out"
+    },
+    {
+      "id": "ENG-7101",
+      "createdAt": "2026-03-25T05:40:47.538Z",
+      "title": "Build promo code management page",
+      "state": "Canceled",
+      "assignee": null,
+      "parent": null,
+      "labels": ["Feature", "Phase 1"],
+      "description": "## Context\n\nManage individual promo codes within a promotion. Accessible from the promotion detail view.\n\n## Acceptance Criteria\n\n- [ ] Accessible from promotion detail page (nested route or tab)\n- [ ] Data table columns: code string, status badge, usage count / max uses, created date\n- [ ] Generate codes: \"Generate\" button → dialog with count input + optional prefix\n- [ ] Single code generation with custom code input\n- [ ] Enable/disable toggle per code\n- [ ] Copy code to clipboard button\n- [ ] Bulk actions: enable all, disable all\n- [ ] Pagination for promotions with many codes\n\n## Codebase Reference\n\n* Schema: `lib/db/schema/commerce.ts` — promoCode table linked to promotion\n* tRPC routers: `trpc/routers/commerce/` — use `protectedFeatureProcedure(FEATURES.COMMERCE)`\n* Name 14 isolation: `assertUserIsOrgMember()` + `eq(table.organizationId, orgId)`\n* DataTable: `components/ui/data-table.tsx`\n* Admin page pattern: follow `app/(saas)/dashboard/(sidebar)/[organizationSlug]/` page structure\n* Status badges: use `Badge` component with appropriate variants\n\n## Implementation Steps\n\n1. Create as tab or section within promotion detail page\n2. DataTable with code data from `trpc.commerce.promoCodes.list.useQuery()`\n3. Generate dialog: count input, prefix input (optional), generate button → calls `bulkGenerate` mutation\n4. Copy button: `navigator.clipboard.writeText(code)`\n5. Enable/disable: call mutation, optimistically update UI"
+    },
+    {
+      "id": "ENG-9213",
+      "createdAt": "2026-05-25T21:04:11.114Z",
+      "title": "Billing upgrade promo codes fail because app passes Stripe/Autumn promo codes to legacy Autumn reward field",
+      "state": "Done",
+      "assignee": "Tyler Olsen",
+      "parent": null,
+      "labels": [],
+      "description": "Issue\n\nUsers attempting to upgrade with a promo code see a generic “Something went wrong” toast during upgrade confirmation. Promo code validation can pass, but the final checkout creation fails.\n\n**Affected example**\n\n* User: Name 15 (`<email>`)\n* Workspace: `Name 15' Workspace`\n* Billing account / Autumn customer id used by app: `<uuid>`\n* Codes investigated: `<promo-code>`, `<promo-code>`\n\n**Root cause**\nThe current `billing.createCheckout` upgrade flow calls legacy Autumn attach and passes the user-entered promo code as `reward`:\n\n`autumn.attach({ customer_id, product_id: targetPlan, reward: promoCode })`\n\nThat legacy `reward` field is not accepting the Stripe/Autumn promo code values we’re creating. Autumn returns `reward_not_found`, and the app converts that backend failure into a generic production tRPC error toast.\n\nCode path: <ref_snippet file=\"/home/ubuntu/repos/ai-clients/apps/web/trpc/routers/billing.ts\" lines=\"1050-1080\" />\n\n**Evidence**\n\n* `<promo-code>` exists in Stripe and is active/unredeemed, but Autumn attach rejects it as `reward_not_found`.\n* `<promo-code>` exists in Stripe as active/unredeemed with coupon metadata containing Autumn reward id `rew_3EESFB4E8k8Gg5BLtI9ae1XlLc8`.\n* Testing the current app payload shape with `<promo-code>` returned `reward_not_found: Reward <promo-code> not found`.\n* Testing the current app payload shape with the metadata reward id also returned `reward_not_found`.\n* Autumn `rewards.redeem` with `<promo-code>` returned `No reward found for code \"<promo-code>\"`.\n* Vercel production runtime logs showed recent `/api/trpc/billing.createCheckout` 500s containing `reward_not_found`.\n* tRPC masks `INTERNAL_SERVER_ERROR` as “Something went wrong” in production. <ref_snippet file=\"/home/ubuntu/repos/ai-clients/apps/web/trpc/init.ts\" lines=\"30-38\" />\n\n**Expected behavior**\nIf a valid promo/reward code is entered during upgrade confirmation, the app should create an Autumn/Stripe checkout session with the discount applied, or show a clear user-facing promo error if the code is invalid.\n\n**Actual behavior**\nCheckout creation fails with Autumn `reward_not_found`; user sees generic “Something went wrong.”\n\n**Suggested fix**\nUpdate the upgrade checkout flow to use Autumn’s current billing attach discount API instead of the legacy `reward` field. Autumn’s documented shape supports:\n\n`discounts: [{ promotion_code: code }]`\n\nor\n\n`discounts: [{ reward_id: rewardId }]`\n\nThis likely means replacing/augmenting the current `autumn.attach(...)` call with the newer Autumn billing attach API and passing discounts through the supported field.\n\n**Possible short-term workaround**\nApply the discount directly to Name 16's Autumn customer in the Autumn dashboard under Customer → Rewards/Add Coupon, then have Name 16 upgrade without entering a promo code. Autumn docs indicate customer-level rewards show when an attach checkout URL is generated or on the next invoice. This should still be verified before sending to the client.\n\n**Not recommended**\nCreating the code only in Stripe is not enough, because the app does not create Stripe Checkout directly. The upgrade confirmation goes through Autumn first, so Stripe-only promo validity does not bypass Autumn’s rejection.\n\n**Acceptance criteria**\n\n* Entering an active Autumn/Stripe promo code in the upgrade dialog successfully creates a checkout URL with the discount applied.\n* Invalid promo/reward codes show a clear promo-specific error, not generic “Something went wrong.”\n* Add coverage for the billing attach payload shape to ensure discounts are sent through Autumn’s supported API field."
+    },
+    {
+      "id": "ENG-6992",
+      "createdAt": "2026-03-24T15:21:14.441Z",
+      "title": "Add promo code UI for inbox/domain purchase flows",
+      "state": "Done",
+      "assignee": "Tyler Olsen",
+      "parent": null,
+      "labels": ["Feature Request"],
+      "description": "Restore promo/discount code UI to the inbox and domain purchase flow. The old purchase modal had promo code support wired through `custom-checkout-dialog.tsx`, but when PR #2703 (email management v2) replaced it with the new Buy All flow, the promo code UI was not carried over.\n\nPR: <url:github.com>\n\nRelated: ENG-6991"
+    },
+    {
+      "id": "ENG-12460",
+      "createdAt": "2026-08-10T13:16:23.836Z",
+      "title": "Need a one-year promo code for Acquisity?",
+      "state": "Done",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": ["Discount", "triaged-by-devin"],
+      "description": "#### User Email\n\n<email>\n\n#### Workspace Name\n\nName 17't created one yet\n\n#### Request Type\n\nDiscount code\n\n#### Reason for request\n\nPromised and clients' agreement that we will cover twelve months of Acquisity"
+    },
+    {
+      "id": "ENG-5748",
+      "createdAt": "2026-02-20T18:53:45.089Z",
+      "title": "Activate Acquisity with promo code for 90 day challenge",
+      "state": "Duplicate",
+      "assignee": "Beth Newton",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "#### Customer Name\n\nName 18\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 18's Workspace\n\n#### Screenshot\n\n <image> \n\n#### What are you trying to achieve?\n\nHe is part of the 90 day challenge and we need to activate Acquisity, his domains and inboxes with a Promo Code\n\n#### What are you doing to achieve it?\n\nI already tried to activate it from his account and I have the promo code ready\n\n#### What is happening instead?\n\nI can only see legacy access when I try to activate it\n\n#### What is the expected outcome?\n\nget acquisity set up with the promocode since he gets 3 months for free including domains and inboxes"
+    },
+    {
+      "id": "ENG-11937",
+      "createdAt": "2026-07-21T18:49:35.219Z",
+      "title": "Request for two month promo code due to fee concerns",
+      "state": "Todo",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": ["Billing", "Refund", "triaged-by-devin"],
+      "description": "#### Customer Name\n\nName 19 & Name 20\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 19\n\n#### Screenshot\n\n#### What are you trying to achieve?\n\nrequesting 2 month promo code to cover acquisity & domain/inboxes due to lack of communication regarding tech stack fees\n\n#### What are you doing to achieve it?\n\nobtain 2 month promo code\n\n#### What is happening instead?\n\nclient is not willing to pay for acquisity/inboxes\n\n#### What is the expected outcome?\n\nobtain 2 month code"
+    },
+    {
+      "id": "ENG-5065",
+      "createdAt": "2026-02-02T23:16:58.966Z",
+      "title": "Request new Acquisity promo code due to previous issue",
+      "state": "Done",
+      "assignee": "Beth Newton",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "#### Customer Name\n\nName 21\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 21's Workspace\n\n#### Screenshot\n\n#### What are you trying to achieve?\n\nshe was never able to use her promo code for Acquisity & needs a new one\n\n#### What are you doing to achieve it?\n\nsubmitting this\n\n#### What is happening instead?\n\nnothing\n\n#### What is the expected outcome?\n\nNew Acquisity promo code"
+    },
+    {
+      "id": "ENG-12367",
+      "createdAt": "2026-08-06T16:00:17.104Z",
+      "title": "Need promo code for blacklabel client to cover 1 year of acquisity, domains, and inboxes",
+      "state": "Done",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [],
+      "description": "#### User Email\n\n<email>\n\n#### Workspace Name\n\nCompany Three\n\n#### Request Type\n\nDiscount code\n\n#### Reason for request\n\nName 22 - for BL client"
+    },
+    {
+      "id": "ENG-4050",
+      "createdAt": "2025-12-30T00:06:06.949Z",
+      "title": "Move Promo Input to Name 23",
+      "state": "Done",
+      "assignee": "Tyler Olsen",
+      "parent": null,
+      "labels": [],
+      "description": "Currently promo codes can only be used during the email account purchasing flow, but it's possible for customers to use promo codes during the subscription upgrade flow.\n\nWe need to move the promo field into the Name 24"
+    },
+    {
+      "id": "ENG-12872",
+      "createdAt": "2026-08-18T12:40:47.998Z",
+      "title": "Requesting promo code for 2 additional months of acquisity platform & 18 inboxes covered by us",
+      "state": "Done",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [],
+      "description": "#### User Email\n\n<email>\n\n#### Workspace Name\n\nName 100\n\n#### Request Type\n\nDiscount code\n\n#### Reason for request\n\nName 100 - Company Two asked if we could cover 2 additional months of acquisity platform and 18 inboxes instead of 1 month since with ads model we would cover closer to 1k in expenses"
+    },
+    {
+      "id": "ENG-14164",
+      "createdAt": "2026-09-23T17:32:35.654Z",
+      "title": "Name 25 - 3 months acquisity and inboxes covered by us plus 10k lead credits",
+      "state": "Todo",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": ["Credits", "Internal reported"],
+      "description": "#### User Email\n\n<email>\n\n#### Workspace Name\n\nCompany Four\n\n#### Request Type\n\nDiscount code\n\n#### Reason for request\n\nRR save - 3 months acquisity and inboxes covered by us plus 10k lead credits"
+    }
+  ]
+}

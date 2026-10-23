@@ -1,0 +1,230 @@
+{
+  "id": "ENG-15037",
+  "provenance": "seeded",
+  "createdAt": "2026-10-09T13:48:37.165Z",
+  "lane": "triage",
+  "stratum": "duplicate",
+  "ticket": {
+    "title": "Name 16 - Inboxes are not showing after paying for them.",
+    "description": "#### Customer Name\n\nName 16\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nCompany Three\n\n#### Screenshot\n\n <image> \n\n <image> \n\n#### What are you trying to achieve?\n\nSetup outreach inboxes & domains\n\n#### What are you doing to achieve it?\n\nPaid $53.95 to purchase domains and inboxes\n\n#### What is happening instead?\n\nThe inboxes are not showing in Acquisity\n\n#### What is the expected outcome?\n\nPlease investigate and resolve this issue",
+    "attachmentKinds": ["image"]
+  },
+  "repoCommitAtCreate": "5c6a3f41cc08571c54a3e0762f60bdcd53425785",
+  "flags": {
+    "descriptionEditedAfterCreate": false,
+    "needsProductionData": true,
+    "alreadyFixedAtTriage": false
+  },
+  "relatedSnapshot": [
+    {
+      "id": "ENG-14716",
+      "createdAt": "2026-10-05T13:06:42.366Z",
+      "title": "Master: unpaid mailboxes from a refunded DFY order cannot be paid from the billing page",
+      "state": "Backlog",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": ["Bug", "fast-lane"],
+      "description": "## Overview\n\nThe billing page cannot take payment for mailboxes that the platform still bills the provider for. When a Done-For-You domain order is refunded because the provider failed to provision it, the mailboxes it created are still live and in use, the audit flags them unpaid and warns they will be cancelled on a dated deadline, and the resubscribe control that would settle them never renders. Customers see a warning they cannot act on, and the mailboxes are removed while they are willing to pay.\n\n## Problem\n\nAn owner opens Settings -> Billing from the \"Review billing\" banner, expecting to pay for the mailboxes the banner names. The page shows no managed domains for that workspace, so there is no \"Review and resubscribe\" and no per-domain \"Resubscribe\", and no other surface opens the pay dialog. Support then tells the customer a payment failed, when the only inbox charge was refunded.\n\n## Root cause\n\n`apps/web/trpc/routers/outreach/email-accounts.ts` `listManagedDomains` inner-joins the domain's purchase order and filters `ne(domainPurchaseOrderTable.status, 'refunded')` (and `ne(mailDomainTable.status, 'suspended')`). A refunded order therefore removes its domain from the managed list even while an open unpaid audit finding exists for it. `apps/web/components/billing/email-accounts-domains-card.tsx` `EmailAccountsDomainsCard` returns its \"No managed domains\" empty state before rendering the \"Review and resubscribe\" and per-domain \"Resubscribe\" buttons, and those are the only entry points to the pay flow (`apps/web/trpc/routers/cmr-domain-charges.ts` `listUnpaid` already returns the domain for an owner or admin, regardless of order status). When the card does render for a workspace with other domains, the refunded domain is still hidden from the list, so its per-domain control is missing too.\n\n## Blast radius\n\nCounted 2026-10-05 against production. 4 organizations and 9 open `unpaid` findings belong to a refunded purchase order; 2 of those organizations have an empty managed list, where the control is unreachable (6 findings), and the other 2 keep 3 and 4 visible managed domains, where only the per-domain control is missing (3 findings). All 4 organizations have a sent unpaid reminder dated 2026-09-29, so all 4 face a 2026-10-06 cancellation date. Distinct affected users were not counted: the audit rows carry no user id.\n\n```\nWITH f AS (SELECT fa.organization_id FROM cmr_domain_audit_finding fa\n  JOIN domain_purchase_order o ON o.id = fa.order_id\n  WHERE fa.payment_state = 'unpaid' AND fa.resolved_at IS NULL\n    AND fa.dismissed_at IS NULL AND o.status = 'refunded')\nSELECT f.organization_id::text, count(*) AS open_findings,\n  (SELECT count(*) FROM mail_domain md\n     JOIN domain_purchase_order o2 ON o2.id = md.order_id\n    WHERE md.organization_id = f.organization_id\n      AND md.status <> 'suspended' AND o2.status <> 'refunded') AS visible_managed_domains,\n  (SELECT min(r.created_at)::text FROM cmr_renewal_reminder r\n    WHERE r.organization_id = f.organization_id\n      AND r.kind = 'unpaid' AND r.status = 'sent') AS first_sent_reminder\nFROM f GROUP BY f.organization_id\n```\n\nConfirmed affected: 2 organizations with the control unreachable. Potentially exposed: the further 2 organizations whose refunded domain is hidden from the list while their pay-all control is reachable.\n\n## Proposed fix\n\nMake the unpaid-mailbox notice actionable for every workspace that carries an open unpaid finding. A workspace whose DFY order was refunded but whose provider mailboxes are still live should be able to pay for them from the billing page: the pay control should be reachable from the unpaid findings themselves rather than only from the managed domain list, and a refunded order's domain should stay visible to the billing card while an open unpaid finding exists so its per-domain \"Resubscribe\" renders as well. The customer-facing outcome is that the banner's deadline can be met from the billing page, without an operator making a production or billing change by hand.\n\n## What's included\n\nBoth variants found in the blast radius (empty card, and refunded domain hidden beside visible ones). Not included: the upstream provisioning failure that leaves mailboxes live after a refunded order (owned by the DFY provisioning family tracked under ENG-13213), and the wording of the reminder emails. Related umbrella work: ENG-13358, whose child ENG-14423 covers giving customers a clear date to act by. Separately filed work needed for the current cohort: an operator must make the affected mailboxes payable, or decide they are removed, before 2026-10-06.\n\n## Regression seam\n\nThe billing page's managed-domain list and its pay control. Red before: for a workspace whose only mail domain belongs to a refunded order while an open unpaid finding exists, `listManagedDomains` returns nothing and the billing card renders its empty state with no pay control. Green after: the same workspace offers a working resubscribe path that charges for the live mailboxes and clears the finding.\n\n## Done when\n\n* An owner of a workspace whose DFY order was refunded but whose provider mailboxes are live can open Settings -> Billing and pay for those mailboxes from the page.\n* A workspace that also has other managed domains shows the per-domain resubscribe control for the refunded domain while its unpaid finding is open.\n* A regression test at the list/pay seam proves both cases red before and green after.\n\n## Reports\n\n* ENG-14710 (customer report, Company One workspace; carries the full investigation document)."
+    },
+    {
+      "id": "ENG-8045",
+      "createdAt": "2026-04-22T22:23:24.652Z",
+      "title": "Paid inboxes are not showing after purchase",
+      "state": "Done",
+      "assignee": "Tyler Olsen",
+      "parent": null,
+      "labels": [],
+      "description": "User: <email>\nA customer reported that after adding inboxes and making the payment, nothing appeared in the product. Support checked and said the inbox setup seems to have failed and may need to be reinitiated.\n\n\n <image> "
+    },
+    {
+      "id": "ENG-9026",
+      "createdAt": "2026-05-19T20:05:38.305Z",
+      "title": "Inboxes not uploading to workspace after purchase",
+      "state": "In Progress",
+      "assignee": "Tyler Olsen",
+      "parent": null,
+      "labels": [],
+      "description": "#### Customer Name\n\nName 1\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 1's Workspace\n\n#### Screenshot\n\n <image> \n\n <image> \n\n#### What are you trying to achieve?\n\nClient bought inboxes but they platfrom shows 0 inboxes. Bought yesterday.\n\n#### What are you doing to achieve it?\n\nChecked if it shows in billing page and it does\n\n#### What is happening instead?\n\ninboxes are not uploading to workspace\n\n#### What is the expected outcome?\n\n6 domains, 18 email accounts to be added"
+    },
+    {
+      "id": "ENG-8024",
+      "createdAt": "2026-04-22T16:04:55.141Z",
+      "title": "Purchased inboxes do not appear after payment",
+      "state": "Duplicate",
+      "assignee": "Tyler Olsen",
+      "parent": null,
+      "labels": [],
+      "description": "user: <email>\n\nIn workspace `Company Four`, 6 domains and 18 email accounts were purchased, but no email accounts appear in the Email Accounts page after 12+ hours.\n\nA support review found no visible purchase in the account at first, but the customer shared a pending $252 bank charge. The customer also re-authenticated the affected Name 2 accounts after a Name 2 error banner was identified, but the email accounts still do not show.\n\n <image> \n\n <image> "
+    },
+    {
+      "id": "ENG-3998",
+      "createdAt": "2025-12-23T20:13:20.741Z",
+      "title": "Workspace error banner and missing purchased email inboxes",
+      "state": "Done",
+      "assignee": "Tyler Olsen",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "User reports that after purchasing email inboxes for the Cold Email Agent, the inboxes showed as pending for around 20 minutes and then disappeared. Inboxes are still not visible in the account.\n\nThere is also a persistent error message shown in the workspace since initial onboarding (see screenshot below). Support indicated this error \"should have no problem\" but asked for the tech team to investigate.\n\nIn Settings → Your Niche & Offer, the Niche field appears empty even though there are two niche items in the main workspace. The Offer field is populated.\n\nScreenshot of the error:\n\n <image> "
+    },
+    {
+      "id": "ENG-4347",
+      "createdAt": "2026-01-09T17:08:33.874Z",
+      "title": "Inbox provisioning failed for purchased email accounts",
+      "state": "Done",
+      "assignee": "Tyler Olsen",
+      "parent": null,
+      "labels": ["Inbox/Domain Not Created"],
+      "description": "Customer Name 3 Name 4 bought inboxes, but provisioning failed and the inboxes are not available in the \"Email Accounts\" view. The UI shows a red error banner reading \"Provisioning failed - 0/6 domains completed before failure\".\n\nRelevant screenshot:\n\n <image> "
+    },
+    {
+      "id": "ENG-7601",
+      "createdAt": "2026-04-08T00:57:50.007Z",
+      "title": "Pre-warmed inbox purchase not appearing after charge",
+      "state": "Done",
+      "assignee": "Jared Stauffer",
+      "parent": null,
+      "labels": [],
+      "description": "Same refunded first domain only issue.\n\nUser: <email>\nA customer reported that pre-warmed inboxes never appeared in the dashboard several hours after purchase, even after refreshing.\n\nInternal review showed the order as cancelled due to domain reservation expiry or the domain already being purchased, and marked as refunded. The customer replied that the card was still charged and attached a receipt.\n\n <image> \n\nReceipt-2880-8319.pdf"
+    },
+    {
+      "id": "ENG-7986",
+      "createdAt": "2026-04-21T13:44:39.680Z",
+      "title": "Purchased inboxes do not appear in account",
+      "state": "Done",
+      "assignee": "Tyler Olsen",
+      "parent": null,
+      "labels": [],
+      "description": "user: <email>\n\nPurchased inboxes are missing from the account after multiple days.\n\nThe account is using Acquisity native sending. A manual sync did not make the inboxes appear. The reported purchase was about 18 inboxes, and 3 domains purchased the previous day ran into the same issue.\n\nA payment screenshot was provided as proof of purchase.\n\n <image> "
+    },
+    {
+      "id": "ENG-12216",
+      "createdAt": "2026-07-31T21:02:51.766Z",
+      "title": "[Billing / Inboxes] Purchased inboxes do not appear in setup",
+      "state": "Triage",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": ["Bug", "intercom-sourced"],
+      "description": "#### Customer Name\n\nName 5\n\n#### Customer Email\n\n<email>\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 5\n\n#### Screenshot\n\n <image> \n\n <image> \n\n <image> \n\n#### What is the user trying to achieve?\n\nSet up inboxes in the Cold Email Agent using mailboxes that have already been purchased in the workspace.\n\n#### What is the user doing to achieve it?\n\nOpen the workspace billing area and the Cold Email Agent setup flow, then click \"Setup inboxes.\" The workspace shown is \"Name 5.\"\n\n#### What is happening instead?\n\nThe setup flow asks to buy new inboxes instead of showing the purchased mailboxes. In billing, the customer sees \"No managed domains\" and a prompt to purchase domains and inboxes, while another view shows 5 domains and 15 inboxes already purchased in the same workspace.\n\n#### What is the expected outcome?\n\nPreviously purchased mailboxes should be found and available during inbox setup in the same workspace instead of prompting for a new purchase."
+    },
+    {
+      "id": "ENG-14664",
+      "createdAt": "2026-10-02T19:36:58.134Z",
+      "title": "Client has paid for inboxes twice and none are showing",
+      "state": "Triage",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [],
+      "description": "#### Customer Name\n\nName 6\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 6\n\n#### Screenshot\n\n <image> \n\n#### What are you trying to achieve?\n\nClient has paid twice for inboxes and hasnt received any\n\n#### What are you doing to achieve it?\n\nChecked his account and there are no email accounts even though he has paid twice\n\n#### What is happening instead?\n\nNo email accounts\n\n#### What is the expected outcome?\n\nRefund his extra charges and make sure he gets his inboxes"
+    },
+    {
+      "id": "ENG-3862",
+      "createdAt": "2025-12-17T18:15:43.358Z",
+      "title": "Investigate missing 144 newly purchased inboxes",
+      "state": "Done",
+      "assignee": "Tyler Olsen",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "Customer reports that 144 newly purchased inboxes for the Diamond workspace are not appearing in the platform or in Company Two.\n\nContext:\n\n* Workspace: Diamond\n* Contact email: <email>\n* Existing setup: \\~279 inboxes already present in Company Two and visible in the Diamond workspace\n* Issue: After purchasing 144 additional inboxes a few days ago, these new inboxes are not visible in the platform or synced to Company Two. Only the original \\~279 inboxes show.\n* Screenshot shows one of the existing inboxes that has been active for about two months.\n\nRelevant screenshot:\n\n <image> "
+    },
+    {
+      "id": "ENG-4212",
+      "createdAt": "2026-01-06T17:16:00.763Z",
+      "title": "Newly purchased domains and inboxes not appearing",
+      "state": "Done",
+      "assignee": "Tyler Olsen",
+      "parent": null,
+      "labels": [],
+      "description": "Customer reports purchasing 4 new domains that are not showing up in the platform over 30 minutes later. Their account currently shows only 5 inboxes, but they expect 18 inboxes total (missing 4 domains and 12 inboxes).\n\nScreenshot of the current inbox list:\n\n <image> "
+    },
+    {
+      "id": "ENG-7569",
+      "createdAt": "2026-04-06T21:47:24.117Z",
+      "title": "Finish setup for purchased inboxes",
+      "state": "Done",
+      "assignee": "Tyler Olsen",
+      "parent": null,
+      "labels": [],
+      "description": "Email inboxes were purchased, but the setup was not finished. The current view shows the inboxes as canceled by user even though they were not canceled.\n\n <image> \n\n <image> \n\n <image> \n\n <image> "
+    },
+    {
+      "id": "ENG-8293",
+      "createdAt": "2026-05-04T12:29:27.200Z",
+      "title": "Acquisity native inboxes not showing after purchase",
+      "state": "Done",
+      "assignee": "Tyler Olsen",
+      "parent": null,
+      "labels": [],
+      "description": "<email>\nworkspace: Company Five\n\nAcquisity native inboxes and domains purchased on 2026-04-22 still do not appear more than 14 days later.\n\nReported details: 18 inboxes and 6 domains were purchased. The Email Accounts screen shows `Provisioning domains (0/6)...` and no email accounts found.\n\nExpected behavior: purchased native inboxes should appear within the normal provisioning window.\n\n <image> "
+    },
+    {
+      "id": "ENG-4970",
+      "createdAt": "2026-01-29T19:57:06.701Z",
+      "title": "Bug: Purchased inboxes not fully provisioned after domain purchase",
+      "state": "Done",
+      "assignee": "Tyler Olsen",
+      "parent": null,
+      "labels": ["Inbox/Domain Not Created"],
+      "description": "Customer reports purchasing 18 inboxes via AI SDR, with a receipt showing 11 domains. Based on current behavior (3 inboxes per domain), this should provision 33 inboxes, but only 15 inboxes are available.\n\nThis appears to be an ongoing provisioning bug with email inbox allocation after purchase. The issue persists after waiting for the documented 10–30 minute processing window and checking under **Cold Email Agent > Email Accounts**.\n\nScope currently confirmed for this single workspace/account; no broader impact has been established from this conversation."
+    },
+    {
+      "id": "ENG-4713",
+      "createdAt": "2026-01-21T01:29:57.500Z",
+      "title": "User reports purchased inboxes not appearing after payment",
+      "state": "Done",
+      "assignee": "Beth Newton",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "#### Customer Name\n\nName 7\n\n#### Customer Email\n\n<email>\n\n#### Screenshot\n\n#### Clear description of what the problem is\n\nBought inboxes a few hours ago but they are still not in. First it was loading but now that's gone as well.\n\nHe bought 24 inboxes and I watched him doing it and he payed for it."
+    },
+    {
+      "id": "ENG-11251",
+      "createdAt": "2026-07-08T06:50:39.789Z",
+      "title": "Domain and Inboxes order failed",
+      "state": "Done",
+      "assignee": "Tyler Olsen",
+      "parent": null,
+      "labels": ["Bug", "intercom-sourced", "triaged-by-devin"],
+      "description": "**Customer Name**\nName 8\n\n**Customer Email**\n<email>\n\n**Customer Email**\n<Enter text>\n\n**Workspace name**\nName 8's Workspace\n\n**Screenshot**\n\n**What is the user trying to achieve?**\n3 Domains and inboxes\n\n**What is the user doing to achieve it?**\nordered 3 domains and inboxes\n\n**What is happening instead?**\nOrder failed and domain and inboxes not showing\n\n**What is the expected outcome?**\nSuccessfully have domains and inboxes"
+    },
+    {
+      "id": "ENG-11254",
+      "createdAt": "2026-07-08T13:17:45.280Z",
+      "title": "Paid domains/pre-warmed inboxes never provision after a successful charge",
+      "state": "Duplicate",
+      "assignee": "Tyler Olsen",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "## Problem\n\nCustomers are charged for pre-warmed domains and inboxes, but the purchased items never appear in their workspace — provisioning is stuck after a successful charge (distinct from checkout failing). Name 8 paid for domains + inboxes that are not showing up.\n\n## Name 11 signal\n\n* Name 11 topic: `<uuid>`\n* Severity: High | Confidence: 0.85 | Track: Engineering\n* 2nd customer this week (3 in 30d).\n\n## Why new\n\nAll prior provision-after-charge tickets are closed: ENG-8024 (marked Duplicate), ENG-7601 (Done), ENG-3964 (Done), ENG-4903 (Done), ENG-8098 (Done, refund). The symptom is recurring again with no open canonical ticket to track it. Separate from the checkout \"payment failed\" error tracked in ENG-10691.\n\n## Source\n\n* Name 9\n* Reporter: Name 8 (charge succeeded, domains/inboxes absent from workspace).\n\n## Name 10\n\n`modem-<uuid>-2026-07-08`"
+    },
+    {
+      "id": "ENG-15028",
+      "createdAt": "2026-10-09T11:10:35.157Z",
+      "title": "Name 12 - Paid for inboxes and domain but those are nowhere to be found in the workspace",
+      "state": "Todo",
+      "assignee": "Anthony Adewale",
+      "parent": "ENG-14737",
+      "labels": ["Bug", "Customer reported", "Provisioning Pipeline"],
+      "description": "#### Customer Name\n\nName 12\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 12' Workspace\n\n#### Screenshot\n\n <image> \n\n <image> \n\n#### What are you trying to achieve?\n\nPaid for inboxes and domain but those are nowhere to be found in the workspace\n\n#### What are you doing to achieve it?\n\nPaid for inboxes and domain but those are nowhere to be found in the workspace\n\n#### What is happening instead?\n\nPaid for inboxes and domain but those are nowhere to be found in the workspace\n\n#### What is the expected outcome?\n\nInboxes and domains should be visible after payment and purchase"
+    },
+    {
+      "id": "ENG-13382",
+      "createdAt": "2026-09-02T12:42:17.561Z",
+      "title": "Client bought inboxes but they are not showing in his workspace",
+      "state": "Done",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": ["Customer reported"],
+      "description": "#### Customer Name\n\nName 13\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 13's Workspace\n\n#### Screenshot\n\n#### What are you trying to achieve?\n\nWe bought inboxes on a call together as he wanted to double volume but they are not in the workspace\n\n#### What are you doing to achieve it?\n\nChecked billing to see if it was correct + asked him to check bank records and both show that he payed for more inboxes\n\n#### What is happening instead?\n\nInboxes are not in the workspace so he can't send more volume.\n\n#### What is the expected outcome?\n\nThat the inboxes he paid for are being added - billing in Acquisity shows how much he paid"
+    },
+    {
+      "id": "ENG-14551",
+      "createdAt": "2026-10-01T00:13:41.153Z",
+      "title": "Charged twice for the same domain and inbox bundle; one bundle was never delivered and its subscription is still billing",
+      "state": "Todo",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": ["intercom-sourced"],
+      "description": "Intercom conversation: <url:app.intercom.com>\n\nConversation context: customer-initiated Intercom conversation, opened 2026-09-30, contact Name 14 <email>, workspace \"Name 15 Workspace\", owner role. Initial message: \"I have a billing issue that isn't being sorted. Please escalate to someone asap!\" Asked for detail: \"I've been billed twice for emails and domains for the last 3 months when that's not what I'm using.\" Declined the self-serve answer: \"No, I still need help.\" No attachments.\n\nBucket: overcharged.\n\nFinding: the customer bought the same DFY bundle (1 domain + 3 inboxes) twice about 17 hours apart and was charged for both; only one bundle was ever delivered. Order <uuid> (domain <domain>, created 2026-07-23 14:01Z) was cancelled for \"Payment timeout - order automatically cancelled after 30 minutes\" with nothing provisioned, but its Autumn subscription and its Stripe charges landed anyway. Order <uuid> (domain <domain>, created 2026-07-24 06:47Z) completed and is the bundle the customer actually uses (3 active connected inboxes). The cancelled order's subscription was never cancelled, so it has kept invoicing every month since.\n\nExposure (Stripe, smallest currency unit, all succeeded and unrefunded, no credit notes):\n\n* 2026-07-23, 3276 cents ($32.76), charge <stripe-id>, invoice EKGUJ5YE-0017\n* 2026-08-23, 1800 cents ($18.00), charge <stripe-id>, invoice EKGUJ5YE-0021\n* 2026-09-23, 1800 cents ($18.00), charge <stripe-id>, invoice EKGUJ5YE-0025\n  Total already collected for the undelivered bundle: $68.76, and $18.00/month continues until the orphan subscription is cancelled. The delivered bundle's own charges are legitimate and are not part of this ask.\n\nProposed human action (proposal, not a promise): refund the $68.76 collected for the undelivered bundle, and cancel the orphan domain and inbox line items on the billing account so the recurring $18.00/month stops. A Stripe customer credit is the alternative if the customer would rather have it applied forward (the Legacy Pro plan bills monthly, so there is a future invoice to consume it). The customer has not yet said which they want. No money has been moved and nothing has been cancelled.\n\nFull readout, systems of record, and the code path are in the Billing investigation document on this ticket."
+    }
+  ]
+}

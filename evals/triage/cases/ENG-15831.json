@@ -1,0 +1,230 @@
+{
+  "id": "ENG-15831",
+  "provenance": "seeded",
+  "createdAt": "2026-10-20T20:48:01.946Z",
+  "lane": "triage",
+  "stratum": "duplicate",
+  "ticket": {
+    "title": "Name 17's Workspace - AI SDR not following rules in the knowledge base",
+    "description": "#### Customer Name\n\nName 4\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 17's Workspace\n\n#### Screenshot\n\n#### What are you trying to achieve?\n\nai sdr hallucinating and escalating the simplest responses such as 'unsubscribe' or 'yes im interested'\n\n#### What are you doing to achieve it?\n\n* \n\n#### What is happening instead?\n\nescalated to client\n\n#### What is the expected outcome?\n\nai sdr to handle those",
+    "attachmentKinds": ["slack"]
+  },
+  "repoCommitAtCreate": "0dc2d70e27dac8145d19619967afd4da133f80a5",
+  "flags": {
+    "descriptionEditedAfterCreate": false,
+    "needsProductionData": true,
+    "alreadyFixedAtTriage": false
+  },
+  "relatedSnapshot": [
+    {
+      "id": "ENG-6660",
+      "createdAt": "2026-03-12T15:35:59.677Z",
+      "title": "AI-SDR ignores scheduling rules and books back-to-back meetings",
+      "state": "Done",
+      "assignee": "Jared Stauffer",
+      "parent": null,
+      "labels": [],
+      "description": "AI-SDR is reported to ignore scheduling rules placed at the front of the knowledge base and schedule meetings with no buffer time between them. Meetings are being booked back to back with no preparation time, and rescheduling them is reported to be difficult. The issue has led to AI-SDR being turned off multiple times."
+    },
+    {
+      "id": "ENG-12302",
+      "createdAt": "2026-08-04T20:57:43.929Z",
+      "title": "AI SDR not following rule +KB",
+      "state": "Canceled",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [],
+      "description": "#### Customer Name\n\nName 1\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 1's Workspace\n\n#### Screenshot\n\n <image> \n\n <image> \n\n#### What are you trying to achieve?\n\nGP has updated his KB as well as set a rule where if a prospect says they are not interested, the AI SDR is to respond back asking for feedback. The AI SDR has continued to ignore the rule as well as the KB. It has only responded accurately to one prospect (see first screenshot - email from Name 2).\nSee second screenshot for the AI SDR ignoring the rule (email from Name 3)\n\n#### What are you doing to achieve it?\n\n* \n\n#### What is happening instead?\n\n* \n\n#### What is the expected outcome?\n\n* "
+    },
+    {
+      "id": "ENG-15651",
+      "createdAt": "2026-10-17T11:17:41.175Z",
+      "title": "Help center: fix five contradictions the support widget repeats",
+      "state": "Backlog",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [],
+      "description": "## Why\n\nThe support widget answers from a guide generated from the help center (ENG-15025). Bot review of Foreman PR #210 found help-center articles that contradict each other or the product. The widget repeats them faithfully, so they must be fixed in the docs. Verified against Acquisity `main` on 2026-10-17. Paths are under `apps/web/content/docs/`.\n\n## Fix\n\n1. **AI SDR tone.** `ai-sdr/faq/inbox-replies/what-are-the-ai-sdrs-capabilities-and-limits.mdx:29` says the knowledge base changes \"not tone or voice\", and the widget guide says the AI SDR \"can't change tone\". The tone FAQ (`ai-sdr/faq/.../why-isnt-the-ai-sdr-kb-changing-the-reply-tonepersona...`) tells users to put a tone block at the top of the KB. Check the AI SDR prompt code, then make both agree.\n2. **Clients and support.** `support/index.mdx:10` sends everyone to **Feedback**, but Clients have no Feedback menu or chat bubble. `support/faq/i-cant-see-the-support-chat-widget.mdx:22` already says to ask the workspace owner or admin. Say that in the support overview too.\n3. **KB and escalation.** `ai-sdr/knowledge-base.mdx:83` says escalation ignores the knowledge base. `ai-sdr/faq/.../why-does-the-ai-sdr-make-up-answers...mdx:42-47` and the onboarding step say to add escalation rules to the KB. Check the escalation code and keep only the true one.\n4. **Talking to a human.** `support/faq/can-i-talk-to-a-human.mdx:14` still describes the Intercom flow (\"type human agent\"). Intercom is retired (ENG-15579); describe how the Foreman support chat hands off to a person, including office hours.\n5. **CSV re-verification.** `cold-email-agent/faq/lead-search/how-do-i-splitexport-a-large-ai-generated-lead-list-into-csv.mdx:44-45` says uploaded CSVs aren't re-verified, but the import screen has an **Automatically verify lead emails on upload** checkbox (`should-i-verify-imported-lead-emails.mdx:11`). Make them agree.\n\nFollow the local `docs-style-guide.md` (never commit it). Docs-only: Aaron merges once approved and green.\n\n## Done when\n\nEach pair agrees with the product code, and the next guide sync carries the fixes to the widget."
+    },
+    {
+      "id": "ENG-2720",
+      "createdAt": "2025-11-13T11:12:53.391Z",
+      "title": "Add a sheet for editing leads inside Leads tab",
+      "state": "Done",
+      "assignee": "James Keeble",
+      "parent": null,
+      "labels": ["Feature"],
+      "description": " <image> \n\nCurrently if I want to edit a lead's information, I can't\n\nThis is sometimes useful for testing or low volume campaigns or fixing some mistakes\n\nWe'd need to design a button somewhere on the lead that when pressed, opens a sheet with the lead's information that's editable and savable"
+    },
+    {
+      "id": "ENG-7927",
+      "createdAt": "2026-04-17T14:18:01.297Z",
+      "title": "Knowledge Base formatting breaks after saving content",
+      "state": "Duplicate",
+      "assignee": "Arthur Li",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "Content entered as normal sentences with paragraph spacing in the AI SDR Agent Knowledge Base does not preserve formatting after save. The saved result rewrites or collapses formatting unexpectedly.\n\nThis still happens even when avoiding bullets and structured formatting.\n\nScreenshots show the editor input and the saved resource output.\n\n <image> \n\n <image> "
+    },
+    {
+      "id": "ENG-15633",
+      "createdAt": "2026-10-16T16:43:12.405Z",
+      "title": "Campaign Backend Error & Lead Replacement Request",
+      "state": "Done",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": ["Customer reported"],
+      "description": "#### Customer Name\n\nName 4\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nnot provided\n\n#### Screenshot\n\n#### What are you trying to achieve?\n\nFix a backend campaign error that pulled incorrect variables, and authorize replacement leads for the ones burned by the glitch.\n\n#### What are you doing to achieve it?\n\nEscalating to engineering to verify the backend error and approve the lead credit.\n\n#### What is happening instead?\n\nA recent campaign pulled the wrong podcast name and signed all emails with Name 4's name instead of the individual warm inbox names. This caused prospect confusion, made them look unprofessional, and effectively burned the leads.\n\n#### What is the expected outcome?\n\nFix the backend variable/signature error for her campaign, and replace the leads that were ruined by the wrong messaging."
+    },
+    {
+      "id": "ENG-9433",
+      "createdAt": "2026-05-28T20:40:20.701Z",
+      "title": "AI SDR offering gift cards instead of booking meetings",
+      "state": "Backlog",
+      "assignee": "Koppany Kondricz",
+      "parent": null,
+      "labels": [],
+      "description": "#### Customer Name\n\nName 5\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 5\n\n#### Screenshot\n\n <image> \n\n#### What are you trying to achieve?\n\nAI SDR book calls\n\n#### What are you doing to achieve it?\n\nset up by the book\n\n#### What is happening instead?\n\nper screenshot - AI SDR offering $100 gift cards to book a meeting\n\n#### What is the expected outcome?\n\nJust book meeting."
+    },
+    {
+      "id": "ENG-14206",
+      "createdAt": "2026-09-24T06:45:54.115Z",
+      "title": "AI SDR is not able to process the responses",
+      "state": "Done",
+      "assignee": "Koppany Kondricz",
+      "parent": "ENG-14208",
+      "labels": ["Bug", "Customer reported"],
+      "description": "#### Customer Name\n\nName 6\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nCompany One Workspace\n\n#### Screenshot\n\n <image> \n\n#### What are you trying to achieve?\n\nAi SDR to respond to replies from the prospects\n\n#### What are you doing to achieve it?\n\nAi SDR KB is updated\n\n#### What is happening instead?\n\nAI SDR is not able to process simple questions like 'Tell me more about this Name 7'\n\n#### What is the expected outcome?\n\nPlease investigate and resolve the issue"
+    },
+    {
+      "id": "ENG-7557",
+      "createdAt": "2026-04-06T18:30:31.819Z",
+      "title": "Improved Escalation UX: Knowledge Gap Feedback & KB Training Prompts",
+      "state": "Done",
+      "assignee": "Koppany Kondricz",
+      "parent": null,
+      "labels": [],
+      "description": "## Context\n\nDuring testing of the copywriter agent and new models, many AI SDRs fabricate information when the knowledge base is missing data or poorly set up. Most clients either have no AI SDR knowledge base or have added low-quality info. While we want escalations to be minimal, the AI should escalate when it doesn't have the information rather than making things up or just pivoting to booking.\n\n## Problem\n\nThe AI SDR fabricates info primarily on these question types:\n\n* **Podcast/show specifics** — name, episode links, listener counts, past guests (KB rarely has these)\n* **Pricing/package details** — rates, what's included, ROI claims\n* **Social proof** — testimonials, client names, case studies\n* **Process/logistics** — how recordings work, what platform, preparation needed\n* **Company identity** — team size, location, history\n* **Competitive comparisons** — differentiators vs alternatives\n\n**Root cause:** The knowledge analysis agent is well-guarded (it flags gaps and sets `pivot_to_booking`), but the copywriter agent has no hard anti-fabrication rules. When it gets partial KB context, it fills gaps with plausible-sounding but fake details. Also, questions never escalate today — they always attempt an answer or pivot to booking, so users never learn what the SDR couldn't handle.\n\n## Solution\n\n### Phase 1: Escalation Banner with Name 8\n\n* When the AI SDR escalates, the banner should show **what the AI did not know** and **what info it needed**\n* Prompt the user to add that info to the knowledge base\n* Example: If a prospect asks for previous episodes or the name of the podcast, the escalation banner will ask the user to add the link to previous episodes or the podcast name to the KB\n* Include a button that takes the user directly to the knowledge base settings\n\n### Phase 2: \"Special Escalation\" for Quick Answers\n\n* Simplified UI: just a text input for the answer (not the full 'send email' interface)\n* When the user answers:\n  1. Send an email to the prospect with the answer (via copywriter)\n  2. Submit the Q&A to the user's knowledge base so the SDR learns for next time\n  3. Remove the escalation from the thread so SDR keeps working on the next prospect response\n\n### Phase 3: \"How to Train Your SDR\" (Future)\n\n* Unknown question → human answer → goes to knowledge base\n* Mark thread as 'favourite' → thread goes into the knowledge base\n* Name 9: 'Do these 5 steps to increase bookings'\n* Submit custom rules to the SDR (per-user agent prompts)\n* Add a link/modal showing two strong KB examples to guide users\n\n## Current Implementation (Koppany's WIP)\n\nBranch: `kopi/improved-escalation-ux`\n\n**Backend:**\n\n* New escalation metadata system (`types/escalation-metadata.ts`, `lib/outreach/db/escalation-metadata.ts`)\n* Metadata types: `contact_switch`, `platform_switch`, `knowledge_gap`\n* New tRPC endpoint `submitKnowledgeAnswer` — appends Q&A to KB, updates thread control level back to automated\n* Escalation metadata fetched in batch for escalated threads (avoids N+1)\n* New escalation reason constant: `ESCALATION_REASON_UNKNOWN_QUESTION`\n\n**Name 10:**\n\n* New `EscalationActionBox` component with type-specific UIs:\n  * Knowledge gap: shows the question, text input for answer, submit to KB + optionally send reply\n  * Contact switch: shows new contact info with action buttons\n  * Platform switch: shows requested platform with action buttons\n* Integrated into `email-thread-view.tsx`\n\n## References\n\n* Branch: <url:github.com>\n* Slack discussion between James, Koppany, and Blaise"
+    },
+    {
+      "id": "ENG-10987",
+      "createdAt": "2026-06-29T15:42:02.488Z",
+      "title": "AI SDR replies in Spanish when prospect writes in English — language detection picks up email metadata instead of message body",
+      "state": "Backlog",
+      "assignee": "Koppany Kondricz",
+      "parent": null,
+      "labels": ["Bug", "intercom-sourced"],
+      "description": "BUG: Yes\n\nEVIDENCE:\n\n* Customer Name 11 (<email>, workspace Company Two) reports the AI SDR is replying in Spanish when the prospect responds in English.\n* Confirmed in prod DB: thread `<uuid>` (prospect: <email>). Prospect wrote in English: \"Thank you for your email. Unfortunately, I am unable to help you as our firm does not deal with tax matters.\" AI SDR replied in Spanish: \"Name 12, gracias por aclararlo. Te deseo lo mejor.\"\n* The prospect's email contained Spanish-locale metadata (quoted reply header \"El 26 jun 2026, a las 14:58...\", signature \"Name 13\", location \"Name 14 (España)\") but the actual message body was entirely in English.\n* The customer's knowledge base explicitly states: \"When a prospect responds in English, only respond in English. When a prospect responds in Spanish, only respond in Spanish. Do not switch languages unless the prospect does.\"\n* Despite these KB instructions, the system-level language matching prompt in `default-agent.ts:108-109` (\"Detect the prospect's language from their most recent message. Reply in that language throughout.\") appears to misdetect the language based on email metadata/signature rather than the message body.\n* This is a repeat of ENG-8975 (same customer, same issue, marked Done 2026-05-20 without a code fix — was called \"operating as expected\"). Customer has since added explicit language instructions to their KB but the issue persists.\n* Related: ENG-10406 (docs gap, canceled), ENG-3678 (backlog).\n\nPOTENTIAL FIX:\n\n1. Update the language detection logic in the copywriter agent system prompt (`default-agent.ts:108-109`) to explicitly instruct the model to detect language from the prospect's **message body only**, ignoring email client locale headers, quoted reply metadata, and signature blocks.\n2. Add a precedence rule: if the knowledge base contains explicit language instructions, those should override the system-level language matching.\n3. Consider adding a per-workspace `replyLanguage` setting to `ai_sdr_setting` (as suggested in ENG-8975 comments but never implemented).\n\nWHATS NEEDED TO RESOLVE:\n\n* Update the system prompt language matching section to be more precise about what constitutes \"the prospect's language\" (message body vs metadata)\n* Ensure KB language instructions take precedence over system prompt defaults\n* Consider a configurable language preference per workspace\n\nINTERCOM: <url:app.intercom.com>\nDEVIN SESSION: <url>"
+    },
+    {
+      "id": "ENG-10988",
+      "createdAt": "2026-06-29T15:42:42.432Z",
+      "title": "[Docs gap] AI SDR language matching behavior — how to enforce a reply language via knowledge base",
+      "state": "Done",
+      "assignee": "Koppany Kondricz",
+      "parent": null,
+      "labels": [],
+      "description": "HELP CENTER DOC GAP\n\nGAP TYPE: Missing topic\n\nCONTEXT:\nCustomer Name 11 (Company Two) reported that the AI SDR replies in Spanish when a prospect writes in English. The customer had already added explicit language instructions to their knowledge base (\"When a prospect responds in English, only respond in English\") but was unaware that the AI SDR's language detection can be confused by email metadata (locale headers, signature blocks) and may not always follow KB overrides. No existing Help Center doc explains how language matching works or how to enforce a specific reply language.\n\nWHAT IS NEEDED:\nCreate a new FAQ doc under `ai-sdr/faq/inbox-replies/` that explains:\n\n1. How the AI SDR detects and matches the prospect's language (it mirrors the language of the most recent message)\n2. Known edge cases: email client locale headers, signature blocks, and quoted reply metadata in a different language can cause misdetection\n3. How to add language enforcement instructions to the knowledge base (e.g., \"Always reply in English regardless of the prospect's language\" or \"Only respond in the language the prospect's message body is written in\")\n4. Current limitation: there is no per-workspace language setting — language control is done through knowledge base instructions only\n\nINSTRUCTIONS:\n\n* Help Center codebase location: apps/web/content/docs in the ai-clients repo (Institute-of-Business-Growth/ai-clients)\n* Help Center live site: <url:app.acquisity.ai>\n* Follow the existing documentation style: Name 15 MDX format with YAML frontmatter (title, description), plain-language tone, step-by-step instructions where applicable.\n* Study the structure and tone of neighboring docs in the same section before writing. Match how existing docs are organized (index.mdx with Cards for sections, meta.json for navigation, FAQ pages with QuestionList/QuestionItem components).\n* If adding a new topic: create the .mdx file in the appropriate section folder and add it to that section's meta.json.\n* If updating an existing doc: edit the existing .mdx file and preserve its structure.\n* Only create or update user-facing application guidance — instructions a customer/operator can follow inside the Acquisity app.\n* Do not change any code, settings, or configuration outside of apps/web/content/docs.\n* Open a pull request on the ai-clients repo with the documentation changes."
+    },
+    {
+      "id": "ENG-15733",
+      "createdAt": "2026-10-19T16:14:31.551Z",
+      "title": "Knowledge Base and Rules edits vanish after saving",
+      "state": "Done",
+      "assignee": "Jil Patel",
+      "parent": null,
+      "labels": ["Bug", "Raindrop"],
+      "description": "**What's happening:** A user reports that edits to the agent's Knowledge Base and Rules disappear after saving — the save appears to succeed but the changes are gone.\n\n**What should happen:** KB/Rules edits persist on save.\n\n**Who it hits:** 1 user report today; potential silent data loss for anyone editing agent settings.\n\n**How to see it:** Raindrop digest Oct 19, 2026, theme 5 stumble \"Knowledge Base and Rules edits vanish after saving\". Found via Raindrop digest 2026-10-19. Not reproduced yet.\n\n**Done when:**\n\n- [ ] Repro identified (save path, cache invalidation, or org scoping)\n- [ ] Edits persist across save and reload"
+    },
+    {
+      "id": "ENG-15364",
+      "createdAt": "2026-10-14T01:19:55.659Z",
+      "title": "Stop an AI SDR Settings save from overwriting a newer knowledge base written through the API",
+      "state": "Done",
+      "assignee": "James Keeble",
+      "parent": "ENG-15321",
+      "labels": [],
+      "description": "## Overview\n\nPart of ENG-15321. James chose this follow-up on 14 Oct 2026, instead of holding PR #7186 for it. The goal is that a user saving AI SDR Settings never silently wipes a newer knowledge base the campaign agent wrote through the API.\n\n## Problem\n\nThe Settings form remembers the knowledge base it loaded. PR #7186 already skips the write when the user didn't touch the field. But if the user edits the knowledge base, and the API writes a newer version while the form is open, saving the form overwrites the API's version without warning.\n\n## What's included\n\n* Save the knowledge base only if it hasn't changed since the form loaded it. Do it as a conditional write (`setWhere` on the upsert, or an `updatedAt` check), as in the draft patch from the #7186 review.\n* When the stored value has moved, the save keeps the user's other settings, does not overwrite the knowledge base, and shows a toast asking the user to reload. That's a small user-visible change.\n* Tests for an unchanged, a changed and a concurrent edit.\n\n## Done when\n\n* A unit test proves a stale form save leaves the newer knowledge base intact and returns the conflict.\n* Browser QA on the PR preview shows the toast, with screenshots sent to James before the #to-cr hand-off, because it's a UI change."
+    },
+    {
+      "id": "ENG-4931",
+      "createdAt": "2026-01-28T17:03:16.444Z",
+      "title": "AI SDR not utilizing knowledge base context for replies",
+      "state": "Canceled",
+      "assignee": "Beth Newton",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "#### Customer Name\n\nName 16\n\n#### Customer Email\n\n<email>\n\n#### Screenshot\n\n#### Clear description of what the problem is\n\nShe has context added to her knowledge base but the AI SDR is not using the info in there and is escalating a lot of simple replies for her."
+    },
+    {
+      "id": "ENG-13915",
+      "createdAt": "2026-09-15T21:42:16.139Z",
+      "title": "Polish Fin responses, knowledge-base use and Foreman Slack presentation",
+      "state": "Canceled",
+      "assignee": "Aaron Fraga",
+      "parent": "ENG-13762",
+      "labels": [],
+      "description": "## Outcome\n\nMake the completed Fin + Foreman MVP feel coherent and useful to customers and teammates. Aaron observed the Preview tests and requested a dedicated cleanup pass: the investigation work is solid, but output across Fin and Slack is messy.\n\nThis is a focused response-quality and presentation follow-up after the functional workflows in ENG-13766/ENG-13767. Reuse those implementations; do not duplicate their run coordination, ticket workflows or authorization work.\n\n## Work\n\n### Fin customer responses\n\n* Lead with the answer, explain the useful evidence briefly, and give a proportionate next step. Remove repetitive acknowledgements, boilerplate, excessive headings and unsupported promises.\n* Preserve every material requested finding and qualification from Foreman's evidence. Missing metrics are not zero activity; unavailable providers are not successful empty results; saved state is not live provider health.\n* Keep record update time distinct from when an error occurred. A saved error alone must not imply a current failure or justify reconnecting.\n* Keep unavailable resource IDs ambiguous: do not infer existence or ownership elsewhere. Preserve existing cross-workspace refusal behavior.\n* Preserve verified ticket outcomes and existing delivery ownership rules. Never invent actions, fixes, commitments or ETAs.\n\n### Knowledge-base use and investigation routing\n\n* Verify Fin retains normal access to its knowledge base for how-to, feature and troubleshooting questions. The investigation integration must not turn every question into an investigation or make Fin unnecessarily unhelpful.\n* Combine relevant knowledge-base guidance with scoped findings when useful, clearly distinguishing general guidance from facts checked for this customer. Verify linked articles are relevant.\n* Review follow-up behavior in an existing conversation: a new legitimate investigation request after completion must not silently fall back to generic help that claims records cannot be checked. Reuse the existing workflow and diagnose routing separately from provider availability.\n* Cover ordinary knowledge questions, investigation questions, mixed questions, and follow-ups without duplicate active investigations.\n\n### Foreman in Slack\n\n* Review actual rendered intake, progress, completion and failure messages together. Make the case/workspace and outcome easy for a teammate to identify using appropriate existing context and links.\n* Use concise Slack-native formatting. Replace raw Markdown tables, awkward escaping, walls of text, repeated caveat blocks and generic completion headings where they reduce readability.\n* Keep decisive findings, uncertainty and the next action visible. Keep detailed evidence accessible through the existing case/report links where supported.\n* Preserve existing threading, delivery ownership and progress limits. Do not add notification spam or expose credentials, raw provider errors or other customers' data.\n\n## Concrete regressions from ENG-13765\n\n* Final Aaron test on PR #136 head `9e1ad6a`: Foreman correctly explained empty metrics and that June 7 was a record update. Fin omitted the requested metric detail and described the date as belonging to the saved error.\n* Final Diamond test preserved missing counts when explicitly asked, showing inconsistent summarization rather than missing evidence.\n* An older Diamond conversation answered a request to recheck actual records with generic knowledge instructions and did not invoke Foreman.\n* Slack reports included lengthy customer-style explanations and Markdown tables rendered as raw text. Audit the complete message sequence rather than polishing one isolated sample.\n\nEvidence: ENG-13765 handoff, Aaron report, Diamond report.\n\n## Acceptance\n\n* Record before/after transcripts and rendered Slack examples from natural customer scenarios in Aaron's Workspace and Diamond.\n* Compare source evidence, Foreman report/callback, Fin reply and Slack output side by side. All material requested findings and caveats survive; no unsupported facts or claims of action are introduced.\n* Prove useful knowledge-only answers, relevant article use, mixed knowledge/evidence answers, same-chat follow-ups and fresh-chat behavior. Distinguish routing failures from unavailable evidence.\n* Cover valid empty metrics, provider unavailable, saved connection error, foreign/missing ID, pending/completed/failed investigation and confirmed ticket outcomes using the established workflows.\n* Aaron reviews representative final customer and Slack conversations before calling the polish pass complete. Feed results into ENG-13768 pilot acceptance.\n\n## Boundaries and test setup\n\nNo new evidence providers, broader Executor access, product writes, authorization redesign or general runtime framework. Keep this work separate from ENG-13765's evidence-read PR.\n\nUse the exact PR Preview deployment with the existing two-email audience and verify zero Production Foreman investigation traffic for every test window. Preserve the working Acquisity Production → Foreman Preview setup. Keep scheduled support disabled; do not test human handoff until its path is isolated. Document anything untested rather than claiming a complete pass."
+    },
+    {
+      "id": "ENG-14758",
+      "createdAt": "2026-10-05T21:41:48.522Z",
+      "title": "New AI SDR follow-up writer: Sonnet 5.5 on a follow-up-only prompt, switched on for all follow-ups",
+      "state": "In Progress",
+      "assignee": "Koppany Kondricz",
+      "parent": "ENG-14756",
+      "labels": [],
+      "description": "## Overview\n\nFollow-up emails get written by Claude Sonnet 5.5 on a prompt built only for follow-ups, with the facts it needs. James decided on 6 Oct: Sonnet 5.5, switched on for **every** follow-up on day one. No gradual rollout and no A/B split. We measure the difference by comparing results before and after the switch.\n\nIn a blind test on 51 real quiet threads, Sonnet 5.5 with this prompt scored 8.0 out of 10, against 2.8 for today's follow-ups, at about $0.015 per email.\n\n## Problem\n\n* Today's follow-ups are generic \"just checking in\" notes. The writer uses the general reply prompt and knows nothing about the campaign, the sender or the prospect.\n* In the blind test, today's follow-ups gave a clear next step in 1 of 51 cases and read like a template in almost all of them.\n\n## User experience\n\n* A prospect who went quiet gets a short email (20 to 60 words) in the same thread, from the same sender, that:\n  * picks up on what they last said or asked;\n  * gives one easy next step: point back to the times we offered that are still open, or ask \"want me to send two times for next week?\";\n  * never invents times, links, episodes, prices or history.\n* For threads that need a person (the prospect sent their own booking link, our earlier reply contradicts the campaign, a pricing deadlock), the AI sends nothing and creates a task for the deal owner instead.\n* Live times come in the next ticket. Until then this writer offers no new times.\n\n## What's included\n\n1. **The new writer**, as a new arm in the writer setup from ENG-14757:\n   * an agent row of type `followup-writer`, version 1;\n   * model `anthropic/claude-sonnet-5.5`, effort **low**, no temperature, max output tokens 4000. Use exactly this. Medium effort was only tested with the older prompt, so don't switch to it;\n   * the prompt is prompt v3, full text in the AI context. Copy it exactly.\n2. **Fact sheet**, built by code for each follow-up (field list and sources in the AI context):\n   * the cold email variant they received\n   * our earlier emails as real text\n   * their words\n   * the campaign offer, method, niche and industry\n   * show and host as written in this campaign's emails\n   * sender first name, and the workspace's signature rule if it has one\n   * title, company and company one-liner\n   * today's date in the prospect's time zone\n   * the situation and the step's job\n   * which offered times are still open\n   * allowed links\n3. **Placeholders filled by code.** The model never types a time or a link:\n   * `{{OFFERED_TIMES_OPEN}}` is replaced by the times we already offered that are still more than 2 hours away, in the prospect's time zone.\n   * `{{LINK:id}}` is replaced by an allowed URL.\n   * `{{TIMES}}` is not allowed yet. Treat it as a check failure.\n4. **Code checks before send**, on every email from the new writer:\n   * typed days, dates or times\n   * raw URLs\n   * banned phrases (\"just checking in\", \"circling back\" and the rest of the list)\n   * false history (\"thanks for getting back\")\n   * \"the link I sent\" when no link was sent\n   * wrong sign-off name\n   * leftover template text\n   * over 80 words\n   * a placeholder that could not be filled\n\n   On failure, regenerate once with the reasons. If it fails again, skip this follow-up (`check_failed`). Never send, never escalate.\n5. **Writer says \"don't send\"** (`send: false`): skip the follow-up (`writer_declined`) and create a CRM task for the deal owner with the reason.\n6. **Subject line**: reuse the subject of our last sent email in the thread, never an out-of-office subject.\n7. **Switch-on, in this order. Do not skip a step:**\n   1. **Baseline.** ENG-14757 must have been live in production, with today's writer at 100%, for at least 14 full days. Those days are the \"before\" numbers. One week is not enough: results swing a lot from week to week. Its history fix and policy switches change today's results, so older data is not a fair baseline.\n   2. **Gate.** Run the 51-case replay (AI context) in preview. All 51 must pass the code checks after at most one regeneration. Read 20 of the outputs yourself. Attach the pass/fail table and your notes to the PR. If either fails, fix before switching on.\n   3. **Switch on.** In production, set the new writer's arm to weight 100 and today's writer (control) to weight 0. Leave control `active`: it is the instant rollback. Pausing the new arm sends every thread back to today's writer on its next follow-up, with no deploy.\n   4. **Record the switch time.** Post the exact UTC timestamp as a comment on this ticket. The before/after report uses it.\n   5. **First 3 days:** read 20 sent emails a day and post one line per day on this ticket (\"20 read, 0 problems\" or what you found).\n8. **Measure.** Run the before/after report from ENG-14757 at 1, 2 and 4 weeks after the switch, and post the output on this ticket. Follow-ups rely on the code checks in this ticket. The ENG-14745 reply checker covers replies only (agreed 12 Oct 2026).\n\n**Stop limits.** Pause the new arm (one database update) and tell James in Slack if any of these happen:\n\n* \"no\" plus do-not-contact replies per follow-up sent run more than 2 points above the baseline rate, over at least 300 sends;\n* any email goes to the wrong person or names the wrong sender, show or company;\n* more than 15% of follow-ups are skipped by the checks;\n* a mailbox gets a spam complaint traced to the new writer.\n\nAlso tell James (don't pause) if positive replies to follow-up 1 are more than 4 points below baseline after 1,000 sends.\n\n## Blocked by\n\n* ENG-14757: writer setup, logging, the history fix and the before/after report.\n\n## Done when\n\n- [ ] Replaying the 51 cases (fixture list in the AI context) in preview gives no email that fails the code checks after one regeneration, and the table plus 20 read emails are in the PR.\n- [ ] No email from the new writer can contain a typed time, a raw URL, a banned phrase or a wrong sender name (code check and unit tests).\n- [ ] `{{OFFERED_TIMES_OPEN}}` renders the correct still-open times in the prospect's time zone, and the email is skipped (not broken) when none are left.\n- [ ] Writer-declined threads create a CRM task for the deal owner.\n- [ ] Pausing the new arm in preview sends the next follow-up through today's writer (rollback tested).\n- [ ] In production the new arm is at weight 100 and control at weight 0 (still active), after at least 14 days of baseline. The switch timestamp is posted on this ticket.\n- [ ] Its `agent_executions` rows show the full fact sheet and v3 prompt.\n- [ ] Three daily read-throughs and the 1, 2 and 4-week before/after reports are posted on this ticket.\n\n## Implementation context\n\n* Plan, bake-off results and prompt evolution: AI SDR Follow-ups v2\n* Full prompt v3, fact-sheet fields with their sources, the check list, and the replay fixture list are in this ticket's AI context.md.\n* The model decision comment of 6 Oct (Sonnet 5.5 only, 100%) replaces the earlier comment about Opus and Sonnet arms."
+    },
+    {
+      "id": "ENG-10054",
+      "createdAt": "2026-06-12T01:34:23.912Z",
+      "title": "Route follow-up generation through the context pack + KB rules",
+      "state": "unknown",
+      "assignee": "Jared Stauffer",
+      "parent": "ENG-10034",
+      "labels": [],
+      "description": "**Sub-ticket 2 of 4 for** ENG-10034 **(Hardening 2). Blocked by** ENG-10041 **(follow-up agent must exist first).**\n\n## Problem\n\nEven after PR #4450 bolted KB lookup onto the follow-up path, it remains a bespoke context assembly — not `generateContextPack`. That means every context improvement shipped for the main path (KB rules priority from #3779, lead metadata enrichment from #3262, company/personalization context from ENG-6989) silently does NOT apply to follow-ups, and ENG-9145 (org resources never reach follow-up generation) stays broken by construction.\n\n## Build notes\n\n* Replace the follow-up path's hand-built context with `generateContextPack` (`apps/web/lib/ai-sdr-v2/workflow/helpers/context-pack.ts`) using explicit config flags, per the v2 rule that new context must be auditable and testable via flags.\n* Include at minimum: KB + mandatory `knowledge_base_rules`, org resources (fixes ENG-9145 — verify against that ticket's repro), lead/company enrichment, and thread history with the quoted-header hygiene from #3807.\n* **Preserve fail-open**: KB/context lookup failure must not block the follow-up send (CodeRabbit finding on #4450, fixed with try/catch fail-open — keep that property, with structured logging on degradation).\n* Watch token budget: the context pack is bigger than the old lightweight prompt; confirm the follow-up agent's model/config handles it.\n* This changes follow-up generation inputs — coordinate with the follow-up eval (Hardening 1 sub-ticket 6) and re-baseline it after landing.\n* Tests: context-pack config coverage for the new flag combination + `followup-workflow` tests under `apps/web/lib/ai-sdr-v2/**/__tests__`.\n\n## Acceptance criteria\n\n* Follow-up generation consumes `generateContextPack` output; no bespoke context assembly remains in `followup-workflow.ts`.\n* ENG-9145's scenario passes: attached resources appear available to follow-up generation.\n* KB-rule prohibitions (e.g., no pricing) hold on the follow-up path, same as the main path.\n* Follow-up sends still succeed when KB lookup fails (fail-open preserved)."
+    },
+    {
+      "id": "ENG-8385",
+      "createdAt": "2026-05-07T14:31:10.150Z",
+      "title": "AI SDR: Rework V2 follow-up prompt and sequence rules",
+      "state": "unknown",
+      "assignee": "Koppany Kondricz",
+      "parent": null,
+      "labels": [],
+      "description": "## User Goal\n\nThe V2 AI SDR follow-up prompt should produce better, more context-aware follow-ups while obeying the product rule of max 2 follow-ups and only using variables/data that are actually available.\n\n## Current Code Map\n\n* `lib/ai-sdr-v2/agents/smart-followup/default-agent.ts` decides follow-up schedule/type and currently describes a 3-follow-up pattern.\n* `lib/ai-sdr-v2/workflow/steps/followup.ts` consumes the smart-followup result and schedules follow-ups.\n* `lib/ai-sdr-v2/services/followup-scheduler.ts` appends a closure follow-up after the regular sequence for non-deferred cases, which can effectively create more than two follow-ups.\n* `lib/ai-sdr-v2/workflow/followup-workflow.ts` contains the actual follow-up email copy prompt, which is currently very generic.\n* `lib/ai-sdr-v2/workflow/helpers/context-pack.ts`, `kb-formatter.ts`, and copywriter helpers can provide richer context.\n\n## Scope\n\n* Rewrite the V2 follow-up decision prompt and actual email copy prompt together.\n* Enforce max 2 follow-ups total, including any closure/final attempt behavior.\n* Use campaign-level data as the source of truth and treat onboarding/knowledge-base context as supplementary.\n* For P1, optimize for podcast/interview-centric indirect methods; do not add direct-method complexity in this ticket.\n* Only reference variables and facts that are available in the current thread/campaign/contact context.\n* Make follow-ups concise, natural, and oriented around booking or reviving the scheduling thread without sounding like generic reminders.\n* Update scheduling logic so prompt output and scheduler behavior cannot disagree on sequence count.\n* Add eval cases for no response after slots sent, no response after answer, deferred interest, OOO return, and weak interest.\n\n## Acceptance Criteria\n\n* V2 schedules and sends no more than two follow-ups for a thread.\n* Follow-up copy uses available context without raw template tokens or enrichment-dependent fields.\n* Follow-ups are method-aware for podcast/interview campaigns.\n* Deferred/OOO/negative/DNC/escalated cases remain suppressed or delayed appropriately.\n* The scheduler and prompt agree on follow-up count, timing, and final/closure behavior.\n\n## Tests / QA\n\n* Unit tests for follow-up sequence count and closure behavior.\n* Prompt/eval snapshots for the main follow-up scenarios.\n* Workflow tests for scheduling, cancelling, and executing follow-ups.\n* Manual QA by generating follow-ups from realistic AI SDR thread transcripts."
+    },
+    {
+      "id": "ENG-570",
+      "createdAt": "2025-06-05T01:36:16.564Z",
+      "title": "Notion Knowledge Base AI Assistant",
+      "state": "Canceled",
+      "assignee": "Jose Cervino",
+      "parent": null,
+      "labels": [],
+      "description": "* **Notion knowledge base AI assistant** (10 Official n8n Templates)"
+    },
+    {
+      "id": "ENG-10433",
+      "createdAt": "2026-04-20T08:50:19.545Z",
+      "title": "Review knowledge base as a fresh user",
+      "state": "Done",
+      "assignee": "Saher Shodhan",
+      "parent": null,
+      "labels": [],
+      "description": "Review the knowledge base in Notion as a fresh user and document all questions and confusion points. This should happen after James exports by end of day today."
+    },
+    {
+      "id": "ENG-15665",
+      "createdAt": "2026-10-17T18:45:04.691Z",
+      "title": "Stop the AI SDR escalating interested replies since the switch to the new reply classifier",
+      "state": "Todo",
+      "assignee": "Koppany Kondricz",
+      "parent": null,
+      "labels": ["Bug", "fast-lane"],
+      "description": "## Overview\n\nThis fixes the AI SDR escalating interested prospects instead of booking them, which has happened since reply classification moved to Jev on 9 Oct 2026. Every one of these is a positive reply that never gets times, so it's costing booked calls across hundreds of workspaces every day.\n\n## Problem\n\nA prospect says yes, and the thread lands in escalation with \"The AI encountered an issue processing this thread. Please review manually.\" No reply goes out. Users can't see why it escalated, and pressing Resume AI SDR doesn't help, because the response-timeout monitor escalates the thread again within about 15 minutes (that's the separate resume bug in ENG-14421).\n\n## Root cause\n\n`routeByIntent` in `apps/web/lib/ai-sdr-v2/workflow/steps/intent-classification.ts` sends BOOKING, POSITIVE_RESPONSE and RESCHEDULE to `IntentRoute.ESCALATE` below `CONFIDENCE_THRESHOLD` (0.7), and any intent below `ESCALATION_THRESHOLD` (0.5). Commit 14b416d1f (ENG-14766, 9 Oct) switched the classifier to Jev and left those thresholds alone. ENG-14766 says the old classifier was \"almost always 0.9 or higher, so the low-confidence escalation never fires\", and its spec puts the Jev low-confidence gate at 0.6. Jev scores clear yes replies around 0.60 to 0.65, so the 0.7 gate now fires on them. Escalation detection said NO_ESCALATION, at confidence 1, on the runs we traced.\n\nThat route also sets `escalate` with no `escalationReason` (around line 330). It's the only escalate path in the workflow that leaves the reason out. So `finalize.ts` stores \"Unknown reason\", and `getUserFriendlyEscalationReason` in `constants/escalation-reasons.ts` turns it into the generic banner. Commit read: 82ec7dc61cc1d76220a24b3522c9db9b332b1c87.\n\n## Blast radius\n\nCounted in PlanetScale on 18 Oct 2026:\n\n`SELECT count(*) runs, count(DISTINCT r.organization_id) orgs, count(DISTINCT r.thread_id) threads, count(DISTINCT r.thread_id) FILTER (WHERE t.control_level='escalated' AND t.appointment_id IS NULL), count(DISTINCT m.user_id) FROM execution_runs r LEFT JOIN crm_message_thread t ON t.id=r.thread_id LEFT JOIN member m ON m.organization_id=r.organization_id AND m.role='owner' WHERE r.start_time >= '2026-10-09' AND r.status='escalated' AND r.final_state->'action'->>'reason'='Unknown reason'`\n\n* Confirmed affected, 9 to 17 Oct: 686 workspaces and 715 owner users, across 3,567 runs and 2,959 threads. About 1,985 of those threads are still escalated with no meeting booked. 2,707 of the 2,959 threads are marked high interest.\n* Daily count of these escalations: zero on every day from 25 Sep to 8 Oct. Then 419 on 9 Oct, 48 on 10 Oct, 36 on 11 Oct, 503 on 12 Oct, 539 on 13 Oct, 538 on 14 Oct, 568 on 15 Oct, 491 on 16 Oct and 57 on 17 Oct (a Saturday).\n* In Axiom, low-confidence decisions by intent from 9 to 17 Oct: POSITIVE_RESPONSE 1,075, BOOKING 645 and RESCHEDULE 52 (1,772 interested replies). Also NEGATIVE 722, QUESTION 224 and OBJECTION_HANDLING 210, plus about 385 others under the 0.5 floor.\n* Potentially exposed: every workspace with the AI SDR on.\n\n## Proposed fix\n\nInterested replies that Jev classifies as booking, positive or reschedule should go through the booking flow and get times, unless there's a real escalation signal. Recalibrate both thresholds to Jev's confidence distribution, starting from the 0.6 the ENG-14766 spec gives, or drop the positive-intent gate altogether. Any thread that does still escalate from the intent step should carry a specific, readable reason rather than \"Unknown reason\".\n\n## What's included\n\n* Containment: change the gate so interested replies stop escalating.\n* Customer recovery: re-run the AI SDR on the threads that escalated with \"Unknown reason\" since 9 Oct and are still escalated and unbooked. This must be idempotent and skip any thread a human has already answered.\n* Prevention: always set an escalationReason on the intent ESCALATE route, and add a test on the gate.\n* Observability: alert on the daily count of \"Unknown reason\" escalations. It went from 0 to more than 400 a day without anyone noticing.\n* Excluded: the resume loop. That's ENG-14421, which is marked Done but still reproduces. It's related, not part of this fix.\n\n## Regression seam\n\n`routeByIntent` and the intent step's state output. Today a POSITIVE_RESPONSE or BOOKING intent at confidence 0.6 to 0.69, with no escalation signal, returns ESCALATE with no escalationReason (red). After the fix it should route to BOOKING, and any ESCALATE from the intent step should carry a non-empty reason (green).\n\n## Done when\n\n* A positive or booking reply that Jev scores between 0.6 and 0.69 gets times from the AI SDR instead of being escalated.\n* The daily count of escalations with \"Unknown reason\" goes back to 0.\n* Threads stuck since 9 Oct have been re-run or explicitly handed to their users.\n* A regression test proves the gate routes interested replies to booking and that every intent escalation carries a reason.\n\n## Reports\n\n* ENG-15664"
+    }
+  ]
+}

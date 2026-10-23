@@ -1,0 +1,230 @@
+{
+  "id": "ENG-15003",
+  "provenance": "seeded",
+  "createdAt": "2026-10-08T20:32:40.280Z",
+  "lane": "triage",
+  "stratum": "duplicate",
+  "ticket": {
+    "title": "Name 15 - Lead Extraction",
+    "description": "#### User Email\n\n<email>\n\n#### Workspace Name\n\nCompany Three Agency\n\n#### Request Type\n\nRefund\n\n#### Reason for request\n\nName 15 was partially refunded and offboarded. Her acquisity account was reactivated in an effort to retrieve her leads she has contacted.\n\nI am inside of her acquisity account to locate the leads within her cold email campaign and it apperas all of the leads are gone.\n\nIs it possible to extract her contacted lead list in a csv file that I can send her?",
+    "attachmentKinds": []
+  },
+  "repoCommitAtCreate": "5a826728493b818249d8d8b431a34d248d36d9db",
+  "flags": {
+    "descriptionEditedAfterCreate": false,
+    "needsProductionData": true,
+    "alreadyFixedAtTriage": false
+  },
+  "relatedSnapshot": [
+    {
+      "id": "ENG-14704",
+      "createdAt": "2026-10-05T03:45:26.337Z",
+      "title": "Customer report: purchased campaign leads hard-deleted by automatic completed-campaign cleanup, campaign shows 0 leads while History still reports the uploads",
+      "state": "Duplicate",
+      "assignee": "Koppany Kondricz",
+      "parent": null,
+      "labels": ["Bug", "Customer reported", "intercom-sourced"],
+      "description": "## Source\n\nIntercom conversation: <url:app.intercom.com>\nContact: Name 1, Company One Workspace. The Intercom source URL points directly at the campaign in view: \"Management Consulting | Name 2 | May 2026\".\n\n## Conversation context (bounded)\n\nThe customer reports that 5,000 leads purchased for that campaign went missing, that the total is now 7,802, and that it has been over a month without resolution. She says the Leads tab History view shows uploads while the campaign table shows 0 leads, and that she did not delete them: \"when I purchased more leads the first time there was an issue the first 5000 disappeared, I purchased 1500 more and now they are also gone.\" She asks whether a record of the purchased leads exists, then asked for a human agent. Fin AI replied with the History view and deletion-recovery guidance; no human has answered.\n\n## Claim\n\nLeads purchased for a cold email campaign are hard-deleted from that campaign by the platform's automatic completed-campaign lead removal, which a later lead purchase triggers when the workspace is short on provider lead space, so the campaign ends up with 0 leads while its Leads tab History still reports every purchase as uploaded.\n\n## Evidence\n\n* Production: the campaign holds 0 lead rows (including soft-deleted); its Leads tab History holds 18 lead sources totalling 7,969 leads recorded as uploaded.\n* Production activity log: \"Deleted all 5686 leads from campaign\" at 2026-07-27T17:03:04Z and \"Deleted all 2630 leads from campaign\" at 2026-10-02T18:19:05Z, both on this campaign.\n* Name 3: Inngest run 01M3YXDZ55D5P0723AXMDM7EW1 (ai-clients.campaigns.process-delete-all-leads, COMPLETED 2026-10-02T18:19:06Z) returned deletedFromDb 2630, providerDeletedCount 2531; its step trace contains classify-final-capacity-plan, a step that only runs on the automatic-completed-campaign-cleanup branch. The deletion followed a lead purchase for a different campaign by 23 seconds.\n* Code: process-lead-generator.ts sends PROCESS_LEAD_REMOVAL when provider lead space is low; process-lead-removal.ts fans out campaign-delete-all-leads with deletionSource automatic_completed_campaign_cleanup for every Completed campaign; process-campaign-delete-all-leads.ts deletes at the provider then calls deleteAllLeadsByCampaign (hard delete, all rows, no recency guard).\n* Blast radius (queried 2026-10-05): 727 \"Deleted all N leads from campaign\" activity rows across 245 organizations in the last 30 days, 221 of them within 15 minutes after a lead purchase for the same organization; 3,032 campaigns currently in Completed status still holding live leads across 1,416 organizations.\n* Related open work: ENG-12122 (this same customer and campaign, 5,347 leads reported lost on 2026-07-29, Urgent, Blocked) and ENG-11215 (sibling automatic cleanup hard-deleting campaign lead lists, Backlog)."
+    },
+    {
+      "id": "ENG-3397",
+      "createdAt": "2025-12-04T13:28:46.335Z",
+      "title": "Export/Download Leads CSV from Campaign",
+      "state": "Done",
+      "assignee": "Anuj Bhatt",
+      "parent": null,
+      "labels": ["Feature", "Improvement"],
+      "description": "**Description:** **Context:** Currently, once leads are uploaded or scraped into a campaign, there is no way to get them out. The data is effectively locked inside the platform.\n\n**Problem:** Users often need to extract lead lists to:\n\n1. **Recycle Leads:** Move \"Not Interested\" or \"No Reply\" leads into a different campaign or nurture sequence.\n2. **Segment Data:** Filter and analyze the data in Excel/Name 4 Sheets.\n3. **Backup/Ownership:** Keep a local copy of their prospects.\n\n**Requirement:** Add an **\"Export CSV\"** button in the **Leads** tab of every campaign.\n\n* **Function:** Download all leads (or currently filtered view) with their statuses (Contacted, Replied, etc.) and all associated fields."
+    },
+    {
+      "id": "ENG-598",
+      "createdAt": "2025-06-05T00:48:52.615Z",
+      "title": "B2B Crunchbase Leads System",
+      "state": "Canceled",
+      "assignee": "Jose Cervino",
+      "parent": null,
+      "labels": [],
+      "description": "**Extract & Summarize B2B Leads From Crunchbase With Bright Data, GPT-4o & Name 4 Sheets** (10 Official n8n Templates)"
+    },
+    {
+      "id": "ENG-10052",
+      "createdAt": "2026-06-12T01:34:00.112Z",
+      "title": "Eval: data extraction — dates & scheduling constraints",
+      "state": "Backlog",
+      "assignee": "Jared Stauffer",
+      "parent": "ENG-10033",
+      "labels": [],
+      "description": "**Sub-ticket 5 of 6 for** ENG-10033 **(Hardening 1). Blocked by the eval harness (**ENG-10040**). Also the safety net for Hardening 5's schema work.**\n\n## Goal\n\nAn eval for the data-extraction agent (`apps/web/lib/ai-sdr-v2/agents/data-extraction/`) — the most deterministic of the agent evals, since outputs are structured fields that can be asserted exactly.\n\n## Name 5 — every case is a past production incident\n\n* **Relative offsets**: \"in two weeks\", \"at least 2 weeks out\", \"in three weeks\" → correct `relative_week` / `minimum_weeks_out` values (ENG-8195/ENG-8479, PR #3665 — the old enum only knew THIS_WEEK/NEXT_WEEK and silently dropped the constraint; a lead was lost).\n* **Quoted-content contamination**: thread containing quoted Outlook/Gmail headers with month names (\"Sent: Tuesday, April…\") → extraction must ignore quoted content (ENG-8418 / PR #3807: \"April\" in a quoted header scheduled a follow-up 11 months out; `stripQuotedHeaderLines`).\n* **Year rollover**: \"mid-May\" asked in early May must resolve to THIS May, not next year (CodeRabbit found this exact bug in #3807's new prompt rule); December → January cases too.\n* **Direct date/slot picks**: prospect picks a previously offered slot (the ENG-8148 context-pack regression family).\n* **Blocked dates / travel weeks**: \"I'm traveling this week, anytime after works\" (ENG-8339, in progress — coordinate so cases match its final schema).\n* **No temporal content** → null extraction, no hallucinated dates (ENG-9841 date hallucinations).\n\n## Build notes\n\n* Deterministic assertions on the Zod schema output — exact field values, no LLM judge needed for most cases.\n* **Frozen reference dates**: each case carries its \"today\" so relative math is reproducible.\n* Run against the released DB agent version. When Hardening 5 (ENG-10037) redesigns the schema, this dataset migrates with it.\n\n## Acceptance criteria\n\n* ≥40 cases; exact-match scoring per field; wired into the release gate; baseline documented."
+    },
+    {
+      "id": "ENG-10037",
+      "createdAt": "2026-06-12T01:29:35.881Z",
+      "title": "Hardening 5: Scheduling extraction contract",
+      "state": "Backlog",
+      "assignee": "Jared Stauffer",
+      "parent": "ENG-10032",
+      "labels": [],
+      "description": "# Scheduling extraction contract\n\n**Item 5 of the AI SDR v2 Hardening Epic (**ENG-10032**). Starts with a spec ticket (no code).**\n\n## Problem\n\nThe scheduling data-extraction schema keeps discovering it can't represent what prospects actually say, one customer incident at a time:\n\n* \"2+ weeks out\" silently dropped — schema only knew THIS_WEEK/NEXT_WEEK; prospect got 1–3-days-out slots twice and opted out (ENG-8195/ENG-8479, PR #3665 — a real lost lead)\n* Month name in a quoted Outlook header → follow-up scheduled 11 months out (ENG-8418, PR #3807)\n* Blocked travel dates not respected (ENG-8339, in progress)\n* Holiday calendars not blocked (ENG-8620, in QA)\n* Open 5-ticket timezone/availability cluster: ENG-9841, ENG-9676, ENG-9918, ENG-9776, ENG-8998 (one customer, Name 6, appears twice)\n\nEach was handled as a new schema field or prompt rule bolted on after the incident. The silent-drop failure mode is the dangerous one: unrepresentable input should escalate, not vanish.\n\n## Sub-tickets in execution order\n\n1. ENG-10044 — **Spec (no code):** enumerate the temporal/constraint expressions the system must represent; define the \"unrepresentable → escalate\" rule; root-cause the timezone cluster\n2. ENG-10062 — Implement extraction schema + agent update to the new contract (regression-guarded by ENG-10052, the data-extraction eval)\n3. ENG-10070 — Escalate on unrepresentable scheduling input (generalize the ENG-8195 fix)\n4. ENG-10063 — Timezone normalization pass — sized by the spec's findings; may split further\n\nKey surfaces: `apps/web/lib/ai-sdr-v2/agents/data-extraction/`, `apps/web/lib/ai-sdr-v2/workflow/steps/deferred-followup.ts`, `apps/web/lib/ai-sdr-v2/workflow/helpers/context-pack.ts`, slot matchmaking/closest-slot-finder."
+    },
+    {
+      "id": "ENG-10070",
+      "createdAt": "2026-06-12T01:38:08.145Z",
+      "title": "Escalate on unrepresentable scheduling input",
+      "state": "Backlog",
+      "assignee": "Jared Stauffer",
+      "parent": "ENG-10037",
+      "labels": [],
+      "description": "**Sub-ticket 3 of 4 for** ENG-10037 **(Hardening 5). Blocked by the schema implementation (**ENG-10062**), which adds the representability marker this consumes.**\n\n## Problem\n\nWhen the extraction schema couldn't express \"at least 2 weeks out\" (ENG-8195), the constraint was **silently dropped** and the SDR confidently offered 1–3-days-out slots — twice — until the prospect opted out. A lead was lost not because the system couldn't represent the constraint, but because it didn't know it couldn't. Schema extensions (ENG-10062) shrink the unrepresentable space; this ticket makes whatever remains safe: detected → escalated, never guessed.\n\n## Build notes\n\n* Consume the confidence/representability marker from the new extraction schema (ENG-10062). When extraction reports unrepresentable/uncertain temporal constraints:\n  * Workflow routes to escalation instead of slot matchmaking — add a dedicated escalation reason (e.g. `SCHEDULING_CONSTRAINT_UNREPRESENTABLE`) to `apps/web/lib/ai-sdr-v2/constants/escalation-reasons.ts`, following the `OBJECTION_KB_GAP` precedent from PR #3941.\n  * Escalation surfaces WHAT couldn't be represented (the raw prospect phrase) so the human can act without re-reading the thread — same UX pattern as the knowledge-gap feedback from ENG-7557/PR #3435.\n* Escalated-not-guessed must still go through `finalizeExecution` (execution status, CRM sync, notifications, follow-up cancellation stay consistent — v2 rule for blocked/escalated paths).\n* Guard against over-triggering: only escalate when a scheduling-relevant constraint is both present and unrepresentable — a chatty reply with no temporal content is NOT an escalation (that's the ENG-9841 null-extraction case; covered by the data-extraction eval). Track the escalation rate after release; if it exceeds a small % of scheduling threads, the schema (not the guard) needs another pass.\n* Update the escalation-detection eval dataset (ENG-10050) and data-extraction eval (ENG-10052) with these cases.\n* Step changes follow the standard pattern: `createStepOutput` + `trackStep*`, stable step names, `WorkflowResults` updates.\n\n## Acceptance criteria\n\n* An unrepresentable constraint produces an escalation carrying the offending phrase; no slots are offered.\n* No escalations for temporal-content-free replies.\n* Workflow tests cover: representable → normal path, unrepresentable → escalation, none → normal path."
+    },
+    {
+      "id": "ENG-10044",
+      "createdAt": "2026-06-12T01:32:07.310Z",
+      "title": "Spec (no code): scheduling extraction contract for temporal/constraint expressions",
+      "state": "Backlog",
+      "assignee": "Jared Stauffer",
+      "parent": "ENG-10037",
+      "labels": [],
+      "description": "**Sub-ticket 1 of 4 for** ENG-10037 **(Hardening 5). No code — output is a spec document. Blocks the schema/agent implementation and timezone tickets.**\n\n## Goal\n\nStop extending the scheduling extraction schema one incident at a time. Define, in one pass, the full set of temporal/constraint expressions the system must represent, and the rule that **unrepresentable input escalates instead of silently dropping** (the silent drop in ENG-8195 lost a lead).\n\n## Scope of the spec\n\n1. **Inventory current capability:** read the data-extraction agent schema (`apps/web/lib/ai-sdr-v2/agents/data-extraction/`), `deferred-followup.ts`, slot matchmaking / `closest-slot-finder.ts`, and list every temporal field that exists today (relative weeks, `minimum_weeks_out` from PR #3665, prompt-based month extraction from PR #3807, `blocked_dates` in-flight per ENG-8339).\n2. **Enumerate required expressions** from real incidents: absolute dates/times; relative offsets (days/weeks/months, \"2+ weeks out\"); ranges; minimums; exclusions/blocked dates (travel weeks, holidays — ENG-8620); recurring availability (\"Fridays only\" — ENG-9776); timezone semantics (prospect TZ vs host TZ vs calendar TZ — ENG-8998, ENG-9676, ENG-9918, ENG-9841); quoted-content contamination rules (ENG-8418); year-rollover rules (CodeRabbit finding on #3807).\n3. **Root-cause the open timezone cluster** (ENG-9841, ENG-9676, ENG-9918, ENG-9776, ENG-8998): for each, identify where the wrong timezone/availability enters (extraction, slot generation, calendar API, display) and whether they share one cause. This sizes sub-ticket 4.\n4. **Define the contract:** the target extraction schema (fields + semantics), what \"confidently extracted\" vs \"uncertain/unrepresentable\" means, and the escalation rule for the latter.\n\n## Deliverable\n\nA spec doc (in `references/` or a Name 7 document attached to ENG-10037) with: target schema, gap list vs today, per-ticket mapping for the timezone cluster, and revised scoping notes for sub-tickets 2–4."
+    },
+    {
+      "id": "ENG-2515",
+      "createdAt": "2025-11-01T17:47:46.773Z",
+      "title": "Derive campaign data from existing leads when importing campaigns",
+      "state": "Done",
+      "assignee": "Anthony Adewale",
+      "parent": null,
+      "labels": [],
+      "description": "## Overview\n\nWhen importing campaigns, derive campaign targeting data (industry, title, location, company size) from existing lead metadata instead of parsing from campaign configurations.\n\n## Key Changes\n\n* **Campaign Analytics & Creation Workflows**: Pass `usedLeadsMetadata` and `campaignAgent` through lead generation and campaign creation flows\n* **Outreach Service**: Add normalization for `companySize` and `location` with strict validation; prioritize and deduplicate targeting fields from existing campaign leads\n* **DB/Repository**: Improve `getRandomLeadsByMetadata` to handle multiple key variants for `title`, `industry`, and composite `location` fields\n* **Types/Schemas**: Add optional `usedLeadsMetadata` and `campaignAgent` to campaign and scrape input schemas\n\n## Technical Implementation\n\n* Strict country/company size normalization (validated against `COMPANY_SIZES` and `COUNTRIES`)\n* Robust location extraction (country-only)\n* Remove fallback parsing; rely on lead metadata with strict validations\n* Ensure empty defaults when missing data\n\n## Related PR\n\n<url:github.com>"
+    },
+    {
+      "id": "ENG-8124",
+      "createdAt": "2026-04-27T12:26:24.620Z",
+      "title": "Add API key or webhook access for Zapier",
+      "state": "Backlog",
+      "assignee": null,
+      "parent": null,
+      "labels": ["Feature"],
+      "description": "user: <email>\n\nA feature request to expose an API key or webhook so AI Acquisition can be integrated with Zapier.\n\nThe requested workflow is for Zapier to read inbox and dashboard data automatically, send that information to Claude to generate a weekly score report with best performing messages, leads, and contacted leads, and then send the report to ClickUp CRM.\n\nCurrent workflow requires manual data extraction, and only dashboard data can be extracted today."
+    },
+    {
+      "id": "ENG-4539",
+      "createdAt": "2026-01-14T16:18:44.720Z",
+      "title": "Lead scrape fails at final upload to database step",
+      "state": "Canceled",
+      "assignee": "Blaise Gulaj",
+      "parent": null,
+      "labels": ["Lead Scraping Fails"],
+      "description": "Customer reports a bug where lead scraping completes all initial steps (search, scraping, verification, processing) but repeatedly fails at the final \"Uploading to Database\" step.\n\nFrom the conversation context:\n\n* Customer is running scrapes for automotive dealership leads (AL, FL, TN, GA, MS)\n* The UI shows the scrape pipeline completing until the last upload stage, which fails\n* Customer retried the scrape at least three times with the same result\n* A Loom recording was provided demonstrating the behavior: <loom>\n\nThe issue appears isolated to this customer’s workspace but blocks successful lead imports despite the scrape pipeline otherwise completing."
+    },
+    {
+      "id": "ENG-2323",
+      "createdAt": "2025-10-25T09:00:18.635Z",
+      "title": "Scraped Lead Data in Name 8 All Fields",
+      "state": "Done",
+      "assignee": "Anthony Adewale",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "Scraped lead data that shows in the app does not reflect in Company Two. In Company Two users can see more fields than we're displaying on our app:\n\n* Company Name\n* Job title\n* LinkedIn Profile\n\n**Key Issue**: Without fields like company name, sent emails that use those custom variable fields are blank.\n\nThe Email Agent lead scrape is returning incomplete and improperly formatted data:\n\n1. **Contact Name Issue**: Only scraped `{Contact}` variable instead of separate `{FirstName}` and `{LastName}` fields\n2. **Missing Enrichment Data**: Did not scrape the standard data that typically comes with Apollo scrapes, including:\n   * Company website\n   * State\n   * City\n   * Employee count\n   * Other typical Apollo enrichment fields\n\n## Reporter Information\n\n**Reported by:** Name 9\n\nIssued raised by: <url:thegrowthpartner.slack.com>\n\n---\n\n## Expected Behavior\n\nThe Email Agent lead scrape should:\n\n1. Parse contact names into separate `{FirstName}` and `{LastName}` fields for proper email personalization\n2. Include all standard Apollo enrichment data:\n   * Company website\n   * State/location\n   * City\n   * Employee count\n   * Other relevant business data fields\n3. Return data in a format that's immediately usable without requiring external enrichment tools\n\n## Current Workaround\n\nUser noted they can manually:\n\n1. Export the leads\n2. Parse first name/last name with an LLM\n3. Enrich them with Clay\n4. Re-upload into Company Two\n\nHowever, this defeats the purpose of an automated lead scraping tool."
+    },
+    {
+      "id": "ENG-2652",
+      "createdAt": "2025-11-07T06:39:50.051Z",
+      "title": "Email Agent Lead Scrape: Incomplete Data - Only Contact Name Instead of FirstName/LastName, Missing Apollo Enrichment Fields",
+      "state": "Duplicate",
+      "assignee": "Pieter Venter",
+      "parent": null,
+      "labels": [],
+      "description": "## Found Problem\n\nThe Email Agent lead scrape is returning incomplete and improperly formatted data:\n\n1. **Contact Name Issue**: Only scraped `{Contact}` variable instead of separate `{FirstName}` and `{LastName}` fields\n2. **Missing Enrichment Data**: Did not scrape the standard data that typically comes with Apollo scrapes, including:\n   * Company website\n   * State\n   * City\n   * Employee count\n   * Other typical Apollo enrichment fields\n\nThis results in incomplete lead data that requires manual post-processing through external tools.\n\n## Reproduction Steps\n\n1. User ran Email Agent lead scrape\n2. Leads were returned with incomplete data structure\n3. Observed in the results that:\n   * Contact name appears as single field `{Contact}` instead of `{FirstName}` and `{LastName}`\n   * Standard Apollo enrichment fields (company website, location, employee count, etc.) are missing\n\n## Reporter Information\n\n**Reported by:** Name 9\n**Slack Thread:** <url:thegrowthpartner.slack.com>\n\n## Expected Behavior\n\nThe Email Agent lead scrape should:\n\n1. Parse contact names into separate `{FirstName}` and `{LastName}` fields for proper email personalization\n2. Include all standard Apollo enrichment data:\n   * Company website\n   * State/location\n   * City\n   * Employee count\n   * Other relevant business data fields\n3. Return data in a format that's immediately usable without requiring external enrichment tools\n\n## Current Workaround\n\nUser noted they can manually:\n\n1. Export the leads\n2. Parse first name/last name with an LLM\n3. Enrich them with Clay\n4. Re-upload into Company Two\n\nHowever, this defeats the purpose of an automated lead scraping tool.\n\n## Screenshots\n\n <image> "
+    },
+    {
+      "id": "ENG-379",
+      "createdAt": "2025-05-28T13:55:53.330Z",
+      "title": "Review workflows in the official n8n workflow templates page and pick the best ones",
+      "state": "Done",
+      "assignee": "Jose Cervino",
+      "parent": "ENG-371",
+      "labels": [],
+      "description": "<url>"
+    },
+    {
+      "id": "ENG-11488",
+      "createdAt": "2026-07-11T05:06:29.126Z",
+      "title": "Return campaign lead search totals from the paged query",
+      "state": "Backlog",
+      "assignee": "Pieter Venter",
+      "parent": null,
+      "labels": ["Performance", "triaged-by-devin"],
+      "description": "## Refined implementation brief\n\n*Refined on 2026-07-20. This is the current delivery brief.*\n\n### Outcome\n\nReturn exact campaign-lead search totals from the paged search query so the application does not evaluate the same large search predicate twice.\n\n### Scope\n\n* Add `count(*) over()` to the existing paged campaign-lead query.\n* Use the window total for non-empty pages and remove the normal separate count query.\n* Return zero for an empty first page.\n* Use a bounded fallback or pagination-clamping path for an empty later page.\n* Preserve global search, advanced filters, sorting, tenant boundaries, campaign boundaries, and soft-delete filtering.\n* Exclude trigram indexes, generated search columns, metadata denormalization, and a new full-text subsystem.\n\n### Acceptance criteria\n\n* Non-empty search and advanced-filter pages execute the expensive predicate once.\n* Totals retain parity across global search, field filters, combined filters, and unfiltered pagination.\n* Empty first-page and later-page behavior is deterministic.\n* Other organizations, campaigns, and soft-deleted rows cannot affect totals.\n* The API and UI retain their pagination contract.\n\n### Implementation direction\n\nReturn a window total with each selected lead row. Use it as the normal exact total and reserve a bounded secondary path only for an empty non-first page. Rebase after ENG-11249 and PR #5463 if necessary.\n\n### Validation\n\n* Add focused repository and router tests for total parity and empty-page behavior.\n* Confirm the standalone count fingerprint disappears after deployment.\n* Compare remaining paged-query latency and CPU with the prior paired fingerprints.\n* Revisit index work only if the remaining single query is still material.\n\n## Original description\n\n## Summary\n\n**#14 by total DB runtime (1.01%)** over the last 24h, and one of the **slowest per-call queries in the workload**: p50 **3.95s**, p99 **23.5s**, max **23.5s** across 97 calls, reading **634.9k rows/call (\\~6,545 rows/query)**. It is the `count(*)` companion to the campaign-lead advanced-search list — a `LEFT JOIN outreach_campaign_lead → lead_scrape_lead` with a large `OR` of leading-wildcard `ILIKE` predicates across many text columns **and** ~20 JSONB `metadata` paths. Filter builder source: `apps/web/lib/outreach/db/campaign.ts` (per-field ILIKE / JSONB `metadata::jsonb -> ... ->> ...` conditions, e.g. `linkedinUrl` block ~L13307).\n\n## Query (normalized, abbreviated)\n\n```sql\nSELECT count(*)\nFROM outreach_campaign_lead\nLEFT JOIN lead_scrape_lead\n  ON outreach_campaign_lead.internal_lead_id = lead_scrape_lead.id\nWHERE outreach_campaign_lead.campaign_id = $1\n  AND outreach_campaign_lead.organization_id = $2\n  AND (\n    outreach_campaign_lead.email      ILIKE $3\n    OR outreach_campaign_lead.full_name  ILIKE $4\n    OR outreach_campaign_lead.first_name ILIKE $5\n    OR outreach_campaign_lead.last_name  ILIKE $6\n    OR lead_scrape_lead.title      ILIKE $7\n    OR lead_scrape_lead.company    ILIKE $8\n    OR lead_scrape_lead.linkedin_url ILIKE $9\n    OR lead_scrape_lead.state      ILIKE $10\n    OR lead_scrape_lead.country    ILIKE $11\n    OR outreach_campaign_lead.metadata::jsonb -> ... ->> ... ILIKE $..  -- ~20 JSONB paths\n  )\n```\n\n## Metrics (last 24h, PlanetScale Insights)\n\n| Metric | Value |\n| -- | -- |\n| Total time | 575k ms (1.01% of DB runtime) |\n| Calls | 97 |\n| p50 / p99 / max | **3.95s / 23.5s / 23.5s** |\n| rows read | 634.9k (~6,545/query) |\n| egress | tiny (count only) |\n\nIndex usage: `outreach_campaign_lead_campaign_org_lower_email_idx` (100%) and `lead_scrape_lead_pkey` (100%) — the index narrows to the campaign+org slice, but the `OR ... ILIKE` block then forces a **scan of the whole campaign's leads** (and their joined scrape rows) applying leading-wildcard `ILIKE` and JSONB extraction to each row. Large campaigns → ~6.5k rows scanned per call, seconds of CPU.\n\n## Root cause\n\n* **Leading-wildcard** `ILIKE` **on many columns cannot use a b-tree index**; every lead in the campaign is examined.\n* The **JSONB** `metadata` **extractions** (~20 paths, `->` / `->>`) run per row, compounding cost.\n* Joining `lead_scrape_lead` just to search its text columns widens each scanned row.\n* The `count(*)` runs the full predicate over the whole matching set (no `LIMIT`), so it is strictly more expensive than the paged list it accompanies.\n\n## Recommended fix\n\n1. **Full-text / trigram index**: add a `pg_trgm` GIN index on the searched text columns (`email`, `full_name`, `first_name`, `last_name` on `outreach_campaign_lead`; `title`, `company`, `linkedin_url` on `lead_scrape_lead`) so `ILIKE '%term%'` can use an index, or maintain a combined `tsvector` search column.\n2. **Name 10 the searched JSONB metadata** into real columns (or a generated column) so the ~20 `metadata` ILIKE paths become indexable instead of per-row extraction.\n3. **Avoid recomputing the count** on every keystroke — debounce, cache the count per (campaign, search) for a short TTL, or use an estimated count for large result sets and only compute exact counts on demand.\n4. Consider restricting which fields participate in the default \"global\" search to reduce the OR fan-out.\n\n*Filed by the daily PlanetScale performance review automation. Metrics are 24h aggregates as of 2026-07-11.*"
+    },
+    {
+      "id": "ENG-4306",
+      "createdAt": "2026-01-08T16:05:22.220Z",
+      "title": "Lead scraping filters reset when manual filters are applied",
+      "state": "Done",
+      "assignee": "Anthony Adewale",
+      "parent": null,
+      "labels": ["Bug", "Lead Scraping"],
+      "description": "Customer reports that when setting up lead scraping with manual filters, the filters are repeatedly cleared before they can run the lead list.\n\nObserved behavior:\n\n* Name 11 manual filters in the lead scraping tool\n* Customer needs to navigate back and forth to reference a list of filters while configuring\n* Filters keep resetting/clearing before the customer can finish configuring and run the lead list\n* At least once, after waiting for the final lead count to generate, all filters were cleared again\n\nThis is causing loss of work when configuring lead filters and blocking the customer from running their lead list.\n\nThis issue is separate from the existing email domain provisioning bug (ENG-4253)."
+    },
+    {
+      "id": "ENG-7595",
+      "createdAt": "2026-04-07T17:35:56.660Z",
+      "title": "Add default timezone for prospects from lead data",
+      "state": "Done",
+      "assignee": "Koppany Kondricz",
+      "parent": null,
+      "labels": [],
+      "description": "98% of lists used in Acquisity contain the location of the prospect, from that we can infer their timezone very accurately. \n\nAdd a step/process in the AI SDR to infer the prospects timezone automatically for each conversation based on their location from their lead data."
+    },
+    {
+      "id": "ENG-8344",
+      "createdAt": "2026-05-06T17:36:10.337Z",
+      "title": "Cold Email Agent campaign options UI cleanup",
+      "state": "Done",
+      "assignee": "James Keeble",
+      "parent": "ENG-8343",
+      "labels": ["Improvement"],
+      "description": "## Summary\n\nCampaign Options tab cleanup for the Cold Email Agent release stack. This aligns campaign-level settings with the new approval model and makes the Options tab clearer before AI lead search, CSV fallback, and approval emails build on top of it.\n\n## Current stack position\n\nFirst layer after ENG-5402 approval foundation.\n\n* PR: #3774\n* Branch: `bi/8344-options-ui`\n* Base: `ba/5402-approval-modal`\n* Downstream PRs: ENG-8345 -> ENG-8423 -> ENG-7755 -> ENG-8346\n\n## Core UI scope\n\nSection order:\n\n1. Email accounts\n2. Lead search filters\n3. Campaign configuration\n4. Sending schedule\n5. Cold Email Agent controls\n\nMain cleanup goals:\n\n* Show selected email accounts clearly, including connection-error states.\n* Make lead search filters read-only and render from saved `campaign.superSearchFilters`.\n* Consolidate campaign type, salesperson, CRM pipeline, and start/end dates into clearer campaign configuration controls.\n* Keep sending schedule controls separate from meeting/calendar availability.\n* Add Cold Email Agent controls that match the approval model: on/off, speed preset, and per-action behavior.\n* Remove stale old UI controls such as direct job title/headcount editing and the old Auto Agent Run toggle.\n* Use design-system variables and keep dropdown/popover positioning reliable.\n\n## Implementation update, 2026-05-13\n\nAdditional changes made during stack cleanup:\n\n* PR #3774 stays as the campaign options cleanup PR on `bi/8344-options-ui`.\n* It is now the first layer after ENG-5402, so AI lead search, CSV fallback, and clean approval emails all build on the cleaned campaign options UI.\n* No new product scope was added beyond the options UI cleanup. The main cleanup change is the branch position: this PR now provides the campaign settings/options foundation for later Cold Email Agent PRs.\n* Expected overlap with SuperSearch filter display and campaign settings was resolved during the restack.\n* Final checks passed on the restacked PR: preview DB migration, lint, typecheck, unit tests, integration tests, Vercel deploy, Name 7 sync, and Company Two webhook setup.\n\n## Acceptance criteria\n\n* Options tab is cleaner and matches the new Cold Email Agent settings/approval model.\n* Campaign-level options are available to all later PRs in the stack.\n* AI lead search, CSV fallback, and approval email PRs no longer need to carry this UI cleanup noise.\n* This PR remains focused on campaign options UI, not lead search behavior, CSV fallback, email delivery, or backend activation.\n\n<!-- preview-url-start -->\n**Preview:** <url:options-ui-aiacquisition.vercel.app> — PR #3774\n<!-- preview-url-end -->"
+    },
+    {
+      "id": "ENG-8168",
+      "createdAt": "2026-04-28T21:49:47.855Z",
+      "title": "Mitigate Gemini 2.0 Flash failures in campaign AI filters",
+      "state": "Done",
+      "assignee": "Jared Stauffer",
+      "parent": null,
+      "labels": [],
+      "description": "## Cause\n\nCampaign creation/add-leads gets stuck on \"Analyzing your niche...\" because the synchronous `outreach.providers.inferFromNiche` endpoint calls OpenRouter model `google/gemini-2.0-flash-001` twice in sequence. That model was returning provider errors or stalling via OpenRouter.\n\nEach AI call can wait up to \\~90s and retry/fallback before continuing, so two sequential calls can make the UI spinner hang for several minutes. The endpoint often eventually returns HTTP 200 because errors are caught and fallback/default filter data is returned, which hides the failure from the user.\n\n## Current PR\n\nPR #3642 updates only the three campaign/provider model usages in `trpc/routers/outreach/providers.ts` from `google/gemini-2.0-flash-001` to `google/gemini-2.5-flash`:\n\n* industry inference\n* job title/location/keyword/company size inference\n* low-lead-count filter broadening\n\nIt does not change prompts, schemas, UI, appointment extraction, n8n workflow templates, or AI SDR Claude-migration agent models.\n\nPR: <url:github.com>\n\n## Validation already run\n\n* `bun run fix`\n* `bun run typecheck`\n* Name 3 preview QA with `HVAC contractors`: spinner resolved under 45s and filters populated."
+    },
+    {
+      "id": "ENG-3100",
+      "createdAt": "2025-11-28T22:23:51.057Z",
+      "title": "Export leads scraped through Acquisity for external enrichment",
+      "state": "Backlog",
+      "assignee": null,
+      "parent": null,
+      "labels": ["Feature"],
+      "description": "## Feature Request\n\nAdd the ability to export leads scraped through Acquisity so they can be processed in external tools.\n\nOne example use case is exporting leads to Clay for additional data enrichment and then re-uploading them with more data."
+    },
+    {
+      "id": "ENG-12016",
+      "createdAt": "2026-07-23T21:16:07.614Z",
+      "title": "Import leads through one ingestion pipeline",
+      "state": "Done",
+      "assignee": "Anthony Adewale",
+      "parent": "ENG-12011",
+      "labels": [],
+      "description": "## Overview\n\nLet integrations upload their own campaign leads and per-person custom variables through the API and MCP, then use those variables in existing email sequences. Deliver the endpoint, MCP tool, documentation and tests in one PR.\n\n## User experience\n\nThe caller reads a CSV, maps its columns to standard lead fields and customVariables, and submits JSON lead objects. A 5,000-lead list is sent in batches of up to 1,000, with smaller batches when personalized content reaches the request-size limit. Callers receive an operation to poll, import counts and row outcomes, and can read back saved custom values.\n\n## What's included\n\n* One workspace-scoped bulk lead-upload endpoint and matching MCP tool, using the existing manual-import behavior.\n* Existing custom-variable storage, UI and sequence rendering, with sanitized API readback.\n* REST examples, CSV conversion/batching example, and a complete MCP mapping-to-sequence guide in the same PR.\n* Scope agreed on 16 September replaces the earlier server-side CSV upload/parser proposal: CSV mapping happens in the caller, following Company Two's bulk-upload pattern. No new variable-definition product or file-storage flow.\n\n## How it should work\n\nPreserve existing validation, duplicate protection, workspace capacity and provider checks. Reuse shared idempotency and operation polling; retries must not duplicate uploads. Do not charge lead-search credits or automatically enable paid verification. Drafts remain drafts; adding leads to an active campaign may enroll them in its current sequence and must be documented. Import must not implicitly reactivate completed campaigns.\n\n## Who can do what\n\nUse existing campaign write permissions and organization-owned credentials. Derive the actor from the credential, enforce workspace boundaries, and preserve client-write restrictions. Never accept a caller-supplied user identity.\n\n## Done when\n\n* API and MCP can import a 5,000-lead CSV-derived list in supported batches with per-person values and safe retries.\n* Existing UI and sequence previews resolve each lead's custom placeholders correctly.\n* Invalid rows, duplicates, limits, capacity, permissions and partial failures have tested, documented outcomes.\n* Existing upload and approval behavior remains correct after any shared-service extraction.\n* The docs-only cold-start example works against preview; current-head tests, automated reviews and browser QA pass before code-review handoff.\n\n## Implementation context\n\nAI context.md"
+    },
+    {
+      "id": "ENG-12122",
+      "createdAt": "2026-07-29T13:12:34.213Z",
+      "title": "Adding leads to an existing campaign wipes the campaign's existing leads while still consuming credits",
+      "state": "Blocked",
+      "assignee": "Koppany Kondricz",
+      "parent": null,
+      "labels": ["Bug", "intercom-sourced", "triaged-by-devin"],
+      "description": "## Name 13 signal (daily triage 2026-07-29)\n\nName 13 cluster *Campaign leads vanish after new upload, credits consumed* — severity high, confidence 0.88, **2 customers this week**.\n\n* **Name 1 (Company One)**: 5,347 existing leads in a campaign disappeared when she added more leads to it.\n* **Name 12**: hit the same data-loss pattern today.\n\nIn both cases the leads are gone and the credits were still charged, so the customer pays twice to rebuild the list.\n\nName 13 topic: <url>\n\n## Why this is a new issue\n\nDuplicate search found no open canonical for \"adding leads wipes the existing lead set\":\n\n* ENG-10981 \"Scraped leads disappear after processing — credits consumed, campaign stays empty\" — Done (2026-06-29); different trigger (initial scrape, not a second upload into a populated campaign)\n* ENG-8186 \"Cold Email Agent lead count resets after import\" — Done (2026-05-03)\n* ENG-7942 \"Campaign upload loses leads and skips to step 4\" — Done\n* ENG-4551 \"Missing ~760 leads after CSV import\" — Done\n* ENG-7247 / ENG-7186 — deletion/duplicate-skip behaviour, not data loss on add\n\nDistinct from the stuck-processing cluster on ENG-10762: here the leads were present and are afterwards gone.\n\n## Suggested starting points\n\n* The add-leads path into an existing campaign: whether the import replaces rather than appends the campaign lead set\n* Credit deduction on the second import happening before/independently of the lead write, so credits are consumed even when the resulting lead set shrinks\n\n## Triage metadata\n\n* Name 14 key: `modem_daily_triage:v1/<uuid>/2026-07-29`\n* Window: 2026-07-28 13:02 UTC → 2026-07-29 13:02 UTC\n* Recurrence: recurring, 2 customers this week"
+    }
+  ]
+}

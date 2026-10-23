@@ -1,0 +1,230 @@
+{
+  "id": "ENG-14651",
+  "provenance": "seeded",
+  "createdAt": "2026-10-02T14:33:43.991Z",
+  "lane": "triage",
+  "stratum": "platform_limitation",
+  "ticket": {
+    "title": "devin not scraping leads",
+    "description": "#### Customer Name\n\nno customer\n\n#### Customer Email\n\nno email\n\n#### Workspace name\n\nCompany Nine\n\n#### Screenshot\n\n <image> \n\n#### What are you trying to achieve?\n\ndevin not being able to scrape leads due to acqusitiy blocks for lto clients on the free path. can you help pls\n\n#### What are you doing to achieve it?\n\nposted here\n\n#### What is happening instead?\n\nna\n\n#### What is the expected outcome?\n\nna",
+    "attachmentKinds": ["image", "slack"]
+  },
+  "repoCommitAtCreate": "5c62e4413cbf8970ef6098dd3d4100c851396391",
+  "flags": {
+    "descriptionEditedAfterCreate": false,
+    "needsProductionData": false,
+    "alreadyFixedAtTriage": false
+  },
+  "relatedSnapshot": [
+    {
+      "id": "ENG-12002",
+      "createdAt": "2026-07-23T17:04:31.609Z",
+      "title": "User unable to scrape leads without upgrading agent upgrade",
+      "state": "Canceled",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": ["triaged-by-devin"],
+      "description": "#### Customer Name\n\nName 1\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 1's Workspace\n\n#### Screenshot\n\n <image> \n\n#### What are you trying to achieve?\n\nScrape 1k leads promised for LTO\n\n#### What are you doing to achieve it?\n\nGet him to upgrade his Cold Email Agent\n\n#### What is happening instead?\n\nHe doesn't have the funds to upgrade his Cold email agent and buy inboxes\n\n#### What is the expected outcome?\n\nScrape the 1k leads from list provided and send in a google sheet"
+    },
+    {
+      "id": "ENG-10877",
+      "createdAt": "2026-06-26T11:09:28.620Z",
+      "title": "Lead scraper fails on special characters",
+      "state": "Canceled",
+      "assignee": "Koppany Kondricz",
+      "parent": null,
+      "labels": [],
+      "description": "#### Customer Name\n\nName 2\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nCompany One\n\n#### Screenshot\n\n <image> \n\n <image> \n\n#### What are you trying to achieve?\n\nScrape Leads from Apollo using <domain>\n\n#### What are you doing to achieve it?\n\nScraping Leads from Apollo using <domain>\n\n#### What is happening instead?\n\nthere’s a definite bug in the lead scrapper when it comes to special characters (e.g., those with accent marks, or other non-english alphabet letters). These are company names and in order to include that variable field I’m having to clean this up manually, or simply exclude the personalization.\n\n#### What is the expected outcome?\n\nLead lists to be scraped without manual efforts"
+    },
+    {
+      "id": "ENG-10981",
+      "createdAt": "2026-06-29T13:13:53.463Z",
+      "title": "Scraped leads disappear after processing — credits consumed, campaign stays empty",
+      "state": "Done",
+      "assignee": "Jared Stauffer",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "## Problem\n\nScraped leads show brief processing activity then disappear entirely. Credits are consumed but campaigns show zero leads, blocking outreach.\n\n## Context\n\n* Name 7 topic: `<uuid>`\n* Severity: High | Confidence: 0.90\n* Recurring: 2 customers this week (Name 3 Name 8 3,000 leads, Name 4 4,000 contacts)\n* Track: Engineering\n\n## Why New\n\nPrior tickets about scraped leads disappearing (ACQ-3355, ENG-6668, ENG-4984) are all Done/Canceled. ENG-10592 (stale lead-scrape runs) is a different issue. No open issue tracks the current recurrence of leads vanishing post-scrape with credits deducted.\n\n## Source\n\n* Name 5\n\n## Evidence\n\n> Name 3 Name 8 paid for 3,000 leads and Name 4's 4,000 contacts both show brief processing then disappear — credits consumed, campaign leads list stays empty.\n\n## Name 6\n\n`modem-<uuid>-2026-06-29`"
+    },
+    {
+      "id": "ENG-11252",
+      "createdAt": "2026-07-08T10:17:32.380Z",
+      "title": "Resolve inbox purchase, lead scraping, and invite issues",
+      "state": "Done",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [],
+      "description": "#### Customer Name\n\nName 9\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nCompany Two and Company Three\n\n#### Screenshot\n\n <image> \n\n <image> \n\n#### What are you trying to achieve?\n\nClient Name 9 needs three platform functions working, all currently failing: 1. Purchase new inboxes and domains in the Company Twelve workspace . 2. Add and scrape roughly 1,000 leads into one of his campaigns in the same workspace. 3. Send a dashboard access invite to his client at <email> for the Company Three dashboard.\n\n#### What are you doing to achieve it?\n\n1. Inboxes and domains purchase: In the Company Twelve workspace, went to Marketing, then Cold Email Agent, then Email Accounts, then Add inboxes. Selected the <domain> and <domain> domains, configured the inbox names, and clicked through to complete the payment. Has retried this many times over the past two weeks, restarting from scratch each time. Screenshot attached.  2. Lead scraping: Opened one of his campaigns, set the ICP and niche targeting (based on his discussion with Name 10), and attempted to add roughly 1,000 leads and start the lead scrape for that campaign.  3. Invite: From the Company Three dashboard workspace, sent a client access invite to <email> so his client can log in and view the dashboard. Sent it five times, using the email that matches the client's AIA account.\n\n#### What is happening instead?\n\n1. Inboxes and domains: the order stalls at the payment step (\"Your inbox order is waiting for payment\") and never completes, then cancels itself. On retry it returns \"Payment failed: You already have an order in progress. Please wait for it to complete,\" so a stuck in-progress order is blocking every new attempt. The card is valid and has not been charged. The help desk has confirmed this as a known issue being worked on, but it remains unresolved after several days. 2. Lead scraping: fails with \"Failed to start lead scraping: Niche must be 120 characters or less.\" The niche label exceeds 120 characters and blocks the upload. 3. Invite: the invite email never reaches <email> after five attempts, nothing arrives in his inbox.\n\n#### What is the expected outcome?\n\n1. The stuck in-progress order is cleared on the backend so the payment completes and the inboxes and domains provision. 2. The lead scrape runs successfully, either by clarifying or lifting the 120-character niche limit, or confirming the client can proceed by shortening the niche label. 3. The dashboard invite is delivered to <email> so the client can access the Company Three dashboard."
+    },
+    {
+      "id": "ENG-11943",
+      "createdAt": "2026-07-21T21:38:53.350Z",
+      "title": "Point the AmpleLeads and Apollo provider cases to InstantlyClientService and default the lead-scrape cron, campaign-creator fallback, and campaign and scrape Zod source schemas to Company Four.",
+      "state": "Done",
+      "assignee": "Koppany Kondricz",
+      "parent": null,
+      "labels": ["Chore"],
+      "description": "AmpleLeads and Apollo should remain valid inputs and resolve to the Company Four client."
+    },
+    {
+      "id": "ENG-7391",
+      "createdAt": "2026-03-31T14:25:25.444Z",
+      "title": "Update lead scrape submission status to completed for Company Four source",
+      "state": "Canceled",
+      "assignee": null,
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "## Problem\n\nFor the Company Four lead scraping path, the `lead_scrape` submission status is never updated from `processing` to `completed`. The non-Instantly path in `processLeadScrape` has an explicit `update-status-completed` step (lines 776–828) that updates the submission, but the Company Four path (lines 164–267) just polls enrichment, fires an `import-list-leads` event, and returns — without ever touching the submission record.\n\n## Impact\n\n* Campaigns using the Company Four source for lead scraping will show a perpetual \"processing\" state in the UI even after leads have been successfully scraped and imported.\n* Users may think their lead scrape is stuck or failed when it has actually completed.\n\n## Related PR\n\n<url:github.com>"
+    },
+    {
+      "id": "ENG-2738",
+      "createdAt": "2025-11-14T16:27:19.408Z",
+      "title": "Add Programmatic Lead Ingestion Monitoring and Fallback Solutions",
+      "state": "Backlog",
+      "assignee": "Anthony Adewale",
+      "parent": null,
+      "labels": ["Bug", "Improvement"],
+      "description": "## Issue Identified:\n\nFailed lead scrape processes occur silently, without visibility or remediation.\n\nTypical failed lead scrape process goes like:\n\n* User creates a new campaign\n* Lead scrape process is initiated\n* Lead scrape process fails, either in Verification or Uploading to Company Four stage\n* Many hours go by and the user wonders what's taking so long\n* With a question to Support or maybe stumbling on it themselves, they eventually discover the lead scrape process didn't work and now they can't run their campaign\n* There was a new button added to the lead process card where users can \"Regenerate Leads\" and hope for the best, however this is a manual step\n* The user then needs to come back later and check to see if the lead scrape process worked\n* If the process worked, then they can launch their campaign\n\nThis process is inefficient and needlessly manual, and we need a programmatic way to detect failures, retry automatically, and notify the user only when action is actually required.\n\n <image> \n\n## Proposed Solution:\n\nAdd programmatic monitoring across all four ingestion stages, with automated remediation paths for each:\n\n1. Submission\n   1. Detect submission failures\n   2. If failed, programmatically resubmit\n   3. If failed three consecutive times, stop retry and add alert with reason\n2. **Lead Scraping**\n   * Detect timeout, empty payload, or other errors from lead provider\n   * If failed, retry scrape automatically\n   * If failed three consecutive times, stop retry and add alert with reason\n3. **Email Verification**\n   * Detect stalled or incomplete verification\n   * If failed, restart verification job or re-submit batch\n   * If failed three consecutive times, stop retry and add alert with reason\n4. **Uploading to Company Four**\n   * Detect failed upload to Company Four\n   * If failed, reattempt upload process\n   * If failed three consecutive times, stop retry and add alert with reason\n\nEach stage should emit success/failure states, log the outcome, and attempt automated self-correction before requiring any manual input.\n\n## Assumptions:\n\n* The entire lead scrape process should only take 5-10 minutes when working normally\n* When users set up new campaigns, they want to get started right away\n  * Therefore, UI feedback is critical\n  * If a process is failing, show them that the agent is taking action on their behalf\n\n<!-- preview-url-start -->\n**Preview:** <url:1772277796-aiacquisition.vercel.app> — PR #2787\n<!-- preview-url-end -->"
+    },
+    {
+      "id": "ENG-3475",
+      "createdAt": "2025-12-05T21:34:31.815Z",
+      "title": "Lead scraping US targeting returns worldwide leads",
+      "state": "Canceled",
+      "assignee": "Pieter Venter",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "## Issue Identified:\n\nLead scrape did not follow geographic targeting.\n\nWhen creating a new campaign targeting marketing agencies in the US, the lead scraping form was configured with the geographic setting set to US only. The resulting lead list contained 4,227 leads from multiple countries worldwide instead of being limited to US-based leads.\n\n <image> \n\n### Name 11 #1:\n\n* Name: Name 12 Name 13\n* Campaign: Marketing Firms\n* Leads used: 4,227\n\n### Name 11 #2:\n\n* Name: Name 101\n* Campaign: "
+    },
+    {
+      "id": "ENG-11488",
+      "createdAt": "2026-07-11T05:06:29.126Z",
+      "title": "Return campaign lead search totals from the paged query",
+      "state": "Backlog",
+      "assignee": "Pieter Venter",
+      "parent": null,
+      "labels": ["Performance", "triaged-by-devin"],
+      "description": "## Refined implementation brief\n\n*Refined on 2026-07-20. This is the current delivery brief.*\n\n### Outcome\n\nReturn exact campaign-lead search totals from the paged search query so the application does not evaluate the same large search predicate twice.\n\n### Scope\n\n* Add `count(*) over()` to the existing paged campaign-lead query.\n* Use the window total for non-empty pages and remove the normal separate count query.\n* Return zero for an empty first page.\n* Use a bounded fallback or pagination-clamping path for an empty later page.\n* Preserve global search, advanced filters, sorting, tenant boundaries, campaign boundaries, and soft-delete filtering.\n* Exclude trigram indexes, generated search columns, metadata denormalization, and a new full-text subsystem.\n\n### Acceptance criteria\n\n* Non-empty search and advanced-filter pages execute the expensive predicate once.\n* Totals retain parity across global search, field filters, combined filters, and unfiltered pagination.\n* Empty first-page and later-page behavior is deterministic.\n* Other organizations, campaigns, and soft-deleted rows cannot affect totals.\n* The API and UI retain their pagination contract.\n\n### Implementation direction\n\nReturn a window total with each selected lead row. Use it as the normal exact total and reserve a bounded secondary path only for an empty non-first page. Rebase after ENG-11249 and PR #5463 if necessary.\n\n### Validation\n\n* Add focused repository and router tests for total parity and empty-page behavior.\n* Confirm the standalone count fingerprint disappears after deployment.\n* Compare remaining paged-query latency and CPU with the prior paired fingerprints.\n* Revisit index work only if the remaining single query is still material.\n\n## Original description\n\n## Summary\n\n**#14 by total DB runtime (1.01%)** over the last 24h, and one of the **slowest per-call queries in the workload**: p50 **3.95s**, p99 **23.5s**, max **23.5s** across 97 calls, reading **634.9k rows/call (\\~6,545 rows/query)**. It is the `count(*)` companion to the campaign-lead advanced-search list — a `LEFT JOIN outreach_campaign_lead → lead_scrape_lead` with a large `OR` of leading-wildcard `ILIKE` predicates across many text columns **and** ~20 JSONB `metadata` paths. Filter builder source: `apps/web/lib/outreach/db/campaign.ts` (per-field ILIKE / JSONB `metadata::jsonb -> ... ->> ...` conditions, e.g. `linkedinUrl` block ~L13307).\n\n## Query (normalized, abbreviated)\n\n```sql\nSELECT count(*)\nFROM outreach_campaign_lead\nLEFT JOIN lead_scrape_lead\n  ON outreach_campaign_lead.internal_lead_id = lead_scrape_lead.id\nWHERE outreach_campaign_lead.campaign_id = $1\n  AND outreach_campaign_lead.organization_id = $2\n  AND (\n    outreach_campaign_lead.email      ILIKE $3\n    OR outreach_campaign_lead.full_name  ILIKE $4\n    OR outreach_campaign_lead.first_name ILIKE $5\n    OR outreach_campaign_lead.last_name  ILIKE $6\n    OR lead_scrape_lead.title      ILIKE $7\n    OR lead_scrape_lead.company    ILIKE $8\n    OR lead_scrape_lead.linkedin_url ILIKE $9\n    OR lead_scrape_lead.state      ILIKE $10\n    OR lead_scrape_lead.country    ILIKE $11\n    OR outreach_campaign_lead.metadata::jsonb -> ... ->> ... ILIKE $..  -- ~20 JSONB paths\n  )\n```\n\n## Metrics (last 24h, PlanetScale Insights)\n\n| Metric | Value |\n| -- | -- |\n| Total time | 575k ms (1.01% of DB runtime) |\n| Calls | 97 |\n| p50 / p99 / max | **3.95s / 23.5s / 23.5s** |\n| rows read | 634.9k (~6,545/query) |\n| egress | tiny (count only) |\n\nIndex usage: `outreach_campaign_lead_campaign_org_lower_email_idx` (100%) and `lead_scrape_lead_pkey` (100%) — the index narrows to the campaign+org slice, but the `OR ... ILIKE` block then forces a **scan of the whole campaign's leads** (and their joined scrape rows) applying leading-wildcard `ILIKE` and JSONB extraction to each row. Large campaigns → ~6.5k rows scanned per call, seconds of CPU.\n\n## Root cause\n\n* **Leading-wildcard** `ILIKE` **on many columns cannot use a b-tree index**; every lead in the campaign is examined.\n* The **JSONB** `metadata` **extractions** (~20 paths, `->` / `->>`) run per row, compounding cost.\n* Joining `lead_scrape_lead` just to search its text columns widens each scanned row.\n* The `count(*)` runs the full predicate over the whole matching set (no `LIMIT`), so it is strictly more expensive than the paged list it accompanies.\n\n## Recommended fix\n\n1. **Full-text / trigram index**: add a `pg_trgm` GIN index on the searched text columns (`email`, `full_name`, `first_name`, `last_name` on `outreach_campaign_lead`; `title`, `company`, `linkedin_url` on `lead_scrape_lead`) so `ILIKE '%term%'` can use an index, or maintain a combined `tsvector` search column.\n2. **Name 14 the searched JSONB metadata** into real columns (or a generated column) so the ~20 `metadata` ILIKE paths become indexable instead of per-row extraction.\n3. **Avoid recomputing the count** on every keystroke — debounce, cache the count per (campaign, search) for a short TTL, or use an estimated count for large result sets and only compute exact counts on demand.\n4. Consider restricting which fields participate in the default \"global\" search to reduce the OR fan-out.\n\n*Filed by the daily PlanetScale performance review automation. Metrics are 24h aggregates as of 2026-07-11.*"
+    },
+    {
+      "id": "ENG-11595",
+      "createdAt": "2026-07-13T20:40:37.538Z",
+      "title": "AI SDR re-emails already-contacted leads when prior campaign has no remaining lead rows (cross-campaign dedup gap beyond ENG-8163)",
+      "state": "Backlog",
+      "assignee": "Koppany Kondricz",
+      "parent": null,
+      "labels": ["Bug", "intercom-sourced"],
+      "description": "BUG: Yes\n\nEVIDENCE:\n\n* Customer: Name 15 (<email>), workspace \"Name 15's Workspace\" (org <uuid>). Reported via Intercom that a newly scraped batch emailed leads he had already engaged/booked, plus the separate signature-name bug (tracked in ENG-11457).\n* Name 17 is on a SHARED Company Four workspace (outreach_provider.workspace_id IS NULL) — the highest-risk category called out in ENG-8163.\n* New campaign created 2026-07-13 \"Name 18 | Legal Services ... (6.22) (copy)\" (<uuid>) via the Company Four SuperSearch scrape path (leads carry scrapeRunId + instantlyData). It holds 6,166 leads; ~69% (4,246) overlap emails from the org's other same-niche campaigns.\n* 55 prospects contacted in the new campaign have an OLDER crm_message_thread from a prior COMPLETED same-niche campaign \"Name 18 | Law Practices ... (AIA created)*\" (<uuid>, threads dated 2026-06-23) → they were emailed before and re-emailed today.\n* Critical detail: campaign 46d8e933 has 6,145 crm_message_threads (proof of prior contact) but ZERO outreach_campaign_lead rows (live or soft-deleted). None of the 55 re-emailed prospects have a live outreach_campaign_lead row in any other campaign.\n\nROOT CAUSE:\n\n* The cross-campaign dedup shipped in ENG-8163 (OutreachRepository.getEmailsExistingInOtherActiveCampaigns, apps/web/lib/outreach/db/campaign.ts:3060) filters candidate emails ONLY against outreach_campaign_lead rows in other non-archived campaigns. It does not consult crm_message_thread (the authoritative \"we already emailed this person\" record).\n* When an earlier campaign's outreach_campaign_lead rows are gone (e.g. completed/cleaned-up campaign 46d8e933 with 0 lead rows) but the send history remains in crm_message_thread, the dedup has nothing to match, so those already-contacted prospects pass the filter and get emailed again. Both the scrape path (OutreachService.bulkAddLeadsToCampaignWithDedup, out-reach-service.ts:376) and the CSV path share this same lead-row-only data source.\n* This is a residual gap beyond ENG-8163 (which is Done): ENG-8163 closed the missing-filter case, but the filter's data source is incomplete for prospects whose campaign_lead rows no longer exist.\n\nPOTENTIAL FIX:\n\n* Extend the dedup source so it also treats prospects with existing crm_message_thread / sent crm_message history (per org, excluding the current campaign) as already-contacted, not just prospects with live outreach_campaign_lead rows. Especially important for shared-workspace (workspace_id IS NULL) orgs that re-scrape the same niche.\n* Confirm intended scoping (should a prior COMPLETED campaign block re-contact? currently the app relies on lead rows that may be pruned for completed campaigns).\n\nWHATS NEEDED TO RESOLVE:\n\n* Product decision on the dedup source of truth (outreach_campaign_lead vs crm_message_thread/contact history) and desired behavior for completed/cleaned-up campaigns and shared workspaces.\n* Implementation + tests covering the scrape and CSV paths for the \"prior contact exists but no campaign_lead row\" case.\n\nDOCS: Help Center already documents the intended dedup behavior (\"a lead used in any campaign, even deleted ones, is flagged as a duplicate\") at /docs/cold-email-agent/faq/lead-search/why-cant-i-re-upload-leads-that-were-in-a-deleted-campaign and /docs/cold-email-agent/faq/campaigns/what-happens-when-i-upload-a-csv-with-duplicate-leads. No documentation gap — the product is not matching the documented behavior.\n\nRELATED: ENG-8163 (cross-campaign dedup fix, Done); ENG-11457 (AI SDR wrong/hallucinated sign-off name — the second symptom in this same Intercom conversation; verified 34 sent replies in this org signed \"Name 16\" from non-Name 100 mailboxes).\n\nINTERCOM: <url:app.intercom.com>\nSLACK THREAD: <url:acquisityworkspace.slack.com>\nDEVIN SESSION: <url>"
+    },
+    {
+      "id": "ENG-12122",
+      "createdAt": "2026-07-29T13:12:34.213Z",
+      "title": "Adding leads to an existing campaign wipes the campaign's existing leads while still consuming credits",
+      "state": "Blocked",
+      "assignee": "Koppany Kondricz",
+      "parent": null,
+      "labels": ["Bug", "intercom-sourced", "triaged-by-devin"],
+      "description": "## Name 7 signal (daily triage 2026-07-29)\n\nName 7 cluster *Campaign leads vanish after new upload, credits consumed* — severity high, confidence 0.88, **2 customers this week**.\n\n* **Name 19 (Company Five)**: 5,347 existing leads in a campaign disappeared when she added more leads to it.\n* **Name 20**: hit the same data-loss pattern today.\n\nIn both cases the leads are gone and the credits were still charged, so the customer pays twice to rebuild the list.\n\nName 7 topic: <url>\n\n## Why this is a new issue\n\nDuplicate search found no open canonical for \"adding leads wipes the existing lead set\":\n\n* ENG-10981 \"Scraped leads disappear after processing — credits consumed, campaign stays empty\" — Done (2026-06-29); different trigger (initial scrape, not a second upload into a populated campaign)\n* ENG-8186 \"Cold Email Agent lead count resets after import\" — Done (2026-05-03)\n* ENG-7942 \"Campaign upload loses leads and skips to step 4\" — Done\n* ENG-4551 \"Missing ~760 leads after CSV import\" — Done\n* ENG-7247 / ENG-7186 — deletion/duplicate-skip behaviour, not data loss on add\n\nDistinct from the stuck-processing cluster on ENG-10762: here the leads were present and are afterwards gone.\n\n## Suggested starting points\n\n* The add-leads path into an existing campaign: whether the import replaces rather than appends the campaign lead set\n* Credit deduction on the second import happening before/independently of the lead write, so credits are consumed even when the resulting lead set shrinks\n\n## Triage metadata\n\n* Name 21 key: `modem_daily_triage:v1/<uuid>/2026-07-29`\n* Window: 2026-07-28 13:02 UTC → 2026-07-29 13:02 UTC\n* Recurrence: recurring, 2 customers this week"
+    },
+    {
+      "id": "ENG-10161",
+      "createdAt": "2026-06-13T09:33:39.294Z",
+      "title": "Name 12",
+      "state": "Blocked",
+      "assignee": "Blaise Gulaj",
+      "parent": "ENG-10107",
+      "labels": [],
+      "description": ""
+    },
+    {
+      "id": "ENG-10762",
+      "createdAt": "2026-06-24T17:51:44.129Z",
+      "title": "Leads Uploaded via CSV Not Appearing in Campaign",
+      "state": "Done",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "**Customer Name**\nName 22\n\n**Customer Email**\n<email>\n\n**Customer Email**\n<email>\n\n**Workspace name**\nName 22's Workspace\n\n**Screenshot**\n<optional>\n\n**What is the user trying to achieve?**\nThe user is trying to upload leads via CSV into campaigns \"10a. 6.23.26 Building Materials Owners etc. 200\" and \"9a\" so the campaigns can be launched and begin sending emails.\n\n**What is the user doing to achieve it?**\nThe user uploaded CSV files, mapped all fields, and completed the import process. The user reports seeing the upload process run successfully.\n\n**What is happening instead?**\nThe campaigns show zero uploaded leads, zero leads in progress, and no leads visible in the Leads tab. A banner indicates that 21 leads were skipped (17 duplicates and 4 blocked by Mimecast), but the user reports uploading approximately 200 leads to one campaign and approximately 700 leads to another. The majority of the uploaded leads do not appear in the campaign.\n\n**What is the expected outcome?**\nThe uploaded leads should appear in the campaign after the CSV import completes, allowing the user to review the leads and launch the campaign.\n\n<!-- preview-url-start -->\n**Preview:** <url:aiacquisition-l0xc9ayt4-aiacquisition.vercel.app> — PR #5074\n<!-- preview-url-end -->"
+    },
+    {
+      "id": "ENG-10826",
+      "createdAt": "2026-06-25T15:20:37.320Z",
+      "title": "AI Lead Database: apply exclude keywords defensively after Company Four SuperSearch results",
+      "state": "Canceled",
+      "assignee": "Koppany Kondricz",
+      "parent": null,
+      "labels": ["Bug", "triaged-by-devin"],
+      "description": "## Problem\n\nA customer reported that AI Lead Database / SuperSearch exclude keywords are not reliably excluding freight brokerage companies. Acquisity sends the Company Four filter correctly, but Company Four still returns matching leads, and we currently import them without defensive post-filtering.\n\n## Customer / scope\n\n* Customer org: `<uuid>`\n* Campaign: `<uuid>` (`Freight Brokers Test Leads`)\n* Scrape run: `<uuid>`\n* Intercom conversation: <url:app.intercom.com>\n* Slack thread: <url:acquisityworkspace.slack.com>\n\n## Evidence\n\n* Production log at `2026-06-25T14:36:00.938Z` shows `keyword_filter.exclude` was sent to Company Four with: `AI Companies, Software Companies, SaaS Companies, Trucking Companies, TRUCKING, Freight Broker, Freight Brokers, Software Company`.\n* Code path constructs and sends this filter via:\n  * `apps/web/lib/outreach/Company Four/utils/build-supersearch-filters.ts` (`keyword_filter.exclude`)\n  * `apps/web/lib/scrape/Company Four/client.ts` (`enrichLeadsFromSuperSearch`)\n* Production DB result for run `<uuid>`: 489 leads imported; 11 leads contain `freight brokerage` / `Freight Brokerage` in raw Company Four company description despite exclude terms.\n\nExample violating leads:\n\n* Name 23 — Company Ten — companyDescription says family-owned freight brokerage firm\n* Name 24 — Company Thirteen — companyDescription lists Freight Brokerage\n* Company Fourteen leads — companyDescription says specializing in freight brokerage\n\n## Root cause hypothesis\n\nCompany Four's `keyword_filter.exclude` is insufficient / not consistently applied to all returned company-description fields. Acquisity currently trusts Company Four results and does not reapply exclude keywords before saving/importing leads.\n\n## Proposed fix\n\nAfter Company Four returns leads and before saving/importing to `lead_scrape_lead` / campaign leads, normalize the configured exclude keywords and defensively drop any lead where a keyword matches relevant fields, at minimum:\n\n* lead title / jobTitle / headline\n* company / companyName\n* summary\n* companyDescription\n* other raw payload text fields used in the Lead Database UI\n\nAlso log how many leads were filtered out with run/campaign/org metadata for support debugging.\n\n## Acceptance criteria\n\n* A scrape run with `keywordFilterExclude: \"Freight Broker, Freight Brokers\"` does not import leads whose raw Company Four payload contains `freight brokerage`, `Freight Brokerage`, `Freight Broker`, or `Freight Brokers` in title/company/summary/companyDescription.\n* Filtered-out leads are not counted as imported campaign leads.\n* Add focused tests for exclude keyword post-filtering.\n\n## Support workaround\n\nFor the affected customer, manually remove the 11 freight-brokerage leads from the campaign/list. Company Name Exclude can help but will not reliably catch company-description matches."
+    },
+    {
+      "id": "ENG-10972",
+      "createdAt": "2026-06-28T16:49:33.849Z",
+      "title": "Customer received fewer leads than purchased",
+      "state": "Done",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [],
+      "description": "#### Customer Name\n\nName 4\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nCompany Six\n\n#### Screenshot\n\n <image> \n\n#### What are you trying to achieve?\n\nGp purchased 4000 leads but only got about 1500 and she is now escalated\n\n#### What are you doing to achieve it?\n\n* \n\n#### What is happening instead?\n\n* \n\n#### What is the expected outcome?\n\n* "
+    },
+    {
+      "id": "ENG-6668",
+      "createdAt": "2026-03-12T17:08:12.185Z",
+      "title": "Leads scraped via Add Leads do not appear",
+      "state": "Canceled",
+      "assignee": "Jared Stauffer",
+      "parent": null,
+      "labels": [],
+      "description": "On March 10, leads were scraped using the **Add Leads** button under a campaign, but the leads did not appear in the account.\n\nSupport observed a message that 324 leads were skipped during upload and 330 leads were successfully uploaded. The issue needs investigation to confirm whether the scrape job or upload logs show skipped leads due to duplication, campaign requirements, or another backend problem.\n\nRelevant context: Loom link"
+    },
+    {
+      "id": "ENG-11249",
+      "createdAt": "2026-07-08T05:08:43.847Z",
+      "title": "DB perf: outreach_campaign_lead + leadScrapeLead lateral over-fetch — 3.1 GB egress/day, p99 ~6.1s (270 calls)",
+      "state": "Done",
+      "assignee": "Pieter Venter",
+      "parent": null,
+      "labels": ["Performance"],
+      "description": "## Summary\n\n**#12 by total DB runtime (1.47%)** over the last 24h — an over-fetch pattern: ~**3.1 GB egress/day across 270 calls (\\~12 MB/call)**, p99 **6.1s**. It lists outreach campaign leads and left-lateral-joins the linked `lead_scrape_lead` row, pulling its large `data` JSON per lead.\n\n## Query (normalized, abbreviated)\n\n```sql\nSELECT outreachCampaignLeadTable.id, ...created_at, first_name, last_name, full_name,\n       email, esp_code, esg_code, metadata,\n       outreachCampaignLeadTable_leadScrapeLead.data AS \"leadScrapeLead\"\nFROM outreach_campaign_lead outreachCampaignLeadTable\nLEFT JOIN LATERAL (\n  SELECT json_build_array( <lead_scrape_lead columns incl. industry, raw_data, ...> ) AS data\n  FROM lead_scrape_lead ...\n) outreachCampaignLeadTable_leadScrapeLead ON true\nWHERE ...organization_id / campaign filters...;\n```\n\n## Metrics (24h, main primary)\n\n| Metric | Value |\n| -- | -- |\n| Total time | 441,048 ms (~7.4 min) — **1.47%** of all DB runtime |\n| CPU time | 19,635 ms |\n| Calls | 270 |\n| p50 / p99 latency | 1,290 ms / **6,141 ms** |\n| Rows read | 822,279 (~3,045/query) |\n| Egress | **\\~3.07 GB** (~12 MB/call) |\n| Index usage | `outreach_campaign_lead.outreach_campaign_lead_campaign_org_lower_email_idx` 100% |\n\n## Root cause\n\nThe filter is well-indexed (`campaign_org_lower_email_idx` used 100%), so this is **not** a missing-index problem. The cost is egress/materialization: each row drags along the joined `lead_scrape_lead` payload (including bulky fields such as `raw_data`, `industry`, `departments`) via a per-row lateral, and the result set is large and unpaginated-enough that responses reach ~12 MB.\n\n## Code origin\n\n`apps/web/lib/outreach/db/campaign.ts` — a campaign-lead list query using Drizzle relational `with: { leadScrapeLead: { ... } }` (grep `leadScrapeLead` in that file).\n\n## Recommended fix\n\n1. **Project only needed** `lead_scrape_lead` **columns** in the `with`/lateral (avoid `raw_data` and other large fields unless the caller needs them).\n2. **Ensure the list is paginated** (page size + cursor on `created_at`) so a single call can't return thousands of enriched rows.\n3. If the enrichment is only needed on-demand (e.g. row expand), fetch `lead_scrape_lead` lazily rather than eagerly for the whole page.\n\n## Risk\n\nLow/Medium — verify consumers don't rely on the full `leadScrapeLead.data` shape before trimming. No schema change required.\n\n---\n\n*Filed by the daily PlanetScale DB performance automation. Window: last 24h ending 2026-07-08 \\~05:00 UTC.*"
+    },
+    {
+      "id": "ENG-11755",
+      "createdAt": "2026-07-17T13:14:05.402Z",
+      "title": "AI Campaign Manager: approved lead count not fully imported (large credit loss, no error)",
+      "state": "Todo",
+      "assignee": "Koppany Kondricz",
+      "parent": null,
+      "labels": ["triaged-by-devin"],
+      "description": "## Summary\n\nThe AI Campaign Manager approval step credits a large lead count but the actual import delivers far fewer — one workspace approved 1,708 leads yet only 202 were imported (~88% shortfall) — with no error surfaced to the customer. Credits appear consumed against the approved count while the campaign runs with a fraction of the leads.\n\n## Name 7 signal\n\n* Severity: MEDIUM · confidence 0.82 · engineering · recurring (ongoing since Feb)\n* Name 7 topic: <url>\n* Window: 2026-07-16 13:00 → 2026-07-17 13:00 UTC\n* Name 7 clustered this as a distinct, long-running signal separate from the CSV-processing hang and the \"fewer leads than purchased\" one-off tickets.\n\n## Why new\n\nName 25 search across all teams (incl. archived/completed) found no OPEN issue for an approved-vs-imported lead-count mismatch. Name 27 matches are both Done: ENG-10972 (customer received fewer leads than purchased — one-off support resolution) and ENG-10964 (CEA approval modal missing when credits exist but monthly quota exhausted). Neither tracks the approval→import count discrepancy / silent credit loss that Name 7 reports as recurring since February.\n\n## Source context\n\nApproval step reports ~1,708 leads; import completes with ~202. No error shown; credits burned. Recurring pattern per Name 7 clustering.\n\n*Filed by Name 26 (2026-07-17).*"
+    },
+    {
+      "id": "ENG-6989",
+      "createdAt": "2026-03-24T14:04:15.291Z",
+      "title": "Add company description and personalization to AI SDR copywriter context",
+      "state": "Done",
+      "assignee": "Koppany Kondricz",
+      "parent": null,
+      "labels": ["Feature"],
+      "description": "## Problem\n\nThe AI SDR copywriter agent only has access to basic lead info (name, title, company name, LinkedIn URL, email). It has no visibility into what the prospect's company actually does, its size, or any per-lead personalization data — even though this data already exists in the database.\n\n## Impact\n\n* **User Impact**: For direct campaigns, the AI SDR generates generic-sounding emails because it can't reference the prospect's business specifics.\n* **Business Impact**: Lower conversion rates on direct campaigns due to AI SDR having 0 context on what the prospect's company does\n\n## Root Cause\n\n`loadLeadEnrichment()` in `context-pack.ts` only fetches basic fields from `outreachCampaignLeadTable` and `outreachLeadTable`. It never touches `crmCompanyTable` or the `personalization` column.\n\n## Solution\n\n* Extend `LeadEnrichment` interface with `personalization`, `companyDescription`, `companyIndustry`, `companyEmployees`, `companyWebsites`\n* Add `personalization` to the existing `outreachCampaignLeadTable` query\n* Add `loadCrmCompanyForLead()` to resolve CRM company by traversing `crmContactTable.leadId` → `crmContactCompanyTable` → `crmCompanyTable`\n* Add new fields to the `## Prospect` section of the context pack output\n* No schema or migration changes required\n\n## PR\n\n<url:github.com>"
+    },
+    {
+      "id": "ENG-11993",
+      "createdAt": "2026-07-23T06:59:12.626Z",
+      "title": "Lead scraper verification process hangs indefinitely",
+      "state": "Done",
+      "assignee": "Koppany Kondricz",
+      "parent": null,
+      "labels": ["Bug", "Lead Scraping", "triaged-by-devin"],
+      "description": "#### Customer Name\n\nName 28 & Name 29\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nCompany Seven\n\n#### Screenshot\n\n <image> \n\n#### What are you trying to achieve?\n\nVerifying Leads\n\n#### What are you doing to achieve it?\n\nGoing through Lead Scraper in the platform\n\n#### What is happening instead?\n\nKeeps verifying for several hours and never completes\n\n#### What is the expected outcome?\n\nShould verify leads and complete"
+    },
+    {
+      "id": "ENG-14030",
+      "createdAt": "2026-09-18T14:06:21.307Z",
+      "title": "ApiClientError: Company Four API Client Error (402): Insufficient credits",
+      "state": "Triage",
+      "assignee": "Anthony Adewale",
+      "parent": null,
+      "labels": ["bugfix", "fast-lane"],
+      "description": "## Overview\n\nAI lead search (the \"lead scrape\" that feeds a cold email campaign) fails for workspaces whose Company Four enrichment workspace is out of provider credit. The user sees only a generic \"Unable to complete your request. Please try again later.\", no leads are delivered, and the campaign stays empty.\n\n## Problem\n\nFrom the user's side: they launch or configure a cold email campaign, confirm the lead search, and it errors out with no leads and no actionable message. There is no setting they can change to fix it, because the exhausted pool belongs to an Company Four workspace Acquisity provisioned and manages on their behalf.\n\n## Root cause\n\nThe AI lead-search dispatch uses the organization's own Company Four enrichment workspace when one is configured (`system_provisioned`, i.e. Acquisity owns and pays for it). When that workspace has no remaining Company Four enrichment credit, Company Four rejects the enrichment call with HTTP 402 `Insufficient credits`. The HTTP layer maps any non-429 4xx to a non-retriable `ApiClientError` and the dispatch path has no 402 handling, so the step fails, no scrape run is created, and the campaign receives zero leads.\n\nThe seam: other Company Four callers already treat 402 as a known signal via `isNoActivePaidPlanError()` and raise `alertProvisioningBillingGap()`; the lead-generator dispatch path does not, so the condition is neither alerted nor surfaced to the user as an actionable state.\n\n## Blast radius\n\nConfirmed affected (cause-confirmed from production, counted 2026-09-18 from `submission.metadata->>'diagnosticError' = \"Company Four API Client Error (402): Insufficient credits\"`): 28 organizations / 32 submissions all time (first 2026-05-12T15:49:34Z, most recent 2026-09-18T18:31:06Z), of which 24 organizations / 28 submissions fell in the trailing 48 hours. Counted independently from the campaign_creator-submission grouping used in the original count, which agreed (24 orgs / 27 submissions at 2026-09-18T17:37Z). A second independent customer report is frequency evidence for the same cause, not a new defect.\n\nPotentially exposed (upper bound, not cause-filtered): 26 organizations / 44 failed lead_scrape submissions on active system_provisioned Company Four providers in the 7 days to 2026-09-18T17:37:28Z. This counts every failed lead scrape on that population regardless of cause.\n\nDenominator: 2697 active Company Four providers are system_provisioned.\n\nNot a global provider outage: on 2026-09-18, 23 system_provisioned organizations completed 27 lead scrapes, and the busiest single organization completed 46 runs that day; steady completions continued through 17:44Z.\n\nLimitations: the Company Four workspace read API exposes no credit or plan balance, so the exact exhausted figure is not directly measurable; the 402 is the authoritative provider statement. Axiom log corroboration was unavailable.\n\nObservability gap seen in the second report: on the same organization, only one of several failed submissions carried the 402 diagnostic, while sibling failures recorded a null `diagnosticError`. The condition is therefore under-reported in the diagnostic field and the cause-confirmed count above is a lower bound, not a ceiling.\n\n## Proposed fix\n\nMake enrichment-credit exhaustion on a provisioned Company Four workspace a visible, actionable state end to end: detect the 402 on the lead-search dispatch path the same way other Company Four callers do, surface a message that names the real condition instead of the generic retry prompt, and ensure the provisioning/billing gap is alerted and remedied by the owner of those workspaces. The user should either get a working search or a clear statement of what Acquisity is doing about it, not an unexplained failure.\n\n## What's included\n\nIn scope: 402 detection and handling on the AI lead-search dispatch path; a user-visible state that names credit exhaustion; the alert/remedy path for provisioned workspaces; a regression test at the dispatch seam.\n\nOut of scope: changing the provider's credit pricing; customer-owned Company Four workspaces (they administer their own credit).\n\nSeparately deliverable work: backfill/retry for the campaigns already left empty by this failure; an observability signal that reports how many provisioned workspaces are credit-exhausted over time.\n\n## Regression seam\n\nPublic boundary: the AI lead-search dispatch step (`start-scrape-run` in the lead-generator function). Trigger: the configured Company Four enrichment workspace returns HTTP 402. Observable red-before, green-after: before, the step throws a generic non-retriable error and the submission is failed with only \"Unable to complete your request\"; after, the 402 is classified, the workspace is flagged as credit-exhausted, and the user-facing state and the internal alert both reflect that condition.\n\n## Done when\n\n* A lead search on a provisioned workspace that is out of Company Four credit produces a user-visible state that names credit exhaustion rather than a generic retry prompt.\n* The provisioning/billing gap is alerted for affected workspaces, by the same path other Company Four callers already use.\n* The affected campaigns can be recovered once credit is restored, without the user re-creating them.\n* A regression test at the dispatch seam proves the 402 is classified and handled rather than failing generically.\n\n## Reports\n\n* ENG-14042 Company Eight - leads won't scrape\n* ENG-14049 Company Eleven - campaign setup fails with \"We could not finish this request\" on every attempt"
+    }
+  ]
+}

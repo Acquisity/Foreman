@@ -1,0 +1,220 @@
+{
+  "id": "ENG-14616",
+  "provenance": "seeded",
+  "createdAt": "2026-10-02T08:35:07.802Z",
+  "lane": "billing",
+  "stratum": "billing",
+  "ticket": {
+    "title": "Company Four - Refund for Acquisity charge",
+    "description": "#### User Email\n\n<email>\n\n#### Workspace Name\n\nCompany Four\n\n#### Request Type\n\nRefund\n\n#### Reason for request\n\nClient is a refund save and we agreed for Financial Support: covering business running costs (Acquisity, domains, inboxes).\n\nClient was charged for Acquisity on Sept 5th. Please refund the amount $297 USD and makes sure he is not charged for the next two months as well.",
+    "attachmentKinds": ["slack"]
+  },
+  "repoCommitAtCreate": "a99dc84c325ef5d3da5d036fd8ac23e875c4867b",
+  "flags": {
+    "descriptionEditedAfterCreate": false,
+    "needsProductionData": true,
+    "alreadyFixedAtTriage": false
+  },
+  "relatedSnapshot": [
+    {
+      "id": "ENG-12040",
+      "createdAt": "2026-07-24T18:23:40.664Z",
+      "title": "Refund for duplicate accounts",
+      "state": "Done",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [],
+      "description": "#### Customer Name\n\nName 1\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nN\n\n#### Screenshot\n\n <image> \n\n#### What are you trying to achieve?\n\nName 1 has duplicate acquisity accounts he has been charged for so please process a refund for the 2 duplicates\n\n#### What are you doing to achieve it?\n\nSubmitting a ticket\n\n#### What is happening instead?\n\nClient is being charged when he shouldn't\n\n#### What is the expected outcome?\n\nRefund"
+    },
+    {
+      "id": "ENG-5376",
+      "createdAt": "2026-02-10T10:44:34.866Z",
+      "title": "Investigate billing after cancellation (Feb 1 charge)",
+      "state": "Done",
+      "assignee": "Tyler Olsen",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "Customer reports canceling Acquisity on 2026-01-13 but still being billed on 2026-02-01. Investigate why the charge occurred."
+    },
+    {
+      "id": "ENG-11982",
+      "createdAt": "2026-07-22T15:42:13.748Z",
+      "title": "Refund duplicate charge for Acquisity",
+      "state": "Todo",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [],
+      "description": "#### Customer Name\n\nName 2\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 2\n\n#### Screenshot\n\n <image> \n\n <image> \n\n <image> \n\n <image> \n\n <image> \n\n <image> \n\n <image> \n\n <image> \n\n#### What are you trying to achieve?\n\nClient is paying $531.99 for Whop Tech Stack is includes Acquisity, Inboxes, Domains and Riverside\n\n#### What are you doing to achieve it?\n\nClient is paying $531.99 for Whop Tech Stack is includes Acquisity, Inboxes, Domains and Riverside\n\n#### What is happening instead?\n\nAlong with $531.99, client is alse getting charged $297 a month for Acquisity\n\n#### What is the expected outcome?\n\nPlease look into this and refund the duplicate payment."
+    },
+    {
+      "id": "ENG-14224",
+      "createdAt": "2026-09-24T13:03:31.910Z",
+      "title": "Acquisity Refund - Name 3",
+      "state": "Todo",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": ["Customer reported", "Internal reported", "Refund"],
+      "description": "#### User Email\n\n<email>\n\n#### Workspace Name\n\n#### Request Type\n\nRefund\n\n#### Reason for request\n\nName 4 and Name 5 agreed to have a remediation plan put in place. (to save refund)\n\nThe plan should cover the 120-day guarantee miss and extension it possible and the additional costs she paid on Acquisity (if we can refund those) as she is on the LTO google reviews funnel now.\n\nThese are the costs she had; \n I paid $437 on June 6th, $329 on July 6th, and $329 on August 6th for acquisity costs.\nThose total: $1095"
+    },
+    {
+      "id": "ENG-12895",
+      "createdAt": "2026-08-18T19:14:15.788Z",
+      "title": "Charged twice for Acquisity whitelabel when it is no longer required",
+      "state": "Triage",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [],
+      "description": "#### User Email\n\n<email>\n\n#### Workspace Name\n\nName 6\n\n#### Request Type\n\nRefund\n\n#### Reason for request\n\ncharged August 12th and 6th for white label when it is no longer necessary. Please refund him the $198"
+    },
+    {
+      "id": "ENG-13679",
+      "createdAt": "2026-09-11T05:49:54.667Z",
+      "title": "Name 7 & Name 8 - duplicate Acquisity charges - need clarity or refund.",
+      "state": "Todo",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": ["Customer reported", "Internal reported", "Refund"],
+      "description": "#### User Email\n\n<email>\n\n#### Workspace Name\n\nName 9\n\n#### Request Type\n\nRefund\n\n#### Reason for request\n\nduplicate Acquisity charges - need clarity or refund."
+    },
+    {
+      "id": "ENG-12070",
+      "createdAt": "2026-07-27T16:37:33.356Z",
+      "title": "Refund request for email and domain charge",
+      "state": "Triage",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": ["intercom-sourced"],
+      "description": "#### Customer Name\n\nName 10\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 10's Workspace\n\n#### Screenshot\n\n#### What are you trying to achieve?\n\nRequest a refund for the $192 charge for email accounts and domains billed on July 15.\n\n#### What are you doing to achieve it?\n\nThe user explained that they cancelled their Acquisity subscription but didn't realize the email accounts and domains required separate cancellation. They state they haven't used those services since the charge and are requesting a refund.\n\n#### What is happening instead?\n\nThe user was charged $192 for the email accounts and domains after cancelling their Acquisity subscription.\n\n#### What is the expected outcome?\n\nThe billing team reviews the request and approves a full or partial refund for the July 15 charge."
+    },
+    {
+      "id": "ENG-12248",
+      "createdAt": "2026-08-03T17:50:58.170Z",
+      "title": "Refund Acquisity Charges - $370",
+      "state": "Done",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [],
+      "description": "#### User Email\n\n<email>\n\n#### Workspace Name\n\nName 11's Workspace\n\n#### Request Type\n\nRefund\n\n#### Reason for request\n\nRR call - please ensure client is not charged in the future"
+    },
+    {
+      "id": "ENG-13157",
+      "createdAt": "2026-08-26T17:16:54.051Z",
+      "title": "Acquisity paid for but not activated",
+      "state": "Todo",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": ["Refund"],
+      "description": "#### User Email\n\n<email>\n\n#### Workspace Name\n\nName 100's Workspace\n\n#### Request Type\n\nRefund\n\n#### Reason for request\n\nShe was charged $206 on August 13th but no Acquisity was enabled"
+    },
+    {
+      "id": "ENG-6620",
+      "createdAt": "2026-03-11T15:55:22.324Z",
+      "title": "Process refund request of $600 for Acquisity",
+      "state": "Canceled",
+      "assignee": "Jared Stauffer",
+      "parent": null,
+      "labels": ["Refund"],
+      "description": "#### Workspace Name\n\nName 12 - <email>\n\n#### Request Type\n\nRefund\n\n#### Reason for request\n\nHe has requested to switch completely away from Acquisity and back onto Company One because of all the ongoing issues with AISDR and not being able to run anything that he wants to on there. He prefers the Company One interface, as it was previously suggested that he moved from Company One over onto Acquisity, and now he's had to pay that money over to Acquisity. He wants all of the money that is refunded. I personally suggest that we refund him only for his emails and only for his last few months of Acquisity, which totals to the amount of $600"
+    },
+    {
+      "id": "ENG-8122",
+      "createdAt": "2026-04-27T12:15:04.922Z",
+      "title": "Customer charged after canceling Acquisity",
+      "state": "Done",
+      "assignee": "Beth Newton",
+      "parent": null,
+      "labels": [],
+      "description": "user: <email>\n\nA charge of 125,42 euros (USD 144) was made on 2026-04-22 after Acquisity had already been disabled and all subscriptions had been canceled the previous month. The payment is visible and the cancellation is also visible. This needs review to understand why the charge went through."
+    },
+    {
+      "id": "ENG-14420",
+      "createdAt": "2026-09-28T20:08:12.183Z",
+      "title": "Name 13 been offbaorded and still charged for Acquisity",
+      "state": "Triage",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [],
+      "description": "#### User Email\n\n<email>\n\n#### Workspace Name\n\nName 13\n\n#### Request Type\n\nRefund\n\n#### Reason for request\n\nGP was offboarded and is still being charged for Acquisity.\n\nPlease refund payments paid in the last 2 months."
+    },
+    {
+      "id": "ENG-11918",
+      "createdAt": "2026-07-21T14:12:27.618Z",
+      "title": "Refund requested for cancelled Acquisity subscription",
+      "state": "Todo",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": ["Billing", "Refund", "triaged-by-devin"],
+      "description": "#### Customer Name\n\nName 14\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 14\n\n#### Screenshot\n\n <image> \n\n#### What are you trying to achieve?\n\nClient cancelled Acquisity, and is still being charged - $96\n\n#### What are you doing to achieve it?\n\nnothing\n\n#### What is happening instead?\n\nBeing charged\n\n#### What is the expected outcome?\n\nCharge to be refunded"
+    },
+    {
+      "id": "ENG-11111",
+      "createdAt": "2026-07-02T19:40:31.260Z",
+      "title": "Request for discount code approved by Name 15",
+      "state": "Done",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [],
+      "description": "#### User Email\n\n<email>\n\n#### Workspace Name\n\nName 16's\n\n#### Request Type\n\nDiscount code\n\n#### Reason for request\n\nMy client is slightly risky, and if we don't reach out with a discount code, it might make him riskier. I already talked to Name 15. He approved."
+    },
+    {
+      "id": "ENG-12827",
+      "createdAt": "2026-08-17T10:21:58.340Z",
+      "title": "Client is getting double charged for Acquisity for the last 6 months",
+      "state": "Done",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [],
+      "description": "#### User Email\n\n<email>\n\n#### Workspace Name\n\nName 2\n\n#### Request Type\n\nRefund\n\n#### Reason for request\n\n$297 x 6 months or $1,782 to be refunded as client is getting charged twice since last 6 months for Acquisity. Refer to the thread where this was investigated. \n<url:fegrowthpartner.slack.com>"
+    },
+    {
+      "id": "ENG-12532",
+      "createdAt": "2026-08-11T14:02:27.543Z",
+      "title": "Acquisity Charge After Cancellation + Pending $1,200 AIA course Refund",
+      "state": "Canceled",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [],
+      "description": "#### User Email\n\n<email>\n\n#### Workspace Name\n\nCompany Two's Workspace\n\n#### Request Type\n\nRefund\n\n#### Reason for request\n\nClient is requesting refunds related to both his Acquisity membership and canceled AIA membership.\n\nThe client previously canceled his Acquisity subscription but reported a new charge of approximately $171.70 USD afterward. He provided a screenshot of the charge and confirmed that <email> is the only email address associated with his account.\n\nName 17 has double-checked both the client’s Whop and Acquisity accounts and confirmed that he cannot see any ongoing/active subscription on either platform. Name 17 had previously also confirmed that the Acquisity subscription should already be canceled. At this stage, the source of the recent ~$171.70 charge is unclear and needs further investigation.\n\nSeparately, the client is still awaiting a $1,200 USD refund for his canceled AIA course. Name 18 previously advised that the refund process had been completed and was awaiting payout, but the client has followed up multiple times and reports that he still has not received the funds.\n\nPlease investigate the source of the recent Acquisity charge and process the applicable refund, as well as confirm the current status of the outstanding $1,200 AIA membership refund."
+    },
+    {
+      "id": "ENG-5497",
+      "createdAt": "2026-02-04T17:22:39.344Z",
+      "title": "Process refund for Name 19 for unused Acquisity charges",
+      "state": "Done",
+      "assignee": "Beth Newton",
+      "parent": null,
+      "labels": [],
+      "description": "#### Request Type\n\nRefund\n\n#### Reason for request\n\n*<email>* Name 19 charged for Acquisity three times when she hasn't used the platform at all. She had asked for a refund a month ago, but it still hasn't been actioned upon. She is requesting her money ($129 x 2 months + $113 in Dec) from the past three months, including December, back because she hasn't been using Acquisity. She only uses Company One."
+    },
+    {
+      "id": "ENG-14388",
+      "createdAt": "2026-09-28T14:48:20.021Z",
+      "title": "Name 20 - Continued billing after account cancelled",
+      "state": "Done",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": ["Customer reported", "Refund"],
+      "description": "#### User Email\n\n<email>\n\n#### Workspace Name\n\nName 20\n\n#### Request Type\n\nRefund\n\n#### Reason for request\n\nCharged since cancelling subscription.\n\nPlease cancel ongoing sub and refund last installment."
+    },
+    {
+      "id": "ENG-14129",
+      "createdAt": "2026-09-22T19:42:56.678Z",
+      "title": "Ongoing charges post offboarding",
+      "state": "Todo",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": ["Customer reported", "Internal reported", "Refund"],
+      "description": "#### User Email\n\n<email>\n\n#### Workspace Name\n\nName 13\n\n#### Request Type\n\nRefund\n\n#### Reason for request\n\nHas been off boarded and refunded but still being charged by Acquisity.\nPlease cancel sub and refund last charge"
+    },
+    {
+      "id": "ENG-13512",
+      "createdAt": "2026-09-04T21:28:55.112Z",
+      "title": "Name 21 & Name 22 - Acquisity appears to have charged three times for two workspaces, resulting in potential overcharges",
+      "state": "Todo",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": ["Customer reported", "Refund"],
+      "description": "#### User Email\n\n<email>\n\n#### Workspace Name\n\nCompany Three\n\n#### Request Type\n\nRefund\n\n#### Reason for request\n\nReview billing charges for Acquisity workspaces and resolve potential overcharges on Company Three workspace.  Acquisity appears to have charged three times for two workspaces, resulting in potential overcharges. Billing charges should accurately reflect the actual number of workspaces used, with any overcharges refunded or credited to the account. Screenshots from clients attached."
+    }
+  ]
+}
