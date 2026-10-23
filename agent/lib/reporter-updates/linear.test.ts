@@ -183,7 +183,7 @@ describe("readTicket", () => {
       })
     );
     await assert.rejects(long.port.readTicket("ENG-1"), {
-      message: "ENG-1 has more than 100 comments.",
+      name: "ThreadIncompleteError",
     });
   });
 });
@@ -207,7 +207,7 @@ describe("postUnderAnchor", () => {
       ok({ commentCreate: { comment: null, success: false } })
     );
     await assert.rejects(port.postUnderAnchor("uuid-1", "c-anchor", "Hello"), {
-      message: "Linear did not create the update.",
+      message: "Linear did not create the reply.",
     });
   });
 });

@@ -2,6 +2,11 @@ import { callLinearGraphQL } from "eve/channels/linear";
 import { z } from "zod";
 import { ENGINEERING_TEAM_ID } from "../linear-api.js";
 import { slackChannelOf } from "../linear-context.js";
+import {
+  assertThreadComplete,
+  createThreadComment,
+  SLACK_ANCHOR_PATTERN,
+} from "../requester-reply.js";
 import { parsePullUrl, type TicketFacts } from "./plan.js";
 
 export interface ThreadComment {
@@ -34,7 +39,6 @@ type Variables = NonNullable<
   Parameters<typeof callLinearGraphQL>[0]["variables"]
 >;
 
-const ANCHOR = /^Slack thread connected in /u;
 const ASK_FROM = /^Ask from /u;
 const ASK_FROM_TITLE = "Ask from ";
 const ANCHOR_LINK = /\]\((https:\/\/[^\s)]+)\)/u;
@@ -72,10 +76,6 @@ const RECENT_QUERY = `query ReporterRecent($team: ID!, $since: DateTimeOrDuratio
     pageInfo { hasNextPage endCursor }
     nodes { identifier }
   }
-}`;
-
-const POST_MUTATION = `mutation ReporterUpdate($input: CommentCreateInput!) {
-  commentCreate(input: $input) { success comment { id } }
 }`;
 
 const attachments = z.object({
@@ -123,13 +123,6 @@ const recentSchema = z.object({
     }),
   }),
 });
-const postSchema = z.object({
-  commentCreate: z.object({
-    comment: z.object({ id: z.string() }).nullable(),
-    success: z.boolean(),
-  }),
-});
-
 const channelOf = (
   asks: readonly { title: string; url: string }[],
   anchorBody: string
@@ -157,15 +150,14 @@ export const linearPort = (
     });
   return {
     async postUnderAnchor(issueId, anchorId, body) {
-      const created = postSchema.parse(
-        await call(POST_MUTATION, "ReporterUpdate", {
-          input: { body, issueId, parentId: anchorId },
-        })
-      ).commentCreate;
-      if (!(created.success && created.comment)) {
-        throw new Error("Linear did not create the update.");
-      }
-      return created.comment.id;
+      const created = await createThreadComment({
+        api: fetchImpl ? { fetch: fetchImpl } : undefined,
+        body,
+        credentials: { accessToken },
+        issueId,
+        parentId: anchorId,
+      });
+      return created.id;
     },
     async readTicket(identifier) {
       const data = ticketSchema.parse(
@@ -175,13 +167,12 @@ export const linearPort = (
       if (!issue) {
         return null;
       }
-      if (issue.comments.pageInfo.hasNextPage) {
-        throw new Error(`${identifier} has more than 100 comments.`);
-      }
+      assertThreadComplete(identifier, issue.comments.pageInfo.hasNextPage);
       const comments = issue.comments.nodes;
       const anchor = comments
         .filter(
-          (comment) => !comment.parent && ANCHOR.test(comment.body.trim())
+          (comment) =>
+            !comment.parent && SLACK_ANCHOR_PATTERN.test(comment.body.trim())
         )
         .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
         .at(0);

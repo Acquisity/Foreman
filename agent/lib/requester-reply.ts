@@ -31,6 +31,7 @@ import { WIDGET_FEEDBACK_PROJECT_ID } from "./widget-feedback.js";
  */
 // The Acquisity support inbox roots its notes the same way, in "Support
 // conversation connected in …", and imports Foreman's reply as a team note.
+export const SLACK_ANCHOR_PATTERN = /^Slack thread connected in /u;
 const ANCHOR_PATTERN = /^(?:Slack thread|Support conversation) connected in /u;
 
 export interface ThreadComment {
@@ -215,11 +216,7 @@ async function readThread(
   }
   // One page is the whole history for an intake ticket; past it the latest
   // reply may be missing, so refuse rather than risk a second message.
-  if (thread.issue.comments.pageInfo.hasNextPage) {
-    throw new Error(
-      `${issue} has more than 100 comments, so the thread state cannot be checked; reply in Slack by hand.`
-    );
-  }
+  assertThreadComplete(issue, thread.issue.comments.pageInfo.hasNextPage);
   const comments = withoutReporterUpdates(
     thread.issue.comments.nodes.map((c) => ({
       body: c.body,
@@ -391,6 +388,54 @@ export function directFollowUp(
   };
 }
 
+export class ThreadIncompleteError extends Error {
+  constructor(issue: string) {
+    super(
+      `${issue} has more than 100 comments, so the thread state cannot be checked; reply in Slack by hand.`
+    );
+    this.name = "ThreadIncompleteError";
+  }
+}
+
+export function assertThreadComplete(issue: string, hasNextPage: boolean) {
+  if (hasNextPage) {
+    throw new ThreadIncompleteError(issue);
+  }
+}
+
+export interface ThreadCommentInput {
+  api?: Parameters<typeof callLinearGraphQL>[0]["api"];
+  body: string;
+  credentials: LinearChannelCredentials;
+  id?: string;
+  issueId: string;
+  parentId: string;
+}
+
+export async function createThreadComment(
+  input: ThreadCommentInput
+): Promise<{ id: string; url: string }> {
+  const created = await callLinearGraphQL<ReplyResponse>({
+    api: input.api,
+    credentials: input.credentials,
+    query: REPLY_MUTATION,
+    queryName: "RequesterReply",
+    variables: {
+      input: {
+        body: input.body,
+        issueId: input.issueId,
+        parentId: input.parentId,
+        ...(input.id ? { id: input.id } : {}),
+      },
+    },
+  });
+  const { comment, success } = created.commentCreate;
+  if (!(success && comment)) {
+    throw new Error("Linear did not create the reply.");
+  }
+  return comment;
+}
+
 export async function replyToRequester(
   issue: string,
   message: string,
@@ -410,21 +455,11 @@ export async function replyToRequester(
       return { outcome, posted: false, reason: SKIP_REASON };
     }
   }
-  const created = await callLinearGraphQL<ReplyResponse>({
+  const created = await createThreadComment({
+    body: rewrite ? await rewrite(message) : message,
     credentials,
-    query: REPLY_MUTATION,
-    queryName: "RequesterReply",
-    variables: {
-      input: {
-        body: rewrite ? await rewrite(message) : message,
-        issueId,
-        parentId: plan.anchorId,
-      },
-    },
+    issueId,
+    parentId: plan.anchorId,
   });
-  const { comment, success } = created.commentCreate;
-  if (!(success && comment)) {
-    throw new Error("Linear did not create the reply.");
-  }
-  return { commentId: comment.id, posted: true, url: comment.url };
+  return { commentId: created.id, posted: true, url: created.url };
 }
