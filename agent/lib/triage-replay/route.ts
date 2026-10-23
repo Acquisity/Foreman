@@ -183,37 +183,31 @@ function allowanceOf(env: NodeJS.ProcessEnv): Allowance | string {
   };
 }
 
-export async function reserveSlot(
+export function reserve(
   request: StartRequest,
   ledger: AdmissionLedger,
   env: NodeJS.ProcessEnv = process.env,
   now: number = Date.now()
-): Promise<{ recovered: boolean; refusal: string | null }> {
-  const refuse = (message: string) => ({
-    recovered: false,
-    refusal: message,
-  });
+): Promise<string | null> {
   if (!env.TRIAGE_REPLAY_RUN_ID || request.runId !== env.TRIAGE_REPLAY_RUN_ID) {
-    return refuse("This run id is not the one approved on the server.");
+    return Promise.resolve(
+      "This run id is not the one approved on the server."
+    );
   }
   const allowance = allowanceOf(env);
   if (typeof allowance === "string") {
-    return refuse(allowance);
+    return Promise.resolve(allowance);
   }
   const entry = caseKeyOf(request);
-  let recovered = false;
-  const refusal = await updateLedger(request.runId, ledger, (entries) => {
-    recovered = false;
+  return updateLedger(request.runId, ledger, (entries) => {
     if (entries.admitted.includes(entry)) {
       return `${entry} was already started in this run.`;
     }
     const reservedAt = entries.reserved[entry];
     if (reservedAt !== undefined) {
-      if (now - reservedAt < RESERVATION_LEASE_MS) {
-        return `${entry} is already starting in this run.`;
-      }
-      recovered = true;
-      return { ...entries, reserved: { ...entries.reserved, [entry]: now } };
+      return now - reservedAt < RESERVATION_LEASE_MS
+        ? `${entry} is already starting in this run.`
+        : `${entry} was reserved by a start that never settled, so it stays charged and cannot be started again in this run. Use a new run id.`;
     }
     if (
       entries.admitted.length + Object.keys(entries.reserved).length >=
@@ -230,12 +224,7 @@ export async function reserveSlot(
       reserved: { ...entries.reserved, [entry]: now },
     };
   });
-  return { recovered, refusal };
 }
-
-export const reserve = async (
-  ...args: Parameters<typeof reserveSlot>
-): Promise<string | null> => (await reserveSlot(...args)).refusal;
 
 async function settle(
   request: StartRequest,
@@ -434,7 +423,7 @@ export async function startReplay(
     return json({ error: "Invalid replay start request." }, 400);
   }
   const start = parsed.data;
-  const { recovered, refusal: refused } = await reserveSlot(start, ledger);
+  const refused = await reserve(start, ledger);
   if (refused) {
     return json({ error: refused }, 429);
   }
@@ -467,15 +456,13 @@ export async function startReplay(
       await confirm(start, ledger);
       return json({ error: `${key} was already started in this run.` }, 409);
     }
-    if (!recovered) {
-      try {
-        await release(start, ledger);
-      } catch (releaseError) {
-        throw new Error(
-          `Replay ${key} failed to start (${String(error)}), and its reservation could not be released.`,
-          { cause: releaseError }
-        );
-      }
+    try {
+      await release(start, ledger);
+    } catch (releaseError) {
+      throw new Error(
+        `Replay ${key} failed to start (${String(error)}), and its reservation could not be released.`,
+        { cause: releaseError }
+      );
     }
     throw error;
   }

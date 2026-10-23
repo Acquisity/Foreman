@@ -27,6 +27,7 @@ import {
 const ONE_SLOT = /used its 1 admitted/u;
 const STARTING = /already starting/u;
 const STARTED = /already started/u;
+const NEVER_SETTLED = /never settled/u;
 const BUDGET_USED = /used its 2 admitted/u;
 const NOT_APPROVED = /not the one approved/u;
 const KEPT_CHANGING = /kept changing/u;
@@ -120,7 +121,7 @@ describe("replay routes", () => {
     assert.equal(await reserve({ ...request, run: 2 }, held(), one), null);
   });
 
-  it("refuses a second start of the same case and run while the first is fresh, and reuses a stale reservation without charging twice", async () => {
+  it("refuses a second start of the same case and run while the first is fresh, and never takes over a stale one", async () => {
     const twice = sharedLedger();
     const start = 1_000_000;
     assert.equal(await reserve(request, twice(), env, start), null);
@@ -128,9 +129,11 @@ describe("replay routes", () => {
       String(await reserve(request, twice(), env, start + 1000)),
       STARTING
     );
-    assert.equal(
-      await reserve(request, twice(), env, start + RESERVATION_LEASE_MS),
-      null
+    assert.match(
+      String(
+        await reserve(request, twice(), env, start + RESERVATION_LEASE_MS)
+      ),
+      NEVER_SETTLED
     );
     const after = await twice().read(RUN);
     assert.equal(after.chargedUsd, 4);
