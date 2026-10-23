@@ -628,6 +628,29 @@ describe("routeTicket owner map", () => {
     assert.equal(added.updates().length, 1);
   });
 
+  it("applies removals before additions, so a label removed and added again still counts", async () => {
+    const linear = fakeLinear({
+      teamLabels: FEATURE_LABELS,
+      ticketLabels: [
+        { id: "l-fr", name: "Feature Request" },
+        { id: "l-ok", name: "Approved" },
+      ],
+    });
+    await routeTicket(
+      {
+        addLabels: ["Approved"],
+        assignee: "Ebubeker Rexha",
+        issue: "ENG-1",
+        removeLabels: ["Approved"],
+      },
+      { client: linear.fetchStub }
+    );
+    assert.deepEqual(linear.updates()[0]?.variables.input, {
+      assigneeId: "u-ebu",
+      labelIds: ["l-fr", "l-ok"],
+    });
+  });
+
   it("lets a support owner take any ticket", async () => {
     const linear = fakeLinear({ ticketLabels: [] });
     await routeTicket(

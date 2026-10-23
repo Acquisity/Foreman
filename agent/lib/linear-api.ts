@@ -469,9 +469,11 @@ const finalLabelNames = (
     (input.removeLabels ?? []).map((name) => name.toLowerCase())
   );
   return [
-    ...issue.labels.nodes.map((label) => label.name),
+    ...issue.labels.nodes
+      .map((label) => label.name)
+      .filter((name) => !removed.has(name.toLowerCase())),
     ...(input.addLabels ?? []),
-  ].filter((name) => !removed.has(name.toLowerCase()));
+  ];
 };
 
 async function chooseAssignee(
