@@ -8,12 +8,8 @@ import decideTriage from "../../tools/decide_triage.js";
 import { readCohortFiles } from "./cohort-files.js";
 import { triageCaseSchema, triageLabelSchema } from "./schema.js";
 import { cohortSha256, splitSchema } from "./score.js";
-import {
-  FROZEN_LISTS,
-  frozenListsSchema,
-  replayCatalog,
-  seedReplayState,
-} from "./store.js";
+import { FROZEN_LISTS, frozenListsSchema, seedReplayState } from "./store.js";
+import { replayCatalog } from "./views.js";
 
 const COHORT = new URL("../../../evals/triage/", import.meta.url);
 const ACCOUNT_IDS = [

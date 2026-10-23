@@ -30,7 +30,8 @@ import {
 } from "./fixtures.js";
 import { triageReplayHook } from "./hook.js";
 import { readReplayResult } from "./route.js";
-import { replayDocumentText, seedReplayState } from "./store.js";
+import { seedReplayState } from "./store.js";
+import { replayDocumentText } from "./views.js";
 
 const NEEDS_SECRET = /needs FOREMAN_DIAGNOSTICS_SECRET/u;
 const BLOB_DOWN = /blob down/u;

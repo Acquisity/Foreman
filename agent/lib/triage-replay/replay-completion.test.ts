@@ -22,8 +22,8 @@ import {
 import { triageReplayHook } from "./hook.js";
 import { buildReplayResult, replaySettled } from "./route.js";
 import { NEW_MASTER } from "./schema.js";
-import { appliedRoute } from "./store.js";
 import { replayMayCall } from "./tool-policy.js";
+import { appliedRoute } from "./views.js";
 
 describe("replay result", () => {
   const META = { cohortSha256: "0".repeat(64), run: 1, runId: RUN };

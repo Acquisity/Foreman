@@ -3,7 +3,7 @@ import { defineTool } from "eve/tools";
 import { z } from "zod";
 import { withReplayState } from "#lib/triage-replay/backend.js";
 import { replaySessionOf } from "#lib/triage-replay/mode.js";
-import { replayDocumentText } from "#lib/triage-replay/store.js";
+import { replayDocumentText } from "#lib/triage-replay/views.js";
 
 /**
  * Triage replay only (ENG-16049): reads an investigation document this replay

@@ -2,8 +2,8 @@ import type { SessionAuthContext } from "eve/context";
 import type { ProviderClient } from "../executor/operations.js";
 import type { LinearOperation } from "../linear-operations.js";
 import { withReplayState } from "./backend.js";
+import { answerLinear } from "./linear-simulation.js";
 import { replaySessionOf } from "./mode.js";
-import { answerLinear } from "./store.js";
 
 /**
  * The typed Executor client inside a replay session: authored Linear

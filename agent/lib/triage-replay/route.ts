@@ -22,11 +22,11 @@ import {
 } from "./mode.js";
 import { type TriageResult, triageCaseSchema } from "./schema.js";
 import {
-  appliedRoute,
   frozenListsSchema,
   type ReplayState,
   seedReplayState,
 } from "./store.js";
+import { appliedRoute } from "./views.js";
 
 /**
  * The replay's two routes (ENG-16049). Every guard is on the server: the

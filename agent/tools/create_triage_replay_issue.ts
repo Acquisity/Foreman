@@ -4,7 +4,7 @@ import { z } from "zod";
 import { LINEAR_ISSUE_ID_PATTERN } from "#lib/investigation-memory/scope.js";
 import { withReplayState } from "#lib/triage-replay/backend.js";
 import { replaySessionOf } from "#lib/triage-replay/mode.js";
-import { createReplayIssue } from "#lib/triage-replay/store.js";
+import { createReplayIssue } from "#lib/triage-replay/views.js";
 
 const name = z.string().trim().min(1).max(120);
 
