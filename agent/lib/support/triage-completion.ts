@@ -78,14 +78,15 @@ export function assertTriageOutputs(
     );
   }
   if (
-    !(
-      issue.assignee &&
-      (issue.project ||
-        issue.labels.some((label) => areaLabels().includes(label)) ||
-        issue.assignee === SUPPORT_OWNER ||
-        issue.assignee === FALLBACK_OWNER) &&
-      issue.priority
-    ) ||
+    !issue.priority ||
+    (classification === "Bug" &&
+      !(
+        issue.assignee &&
+        (issue.project ||
+          issue.labels.some((label) => areaLabels().includes(label)) ||
+          issue.assignee === SUPPORT_OWNER ||
+          issue.assignee === FALLBACK_OWNER)
+      )) ||
     issue.priority.value < 1 ||
     issue.priority.value > 4 ||
     !issue.status.trim() ||

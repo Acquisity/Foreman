@@ -528,3 +528,52 @@ test("finish refuses omitted or failed writes; a blocker retry stays unprocessed
     "A teammate taking ownership cannot conceal unfinished triage"
   );
 });
+
+test("an outcome left unassigned on purpose can finish, an unassigned Bug cannot", () => {
+  const closed = {
+    ...report,
+    assignee: null,
+    labels: ["intercom-sourced", "Customer reported"],
+    parentId: null,
+    project: null,
+    status: "Done",
+  };
+  for (const classification of ["User Error", "Platform Limitation"]) {
+    assert.doesNotThrow(
+      () =>
+        assertTriageOutputs(
+          closed,
+          {
+            ...document,
+            content: `**Classification**: ${classification}\n**Review**: Not required`,
+          },
+          comments
+        ),
+      classification
+    );
+  }
+  assert.throws(
+    () =>
+      assertTriageOutputs(
+        { ...report, assignee: null, project: null },
+        document,
+        comments
+      ),
+    SupportRefusal
+  );
+  assert.throws(
+    () =>
+      assertTriageOutputs(
+        {
+          ...closed,
+          priority: null,
+        },
+        {
+          ...document,
+          content: "**Classification**: User Error\n**Review**: Not required",
+        },
+        comments
+      ),
+    SupportRefusal
+  );
+});
