@@ -425,6 +425,54 @@ describe("routeTicket owner map", () => {
     });
   });
 
+  it("takes the named labels off while keeping the rest", async () => {
+    const linear = fakeLinear({
+      teamLabels: FEATURE_LABELS,
+      ticketLabels: [
+        { id: "l-bug", name: "Bug" },
+        { id: "l-need", name: "Needs approval" },
+      ],
+    });
+    await routeTicket(
+      {
+        addLabels: ["Approved"],
+        issue: "ENG-1",
+        removeLabels: ["needs approval"],
+      },
+      { client: linear.fetchStub }
+    );
+    assert.deepEqual(linear.updates()[0]?.variables.input, {
+      labelIds: ["l-bug", "l-ok"],
+    });
+    const removeOnly = fakeLinear({
+      ticketLabels: [
+        { id: "l-bug", name: "Bug" },
+        { id: "l-need", name: "Needs approval" },
+      ],
+    });
+    await routeTicket(
+      { issue: "ENG-1", removeLabels: ["Needs approval"] },
+      { client: removeOnly.fetchStub }
+    );
+    assert.deepEqual(removeOnly.updates()[0]?.variables.input, {
+      labelIds: ["l-bug"],
+    });
+    assert.equal(
+      removeOnly.calls.some((call) => call.query === "linear.TeamLabels"),
+      false
+    );
+  });
+
+  it("ignores a label to remove that the ticket does not carry", async () => {
+    const linear = fakeLinear();
+    const result = await routeTicket(
+      { issue: "ENG-1", removeLabels: ["Needs approval"] },
+      { client: linear.fetchStub }
+    );
+    assert.equal(linear.updates().length, 0);
+    assert.equal(result.identifier, "ENG-1");
+  });
+
   it("lets a support owner take any ticket", async () => {
     const linear = fakeLinear({ ticketLabels: [] });
     await routeTicket(

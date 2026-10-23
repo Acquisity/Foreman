@@ -236,6 +236,7 @@ export interface TriageRoute {
   inheritAssigneeFrom?: string;
   priority: number;
   project?: string;
+  removeLabels?: string[];
   state: string;
 }
 

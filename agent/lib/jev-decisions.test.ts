@@ -888,3 +888,23 @@ test("an approved feature request on a path that closes or delegates it keeps th
     assert.equal(decision.route.assignee, undefined, path);
   }
 });
+
+test("an approved feature request drops the label that held it for approval", () => {
+  const approved = resolveTriage(
+    triageInput({
+      ticketLabels: ["Approved", "Feature Request", "Needs approval"],
+    }),
+    bugAnswers({
+      area: pick("ai_sdr"),
+      classification: pick("platform_limitation"),
+      path: pick("Platform Limitation"),
+      wants_limit_lifted: yes(),
+    })
+  );
+  assert.ok(approved.outcome === "route");
+  assert.deepEqual(approved.route.removeLabels, ["Needs approval"]);
+  assert.equal(approved.route.addLabels.includes("Needs approval"), false);
+  const bug = resolveTriage(triageInput(), bugAnswers());
+  assert.ok(bug.outcome === "route");
+  assert.equal(bug.route.removeLabels, undefined);
+});

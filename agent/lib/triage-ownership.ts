@@ -154,7 +154,7 @@ export function resolveOwnership(context: {
 export const ownershipRoute = (
   ownership: Ownership,
   labels: string[]
-): { addLabels: string[]; assignee?: string } => ({
+): { addLabels: string[]; assignee?: string; removeLabels?: string[] } => ({
   addLabels: [
     ...new Set([
       ...labels,
@@ -162,5 +162,8 @@ export const ownershipRoute = (
       ...(ownership.approval === "needed" ? [NEEDS_APPROVAL_LABEL] : []),
     ]),
   ],
+  ...(ownership.approval === "approved"
+    ? { removeLabels: [NEEDS_APPROVAL_LABEL] }
+    : {}),
   ...(ownership.assignee ? { assignee: ownership.assignee } : {}),
 });

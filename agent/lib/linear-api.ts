@@ -334,6 +334,7 @@ export interface RouteTicketInput {
   parent?: string;
   priority?: number;
   project?: string;
+  removeLabels?: string[];
   state?: string;
 }
 
@@ -409,12 +410,20 @@ const toResult = (
   warnings,
 });
 
-/** Unions the labels to add with the ticket's current labels; unknown names throw before any write. */
+/** Unions the labels to add with the ticket's current labels, minus the ones to remove; unknown names throw before any write. */
 async function resolveLabelIds(
   gql: Gql,
   issue: RouteIssue,
-  addLabels: string[]
+  addLabels: string[],
+  removeLabels: string[]
 ): Promise<string[]> {
+  const removed = new Set(removeLabels.map((name) => name.toLowerCase()));
+  const kept = issue.labels.nodes.filter(
+    (label) => !removed.has(label.name.toLowerCase())
+  );
+  if (addLabels.length === 0) {
+    return kept.map((label) => label.id);
+  }
   const labels: Named[] = [];
   let after: string | null = null;
   for (let page = 0; page < MAX_LABEL_PAGES; page += 1) {
@@ -444,7 +453,7 @@ async function resolveLabelIds(
   }
   return [
     ...new Set([
-      ...issue.labels.nodes.map((label) => label.id),
+      ...kept.map((label) => label.id),
       ...addLabels.map((name) => byName.get(name.toLowerCase()) ?? ""),
     ]),
   ].filter(Boolean);
@@ -498,8 +507,18 @@ async function buildUpdate(
   input: RouteTicketInput
 ): Promise<{ update: Record<string, unknown>; warnings: string[] }> {
   const update: Record<string, unknown> = {};
-  if (input.addLabels?.length) {
-    update.labelIds = await resolveLabelIds(gql, issue, input.addLabels);
+  const removing = (input.removeLabels ?? []).some((name) =>
+    issue.labels.nodes.some(
+      (label) => label.name.toLowerCase() === name.toLowerCase()
+    )
+  );
+  if (input.addLabels?.length || removing) {
+    update.labelIds = await resolveLabelIds(
+      gql,
+      issue,
+      input.addLabels ?? [],
+      input.removeLabels ?? []
+    );
   }
   if (input.state !== undefined) {
     const { workflowStates } = await gql<{

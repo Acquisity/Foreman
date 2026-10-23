@@ -12,7 +12,7 @@ export default defineTool({
   approval: questionsOnlyPolicy,
   description:
     "Apply final routing decisions to a Linear ticket in one write: state, priority, labels to add, project, assignee, parent, and duplicate relation, then read it back. " +
-    "Labels are added to the ones already on the ticket, never replaced; an unknown label name fails before any write and lists the valid names. " +
+    "Labels are added to the ones already on the ticket, never replaced, and removeLabels takes named ones off; an unknown label name to add fails before any write and lists the valid names. " +
     "Names are resolved for you: state by name within the ticket's team and project by name. The assignee must be a person in the owner map, given by name; any other name fails before any write. A developer takes a ticket only when it is labelled Bug, or Feature Request and Approved, counting the labels being added; support owners are not gated. " +
     "For a duplicate pass duplicateOf and inheritAssigneeFrom with the same master; when that master has an assignee it is inherited, otherwise assignee (the area owner) is used as the fallback. " +
     "links attach urls as resources on the ticket. Use the returned projectId for memory recording. " +
@@ -67,6 +67,11 @@ export default defineTool({
       .optional()
       .describe("1 Urgent, 2 High, 3 Medium, 4 Low, 0 none."),
     project: name.optional().describe("Project name."),
+    removeLabels: z
+      .array(name)
+      .max(10)
+      .optional()
+      .describe("Label names to take off; a name the ticket lacks is ignored."),
     state: name
       .optional()
       .describe("Workflow state name in the ticket's team."),
