@@ -295,6 +295,13 @@ export const memoryStore = () => {
       state.sweep = sweep;
       return Promise.resolve();
     },
+    stampWaiting(issue, checkedSha) {
+      const row = table.get(key(issue, "fixed"));
+      if (row?.status === "waiting") {
+        table.set(key(issue, "fixed"), { ...row, checkedSha });
+      }
+      return Promise.resolve();
+    },
   };
   return { pending, state, store, table };
 };

@@ -72,6 +72,7 @@ export interface ReporterStore {
   rows: (issue: string) => Promise<LedgerRow[]>;
   saveCursor: (ms: number) => Promise<void>;
   saveSweep: (sweep: Sweep) => Promise<void>;
+  stampWaiting: (issue: string, checkedSha: string) => Promise<void>;
 }
 
 const ROW_STAGE = z.enum(STAGES as [Stage, ...Stage[]]);
@@ -322,6 +323,13 @@ export const createReporterStore = (query: Query): ReporterStore => {
            SET sweep_after = EXCLUDED.sweep_after, sweep_since = EXCLUDED.sweep_since,
                sweep_started = EXCLUDED.sweep_started, updated_at = now()`,
         [sweep.after, sweep.since, sweep.startedAt]
+      );
+    },
+    async stampWaiting(issue, checkedSha) {
+      await query(
+        `UPDATE reporter_updates SET checked_sha = $2, updated_at = now()
+         WHERE issue = $1 AND stage = 'fixed' AND status = 'waiting'`,
+        [issue, checkedSha]
       );
     },
   };

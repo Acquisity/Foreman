@@ -298,6 +298,25 @@ const settle = async (
 
 const KEEP_PENDING = new Set(["backing_off", "busy", "undeliverable"]);
 
+const settleWaiting = async (
+  identifier: string,
+  outcome: Outcome,
+  deps: Deps,
+  liveSha: () => Promise<string | null>
+): Promise<void> => {
+  if (outcome.kind === "waiting") {
+    return;
+  }
+  if (outcome.kind === "skipped" && outcome.why === "channel_not_enabled") {
+    const live = await liveSha().catch(() => null);
+    if (live) {
+      await deps.store.stampWaiting(identifier, live);
+    }
+    return;
+  }
+  await deps.store.dropWaiting(identifier);
+};
+
 const SWEEP_MAX_AGE_MS = 86_400_000;
 
 const discoverTickets = async (
@@ -390,9 +409,7 @@ export const runReporterUpdates = async (
     ) {
       await deps.store.failPending(identifier);
     } else {
-      if (result.outcome.kind !== "waiting") {
-        await deps.store.dropWaiting(identifier);
-      }
+      await settleWaiting(identifier, result.outcome, deps, liveSha);
       await deps.store.resolvePending(identifier);
     }
   }, Promise.resolve());

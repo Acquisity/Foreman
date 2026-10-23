@@ -261,6 +261,20 @@ await store.complete(
   "c-fixed",
   sentFixed.token
 );
+await store.markWaiting("ENG-10", "old-sha");
+await store.stampWaiting("ENG-10", "new-sha");
+await store.queueWaiting("new-sha");
+assert.equal(
+  (await store.nextPending(10)).includes("ENG-10"),
+  false,
+  "a row stamped with the live commit is not requeued until the next deploy"
+);
+await store.queueWaiting("newer-sha");
+assert.equal(
+  (await store.nextPending(10)).includes("ENG-10"),
+  true,
+  "and is requeued once the next deploy lands"
+);
 await store.markWaiting("ENG-9", "old-sha");
 await store.dropWaiting("ENG-9");
 await store.queueWaiting("new-sha");

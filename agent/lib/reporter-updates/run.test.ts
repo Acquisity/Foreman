@@ -1009,12 +1009,6 @@ describe("a deploy wait that is no longer needed", () => {
       },
     ],
     [
-      "its channel is no longer enabled",
-      (s) => {
-        s.deps.config.channels = new Set(["C0OTHER00000"]);
-      },
-    ],
-    [
       "the ticket can no longer be found",
       (s) => {
         s.linear.port.readTicket = () => Promise.resolve(null);
@@ -1066,6 +1060,56 @@ describe("a deploy wait that is no longer needed", () => {
     s.probe.state.ancestors[`${MERGE_SHA}>${NEWER_SHA}`] = true;
     await runReporterUpdates(s.deps, NOW + 3 * MIN, () => NOW + 3 * MIN);
     assert.ok(s.linear.posts.some((p) => p.body === fixedText()));
+  });
+
+  describe("when the channel is turned off", () => {
+    const NOT_SANDBOX = new Set(["C0OTHER00000"]);
+    const doneWithFix = () => {
+      const t = ticket({ pullUrls: [PR_URL], stateType: "completed" });
+      return setup([t], {
+        liveSha: OLD_SHA,
+        pulls: { [pullKey(7)]: merged() },
+      });
+    };
+
+    it("keeps the fixed update, and sends exactly one once the channel is back and a deploy holds the fix", async () => {
+      const s = doneWithFix();
+      await runReporterUpdates(s.deps, NOW, () => NOW);
+      s.deps.config.channels = NOT_SANDBOX;
+      s.probe.state.liveSha = NEW_SHA;
+      await runReporterUpdates(s.deps, NOW + MIN, () => NOW + MIN);
+      assert.equal(s.linear.posts.length, 0);
+      assert.deepEqual(waitingIssues(s.memory), [
+        { checkedSha: NEW_SHA, issue: "ENG-1" },
+      ]);
+      s.deps.config.channels = new Set([SANDBOX]);
+      s.probe.state.liveSha = NEWER_SHA;
+      s.probe.state.ancestors[`${MERGE_SHA}>${NEWER_SHA}`] = true;
+      await runReporterUpdates(s.deps, NOW + 2 * MIN, () => NOW + 2 * MIN);
+      await runReporterUpdates(s.deps, NOW + 3 * MIN, () => NOW + 3 * MIN);
+      assert.deepEqual(
+        s.linear.posts.map((p) => p.body),
+        [fixedText()]
+      );
+    });
+
+    it("requeues the row once per deploy, not on every run", async () => {
+      const s = doneWithFix();
+      await runReporterUpdates(s.deps, NOW, () => NOW);
+      s.deps.config.channels = NOT_SANDBOX;
+      s.probe.state.liveSha = NEW_SHA;
+      await runReporterUpdates(s.deps, NOW + MIN, () => NOW + MIN);
+      const afterFirstDeploy = s.linear.state.reads;
+      await runReporterUpdates(s.deps, NOW + 2 * MIN, () => NOW + 2 * MIN);
+      await runReporterUpdates(s.deps, NOW + 3 * MIN, () => NOW + 3 * MIN);
+      assert.equal(s.linear.state.reads, afterFirstDeploy);
+      s.probe.state.liveSha = NEWER_SHA;
+      await runReporterUpdates(s.deps, NOW + 4 * MIN, () => NOW + 4 * MIN);
+      assert.equal(s.linear.state.reads, afterFirstDeploy + 1);
+      await runReporterUpdates(s.deps, NOW + 5 * MIN, () => NOW + 5 * MIN);
+      assert.equal(s.linear.state.reads, afterFirstDeploy + 1);
+      assert.equal(waitingIssues(s.memory).length, 1);
+    });
   });
 
   it("keeps the row while the ticket still needs the deploy", async () => {
