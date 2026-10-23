@@ -48,3 +48,7 @@ The scorer refuses results from more than one run id or Foreman commit, or with 
 ## Live logging
 
 Outside a replay, every triage logs countable lines with the issue id. `triage.decision` logs each time `decide_triage` settles (`decide`, then `adjudicate` for a later decision on the same ticket) and whenever `route_ticket` writes a ticket, with the duplicate only when Linear confirmed the relation. A route with no Jev decision logs `code: skill_fallback`, and a route matching `decide_billing`'s Support route for that ticket logs `code: billing`. `critic.verdict` logs when the critic settles, against the ticket on the dispatch message's first line (`Source issue: ENG-123`).
+
+## Second-check coverage without a replay
+
+`agent/lib/triage-replay/second-check-coverage.test.ts` runs the real decision code over the train labels' decided class and path, with Jev's answers set to match each label, and counts which cases need the critic's second check under the old Bug-only rule and under the new one (ENG-16055). It runs offline and costs nothing. It shows reach: which cases the check now covers. It does not show accuracy, because the replay stores decisions, not Jev's raw answers, so score movement needs the live replay above. Held-out labels are not read.
