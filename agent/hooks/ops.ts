@@ -1,5 +1,6 @@
 /**
- * Countable lifecycle logging. Every handler routes through the
+ * Countable lifecycle logging. Every handler but `actions.requested`, which
+ * only binds a critic task to its ticket and logs nothing, routes through the
  * never-throwing `logOpsEvent`, because eve logs and swallows an error a hook
  * raises, so throwing here would only lose the log line. Failure events log
  * the bounded code and message; payloads such as message text, authorization
