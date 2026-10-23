@@ -1,5 +1,5 @@
 ---
-description: "Investigate product reports and feedback from one live Intercom conversation before any Linear issue exists. Classify money versus product, search all live product-area investigation memory immediately after stating the claim, verify current code and production evidence, create the customer report for a confirmed bug and hand it to triage-handling for review and routing, and reply in Slack."
+description: "Investigate product reports and feedback from one live Intercom conversation before any Linear issue exists. Classify money versus product, search all live product-area investigation memory immediately after stating the claim, verify current code and production evidence, create the customer report for a confirmed bug or feature request and hand it to triage-handling for review and routing, and reply in Slack."
 ---
 
 # Intercom product and feedback investigation
@@ -95,11 +95,9 @@ Missing any item means the claim is not a confirmed Bug yet.
 
 ### A confirmed Bug: create the report, then hand off
 
-The report must exist before the handoff: the shared review needs its id for its document and critic. Create it with one linear `save_issue` with team `8eaf95ab-56ac-4490-8253-f6a96793dc40`: the conversation URL, bounded conversation context, and testable claim in the description, `labels: ["intercom-sourced", "Customer reported"]`, and `links: [{ url: <canonical conversation URL>, title: "Intercom conversation" }]`, so the Intercom and Linear integration can show the ticket's progress. Attach it to the customer report, never the shared root-cause master. Leave state, priority, project, parent, and assignee to the shared stages.
+The report must exist before the handoff: the shared review needs its id for its document and critic. Create it with one linear `save_issue` with team `8eaf95ab-56ac-4490-8253-f6a96793dc40`: the conversation URL, bounded conversation context, and testable claim in the description, `labels: ["intercom-sourced", "Customer reported"]`, and `links: [{ url: <canonical conversation URL>, title: "Intercom conversation" }]`. Attach it to the customer report, never the shared root-cause master. Leave state, priority, project, parent, and assignee to the shared stages.
 
-A feature request takes this path too: `triage-handling` parks it in Backlog with `Needs approval` until the report carries `Approved`.
-
-Then write `STAGE 4 COMPLETE: evidence record ready` in working context and load `triage-handling` with that report as the source ticket. Run Stages 5 to 7: exactly one critic pass, documentation, routing and `engineering-handoff`. Schedules skip all memory and use `support_investigation` reporting instead of Slack. Attended runs include memory. Steps 7 and 8 below are not for these; their Slack reply is Step 9.
+Then write `STAGE 4 COMPLETE: evidence record ready` in working context and load `triage-handling` with that report as the source ticket. Run Stages 5 to 7: a confirmed Bug gets exactly one critic pass; a Bug or an approved feature request (`Feature Request` plus `Approved`) then gets documentation, routing and `engineering-handoff`; an unapproved one stops at `triage-handling`'s Backlog with `Needs approval`. Schedules skip all memory and use `support_investigation` reporting instead of Slack. Attended runs include memory. Steps 7 and 8 below are not for these; their Slack reply is Step 9.
 
 ## Step 7: Decide whether a follow-up is warranted
 
@@ -131,4 +129,4 @@ Do not include assignees, internal routing, code paths, SQL, raw logs, system na
 
 ## Triage investigation document
 
-A Bug's document is written by `triage-handling` from the template in its `references/reporting.md`, with two header lines added under `**Organization**`: `**Intercom source**: <canonical conversation URL>` and `**Conversation context**: <bounded summary>`. Raw customer identity, production rows, queries, and conversation evidence stay on that report document. No other outcome writes a document.
+A Bug's or feature request's document is written by `triage-handling` from the template in its `references/reporting.md`, with two header lines added under `**Organization**`: `**Intercom source**: <canonical conversation URL>` and `**Conversation context**: <bounded summary>`. Raw customer identity, production rows, queries, and conversation evidence stay on that report document. Other outcomes write none.

@@ -1316,10 +1316,14 @@ test("the Intercom skill sends a feature request through the report and hand-off
     "### A confirmed Bug: create the report, then hand off",
     "## Step 7:"
   );
-  assert.ok(handoff.includes("A feature request takes this path too"));
   assert.ok(
     handoff.includes(
-      "Backlog with `Needs approval` until the report carries `Approved`"
+      "a Bug or an approved feature request (`Feature Request` plus `Approved`) then gets documentation, routing and `engineering-handoff`"
+    )
+  );
+  assert.ok(
+    handoff.includes(
+      "an unapproved one stops at `triage-handling`'s Backlog with `Needs approval`"
     )
   );
   const followUp = extractInstruction(
@@ -1351,4 +1355,18 @@ test("the Intercom skill keeps historical counts from being reported as today's 
       "Historical affected counts are dated figures, never the current blast radius."
     )
   );
+});
+
+test("the Intercom skill agrees with triage-handling on the document and the description", () => {
+  const documentRule = intercomTriageSkill.slice(
+    intercomTriageSkill.indexOf("## Triage investigation document")
+  );
+  assert.ok(
+    documentRule.includes(
+      "A Bug's or feature request's document is written by `triage-handling`"
+    )
+  );
+  assert.ok(documentRule.includes("Other outcomes write none."));
+  const description = intercomTriageSkill.match(DESCRIPTION_PATTERN)?.[1] ?? "";
+  assert.ok(description.includes("confirmed bug or feature request"));
 });
