@@ -3,6 +3,7 @@ import { describe, it } from "node:test";
 import { linearPort } from "./linear.js";
 
 const SANDBOX = "C0AAAAAAAAA";
+const COMMENT_ID = "00000000-0000-4000-8000-000000000001";
 const PR = "https://github.com/Acquisity/Acquisity/pull/7";
 
 const ok = (data: unknown) =>
@@ -285,11 +286,16 @@ describe("postUnderAnchor", () => {
       ok({ commentCreate: { comment: { id: "new" }, success: true } })
     );
     assert.equal(
-      await port.postUnderAnchor("uuid-1", "c-anchor", "Hello"),
+      await port.postUnderAnchor("uuid-1", "c-anchor", "Hello", COMMENT_ID),
       "new"
     );
     assert.deepEqual(requests[0]?.variables, {
-      input: { body: "Hello", issueId: "uuid-1", parentId: "c-anchor" },
+      input: {
+        body: "Hello",
+        id: COMMENT_ID,
+        issueId: "uuid-1",
+        parentId: "c-anchor",
+      },
     });
   });
 
@@ -297,9 +303,12 @@ describe("postUnderAnchor", () => {
     const { port } = portWith(() =>
       ok({ commentCreate: { comment: null, success: false } })
     );
-    await assert.rejects(port.postUnderAnchor("uuid-1", "c-anchor", "Hello"), {
-      message: "Linear did not create the reply.",
-    });
+    await assert.rejects(
+      port.postUnderAnchor("uuid-1", "c-anchor", "Hello", COMMENT_ID),
+      {
+        message: "Linear did not create the reply.",
+      }
+    );
   });
 });
 
@@ -376,8 +385,11 @@ describe("deadline", () => {
       40
     );
     await assert.rejects(hung.readTicket("ENG-1"), { message: "aborted" });
-    await assert.rejects(hung.postUnderAnchor("uuid-1", "c-anchor", "Hello"), {
-      message: "aborted",
-    });
+    await assert.rejects(
+      hung.postUnderAnchor("uuid-1", "c-anchor", "Hello", COMMENT_ID),
+      {
+        message: "aborted",
+      }
+    );
   });
 });
