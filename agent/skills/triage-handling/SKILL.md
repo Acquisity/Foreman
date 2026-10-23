@@ -110,7 +110,7 @@ When Aaron explicitly requests read-only validation during an attended manual te
 
 ### Area-routing roster
 
-Take the product area from the evidence, never from the incoming project, title, symptom, repository name, or memory. `decide_triage` used the owner map in [references/roster.md](references/roster.md): `route` carries the `Area:` label and `assignee`, so pass it unchanged.
+Take the product area from the evidence, never from the incoming project, title, symptom, repository name, or memory. `route` carries the `Area:` label and `assignee` from the owner map in [references/roster.md](references/roster.md); pass it unchanged.
 
 A developer gets only a confirmed Bug or a feature request labelled `Approved`. An unapproved feature request gets `Needs approval` and no developer; questions, user errors, platform limits, billing and support get none.
 
@@ -118,7 +118,7 @@ SAN sandbox tickets always route to Aaron Fraga. When no area fits, `decide_tria
 
 ### When the ticket is not engineering actionable
 
-`User Error`, `Platform Limitation`, `Resolved by triage`, `Duplicate`, `Backlog/low-impact`, and the `Support/` paths end here: call `route_ticket` once with the decision's `route` unchanged. Add no assignee: the ticket keeps its current one. The ticket carries the explanation and moves to the Stage 5 state; nothing goes to engineering. `User Error`, `Platform Limitation`, and `Resolved by triage` close as `Done`; the `Support/` paths stay `Todo` for a person.
+`User Error`, `Platform Limitation`, `Resolved by triage`, `Duplicate`, `Backlog/low-impact`, and the `Support/` paths end here: call `route_ticket` once with the decision's `route` unchanged. `route` names Aaron Fraga for an open follow-up, no one for a closed outcome. The ticket carries the explanation and moves to the Stage 5 state; nothing goes to engineering. `User Error`, `Platform Limitation`, and `Resolved by triage` close as `Done`; the `Support/` paths stay `Todo` for a person.
 
 A `Duplicate` still inherits: `route` already carries `duplicateOf` and `inheritAssigneeFrom`. Add only `assignee`, the area owner from the roster, when `route` names none (a confirmed Bug only), so the root cause's owner owns its reports. The tool inherits the parent's assignee when it is in the roster and uses the fallback otherwise.
 

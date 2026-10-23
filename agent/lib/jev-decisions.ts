@@ -544,6 +544,7 @@ export function resolveTriage(
     answers,
     bar: BARS.project,
     classification,
+    closed: ["Done", "Duplicate"].includes(PATH_STATE[path]),
     duplicate: duplicate !== undefined,
     input,
     notes,

@@ -577,3 +577,32 @@ test("an outcome left unassigned on purpose can finish, an unassigned Bug cannot
     SupportRefusal
   );
 });
+
+test("an open non-Bug outcome needs an owner, a closed one does not", () => {
+  const followUp = {
+    ...report,
+    assignee: null,
+    labels: ["intercom-sourced", "Customer reported"],
+    parentId: null,
+    project: null,
+    status: "Todo",
+  };
+  const content = {
+    ...document,
+    content: "**Classification**: User Error\n**Review**: Not required",
+  };
+  assert.throws(
+    () => assertTriageOutputs(followUp, content, comments),
+    SupportRefusal
+  );
+  assert.doesNotThrow(() =>
+    assertTriageOutputs(
+      { ...followUp, assignee: "Aaron Fraga" },
+      content,
+      comments
+    )
+  );
+  assert.doesNotThrow(() =>
+    assertTriageOutputs({ ...followUp, status: "Done" }, content, comments)
+  );
+});

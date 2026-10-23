@@ -10,6 +10,8 @@ import {
 import { writtenIssueId } from "./linear-state.js";
 import type { supportOperations } from "./store.js";
 
+const CLOSED_STATES = ["Done", "Duplicate", "Canceled"];
+
 const documentSchema = z.object({
   content: z.string().min(1),
   url: z.string().min(1),
@@ -27,6 +29,22 @@ const CLASSIFICATION = /^\*\*Classification\*\*:\s*([^\r\n]+)/m;
 const REVIEW = /^\*\*Review\*\*:\s*([^\r\n]+)/m;
 const SETTLED_REVIEW =
   /^(?:Approved \S+ at [a-f0-9]{40}|Adjudicated \S+ at [a-f0-9]{40}: (?:CHALLENGE|INSUFFICIENT_EVIDENCE|review failure)[;:,]?[ \t]+\S.*)$/;
+
+const ownerRecordMissing = (
+  issue: z.infer<typeof issueSchema>,
+  classification: string | undefined
+): boolean => {
+  if (classification !== "Bug") {
+    return !(issue.assignee || CLOSED_STATES.includes(issue.status));
+  }
+  return !(
+    issue.assignee &&
+    (issue.project ||
+      issue.labels.some((label) => areaLabels().includes(label)) ||
+      issue.assignee === SUPPORT_OWNER ||
+      issue.assignee === FALLBACK_OWNER)
+  );
+};
 
 /** Check durable outputs, not whether a model says it loaded the workflow. */
 export function assertTriageOutputs(
@@ -79,14 +97,7 @@ export function assertTriageOutputs(
   }
   if (
     !issue.priority ||
-    (classification === "Bug" &&
-      !(
-        issue.assignee &&
-        (issue.project ||
-          issue.labels.some((label) => areaLabels().includes(label)) ||
-          issue.assignee === SUPPORT_OWNER ||
-          issue.assignee === FALLBACK_OWNER)
-      )) ||
+    ownerRecordMissing(issue, classification) ||
     issue.priority.value < 1 ||
     issue.priority.value > 4 ||
     !issue.status.trim() ||

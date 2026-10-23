@@ -92,6 +92,7 @@ export function resolveOwnership(context: {
   answers: Answers;
   bar: number;
   classification: TriageClassification;
+  closed: boolean;
   duplicate: boolean;
   input: TriageInput;
   notes: string[];
@@ -99,12 +100,14 @@ export function resolveOwnership(context: {
   project: string | null;
 }): Ownership {
   const { answers, classification, duplicate, input, notes, path } = context;
+  const followUp =
+    classification !== "Bug" && !context.closed ? SUPPORT_OWNER : null;
   const none: Ownership = {
     approval: "not-applicable",
     area: null,
-    assignee: null,
+    assignee: followUp,
     path,
-    releaseDeveloper: classification !== "Bug",
+    releaseDeveloper: classification !== "Bug" && followUp === null,
   };
   if (input.identifier.toUpperCase().startsWith("SAN-")) {
     return { ...none, assignee: SUPPORT_OWNER, releaseDeveloper: false };

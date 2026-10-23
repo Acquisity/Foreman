@@ -356,7 +356,7 @@ describe("who may be assigned to a developer", () => {
     assert.equal(decision.assignee, null);
   });
 
-  it("gives a Support follow-up no developer", () => {
+  it("keeps a Support follow-up with the support owner, not a developer", () => {
     const decision = route(
       resolveTriage(
         input(),
@@ -367,7 +367,8 @@ describe("who may be assigned to a developer", () => {
         })
       )
     );
-    assert.equal(decision.assignee, null);
+    assert.equal(decision.assignee, SUPPORT_OWNER);
+    assert.equal(isDeveloperOwner(SUPPORT_OWNER), false);
   });
 
   it("sends billing and refund items to the support owner, never a developer", () => {

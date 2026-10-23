@@ -885,7 +885,11 @@ test("an approved feature request on a path that closes or delegates it keeps th
       decision.route.state,
       path === "Resolved by triage" ? "Done" : "Todo"
     );
-    assert.equal(decision.route.assignee, undefined, path);
+    assert.equal(
+      decision.route.assignee,
+      path === "Resolved by triage" ? undefined : "Aaron Fraga",
+      path
+    );
   }
 });
 
@@ -956,4 +960,51 @@ test("an approved feature request that Jev already put on the engineering path g
   assert.equal(decision.assignee, "Koppany Kondricz");
   assert.equal(decision.route.assignee, "Koppany Kondricz");
   assert.ok(decision.route.addLabels.includes("Area: AI SDR"));
+});
+
+test("an open follow-up a person owes goes to Aaron instead of being left with no owner", () => {
+  const cases: [string, Record<string, JevAnswer>][] = [
+    [
+      "Support/Product follow-up",
+      {
+        classification: pick("user_error"),
+        path: pick("Support/Product follow-up"),
+      },
+    ],
+    [
+      "Support/Financial",
+      { classification: pick("user_error"), path: pick("Support/Financial") },
+    ],
+    [
+      "Backlog/low-impact",
+      {
+        classification: pick("platform_limitation"),
+        path: pick("Backlog/low-impact"),
+      },
+    ],
+    [
+      "unapproved request on the engineering path",
+      {
+        classification: pick("platform_limitation"),
+        path: pick("Engineering Todo"),
+        wants_limit_lifted: yes(),
+      },
+    ],
+  ];
+  for (const [name, over] of cases) {
+    const decision = resolveTriage(triageInput(), bugAnswers(over));
+    assert.ok(decision.outcome === "route", name);
+    assert.equal(decision.route.assignee, "Aaron Fraga", name);
+    assert.equal(decision.route.releaseDeveloper, undefined, name);
+  }
+  const closed = resolveTriage(
+    triageInput(),
+    bugAnswers({
+      classification: pick("user_error"),
+      path: pick("User Error"),
+    })
+  );
+  assert.ok(closed.outcome === "route");
+  assert.equal(closed.route.assignee, undefined);
+  assert.equal(closed.route.releaseDeveloper, true);
 });
