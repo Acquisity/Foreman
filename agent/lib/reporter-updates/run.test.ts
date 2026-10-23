@@ -265,6 +265,26 @@ describe("not fixed message", () => {
   });
 });
 
+describe("not fixed wording does not claim more than is known", () => {
+  it("tells a cancelled bug only that it was closed without a change, never that none was needed", async () => {
+    const s = setup([
+      ticket({ labels: ["Bug"], stateName: "Canceled", stateType: "canceled" }),
+    ]);
+    await reconcile(s);
+    const [post] = s.linear.posts;
+    assert.equal(post?.body, notFixedText("no_change"));
+    assert.ok(post?.body.includes("closed it without a change"));
+    assert.ok(!post?.body.includes("needed"));
+    assert.ok(!post?.body.includes("nothing is broken"));
+  });
+
+  it("uses the same neutral wording for a Done ticket with no code and no label", async () => {
+    const s = setup([ticket({ stateType: "completed" })]);
+    await reconcile(s);
+    assert.equal(s.linear.posts[0]?.body, notFixedText("no_change"));
+  });
+});
+
 describe("once only, and never lost", () => {
   it("records a message already in the thread instead of posting it again", async () => {
     const t = ticket({ stateName: "Duplicate", stateType: "canceled" });

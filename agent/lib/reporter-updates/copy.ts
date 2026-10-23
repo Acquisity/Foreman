@@ -36,7 +36,7 @@ export const fixedText = (): string =>
 
 const NOT_FIXED_REASONS: Record<NotFixedReason, string> = {
   duplicate: `We looked into this. Someone had already reported the same thing, so we're tracking it under that report instead of this one. ${NOTHING_TO_DO}.`,
-  no_change: `We looked into this and no change to the product was needed. ${NOTHING_TO_DO}. If it still looks wrong, reply here and we'll look again.`,
+  no_change: `We looked into this and closed it without a change to the product. ${NOTHING_TO_DO}. If it still looks wrong, reply here and we'll look again.`,
   not_a_bug: `We looked into this and nothing is broken: it works the way it's designed to right now. ${NOTHING_TO_DO}. If it doesn't match what you saw, reply here.`,
 };
 
