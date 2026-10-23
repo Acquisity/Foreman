@@ -23,6 +23,7 @@ import {
   RESERVATION_LEASE_MS,
   readReplayResult,
   replayStamp,
+  reserve,
   startReplay,
 } from "./route.js";
 
@@ -247,6 +248,85 @@ describe("starting a replay", () => {
       await assert.rejects(startReplay(start(), args, ledger()), BLOB_DOWN);
       assert.equal(sent.length, 1);
       assert.deepEqual(await settled(ledger), {
+        admitted: [],
+        charged: 4,
+        reserved: [KEY],
+      });
+    });
+
+    describe("when the send succeeds but nothing after it can be saved", () => {
+      const lostWrites = async (t: TestContext) => {
+        const inner = memoryBackend();
+        const down: { ledger: boolean; writes: boolean } = {
+          ledger: false,
+          writes: false,
+        };
+        const backend: ReplayBackend = {
+          ...inner,
+          write: (key, state, etag) =>
+            down.writes
+              ? Promise.reject(new Error("blob down"))
+              : inner.write(key, state, etag),
+        };
+        const shared = sharedLedger();
+        const ledger = (): AdmissionLedger => {
+          const live = shared();
+          return {
+            read: live.read,
+            write: (run, entries, etag) =>
+              down.ledger
+                ? Promise.reject(new Error("ledger down"))
+                : live.write(run, entries, etag),
+          };
+        };
+        const { args, sent } = server(t, backend);
+        const dispatching = {
+          from: (address: string) => ({
+            send: (message: string, options: unknown) => {
+              const sending = args.from(address).send(message, options);
+              down.ledger = true;
+              down.writes = true;
+              return sending;
+            },
+          }),
+        };
+        const first = await startReplay(start(), dispatching, ledger());
+        const later = Date.now() + RESERVATION_LEASE_MS + 1;
+        t.mock.method(Date, "now", () => later);
+        return { args, down, first, ledger, sent, shared };
+      };
+
+      it("answers a stale retry as already started and refuses the next one, with the charge kept and one send", async (t) => {
+        const { args, down, first, ledger, sent, shared } = await lostWrites(t);
+        assert.equal(first.status, 200);
+        down.ledger = false;
+        assert.equal((await startReplay(start(), args, ledger())).status, 409);
+        assert.equal(sent.length, 1);
+        assert.deepEqual(await settled(shared), {
+          admitted: [KEY],
+          charged: 4,
+          reserved: [],
+        });
+        down.writes = false;
+        assert.equal((await startReplay(start(), args, ledger())).status, 429);
+        assert.equal(sent.length, 1);
+      });
+    });
+
+    it("never releases a reservation it took over, even when its seed update fails", async (t) => {
+      const backend = memoryBackend();
+      const shared = sharedLedger();
+      const { args, sent } = server(t, backend);
+      await reserve((await start().json()) as never, shared());
+      const later = Date.now() + RESERVATION_LEASE_MS + 1;
+      t.mock.method(Date, "now", () => later);
+      setReplayBackend({
+        ...backend,
+        write: () => Promise.reject(new Error("blob down")),
+      });
+      await assert.rejects(startReplay(start(), args, shared()), BLOB_DOWN);
+      assert.equal(sent.length, 0);
+      assert.deepEqual(await settled(shared), {
         admitted: [],
         charged: 4,
         reserved: [KEY],

@@ -183,31 +183,37 @@ function allowanceOf(env: NodeJS.ProcessEnv): Allowance | string {
   };
 }
 
-export function reserve(
+export async function reserveSlot(
   request: StartRequest,
   ledger: AdmissionLedger,
   env: NodeJS.ProcessEnv = process.env,
   now: number = Date.now()
-): Promise<string | null> {
+): Promise<{ recovered: boolean; refusal: string | null }> {
+  const refuse = (message: string) => ({
+    recovered: false,
+    refusal: message,
+  });
   if (!env.TRIAGE_REPLAY_RUN_ID || request.runId !== env.TRIAGE_REPLAY_RUN_ID) {
-    return Promise.resolve(
-      "This run id is not the one approved on the server."
-    );
+    return refuse("This run id is not the one approved on the server.");
   }
   const allowance = allowanceOf(env);
   if (typeof allowance === "string") {
-    return Promise.resolve(allowance);
+    return refuse(allowance);
   }
   const entry = caseKeyOf(request);
-  return updateLedger(request.runId, ledger, (entries) => {
+  let recovered = false;
+  const refusal = await updateLedger(request.runId, ledger, (entries) => {
+    recovered = false;
     if (entries.admitted.includes(entry)) {
       return `${entry} was already started in this run.`;
     }
     const reservedAt = entries.reserved[entry];
     if (reservedAt !== undefined) {
-      return now - reservedAt < RESERVATION_LEASE_MS
-        ? `${entry} is already starting in this run.`
-        : { ...entries, reserved: { ...entries.reserved, [entry]: now } };
+      if (now - reservedAt < RESERVATION_LEASE_MS) {
+        return `${entry} is already starting in this run.`;
+      }
+      recovered = true;
+      return { ...entries, reserved: { ...entries.reserved, [entry]: now } };
     }
     if (
       entries.admitted.length + Object.keys(entries.reserved).length >=
@@ -224,7 +230,12 @@ export function reserve(
       reserved: { ...entries.reserved, [entry]: now },
     };
   });
+  return { recovered, refusal };
 }
+
+export const reserve = async (
+  ...args: Parameters<typeof reserveSlot>
+): Promise<string | null> => (await reserveSlot(...args)).refusal;
 
 async function settle(
   request: StartRequest,
@@ -327,15 +338,7 @@ export class ReplayAlreadyStartedError extends Error {
 }
 
 const SETTLE_ATTEMPTS = 3;
-
-async function provenNeverDispatched(key: string): Promise<boolean> {
-  try {
-    const stored = await replayBackend().read(key);
-    return !stored || neverDispatched(stored.state);
-  } catch {
-    return false;
-  }
-}
+const DISPATCH_ATTEMPTED = "attempted";
 
 async function persistently(work: () => Promise<unknown>) {
   let failure: unknown = null;
@@ -431,7 +434,7 @@ export async function startReplay(
     return json({ error: "Invalid replay start request." }, 400);
   }
   const start = parsed.data;
-  const refused = await reserve(start, ledger);
+  const { recovered, refusal: refused } = await reserveSlot(start, ledger);
   if (refused) {
     return json({ error: refused }, 429);
   }
@@ -439,15 +442,32 @@ export async function startReplay(
   let session: { id: string };
   try {
     await seedStore(start, replayStamp());
-    session = await args
-      .from(`triage-replay:${start.runId}:${key}`)
-      .send(replayMessage(start), { auth: replayAuth(start.runId, key) });
+    await withReplayState(start.runId, key, (state) => {
+      state.dispatchedSession = DISPATCH_ATTEMPTED;
+    });
+    try {
+      session = await args
+        .from(`triage-replay:${start.runId}:${key}`)
+        .send(replayMessage(start), { auth: replayAuth(start.runId, key) });
+    } catch (sendError) {
+      const stuck = await persistently(() =>
+        withReplayState(start.runId, key, (state) => {
+          state.dispatchedSession = null;
+        })
+      );
+      if (stuck) {
+        logOpsEvent("triage_replay.ledger_unconfirmed", {
+          code: "dispatch_marker_stuck",
+        });
+      }
+      throw sendError;
+    }
   } catch (error) {
     if (error instanceof ReplayAlreadyStartedError) {
       await confirm(start, ledger);
       return json({ error: `${key} was already started in this run.` }, 409);
     }
-    if (await provenNeverDispatched(replayStateKey(start.runId, key))) {
+    if (!recovered) {
       try {
         await release(start, ledger);
       } catch (releaseError) {
