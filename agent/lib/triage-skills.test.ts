@@ -1257,9 +1257,7 @@ test("Stage 5 hands decide_triage the ticket's own labels so an approved request
     "### Jev decides, Foreman acts",
     "### Fallback: only when `decided: false`"
   );
-  assert.ok(
-    stage.includes("the ticket's own labels from Linear now as `ticketLabels`")
-  );
+  assert.ok(stage.includes("the ticket's own labels as `ticketLabels`"));
   const tool = readFileSync(
     new URL("../tools/decide_triage.ts", import.meta.url),
     "utf8"
@@ -1284,4 +1282,17 @@ test("the not-engineering branch covers an unapproved feature request waiting in
   );
   assert.ok(branch.includes("`Backlog/low-impact`"));
   assert.ok(branch.includes("unless a lift is wanted"));
+});
+
+test("the unblock never replaces the root cause or the master ticket", () => {
+  const unblock = extractInstruction(
+    triageHandlingSkill,
+    "### Find the unblock",
+    "### Jev decides, Foreman acts"
+  );
+  assert.ok(
+    unblock.includes(
+      "The unblock never replaces the root cause or the master ticket."
+    )
+  );
 });

@@ -26,9 +26,11 @@ The verdict says what is wrong, not what the customer does tomorrow morning. Ans
 
 When there is one, name it, say who performs it and whether it is already done, and confirm it costs the customer neither data nor money. Never invent a workaround that writes to production or changes billing on your own judgment; propose those and let a person run them. An unblock someone at Acquisity would perform is real only once the evidence shows the procedure exists, works for this case, is safe, and names who is authorized to run it; without all four, record that none was confirmed and what evidence is missing. When there is none, say so explicitly: a silently absent unblock reads as one nobody looked for.
 
+The unblock never replaces the root cause or the master ticket.
+
 ### Jev decides, Foreman acts
 
-Then call `decide_triage` once with the evidence record and that unblock, the Stage 3 duplicate candidates, the team's active projects and Root Cause labels read from Linear now, `classify_ask`'s `sourceLabels`, and the ticket's own labels from Linear now as `ticketLabels`. Its decision is the verdict, classification, path, state, priority, labels, and project; record its notes and never hand-edit them. Call it again whenever the evidence changes: after adjudication, or a correction. A `NEEDS_HUMAN_URGENT` hotlane stop suspends its route. `unproven` takes the unproven branch with its `missing` list:
+Then call `decide_triage` once with the evidence record and that unblock, the Stage 3 duplicate candidates, `classify_ask`'s `sourceLabels`, and, read from Linear now, the team's active projects and Root Cause labels and the ticket's own labels as `ticketLabels`. Its decision is the verdict, classification, path, state, priority, labels, and project; record its notes and never hand-edit them. Call it again whenever evidence changes, as after adjudication or a correction. A `NEEDS_HUMAN_URGENT` hotlane stop suspends its route. `unproven` takes the unproven branch with its `missing` list:
 
 When the deciding confirmation is still missing, take the unproven branch and stop before classification. Before stopping, record any safe unblock supported by the completed evidence: the action, owner, current status, and confirmation that it costs the customer neither data nor money, or `None found: <reason>`. Preserve the source ticket's current state, priority, and labels, even an empty priority; read the unproven reporting exception in [references/reporting.md](references/reporting.md); attach or update the investigation document with the known facts, missing confirmation, and reopen condition; and give the requester that same reopen condition in the short comment or attended reply. Do not create or attach a master, route engineering work, or record investigation memory.
 
@@ -50,7 +52,7 @@ Set the state that matches the handling path: `Engineering Todo` is `Todo` (the 
 
 #### Set Linear priority
 
-Priority comes from impact, never from the reporter's requested priority or how loudly the complaint was phrased. Never leave a ticket at No priority. Weigh in order:
+Priority comes from impact, never from the reporter's requested priority or tone. Never leave a ticket at No priority. Weigh in order:
 
 1. Data loss or security. Any data corruption, loss, or security exposure is automatic `Urgent`, no matter how few accounts are affected.
 2. Blast radius, quantified from primary data in Stage 4, not estimated. A core workflow broken for many orgs outweighs one broken for a single org.
@@ -98,7 +100,7 @@ When Stage 5 review ran, the document already exists at the settled version: do 
 
 ### Comment on the ticket
 
-Write the report comment from [references/reporting.md](references/reporting.md): the root cause and next step, four blocks maximum. Evidence stays in the document. For the unproven branch, save only this document and comment, then stop: do not choose or change the project, read the roster, call `route_ticket`, or load `engineering-handoff`; preserve state, priority, labels, project, parent, and assignee.
+Write the report comment from [references/reporting.md](references/reporting.md): the root cause and next step, four blocks maximum. For the unproven branch, save only this document and comment, then stop: do not choose or change the project, read the roster, call `route_ticket`, or load `engineering-handoff`; preserve state, priority, labels, project, parent, and assignee.
 
 ### Choose the product project from completed evidence
 
