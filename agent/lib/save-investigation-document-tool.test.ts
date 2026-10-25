@@ -13,6 +13,7 @@ const { default: tool, hasCardNumber } = await import(
   "../tools/save_investigation_document.js"
 );
 const { regressionRecords } = await import("./regression-record.js");
+const { triageDecisions } = await import("./triage-log.js");
 
 type Context = Parameters<typeof tool.execute>[1];
 
@@ -174,6 +175,7 @@ describe("save_investigation_document tool", () => {
       windowDays: 30,
     };
     t.mock.method(regressionRecords, "get", () => ({ "ENG-1": record }));
+    t.mock.method(triageDecisions, "get", () => ({}));
     const context = {
       abortSignal: new AbortController().signal,
       session: { auth: { current: null, initiator: null } },
@@ -185,6 +187,9 @@ describe("save_investigation_document tool", () => {
         bug(""),
         bug(
           `## Regression check\n**Deployed commit**: ${deployed}\n**Commit read**: ${read}\n**Result**: none\n`
+        ),
+        bug(
+          "## Regression check\n**Result**: Not applicable: Duplicate of ENG-9\n"
         ),
       ].map((content) =>
         tool.execute({ content, issue: "ENG-1", lane: "triage" }, context)

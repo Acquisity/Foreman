@@ -3,7 +3,6 @@ import { existsSync, readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 import { HANDLING_PATHS } from "./jev-decisions.js";
 import { lineFor } from "./regression-lane.js";
-import { REPLAY_TOOL_POLICY } from "./triage-replay/tool-policy.js";
 
 const read = (path: string) =>
   readFileSync(new URL(`../${path}`, import.meta.url), "utf8");
@@ -44,7 +43,22 @@ describe("the regression lane in the triage skills", () => {
     assert.ok("Support/Product follow-up" in HANDLING_PATHS);
     assert.ok(reference.includes("`Resolved by triage`"));
     assert.ok(reference.includes("`Support/Product follow-up`"));
-    assert.ok(reference.includes("`assignOwner`"));
+    assert.ok(!reference.includes("assignOwner"));
+    assert.ok(
+      reference.includes(
+        "the decision's `route` already names the area owner, so pass it unchanged"
+      )
+    );
+    assert.ok(
+      reference.includes(
+        "It closes as `Done`, not `Canceled`: the earlier fix is the change that was made."
+      )
+    );
+    assert.ok(
+      reference.includes(
+        "link the pull request that merged the fixing commit with `route_ticket` `links`"
+      )
+    );
     assert.ok(reference.includes("No master, no engineering hand-off"));
     assert.ok(reference.includes("nothing for Devin"));
   });
@@ -53,7 +67,7 @@ describe("the regression lane in the triage skills", () => {
     assert.ok(reference.includes("without the commit"));
   });
 
-  it("is loaded from Stage 4 and from Stage 5, and Stage 6 keeps the owner exception", () => {
+  it("is loaded from Stage 4 and from Stage 5", () => {
     assert.ok(
       investigate.includes("references/regression-check.md") &&
         investigate.indexOf("### Check what changed and what production runs") >
@@ -65,7 +79,7 @@ describe("the regression lane in the triage skills", () => {
       handling.includes("../triage-investigate/references/regression-check.md")
     );
     assert.ok(handling.includes("`check_regression`"));
-    assert.ok(handling.includes("`assignOwner`"));
+    assert.ok(!handling.includes("assignOwner"));
     assert.ok(
       existsSync(
         new URL(
@@ -104,8 +118,7 @@ describe("the regression lane in the triage skills", () => {
     assert.match(read("subagents/critic/tools/check_regression.ts"), MOUNT);
   });
 
-  it("names the introducing commit in the master and lists the tool for replays", () => {
+  it("names the introducing commit in the master", () => {
     assert.ok(handoff.includes("`introduced by <commit>`"));
-    assert.equal(REPLAY_TOOL_POLICY.check_regression.mode, "allow");
   });
 });

@@ -17,17 +17,20 @@ const RESULT_LINE = /^\*\*Result\*\*:[ \t]*(.+?)[ \t]*$/mu;
  * for a Bug, the deployed commit, the commit read and the result, copied from
  * the session's check_regression record. A section that disagrees with that
  * record is refused, so a populated heading can't support a different result.
- * Returns the gaps, the same shape as the other document checks.
+ * `Not applicable: Duplicate` is accepted only when the session's latest
+ * decision for the ticket really is `Duplicate`. Returns the gaps, the same
+ * shape as the other document checks.
  */
 export const regressionDocumentGaps = (
   content: string,
-  record: RegressionRecord | undefined
+  record: RegressionRecord | undefined,
+  duplicate = false
 ): string[] => {
   if (!isBugDocument(content)) {
     return [];
   }
   const section = SECTION.exec(content)?.[1] ?? "";
-  if (NOT_APPLICABLE.test(section)) {
+  if (duplicate && NOT_APPLICABLE.test(section)) {
     return [];
   }
   if (!record) {

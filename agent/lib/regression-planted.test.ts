@@ -28,6 +28,7 @@ const no = (): JevAnswer => ({ probability: 0.1, type: "boolean" });
 
 const answers: Record<string, JevAnswer> = {
   classification: pick("bug"),
+  customer_saw_failure: no(),
   data_loss_or_security: no(),
   direct_evidence: yes(),
   impact: {
@@ -35,6 +36,7 @@ const answers: Record<string, JevAnswer> = {
     score: 0,
     type: "score",
   },
+  inbox_error: no(),
   incident: pick("standard"),
   incident_impact: pick("MATERIALLY_IMPAIRED"),
   money_blocker: no(),
@@ -168,7 +170,8 @@ describe("planted tickets, end to end", () => {
     const decision = decide(record);
     assert.equal(decision.path, "Support/Product follow-up");
     assert.equal(decision.route.state, "Todo");
-    assert.equal(decision.assignOwner, true);
+    assert.equal(decision.route.assignee, "James Keeble");
+    assert.ok(decision.route.addLabels.includes("Bug"));
     assert.ok(decision.notes.some((line) => line.includes(fix)));
     assert.deepEqual(regressionDocumentGaps(documentFor(record), record), []);
     assert.equal(

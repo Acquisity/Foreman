@@ -92,7 +92,9 @@ describe("regression section of a Bug document", () => {
     const duplicate = makeDocument(
       "## Regression check\n**Result**: Not applicable: Duplicate of ENG-9\n"
     );
-    assert.deepEqual(regressionDocumentGaps(duplicate, undefined), []);
+    assert.deepEqual(regressionDocumentGaps(duplicate, undefined, true), []);
+    assert.equal(regressionDocumentGaps(duplicate, undefined).length, 1);
+    assert.equal(regressionDocumentGaps(duplicate, record(), false).length, 3);
     assert.deepEqual(
       regressionDocumentGaps(makeDocument("", "User Error"), undefined),
       []

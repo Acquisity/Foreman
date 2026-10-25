@@ -45,5 +45,9 @@ export const fixedRouting = (
     ? FIXED_PATHS[input.regression.kind]
     : undefined;
 
+/**
+ * The one gap Foreman closes itself: it is never a reason to take the
+ * unproven branch or to tell the requester anything.
+ */
 export const REGRESSION_GAP =
-  "A regression check on that code: run check_regression for this ticket (an unchecked result counts when the tool could not run).";
+  "A regression check on the blamed code. Foreman closes this one itself: run check_regression for this ticket, label every commit it returns, and call decide_triage again. An unchecked result counts when the tool could not run. Do not take the unproven branch for it.";

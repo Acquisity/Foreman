@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { resolveTriage } from "./jev-decisions.js";
+import { REGRESSION_GAP } from "./regression-routing.js";
 import { bugAnswers, pick, triageInput } from "./triage-fixtures.js";
 
 const FIX = "b".repeat(40);
@@ -74,8 +75,8 @@ test("a Bug with no regression check is not a Bug yet", () => {
     bugAnswers()
   );
   assert.ok(decision.outcome === "unproven");
-  assert.equal(decision.missing.length, 1);
-  assert.match(decision.missing[0] ?? "", CHECK_REGRESSION);
+  assert.deepEqual(decision.missing, [REGRESSION_GAP]);
+  assert.match(REGRESSION_GAP, CHECK_REGRESSION);
 });
 
 test("the regression result changes nothing for a duplicate or a non-Bug", () => {

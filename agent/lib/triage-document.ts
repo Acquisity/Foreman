@@ -11,7 +11,8 @@ const REVIEW_LINE =
 
 export const triageDocumentGaps = (
   content: string,
-  regression?: RegressionRecord
+  regression?: RegressionRecord,
+  duplicate = false
 ): string[] => [
   ...(CONFIDENCE_LINE.test(content)
     ? []
@@ -23,5 +24,5 @@ export const triageDocumentGaps = (
     : [
         "a `**Review**:` line with the critic's result, or `Not required: <reason>`",
       ]),
-  ...regressionDocumentGaps(content, regression),
+  ...regressionDocumentGaps(content, regression, duplicate),
 ];
