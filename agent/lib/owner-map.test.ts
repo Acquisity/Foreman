@@ -49,6 +49,7 @@ const input = (over: Partial<TriageInput> = {}): TriageInput => ({
   evidence: "Evidence.",
   identifier: "ENG-1",
   projects: [{ name: "CRM" }],
+  regression: { kind: "none", line: "none" },
   rootCauseLabels: [],
   sourceLabels: ["Customer reported"],
   ...over,

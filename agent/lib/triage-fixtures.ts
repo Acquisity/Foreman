@@ -34,6 +34,7 @@ export const triageInput = (over: Partial<TriageInput> = {}): TriageInput => ({
   evidence: "Inngest run failed at step parse.",
   identifier: "ENG-1",
   projects: [{ name: "AI SDR Core" }],
+  regression: { kind: "none", line: "none" },
   rootCauseLabels: [],
   sourceLabels: ["Customer reported"],
   ...over,

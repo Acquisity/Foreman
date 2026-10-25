@@ -7,6 +7,8 @@ import {
   probabilityOf,
 } from "./jev.js";
 import { SUPPORT_OWNER } from "./owner-map.js";
+import type { RegressionOutcome } from "./regression-record.js";
+import { fixedRouting, REGRESSION_GAP } from "./regression-routing.js";
 import { BARS } from "./triage-bars.js";
 import {
   HOTLANE_IMPACTS,
@@ -209,6 +211,8 @@ export interface TriageInput {
   identifier: string;
   organizationId?: string;
   projects: { description?: string; name: string }[];
+  /** What check_regression concluded about the blamed code (ENG-16056). */
+  regression?: RegressionOutcome;
   rootCauseLabels: string[];
   sourceLabels: string[];
   ticketLabels?: string[];
@@ -433,10 +437,11 @@ const findDuplicate = (input: TriageInput, answers: Answers) =>
     .sort((a, b) => b.confidence - a.confidence)
     .at(0);
 
-/** What a Bug verdict still lacks: all three are required, and two are checked in code. */
+/** What a Bug verdict still lacks: all four are required, and three are checked in code. */
 const bugBarGaps = (input: TriageInput, answers: Answers): string[] =>
   [
     input.codePath ? null : "A named file and function the cause runs through.",
+    input.regression ? null : REGRESSION_GAP,
     probabilityOf(answers.direct_evidence) >= BARS.signal
       ? null
       : "Direct production-data or runtime/provider evidence of the failure.",
@@ -624,7 +629,11 @@ export function resolveTriage(
 
   const settled = billed ? "Platform Limitation" : classification;
   const match = billed ? undefined : duplicate;
-  const path = routedPath(billed, match, pathPick.choice);
+  const fixed = fixedRouting(input, settled, match !== undefined);
+  if (fixed) {
+    notes.push(`${fixed.note} Fixing commit: ${input.regression?.commit}.`);
+  }
+  const path = fixed?.path ?? routedPath(billed, match, pathPick.choice);
   const project = choiceOf(answers.project);
   const projectSettled =
     project.choice !== UNDETERMINED && project.confidence >= BARS.project;
@@ -640,6 +649,7 @@ export function resolveTriage(
     classification: settled,
     closed: ["Canceled", "Done", "Duplicate"].includes(PATH_STATE[path]),
     duplicate: match !== undefined,
+    fixPending: fixed?.ownerFollowUp === true,
     input,
     notes,
     path,
@@ -711,6 +721,7 @@ export async function decideTriage(
       })
     ),
     evidence: input.evidence,
+    regression: input.regression?.line ?? null,
   };
   const answers = await askJev(triageQuestions(input), state, opts);
   return resolveTriage(input, answers);
