@@ -5,12 +5,14 @@ import { stampTriageIntake, stampUnattended } from "./trust.js";
 
 const CARD_OR_BANK = /card or bank/u;
 const CONFIDENCE_NEEDED = /`\*\*Confidence\*\*: verdict/u;
+const REGRESSION_CHECK = /Regression check/u;
 
 process.env.LINEAR_CONNECTOR ??= "linear/test";
 
 const { default: tool, hasCardNumber } = await import(
   "../tools/save_investigation_document.js"
 );
+const { regressionRecords } = await import("./regression-record.js");
 
 type Context = Parameters<typeof tool.execute>[1];
 
@@ -155,5 +157,42 @@ describe("save_investigation_document tool", () => {
     assert.equal(result.saved, false);
     assert.match(result.error ?? "", CARD_OR_BANK);
     assert.equal(fetch.mock.callCount(), 0);
+  });
+
+  it("refuses a Bug document without the regression check, or one that disagrees with it", async (t) => {
+    const read = "a".repeat(40);
+    const deployed = "d".repeat(40);
+    const fix = "f".repeat(40);
+    const line = `fixed on main and live, by ${fix}`;
+    const record = {
+      commit: fix,
+      commitRead: read,
+      deployedCommit: deployed,
+      issue: "ENG-1",
+      kind: "fixed_live" as const,
+      line,
+      windowDays: 30,
+    };
+    t.mock.method(regressionRecords, "get", () => ({ "ENG-1": record }));
+    const context = {
+      abortSignal: new AbortController().signal,
+      session: { auth: { current: null, initiator: null } },
+    } as unknown as Context;
+    const bug = (section: string) =>
+      `# Triage investigation\n\n**Classification**: Bug\n\n${section}\n## Code path\nsend.ts\n`;
+    const results = (await Promise.all(
+      [
+        bug(""),
+        bug(
+          `## Regression check\n**Deployed commit**: ${deployed}\n**Commit read**: ${read}\n**Result**: none\n`
+        ),
+      ].map((content) =>
+        tool.execute({ content, issue: "ENG-1", lane: "triage" }, context)
+      )
+    )) as Array<{ error?: string; saved: boolean }>;
+    for (const result of results) {
+      assert.equal(result.saved, false);
+      assert.match(result.error ?? "", REGRESSION_CHECK);
+    }
   });
 });
