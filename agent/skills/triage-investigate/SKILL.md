@@ -87,7 +87,7 @@ Inputs: the claim, identity status, evidence plan, and any existing investigatio
 
 Work the lanes in order and record every one in the Triage investigation document, including those that did not apply; a lane with no entry reads as skipped, and a verdict standing on skipped lanes is not a verdict.
 
-Keep the three database surfaces separate. PlanetScale: production and customer data. Prefer bounded authored helpers; Executor also exposes the underlying reads. Investigation memory: Foreman's own private Postgres of sanitized past-investigation patterns, reached only through `search_investigation_memory`, `record_investigation_case`, and `correct_investigation_case`; it holds no customer data and is never current production evidence. Neon through Executor investigates other Neon databases, unrelated to memory. Never locate, inspect, or verify a database to use memory: no listing projects, schemas, or roles, counting rows, testing SQL, hunting credentials, or using Neon tools on memory's behalf. The three memory tools are the whole interface. Record `available: false` or a failed write in the document and carry on; memory availability never changes the verdict or appears in the Slack reply.
+Keep the three database surfaces separate. PlanetScale: production and customer data. Prefer bounded authored helpers. Investigation memory: Foreman's own private Postgres of sanitized past-investigation patterns, reached only through `search_investigation_memory`, `record_investigation_case`, and `correct_investigation_case`; it holds no customer data and is never current production evidence. Neon through Executor investigates other Neon databases, unrelated to memory. Never locate, inspect, or verify a database to use memory: no listing projects, schemas, or roles, counting rows, testing SQL, hunting credentials, or using Neon tools on memory's behalf. The three memory tools are the whole interface. Record `available: false` or a failed write in the document and carry on; memory availability never changes the verdict or appears in the Slack reply.
 
 ### Load the tool catalog first
 
@@ -99,7 +99,7 @@ After stating the claim, call `search_investigation_memory` with the claim or vi
 
 Results are sanitized past investigations: no customer identity, no production rows, candidate analogies only. For each plausible match, write why it matches and what would disconfirm it, then check that evidence; a historical `User Error` verdict or root cause stands only when current code and current data say so. Affected counts are dated figures from that investigation, never this ticket's blast radius; recount in the production-data lane.
 
-`possibleWiderIncident` means several independent tickets recently landed in this scope: check current Sentry, Axiom, Inngest, Intercom, or provider evidence for a live incident; it is not an incident and creates no master ticket, priority, or outage declaration. `available: false` is normal; note it in the document and investigate from scratch, never hunting the backing database. Memory never marks a duplicate; `decide_triage` does.
+`possibleWiderIncident` means several independent tickets recently landed in this scope: check current Sentry, Axiom, Inngest, Intercom, or provider evidence for a live incident; it is not an incident and creates no master ticket, priority, or outage declaration. `available: false` is normal; note it in the document and investigate from scratch. Memory never marks a duplicate; `decide_triage` does.
 
 ### Read the help center
 
@@ -109,9 +109,13 @@ Results are sanitized past investigations: no customer identity, no production r
 
 `prepare_repository` with `Acquisity/Acquisity` returns the `worktree` path at remote HEAD; `grep` and `read_file` under it to find the code path the claim runs through, answering what the code is supposed to do before deciding whether it did it. Record the files, functions, and commit read at (`git -C <worktree> rev-parse HEAD`). A claim you cannot place in the code is not ready for a Bug verdict.
 
+### Check what changed and what production runs
+
+Before any `Bug` verdict, load [references/regression-check.md](references/regression-check.md) and follow it: it checks the commit production serves and 30 days of history on the blamed code, so a cause main already fixes is not called new.
+
 ### Check the data
 
-`planetscale_execute_read_query`, scoped to the organization pinned in Stage 2; say whether production state matches, contradicts, or is silent on the claim. Prefer a bounded `COUNT` or narrow `SELECT`. PlanetScale is the production database and the only source of current production truth; customer data is never in Neon, and neither Neon tools nor investigation memory substitutes for this lane. Count the blast radius unscoped: distinct orgs and users in the same state, each counted once; aim for an exact figure and record the query and date counted, because the count ages. If unreachable, give the tightest bound and name what blocks it.
+`planetscale_execute_read_query`, scoped to the organization pinned in Stage 2; say whether production state matches, contradicts, or is silent on the claim. Prefer a bounded `COUNT` or narrow `SELECT`. PlanetScale is the production database and the only source of current production truth. Count the blast radius unscoped: distinct orgs and users in the same state, each counted once; aim for an exact figure and record the query and date counted, because the count ages. If unreachable, give the tightest bound and name what blocks it.
 
 ### Check the runtime and provider systems
 
@@ -121,7 +125,7 @@ Pick the lanes the symptom points at; naming one not applicable is an answer, gu
 - Errors, crashes, stack traces: Sentry `search_issues`, then the nested `get_issue_details` read for stacktrace and first/last seen.
 - Anything the other lanes do not carry: Axiom `queryDataset` with APL (<https://axiom.co/docs/apl/introduction>); `listDatasets` and `getDatasetFields` first for real names; metrics via `queryMetrics`.
 - Email delivery, bounces, spam placement: Resend `list_emails`, `get_email`, `list_logs`, and `list_suppressions`; inspect their schemas.
-- Instantly workspace membership, sending accounts, campaigns, and Unibox delivery state: `list_instantly_subworkspaces` follows Workspace Group pages up to a 100-page safety cap and returns only accepted subworkspaces in search pages. A cap error is `Could not run`, never a complete list. Use partial-name `search` for discovery; before `read_instantly_subworkspace`, the selected name must resolve exactly once or fail closed. Follow `nextStartingAfter` as `startingAfter` until null. Zero search matches do not prove absent provisioning; unresolved provider state stays `unverified`.
+- Instantly workspace membership, sending accounts, campaigns, and Unibox delivery state: `list_instantly_subworkspaces` follows Workspace Group pages up to a 100-page safety cap and returns only accepted subworkspaces in search pages. A cap error is `Could not run`, never a complete list. Use partial-name `search` for discovery; before `read_instantly_subworkspace`, the selected name must resolve exactly once or fail closed. Zero search matches do not prove absent provisioning; unresolved provider state stays `unverified`.
 - What the user actually did: read the ticket's Jam link when present. PostHog `persons_list` on the Stage 2 email or distinct id, then session recordings via the catalog. Lucent searches symptoms, never customer names.
 - How Acquisity's own AI features behaved: Raindrop `search_events`, then `get_event` and `get_trace`; `list_signals` and `list_issues` for patterns, `query_cost` for spend.
 - Deployment or edge failures: Vercel `getRuntimeLogs` in `foreman_vercel_api`; inspect its schema, then query around the reported time.

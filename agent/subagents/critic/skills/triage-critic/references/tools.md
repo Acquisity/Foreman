@@ -6,7 +6,7 @@ Every source a triage investigation can cite, and how the critic reaches it. Aut
 
 ## Repository (root tools)
 
-`prepare_repository` then `checkout_commit`, both bare. `glob`, `grep`, and `read_file` read the pinned checkout at `/workspace/repo`. There is no `bash`.
+`prepare_repository` then `checkout_commit`, both bare. `glob`, `grep`, and `read_file` read the pinned checkout at `/workspace/repo`. There is no `bash`, so `check_regression` is how you read git history: it deepens the checkout to 30 days, lists the commits that touched a line range with their patches, and with a label for each returns the result line. It is read-only and takes the deployments you read from Vercel (`getDeployments`, and the project's production target for what is served now).
 
 ## Production data (root tool)
 

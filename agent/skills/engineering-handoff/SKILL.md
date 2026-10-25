@@ -94,7 +94,7 @@ The problem from the user's or operator's perspective.
 
 ## Root cause
 
-The cause, with the file and function it lives in.
+The cause, with the file and function it lives in. When the regression check says `introduced by <commit>`, name that commit.
 
 ## Blast radius
 
