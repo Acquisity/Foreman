@@ -1,18 +1,30 @@
 import assert from "node:assert/strict";
-import { execFile, execFileSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { mkdirSync } from "node:fs";
 import { after, describe, it } from "node:test";
+import {
+  BLAMED,
+  deployment,
+  deps,
+  FILE,
+  git,
+  history,
+  input,
+  NOW,
+  note,
+  Origin,
+  recorded,
+  removeSandbox,
+  scratch,
+  sendLimit,
+  shellFor,
+} from "./regression-fixtures.js";
 import {
   type CheckDeps,
   type CheckInput,
-  type CheckResult,
   type Deployment,
   ensureHistory,
   listCandidates,
   runCheckRegression,
-  type Shell,
   sinceIso,
 } from "./regression-lane.js";
 
@@ -24,182 +36,8 @@ const NOT_SERVED = /not in the commit production serves/u;
 const NO_HISTORY = /no git history/u;
 const NARROW = /narrow the line range/u;
 const NO_REACH = /does not reach back to the failure time/u;
-const NOW = new Date("2026-10-25T12:00:00Z");
-const DAY_MS = 86_400_000;
-const FILE = "src/send-limit.ts";
-const OTHER_FILE = "docs/notes.md";
-const sandbox = mkdtempSync(join(tmpdir(), "regression-lane-"));
-let counter = 0;
 
-const at = (daysAgo: number) =>
-  new Date(NOW.getTime() - daysAgo * DAY_MS).toISOString();
-
-const git = (cwd: string, args: string[], date?: string) =>
-  execFileSync("git", args, {
-    cwd,
-    encoding: "utf8",
-    env: {
-      ...process.env,
-      GIT_AUTHOR_DATE: date,
-      GIT_COMMITTER_DATE: date,
-      GIT_CONFIG_GLOBAL: "/dev/null",
-      GIT_CONFIG_SYSTEM: "/dev/null",
-    },
-    stdio: ["ignore", "pipe", "pipe"],
-  }).trim();
-
-const shellFor = (): Shell => (command) =>
-  new Promise((resolve) => {
-    execFile(
-      "sh",
-      ["-c", command],
-      { env: { ...process.env, GIT_CONFIG_GLOBAL: "/dev/null" } },
-      (error, stdout, stderr) => {
-        resolve({
-          exitCode: error ? Number((error as { code?: number }).code ?? 1) : 0,
-          stderr,
-          stdout,
-        });
-      }
-    );
-  });
-
-/** The blamed function, with an import of the same name above it. */
-const sendLimit = (body: string) =>
-  [
-    'import { computeSendLimit } from "./legacy";',
-    "",
-    "export const unused = computeSendLimit;",
-    "",
-    "export function computeSendLimit(count: number) {",
-    `  return ${body};`,
-    "}",
-    "",
-  ].join("\n");
-const BLAMED = { end: 7, start: 5 };
-
-class Origin {
-  readonly path: string;
-  constructor() {
-    counter += 1;
-    this.path = join(sandbox, `origin-${counter}`);
-    mkdirSync(this.path);
-    git(this.path, ["init", "--quiet", "-b", "main"]);
-    git(this.path, ["config", "user.email", "t@example.com"]);
-    git(this.path, ["config", "user.name", "t"]);
-  }
-
-  commit(daysAgo: number, files: Record<string, string>, message: string) {
-    for (const [name, content] of Object.entries(files)) {
-      mkdirSync(join(this.path, name, ".."), { recursive: true });
-      writeFileSync(join(this.path, name), content);
-    }
-    git(this.path, ["add", "-A"], at(daysAgo));
-    git(
-      this.path,
-      ["commit", "--quiet", "--allow-empty", "-m", message],
-      at(daysAgo)
-    );
-    return git(this.path, ["rev-parse", "HEAD"]);
-  }
-
-  /** Many quick commits at once, through fast-import, for the dense-history test. */
-  bulk(count: number, firstDaysAgo: number, lastDaysAgo: number) {
-    const lines: string[] = [];
-    for (let i = 0; i < count; i += 1) {
-      const daysAgo =
-        firstDaysAgo - (i * (firstDaysAgo - lastDaysAgo)) / (count - 1);
-      const seconds = Math.floor((NOW.getTime() - daysAgo * DAY_MS) / 1000);
-      const message = `docs: ${i}`;
-      const body = `bulk ${i}\n`;
-      lines.push(
-        "commit refs/heads/main",
-        `committer t <t@example.com> ${seconds} +0000`,
-        `data ${message.length}`,
-        message,
-        ...(i === 0 ? ["from refs/heads/main^0"] : []),
-        `M 100644 inline ${OTHER_FILE}`,
-        `data ${body.length}`,
-        body.trimEnd(),
-        ""
-      );
-    }
-    execFileSync("git", ["fast-import", "--quiet"], {
-      cwd: this.path,
-      input: `${lines.join("\n")}\n`,
-    });
-    git(this.path, ["reset", "--quiet", "--hard", "main"]);
-    return git(this.path, ["rev-parse", "HEAD"]);
-  }
-
-  get url() {
-    return `file://${this.path}`;
-  }
-
-  clone(depth?: number) {
-    counter += 1;
-    const dest = join(sandbox, `clone-${counter}`);
-    execFileSync(
-      "git",
-      [
-        "clone",
-        "--quiet",
-        ...(depth ? [`--depth=${depth}`] : []),
-        this.url,
-        dest,
-      ],
-      { env: { ...process.env, GIT_CONFIG_GLOBAL: "/dev/null" } }
-    );
-    return dest;
-  }
-}
-
-const note = (name: string) => ({ [OTHER_FILE]: `notes ${name}\n` });
-
-/** One place for the commits every planted case shares. */
-const history = (origin: Origin) => {
-  const base = origin.commit(
-    60,
-    { [FILE]: sendLimit("count"), ...note("base") },
-    "base"
-  );
-  return { base };
-};
-
-const deps = (worktree: string, origin: Origin): CheckDeps => ({
-  closeNetwork: () => Promise.resolve(),
-  now: () => NOW,
-  openNetwork: () => Promise.resolve(),
-  remote: origin.url,
-  shell: shellFor(),
-  worktree,
-});
-
-const deployment = (commit: string, daysAgo: number): Deployment => ({
-  commit,
-  readyAt: at(daysAgo),
-});
-
-const input = (over: Partial<CheckInput> & Pick<CheckInput, "readCommit">) =>
-  ({
-    deployments: { current: null, timeline: [] },
-    failureAt: at(8),
-    failureAtSource: "claim",
-    file: FILE,
-    issue: "ENG-1",
-    lines: BLAMED,
-    ...over,
-  }) satisfies CheckInput;
-
-const recorded = (result: CheckResult) => {
-  assert.equal(result.status, "recorded", JSON.stringify(result));
-  assert.ok(result.status === "recorded");
-  return result.record;
-};
-
-after(() => {
-  execFileSync("rm", ["-rf", sandbox]);
-});
+after(removeSandbox);
 
 describe("planted case: fixed on main and live", () => {
   it("names the fixing commit when production serves it and it shipped after the failure", async () => {
@@ -663,7 +501,7 @@ describe("history", () => {
 
   it("reports unchecked when the workspace holds no git history", async () => {
     const origin = new Origin();
-    const empty = join(sandbox, "archive-only");
+    const empty = scratch("archive-only");
     mkdirSync(empty);
     const record = recorded(
       await runCheckRegression(
