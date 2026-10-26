@@ -25,6 +25,7 @@ export const PREVIEW_BOT = "U0BTGKF57T7";
 const FOREMAN_PREVIEW_LINEAR_USER = "5aa94691-1ea8-4cbf-8ca2-15e3671181fc";
 const DEMO_WORKSPACE = "demo-workspace-9fvh_";
 const CLI_DEADLINE_MS = 120_000;
+const ACQUISITY_PREVIEW_HOST = /^[a-z0-9-]+-acquisity\.vercel\.app$/;
 
 /** Two deterministic computations, as `routing/native-delegation` uses. */
 export const COMPUTATIONS = [
@@ -85,12 +86,16 @@ export async function previewBuild(t: EveEvalContext): Promise<Build> {
   ])) as {
     id: string;
     meta?: { githubCommitRef?: string; githubCommitSha?: string };
+    projectId: string;
     readyState: string;
+    target: string | null;
   };
   await t.require(
-    deployment.readyState === "READY" &&
+    deployment.projectId === "prj_zeRzl67zpLpS6pXjscNusD3Gc307" &&
+      deployment.target !== "production" &&
+      deployment.readyState === "READY" &&
       deployment.meta?.githubCommitRef === QA_BRANCH,
-    satisfies(Boolean, `${host} serves a READY ${QA_BRANCH} deployment`)
+    satisfies(Boolean, `${host} serves a READY Foreman Preview on ${QA_BRANCH}`)
   );
   const build = {
     deploymentId: deployment.id,
@@ -442,11 +447,23 @@ export async function supportClient(
   base: string,
   page: string
 ): Promise<Support> {
+  const origin = new URL(base);
+  if (
+    origin.protocol !== "https:" ||
+    !ACQUISITY_PREVIEW_HOST.test(origin.hostname) ||
+    origin.port ||
+    origin.username ||
+    origin.password
+  ) {
+    throw new Error(
+      "QA_ACQUISITY_URL must be an HTTPS Acquisity Preview host."
+    );
+  }
   const call = async <T>(
     path: string,
     init: { body?: string; method?: string } = {}
   ): Promise<T> => {
-    const expression = `fetch(${JSON.stringify(new URL(path, base))}, { ...${JSON.stringify(init)}, credentials: "include", headers: { "content-type": "application/json" }, signal: AbortSignal.timeout(30000) }).then(async (r) => JSON.stringify({ status: r.status, body: await r.text() }))`;
+    const expression = `(() => { if (location.origin !== ${JSON.stringify(origin.origin)}) throw new Error("Orca tab origin does not match QA_ACQUISITY_URL"); return fetch(${JSON.stringify(new URL(path, origin))}, { ...${JSON.stringify(init)}, credentials: "include", headers: { "content-type": "application/json" }, signal: AbortSignal.timeout(30000) }).then(async (r) => JSON.stringify({ status: r.status, body: await r.text() })); })()`;
     // orca-ide exits non-zero on a page error but still prints its JSON.
     const { stdout } = await exec(
       "orca-ide",

@@ -17,7 +17,7 @@ const BUG =
 export default defineEval({
   description:
     "W8: an Investigate bug report files a ticket with widget_file_ticket and the customer is told. The ENG ticket is logged for manual cancellation.",
-  tags: ["preview"],
+  tags: ["preview-ticket"],
   async test(t) {
     const env = requireQa(t, "QA_ACQUISITY_URL", "QA_ORCA_PAGE");
     const build = await previewBuild(t);

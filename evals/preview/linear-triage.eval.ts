@@ -36,8 +36,33 @@ const description = [
 ]
   .map(([heading, answer]) => `#### ${heading}\n\n${answer}`)
   .join("\n\n");
-// Tools that write to a named issue; each must name the SAN issue.
-const ISSUE_WRITES = new Set(["route_ticket", "save_investigation_document"]);
+
+// Audit every tool input, including raw Executor requests, rather than keeping
+// a list of writable tools. Reads naming another ticket also fail this check.
+const ENG_ISSUE = /\bENG-\d+\b/;
+const LINEAR_ISSUE = /\b[A-Z][A-Z0-9]*-\d+\b/g;
+const ISSUE_FIELD = /^(issue|issueId|issue_id|issueIdentifier)$/i;
+const namesOnlyIssue = (
+  input: unknown,
+  id: string,
+  identifier: string
+): boolean => {
+  const text = JSON.stringify(input) ?? "";
+  if (ENG_ISSUE.test(text)) {
+    return false;
+  }
+  if ((text.match(LINEAR_ISSUE) ?? []).some((key) => key !== identifier)) {
+    return false;
+  }
+  if (!input || typeof input !== "object") {
+    return true;
+  }
+  return Object.entries(input).every(([key, value]) =>
+    ISSUE_FIELD.test(key) && typeof value === "string"
+      ? value === id || value === identifier
+      : namesOnlyIssue(value, id, identifier)
+  );
+};
 
 export default defineEval({
   description:
@@ -63,7 +88,29 @@ export default defineEval({
       );
       const session = await t.target.attachSession(runId);
       session.succeeded();
-      session.eventsSatisfy("issue writes name only the SAN ticket", (events) =>
+      const events = [...session.events];
+      const children = new Set<string>();
+      for (const event of events) {
+        if (
+          event.type !== "agent.started" ||
+          children.has(event.data.sessionId)
+        ) {
+          continue;
+        }
+        children.add(event.data.sessionId);
+        const signal = AbortSignal.any([t.signal, AbortSignal.timeout(30_000)]);
+        // The root has settled. Read all recorded turns of each child, and
+        // include any nested sessions its task opened in the same audit.
+        // biome-ignore lint/performance/noAwaitInLoops: each stream can announce more children to audit.
+        for await (const child of session.agent(event).stream({
+          follow: false,
+          signal,
+        })) {
+          events.push(child);
+        }
+        signal.throwIfAborted();
+      }
+      await t.require(
         events
           .flatMap((event) =>
             event.type === "actions.requested" ? event.data.actions : []
@@ -71,9 +118,12 @@ export default defineEval({
           .every(
             (action) =>
               action.kind !== "tool-call" ||
-              !ISSUE_WRITES.has(action.toolName) ||
-              (action.input as { issue?: unknown }).issue === issue.identifier
-          )
+              namesOnlyIssue(action.input, issue.id, issue.identifier)
+          ),
+        satisfies(
+          Boolean,
+          "root and child tool inputs name only the SAN ticket and no ENG issue"
+        )
       );
       const { documents, replies } = await requesterReplies(issue);
       await t.require(

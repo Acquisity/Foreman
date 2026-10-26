@@ -47,8 +47,22 @@ export default defineEval({
       satisfies(Boolean, "no reply arrives for the stopped run within 60 s")
     );
 
-    const next = await support.send(`${marker()} ${WIDGET_ASK}`);
+    const nextTag = marker();
+    const nextSince = new Date();
+    const next = await support.send(`${nextTag} ${WIDGET_ASK}`);
+    const nextRun = await matchRun(
+      t,
+      build,
+      "widget",
+      nextTag,
+      nextSince,
+      120_000
+    );
+    const continuation = t.target.watchTurn(nextRun);
     const reply = await supportReply(support, next, t.signal);
+    const turn = await continuation.result();
+    turn.succeeded();
+    turn.event("turn.completed", { count: 1 });
     await t.require(
       Boolean(reply?.text.trim()),
       satisfies(Boolean, "the next message is answered")
