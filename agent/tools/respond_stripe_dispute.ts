@@ -334,6 +334,7 @@ const summary = (dispute: StripeDispute) => ({
 const PAGE = { height: 792, margin: 50, width: 612 } as const;
 const BODY_SIZE = 10;
 const LINE_HEIGHT = 13;
+const LINE_BREAK = /\r?\n/u;
 
 // ponytail: the standard Helvetica font encodes WinAnsi only, so anything
 // outside Latin-1 becomes "?". Embed a Unicode font if names need it.
@@ -389,7 +390,7 @@ export const renderEvidencePdf = async (
   let y = PAGE.height - PAGE.margin;
   const draw = (text: string, font: PDFFont, size: number) => {
     const lines = text
-      .split(/\r?\n/u)
+      .split(LINE_BREAK)
       .flatMap((part) => wrap(part, font, size, usable));
     for (const line of lines) {
       if (y < PAGE.margin + LINE_HEIGHT) {
