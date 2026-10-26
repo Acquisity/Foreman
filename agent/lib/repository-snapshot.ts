@@ -15,7 +15,7 @@ import {
 } from "./repository-warmup.js";
 
 /**
- * The image the snapshot is built from: eve 0.81's Vercel sandbox image,
+ * The image the snapshot is built from: eve 0.83's Vercel sandbox image,
  * `vcr.vercel.com/vercel/eve/base:<tag>`, derived the way eve derives it
  * (`EVE_SANDBOX_IMAGE_TAG` when set, else the installed eve version without
  * build metadata). eve's resolver is not exported, so this mirrors it.
