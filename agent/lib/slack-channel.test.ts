@@ -18,7 +18,11 @@ import {
   QUESTIONS_ONLY_CHANNELS,
 } from "./slack-intake.js";
 import { STRIPE_DISPUTES_CHANNEL } from "./stripe-dispute-trigger.js";
-import { isStripeDisputeSession, isTriageIntake } from "./trust.js";
+import {
+  isStripeDisputeSession,
+  isTriageIntake,
+  stripeDisputeIdOf,
+} from "./trust.js";
 
 // Connector variables the channel module requires at evaluation time.
 // Nothing here is contacted; the values only have to exist.
@@ -1622,6 +1626,7 @@ describe("slack channel stripe disputes", () => {
     assert.ok(line.includes("Dispute id: du_1AbCdEf"));
     assert.ok(line.includes("stripe-disputes skill"));
     assert.equal(isStripeDisputeSession(result?.auth ?? null), false);
+    assert.equal(stripeDisputeIdOf(result?.auth ?? null), "du_1AbCdEf");
   });
 
   it("adds nothing in any other channel, at the top level, or for a root another app posted", async () => {
@@ -1642,6 +1647,7 @@ describe("slack channel stripe disputes", () => {
       inThread(STRIPE_DISPUTES_CHANNEL)
     );
     assert.equal(alertLine(foreign?.context), undefined);
+    assert.equal(stripeDisputeIdOf(foreign?.auth ?? null), undefined);
   });
 
   it("still dispatches without the alert when the thread read fails", async () => {
@@ -1688,6 +1694,7 @@ describe("slack channel stripe disputes", () => {
       typeof isStripeDisputeSession
     >[0];
     assert.ok(isStripeDisputeSession(auth));
+    assert.equal(stripeDisputeIdOf(auth), "du_1AbCdEf");
     assert.ok(String(send?.message).includes("Dispute id: du_1AbCdEf"));
     assert.ok(String(send?.message).includes("stripe-disputes skill"));
   });

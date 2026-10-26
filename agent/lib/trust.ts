@@ -206,6 +206,34 @@ export function stampStripeDispute(
   };
 }
 
+/**
+ * Auth attribute naming the one dispute a Slack turn may write: the `du_` id
+ * read from the alert this app posted at the root of the turn's thread.
+ */
+export const STRIPE_DISPUTE_ID_ATTRIBUTE = "stripeDisputeId";
+
+/** Returns a copy of `auth` bound to the dispute in its thread's alert. */
+export function stampStripeDisputeId(
+  auth: SessionAuthContext,
+  disputeId: string
+): SessionAuthContext {
+  return {
+    ...auth,
+    attributes: {
+      ...auth.attributes,
+      [STRIPE_DISPUTE_ID_ATTRIBUTE]: disputeId,
+    },
+  };
+}
+
+/** The dispute this turn's thread alert names, if any. */
+export function stripeDisputeIdOf(
+  auth: SessionAuthContext | null | undefined
+): string | undefined {
+  const id = auth?.attributes[STRIPE_DISPUTE_ID_ATTRIBUTE];
+  return typeof id === "string" && id.length > 0 ? id : undefined;
+}
+
 /** Whether this is the automatic Stripe dispute session. */
 export function isStripeDisputeSession(
   auth: SessionAuthContext | null | undefined

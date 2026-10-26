@@ -1,5 +1,10 @@
 import type { SessionAuthContext } from "eve/context";
-import { stampStripeDispute, stampTrusted, stampUnattended } from "./trust.js";
+import {
+  stampStripeDispute,
+  stampStripeDisputeId,
+  stampTrusted,
+  stampUnattended,
+} from "./trust.js";
 
 /**
  * The Acquisity Slack channel where Stripe dispute alerts land (ENG-16255).
@@ -83,6 +88,20 @@ const bounded = (text: string) =>
  * link, so it is pulled out and stated on the first line, where no length cap
  * can cut it.
  */
+export const alertDisputeId = (
+  message: Record<string, unknown>
+): string | undefined =>
+  [
+    textOf(message),
+    ...blocksOf(message).flatMap((block) => [
+      textOf(block.text),
+      ...(Array.isArray(block.fields) ? block.fields.map(textOf) : []),
+      ...(Array.isArray(block.elements) ? block.elements.map(textOf) : []),
+    ]),
+  ]
+    .join("\n")
+    .match(DISPUTE_ID)?.[0];
+
 export const renderStripeDisputeAlert = (
   message: Record<string, unknown>
 ): string => {
@@ -104,7 +123,7 @@ export const renderStripeDisputeAlert = (
     }
   }
   const body = lines.map(bounded).join("\n").slice(0, MAX_ALERT);
-  const disputeId = lines.join("\n").match(DISPUTE_ID)?.[0];
+  const disputeId = alertDisputeId(message);
   return [
     `Dispute id: ${disputeId ?? "not found in the alert"}`,
     "Alert text:",
@@ -123,10 +142,11 @@ export const renderStripeDisputeAlert = (
  * needs a person in the channel, never opens for it.
  */
 export const stripeDisputeSessionAuth = (input: {
+  readonly disputeId: string | undefined;
   readonly teamId: string | undefined;
   readonly threadTs: string;
-}): SessionAuthContext =>
-  stampStripeDispute(
+}): SessionAuthContext => {
+  const auth = stampStripeDispute(
     stampUnattended(
       stampTrusted({
         attributes: {
@@ -141,6 +161,8 @@ export const stripeDisputeSessionAuth = (input: {
       })
     )
   );
+  return input.disputeId ? stampStripeDisputeId(auth, input.disputeId) : auth;
+};
 
 /** The first message of the session a new alert starts. */
 export const stripeDisputeSessionMessage = (alert: string): string =>

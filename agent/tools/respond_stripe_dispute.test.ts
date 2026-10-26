@@ -42,6 +42,7 @@ const person = (channelId = STRIPE_DISPUTES_CHANNEL): SessionAuthContext => ({
   attributes: {
     author_type: "user",
     channel_id: channelId,
+    stripeDisputeId: ID,
     team_id: "T123",
     thread_ts: "1761400000.000100",
     trusted: "true",
@@ -53,6 +54,7 @@ const person = (channelId = STRIPE_DISPUTES_CHANNEL): SessionAuthContext => ({
   principalType: "user",
 });
 const automatic = stripeDisputeSessionAuth({
+  disputeId: ID,
   teamId: "T123",
   threadTs: "1761400000.000100",
 });
@@ -547,14 +549,11 @@ describe("respond_stripe_dispute submit", () => {
     });
   });
 
-  it("refuses an approval from a thread other than the dispute's alert thread", async () => {
+  it("refuses an approval from a thread whose alert names another dispute, or none", async () => {
     const { fingerprint, stripe } = await staged();
     const writes = stripe.writes.length;
-    const base = person();
-    const elsewhere = {
-      ...base,
-      attributes: { ...base.attributes, thread_ts: "1761499999.000200" },
-    };
+    const { stripeDisputeId: _ignored, ...unbound } = person().attributes;
+    const elsewhere = { ...person(), attributes: unbound };
     const result = await run(stripe.deps(elsewhere), {
       action: "submit",
       fingerprint,

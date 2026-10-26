@@ -13,6 +13,7 @@ import {
   isStripeDisputeSession,
   isTrusted,
   isUnattended,
+  stripeDisputeIdOf,
 } from "./trust.js";
 
 const APP = "A0BQA371MBQ";
@@ -162,6 +163,7 @@ describe("stripe dispute trigger", () => {
 
   it("stamps the automatic session unattended and trusted, nothing more", () => {
     const auth = stripeDisputeSessionAuth({
+      disputeId: "du_1AbCdEf",
       teamId: "T123",
       threadTs: "1761400000.000100",
     });
@@ -173,5 +175,6 @@ describe("stripe dispute trigger", () => {
     assert.equal(canUseInvestigationMemory(auth), false);
     assert.notEqual(auth.principalType, "user");
     assert.equal(auth.attributes.channel_id, STRIPE_DISPUTES_CHANNEL);
+    assert.equal(stripeDisputeIdOf(auth), "du_1AbCdEf");
   });
 });

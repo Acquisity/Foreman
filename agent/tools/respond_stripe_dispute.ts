@@ -24,6 +24,7 @@ import {
   isQuestionsOnly,
   isStripeDisputeSession,
   isUnattended,
+  stripeDisputeIdOf,
 } from "#lib/trust.js";
 
 /**
@@ -53,13 +54,7 @@ const MAX_PAGES = 49;
 const MAX_MASTERCARD_PAGES = 19;
 const LINK = /https?:\/\/|www\./iu;
 const FOREMAN_FIELDS = "foreman_fields";
-/** The alert thread whose ready message a person approves; submit must come from it. */
-const FOREMAN_THREAD = "foreman_thread";
 
-const threadOf = (auth: SessionAuthContext | null | undefined) => {
-  const thread = auth?.attributes.thread_ts;
-  return typeof thread === "string" && thread.length > 0 ? thread : null;
-};
 const MAX_METADATA_CHARS = 500;
 
 type Evidence = Record<string, unknown>;
@@ -702,10 +697,6 @@ const stage = async (
       }).sort(([a], [b]) => a.localeCompare(b))
     )
   );
-  const thread = threadOf(deps.auth.current);
-  if (!thread) {
-    return refuse("Stage from the dispute's alert thread.");
-  }
   if (marker.length > MAX_METADATA_CHARS) {
     return refuse(
       `Foreman's record of the fields it wrote would exceed Stripe's ${MAX_METADATA_CHARS} character metadata limit. Stage fewer fields.`
@@ -715,7 +706,7 @@ const stage = async (
     await deps.write("stripe.disputes.update", {
       dispute_id: dispute.id,
       evidence,
-      metadata: { [FOREMAN_FIELDS]: marker, [FOREMAN_THREAD]: thread },
+      metadata: { [FOREMAN_FIELDS]: marker },
       submit: false,
     })
   );
@@ -737,12 +728,6 @@ const submit = async (
   if (!input.fingerprint) {
     return refuse(
       "Submit needs the fingerprint from the ready message the person approved."
-    );
-  }
-  const thread = dispute.metadata[FOREMAN_THREAD];
-  if (!thread || thread !== threadOf(deps.auth.current)) {
-    return refuse(
-      "Approve in the alert thread where Foreman posted this dispute's ready message. Nothing was submitted."
     );
   }
   const current = evidenceFingerprint(dispute.evidence);
@@ -788,6 +773,16 @@ export const respondStripeDispute = async (
   }
   if (!DISPUTE_ID.test(input.disputeId)) {
     return refuse("disputeId must be a Stripe dispute id (du_...).");
+  }
+  // A write is bound to the dispute named by the alert at the root of this
+  // turn's thread, so a person in another thread cannot stage or approve it.
+  if (
+    input.action !== "check" &&
+    stripeDisputeIdOf(deps.auth.current) !== input.disputeId
+  ) {
+    return refuse(
+      "Work this dispute from its own alert thread. Nothing was written."
+    );
   }
   if (input.action !== "stage" && (input.evidence || input.files)) {
     return refuse("Evidence and files are staged with action stage only.");

@@ -39,13 +39,18 @@ import {
   stopSlackSession,
 } from "../lib/slack-stop.js";
 import {
+  alertDisputeId,
   isStripeDisputeAlert,
   renderStripeDisputeAlert,
   STRIPE_DISPUTES_CHANNEL,
   stripeDisputeSessionAuth,
   stripeDisputeSessionMessage,
 } from "../lib/stripe-dispute-trigger.js";
-import { isIntakeOnly, stampTriageIntake } from "../lib/trust.js";
+import {
+  isIntakeOnly,
+  stampStripeDisputeId,
+  stampTriageIntake,
+} from "../lib/trust.js";
 
 /**
  * Slack channel: mentions and direct messages in, threaded progress out, via
@@ -147,7 +152,7 @@ const ALERT_ROOT_TIMEOUT_MS = 5000;
 export const stripeDisputeAlertContext = async (
   ctx: SlackInboundMessageContext,
   message: SlackMessage
-): Promise<string | undefined> => {
+): Promise<{ context: string; disputeId?: string } | undefined> => {
   if (
     message.channelId !== STRIPE_DISPUTES_CHANNEL ||
     message.threadTs === message.ts
@@ -171,7 +176,10 @@ export const stripeDisputeAlertContext = async (
       root &&
       isStripeDisputeAlert(message.channelId, root.raw, root.raw.app_id)
     ) {
-      return `This thread is a Stripe dispute alert. Load the stripe-disputes skill. The alert:\n${renderStripeDisputeAlert(root.raw)}`;
+      return {
+        context: `This thread is a Stripe dispute alert. Load the stripe-disputes skill. The alert:\n${renderStripeDisputeAlert(root.raw)}`,
+        disputeId: alertDisputeId(root.raw),
+      };
     }
   } catch (error) {
     console.error("Stripe dispute alert root read failed.", error);
@@ -205,6 +213,7 @@ export const onStripeDisputeEvent = async (
   }
   await ctx.send(stripeDisputeSessionMessage(renderStripeDisputeAlert(event)), {
     auth: stripeDisputeSessionAuth({
+      disputeId: alertDisputeId(event),
       teamId:
         typeof ctx.envelope.team_id === "string"
           ? ctx.envelope.team_id
@@ -276,10 +285,16 @@ export const dispatch = async (
     intakeOnly ? slackIntakeContext(message.channelId) : FINAL_SLACK_POST_RULE,
     ...(requesterContext ? [requesterContext] : []),
     ...(attachmentContext ? [attachmentContext] : []),
-    ...(disputeAlert ? [disputeAlert] : []),
+    ...(disputeAlert ? [disputeAlert.context] : []),
     ...(history ? [history] : []),
   ];
-  return { auth: stamped, context };
+  // The only dispute this turn may write is the one its thread's alert names.
+  return {
+    auth: disputeAlert?.disputeId
+      ? stampStripeDisputeId(stamped, disputeAlert.disputeId)
+      : stamped,
+    context,
+  };
 };
 
 // --- Slack rendering through one renderer over eve's defaults ---------------
