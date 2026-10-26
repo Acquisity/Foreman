@@ -1,4 +1,5 @@
 import { getToken as getConnectToken } from "@vercel/connect";
+import { defineState } from "eve/context";
 import type { ToolContext } from "eve/tools";
 import { z } from "zod";
 import { PRODUCTION_READ_QUERY_ARGS } from "../lookup-customer.js";
@@ -11,7 +12,7 @@ import {
 } from "../widget-scope.js";
 import { executorAuth } from "./auth.js";
 import { operationPath } from "./bindings.js";
-import { WIDGET_TOOLKIT } from "./endpoint.js";
+import { DISPUTES_TOOLKIT, WIDGET_TOOLKIT } from "./endpoint.js";
 import { ExecutorError, executorTransport } from "./transport.js";
 
 export type ProviderContext = Pick<ToolContext, "abortSignal" | "getToken"> &
@@ -55,13 +56,86 @@ const widgetLinearTicketInput = z.union([
   }),
 ]);
 
+/** Every path the foreman-disputes toolkit binds starts with its connection. */
+export const DISPUTE_WRITE_CONNECTION = "foreman_stripe_dispute_write.";
+
+const disputeJournal = defineState<
+  Record<string, { result?: unknown; state: "done" | "failed" | "started" }>
+>("foreman.stripeDispute.journal", () => ({}));
+
+/**
+ * The Stripe dispute write: its own toolkit, and the same reserve then
+ * complete journal the support lane uses, kept in durable session state.
+ *
+ * @remarks
+ * Only a call that passes an operation key is journaled; respond_stripe_dispute
+ * passes one for submit, the one write Stripe never lets anyone take back. A
+ * finished submit replays its result, and one whose outcome is unknown refuses
+ * instead of sending again. Staging and uploads can be repeated before submit,
+ * so they are not journaled. Stripe's own re-read in the tool stays the
+ * authority across sessions.
+ */
+const disputeOperationPolicy = (path: string) =>
+  path.startsWith(DISPUTE_WRITE_CONNECTION)
+    ? {
+        assert: (): void => undefined,
+        authorize: () => Promise.resolve("dispute"),
+        complete(
+          key: string,
+          result: ExecutorOutcome,
+          state: "done" | "failed"
+        ) {
+          disputeJournal.update((journal) => ({
+            ...journal,
+            [key]: { result, state },
+          }));
+          return Promise.resolve();
+        },
+        describe: (): void => undefined,
+        record: () => Promise.resolve(),
+        reserve(key: string) {
+          const entry = disputeJournal.get()[key];
+          if (entry?.state === "done") {
+            return Promise.resolve({
+              fresh: false as const,
+              result: entry.result,
+            });
+          }
+          if (entry?.state === "started") {
+            throw new ExecutorError("dispute_write_uncertain", undefined, {
+              dispatched: false,
+            });
+          }
+          disputeJournal.update((journal) => ({
+            ...journal,
+            [key]: { state: "started" },
+          }));
+          return Promise.resolve({ fresh: true as const });
+        },
+        toolkit: DISPUTES_TOOLKIT as typeof DISPUTES_TOOLKIT,
+        writeKey: (
+          _path: string,
+          _input: Record<string, unknown>,
+          _version: string,
+          operationKey?: string
+        ) => operationKey ?? null,
+      }
+    : null;
+
 type OperationPolicy =
   | ReturnType<typeof supportOperationPolicy>
-  | ReturnType<typeof widgetOperationPolicy>;
+  | ReturnType<typeof widgetOperationPolicy>
+  | ReturnType<typeof disputeOperationPolicy>;
 
-/** Lanes with their own toolkit select it here; every other session uses the shared toolkit. */
-const operationPolicy = (ctx: ProviderContext): OperationPolicy =>
-  supportOperationPolicy(ctx) ?? widgetOperationPolicy(ctx);
+/**
+ * Lanes with their own toolkit select it here; every other session uses the
+ * shared toolkit. A lane policy wins over the dispute toolkit, so a support or
+ * widget session asking for a dispute path is refused by its own allowlist.
+ */
+const operationPolicy = (ctx: ProviderContext, path: string): OperationPolicy =>
+  supportOperationPolicy(ctx) ??
+  widgetOperationPolicy(ctx) ??
+  disputeOperationPolicy(path);
 
 /** The widget egress gate runs outside any eve session: one fixed read under the app principal. */
 export async function readWidgetOwnership(
@@ -142,7 +216,7 @@ export async function invokeProvider(
   options: { maxBytes?: number; timeoutMs?: number } = {}
 ): Promise<ExecutorOutcome> {
   assertLaneOperation(ctx, path, input);
-  const policy = operationPolicy(ctx);
+  const policy = operationPolicy(ctx, path);
   policy?.assert(path, input);
   const { wire, authorization } = await connection(ctx, policy);
   const key =
@@ -189,7 +263,7 @@ export async function invokeProvider(
 }
 
 export async function describeProvider(ctx: ProviderContext, path: string) {
-  const policy = operationPolicy(ctx);
+  const policy = operationPolicy(ctx, path);
   // Describing a dispatcher is permitted; operation arguments are checked only when called.
   policy?.describe(path);
   const { wire } = await connection(ctx, policy);

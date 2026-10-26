@@ -86,6 +86,56 @@ export const operationInputs = {
   }),
 };
 
+/** Stripe dispute evidence text fields Foreman may fill. */
+export const DISPUTE_TEXT_FIELDS = [
+  "access_activity_log",
+  "billing_address",
+  "cancellation_policy_disclosure",
+  "cancellation_rebuttal",
+  "customer_email_address",
+  "customer_name",
+  "customer_purchase_ip",
+  "duplicate_charge_explanation",
+  "product_description",
+  "refund_policy_disclosure",
+  "refund_refusal_explanation",
+  "service_date",
+  "uncategorized_text",
+] as const;
+/** Stripe dispute evidence file slots Foreman may fill, one file each. */
+export const DISPUTE_FILE_SLOTS = [
+  "cancellation_policy",
+  "customer_communication",
+  "receipt",
+  "refund_policy",
+  "service_documentation",
+  "uncategorized_file",
+] as const;
+
+/**
+ * The dispute writes, bound only in the foreman-disputes toolkit and reached
+ * only by respond_stripe_dispute. Kept out of {@link operationInputs} so they
+ * are never required of, or selected in, the shared toolkit. There is no
+ * close, file link, or refund operation.
+ */
+export const disputeOperationInputs = {
+  "stripe.disputes.update": z.strictObject({
+    dispute_id: z.string().regex(/^du_[A-Za-z0-9]{1,64}$/u),
+    evidence: z
+      .partialRecord(
+        z.enum([...DISPUTE_TEXT_FIELDS, ...DISPUTE_FILE_SLOTS]),
+        z.string().max(20_000)
+      )
+      .optional(),
+    metadata: z.record(z.string().max(40), z.string().max(500)).optional(),
+    submit: z.boolean(),
+  }),
+  "stripe.files.create": z.strictObject({
+    file: z.base64().max(7_000_000),
+    purpose: z.literal("dispute_evidence"),
+  }),
+};
+
 type ApiRequest = {
   [K in keyof typeof operationInputs]: {
     operation: K;

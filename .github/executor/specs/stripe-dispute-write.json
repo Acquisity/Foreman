@@ -1,0 +1,224 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Foreman Stripe dispute evidence write",
+    "version": "1.0.0",
+    "description": "Two Stripe operations for the foreman_stripe_dispute_write connection, bound only in the foreman-disputes toolkit and called only by respond_stripe_dispute. The restricted key has dispute_write and file_write, which Stripe does not split, so close, file links, and refunds are excluded by defining no operation for them."
+  },
+  "servers": [
+    {
+      "url": "https://api.stripe.com"
+    }
+  ],
+  "security": [
+    {
+      "bearer": []
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "bearer": {
+        "type": "http",
+        "scheme": "bearer"
+      }
+    }
+  },
+  "paths": {
+    "/v1/disputes/{dispute_id}": {
+      "post": {
+        "operationId": "updateDisputeEvidence",
+        "parameters": [
+          {
+            "name": "dispute_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^du_[A-Za-z0-9]{1,64}$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "required": ["submit"],
+                "additionalProperties": false,
+                "properties": {
+                  "evidence": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "access_activity_log": {
+                        "type": "string",
+                        "maxLength": 20000
+                      },
+                      "billing_address": {
+                        "type": "string",
+                        "maxLength": 20000
+                      },
+                      "cancellation_policy_disclosure": {
+                        "type": "string",
+                        "maxLength": 20000
+                      },
+                      "cancellation_rebuttal": {
+                        "type": "string",
+                        "maxLength": 20000
+                      },
+                      "customer_email_address": {
+                        "type": "string",
+                        "maxLength": 20000
+                      },
+                      "customer_name": {
+                        "type": "string",
+                        "maxLength": 20000
+                      },
+                      "customer_purchase_ip": {
+                        "type": "string",
+                        "maxLength": 20000
+                      },
+                      "duplicate_charge_explanation": {
+                        "type": "string",
+                        "maxLength": 20000
+                      },
+                      "product_description": {
+                        "type": "string",
+                        "maxLength": 20000
+                      },
+                      "refund_policy_disclosure": {
+                        "type": "string",
+                        "maxLength": 20000
+                      },
+                      "refund_refusal_explanation": {
+                        "type": "string",
+                        "maxLength": 20000
+                      },
+                      "service_date": {
+                        "type": "string",
+                        "maxLength": 20000
+                      },
+                      "uncategorized_text": {
+                        "type": "string",
+                        "maxLength": 20000
+                      },
+                      "cancellation_policy": {
+                        "type": "string",
+                        "pattern": "^file_[A-Za-z0-9]+$"
+                      },
+                      "customer_communication": {
+                        "type": "string",
+                        "pattern": "^file_[A-Za-z0-9]+$"
+                      },
+                      "receipt": {
+                        "type": "string",
+                        "pattern": "^file_[A-Za-z0-9]+$"
+                      },
+                      "refund_policy": {
+                        "type": "string",
+                        "pattern": "^file_[A-Za-z0-9]+$"
+                      },
+                      "service_documentation": {
+                        "type": "string",
+                        "pattern": "^file_[A-Za-z0-9]+$"
+                      },
+                      "uncategorized_file": {
+                        "type": "string",
+                        "pattern": "^file_[A-Za-z0-9]+$"
+                      }
+                    }
+                  },
+                  "metadata": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "type": "string",
+                      "maxLength": 500
+                    }
+                  },
+                  "submit": {
+                    "type": "boolean"
+                  }
+                }
+              },
+              "encoding": {
+                "evidence": {
+                  "style": "deepObject",
+                  "explode": true
+                },
+                "metadata": {
+                  "style": "deepObject",
+                  "explode": true
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The updated dispute",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/files": {
+      "post": {
+        "operationId": "createDisputeEvidenceFile",
+        "servers": [
+          {
+            "url": "https://files.stripe.com"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": ["file", "purpose"],
+                "additionalProperties": false,
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary",
+                    "description": "PDF bytes, sent by the tool as base64."
+                  },
+                  "purpose": {
+                    "type": "string",
+                    "enum": ["dispute_evidence"]
+                  }
+                }
+              },
+              "encoding": {
+                "file": {
+                  "contentType": "application/pdf"
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The created file",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

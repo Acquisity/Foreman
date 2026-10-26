@@ -109,5 +109,11 @@
   },
   "vercel.billingCharges": {
     "path": "foreman_vercel_api.user.foremanVercelBilling.billing.listBillingCharges"
+  },
+  "stripe.disputes.update": {
+    "path": "foreman_stripe_dispute_write.org.foremanStripeDisputeWrite.disputes.updateDisputeEvidence"
+  },
+  "stripe.files.create": {
+    "path": "foreman_stripe_dispute_write.org.foremanStripeDisputeWrite.files.createDisputeEvidenceFile"
   }
 }

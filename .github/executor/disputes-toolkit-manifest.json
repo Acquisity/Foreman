@@ -1,0 +1,15 @@
+{
+  "version": 2,
+  "executorVersion": "1.6.8",
+  "toolkit": {
+    "slug": "foreman-disputes",
+    "name": "Foreman Stripe disputes",
+    "owner": "user",
+    "paths": [
+      "foreman_stripe_dispute_write.org.foremanStripeDisputeWrite.disputes.updateDisputeEvidence",
+      "foreman_stripe_dispute_write.org.foremanStripeDisputeWrite.files.createDisputeEvidenceFile"
+    ],
+    "missing": {},
+    "connectionPolicies": []
+  }
+}

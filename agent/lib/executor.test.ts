@@ -5,8 +5,16 @@ import type { SessionAuthContext, SessionContext } from "eve/context";
 import type { ApprovalContext } from "eve/tools/approval";
 import { operationPath } from "./executor/bindings.js";
 import { executorConnection } from "./executor/connection.js";
-import { FOREMAN_TOOLKIT_SLUG, toolkitUrl } from "./executor/endpoint.js";
-
+import { DISPUTE_WRITE_CONNECTION } from "./executor/dispatch.js";
+import {
+  DISPUTES_TOOLKIT,
+  FOREMAN_TOOLKIT_SLUG,
+  toolkitUrl,
+} from "./executor/endpoint.js";
+import {
+  disputeOperationInputs,
+  REQUIRED_HELPER_OPERATIONS,
+} from "./executor/operations.js";
 import { readSentryIssue, sentryIssueInput } from "./executor/sentry.js";
 import { ExecutorError, executorTransport } from "./executor/transport.js";
 import { stampInvestigationMemory, stampUnattended } from "./trust.js";
@@ -437,6 +445,48 @@ test("critic Sentry helper refuses arbitrary nested operations before authentica
   );
 });
 
+const DISPUTE_WRITE_PATH =
+  /dispute.*(?:update|close|submit|evidence)|createfile|\.files\.|filelink/iu;
+
+test("the Stripe dispute write lives only in the foreman-disputes toolkit", () => {
+  const read = (name: string) =>
+    JSON.parse(
+      readFileSync(
+        new URL(`../../.github/executor/${name}`, import.meta.url),
+        "utf8"
+      )
+    );
+  const shared = read("toolkit-manifest.json") as {
+    toolkit: { paths: string[] };
+  };
+  const disputes = read("disputes-toolkit-manifest.json") as {
+    toolkit: { paths: string[]; slug: string };
+  };
+  const bindings = read("operation-bindings.json") as Record<
+    string,
+    { path: string }
+  >;
+  assert.equal(disputes.toolkit.slug, DISPUTES_TOOLKIT);
+  const writes = Object.keys(disputeOperationInputs).map(
+    (operation) => bindings[operation]?.path
+  );
+  assert.deepEqual([...writes].sort(), [...disputes.toolkit.paths].sort());
+  for (const path of disputes.toolkit.paths) {
+    assert.ok(path.startsWith(DISPUTE_WRITE_CONNECTION), path);
+  }
+  // The raw execute gateway runs any shared path, so no shared path may
+  // update a dispute, upload a file, or reach the write connection.
+  for (const path of shared.toolkit.paths) {
+    assert.ok(!path.startsWith(DISPUTE_WRITE_CONNECTION), path);
+    assert.doesNotMatch(path, DISPUTE_WRITE_PATH, path);
+  }
+  assert.ok(
+    Object.keys(disputeOperationInputs).every(
+      (operation) => !REQUIRED_HELPER_OPERATIONS.includes(operation)
+    )
+  );
+});
+
 test("one toolkit contains platform operations and every helper binding", () => {
   const manifest = JSON.parse(
     readFileSync(
@@ -456,7 +506,10 @@ test("one toolkit contains platform operations and every helper binding", () => 
   const { toolkit } = manifest;
   assert.equal(toolkit.slug, FOREMAN_TOOLKIT_SLUG);
   assert.equal(new Set(toolkit.paths).size, toolkit.paths.length);
-  for (const binding of Object.values(bindings)) {
+  for (const [operation, binding] of Object.entries(bindings)) {
+    if (operation in disputeOperationInputs) {
+      continue;
+    }
     assert.ok(toolkit.paths.includes(binding.path), binding.path);
   }
   for (const suffix of [".save_issue", ".send_message", ".get_conversation"]) {
