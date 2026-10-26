@@ -16,9 +16,9 @@ export default defineEval({
     "W7: Stop during an investigation cancels its turn, no stale reply arrives for it, and the next message is answered.",
   tags: ["preview"],
   async test(t) {
-    const env = requireQa(t, "QA_ACQUISITY_URL");
+    const env = requireQa(t, "QA_ACQUISITY_URL", "QA_ORCA_PAGE");
     const build = await previewBuild(t);
-    const support = await supportClient(env.QA_ACQUISITY_URL);
+    const support = await supportClient(env.QA_ACQUISITY_URL, env.QA_ORCA_PAGE);
     const tag = marker();
     const since = new Date();
     const stoppedId = await support.send(`${tag} ${WIDGET_ASK}`);

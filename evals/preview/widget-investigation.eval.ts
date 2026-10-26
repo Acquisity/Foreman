@@ -15,9 +15,9 @@ export default defineEval({
     "W4: two Investigate messages in one widget conversation each complete with a reply, in two separate sessions on the QA build (the PR #233 per-run session rule).",
   tags: ["preview"],
   async test(t) {
-    const env = requireQa(t, "QA_ACQUISITY_URL");
+    const env = requireQa(t, "QA_ACQUISITY_URL", "QA_ORCA_PAGE");
     const build = await previewBuild(t);
-    const support = await supportClient(env.QA_ACQUISITY_URL);
+    const support = await supportClient(env.QA_ACQUISITY_URL, env.QA_ORCA_PAGE);
     const sessions: string[] = [];
     for (const ask of [WIDGET_ASK, `Thanks. ${WIDGET_ASK}`]) {
       const tag = marker();

@@ -12,8 +12,6 @@
  */
 import { execFile } from "node:child_process";
 import { randomUUID } from "node:crypto";
-import { readFile } from "node:fs/promises";
-import { homedir } from "node:os";
 import { setTimeout as sleep } from "node:timers/promises";
 import { promisify } from "node:util";
 import type { EveEvalContext } from "eve/evals";
@@ -381,7 +379,8 @@ export async function requesterReplies(issue: SandboxIssue) {
   };
 }
 
-// The Acquisity QA Preview's support API, as the signed-in QA user in the
+// The Acquisity QA Preview's support API, called from inside a signed-in
+// Orca browser tab (its session cookie is httpOnly), as the QA user in the
 // demo workspace.
 
 export interface SupportMessage {
@@ -400,31 +399,36 @@ export interface Support {
   stop: () => Promise<boolean>;
 }
 
-export async function supportClient(base: string): Promise<Support> {
-  const { host } = new URL(base);
-  const file =
-    process.env.QA_ACQUISITY_COOKIE_FILE ??
-    `${homedir()}/.config/lightpanda/cookies.json`;
-  const jar = JSON.parse(await readFile(file, "utf8")) as {
-    domain: string;
-    name: string;
-    value: string;
-  }[];
-  const cookie = jar
-    .filter(({ domain }) => domain === host || `.${host}`.endsWith(domain))
-    .map(({ name, value }) => `${name}=${value}`)
-    .join("; ");
-  const call = async <T>(path: string, init?: RequestInit): Promise<T> => {
-    const response = await fetch(new URL(path, base), {
-      ...init,
-      headers: { "content-type": "application/json", cookie },
-      redirect: "manual",
-      signal: AbortSignal.timeout(30_000),
-    });
-    if (!response.ok) {
+export async function supportClient(
+  base: string,
+  page: string
+): Promise<Support> {
+  const call = async <T>(
+    path: string,
+    init: { body?: string; method?: string } = {}
+  ): Promise<T> => {
+    const expression = `fetch(${JSON.stringify(new URL(path, base))}, { ...${JSON.stringify(init)}, credentials: "include", headers: { "content-type": "application/json" }, signal: AbortSignal.timeout(30000) }).then(async (r) => JSON.stringify({ status: r.status, body: await r.text() }))`;
+    // orca-ide exits non-zero on a page error but still prints its JSON.
+    const { stdout } = await exec(
+      "orca-ide",
+      ["eval", "--page", page, "--expression", expression, "--json"],
+      { timeout: 60_000 }
+    ).catch((error: { stdout?: string }) => ({ stdout: error.stdout ?? "{}" }));
+    const evaluated = JSON.parse(stdout) as {
+      error?: { message: string };
+      result?: { result: string };
+    };
+    if (!evaluated.result) {
+      throw new Error(`Orca page ${page}: ${evaluated.error?.message}`);
+    }
+    const response = JSON.parse(evaluated.result.result) as {
+      body: string;
+      status: number;
+    };
+    if (response.status >= 300) {
       throw new Error(`Acquisity ${path.split("?")[0]}: ${response.status}`);
     }
-    return (await response.json()) as T;
+    return JSON.parse(response.body) as T;
   };
   const organizations = await call<{ id: string; slug: string }[]>(
     "/api/auth/organization/list"
