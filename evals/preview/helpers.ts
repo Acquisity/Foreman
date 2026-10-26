@@ -167,8 +167,9 @@ export async function matchRun(
       "foreman",
       "--team",
       "acquisity",
+      // Two minutes early absorbs clock skew; the marker picks the run.
       "--since",
-      since.toISOString(),
+      new Date(since.getTime() - 120_000).toISOString(),
       "--attribute",
       `$eve.trigger=channel:${channel}`,
       "--limit",
