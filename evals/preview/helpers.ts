@@ -245,12 +245,14 @@ export async function settledReplies(
 
 export async function linear<T>(
   query: string,
-  variables: Record<string, unknown> = {},
-  key = process.env.LINEAR_SANDBOX_API_KEY
+  variables: Record<string, unknown> = {}
 ): Promise<T> {
   const response = await fetch("https://api.linear.app/graphql", {
     body: JSON.stringify({ query, variables }),
-    headers: { authorization: key ?? "", "content-type": "application/json" },
+    headers: {
+      authorization: process.env.LINEAR_SANDBOX_API_KEY ?? "",
+      "content-type": "application/json",
+    },
     method: "POST",
     signal: AbortSignal.timeout(30_000),
   });
@@ -334,24 +336,21 @@ async function askFrom(id: string, requester: string): Promise<string> {
   return commentCreate.comment.id;
 }
 
-/** Cancels an issue, with a comment saying why, using the given key. */
-export async function cancelIssue(id: string, key?: string): Promise<void> {
+/** Cancels a SAN issue, with a comment saying why. */
+export async function cancelIssue(id: string): Promise<void> {
   const { issue } = await linear<{
     issue: { team: { states: { nodes: { id: string }[] } } };
   }>(
     `query($id: String!) { issue(id: $id) { team { states(filter: { type: { eq: "canceled" } }) { nodes { id } } } } }`,
-    { id },
-    key
+    { id }
   );
   await linear(
     "mutation($id: String!, $body: String!) { commentCreate(input: { issueId: $id, body: $body }) { success } }",
-    { body: "Preview smoke check (ENG-16248) cleanup.", id },
-    key
+    { body: "Preview smoke check (ENG-16248) cleanup.", id }
   );
   await linear(
     "mutation($id: String!, $input: IssueUpdateInput!) { issueUpdate(id: $id, input: $input) { success } }",
-    { id, input: { stateId: issue.team.states.nodes[0]?.id } },
-    key
+    { id, input: { stateId: issue.team.states.nodes[0]?.id } }
   );
 }
 
