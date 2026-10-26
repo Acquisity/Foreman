@@ -550,8 +550,11 @@ describe("respond_stripe_dispute submit", () => {
   it("refuses an approval from a thread other than the dispute's alert thread", async () => {
     const { fingerprint, stripe } = await staged();
     const writes = stripe.writes.length;
-    const elsewhere = person();
-    elsewhere.attributes.thread_ts = "1761499999.000200";
+    const base = person();
+    const elsewhere = {
+      ...base,
+      attributes: { ...base.attributes, thread_ts: "1761499999.000200" },
+    };
     const result = await run(stripe.deps(elsewhere), {
       action: "submit",
       fingerprint,
