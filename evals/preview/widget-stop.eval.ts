@@ -11,6 +11,10 @@ import {
   WIDGET_ASK,
 } from "./helpers.js";
 
+// Broad enough that the investigation is still working when Stop lands.
+const LONG_ASK =
+  "Please check my whole workspace one area at a time: each campaign, each inbox and sending account, my lead pipeline, recent job failures and my website, and summarise each.";
+
 export default defineEval({
   description:
     "W7: Stop during an investigation cancels its turn, no stale reply arrives for it, and the next message is answered.",
@@ -21,13 +25,12 @@ export default defineEval({
     const support = await supportClient(env.QA_ACQUISITY_URL, env.QA_ORCA_PAGE);
     const tag = marker();
     const since = new Date();
-    const stoppedId = await support.send(`${tag} ${WIDGET_ASK}`);
+    const stoppedId = await support.send(`${tag} ${LONG_ASK}`);
     const runId = await matchRun(t, build, "widget", tag, since, 120_000);
     // Watch from the start: a widget session is retired soon after it settles.
     const live = t.target.watchTurn(runId);
-    await sleep(Math.max(0, since.getTime() + 15_000 - Date.now()), undefined, {
-      signal: t.signal,
-    });
+    // Stop once the investigation is working; the broad ask keeps it busy.
+    await live.waitForEvent("actions.requested");
     await t.require(
       await support.stop(),
       satisfies(Boolean, "the app accepts Stop")
