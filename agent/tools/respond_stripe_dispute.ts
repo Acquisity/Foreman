@@ -53,6 +53,13 @@ const MAX_PAGES = 49;
 const MAX_MASTERCARD_PAGES = 19;
 const LINK = /https?:\/\/|www\./iu;
 const FOREMAN_FIELDS = "foreman_fields";
+/** The alert thread whose ready message a person approves; submit must come from it. */
+const FOREMAN_THREAD = "foreman_thread";
+
+const threadOf = (auth: SessionAuthContext | null | undefined) => {
+  const thread = auth?.attributes.thread_ts;
+  return typeof thread === "string" && thread.length > 0 ? thread : null;
+};
 const MAX_METADATA_CHARS = 500;
 
 type Evidence = Record<string, unknown>;
@@ -381,7 +388,10 @@ export const renderEvidencePdf = async (
   let page = pdf.addPage([PAGE.width, PAGE.height]);
   let y = PAGE.height - PAGE.margin;
   const draw = (text: string, font: PDFFont, size: number) => {
-    for (const line of wrap(text, font, size, usable)) {
+    const lines = text
+      .split(/\r?\n/u)
+      .flatMap((part) => wrap(part, font, size, usable));
+    for (const line of lines) {
       if (y < PAGE.margin + LINE_HEIGHT) {
         page = pdf.addPage([PAGE.width, PAGE.height]);
         y = PAGE.height - PAGE.margin;
@@ -691,6 +701,10 @@ const stage = async (
       }).sort(([a], [b]) => a.localeCompare(b))
     )
   );
+  const thread = threadOf(deps.auth.current);
+  if (!thread) {
+    return refuse("Stage from the dispute's alert thread.");
+  }
   if (marker.length > MAX_METADATA_CHARS) {
     return refuse(
       `Foreman's record of the fields it wrote would exceed Stripe's ${MAX_METADATA_CHARS} character metadata limit. Stage fewer fields.`
@@ -700,7 +714,7 @@ const stage = async (
     await deps.write("stripe.disputes.update", {
       dispute_id: dispute.id,
       evidence,
-      metadata: { [FOREMAN_FIELDS]: marker },
+      metadata: { [FOREMAN_FIELDS]: marker, [FOREMAN_THREAD]: thread },
       submit: false,
     })
   );
@@ -722,6 +736,12 @@ const submit = async (
   if (!input.fingerprint) {
     return refuse(
       "Submit needs the fingerprint from the ready message the person approved."
+    );
+  }
+  const thread = dispute.metadata[FOREMAN_THREAD];
+  if (!thread || thread !== threadOf(deps.auth.current)) {
+    return refuse(
+      "Approve in the alert thread where Foreman posted this dispute's ready message. Nothing was submitted."
     );
   }
   const current = evidenceFingerprint(dispute.evidence);

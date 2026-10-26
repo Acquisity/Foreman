@@ -424,6 +424,18 @@ describe("respond_stripe_dispute stage", () => {
     assert.ok(long.bytes.length > small.bytes.length);
   });
 
+  it("keeps line breaks inside one section line", async () => {
+    const lines = Array.from({ length: 120 }, (_, i) => `Message ${i}`);
+    const render = (text: string) =>
+      renderEvidencePdf({
+        sections: [{ heading: "Thread", lines: [text] }],
+        slot: "customer_communication",
+        title: "Client channel",
+      });
+    assert.equal((await render(lines.join(" "))).pages, 1);
+    assert.ok((await render(lines.join("\n"))).pages > 1);
+  });
+
   it("refuses over the page limit before any upload, tighter for Mastercard", async () => {
     const visa = fakeStripe();
     const tooLong = await run(visa.deps(automatic), {
@@ -533,6 +545,20 @@ describe("respond_stripe_dispute submit", () => {
       "Idempotency-Key": `foreman-dispute-submit-${ID}-${fingerprint}`,
       submit: true,
     });
+  });
+
+  it("refuses an approval from a thread other than the dispute's alert thread", async () => {
+    const { fingerprint, stripe } = await staged();
+    const writes = stripe.writes.length;
+    const elsewhere = person();
+    elsewhere.attributes.thread_ts = "1761499999.000200";
+    const result = await run(stripe.deps(elsewhere), {
+      action: "submit",
+      fingerprint,
+    });
+    assert.equal(result.ok, false);
+    assert.ok(reasonMatches(result.reason, "alert thread"), result.reason);
+    assert.equal(stripe.writes.length, writes);
   });
 
   it("sends the same idempotency key for the same approval and a new one for new evidence", async () => {
