@@ -1,0 +1,56 @@
+import { defineEval } from "eve/evals";
+import { satisfies } from "eve/evals/expect";
+import {
+  marker,
+  matchRun,
+  previewBuild,
+  requireQa,
+  supportClient,
+  supportReply,
+} from "./helpers.js";
+
+// The customer reply says a ticket was filed; it never shows the identifier.
+const TICKET_REPLY = /\bticket\b/iu;
+const BUG =
+  "I want to report a bug. Every time I open the Campaigns page it shows a blank white screen. I have refreshed, cleared my cache, and tried Chrome, Safari and another computer; it still happens. Please file a ticket for the team.";
+
+export default defineEval({
+  description:
+    "W8: an Investigate bug report files a ticket with widget_file_ticket and the customer is told. The ENG ticket is logged for manual cancellation.",
+  tags: ["preview-ticket"],
+  async test(t) {
+    const env = requireQa(t, "QA_ACQUISITY_URL", "QA_ORCA_PAGE");
+    const build = await previewBuild(t);
+    const support = await supportClient(env.QA_ACQUISITY_URL, env.QA_ORCA_PAGE);
+    const tag = marker();
+    const since = new Date();
+    const messageId = await support.send(`${tag} ${BUG}`);
+    const runId = await matchRun(t, build, "widget", tag, since, 120_000);
+    // Watch from the start: a widget session is retired soon after it replies.
+    const live = t.target.watchTurn(runId);
+    const event = await live.waitForEvent("action.result", {
+      data: {
+        result: { kind: "tool-result", toolName: "widget_file_ticket" },
+      },
+    });
+    const identifier =
+      event.data.result.kind === "tool-result"
+        ? (event.data.result.output as { identifier?: string }).identifier
+        : undefined;
+    t.log(
+      `widget_file_ticket returned ${identifier ?? "no identifier"}: cancel it`
+    );
+    const reply = await supportReply(support, messageId, t.signal);
+    const turn = await live.result();
+    turn.succeeded();
+    await t.require(
+      Boolean(identifier),
+      satisfies(Boolean, "widget_file_ticket returned an identifier")
+    );
+    await t.require(
+      TICKET_REPLY.test(reply?.text ?? ""),
+      satisfies(Boolean, "the customer is told about the ticket")
+    );
+  },
+  timeoutMs: 1_200_000,
+});
