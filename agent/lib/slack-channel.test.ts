@@ -17,7 +17,8 @@ import {
   FINAL_SLACK_POST_RULE,
   QUESTIONS_ONLY_CHANNELS,
 } from "./slack-intake.js";
-import { isTriageIntake } from "./trust.js";
+import { STRIPE_DISPUTES_CHANNEL } from "./stripe-dispute-trigger.js";
+import { isStripeDisputeSession, isTriageIntake } from "./trust.js";
 
 // Connector variables the channel module requires at evaluation time.
 // Nothing here is contacted; the values only have to exist.
@@ -42,6 +43,7 @@ const {
   default: channel,
   dispatch,
   foremanRenderer,
+  onStripeDisputeEvent,
 } = await import("../channels/slack.js");
 
 const { defaultEvents } = (await import(
@@ -1545,5 +1547,174 @@ describe("retired reply marker", () => {
       readFileSync(file, "utf8").includes(RETIRED_REPLY_MARKER)
     );
     assert.deepEqual(offenders, []);
+  });
+});
+
+describe("slack channel stripe disputes", () => {
+  const APP = "A0BQA371MBQ";
+  const ROOT_TS = "1761400000.000100";
+  const alert = (): Record<string, unknown> => ({
+    app_id: APP,
+    blocks: [
+      {
+        text: {
+          text: ":rotating_light:  Stripe dispute opened",
+          type: "plain_text",
+        },
+        type: "header",
+      },
+      {
+        elements: [
+          {
+            text: "<https://dashboard.stripe.com/disputes/du_1AbCdEf|Open in Stripe>",
+            type: "mrkdwn",
+          },
+        ],
+        type: "context",
+      },
+    ],
+    channel: STRIPE_DISPUTES_CHANNEL,
+    text: "Dispute opened by Eric Mead. Nothing has been cancelled automatically; review the checklist.",
+    thread_ts: ROOT_TS,
+    ts: ROOT_TS,
+    type: "message",
+    user: "U0BQ5QMHM7D",
+  });
+  const inThread = (channelId: string): SlackMessage => ({
+    ...message("@Foreman work this dispute", channelId),
+    threadTs: ROOT_TS,
+    ts: "1761400500.000200",
+  });
+  const threadContext = (
+    root: { isMe: boolean; raw: Record<string, unknown> },
+    refresh: () => Promise<void> = () => Promise.resolve()
+  ) => {
+    const base = inboundContext(undefined);
+    return {
+      ...base,
+      thread: {
+        ...base.thread,
+        recentMessages: [
+          {
+            botId: "B0BQA35JD62",
+            isMe: root.isMe,
+            markdown: String(root.raw.text),
+            raw: root.raw,
+            text: String(root.raw.text),
+            threadTs: ROOT_TS,
+            ts: ROOT_TS,
+            user: "U0BQ5QMHM7D",
+          },
+        ],
+        refresh,
+      },
+    } as unknown as SlackInboundMessageContext;
+  };
+  const alertLine = (context: readonly string[] | undefined) =>
+    context?.find((part) => part.includes("Stripe dispute alert"));
+
+  it("adds the alert for a mention in an alert thread", async () => {
+    const result = await dispatch(
+      threadContext({ isMe: true, raw: alert() }),
+      inThread(STRIPE_DISPUTES_CHANNEL)
+    );
+    const line = alertLine(result?.context) ?? "";
+    assert.ok(line.includes("Dispute id: du_1AbCdEf"));
+    assert.ok(line.includes("stripe-disputes skill"));
+    assert.equal(isStripeDisputeSession(result?.auth ?? null), false);
+  });
+
+  it("adds nothing in any other channel, at the top level, or for a root another app posted", async () => {
+    const other = await dispatch(
+      threadContext({ isMe: true, raw: { ...alert(), channel: "C0DEV" } }),
+      inThread("C0DEV")
+    );
+    assert.equal(alertLine(other?.context), undefined);
+    const topLevel = await dispatch(
+      threadContext({ isMe: true, raw: alert() }, () =>
+        assert.fail("a top-level mention must not read the thread for an alert")
+      ),
+      { ...inThread(STRIPE_DISPUTES_CHANNEL), ts: ROOT_TS }
+    );
+    assert.equal(alertLine(topLevel?.context), undefined);
+    const foreign = await dispatch(
+      threadContext({ isMe: false, raw: alert() }),
+      inThread(STRIPE_DISPUTES_CHANNEL)
+    );
+    assert.equal(alertLine(foreign?.context), undefined);
+  });
+
+  it("still dispatches without the alert when the thread read fails", async () => {
+    const result = await dispatch(
+      threadContext({ isMe: true, raw: alert() }, () =>
+        Promise.reject(new Error("slack down"))
+      ),
+      inThread(STRIPE_DISPUTES_CHANNEL)
+    );
+    assert.ok(result?.auth);
+    assert.equal(alertLine(result.context), undefined);
+  });
+
+  const eventContext = (session: Session | undefined) => {
+    const sends: { message: unknown; options: Record<string, unknown> }[] = [];
+    const lookups: unknown[] = [];
+    const ctx = {
+      envelope: { api_app_id: APP, event_id: "Ev1", team_id: "T123" },
+      resolveSession: (input: unknown) => {
+        lookups.push(input);
+        return Promise.resolve(session);
+      },
+      send: (text: unknown, options: Record<string, unknown>) => {
+        sends.push({ message: text, options });
+        return Promise.resolve({} as Session);
+      },
+    };
+    return { ctx: ctx as never, lookups, sends };
+  };
+
+  it("starts one unattended dispute session in the alert's thread", async () => {
+    const { ctx, sends } = eventContext(undefined);
+    await onStripeDisputeEvent(ctx, {
+      ...alert(),
+      thread_ts: undefined,
+    } as never);
+    assert.equal(sends.length, 1);
+    const [send] = sends;
+    assert.deepEqual(send?.options.target, {
+      channelId: STRIPE_DISPUTES_CHANNEL,
+      threadTs: ROOT_TS,
+    });
+    const auth = send?.options.auth as Parameters<
+      typeof isStripeDisputeSession
+    >[0];
+    assert.ok(isStripeDisputeSession(auth));
+    assert.ok(String(send?.message).includes("Dispute id: du_1AbCdEf"));
+    assert.ok(String(send?.message).includes("stripe-disputes skill"));
+  });
+
+  it("skips an alert whose thread already has a session", async () => {
+    const { ctx, sends } = eventContext({ id: "s1" } as Session);
+    await onStripeDisputeEvent(ctx, alert() as never);
+    assert.equal(sends.length, 0);
+  });
+
+  it("ignores every other event without a session lookup", async () => {
+    const { ctx, lookups, sends } = eventContext(undefined);
+    await onStripeDisputeEvent(ctx, { ...alert(), channel: "C0DEV" } as never);
+    await onStripeDisputeEvent(ctx, {
+      ...alert(),
+      subtype: "message_changed",
+    } as never);
+    await onStripeDisputeEvent(ctx, { ...alert(), app_id: "A0OTHER" } as never);
+    assert.deepEqual(lookups, []);
+    assert.deepEqual(sends, []);
+  });
+
+  it("registers the dispute handler as the channel's onEvent", () => {
+    const source = readFileSync(
+      new URL("../channels/slack.ts", import.meta.url),
+      "utf8"
+    );
+    assert.ok(source.includes("onEvent: onStripeDisputeEvent"));
   });
 });

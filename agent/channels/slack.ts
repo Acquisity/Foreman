@@ -2,7 +2,9 @@ import { connectSlackCredentials } from "@vercel/connect/eve";
 import {
   defaultSlackAuth,
   defineSlackRenderer,
+  type SlackEvent,
   type SlackEventContext,
+  type SlackInboundEventContext,
   type SlackInboundMessageContext,
   type SlackMessage,
   slackChannel,
@@ -36,6 +38,13 @@ import {
   postStopConfirmation,
   stopSlackSession,
 } from "../lib/slack-stop.js";
+import {
+  isStripeDisputeAlert,
+  renderStripeDisputeAlert,
+  STRIPE_DISPUTES_CHANNEL,
+  stripeDisputeSessionAuth,
+  stripeDisputeSessionMessage,
+} from "../lib/stripe-dispute-trigger.js";
 import { isIntakeOnly, stampTriageIntake } from "../lib/trust.js";
 
 /**
@@ -111,7 +120,101 @@ import { isIntakeOnly, stampTriageIntake } from "../lib/trust.js";
  * post is rejected. A non-terminal turn failure posts Foreman's short text
  * with the error id; Foreman's `session.failed` notice owns terminal failures
  * so the thread sees one content-free message.
+ *
+ * Stripe dispute alerts (ENG-16255) arrive through `onEvent`: Acquisity posts
+ * them through this same Slack app, so eve drops them from every message hook
+ * as self-authored. A matching alert starts one unattended session in its
+ * thread. A person mentioning Foreman in an alert thread gets the alert read
+ * back from the thread root, because `last-agent-reply` thread context starts
+ * after this app's last message and the alert is this app's message.
  */
+
+/** How long dispatch waits for the alert thread's root message. */
+const ALERT_ROOT_TIMEOUT_MS = 5000;
+
+/**
+ * The alert this mention's thread hangs off, as one context line, when the
+ * mention is a reply in a disputes-channel alert thread. Any other channel or
+ * a top-level mention adds nothing and makes no call. A failed or slow read
+ * adds nothing either; the skill then asks for the dispute id.
+ *
+ * @remarks
+ * The root comes from eve's own thread refresh, the first page of 50 replies
+ * that history restoration shares, because its `isMe` flag is the only proof
+ * available here that this app posted the root: the mention's payload carries
+ * no app id to compare with.
+ */
+export const stripeDisputeAlertContext = async (
+  ctx: SlackInboundMessageContext,
+  message: SlackMessage
+): Promise<string | undefined> => {
+  if (
+    message.channelId !== STRIPE_DISPUTES_CHANNEL ||
+    message.threadTs === message.ts
+  ) {
+    return;
+  }
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    const loaded = await Promise.race([
+      ctx.thread.refresh().then(() => true),
+      new Promise<false>((resolve) => {
+        timer = setTimeout(() => resolve(false), ALERT_ROOT_TIMEOUT_MS);
+      }),
+    ]);
+    const root = loaded
+      ? ctx.thread.recentMessages.find(
+          (entry) => entry.ts === message.threadTs && entry.isMe
+        )
+      : undefined;
+    if (
+      root &&
+      isStripeDisputeAlert(message.channelId, root.raw, root.raw.app_id)
+    ) {
+      return `This thread is a Stripe dispute alert. Load the stripe-disputes skill. The alert:\n${renderStripeDisputeAlert(root.raw)}`;
+    }
+  } catch (error) {
+    console.error("Stripe dispute alert root read failed.", error);
+  } finally {
+    clearTimeout(timer);
+  }
+};
+
+/**
+ * Starts one unattended session for a new Stripe dispute alert. Every other
+ * event, from every other channel, returns at the matcher's first check.
+ */
+export const onStripeDisputeEvent = async (
+  ctx: SlackInboundEventContext,
+  event: SlackEvent
+): Promise<void> => {
+  if (!isStripeDisputeAlert(event.channel, event, ctx.envelope.api_app_id)) {
+    return;
+  }
+  const threadTs = String(event.ts);
+  const target = { channelId: STRIPE_DISPUTES_CHANNEL, threadTs };
+  // eve dedupes event ids per instance only. A session already in the thread
+  // means another delivery of this alert got there first; the tool's dispute
+  // re-check covers whatever slips past this.
+  try {
+    if (await ctx.resolveSession({ target })) {
+      return;
+    }
+  } catch (error) {
+    console.error("Stripe dispute session lookup failed.", error);
+  }
+  await ctx.send(stripeDisputeSessionMessage(renderStripeDisputeAlert(event)), {
+    auth: stripeDisputeSessionAuth({
+      teamId:
+        typeof ctx.envelope.team_id === "string"
+          ? ctx.envelope.team_id
+          : undefined,
+      threadTs,
+    }),
+    target,
+    title: "Stripe dispute",
+  });
+};
 
 export const dispatch = async (
   ctx: SlackInboundMessageContext,
@@ -164,6 +267,7 @@ export const dispatch = async (
   // stages a file dropped earlier in the thread, is not visible to dispatch.
   const attachmentContext = slackAttachmentContext(message.attachments);
   const history = await slackFreshSessionHistory(ctx, message);
+  const disputeAlert = await stripeDisputeAlertContext(ctx, message);
   // Who is asking, from the signed author id's Slack profile, never the text.
   const requesterContext = questionsOnly
     ? slackRequesterContext(await lookupSlackRequester(message.author?.userId))
@@ -172,6 +276,7 @@ export const dispatch = async (
     intakeOnly ? slackIntakeContext(message.channelId) : FINAL_SLACK_POST_RULE,
     ...(requesterContext ? [requesterContext] : []),
     ...(attachmentContext ? [attachmentContext] : []),
+    ...(disputeAlert ? [disputeAlert] : []),
     ...(history ? [history] : []),
   ];
   return { auth: stamped, context };
@@ -384,6 +489,7 @@ export default slackChannel({
   ),
   onAppMention: dispatch,
   onDirectMessage: dispatch,
+  onEvent: onStripeDisputeEvent,
   renderers: [foremanRenderer],
   threadContext: { since: "last-agent-reply" },
   turnPolicy: "queue",

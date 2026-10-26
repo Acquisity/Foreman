@@ -186,6 +186,34 @@ export function isQuestionsOnly(
 }
 
 /**
+ * Auth attribute marking the automatic session a new Stripe dispute alert
+ * starts in the disputes channel (ENG-16255).
+ *
+ * @remarks
+ * Stamped only by the Slack channel's `onEvent`, next to the unattended
+ * stamp, on an alert this Slack app posted. It lets `respond_stripe_dispute`
+ * stage evidence and grants nothing else. Submitting always needs a person.
+ */
+export const STRIPE_DISPUTE_ATTRIBUTE = "stripeDispute";
+
+/** Returns a copy of `auth` carrying the {@link STRIPE_DISPUTE_ATTRIBUTE} stamp. */
+export function stampStripeDispute(
+  auth: SessionAuthContext
+): SessionAuthContext {
+  return {
+    ...auth,
+    attributes: { ...auth.attributes, [STRIPE_DISPUTE_ATTRIBUTE]: "true" },
+  };
+}
+
+/** Whether this is the automatic Stripe dispute session. */
+export function isStripeDisputeSession(
+  auth: SessionAuthContext | null | undefined
+): boolean {
+  return auth?.attributes[STRIPE_DISPUTE_ATTRIBUTE] === "true";
+}
+
+/**
  * Auth attribute marking a session authorized to read and write investigation
  * memory.
  *
