@@ -37,30 +37,50 @@ const description = [
   .map(([heading, answer]) => `#### ${heading}\n\n${answer}`)
   .join("\n\n");
 
-// Audit every tool input, including raw Executor requests, rather than keeping
-// a list of writable tools. Reads naming another ticket also fail this check.
-const ENG_ISSUE = /\bENG-\d+\b/;
-const LINEAR_ISSUE = /\b[A-Z][A-Z0-9]*-\d+\b/g;
-const ISSUE_FIELD = /^(issue|issueId|issue_id|issueIdentifier)$/i;
-const namesOnlyIssue = (
-  input: unknown,
+// Reads and references in prose may name other tickets. Only a Linear write's
+// destination must be this fixture, including mutations inside raw Executor code.
+const LINEAR_WRITE =
+  /^(?:save_comment|save_document|save_issue|save_investigation_document|route_ticket|reply_to_requester)$/;
+const EXECUTOR_LINEAR_WRITE =
+  /\b(?:save|create|update|delete|remove|archive|unarchive|attach|link|unlink)_[a-z_]+\b|\bexecuteForemanWrite\b|\bmutation\b/;
+const LINEAR_CODE = /linear/i;
+const EXECUTOR_CALL =
+  /tools(?:\.(?!search\b|describe\b)[\w.]+|\[[^\]]+\])\s*\(/;
+const ISSUE_FIELD = /^(?:issue|issueId|issue_id|issueIdentifier|id)$/i;
+const writesOnlyIssue = (
+  action: { input: unknown; toolName: string },
   id: string,
   identifier: string
 ): boolean => {
-  const text = JSON.stringify(input) ?? "";
-  if (ENG_ISSUE.test(text)) {
-    return false;
-  }
-  if ((text.match(LINEAR_ISSUE) ?? []).some((key) => key !== identifier)) {
-    return false;
-  }
-  if (!input || typeof input !== "object") {
+  const input = action.input as Record<string, unknown>;
+  const name = action.toolName.split("__").at(-1) ?? "";
+  let targets: unknown[];
+  if (action.toolName === "executor__execute") {
+    const code = typeof input.code === "string" ? input.code : "";
+    if (!(LINEAR_CODE.test(code) && EXECUTOR_LINEAR_WRITE.test(code))) {
+      return true;
+    }
+    // An unresolvable mutation destination fails closed. This also covers
+    // tools[path](...) after discovering a Linear mutation by name.
+    targets = [
+      ...code.matchAll(
+        /\b(?:issue|issueId|issue_id|issueIdentifier|id)\s*:\s*["']([^"']+)["']/gi
+      ),
+    ].map((match) => match[1]);
+    // Discovery alone does not mutate state.
+    if (!(targets.length || EXECUTOR_CALL.test(code))) {
+      return true;
+    }
+  } else if (LINEAR_WRITE.test(name)) {
+    targets = Object.entries(input)
+      .filter(([key]) => ISSUE_FIELD.test(key))
+      .map(([, value]) => value);
+  } else {
     return true;
   }
-  return Object.entries(input).every(([key, value]) =>
-    ISSUE_FIELD.test(key) && typeof value === "string"
-      ? value === id || value === identifier
-      : namesOnlyIssue(value, id, identifier)
+  return (
+    targets.length > 0 &&
+    targets.every((target) => target === id || target === identifier)
   );
 };
 
@@ -118,11 +138,11 @@ export default defineEval({
           .every(
             (action) =>
               action.kind !== "tool-call" ||
-              namesOnlyIssue(action.input, issue.id, issue.identifier)
+              writesOnlyIssue(action, issue.id, issue.identifier)
           ),
         satisfies(
           Boolean,
-          "root and child tool inputs name only the SAN ticket and no ENG issue"
+          "root and child Linear writes target only the SAN ticket"
         )
       );
       const { documents, replies } = await requesterReplies(issue);
