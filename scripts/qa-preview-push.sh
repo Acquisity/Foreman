@@ -22,14 +22,14 @@ git push origin "$sha:refs/heads/$branch" --force
 
 for attempt in $(seq 90); do
   served=$(api "/v13/deployments/$alias?teamId=$team" |
-    jq -r '"\(.id) \(.readyState) \(.meta.githubCommitSha)"')
+    jq -r '"\(.id) \(.readyState) \(.meta.githubCommitSha)"') || served=""
   if [ "${served#* }" = "READY $sha" ]; then
     echo "${served%% *}"
     exit 0
   fi
   latest=$(api "/v6/deployments?projectId=$project&teamId=$team&target=preview&since=$since&limit=50" |
     jq -r --arg sha "$sha" --arg branch "$branch" \
-      'first(.deployments[] | select(.meta.githubCommitSha == $sha and .meta.githubCommitRef == $branch) | "\(.uid) \(.state)") // ""')
+      'first(.deployments[] | select(.meta.githubCommitSha == $sha and .meta.githubCommitRef == $branch) | "\(.uid) \(.state)") // ""') || latest=""
   case $latest in
   *" ERROR" | *" CANCELED")
     echo "Preview deployment failed: $latest" >&2

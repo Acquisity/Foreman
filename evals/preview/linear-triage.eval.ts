@@ -47,7 +47,7 @@ const LINEAR_CODE = /linear/i;
 const EXECUTOR_CALL =
   /tools(?:\.(?!search\b|describe\b)[\w.]+|\[[^\]]+\])\s*\(/;
 const ISSUE_FIELD = /^(?:issue|issueId|issue_id|issueIdentifier|id)$/i;
-const writesOnlyIssue = (
+export const writesOnlyIssue = (
   action: { input: unknown; toolName: string },
   id: string,
   identifier: string
@@ -64,9 +64,9 @@ const writesOnlyIssue = (
     // tools[path](...) after discovering a Linear mutation by name.
     targets = [
       ...code.matchAll(
-        /\b(?:issue|issueId|issue_id|issueIdentifier|id)\s*:\s*["']([^"']+)["']/gi
+        /\b(?:issue|issueId|issue_id|issueIdentifier|id)\s*:\s*(?:(["'])([^"'\\]*)\1\s*(?=[,}])|)/gi
       ),
-    ].map((match) => match[1]);
+    ].map((match) => match[2]);
     // Discovery alone does not mutate state.
     if (!(targets.length || EXECUTOR_CALL.test(code))) {
       return true;

@@ -28,21 +28,21 @@ export default defineEval({
     const runId = await matchRun(t, build, "widget", tag, since, 120_000);
     // Watch from the start: a widget session is retired soon after it replies.
     const live = t.target.watchTurn(runId);
-    const reply = await supportReply(support, messageId, t.signal);
-    const turn = await live.result();
-    turn.succeeded();
-    const identifier = turn.events
-      .flatMap((event) =>
-        event.type === "action.result" &&
-        event.data.result.kind === "tool-result" &&
-        event.data.result.toolName === "widget_file_ticket"
-          ? [(event.data.result.output as { identifier?: string }).identifier]
-          : []
-      )
-      .find(Boolean);
+    const event = await live.waitForEvent("action.result", {
+      data: {
+        result: { kind: "tool-result", toolName: "widget_file_ticket" },
+      },
+    });
+    const identifier =
+      event.data.result.kind === "tool-result"
+        ? (event.data.result.output as { identifier?: string }).identifier
+        : undefined;
     t.log(
       `widget_file_ticket returned ${identifier ?? "no identifier"}: cancel it`
     );
+    const reply = await supportReply(support, messageId, t.signal);
+    const turn = await live.result();
+    turn.succeeded();
     await t.require(
       Boolean(identifier),
       satisfies(Boolean, "widget_file_ticket returned an identifier")
