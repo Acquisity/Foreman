@@ -131,7 +131,11 @@ async function carries(
     .filter((line) => line.trim())
     .map((line) => JSON.parse(line) as { data?: unknown; type: string })
     .find((event) => event.type === "message.received");
-  return received && JSON.stringify(received.data).includes(needle);
+  // Compare in JSON form, where the needle's own quotes are escaped too.
+  return (
+    received &&
+    JSON.stringify(received.data).includes(JSON.stringify(needle).slice(1, -1))
+  );
 }
 
 /**
