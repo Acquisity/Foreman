@@ -101,17 +101,43 @@ export async function previewBuild(t: EveEvalContext): Promise<Build> {
 }
 
 interface RunRow {
-  attributes?: Record<string, string>;
-  createdAt: string;
   deploymentId: string;
   runId: string;
   workflowName: string;
 }
 
 /**
- * Waits up to `waitMs` for the one root session run whose title carries
- * `needle`, then gates on its deployment being `build`. A run that never
- * appears fails the check.
+ * Whether a session's first received message carries `needle`, read from its
+ * recorded history without following or touching the session; undefined
+ * while that message is not recorded yet. Session titles cannot be used:
+ * Slack sessions are titled "Private message".
+ */
+async function carries(
+  t: EveEvalContext,
+  runId: string,
+  needle: string
+): Promise<boolean | undefined> {
+  const response = await t.target
+    .fetch(`/eve/v1/session/${runId}/stream?follow=false`, {
+      signal: AbortSignal.timeout(30_000),
+    })
+    .catch(() => undefined);
+  if (!response?.ok) {
+    // Another deployment's session, or one already expired: not ours.
+    return response && response.status !== 404 ? false : undefined;
+  }
+  const received = (await response.text())
+    .split("\n")
+    .filter((line) => line.trim())
+    .map((line) => JSON.parse(line) as { data?: unknown; type: string })
+    .find((event) => event.type === "message.received");
+  return received && JSON.stringify(received.data).includes(needle);
+}
+
+/**
+ * Waits up to `waitMs` for the one root session run on `channel` whose first
+ * message carries `needle`, then gates on its deployment being `build`. A run
+ * that never appears fails the check.
  */
 export async function matchRun(
   t: EveEvalContext,
@@ -122,6 +148,7 @@ export async function matchRun(
   waitMs = 300_000
 ): Promise<string> {
   const deadline = Date.now() + waitMs;
+  const checked = new Map<string, boolean>();
   for (;;) {
     // biome-ignore lint/performance/noAwaitInLoops: polls until the run appears.
     const { data } = (await cli("npx", [
@@ -144,11 +171,19 @@ export async function matchRun(
       "100",
       "-j",
     ])) as { data: RunRow[] };
-    const runs = data.filter(
+    const fresh = data.filter(
       (row) =>
-        row.workflowName.endsWith("//workflowEntry") &&
-        row.attributes?.["$eve.title"]?.includes(needle)
+        row.workflowName.endsWith("//workflowEntry") && !checked.has(row.runId)
     );
+    const found = await Promise.all(
+      fresh.map((row) => carries(t, row.runId, needle))
+    );
+    for (const [index, row] of fresh.entries()) {
+      if (found[index] !== undefined) {
+        checked.set(row.runId, found[index]);
+      }
+    }
+    const runs = data.filter((row) => checked.get(row.runId));
     const [run] = runs;
     if (runs.length > 1 || run || Date.now() > deadline) {
       await t.require(
