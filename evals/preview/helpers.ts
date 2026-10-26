@@ -109,7 +109,7 @@ interface RunRow {
 /**
  * Whether a session's first received message carries `needle`, read from its
  * recorded history without following or touching the session; undefined
- * while that message is not recorded yet. Session titles cannot be used:
+ * while that cannot be read yet. Session titles cannot be used:
  * Slack sessions are titled "Private message".
  */
 async function carries(
@@ -122,9 +122,9 @@ async function carries(
       signal: AbortSignal.timeout(30_000),
     })
     .catch(() => undefined);
+  // A session that is still starting can refuse a read; ask again next poll.
   if (!response?.ok) {
-    // Another deployment's session, or one already expired: not ours.
-    return response && response.status !== 404 ? false : undefined;
+    return;
   }
   const received = (await response.text())
     .split("\n")
