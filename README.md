@@ -25,7 +25,7 @@ Skills under `agent/skills/` are load-on-demand procedures the model pulls in wh
 
 Foreman handles conversation, investigation, service operations, and repository changes with one general prompt. For an authorized change it resolves the repository, prepares a workspace, creates a validated feature branch, makes the change, runs proportionate checks, pushes, and opens a pull request. Foreman never merges.
 
-The root can use eve's native `agent` tool for independent subtasks. On eve 0.81.1 each call creates a fresh copy with the root's instructions, tools, connections, and sandbox; the child starts with fresh history and state and cannot delegate recursively. Give children self-contained instructions and avoid concurrent edits to the same files. Critic remains the independent read-only triage reviewer. Vision reads staged screenshots in the shared sandbox. There is no authored station pipeline, run-state coordinator, or automatic GitHub stabilization.
+The root can use eve's native `agent` tool for independent subtasks. On eve 0.83.2 each call creates a fresh copy with the root's instructions, tools, connections, and sandbox; the child starts with fresh history and state and cannot delegate recursively. Give children self-contained instructions and avoid concurrent edits to the same files. Critic remains the independent read-only triage reviewer. Vision reads staged screenshots in the shared sandbox. There is no authored station pipeline, run-state coordinator, or automatic GitHub stabilization.
 
 ## Trust and safety
 
@@ -84,7 +84,7 @@ See [.env.example](.env.example) for the Executor and retained channel/personal 
 
 ### Session limits
 
-The root agent sets `limits: { maxInputTokensPerSession: false }` in [agent/agent.ts](agent/agent.ts). eve defaults to a 40M-token input budget per session, and cached prompt re-reads count as provider-reported input on every model call, so a long Slack thread can cross it and park the session on eve's Approve/Stop budget card, which Slack cannot answer. Output stays on eve's existing uncapped default.
+The root agent sets `limits: { sessionUsage: () => false }` in [agent/agent.ts](agent/agent.ts), so no session reaches a usage window. eve defaults to asking for approval after 40M new input tokens per window, so a long Slack thread can cross it and park the session on eve's Continue/Stop card, which Slack cannot answer. Critic, vision and native delegates use the root's limit. Output stays on eve's existing uncapped default.
 
 ### Instantly admin workspace
 
