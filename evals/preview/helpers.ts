@@ -389,7 +389,6 @@ export interface SupportMessage {
   id: string;
   stopped: boolean;
   text: string;
-  ticket: { id: string; url: string } | null;
 }
 
 export interface Support {

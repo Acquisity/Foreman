@@ -9,6 +9,8 @@ import {
   supportReply,
 } from "./helpers.js";
 
+// The customer reply says a ticket was filed; it never shows the identifier.
+const TICKET_REPLY = /\bticket\b/iu;
 const BUG =
   "I want to report a bug. Every time I open the Campaigns page it shows a blank white screen. I have refreshed, cleared my cache, and tried Chrome, Safari and another computer; it still happens. Please file a ticket for the team.";
 
@@ -24,9 +26,6 @@ export default defineEval({
     const since = new Date();
     const messageId = await support.send(`${tag} ${BUG}`);
     const reply = await supportReply(support, messageId, t.signal);
-    if (reply?.ticket) {
-      t.log(`filed ticket ${reply.ticket.url}: cancel it with a comment`);
-    }
     const runId = await matchRun(t, build, "widget", tag, since, 90_000);
     const session = await t.target.attachSession(runId);
     session.succeeded();
@@ -39,13 +38,15 @@ export default defineEval({
           : []
       )
       .find(Boolean);
-    t.log(`widget_file_ticket returned ${identifier ?? "no identifier"}`);
+    t.log(
+      `widget_file_ticket returned ${identifier ?? "no identifier"}: cancel it`
+    );
     await t.require(
       Boolean(identifier),
       satisfies(Boolean, "widget_file_ticket returned an identifier")
     );
     await t.require(
-      Boolean(reply?.ticket || reply?.text.includes(identifier ?? "-")),
+      TICKET_REPLY.test(reply?.text ?? ""),
       satisfies(Boolean, "the customer is told about the ticket")
     );
   },
