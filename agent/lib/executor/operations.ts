@@ -127,6 +127,11 @@ export const disputeOperationInputs = {
         z.string().max(20_000)
       )
       .optional(),
+    // Stripe replays a repeated submit with the same key instead of sending it twice.
+    "Idempotency-Key": z
+      .string()
+      .regex(/^[A-Za-z0-9_-]{1,255}$/u)
+      .optional(),
     metadata: z.record(z.string().max(40), z.string().max(500)).optional(),
     submit: z.boolean(),
   }),

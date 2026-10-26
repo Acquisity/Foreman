@@ -53,6 +53,7 @@ const MAX_PAGES = 49;
 const MAX_MASTERCARD_PAGES = 19;
 const LINK = /https?:\/\/|www\./iu;
 const FOREMAN_FIELDS = "foreman_fields";
+const MAX_METADATA_CHARS = 500;
 
 type Evidence = Record<string, unknown>;
 
@@ -66,7 +67,7 @@ const disputeSchema = z.looseObject({
       due_by: z.number().nullish(),
       has_evidence: z.boolean().optional(),
       past_due: z.boolean().optional(),
-      submission_count: z.number(),
+      submission_count: z.number().nullish(),
     })
     .optional(),
   id: z.string(),
@@ -121,14 +122,14 @@ export const respondInputSchema = z.object({
     .partialRecord(textField, z.string().max(MAX_FIELD_CHARS))
     .optional()
     .describe(
-      "stage only. Text evidence by Stripe field. Fills empty fields and fields Foreman staged earlier; never replaces what Acquisity staged. No links."
+      "stage only. Text evidence by Stripe field. Fills empty fields and fields that still hold what Foreman staged earlier; never replaces what Acquisity or a person staged. No links."
     ),
   files: z
     .array(fileSchema)
     .max(DISPUTE_FILE_SLOTS.length)
     .optional()
     .describe(
-      "stage only. One PDF per slot, rendered by this tool from plain text sections. Put several items for one slot in several sections. Timestamps and authors go in the lines. No links."
+      "stage only. One PDF per slot, rendered by this tool from plain text sections. Put several items for one slot in several sections. Timestamps and authors go in the lines. Refused when the dispute already holds other files. No links."
     ),
   fingerprint: z
     .string()
@@ -222,11 +223,25 @@ export const disputeStateRefusal = (
   if (!NEEDS_RESPONSE.has(dispute.status)) {
     return `Dispute ${dispute.id} is ${dispute.status}, so there is nothing to stage or submit.`;
   }
-  if ((dispute.evidence_details?.submission_count ?? 0) > 0) {
+  // Missing safety facts refuse: a write needs Stripe to say it was never
+  // submitted and when it is due.
+  const count = dispute.evidence_details?.submission_count;
+  const dueBy = dispute.evidence_details?.due_by;
+  if (
+    !(
+      typeof count === "number" &&
+      typeof dueBy === "number" &&
+      Number.isFinite(count) &&
+      Number.isFinite(dueBy) &&
+      count >= 0
+    )
+  ) {
+    return `Stripe did not report the submission count and deadline for dispute ${dispute.id}, so nothing can be written. Check it in Stripe.`;
+  }
+  if (count > 0) {
     return `Evidence for dispute ${dispute.id} was already submitted, and Stripe accepts it only once.`;
   }
-  const dueBy = dispute.evidence_details?.due_by;
-  if (dispute.evidence_details?.past_due || (dueBy && dueBy * 1000 <= nowMs)) {
+  if (dispute.evidence_details?.past_due || dueBy * 1000 <= nowMs) {
     return `The response deadline for dispute ${dispute.id} has passed.`;
   }
   return null;
@@ -251,15 +266,38 @@ const stagedEvidence = (evidence: Evidence): Record<string, string> =>
       .filter(([, value]) => value !== "")
   );
 
+const shortHash = (value: string, length: number): string =>
+  createHash("sha256").update(value).digest("hex").slice(0, length);
+
 /** A short hash of the evidence Stripe holds now. */
 export const evidenceFingerprint = (evidence: Evidence): string =>
-  createHash("sha256")
-    .update(JSON.stringify(stagedEvidence(evidence)))
-    .digest("hex")
-    .slice(0, 16);
+  shortHash(JSON.stringify(stagedEvidence(evidence)), 16);
 
-const foremanFields = (dispute: StripeDispute): Set<string> =>
-  new Set((dispute.metadata[FOREMAN_FIELDS] ?? "").split(",").filter(Boolean));
+/** The hash Foreman records for a value it wrote to one field or slot. */
+export const valueHash = (value: string): string => shortHash(value, 8);
+
+/**
+ * The fields Foreman wrote that still hold the value it wrote, with that
+ * value's hash. A field a person changed since no longer matches, so it is
+ * theirs; an unreadable marker owns nothing.
+ */
+const foremanFields = (dispute: StripeDispute): Record<string, string> => {
+  let recorded: unknown;
+  try {
+    recorded = JSON.parse(dispute.metadata[FOREMAN_FIELDS] ?? "{}");
+  } catch {
+    return {};
+  }
+  const parsed = z.record(z.string(), z.string()).safeParse(recorded);
+  return Object.fromEntries(
+    Object.entries(parsed.success ? parsed.data : {}).filter(
+      ([field, hash]) => {
+        const current = evidenceValue(dispute.evidence[field]);
+        return current !== "" && valueHash(current) === hash;
+      }
+    )
+  );
+};
 
 const summary = (dispute: StripeDispute) => ({
   amount: dispute.amount,
@@ -274,14 +312,14 @@ const summary = (dispute: StripeDispute) => ({
     : null,
   evidence: stagedEvidence(dispute.evidence),
   fingerprint: evidenceFingerprint(dispute.evidence),
-  foremanFields: [...foremanFields(dispute)],
+  foremanFields: Object.keys(foremanFields(dispute)),
   id: dispute.id,
   networkReasonCode:
     dispute.payment_method_details?.card?.network_reason_code ?? null,
   reason: dispute.reason,
   status: dispute.status,
   stripeLink: `https://dashboard.stripe.com/disputes/${dispute.id}`,
-  submissionCount: dispute.evidence_details?.submission_count ?? 0,
+  submissionCount: dispute.evidence_details?.submission_count ?? null,
 });
 
 // --- Evidence PDFs -----------------------------------------------------------
@@ -379,11 +417,10 @@ export interface DisputeDeps {
   ) => Promise<{ data: unknown; status: number }>;
   /** Renders one file; tests replace it to reach the byte limit. */
   readonly render?: typeof renderEvidencePdf;
-  /** Dispute-toolkit writes through the Executor dispatch journal. */
+  /** Dispute-toolkit writes. */
   readonly write: (
     operation: keyof typeof disputeOperationInputs,
-    input: Record<string, unknown>,
-    operationKey?: string
+    input: Record<string, unknown>
   ) => Promise<ExecutorOutcome>;
 }
 
@@ -424,9 +461,6 @@ const errorReason = (error: unknown): string => {
       error.code === "operation_bindings_missing"
     ) {
       return `The Stripe dispute write is not provisioned yet (${error.code}). An operator has to bind it in the foreman-disputes toolkit.`;
-    }
-    if (error.code === "dispute_write_uncertain") {
-      return "An earlier submit for this dispute has an unknown outcome. Check the dispute; do not submit again.";
     }
     return `Executor could not complete the call (${error.code}).`;
   }
@@ -510,15 +544,23 @@ const stageRefusal = (
   if (new Set(slots).size !== slots.length) {
     return "Each file slot takes one file. Merge items into sections.";
   }
-  // Keep what Acquisity staged: only empty fields and fields this tool wrote
-  // before may change.
+  // Keep what Acquisity or a person staged: only empty fields and fields
+  // still holding the value this tool wrote may change.
   const owned = foremanFields(dispute);
   const taken = [...Object.keys(text), ...slots].filter(
-    (field) =>
-      evidenceValue(dispute.evidence[field]) !== "" && !owned.has(field)
+    (field) => evidenceValue(dispute.evidence[field]) !== "" && !owned[field]
   );
   if (taken.length) {
-    return `Already staged by Acquisity, left as is: ${taken.join(", ")}. Put the extra evidence in an empty field instead.`;
+    return `Already staged by Acquisity or a person, left as is: ${taken.join(", ")}. Put the extra evidence in an empty field instead.`;
+  }
+  // Stripe's file limits cover every file on the dispute, and files already
+  // there cannot be measured, so new files go only beside none.
+  const kept = DISPUTE_FILE_SLOTS.filter(
+    (slot) =>
+      evidenceValue(dispute.evidence[slot]) !== "" && !slots.includes(slot)
+  );
+  if (slots.length && kept.length) {
+    return `The dispute already holds evidence files (${kept.join(", ")}), so no files were added. Stage the text evidence without files.`;
   }
   const newText = [
     ...Object.values(text),
@@ -607,8 +649,6 @@ const stage = async (
     dispute.payment_method_details?.card?.brand === "mastercard"
       ? MAX_MASTERCARD_PAGES
       : MAX_PAGES;
-  // ponytail: counts only this call's files; files staged earlier in other
-  // slots are not re-read. Re-read them if Foreman ever stages in two passes.
   if (bytes > MAX_FILE_BYTES) {
     return refuse(
       `Evidence files total ${bytes} bytes; Stripe allows ${MAX_FILE_BYTES}. Trim the sections.`
@@ -620,22 +660,47 @@ const stage = async (
     );
   }
 
+  // Rendering takes time: the deadline may have passed meanwhile.
+  const late = disputeStateRefusal(dispute, deps.now());
+  if (late) {
+    return refuse(late);
+  }
+
   const fileIds = await uploadFiles(deps, rendered);
   if ("reason" in fileIds && typeof fileIds.reason === "string") {
     return refuse(fileIds.reason);
   }
-  const fields = [
-    ...new Set([
-      ...foremanFields(dispute),
-      ...Object.keys(text),
-      ...files.map((file) => file.slot),
-    ]),
-  ].sort();
+  // Uploads take time too: check the dispute as it is now before writing.
+  const fresh = await readDispute(deps, dispute.id);
+  const changed =
+    disputeStateRefusal(fresh, deps.now()) ?? stageRefusal(input, fresh);
+  if (changed) {
+    return refuse(`The dispute changed while files uploaded. ${changed}`);
+  }
+  const evidence: Record<string, string> = { ...text, ...fileIds };
+  const marker = JSON.stringify(
+    Object.fromEntries(
+      Object.entries({
+        ...foremanFields(fresh),
+        ...Object.fromEntries(
+          Object.entries(evidence).map(([field, value]) => [
+            field,
+            valueHash(value),
+          ])
+        ),
+      }).sort(([a], [b]) => a.localeCompare(b))
+    )
+  );
+  if (marker.length > MAX_METADATA_CHARS) {
+    return refuse(
+      `Foreman's record of the fields it wrote would exceed Stripe's ${MAX_METADATA_CHARS} character metadata limit. Stage fewer fields.`
+    );
+  }
   const update = written(
     await deps.write("stripe.disputes.update", {
       dispute_id: dispute.id,
-      evidence: { ...text, ...fileIds },
-      metadata: { [FOREMAN_FIELDS]: fields.join(",") },
+      evidence,
+      metadata: { [FOREMAN_FIELDS]: marker },
       submit: false,
     })
   );
@@ -665,12 +730,14 @@ const submit = async (
       `The evidence changed after the ready message (fingerprint ${current}, approved ${input.fingerprint}). Nothing was submitted. Read it again and post a new ready message.`
     );
   }
+  // The same approval always sends the same key, so a retried submit whose
+  // first outcome is unknown is replayed by Stripe instead of sent twice.
   const result = written(
-    await deps.write(
-      "stripe.disputes.update",
-      { dispute_id: dispute.id, submit: true },
-      `stripe-dispute-submit:${dispute.id}`
-    )
+    await deps.write("stripe.disputes.update", {
+      dispute_id: dispute.id,
+      "Idempotency-Key": `foreman-dispute-submit-${dispute.id}-${input.fingerprint}`,
+      submit: true,
+    })
   );
   if ("reason" in result) {
     return refuse(result.reason);
@@ -730,12 +797,11 @@ const liveDeps = (
     delegated: Boolean(ctx.session.parent),
     now: Date.now,
     read: (request) => client(request, { maxBytes: READ_BYTES }),
-    write: (operation, input, operationKey) =>
+    write: (operation, input) =>
       invokeProvider(
         ctx,
         operationPath(operation),
-        disputeOperationInputs[operation].parse(input),
-        operationKey
+        disputeOperationInputs[operation].parse(input)
       ),
   };
 };

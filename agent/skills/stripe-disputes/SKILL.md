@@ -38,13 +38,13 @@ The `du_` id is on the "Dispute id:" line of the alert text this turn carries. I
    - Fair, so a person decides: nothing was delivered, the service was broken, a cancellation was honored late, a refund was already promised (for example in a CSP ticket), or the charge is a duplicate.
    - When you are unsure, it is fair. Do not stage anything for a fair case.
 5. Stage (fight only). Call `respond_stripe_dispute` with action `stage`:
-   - `evidence`: text fields. Fill only empty fields; the tool refuses to replace what Acquisity staged. Put client channel excerpts (time, author, message) in `uncategorized_text`, or in `cancellation_rebuttal` when the reason is subscription_canceled. Put delivery proof (domains, inboxes, campaigns sent, logins) in `access_activity_log` or `uncategorized_text`.
-   - `files`: one PDF per slot, written as a title and plain-text sections. The tool renders, measures, and uploads them. Slots: `customer_communication` for the client channel thread with times and authors; `service_documentation` for delivery proof; `cancellation_policy` or `refund_policy` for the quoted terms; `receipt`; `uncategorized_file`. Several items for one slot go in one file as several sections.
+   - `evidence`: text fields. Fill only empty fields; the tool refuses to replace what Acquisity or a person staged. Put client channel excerpts (time, author, message) in `uncategorized_text`, or in `cancellation_rebuttal` when the reason is subscription_canceled. Put delivery proof (domains, inboxes, campaigns sent, logins) in `access_activity_log` or `uncategorized_text`.
+   - `files`: one PDF per slot, written as a title and plain-text sections. The tool renders, measures, and uploads them. Slots: `customer_communication` for the client channel thread with times and authors; `service_documentation` for delivery proof; `cancellation_policy` or `refund_policy` for the quoted terms; `receipt`; `uncategorized_file`. Several items for one slot go in one file as several sections. When the dispute already holds files, the tool refuses new files; stage the text evidence and say so in the ready message.
    - No links anywhere in evidence. No audio or video.
    - If staging with files fails, stage the text evidence without files and say in the ready message that the files were not attached and why.
 6. Reply. One message in the thread, never `@channel` or `@here`.
    - Fight, ready message: the verdict and why; the reason code; every staged field and file by slot with its source; the due date; the Stripe link; the fingerprint the stage call returned; and the line "Reply @Foreman approve to submit, or tell me what to change."
-   - Fair, manual review: the verdict, the reason code, the evidence by source, and the specific question a person has to answer. Say that nothing was written to Stripe.
+   - Fair, manual review: the verdict, the reason code, the evidence by source, and the specific question a person has to answer. Say that nothing was written to Stripe, and that a person must accept the dispute in Stripe before the due date or Stripe will counter it automatically.
    - After a submit: one line with the status Stripe returned and the Stripe link.
 
 ## Never

@@ -3,7 +3,6 @@ import { readFileSync } from "node:fs";
 import { describe, it, type TestContext } from "node:test";
 import type { SessionAuthContext } from "eve/context";
 import type { ApprovalContext } from "eve/tools/approval";
-import { evePackageUrl } from "#lib/eve-dynamic-tools.js";
 import type { ExecutorOutcome } from "#lib/executor/dispatch.js";
 import {
   DISPUTE_WRITE_CONNECTION,
@@ -23,16 +22,8 @@ import {
   renderEvidencePdf,
   respondStripeDispute,
   respondStripeDisputePolicy,
+  valueHash,
 } from "./respond_stripe_dispute.js";
-
-// The journal is durable eve state, so the dispatch runs inside a real eve
-// context, the same way eve calls a tool.
-const { ContextContainer, contextStorage } = (await import(
-  new URL("./dist/src/context/container.js", evePackageUrl()).href
-)) as {
-  ContextContainer: new () => unknown;
-  contextStorage: { run: <T>(store: unknown, body: () => T) => T };
-};
 
 /** Stripe routes no code path may reach: accepting a dispute, file links, refunds. */
 const FORBIDDEN_ROUTES = ["close", "file_links", "v1/refunds"].map(
@@ -102,7 +93,6 @@ const fakeStripe = (
   let dispute = structuredClone(initial) as ReturnType<typeof disputeRecord>;
   const writes: {
     input: Record<string, unknown>;
-    key?: string;
     operation: string;
   }[] = [];
   const reads: OperationRequest[] = [];
@@ -140,8 +130,8 @@ const fakeStripe = (
         status: 200,
       });
     },
-    write: (operation, input, key) => {
-      writes.push({ input, key, operation });
+    write: (operation, input) => {
+      writes.push({ input, operation });
       if (operation === "stripe.files.create") {
         if (options.upload) {
           return Promise.resolve(options.upload());
@@ -168,7 +158,11 @@ const fakeStripe = (
       return Promise.resolve({ data: structuredClone(dispute), ok: true });
     },
   });
-  return { deps, reads, writes };
+  /** A person or Acquisity editing evidence in Stripe. */
+  const edit = (evidence: Record<string, unknown>) => {
+    dispute = { ...dispute, evidence: { ...dispute.evidence, ...evidence } };
+  };
+  return { deps, edit, reads, writes };
 };
 
 const run = (deps: DisputeDeps, input: Partial<RespondInput>) =>
@@ -205,6 +199,18 @@ describe("respond_stripe_dispute rule 3", () => {
       "deadline",
     ],
   ];
+  cases.push(
+    [
+      "Stripe omits the submission count",
+      { evidence_details: undefined },
+      "did not report",
+    ],
+    [
+      "Stripe omits the deadline",
+      { evidence_details: { due_by: null, submission_count: 0 } },
+      "did not report",
+    ]
+  );
   for (const [name, overrides, reason] of cases) {
     it(`refuses to stage or submit when ${name}, with no write`, async () => {
       const stripe = fakeStripe(disputeRecord(overrides));
@@ -293,6 +299,110 @@ describe("respond_stripe_dispute stage", () => {
       evidence: { uncategorized_text: "Second pass, as the person asked." },
     });
     assert.equal(again.ok, true, again.reason);
+  });
+
+  it("refuses to replace a field a person corrected after Foreman staged it", async () => {
+    const stripe = fakeStripe();
+    await run(stripe.deps(automatic), {
+      action: "stage",
+      evidence: { uncategorized_text: "First pass." },
+    });
+    stripe.edit({ uncategorized_text: "Corrected by a person." });
+    const writes = stripe.writes.length;
+    const result = await run(stripe.deps(person()), {
+      action: "stage",
+      evidence: { uncategorized_text: "Second pass." },
+    });
+    assert.equal(result.ok, false);
+    assert.ok(
+      reasonMatches(result.reason, "uncategorized_text"),
+      result.reason
+    );
+    assert.equal(stripe.writes.length, writes);
+  });
+
+  it("records a hash of each value it wrote", async () => {
+    const stripe = fakeStripe();
+    await run(stripe.deps(automatic), {
+      action: "stage",
+      evidence: { uncategorized_text: "First pass." },
+    });
+    const update = stripe.writes.at(-1)?.input.metadata as Record<
+      string,
+      string
+    >;
+    assert.deepEqual(JSON.parse(String(update.foreman_fields)), {
+      uncategorized_text: valueHash("First pass."),
+    });
+  });
+
+  it("refuses new files when the dispute already holds files, but still stages text", async () => {
+    const stripe = fakeStripe(
+      disputeRecord({
+        evidence: { ...disputeRecord().evidence, receipt: "file_acq" },
+      })
+    );
+    const withFiles = await run(stripe.deps(automatic), {
+      action: "stage",
+      evidence: { access_activity_log: "40 logins." },
+      files: [file("service_documentation")],
+    });
+    assert.equal(withFiles.ok, false);
+    assert.ok(reasonMatches(withFiles.reason, "receipt"), withFiles.reason);
+    assert.deepEqual(stripe.writes, []);
+    const textOnly = await run(stripe.deps(automatic), {
+      action: "stage",
+      evidence: { access_activity_log: "40 logins." },
+    });
+    assert.equal(textOnly.ok, true, textOnly.reason);
+  });
+
+  it("refuses when the deadline passes while files render", async () => {
+    const stripe = fakeStripe(
+      disputeRecord({
+        evidence_details: { due_by: NOW / 1000 + 5, submission_count: 0 },
+      })
+    );
+    let now = NOW;
+    const deps = {
+      ...stripe.deps(automatic),
+      now: () => now,
+      render: async (input: EvidenceFile) => {
+        now += 60_000;
+        return await renderEvidencePdf(input);
+      },
+    };
+    const result = await run(deps, {
+      action: "stage",
+      files: [file("customer_communication")],
+    });
+    assert.equal(result.ok, false);
+    assert.ok(reasonMatches(result.reason, "deadline"), result.reason);
+    assert.deepEqual(stripe.writes, []);
+  });
+
+  it("re-reads after uploads and refuses when a field was filled meanwhile", async () => {
+    const stripe = fakeStripe();
+    const deps = {
+      ...stripe.deps(automatic),
+      write: (...args: Parameters<ReturnType<typeof stripe.deps>["write"]>) => {
+        stripe.edit({ uncategorized_text: "Staged by Acquisity meanwhile." });
+        return stripe.deps(automatic).write(...args);
+      },
+    };
+    const result = await run(deps, {
+      action: "stage",
+      evidence: { uncategorized_text: "Foreman's text." },
+      files: [file("customer_communication")],
+    });
+    assert.equal(result.ok, false);
+    assert.ok(
+      reasonMatches(result.reason, "uncategorized_text"),
+      result.reason
+    );
+    assert.ok(
+      stripe.writes.every((w) => w.operation === "stripe.files.create")
+    );
   });
 
   it("refuses links in evidence", async () => {
@@ -418,8 +528,28 @@ describe("respond_stripe_dispute submit", () => {
     });
     assert.equal(result.ok, true, result.reason);
     const submit = stripe.writes.at(-1);
-    assert.deepEqual(submit?.input, { dispute_id: ID, submit: true });
-    assert.equal(submit?.key, `stripe-dispute-submit:${ID}`);
+    assert.deepEqual(submit?.input, {
+      dispute_id: ID,
+      "Idempotency-Key": `foreman-dispute-submit-${ID}-${fingerprint}`,
+      submit: true,
+    });
+  });
+
+  it("sends the same idempotency key for the same approval and a new one for new evidence", async () => {
+    const submitKey = async (log: string) => {
+      const stripe = fakeStripe();
+      const result = await run(stripe.deps(automatic), {
+        action: "stage",
+        evidence: { access_activity_log: log },
+      });
+      const { fingerprint } = result.result as { fingerprint: string };
+      await run(stripe.deps(person()), { action: "submit", fingerprint });
+      return stripe.writes.at(-1)?.input["Idempotency-Key"];
+    };
+    const first = await submitKey("40 logins.");
+    assert.ok(typeof first === "string" && first.includes(ID));
+    assert.equal(await submitKey("40 logins."), first);
+    assert.notEqual(await submitKey("41 logins."), first);
   });
 
   it("refuses when the evidence changed after the ready message", async () => {
@@ -541,14 +671,9 @@ describe("respond_stripe_dispute write surface", () => {
   });
 });
 
-describe("dispute submit journal", () => {
-  it("replays a finished submit instead of sending it again", async (t: TestContext) => {
-    const prior = process.env.EXECUTOR_OPERATION_BINDINGS;
-    t.after(() => {
-      process.env.EXECUTOR_OPERATION_BINDINGS = prior;
-    });
-    let calls = 0;
-    const toolkits: string[] = [];
+describe("dispute write dispatch", () => {
+  it("runs in the foreman-disputes toolkit and carries the idempotency key", async (t: TestContext) => {
+    const bodies: { url: string; request: Record<string, unknown> }[] = [];
     t.mock.method(globalThis, "fetch", (url: string, init?: RequestInit) => {
       const request = JSON.parse(String(init?.body));
       if (request.method === "notifications/initialized") {
@@ -563,8 +688,7 @@ describe("dispute submit journal", () => {
           })
         );
       }
-      calls += 1;
-      toolkits.push(String(url));
+      bodies.push({ request, url: String(url) });
       return Promise.resolve(
         Response.json({
           id: request.id,
@@ -583,22 +707,16 @@ describe("dispute submit journal", () => {
       getToken: () => Promise.resolve({ token: "synthetic-executor-token" }),
     };
     const path = `${DISPUTE_WRITE_CONNECTION}org.foremanStripeDisputeWrite.disputes.updateDisputeEvidence`;
-    const container = new ContextContainer();
-    const submit = () =>
-      contextStorage.run(container, () =>
-        invokeProvider(
-          ctx as never,
-          path,
-          { dispute_id: ID, submit: true },
-          `stripe-dispute-submit:${ID}`
-        )
-      );
-    const first = await submit();
-    const second = await submit();
-    assert.equal(calls, 1);
-    assert.deepEqual(second, first);
+    const input = {
+      dispute_id: ID,
+      "Idempotency-Key": `foreman-dispute-submit-${ID}-abc`,
+      submit: true,
+    };
+    await invokeProvider(ctx as never, path, input);
+    assert.equal(bodies.length, 1);
+    assert.ok(bodies[0]?.url.includes("/mcp/toolkits/foreman-disputes"));
     assert.ok(
-      toolkits.every((url) => url.includes("/mcp/toolkits/foreman-disputes"))
+      JSON.stringify(bodies[0]?.request).includes(input["Idempotency-Key"])
     );
   });
 });

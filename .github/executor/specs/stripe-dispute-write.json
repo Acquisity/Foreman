@@ -36,6 +36,15 @@
               "type": "string",
               "pattern": "^du_[A-Za-z0-9]{1,64}$"
             }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]{1,255}$"
+            }
           }
         ],
         "requestBody": {

@@ -1,5 +1,4 @@
 import { getToken as getConnectToken } from "@vercel/connect";
-import { defineState } from "eve/context";
 import type { ToolContext } from "eve/tools";
 import { z } from "zod";
 import { PRODUCTION_READ_QUERY_ARGS } from "../lookup-customer.js";
@@ -12,7 +11,11 @@ import {
 } from "../widget-scope.js";
 import { executorAuth } from "./auth.js";
 import { operationPath } from "./bindings.js";
-import { DISPUTES_TOOLKIT, WIDGET_TOOLKIT } from "./endpoint.js";
+import {
+  DISPUTES_TOOLKIT,
+  type ExecutorToolkit,
+  WIDGET_TOOLKIT,
+} from "./endpoint.js";
 import { ExecutorError, executorTransport } from "./transport.js";
 
 export type ProviderContext = Pick<ToolContext, "abortSignal" | "getToken"> &
@@ -59,83 +62,25 @@ const widgetLinearTicketInput = z.union([
 /** Every path the foreman-disputes toolkit binds starts with its connection. */
 export const DISPUTE_WRITE_CONNECTION = "foreman_stripe_dispute_write.";
 
-const disputeJournal = defineState<
-  Record<string, { result?: unknown; state: "done" | "failed" | "started" }>
->("foreman.stripeDispute.journal", () => ({}));
-
-/**
- * The Stripe dispute write: its own toolkit, and the same reserve then
- * complete journal the support lane uses, kept in durable session state.
- *
- * @remarks
- * Only a call that passes an operation key is journaled; respond_stripe_dispute
- * passes one for submit, the one write Stripe never lets anyone take back. A
- * finished submit replays its result, and one whose outcome is unknown refuses
- * instead of sending again. Staging and uploads can be repeated before submit,
- * so they are not journaled. Stripe's own re-read in the tool stays the
- * authority across sessions.
- */
-const disputeOperationPolicy = (path: string) =>
-  path.startsWith(DISPUTE_WRITE_CONNECTION)
-    ? {
-        assert: (): void => undefined,
-        authorize: () => Promise.resolve("dispute"),
-        complete(
-          key: string,
-          result: ExecutorOutcome,
-          state: "done" | "failed"
-        ) {
-          disputeJournal.update((journal) => ({
-            ...journal,
-            [key]: { result, state },
-          }));
-          return Promise.resolve();
-        },
-        describe: (): void => undefined,
-        record: () => Promise.resolve(),
-        reserve(key: string) {
-          const entry = disputeJournal.get()[key];
-          if (entry?.state === "done") {
-            return Promise.resolve({
-              fresh: false as const,
-              result: entry.result,
-            });
-          }
-          if (entry?.state === "started") {
-            throw new ExecutorError("dispute_write_uncertain", undefined, {
-              dispatched: false,
-            });
-          }
-          disputeJournal.update((journal) => ({
-            ...journal,
-            [key]: { state: "started" },
-          }));
-          return Promise.resolve({ fresh: true as const });
-        },
-        toolkit: DISPUTES_TOOLKIT as typeof DISPUTES_TOOLKIT,
-        writeKey: (
-          _path: string,
-          _input: Record<string, unknown>,
-          _version: string,
-          operationKey?: string
-        ) => operationKey ?? null,
-      }
-    : null;
-
 type OperationPolicy =
   | ReturnType<typeof supportOperationPolicy>
-  | ReturnType<typeof widgetOperationPolicy>
-  | ReturnType<typeof disputeOperationPolicy>;
+  | ReturnType<typeof widgetOperationPolicy>;
+
+/** Lanes with their own toolkit select it here; every other session uses the shared toolkit. */
+const operationPolicy = (ctx: ProviderContext): OperationPolicy =>
+  supportOperationPolicy(ctx) ?? widgetOperationPolicy(ctx);
 
 /**
- * Lanes with their own toolkit select it here; every other session uses the
- * shared toolkit. A lane policy wins over the dispute toolkit, so a support or
- * widget session asking for a dispute path is refused by its own allowlist.
+ * The toolkit a call runs in. A lane policy wins, so a support or widget
+ * session asking for a dispute path is refused by its own allowlist; the
+ * dispute write paths otherwise run only in the foreman-disputes toolkit.
  */
-const operationPolicy = (ctx: ProviderContext, path: string): OperationPolicy =>
-  supportOperationPolicy(ctx) ??
-  widgetOperationPolicy(ctx) ??
-  disputeOperationPolicy(path);
+const toolkitFor = (
+  policy: OperationPolicy,
+  path: string
+): ExecutorToolkit | undefined =>
+  policy?.toolkit ??
+  (path.startsWith(DISPUTE_WRITE_CONNECTION) ? DISPUTES_TOOLKIT : undefined);
 
 /** The widget egress gate runs outside any eve session: one fixed read under the app principal. */
 export async function readWidgetOwnership(
@@ -170,12 +115,16 @@ export async function readWidgetOwnership(
   return result.data;
 }
 
-async function connection(ctx: ProviderContext, policy: OperationPolicy) {
+async function connection(
+  ctx: ProviderContext,
+  policy: OperationPolicy,
+  path: string
+) {
   const { token } = await ctx.getToken(executorAuth());
   const authorization = policy ? { version: await policy.authorize() } : null;
   return {
     authorization,
-    wire: { signal: ctx.abortSignal, token, toolkit: policy?.toolkit },
+    wire: { signal: ctx.abortSignal, token, toolkit: toolkitFor(policy, path) },
   };
 }
 
@@ -216,9 +165,9 @@ export async function invokeProvider(
   options: { maxBytes?: number; timeoutMs?: number } = {}
 ): Promise<ExecutorOutcome> {
   assertLaneOperation(ctx, path, input);
-  const policy = operationPolicy(ctx, path);
+  const policy = operationPolicy(ctx);
   policy?.assert(path, input);
-  const { wire, authorization } = await connection(ctx, policy);
+  const { wire, authorization } = await connection(ctx, policy, path);
   const key =
     policy && authorization
       ? policy.writeKey(path, input, authorization.version, operationKey)
@@ -263,10 +212,10 @@ export async function invokeProvider(
 }
 
 export async function describeProvider(ctx: ProviderContext, path: string) {
-  const policy = operationPolicy(ctx, path);
+  const policy = operationPolicy(ctx);
   // Describing a dispatcher is permitted; operation arguments are checked only when called.
   policy?.describe(path);
-  const { wire } = await connection(ctx, policy);
+  const { wire } = await connection(ctx, policy, path);
   return executorTransport.describe(wire, path);
 }
 
