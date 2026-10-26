@@ -22,14 +22,17 @@ export default defineEval({
     const tag = marker();
     const since = new Date();
     const stoppedId = await support.send(`${tag} ${WIDGET_ASK}`);
-    await sleep(15_000, undefined, { signal: t.signal });
+    const runId = await matchRun(t, build, "widget", tag, since, 120_000);
+    // Watch from the start: a widget session is retired soon after it settles.
+    const live = t.target.watchTurn(runId);
+    await sleep(Math.max(0, since.getTime() + 15_000 - Date.now()), undefined, {
+      signal: t.signal,
+    });
     await t.require(
       await support.stop(),
       satisfies(Boolean, "the app accepts Stop")
     );
-    const runId = await matchRun(t, build, "widget", tag, since);
-    const stopped = await t.target.attachSession(runId);
-    stopped.event("turn.cancelled", { count: 1 });
+    (await live.result()).event("turn.cancelled", { count: 1 });
 
     await sleep(60_000, undefined, { signal: t.signal });
     const messages = await support.get();

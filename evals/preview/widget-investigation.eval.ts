@@ -24,14 +24,15 @@ export default defineEval({
       const since = new Date();
       // biome-ignore lint/performance/noAwaitInLoops: the second message follows the first reply.
       const messageId = await support.send(`${tag} ${ask}`);
+      const runId = await matchRun(t, build, "widget", tag, since, 120_000);
+      // Watch from the start: a widget session is retired soon after it replies.
+      const live = t.target.watchTurn(runId);
       const reply = await supportReply(support, messageId, t.signal);
       await t.require(
         Boolean(reply?.text.trim()),
         satisfies(Boolean, "the investigation replies")
       );
-      // The reply is in, so its run is already listed.
-      const runId = await matchRun(t, build, "widget", tag, since, 90_000);
-      (await t.target.attachSession(runId)).succeeded();
+      (await live.result()).succeeded();
       sessions.push(runId);
     }
     await t.require(

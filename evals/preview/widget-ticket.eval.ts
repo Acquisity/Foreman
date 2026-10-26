@@ -25,11 +25,13 @@ export default defineEval({
     const tag = marker();
     const since = new Date();
     const messageId = await support.send(`${tag} ${BUG}`);
+    const runId = await matchRun(t, build, "widget", tag, since, 120_000);
+    // Watch from the start: a widget session is retired soon after it replies.
+    const live = t.target.watchTurn(runId);
     const reply = await supportReply(support, messageId, t.signal);
-    const runId = await matchRun(t, build, "widget", tag, since, 90_000);
-    const session = await t.target.attachSession(runId);
-    session.succeeded();
-    const identifier = session.events
+    const turn = await live.result();
+    turn.succeeded();
+    const identifier = turn.events
       .flatMap((event) =>
         event.type === "action.result" &&
         event.data.result.kind === "tool-result" &&
