@@ -65,7 +65,7 @@ describe("eve dynamic tool adapter", () => {
     assert.equal(
       entry.extensionNamespace,
       undefined,
-      "Eve 0.81.1 does not prefix directory overrides"
+      "Eve 0.83.2 does not prefix directory overrides"
     );
     const [resolver] = await loadCompiledDynamicToolResolvers(
       [entry],
