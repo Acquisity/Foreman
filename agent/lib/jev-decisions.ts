@@ -8,11 +8,7 @@ import {
 } from "./jev.js";
 import { SUPPORT_OWNER } from "./owner-map.js";
 import type { RegressionOutcome } from "./regression-record.js";
-import {
-  fixedRouting,
-  pathAfterFix,
-  REGRESSION_GAP,
-} from "./regression-routing.js";
+import { fixedRouting, REGRESSION_GAP } from "./regression-routing.js";
 import { BARS } from "./triage-bars.js";
 import {
   HOTLANE_IMPACTS,
@@ -543,12 +539,16 @@ const barGap = (
 const routedPath = (
   billed: boolean,
   match: DuplicateMatch,
-  choice: string
+  choice: string,
+  fixedPath?: HandlingPath
 ): HandlingPath => {
   if (billed) {
     return "Support/Financial";
   }
-  return match ? "Duplicate" : (choice as HandlingPath);
+  if (match) {
+    return "Duplicate";
+  }
+  return fixedPath ?? (choice as HandlingPath);
 };
 
 const routeProjectOf = (
@@ -634,7 +634,7 @@ export function resolveTriage(
   const settled = billed ? "Platform Limitation" : classification;
   const match = billed ? undefined : duplicate;
   const fixed = fixedRouting(input, settled, match !== undefined, notes);
-  const path = routedPath(billed, match, pathAfterFix(fixed, pathPick.choice));
+  const path = routedPath(billed, match, pathPick.choice, fixed?.path);
   const project = choiceOf(answers.project);
   const projectSettled =
     project.choice !== UNDETERMINED && project.confidence >= BARS.project;

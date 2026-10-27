@@ -52,11 +52,6 @@ export const fixedRouting = (
   return fixed;
 };
 
-export const pathAfterFix = (
-  fixed: FixedRouting | undefined,
-  choice: string
-): string => fixed?.path ?? choice;
-
 /**
  * The one gap Foreman closes itself: it is never a reason to take the
  * unproven branch or to tell the requester anything.
