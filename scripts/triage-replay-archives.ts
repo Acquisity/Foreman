@@ -3,6 +3,7 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { parseArgs } from "node:util";
 import { put } from "@vercel/blob";
+import { TRIAGE_REPLAY_PREFIX } from "../agent/lib/blob.js";
 import { triageCaseSchema } from "../agent/lib/triage-replay/schema.js";
 
 const COHORT = "evals/triage";
@@ -50,12 +51,16 @@ for (const commit of commits) {
     }
   );
   // biome-ignore lint/performance/noAwaitInLoops: one upload at a time keeps memory to one archive.
-  const blob = await put(`triage-replay/archives/${commit}.tar.gz`, archive, {
-    abortSignal: AbortSignal.timeout(UPLOAD_TIMEOUT_MS),
-    access: "private",
-    addRandomSuffix: true,
-    contentType: "application/gzip",
-  });
+  const blob = await put(
+    `${TRIAGE_REPLAY_PREFIX}archives/${commit}.tar.gz`,
+    archive,
+    {
+      abortSignal: AbortSignal.timeout(UPLOAD_TIMEOUT_MS),
+      access: "private",
+      addRandomSuffix: true,
+      contentType: "application/gzip",
+    }
+  );
   map[commit] = blob.url;
   console.log(`${commit}: ${(archive.length / 1024 / 1024).toFixed(1)} MiB`);
 }

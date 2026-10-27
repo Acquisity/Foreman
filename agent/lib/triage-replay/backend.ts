@@ -1,4 +1,5 @@
 import { get, put } from "@vercel/blob";
+import { TRIAGE_REPLAY_PREFIX } from "../blob.js";
 import type { ReplayState } from "./store.js";
 
 const BLOB_TIMEOUT_MS = 20_000;
@@ -52,7 +53,7 @@ export function setReplayBackend(backend: ReplayBackend) {
 }
 
 export const replayStateKey = (runId: string, caseKey: string) =>
-  `triage-replay/${runId}/${caseKey}.json`;
+  `${TRIAGE_REPLAY_PREFIX}${runId}/${caseKey}.json`;
 
 export const loadReplayState = (runId: string, caseKey: string) =>
   active.read(replayStateKey(runId, caseKey));
