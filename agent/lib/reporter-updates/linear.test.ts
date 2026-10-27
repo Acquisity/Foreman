@@ -601,7 +601,7 @@ describe("readOriginal", () => {
       )
     );
     const facts = await port.readOriginal("ENG-9");
-    assert.ok(requests[0]?.query.includes("comments(last: 100)"));
+    assert.ok(requests[0]?.query.includes("comments(first: 100)"));
     assert.ok(!requests[0]?.query.includes("hasNextPage"));
     assert.deepEqual(
       facts && {

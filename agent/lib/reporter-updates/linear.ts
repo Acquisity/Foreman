@@ -138,7 +138,7 @@ const ORIGINAL_QUERY = `query ReporterOriginal($id: String!) {
     labels(first: 50) { nodes { name } }
     attachments(first: 50) { nodes { title url } }
     parent { identifier state { type } attachments(first: 50) { nodes { title url } } }
-    comments(last: ${ORIGINAL_COMMENTS}) {
+    comments(first: ${ORIGINAL_COMMENTS}) {
       nodes { id body createdAt parent { id } user { id name } }
     }
   }
