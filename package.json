@@ -22,7 +22,6 @@
     "report:capabilities": "tsx --env-file-if-exists=.env --env-file-if-exists=.env.local scripts/capability-budget.ts",
     "roster": "tsx scripts/render-roster.ts",
     "roster:check": "tsx scripts/render-roster.ts --check",
-    "routing:eval": "tsx scripts/routing-eval.ts",
     "start": "eve start",
     "test": "tsx --test \"agent/**/*.test.ts\"",
     "typecheck": "tsc",
