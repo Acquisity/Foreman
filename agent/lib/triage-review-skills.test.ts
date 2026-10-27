@@ -116,3 +116,27 @@ test("the critic judges closures and master matches, and is told how many review
   }
   assert.ok(!triageCriticSkill.includes("exactly once per ticket"));
 });
+
+test("a Bug the fallback decides after Jev failed still gets the review and the hotlane", () => {
+  const gate = criticReviewReference.slice(
+    0,
+    criticReviewReference.indexOf("`review.kind` says")
+  );
+  for (const rule of [
+    "`decide_triage` returned `review.required: true`",
+    "or returned `decided: false` and the fallback decided a `Bug`, a `Duplicate`, a `Platform Limitation`, or a `User Error` closing with a lane that could not run or a failure the customer saw",
+    "take `review.kind` from that classification and path",
+  ]) {
+    assert.ok(gate.includes(rule), rule);
+  }
+  assert.ok(
+    reviewSection.includes("or the fallback decides one of these"),
+    "Stage 5 sends a fallback decision to review"
+  );
+});
+
+test("the Intercom Bug branch defers to the shared review protocol", () => {
+  const intercom = read("../skills/intercom-triage-investigate/SKILL.md");
+  assert.ok(!intercom.includes("exactly one critic pass"));
+  assert.ok(intercom.includes("a confirmed Bug gets the shared critic review"));
+});

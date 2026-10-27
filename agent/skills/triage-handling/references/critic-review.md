@@ -1,6 +1,6 @@
 # Critic review protocol
 
-Do not load this reference unless `STAGE 4 COMPLETE: evidence record ready` existed before this file was opened and `decide_triage` returned `review.required: true`. If either gate is absent, stop reading and return to the unfinished stage. This reference is the protocol for the document write, the incident-hotlane gate, the first review, one adjudication, the second review, and the block.
+Do not load this reference unless `STAGE 4 COMPLETE: evidence record ready` existed before this file was opened and `decide_triage` returned `review.required: true`, or returned `decided: false` and the fallback decided a `Bug`, a `Duplicate`, a `Platform Limitation`, or a `User Error` closing with a lane that could not run or a failure the customer saw. For a fallback decision, take `review.kind` from that classification and path as listed below, and its reason from the evidence. If either gate is absent, stop reading and return to the unfinished stage. This reference is the protocol for the document write, the incident-hotlane gate, the first review, one adjudication, the second review, and the block.
 
 `review.kind` says what is being checked: `bug` (a `Bug` that is not a `Duplicate`), `duplicate`, `platform_limitation`, `user_error` (a closure with an evidence lane that could not run, or a failure the customer saw), or `billing_inbox` (an inbox error set aside as billing, not code). For every kind except `bug` the question is the opposite one: is this really not a bug, and is it really the same cause as the ticket it joins.
 

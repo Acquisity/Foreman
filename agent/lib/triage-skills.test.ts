@@ -836,7 +836,7 @@ test("Intercom Bug path creates the report, then hands off to the shared stages"
     ),
     "title rule precedes every issue-creation call"
   );
-  assert.ok(bugHandoff.includes("exactly one critic pass"));
+  assert.ok(bugHandoff.includes("the shared critic review"));
   assert.ok(bugHandoff.includes("`engineering-handoff`"));
   assert.equal(intercomTriageSkill.split(STAGE_4_CHECKPOINT).length, 2);
   assert.equal(
