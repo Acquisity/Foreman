@@ -116,3 +116,46 @@ test("a reviewed decision that adjudication left unproven completes on its Adjud
     );
   }
 });
+
+test("a Bug whose fix is on main but not live completes with the area owner and no master", () => {
+  const fix = "f".repeat(40);
+  const pending = {
+    assignee: "Anthony Adewale",
+    labels: [
+      "intercom-sourced",
+      "Customer reported",
+      "Bug",
+      "Area: Cold Email",
+    ],
+    parentId: null,
+    priority: { value: 3 },
+    project: "Cold Email Core",
+    status: "Todo",
+  };
+  const content = (result: string) => ({
+    content: `# Triage investigation\n**Classification**: Bug\n**Handling path**: Support/Product follow-up\n**Review**: Approved ${pin}\n\n## Regression check\n**Result**: ${result}\n`,
+    url,
+  });
+  for (const result of [
+    `fixed on main, not deployed yet, by ${fix}`,
+    `fixed on main, deploy status unknown, by ${fix}`,
+  ]) {
+    assert.doesNotThrow(
+      () => assertTriageOutputs(pending, content(result), linked),
+      result
+    );
+  }
+  assert.throws(
+    () => assertTriageOutputs(pending, content(`introduced by ${fix}`), linked),
+    SupportRefusal
+  );
+  assert.throws(
+    () =>
+      assertTriageOutputs(
+        { ...pending, assignee: null },
+        content(`fixed on main, not deployed yet, by ${fix}`),
+        linked
+      ),
+    SupportRefusal
+  );
+});
