@@ -40,7 +40,7 @@ If missing evidence materially limits the answer, name the product fact that rem
 
 ## Automatic reporter updates
 
-The scheduled reporter-updates job, not a session turn, posts these messages: received, fixed (a bug), live (a feature, with how to use it), done (a change made without code), not a bug, duplicate (then fixed or live when the original ships) and closed. The fixed lines and fallbacks live in `agent/lib/reporter-updates/copy.ts`; the short phrases inside them come from the `writer` slot (`writer.ts`). Change wording there, keep any text an earlier version posted in `PAST_TEXTS` so those messages are still recognised, and keep these rules:
+The scheduled reporter-updates job, not a session turn, posts these messages: received, fixed (a bug), live (a feature, with how to use it), done (a change made without code), not a bug, duplicate (then fixed or live when the original's code change ships, or done only when staff confirm a change on the duplicate itself; a manual change on the original is never passed on) and closed. The fixed lines and fallbacks live in `agent/lib/reporter-updates/copy.ts`; the short phrases inside them come from the `writer` slot (`writer.ts`). Change wording there, keep any text an earlier version posted in `PAST_TEXTS` so those messages are still recognised, and keep these rules:
 
 - About 40 words at most; a message that runs over drops its optional part or uses its fallback line.
 - Never name an owner or developer. Reporters don't know them. A written phrase that contains any owner-map person's name falls back to the fixed line.

@@ -591,7 +591,7 @@ describe("readOriginal", () => {
     viewer: { id: "viewer" },
   });
 
-  it("reads state, labels, linked pull requests and the newest staff comments, with no full-thread guard to block it", async () => {
+  it("reads only state, labels and linked pull requests, never the original's comments", async () => {
     const { port, requests } = portWith(() =>
       ok(
         original([
@@ -601,8 +601,7 @@ describe("readOriginal", () => {
       )
     );
     const facts = await port.readOriginal("ENG-9");
-    assert.ok(requests[0]?.query.includes("comments(first: 100)"));
-    assert.ok(!requests[0]?.query.includes("hasNextPage"));
+    assert.ok(!requests[0]?.query.includes("comments"));
     assert.deepEqual(
       facts && {
         closingComments: facts.closingComments.map((c) => [c.author, c.body]),
@@ -612,7 +611,7 @@ describe("readOriginal", () => {
         title: facts.title,
       },
       {
-        closingComments: [["staff", "Removed the number."]],
+        closingComments: [],
         labels: ["Feature Request"],
         pullUrls: [PR],
         stateType: "completed",

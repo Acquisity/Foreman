@@ -82,17 +82,53 @@ describe("duplicate of an original that is Done without a linked change", () => 
     assert.deepEqual(waitingIssues(s.memory), []);
   });
 
-  it("posts the Done message when a staff comment on the original describes the change", async () => {
+  it("never sends the original's staff-confirmed manual change to the duplicate's reporter (cross-workspace repro)", async () => {
     const original = doneOriginal({
       closingComments: [
         {
           author: "staff",
-          body: "Removed the wrong number from the CRM.",
+          body: "Removed the incorrect number from workspace B only",
           createdAt: "2026-10-12T10:00:00Z",
         },
       ],
     });
     const s = setup([duplicate(), original]);
+    withLog(s);
+    const writer = fakeWriter({
+      done: { steps: null, what: "the incorrect number has been removed" },
+    });
+    s.deps.write = writer.write;
+    await reconcile(s);
+    assert.deepEqual(await reconcile(s), { kind: "waiting" });
+    assert.deepEqual(
+      s.linear.posts.map((p) => p.body),
+      [DUPLICATE_TEXT]
+    );
+    assert.equal(
+      writer.tasks.some((t) => t.kind === "done"),
+      false,
+      "the original's comments never reach the writer for the duplicate"
+    );
+    assert.deepEqual(waitingIssues(s.memory), [
+      { checkedSha: OLD_SHA, issue: "ENG-1" },
+    ]);
+    assert.equal(
+      s.memory.table.get("ENG-1|fixed")?.status,
+      "waiting",
+      "no claim is taken"
+    );
+  });
+
+  it("posts Done when a staff comment on the duplicate itself describes the change", async () => {
+    const dup = duplicate();
+    dup.facts.closingComments = [
+      {
+        author: "staff",
+        body: "Removed the wrong number from this customer's CRM too.",
+        createdAt: "2026-10-12T10:00:00Z",
+      },
+    ];
+    const s = setup([dup, doneOriginal()]);
     withLog(s);
     const writer = fakeWriter();
     s.deps.write = writer.write;
@@ -104,7 +140,7 @@ describe("duplicate of an original that is Done without a linked change", () => 
     );
     const task = writer.tasks.find((t) => t.kind === "done");
     assert.deepEqual(task && "staff" in task ? task.staff : [], [
-      "Removed the wrong number from the CRM.",
+      "Removed the wrong number from this customer's CRM too.",
     ]);
   });
 
@@ -139,20 +175,10 @@ describe("duplicate of an original that is Done without a linked change", () => 
     });
   });
 
-  it("wakes a waiting duplicate when staff close the original with a change and no new release", async () => {
+  it("wakes a waiting duplicate with no new release once staff confirm a change on the duplicate itself", async () => {
     const dup = duplicate();
     dup.updatedAt = "2026-10-11T10:00:00.000Z";
-    const original = ticket({ identifier: "ENG-9" });
-    original.anchorId = null;
-    const s = setup([dup, original], { liveSha: OLD_SHA, pulls: {} });
-    withLog(s);
-    const run = () => runReporterUpdates(s.deps, NOW, () => NOW);
-    await run();
-    await run();
-    assert.deepEqual(waitingIssues(s.memory), [
-      { checkedSha: OLD_SHA, issue: "ENG-1" },
-    ]);
-    Object.assign(original.facts, {
+    const original = doneOriginal({
       closingComments: [
         {
           author: "staff",
@@ -160,9 +186,23 @@ describe("duplicate of an original that is Done without a linked change", () => 
           createdAt: "2026-10-12T10:00:00Z",
         },
       ],
-      stateName: "Done",
-      stateType: "completed",
     });
+    const s = setup([dup, original], { liveSha: OLD_SHA, pulls: {} });
+    withLog(s);
+    const run = () => runReporterUpdates(s.deps, NOW, () => NOW);
+    await run();
+    await run();
+    assert.deepEqual(
+      s.linear.posts.map((p) => p.body),
+      [DUPLICATE_TEXT]
+    );
+    dup.facts.closingComments = [
+      {
+        author: "staff",
+        body: "Removed the wrong number for this customer as well.",
+        createdAt: "2026-10-12T11:00:00Z",
+      },
+    ];
     await run();
     assert.equal(s.linear.posts.length, 1, "nothing before the recheck time");
     s.memory.state.now += 61 * 60_000;

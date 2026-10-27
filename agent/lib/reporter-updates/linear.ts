@@ -126,9 +126,7 @@ const TICKET_QUERY = `query ReporterTicket($id: String!) {
   }
 }`;
 
-const ORIGINAL_COMMENTS = 100;
 const ORIGINAL_QUERY = `query ReporterOriginal($id: String!) {
-  viewer { id }
   issue(id: $id) {
     identifier
     title
@@ -138,9 +136,6 @@ const ORIGINAL_QUERY = `query ReporterOriginal($id: String!) {
     labels(first: 50) { nodes { name } }
     attachments(first: 50) { nodes { title url } }
     parent { identifier state { type } attachments(first: 50) { nodes { title url } } }
-    comments(first: ${ORIGINAL_COMMENTS}) {
-      nodes { id body createdAt parent { id } user { id name } }
-    }
   }
 }`;
 
@@ -217,23 +212,11 @@ const ticketSchema = z.object({
 const linkNodes = z.object({
   nodes: z.array(z.object({ title: z.string(), url: z.string() })),
 });
-const commentNodes = z.object({
-  nodes: z.array(
-    z.object({
-      body: z.string(),
-      createdAt: z.string(),
-      id: z.string(),
-      parent: z.object({ id: z.string() }).nullable(),
-      user: z.object({ id: z.string(), name: z.string() }).nullable(),
-    })
-  ),
-});
 const originalSchema = z.object({
   issue: z
     .object({
       assignee: z.object({ name: z.string() }).nullable(),
       attachments: linkNodes,
-      comments: commentNodes,
       description: z.string().nullable(),
       identifier: z.string(),
       labels: z.object({ nodes: z.array(z.object({ name: z.string() })) }),
@@ -248,7 +231,6 @@ const originalSchema = z.object({
       title: z.string(),
     })
     .nullable(),
-  viewer: z.object({ id: z.string() }),
 });
 
 const pullUrlsOf = (nodes: readonly { url: string }[]): string[] => [
@@ -414,7 +396,7 @@ export const linearPort = (
       return created.id;
     },
     async readOriginal(identifier) {
-      const { issue, viewer } = originalSchema.parse(
+      const { issue } = originalSchema.parse(
         await call(ORIGINAL_QUERY, "ReporterOriginal", { id: identifier })
       );
       return issue
@@ -422,11 +404,7 @@ export const linearPort = (
             assignee: issue.assignee?.name ?? null,
             channel: null,
             closedAt: null,
-            closingComments: closingCommentsOf(
-              issue.comments.nodes,
-              viewer.id,
-              issue.identifier
-            ),
+            closingComments: [],
             createdAt: "",
             description: issue.description ?? "",
             duplicateOf: null,

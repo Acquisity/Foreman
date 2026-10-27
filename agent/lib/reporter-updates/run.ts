@@ -315,7 +315,7 @@ const originalFollowUp = async (
     );
   }
   if (closure.kind === "done_without_pull") {
-    const done = await composeDone(original, deps.write);
+    const done = await composeDone(view.facts, deps.write);
     if (done) {
       return done;
     }
