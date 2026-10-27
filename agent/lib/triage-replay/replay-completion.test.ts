@@ -457,6 +457,33 @@ describe("replay result", () => {
     assert.equal(result.final?.path, "Support/Financial");
   });
 
+  it("does not let an earlier approval complete a new closure decision", async (t) => {
+    await replayProcess(t);
+    noTransport(t);
+    const closure = routeDecision({
+      needsCriticReview: true,
+      review: { kind: "duplicate", reason: "r", required: true },
+    });
+    await toolResult("decide_triage", closure);
+    await criticSettles("critic-1", criticReply("APPROVE"));
+    await toolResult("decide_triage", closure);
+    await routeTicket(
+      {
+        addLabels: ["Bug"],
+        duplicateOf: "ENG-90",
+        inheritAssigneeFrom: "ENG-90",
+        issue: "ENG-100",
+        project: "Cold Email Core",
+        state: "Duplicate",
+      },
+      { client: executorClient(ctx) }
+    );
+    await endTurn();
+    assert.equal(buildReplayResult(await state(), RUN).status, "failed");
+    await criticSettles("critic-2", criticReply("APPROVE"));
+    assert.equal(buildReplayResult(await state(), RUN).status, "completed");
+  });
+
   it("completes an unproven stop once its document is saved", async (t) => {
     await replayProcess(t);
     await toolResult("decide_triage", {

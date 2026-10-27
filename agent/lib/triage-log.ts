@@ -190,18 +190,25 @@ const statusOnly = (input: RouteInput & Record<string, unknown>): boolean =>
     ([key, value]) => key === "issue" || key === "state" || value === undefined
   );
 
-const awaitingReview = (
-  decisions: Readonly<Record<string, LatestTriageDecision>>,
+/**
+ * Whether the latest decision for an issue has had its review: the critic
+ * settled since that decision, or the cycle has used both reviews.
+ */
+export const reviewedSinceDecision = (
   rounds: Readonly<Record<string, CriticRounds>>,
   issue: string
 ): boolean => {
   const round = rounds[issue];
-  return (
-    decisions[issue]?.closureReview === true &&
-    !round?.ran &&
-    (round?.reviews ?? 0) < CRITIC_REVIEW_LIMIT
-  );
+  return Boolean(round?.ran) || (round?.reviews ?? 0) >= CRITIC_REVIEW_LIMIT;
 };
+
+const awaitingReview = (
+  decisions: Readonly<Record<string, LatestTriageDecision>>,
+  rounds: Readonly<Record<string, CriticRounds>>,
+  issue: string
+): boolean =>
+  decisions[issue]?.closureReview === true &&
+  !reviewedSinceDecision(rounds, issue);
 
 export function routeRefusal(
   decisions: Readonly<Record<string, LatestTriageDecision>>,

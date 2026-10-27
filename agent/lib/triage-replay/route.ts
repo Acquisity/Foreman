@@ -1,7 +1,11 @@
 import type { SessionAuthContext } from "eve/context";
 import { z } from "zod";
 import { diagnosticsSecretRefusal } from "../diagnostics-secret.js";
-import { BILLING_PATH, CRITIC_OBJECTION_LIMIT } from "../triage-log.js";
+import {
+  BILLING_PATH,
+  CRITIC_OBJECTION_LIMIT,
+  reviewedSinceDecision,
+} from "../triage-log.js";
 import { stampTriageIntake, stampUnattended } from "../trust.js";
 import { loadReplayState, seedReplayStore } from "./backend.js";
 import {
@@ -226,7 +230,13 @@ function reachedTerminal(state: ReplayState, decision: FinalDecision | null) {
     case "billing":
       return routed;
     case "route":
-      return routed && (!decision.needsCritic || state.critic !== null);
+      return (
+        routed &&
+        (!decision.needsCritic ||
+          (state.criticRounds
+            ? reviewedSinceDecision(state.criticRounds, state.case.id)
+            : state.critic !== null))
+      );
     default:
       return false;
   }
