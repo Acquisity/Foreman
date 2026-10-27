@@ -1,6 +1,6 @@
 # Triage replay
 
-This folder scores Foreman's triage against what people decided later (ENG-16049). It replays settled ENG tickets through today's triage code and checks the verdict, classification, handling path, project, owner, duplicate and master. Every Foreman triage change should show it helped here before it ships.
+This folder scores Foreman's triage against what people decided later (ENG-16049). It replays settled ENG tickets through today's triage code and checks the verdict, classification, handling path, project, owner, duplicate, master and root cause. Every Foreman triage change should show it helped here before it ships.
 
 ## What's here
 
@@ -39,7 +39,11 @@ The runner starts one case at a time, polls until the root turn ends, and writes
 pnpm triage:score .eve/triage-replay/<run id> --heldout-labels <path to heldout.json> [--runs N]
 ```
 
-The scorer writes `scorecard.md` and `scores.json` next to the results. Every case in the split counts once per run, so a missing, failed or cancelled run scores wrong on every field. Train and held-out score apart, each split by intake lane. Text fields match trimmed and case-folded, and a field the label leaves null is unscored. Duplicates match as sets of issue ids, where null means not a duplicate. A master filed after the case means the run should have created a new one. The scorer refuses results from more than one run id or Foreman commit, or with an unknown commit, so a baseline and a candidate are never scored together.
+The scorer writes `scorecard.md` and `scores.json` next to the results. Every case in the split counts once per run, so a missing, failed or cancelled run scores wrong on every field. Train and held-out score apart, each split by intake lane. Text fields match trimmed and case-folded, and a field the label leaves null is unscored. Duplicates match as sets of issue ids, where null means not a duplicate. A master filed after the case means the run should have created a new one.
+
+Root cause is scored only for labels with known fix files or functions (23 of the 103 train labels today). A run matches when its investigation document names at least one labelled file and, when the label lists functions, at least one labelled function. A file counts when its file name appears case-insensitively with no letter, digit, `_`, `.` or `-` around it, so any path ending in it matches (`client.ts` and `autumn/client.ts` both count, `myclient.ts` and `client.tsx` don't). A function counts as a whole word, case-insensitively. A file alone is wrong when the label lists functions. A missing, failed or cancelled run is wrong here too. Every other label (a text-only cause, or none) shows as "not scored" with its count and is never a pass or a fail. Judging text-only causes is left to ENG-16431.
+
+The scorer refuses results from more than one run id or Foreman commit, or with an unknown commit, so a baseline and a candidate are never scored together.
 
 ## Live logging
 
