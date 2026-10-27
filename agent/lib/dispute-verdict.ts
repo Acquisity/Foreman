@@ -254,7 +254,7 @@ const deliveryStoppedBeforeCharge = (
     [facts.domains, facts.inboxes, facts.deletionRequests].some(incomplete) ||
     !invoice ||
     subscriptionIds.length > 1 ||
-    incomplete(stripe.invoices) ||
+    incomplete(stripe.invoiceWindow) ||
     incomplete(stripe.subscriptions);
   return flag(
     because,

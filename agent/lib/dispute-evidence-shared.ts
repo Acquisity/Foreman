@@ -1,3 +1,4 @@
+import { isConnectionAuthorizationFailedError } from "eve/connections";
 import { ExecutorError } from "./executor/transport.js";
 import { truncateRows } from "./planetscale.js";
 
@@ -78,8 +79,21 @@ export const rowList = <T>(
 };
 
 export const failure = (error: unknown): string => {
-  if (error instanceof ExecutorError) {
-    return `Executor could not complete the call (${error.code}).`;
+  let cause = error;
+  for (let depth = 0; depth < 8 && cause instanceof Error; depth += 1) {
+    if (isConnectionAuthorizationFailedError(cause)) {
+      return `Executor authorization is unavailable (${cause.reason ?? "authorization_failed"}).`.slice(
+        0,
+        ERROR_CHARS
+      );
+    }
+    if (cause instanceof ExecutorError) {
+      return `Executor could not complete the call (${cause.code}).`.slice(
+        0,
+        ERROR_CHARS
+      );
+    }
+    ({ cause } = cause);
   }
   return (
     error instanceof Error ? error.message : "The read could not run."

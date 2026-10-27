@@ -1,6 +1,5 @@
 import { readAutumnCustomer } from "./billing-api.js";
 import { withEvidenceDeadline } from "./dispute-evidence-deadline.js";
-
 import {
   attempt,
   boundedText,
@@ -15,6 +14,7 @@ import {
   str,
   UUID,
 } from "./dispute-evidence-shared.js";
+import { readLinear } from "./dispute-linear.js";
 import { readSlack } from "./dispute-slack.js";
 import { verdictFacts } from "./dispute-verdict.js";
 import { executorClient } from "./executor/client.js";
@@ -25,8 +25,6 @@ import {
   readInstantlySubworkspace,
   resolveInstantlySubworkspace,
 } from "./instantly-api.js";
-import { findRelatedIssues, linearGraphql } from "./linear-api.js";
-import type { LinearResponse } from "./linear-response.js";
 import { PRODUCTION_READ_QUERY_ARGS } from "./lookup-customer.js";
 import {
   callPlanetscaleReadQuery,
@@ -54,7 +52,7 @@ import {
 export const GATHER_DEADLINE_MS = 240_000;
 export const SOURCE_DEADLINES_MS = {
   autumn: 25_000,
-  database: 75_000,
+  database: 100_000,
   instantly: 120_000,
   linear: 45_000,
   slack: 90_000,
@@ -63,10 +61,7 @@ export const SOURCE_DEADLINES_MS = {
 const DAY_MS = 86_400_000;
 const USE_WINDOW_DAYS = 30;
 const STRIPE_LIMIT = 50;
-const MAX_TICKETS = 25;
 const TEXT_CHARS = 1500;
-const DESCRIPTION_CHARS = 4000;
-const IDENTIFIER = /^([A-Z][A-Z0-9]*)-(\d+)$/u;
 export interface EvidenceDeps {
   readonly abortSignal?: AbortSignal;
   /** Linear GraphQL reads. */
@@ -209,6 +204,25 @@ const readStripe = async (deps: EvidenceDeps, disputeId: string) => {
         invoiceFacts
       )
     : null;
+  const chargedAt = identity.charge.created
+    ? Date.parse(identity.charge.created) / 1000
+    : Number.NaN;
+  const invoiceWindow =
+    id && Number.isFinite(chargedAt)
+      ? await list(
+          "invoiceWindow",
+          {
+            input: {
+              "created[gte]": Math.floor(chargedAt - (2 * DAY_MS) / 1000),
+              "created[lte]": Math.floor(chargedAt + (2 * DAY_MS) / 1000),
+              customer: id,
+              limit: STRIPE_LIMIT,
+            },
+            operation: "stripe.invoices.list",
+          },
+          invoiceFacts
+        )
+      : null;
   const subscriptions = id
     ? await list(
         "subscriptions",
@@ -244,8 +258,8 @@ const readStripe = async (deps: EvidenceDeps, disputeId: string) => {
     charge: identity.charge,
     chargeInvoice: matchChargeInvoice(
       identity.charge,
-      invoices?.rows ?? [],
-      invoices !== null && !invoices.truncated
+      invoiceWindow?.rows ?? [],
+      invoiceWindow !== null && !invoiceWindow.truncated
     ),
     charges,
     creditNotes,
@@ -265,6 +279,7 @@ const readStripe = async (deps: EvidenceDeps, disputeId: string) => {
       submissionCount: dispute.evidence_details?.submission_count ?? null,
     },
     invoices,
+    invoiceWindow,
     subscriptions,
     unavailable,
   };
@@ -574,107 +589,6 @@ const readInstantly = async (
     campaigns: campaigns?.list ?? null,
     unavailable,
     workspace: campaigns?.workspace ?? accounts?.workspace ?? null,
-  };
-};
-
-// --- Linear --------------------------------------------------------------------
-
-const readLinear = async (
-  deps: EvidenceDeps,
-  stripe: Source<StripeFacts>,
-  database: Source<DatabaseFacts>
-) => {
-  const phrases = [
-    ...new Set(
-      [
-        stripe.facts ? stripe.facts.customer?.email : null,
-        stripe.facts ? stripe.facts.cardholder.email : null,
-        database.facts ? database.facts.provisioned?.name : null,
-      ]
-        .map((phrase) => phrase?.trim().toLowerCase())
-        .filter((phrase): phrase is string => Boolean(phrase))
-    ),
-  ];
-  if (phrases.length === 0) {
-    throw new Error(
-      "No customer email or workspace name was read, so Linear could not be searched."
-    );
-  }
-  const related = await findRelatedIssues(
-    { phrases, scope: "duplicates", windowed: false },
-    { client: deps.linear, signal: deps.abortSignal }
-  );
-  const found = related.issues.slice(0, MAX_TICKETS);
-  const keys = found.flatMap((issue) => {
-    const match = IDENTIFIER.exec(issue.identifier);
-    return match
-      ? [{ number: { eq: Number(match[2]) }, team: { key: { eq: match[1] } } }]
-      : [];
-  });
-  const bodies = keys.length
-    ? (
-        await linearGraphql<LinearResponse<"IssueBodies">>(
-          "IssueBodies",
-          { filter: { or: keys } },
-          { client: deps.linear, signal: deps.abortSignal }
-        )
-      ).issues.nodes
-    : [];
-  const identities = [
-    stripe.facts?.customer?.email,
-    database.facts?.provisioned?.organizationId,
-  ].filter((value): value is string => Boolean(value));
-  const owned = bodies.filter((body) => {
-    const text = [
-      body.title,
-      body.description,
-      ...body.comments.nodes.map((comment) => comment.body),
-    ]
-      .join("\n")
-      .toLowerCase();
-    return identities.some((identity) => {
-      const escaped = identity
-        .toLowerCase()
-        .replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
-      return new RegExp(
-        `(?<![a-z0-9_@.+-])${escaped}(?![a-z0-9_@+-]|\\.[a-z0-9])`,
-        "u"
-      ).test(text);
-    });
-  });
-  const tickets = owned.map((body) => {
-    const comments = body.comments.nodes
-      .map((comment) => ({
-        author: comment.user?.name ?? null,
-        body: clip(comment.body, TEXT_CHARS),
-        createdAt: comment.createdAt,
-      }))
-      .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
-    const truncated =
-      body.comments.nodes.length >= 10 ||
-      (body.description?.length ?? 0) > DESCRIPTION_CHARS ||
-      body.comments.nodes.some((comment) => comment.body.length > TEXT_CHARS);
-    return {
-      comments,
-      createdAt: body.createdAt,
-      description: clip(body.description, DESCRIPTION_CHARS),
-      identifier: body.identifier,
-      state: body.state.name,
-      title: body.title,
-      truncated,
-      url: body.url,
-    };
-  });
-  return {
-    droppedCandidates: found.length - owned.length,
-    phrases,
-    tickets: rowList(
-      tickets,
-      MAX_TICKETS,
-      related.truncated ||
-        related.issues.length > MAX_TICKETS ||
-        tickets.some((ticket) => ticket.truncated)
-    ),
   };
 };
 

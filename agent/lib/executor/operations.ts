@@ -103,7 +103,10 @@ export const operationInputs = {
   "stripe.customers.balance_transactions": z.object({ customer_id: id, limit }),
   "stripe.customers.get": z.object({ customer_id: id }),
   "stripe.disputes.get": z.object({ dispute_id: id }),
-  "stripe.invoices.list": history,
+  "stripe.invoices.list": history.extend({
+    "created[gte]": z.number().int().nonnegative().optional(),
+    "created[lte]": z.number().int().nonnegative().optional(),
+  }),
   "stripe.promotion_codes.list": z.object({ code: id, limit }),
   "stripe.refunds.get": z.object({ refund_id: id }),
   "stripe.subscriptions.list": history.extend({ status: z.literal("all") }),
