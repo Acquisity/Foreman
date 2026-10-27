@@ -106,7 +106,33 @@ const skillLoadFailure = criticReply("INSUFFICIENT_EVIDENCE", {
     issue_id: "ENG-100",
   },
 });
-const criticSettles = (callId: string, output: unknown) =>
+const PACKET_MESSAGE = [
+  "Source issue: ENG-100",
+  "Document: doc-1",
+  "Document updatedAt: 2026-10-27T10:00:00.000Z",
+  `Commit: ${"c".repeat(40)}`,
+].join("\n");
+const criticDispatched = (callId: string, message = PACKET_MESSAGE) =>
+  replayHandler("actions.requested")(
+    {
+      data: {
+        actions: [
+          {
+            callId,
+            input: { message },
+            kind: "subagent-call",
+            subagentName: "critic",
+          },
+        ],
+      },
+    },
+    rootCtx
+  );
+const criticSettles = async (callId: string, output: unknown) => {
+  await criticDispatched(callId);
+  await criticSettled(callId, output);
+};
+const criticSettled = (callId: string, output: unknown) =>
   replayHandler("task.settled")(
     {
       data: {
@@ -293,6 +319,21 @@ describe("replay result", () => {
     assert.equal((await state()).criticObjections, 1);
     await criticSettles("critic-2", objection);
     assert.equal((await state()).criticObjections, 2);
+  });
+
+  it("does not count an objection to a packet the critic was not sent", async (t) => {
+    await replayProcess(t);
+    noTransport(t);
+    await criticDispatched(
+      "critic-1",
+      PACKET_MESSAGE.replace("doc-1", "doc-2")
+    );
+    await criticSettled("critic-1", objection);
+    await criticDispatched("critic-2", "Source issue: ENG-100\nPlease review.");
+    await criticSettled("critic-2", objection);
+    const settled = await state();
+    assert.equal(settled.criticObjections ?? 0, 0);
+    assert.equal(settled.critic?.counted, "failed");
   });
 
   it("waits for the critic when the decision needs review", async (t) => {

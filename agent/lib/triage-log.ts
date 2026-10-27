@@ -24,8 +24,16 @@ export interface BillingRoute {
   project: string;
 }
 
-export const criticTaskIssues = defineState<Record<string, string>>(
-  "foreman.criticTaskIssues",
+/** What a critic call was sent to review, read from its message. */
+export interface CriticPacket {
+  commit: string | null;
+  documentId: string | null;
+  issue: string;
+  updatedAt: string | null;
+}
+
+export const criticTaskPackets = defineState<Record<string, CriticPacket>>(
+  "foreman.criticTaskPackets",
   () => ({})
 );
 
@@ -175,7 +183,7 @@ export function routeRefusal(
     return null;
   }
   if (awaitingReview(decisions, rounds, input.issue)) {
-    return `${input.issue} is a closure or duplicate that needs the critic's second check first. Delegate to the critic with a first line of exactly "Source issue: ${input.issue}", then route once it settles.`;
+    return `${input.issue} is a closure or duplicate that needs the critic's second check first. Delegate to the critic with a first line of exactly "Source issue: ${input.issue}" and the Document, Document updatedAt and Commit lines critic-review.md names, then route once it settles.`;
   }
   return null;
 }
@@ -216,6 +224,31 @@ export function criticTaskIssue(input: unknown): string | null {
   return SOURCE_LINE.exec(message.split("\n", 1)[0]?.trim() ?? "")?.[1] ?? null;
 }
 
+const PACKET_LINE =
+  /^\**(Document updatedAt|Document|Commit)\**:\**\s*`?([^`\s]+)`?\.?$/iu;
+
+export function criticTaskPacket(input: unknown): CriticPacket | null {
+  const issue = criticTaskIssue(input);
+  if (!issue) {
+    return null;
+  }
+  const fields = new Map<string, string>();
+  for (const line of String((input as { message: string }).message).split(
+    "\n"
+  )) {
+    const match = PACKET_LINE.exec(line.trim());
+    if (match?.[1] && match[2] && !fields.has(match[1].toLowerCase())) {
+      fields.set(match[1].toLowerCase(), match[2]);
+    }
+  }
+  return {
+    commit: fields.get("commit") ?? null,
+    documentId: fields.get("document") ?? null,
+    issue,
+    updatedAt: fields.get("document updatedat") ?? null,
+  };
+}
+
 export function decisionFields(
   issue: string,
   decision: TriageDecision
@@ -245,7 +278,14 @@ const criticReply = z.object({
   criteria_results: z.array(
     z.object({ criterion: z.enum(CRITIC_CRITERIA), result: z.string() })
   ),
-  reviewed: z.object({ commit: z.string(), issue_id: z.string() }).optional(),
+  reviewed: z
+    .object({
+      commit: z.string(),
+      document_id: z.string(),
+      document_updated_at: z.string(),
+      issue_id: z.string(),
+    })
+    .optional(),
   verdict: z.enum(CRITIC_VERDICTS),
 });
 type CriticReply = z.infer<typeof criticReply>;
@@ -276,20 +316,28 @@ const completeApproval = (reply: CriticReply): boolean => {
   );
 };
 
+const sameEcho = (echo: string, sent: string | null): boolean =>
+  sent !== null && echoed(echo) === echoed(sent);
+
 /**
  * What a critic result counts as under critic-review.md step 5: an approval
- * only when it is complete, a failure when the review could not start, ran
- * unpinned or reviewed another ticket, and an objection otherwise.
+ * only when it is complete, a failure when the review could not start or did
+ * not review the packet it was sent (ticket, document, version and pinned
+ * commit), and an objection otherwise.
  */
 export function countCriticReply(
   reply: CriticReply,
-  issue: string | null
+  packet: CriticPacket | null
 ): CriticCount {
+  const { reviewed } = reply;
   if (
     reply.criteria_results.length === 0 ||
-    !reply.reviewed ||
-    !PINNED_COMMIT.test(echoed(reply.reviewed.commit)) ||
-    (issue !== null && echoed(reply.reviewed.issue_id) !== echoed(issue))
+    !(reviewed && packet) ||
+    !PINNED_COMMIT.test(echoed(reviewed.commit)) ||
+    !sameEcho(reviewed.issue_id, packet.issue) ||
+    !sameEcho(reviewed.commit, packet.commit) ||
+    !sameEcho(reviewed.document_id, packet.documentId) ||
+    !sameEcho(reviewed.document_updated_at, packet.updatedAt)
   ) {
     return "failed";
   }
@@ -301,7 +349,7 @@ export function countCriticReply(
 export function criticVerdictFields(
   status: string,
   output: unknown,
-  issue: string | null = null
+  packet: CriticPacket | null = null
 ): CriticVerdictFields {
   const failed = {
     blockingFindings: null,
@@ -326,7 +374,7 @@ export function criticVerdictFields(
   }
   return {
     blockingFindings: parsed.data.blocking_findings.length,
-    counted: countCriticReply(parsed.data, issue),
+    counted: countCriticReply(parsed.data, packet),
     failedCriteria: parsed.data.criteria_results.filter(
       (entry) => entry.result === "FAIL"
     ).length,
@@ -376,10 +424,10 @@ export function routeDecisionEvent(
   };
 }
 
-export const criticVerdictIssue = (
-  bindings: Readonly<Record<string, string>>,
+export const criticVerdictIssue = <T>(
+  bindings: Readonly<Record<string, T>>,
   callId: string
-): string | null => bindings[callId] ?? null;
+): T | null => bindings[callId] ?? null;
 
 export const assigneeKind = (input: {
   assignee?: string;

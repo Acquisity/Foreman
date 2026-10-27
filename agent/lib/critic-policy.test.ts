@@ -4,12 +4,19 @@ import { CRITIC_CRITERIA } from "../subagents/critic/agent.js";
 import { formatOpsEvent } from "./ops-log.js";
 import {
   criticBlocked,
+  criticTaskPacket,
   criticVerdictFields,
   settleCriticRound,
 } from "./triage-log.js";
 import { triageResultSchema } from "./triage-replay/schema.js";
 
 const COMMIT = "c".repeat(40);
+const PACKET = {
+  commit: COMMIT,
+  documentId: "doc-1",
+  issue: "ENG-1",
+  updatedAt: "2026-10-27T10:00:00.000Z",
+};
 const reviewed = (over: Record<string, string> = {}) => ({
   commit: COMMIT,
   document_id: "doc-1",
@@ -44,7 +51,7 @@ const settle = (verdicts: unknown[]) =>
       settleCriticRound(
         rounds,
         "ENG-1",
-        criticVerdictFields("completed", output, "ENG-1").counted
+        criticVerdictFields("completed", output, PACKET).counted
       ),
     {}
   );
@@ -52,7 +59,7 @@ const settle = (verdicts: unknown[]) =>
 describe("the critic policy", () => {
   it("counts a valid approval as an approval and a challenge as an objection", () => {
     assert.equal(
-      criticVerdictFields("completed", reply(), "ENG-1").counted,
+      criticVerdictFields("completed", reply(), PACKET).counted,
       "approve"
     );
     assert.equal(
@@ -63,7 +70,7 @@ describe("the critic policy", () => {
           criteria_results: criteria(1),
           verdict: "CHALLENGE",
         }),
-        "ENG-1"
+        PACKET
       ).counted,
       "objection"
     );
@@ -71,7 +78,7 @@ describe("the critic policy", () => {
 
   it("does not count a review that could not start or ran unpinned as an objection", () => {
     assert.equal(
-      criticVerdictFields("completed", skillLoadFailure, "ENG-1").counted,
+      criticVerdictFields("completed", skillLoadFailure, PACKET).counted,
       "failed"
     );
     const unpinned = reply({
@@ -80,7 +87,7 @@ describe("the critic policy", () => {
       verdict: "CHALLENGE",
     });
     assert.equal(
-      criticVerdictFields("completed", unpinned, "ENG-1").counted,
+      criticVerdictFields("completed", unpinned, PACKET).counted,
       "failed"
     );
     const rounds = settle([skillLoadFailure, skillLoadFailure]);
@@ -93,13 +100,13 @@ describe("the critic policy", () => {
       criticVerdictFields(
         "completed",
         reply({ reviewed: reviewed({ issue_id: "ENG-2" }) }),
-        "ENG-1"
+        PACKET
       ).counted,
       "failed"
     );
     const { reviewed: _dropped, ...noEcho } = reply();
     assert.equal(
-      criticVerdictFields("completed", noEcho, "ENG-1").counted,
+      criticVerdictFields("completed", noEcho, PACKET).counted,
       "failed"
     );
   });
@@ -120,11 +127,65 @@ describe("the critic policy", () => {
       { commit: ` ${COMMIT} ` },
     ]) {
       assert.equal(
-        criticVerdictFields("completed", challenge(echo), "ENG-1").counted,
+        criticVerdictFields("completed", challenge(echo), PACKET).counted,
         "objection",
         JSON.stringify(echo)
       );
     }
+  });
+
+  it("counts a review of another commit, document or version as failed, not as an objection", () => {
+    const challenge = (echo: Record<string, string>) =>
+      reply({
+        blocking_findings: [{ claim: "c" }],
+        criteria_results: criteria(1),
+        reviewed: reviewed(echo),
+        verdict: "CHALLENGE",
+      });
+    const wrongPackets: Record<string, string>[] = [
+      { commit: "d".repeat(40) },
+      { document_id: "doc-2" },
+      { document_updated_at: "2026-10-27T09:00:00.000Z" },
+    ];
+    for (const echo of wrongPackets) {
+      assert.equal(
+        criticVerdictFields("completed", challenge(echo), PACKET).counted,
+        "failed",
+        JSON.stringify(echo)
+      );
+    }
+    const rounds = settle(wrongPackets.slice(0, 2).map(challenge));
+    assert.equal(criticBlocked(rounds, "ENG-1"), false);
+    assert.equal(
+      criticVerdictFields("completed", challenge({}), null).counted,
+      "failed"
+    );
+  });
+
+  it("reads the packet the critic was sent from its message", () => {
+    assert.deepEqual(
+      criticTaskPacket({
+        message: [
+          "Source issue: ENG-1",
+          "Document: doc-1",
+          "Document updatedAt: `2026-10-27T10:00:00.000Z`",
+          `**Commit**: ${COMMIT}`,
+          "Review kind: duplicate: r",
+        ].join("\n"),
+      }),
+      PACKET
+    );
+    assert.deepEqual(
+      criticTaskPacket({
+        message: `Source issue: ENG-1\nDocument: read-only\nDocument updatedAt: read-only\nCommit: ${COMMIT}`,
+      }),
+      { ...PACKET, documentId: "read-only", updatedAt: "read-only" }
+    );
+    assert.deepEqual(
+      criticTaskPacket({ message: "Source issue: ENG-1\nPlease review." }),
+      { commit: null, documentId: null, issue: "ENG-1", updatedAt: null }
+    );
+    assert.equal(criticTaskPacket({ message: "Please review ENG-1." }), null);
   });
 
   it("treats an approval with failed criteria, blocking findings or missing slugs as an objection", () => {
@@ -137,7 +198,7 @@ describe("the critic policy", () => {
       }),
     ]) {
       assert.equal(
-        criticVerdictFields("completed", output, "ENG-1").counted,
+        criticVerdictFields("completed", output, PACKET).counted,
         "objection"
       );
     }
@@ -157,7 +218,7 @@ describe("the critic policy", () => {
 
   it("keeps the raw verdict and counts for the log", () => {
     assert.deepEqual(
-      criticVerdictFields("completed", skillLoadFailure, "ENG-1"),
+      criticVerdictFields("completed", skillLoadFailure, PACKET),
       {
         blockingFindings: 0,
         counted: "failed",
@@ -186,7 +247,7 @@ describe("the critic.verdict log line", () => {
   it("carries how the result counted", () => {
     const line = JSON.parse(
       formatOpsEvent("critic.verdict", {
-        ...criticVerdictFields("completed", skillLoadFailure, "ENG-1"),
+        ...criticVerdictFields("completed", skillLoadFailure, PACKET),
         issue: "ENG-1",
       })
     );

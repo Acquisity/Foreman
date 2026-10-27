@@ -146,3 +146,13 @@ test("the Intercom Bug branch defers to the shared review protocol", () => {
   assert.ok(!intercom.includes("exactly one critic pass"));
   assert.ok(intercom.includes("a confirmed Bug gets the shared critic review"));
 });
+
+test("the critic is sent the packet its echo is checked against", () => {
+  for (const rule of [
+    "The next three lines are exactly `Document: <document id>`, `Document updatedAt: <updatedAt>`, and `Commit: <the full 40-character SHA",
+    "a read-only run writes `read-only` on both document lines",
+    "a result whose `reviewed` echo names another ticket, document, version or commit is a failed review, not an objection",
+  ]) {
+    assert.ok(criticReviewReference.includes(rule), rule);
+  }
+});
