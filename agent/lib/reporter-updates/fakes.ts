@@ -80,6 +80,7 @@ export const memoryStore = () => {
     sweep: { after: string; since: number; startedAt: number } | null;
     failNextEnqueue: boolean;
     failNextMarkSent: boolean;
+    failNextResolve: boolean;
     now: number;
     tokens: number;
   } = {
@@ -87,6 +88,7 @@ export const memoryStore = () => {
     cursorWrites: [],
     failNextEnqueue: false,
     failNextMarkSent: false,
+    failNextResolve: false,
     now: 0,
     sweep: null,
     tokens: 0,
@@ -191,13 +193,6 @@ export const memoryStore = () => {
       }
       return Promise.resolve();
     },
-    dropWaiting(issue) {
-      const row = table.get(key(issue, "fixed"));
-      if (row?.status === "waiting") {
-        table.delete(key(issue, "fixed"));
-      }
-      return Promise.resolve();
-    },
     enqueue(tickets) {
       if (state.failNextEnqueue) {
         state.failNextEnqueue = false;
@@ -299,10 +294,23 @@ export const memoryStore = () => {
       }
       return Promise.resolve();
     },
-    resolvePending(item) {
-      return Promise.resolve(
-        current(item) !== undefined && pending.delete(item.issue)
-      );
+    resolvePending(item, wait) {
+      if (state.failNextResolve) {
+        state.failNextResolve = false;
+        return Promise.reject(new Error("database unavailable"));
+      }
+      if (!current(item)) {
+        return Promise.resolve(false);
+      }
+      pending.delete(item.issue);
+      const row = table.get(key(item.issue, "fixed"));
+      if (row?.status === "waiting" && wait.kind === "drop") {
+        table.delete(key(item.issue, "fixed"));
+      }
+      if (row?.status === "waiting" && wait.kind === "stamp") {
+        table.set(key(item.issue, "fixed"), { ...row, checkedSha: wait.sha });
+      }
+      return Promise.resolve(true);
     },
     rows(issue) {
       return Promise.resolve(
@@ -319,13 +327,6 @@ export const memoryStore = () => {
     },
     saveSweep(sweep) {
       state.sweep = sweep;
-      return Promise.resolve();
-    },
-    stampWaiting(issue, checkedSha) {
-      const row = table.get(key(issue, "fixed"));
-      if (row?.status === "waiting") {
-        table.set(key(issue, "fixed"), { ...row, checkedSha });
-      }
       return Promise.resolve();
     },
   };

@@ -268,6 +268,43 @@ describe("a deploy wait that is no longer needed", () => {
     });
   });
 
+  it("retries closing the wait on the next run when the cleanup write fails once", async () => {
+    const t = ticket({ pullUrls: [PR_URL], stateType: "completed" });
+    t.updatedAt = new Date(NOW - 60_000).toISOString();
+    const s = setup([t], {
+      liveSha: OLD_SHA,
+      pulls: { [pullKey(7)]: merged() },
+    });
+    await runReporterUpdates(s.deps, NOW, () => NOW);
+    assert.equal(waitingIssues(s.memory).length, 1);
+    t.facts.stateName = "Canceled";
+    t.facts.stateType = "canceled";
+    t.updatedAt = new Date(NOW + 60_000).toISOString();
+    s.memory.state.failNextResolve = true;
+    await assert.rejects(
+      runReporterUpdates(s.deps, NOW + MIN, () => NOW + MIN),
+      { message: "database unavailable" }
+    );
+    assert.equal(waitingIssues(s.memory).length, 1);
+    assert.equal(s.memory.pending.has("ENG-1"), true, "the retry is kept");
+    const moved = NOW + 30 * MIN;
+    await runReporterUpdates(
+      { ...s.deps, config: { ...s.deps.config, runDeadlineMs: 0 } },
+      moved,
+      () => moved
+    );
+    const later = NOW + 60 * MIN;
+    await runReporterUpdates(s.deps, later, () => later);
+    assert.ok(
+      Date.parse(s.linear.state.discoveries.at(-1)?.updatedSince ?? "") >
+        Date.parse(t.updatedAt),
+      "the retry comes from the kept entry, not from rediscovery"
+    );
+    assert.deepEqual(waitingIssues(s.memory), []);
+    assert.equal(s.memory.pending.size, 0);
+    assert.equal(s.linear.posts.length, 1);
+  });
+
   it("keeps the row while the ticket still needs the deploy", async () => {
     const t = ticket({ pullUrls: [PR_URL], stateType: "completed" });
     const s = setup([t], {

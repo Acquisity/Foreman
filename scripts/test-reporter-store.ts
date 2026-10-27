@@ -264,7 +264,8 @@ await store.markWaiting("ENG-8", "old-sha");
 await store.markSent("ENG-8", ["received"], "msg", null, "c-received");
 const sentFixed = await store.claim("ENG-8", "fixed", "msg", null);
 assert.ok(sentFixed.ok);
-await store.dropWaiting("ENG-8");
+await store.enqueue([{ issue: "ENG-8", version: 1 }]);
+await store.resolvePending(await queued("ENG-8"), { kind: "drop" });
 assert.equal(
   (await store.rows("ENG-8")).some((row) => row.stage === "fixed"),
   true,
@@ -280,7 +281,11 @@ await store.complete(
   sentFixed.token
 );
 await store.markWaiting("ENG-10", "old-sha");
-await store.stampWaiting("ENG-10", "new-sha");
+await store.enqueue([{ issue: "ENG-10", version: 1 }]);
+await store.resolvePending(await queued("ENG-10"), {
+  kind: "stamp",
+  sha: "new-sha",
+});
 await store.queueWaiting("new-sha");
 assert.equal(
   await due("ENG-10"),
@@ -294,7 +299,8 @@ assert.equal(
   "and is requeued once the next deploy lands"
 );
 await store.markWaiting("ENG-9", "old-sha");
-await store.dropWaiting("ENG-9");
+await store.enqueue([{ issue: "ENG-9", version: 1 }]);
+await store.resolvePending(await queued("ENG-9"), { kind: "drop" });
 await store.queueWaiting("new-sha");
 assert.equal(
   await due("ENG-9"),
@@ -336,7 +342,10 @@ assert.equal(
   false,
   "a ticket that just failed waits out its backoff"
 );
-assert.equal(await store.resolvePending(await queued("ENG-5")), true);
+assert.equal(
+  await store.resolvePending(await queued("ENG-5"), { kind: "keep" }),
+  true
+);
 assert.equal(await due("ENG-5"), false);
 await Array.from({ length: 25 }, (_, i) => i).reduce(async (previous) => {
   await previous;
@@ -392,7 +401,7 @@ assert.equal(
   "an older run's failure or deferral does not back off a newer version"
 );
 assert.equal(
-  await store.resolvePending(olderRun),
+  await store.resolvePending(olderRun, { kind: "keep" }),
   false,
   "an older run is told its version was not the one acknowledged"
 );
@@ -402,11 +411,17 @@ assert.deepEqual(
   "an older run's acknowledgement does not delete a newer version"
 );
 assert.equal(
-  await store.resolvePending({ issue: "ENG-11", version: 200 }),
+  await store.resolvePending(
+    { issue: "ENG-11", version: 200 },
+    { kind: "keep" }
+  ),
   true
 );
 assert.equal(
-  await store.resolvePending({ issue: "ENG-11", version: 200 }),
+  await store.resolvePending(
+    { issue: "ENG-11", version: 200 },
+    { kind: "keep" }
+  ),
   false,
   "acknowledging a row that is already gone reports nothing removed"
 );
@@ -418,11 +433,37 @@ const [waitingRun] = await store.nextPending(10);
 assert.ok(waitingRun);
 assert.deepEqual(waitingRun, { issue: "ENG-12", version: null });
 await store.enqueue([{ issue: "ENG-12", version: 300 }]);
-assert.equal(await store.resolvePending(waitingRun), false);
+assert.equal(await store.resolvePending(waitingRun, { kind: "drop" }), false);
+assert.equal(
+  (await store.rows("ENG-12"))[0]?.status,
+  "waiting",
+  "a stale acknowledgement does not drop the wait"
+);
+assert.equal(
+  await store.resolvePending(waitingRun, { kind: "stamp", sha: "new-sha" }),
+  false
+);
+assert.equal(
+  (await store.rows("ENG-12"))[0]?.checkedSha,
+  "old-sha",
+  "or stamp it"
+);
 assert.deepEqual(
   await store.nextPending(10),
   [{ issue: "ENG-12", version: 300 }],
   "a deploy recheck's acknowledgement does not delete a version discovery queued meanwhile"
+);
+assert.equal(
+  await store.resolvePending(
+    { issue: "ENG-12", version: 300 },
+    { kind: "drop" }
+  ),
+  true
+);
+assert.deepEqual(
+  await store.rows("ENG-12"),
+  [],
+  "the current acknowledgement drops the wait in the same statement"
 );
 
 assert.deepEqual(await store.readCursor(), { since: null, sweep: null });

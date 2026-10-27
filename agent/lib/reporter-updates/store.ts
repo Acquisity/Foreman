@@ -29,6 +29,11 @@ export interface PendingTicket {
   version: number | null;
 }
 
+export type WaitCleanup =
+  | { kind: "drop" }
+  | { kind: "keep" }
+  | { kind: "stamp"; sha: string };
+
 export interface Sweep {
   after: string;
   since: number;
@@ -58,7 +63,6 @@ export interface ReporterStore {
     token: string
   ) => Promise<boolean>;
   deferPending: (ticket: PendingTicket, untilMs: number) => Promise<void>;
-  dropWaiting: (issue: string) => Promise<void>;
   enqueue: (tickets: DiscoveredTicket[]) => Promise<void>;
   failPending: (ticket: PendingTicket) => Promise<void>;
   markSent: (
@@ -73,11 +77,13 @@ export interface ReporterStore {
   queueWaiting: (liveSha: string) => Promise<void>;
   readCursor: () => Promise<DiscoveryCursor>;
   release: (issue: string, stage: Stage, token: string) => Promise<void>;
-  resolvePending: (ticket: PendingTicket) => Promise<boolean>;
+  resolvePending: (
+    ticket: PendingTicket,
+    wait: WaitCleanup
+  ) => Promise<boolean>;
   rows: (issue: string) => Promise<LedgerRow[]>;
   saveCursor: (ms: number) => Promise<void>;
   saveSweep: (sweep: Sweep) => Promise<void>;
-  stampWaiting: (issue: string, checkedSha: string) => Promise<void>;
 }
 
 const ROW_STAGE = z.enum(STAGES as [Stage, ...Stage[]]);
@@ -186,12 +192,6 @@ export const createReporterStore = (query: Query): ReporterStore => {
         [ticket.issue, ticket.version, untilMs]
       );
     },
-    async dropWaiting(issue) {
-      await query(
-        "DELETE FROM reporter_updates WHERE issue = $1 AND stage = 'fixed' AND status = 'waiting'",
-        [issue]
-      );
-    },
     async enqueue(tickets) {
       const latest = new Map<string, number>();
       for (const { issue, version } of tickets) {
@@ -297,12 +297,30 @@ export const createReporterStore = (query: Query): ReporterStore => {
         [issue, stage, token]
       );
     },
-    async resolvePending(ticket) {
-      const deleted = await query(
-        `DELETE FROM reporter_pending WHERE issue = $1 AND ${SAME_VERSION} RETURNING issue`,
-        [ticket.issue, ticket.version]
+    async resolvePending(ticket, wait) {
+      const acknowledged = await query(
+        `WITH acked AS (
+           DELETE FROM reporter_pending WHERE issue = $1 AND ${SAME_VERSION} RETURNING issue
+         ),
+         dropped AS (
+           DELETE FROM reporter_updates
+           WHERE $3 = 'drop' AND issue IN (SELECT issue FROM acked)
+             AND stage = 'fixed' AND status = 'waiting'
+         ),
+         stamped AS (
+           UPDATE reporter_updates SET checked_sha = $4, updated_at = now()
+           WHERE $3 = 'stamp' AND issue IN (SELECT issue FROM acked)
+             AND stage = 'fixed' AND status = 'waiting'
+         )
+         SELECT issue FROM acked`,
+        [
+          ticket.issue,
+          ticket.version,
+          wait.kind,
+          wait.kind === "stamp" ? wait.sha : null,
+        ]
       );
-      return deleted.length === 1;
+      return acknowledged.length === 1;
     },
     async rows(issue) {
       const rows = await query(
@@ -336,13 +354,6 @@ export const createReporterStore = (query: Query): ReporterStore => {
            SET sweep_after = EXCLUDED.sweep_after, sweep_since = EXCLUDED.sweep_since,
                sweep_started = EXCLUDED.sweep_started, updated_at = now()`,
         [sweep.after, sweep.since, sweep.startedAt]
-      );
-    },
-    async stampWaiting(issue, checkedSha) {
-      await query(
-        `UPDATE reporter_updates SET checked_sha = $2, updated_at = now()
-         WHERE issue = $1 AND stage = 'fixed' AND status = 'waiting'`,
-        [issue, checkedSha]
       );
     },
   };

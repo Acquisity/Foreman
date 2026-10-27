@@ -14,7 +14,11 @@ import {
   planFixed,
   planNotFixed,
 } from "./plan.js";
-import { GIVE_UP_LOG_ATTEMPTS, type ReporterStore } from "./store.js";
+import {
+  GIVE_UP_LOG_ATTEMPTS,
+  type ReporterStore,
+  type WaitCleanup,
+} from "./store.js";
 
 export interface RunConfig {
   channels: ReadonlySet<string>;
@@ -298,23 +302,18 @@ const settle = async (
 
 const KEEP_PENDING = new Set(["backing_off", "busy", "undeliverable"]);
 
-const settleWaiting = async (
-  identifier: string,
+const waitCleanup = async (
   outcome: Outcome,
-  deps: Deps,
   liveSha: () => Promise<string | null>
-): Promise<void> => {
+): Promise<WaitCleanup> => {
   if (outcome.kind === "waiting") {
-    return;
+    return { kind: "keep" };
   }
   if (outcome.kind === "skipped" && outcome.why === "channel_not_enabled") {
     const live = await liveSha().catch(() => null);
-    if (live) {
-      await deps.store.stampWaiting(identifier, live);
-    }
-    return;
+    return live ? { kind: "stamp", sha: live } : { kind: "keep" };
   }
-  await deps.store.dropWaiting(identifier);
+  return { kind: "drop" };
 };
 
 const SWEEP_MAX_AGE_MS = 86_400_000;
@@ -409,8 +408,11 @@ export const runReporterUpdates = async (
       KEEP_PENDING.has(result.outcome.why)
     ) {
       await deps.store.failPending(pending);
-    } else if (await deps.store.resolvePending(pending)) {
-      await settleWaiting(identifier, result.outcome, deps, liveSha);
+    } else {
+      await deps.store.resolvePending(
+        pending,
+        await waitCleanup(result.outcome, liveSha)
+      );
     }
   }, Promise.resolve());
   return report;
