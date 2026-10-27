@@ -44,12 +44,31 @@ const isEngineering = (
   handlingPath: string | undefined
 ): boolean => classification === "Bug" || handlingPath === ENGINEERING_PATH;
 
+const isSupportFollowUp = (
+  issue: z.infer<typeof issueSchema>,
+  handlingPath: string | undefined
+): boolean =>
+  issue.assignee === SUPPORT_OWNER &&
+  Boolean(handlingPath?.startsWith("Support/"));
+
+const isWaitingForApproval = (issue: z.infer<typeof issueSchema>): boolean =>
+  issue.labels.includes("Feature Request") &&
+  issue.labels.includes(NEEDS_APPROVAL_LABEL) &&
+  !issue.labels.includes("Approved");
+
 const ownerRecordMissing = (
   issue: z.infer<typeof issueSchema>,
   classification: string | undefined,
   handlingPath: string | undefined
 ): boolean => {
   if (!isEngineering(classification, handlingPath)) {
+    if (
+      isWaitingForApproval(issue) &&
+      !isSupportFollowUp(issue, handlingPath) &&
+      !CLOSED_STATES.includes(issue.status)
+    ) {
+      return issue.assignee !== FALLBACK_OWNER;
+    }
     return !(issue.assignee || CLOSED_STATES.includes(issue.status));
   }
   const hasArea = issue.labels.some((label) => areaLabels().includes(label));
@@ -66,13 +85,6 @@ const ownerRecordMissing = (
     issue.assignee === FALLBACK_OWNER
   );
 };
-
-const isSupportFollowUp = (
-  issue: z.infer<typeof issueSchema>,
-  handlingPath: string | undefined
-): boolean =>
-  issue.assignee === SUPPORT_OWNER &&
-  Boolean(handlingPath?.startsWith("Support/"));
 
 const needsMaster = (
   issue: z.infer<typeof issueSchema>,

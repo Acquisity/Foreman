@@ -828,3 +828,41 @@ test("completion accepts James as the owner of a request waiting in Backlog for 
     SupportRefusal
   );
 });
+
+test("completion refuses anyone but James as the owner of a request waiting in Backlog for approval", () => {
+  const parked = {
+    ...report,
+    labels: [
+      "intercom-sourced",
+      "Customer reported",
+      "Feature Request",
+      "Needs approval",
+    ],
+    parentId: null,
+    project: null,
+    status: "Backlog",
+  };
+  const content = {
+    ...document,
+    content:
+      "# Triage investigation\n**Classification**: Platform Limitation\n**Handling path**: Backlog/low-impact\n**Review**: Not required",
+  };
+  for (const assignee of ["Ebubeker Rexha", "Aaron Fraga"]) {
+    assert.throws(
+      () => assertTriageOutputs({ ...parked, assignee }, content, comments),
+      SupportRefusal,
+      assignee
+    );
+  }
+  assert.doesNotThrow(() =>
+    assertTriageOutputs(
+      {
+        ...parked,
+        assignee: "Ebubeker Rexha",
+        labels: [...parked.labels, "Approved"],
+      },
+      content,
+      comments
+    )
+  );
+});
