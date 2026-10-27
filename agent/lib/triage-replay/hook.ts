@@ -52,6 +52,10 @@ export const triageReplayHook = defineHook({
         return;
       }
       await withReplayState(session.runId, session.caseKey, (state) => {
+        if (state.criticCalls?.includes(data.callId)) {
+          return;
+        }
+        state.criticCalls = [...(state.criticCalls ?? []), data.callId];
         const critic = criticVerdictFields(
           data.status,
           data.status === "completed" ? data.output : undefined,

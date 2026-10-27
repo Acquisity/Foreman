@@ -261,6 +261,16 @@ describe("replay result", () => {
     assert.equal(settled.critic?.verdict, "INSUFFICIENT_EVIDENCE");
   });
 
+  it("counts a republished critic settlement once", async (t) => {
+    await replayProcess(t);
+    noTransport(t);
+    await criticSettles("critic-1", objection);
+    await criticSettles("critic-1", objection);
+    assert.equal((await state()).criticObjections, 1);
+    await criticSettles("critic-2", objection);
+    assert.equal((await state()).criticObjections, 2);
+  });
+
   it("waits for the critic when the decision needs review", async (t) => {
     await replayProcess(t);
     noTransport(t);
