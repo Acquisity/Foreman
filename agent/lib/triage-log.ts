@@ -29,9 +29,16 @@ export const criticTaskIssues = defineState<Record<string, string>>(
   () => ({})
 );
 
+/**
+ * One review cycle per decision: `ran` says the critic settled after the
+ * latest decision, `reviews` counts this cycle's reviews, and `last` is how
+ * the latest one counted.
+ */
 export interface CriticRounds {
+  last: CriticCount | null;
   objections: number;
   ran: boolean;
+  reviews: number;
 }
 
 export const criticRounds = defineState<Record<string, CriticRounds>>(
@@ -40,6 +47,7 @@ export const criticRounds = defineState<Record<string, CriticRounds>>(
 );
 
 export const CRITIC_OBJECTION_LIMIT = 2;
+export const CRITIC_REVIEW_LIMIT = 2;
 
 export function nextObjections(before: number, counted: CriticCount): number {
   if (counted === "approve") {
@@ -56,9 +64,26 @@ export function settleCriticRound(
   return {
     ...rounds,
     [issue]: {
+      last: counted,
       objections: nextObjections(rounds[issue]?.objections ?? 0, counted),
       ran: true,
+      reviews: (rounds[issue]?.reviews ?? 0) + 1,
     },
+  };
+}
+
+export function reviewCycleAfterDecision(
+  rounds: Readonly<Record<string, CriticRounds>>,
+  issue: string
+): Record<string, CriticRounds> {
+  const prior = rounds[issue];
+  const fresh =
+    !prior || prior.last === "approve" || criticBlocked(rounds, issue);
+  return {
+    ...rounds,
+    [issue]: fresh
+      ? { last: null, objections: 0, ran: false, reviews: 0 }
+      : { ...prior, ran: false },
   };
 }
 
@@ -95,11 +120,34 @@ const supportOwnerOnly = (input: RouteInput & Record<string, unknown>) =>
   ownerOnly(input) &&
   input.assignee?.trim().toLowerCase() === SUPPORT_OWNER.toLowerCase();
 
+const statusOnly = (input: RouteInput & Record<string, unknown>): boolean =>
+  typeof input.state === "string" &&
+  Object.entries(input).every(
+    ([key, value]) => key === "issue" || key === "state" || value === undefined
+  );
+
+const awaitingReview = (
+  decisions: Readonly<Record<string, LatestTriageDecision>>,
+  rounds: Readonly<Record<string, CriticRounds>>,
+  issue: string
+): boolean => {
+  const round = rounds[issue];
+  return (
+    decisions[issue]?.closureReview === true &&
+    !round?.ran &&
+    (round?.reviews ?? 0) < CRITIC_REVIEW_LIMIT
+  );
+};
+
 export function routeRefusal(
   decisions: Readonly<Record<string, LatestTriageDecision>>,
   rounds: Readonly<Record<string, CriticRounds>>,
-  input: RouteInput & Record<string, unknown>
+  input: RouteInput & Record<string, unknown>,
+  options: { statusRequest?: boolean } = {}
 ): string | null {
+  if (options.statusRequest && statusOnly(input)) {
+    return null;
+  }
   if (criticBlocked(rounds, input.issue)) {
     return supportOwnerOnly(input)
       ? null
@@ -108,7 +156,7 @@ export function routeRefusal(
   if (ownerOnly(input)) {
     return null;
   }
-  if (decisions[input.issue]?.closureReview && !rounds[input.issue]?.ran) {
+  if (awaitingReview(decisions, rounds, input.issue)) {
     return `${input.issue} is a closure or duplicate that needs the critic's second check first. Delegate to the critic with a first line of exactly "Source issue: ${input.issue}", then route once it settles.`;
   }
   return null;

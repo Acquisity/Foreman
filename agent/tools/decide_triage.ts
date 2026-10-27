@@ -5,7 +5,9 @@ import { decideTriage } from "#lib/jev-decisions.js";
 import { logOpsEvent } from "#lib/ops-log.js";
 import {
   confidenceFields,
+  criticRounds,
   decisionFields,
+  reviewCycleAfterDecision,
   settleDecision,
   triageDecisions,
 } from "#lib/triage-log.js";
@@ -38,6 +40,9 @@ export default defineTool({
       const fields = decisionFields(input.identifier, decision);
       const settled = settleDecision(triageDecisions.get(), fields);
       triageDecisions.update(() => settled.decisions);
+      criticRounds.update((rounds) =>
+        reviewCycleAfterDecision(rounds, input.identifier)
+      );
       logOpsEvent("triage.decision", {
         ...fields,
         ...confidenceFields(decision),

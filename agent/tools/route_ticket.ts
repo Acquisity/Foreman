@@ -11,6 +11,7 @@ import {
   routeRefusal,
   triageDecisions,
 } from "#lib/triage-log.js";
+import { isStatusFollowUp } from "#lib/trust.js";
 
 const identifier = z.string().trim().regex(LINEAR_ISSUE_ID_PATTERN);
 const name = z.string().trim().min(1).max(120);
@@ -28,7 +29,8 @@ export default defineTool({
     const refusal = routeRefusal(
       triageDecisions.get(),
       criticRounds.get(),
-      input
+      input,
+      { statusRequest: isStatusFollowUp(ctx.session.auth.current) }
     );
     if (refusal) {
       return { error: refusal, routed: false as const };

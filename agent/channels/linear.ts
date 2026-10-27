@@ -12,12 +12,14 @@ import {
   linearContinuationToken,
   parseLinearWebhookEvent,
 } from "eve/channels/linear";
+import type { SessionAuthContext } from "eve/context";
 import type { FollowUpOutcome } from "../lib/follow-up-decisions.js";
 import { buildLinearContext } from "../lib/linear-context.js";
 import { extractRepositoryUrls, stampRepository } from "../lib/repository.js";
 import { readAskFrom, relayedFollowUpOutcome } from "../lib/requester-reply.js";
 import {
   stampInvestigationMemory,
+  stampStatusFollowUp,
   stampTriageIntake,
   stampTrusted,
 } from "../lib/trust.js";
@@ -47,6 +49,14 @@ export const withFollowUpOutcome = (
   outcome === "status" && !widgetFeedback
     ? [...context, STATUS_ONLY_FOLLOW_UP]
     : context;
+
+/** Stamps the turn a status-only triage follow-up opened, as above. */
+export const withStatusFollowUp = (
+  auth: SessionAuthContext,
+  outcome: FollowUpOutcome | null,
+  widgetFeedback: boolean
+): SessionAuthContext =>
+  outcome === "status" && !widgetFeedback ? stampStatusFollowUp(auth) : auth;
 
 /**
  * Runs a pre-model read inside Linear's response window. Any failure or a
@@ -180,7 +190,7 @@ export const onAgentSession = async (
   const context =
     buildLinearContext(event, ask?.requester ?? null, route ?? undefined) ?? [];
   return {
-    auth: withRepository,
+    auth: withStatusFollowUp(withRepository, outcome, Boolean(route)),
     context: withFollowUpOutcome(context, outcome, Boolean(route)),
   };
 };
