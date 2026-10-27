@@ -185,6 +185,31 @@ export const lookupIdentity = async (
 export type DisputeIdentity = Awaited<ReturnType<typeof lookupIdentity>>;
 
 /** Prefer explicit API links; newer Stripe shapes need one unique paid invoice near the charge. */
+/**
+ * Stripe lists invoices newest first, so a truncated page still holds every
+ * invoice created after its oldest row. An invoice paid near a charge is
+ * created at most a billing cycle (plus payment retries) before it.
+ */
+export const INVOICE_LOOKBACK_MS = 45 * 86_400_000;
+export const pageCoversCharge = (
+  invoices: { created: string | null }[],
+  truncated: boolean,
+  chargeCreated: string | null
+): boolean => {
+  if (!truncated) {
+    return true;
+  }
+  const chargeAt = chargeCreated ? Date.parse(chargeCreated) : Number.NaN;
+  return (
+    Number.isFinite(chargeAt) &&
+    invoices.some(
+      (invoice) =>
+        invoice.created !== null &&
+        Date.parse(invoice.created) <= chargeAt - INVOICE_LOOKBACK_MS
+    )
+  );
+};
+
 export const matchChargeInvoice = <
   T extends {
     id: string | null;

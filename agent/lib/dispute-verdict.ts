@@ -13,7 +13,7 @@ import {
   str,
   UUID,
 } from "./dispute-evidence-shared.js";
-import { matchChargeInvoice } from "./stripe-dispute-read.js";
+import { matchChargeInvoice, pageCoversCharge } from "./stripe-dispute-read.js";
 
 const ERRORING = /error|fail/iu;
 const WITHDRAWN = /cancel|reject/iu;
@@ -103,7 +103,7 @@ const duplicate = (stripe: StripeFacts): Flag => {
     const { invoice } = matchChargeInvoice(
       other,
       invoices.rows,
-      !invoices.truncated
+      pageCoversCharge(invoices.rows, invoices.truncated, other.created)
     );
     if (!invoice) {
       missing = true;
@@ -254,7 +254,6 @@ const deliveryStoppedBeforeCharge = (
     [facts.domains, facts.inboxes, facts.deletionRequests].some(incomplete) ||
     !invoice ||
     subscriptionIds.length > 1 ||
-    incomplete(stripe.invoiceWindow) ||
     incomplete(stripe.subscriptions);
   return flag(
     because,

@@ -35,6 +35,7 @@ import {
   stripeId as idOf,
   lookupIdentity,
   matchChargeInvoice,
+  pageCoversCharge,
   READ_BYTES,
   readDispute,
 } from "./stripe-dispute-read.js";
@@ -204,25 +205,6 @@ const readStripe = async (deps: EvidenceDeps, disputeId: string) => {
         invoiceFacts
       )
     : null;
-  const chargedAt = identity.charge.created
-    ? Date.parse(identity.charge.created) / 1000
-    : Number.NaN;
-  const invoiceWindow =
-    id && Number.isFinite(chargedAt)
-      ? await list(
-          "invoiceWindow",
-          {
-            input: {
-              "created[gte]": Math.floor(chargedAt - (2 * DAY_MS) / 1000),
-              "created[lte]": Math.floor(chargedAt + (2 * DAY_MS) / 1000),
-              customer: id,
-              limit: STRIPE_LIMIT,
-            },
-            operation: "stripe.invoices.list",
-          },
-          invoiceFacts
-        )
-      : null;
   const subscriptions = id
     ? await list(
         "subscriptions",
@@ -258,8 +240,13 @@ const readStripe = async (deps: EvidenceDeps, disputeId: string) => {
     charge: identity.charge,
     chargeInvoice: matchChargeInvoice(
       identity.charge,
-      invoiceWindow?.rows ?? [],
-      invoiceWindow !== null && !invoiceWindow.truncated
+      invoices?.rows ?? [],
+      invoices !== null &&
+        pageCoversCharge(
+          invoices.rows,
+          invoices.truncated,
+          identity.charge.created
+        )
     ),
     charges,
     creditNotes,
@@ -279,7 +266,6 @@ const readStripe = async (deps: EvidenceDeps, disputeId: string) => {
       submissionCount: dispute.evidence_details?.submission_count ?? null,
     },
     invoices,
-    invoiceWindow,
     subscriptions,
     unavailable,
   };

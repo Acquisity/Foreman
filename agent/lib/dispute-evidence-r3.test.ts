@@ -10,14 +10,34 @@ import {
   ORG_A,
 } from "./__tests__/dispute-evidence-fixtures.js";
 import { gatherDisputeEvidence } from "./dispute-evidence.js";
-import {
-  type OperationRequest,
-  operationInputs,
-} from "./executor/operations.js";
+import type { OperationRequest } from "./executor/operations.js";
 import { ExecutorError } from "./executor/transport.js";
 import { WORKSPACE_ID } from "./instantly-fixtures.js";
 
 const UNREQUESTED = /only unrequested issues \(1\)/u;
+const DISPUTED_INVOICE = {
+  amount_paid: 25_200,
+  created: CHARGE - 3600,
+  id: "in_disputed",
+  lines: {
+    data: [
+      {
+        parent: { subscription_item_details: { subscription: "sub_window" } },
+        period: { end: 2, start: 1 },
+      },
+    ],
+  },
+  status: "paid",
+  status_transitions: { paid_at: CHARGE + 5 },
+};
+const OLD_INVOICE = {
+  amount_paid: 25_200,
+  created: CHARGE - 60 * 86_400,
+  id: "in_old",
+  lines: { data: [] },
+  status: "paid",
+  status_transitions: { paid_at: CHARGE - 60 * 86_400 },
+};
 
 describe("Linear live replay regressions", () => {
   it("requests IssueBodies by identifier through id in", async () => {
@@ -159,7 +179,7 @@ describe("Linear live replay regressions", () => {
 });
 
 describe("invoice and configuration replay regressions", () => {
-  it("keeps history unchanged and identifies the disputed invoice through a separate created window", async () => {
+  it("identifies the disputed invoice from a truncated page that reaches past the lookback", async () => {
     const stub = fake({
       charge: { invoice: null, payment_intent: null },
       subscriptions: [{ canceled_at: CHARGE - 1, id: "sub_window" }],
@@ -173,58 +193,36 @@ describe("invoice and configuration replay regressions", () => {
           return read(request, options);
         }
         invoices.push(request);
-        return "created[gte]" in request.input
-          ? json({
-              data: [
-                {
-                  amount_paid: 25_200,
-                  id: "in_window",
-                  lines: {
-                    data: [
-                      {
-                        parent: {
-                          subscription_item_details: {
-                            subscription: "sub_window",
-                          },
-                        },
-                        period: { end: 2, start: 1 },
-                      },
-                    ],
-                  },
-                  status: "paid",
-                  status_transitions: { paid_at: CHARGE + 5 },
-                },
-              ],
-              has_more: false,
-            })
-          : json({ data: [], has_more: true });
+        return json({ data: [DISPUTED_INVOICE, OLD_INVOICE], has_more: true });
       },
     });
-    const history = {
-      input: { customer: "cus_1", limit: 50 },
-      operation: "stripe.invoices.list",
-    };
-    const window = {
-      input: {
-        "created[gte]": CHARGE - 172_800,
-        "created[lte]": CHARGE + 172_800,
-        customer: "cus_1",
-        limit: 50,
+    assert.deepEqual(invoices, [
+      {
+        input: { customer: "cus_1", limit: 50 },
+        operation: "stripe.invoices.list",
       },
-      operation: "stripe.invoices.list",
-    };
-    assert.deepEqual(invoices, [history, window]);
-    assert.deepEqual(
-      operationInputs["stripe.invoices.list"].parse(window.input),
-      window.input
-    );
+    ]);
     assert.equal(facts(result, "stripe").invoices?.truncated, true);
-    assert.equal(facts(result, "stripe").invoiceWindow?.truncated, false);
     assert.equal(
       facts(result, "stripe").chargeInvoice.invoice?.id,
-      "in_window"
+      "in_disputed"
     );
     assert.equal(result.verdict.deliveryStoppedBeforeCharge.value, true);
+  });
+
+  it("leaves the disputed invoice unknown when a truncated page stops inside the lookback", async () => {
+    const stub = fake({ charge: { invoice: null, payment_intent: null } });
+    const { read } = stub.deps;
+    const result = await gatherDisputeEvidence("du_1", {
+      ...stub.deps,
+      read: (request, options) =>
+        request.operation === "stripe.invoices.list"
+          ? json({ data: [DISPUTED_INVOICE], has_more: true })
+          : read(request, options),
+    });
+    assert.equal(facts(result, "stripe").chargeInvoice.invoice, null);
+    assert.ok(facts(result, "stripe").chargeInvoice.reason);
+    assert.equal(result.verdict.duplicate.value, null);
   });
 
   it("preserves configuration error codes through fixed-sentence provider wrappers", async () => {
@@ -308,43 +306,16 @@ it("preserves missing Executor configuration through the Autumn error wrapper", 
   assert.ok(result.sources.autumn.error.includes("executor_not_configured"));
 });
 
-it("complete invoice-window evidence can disprove stopped delivery despite truncated history", async () => {
+it("a covering truncated page can disprove stopped delivery", async () => {
   const stub = fake({ charge: { invoice: null, payment_intent: null } });
   const { read } = stub.deps;
   const result = await gatherDisputeEvidence("du_1", {
     ...stub.deps,
-    read: (request, options) => {
-      if (request.operation !== "stripe.invoices.list") {
-        return read(request, options);
-      }
-      return "created[gte]" in request.input
-        ? json({
-            data: [
-              {
-                amount_paid: 25_200,
-                id: "in_window",
-                lines: {
-                  data: [
-                    {
-                      parent: {
-                        subscription_item_details: {
-                          subscription: "sub_window",
-                        },
-                      },
-                      period: { end: 2, start: 1 },
-                    },
-                  ],
-                },
-                status: "paid",
-                status_transitions: { paid_at: CHARGE + 5 },
-              },
-            ],
-            has_more: false,
-          })
-        : json({ data: [], has_more: true });
-    },
+    read: (request, options) =>
+      request.operation === "stripe.invoices.list"
+        ? json({ data: [DISPUTED_INVOICE, OLD_INVOICE], has_more: true })
+        : read(request, options),
   });
   assert.equal(facts(result, "stripe").invoices?.truncated, true);
   assert.equal(result.verdict.deliveryStoppedBeforeCharge.value, false);
-  assert.equal(result.verdict.duplicate.value, null);
 });
