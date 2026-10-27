@@ -42,11 +42,11 @@ export const rootModelSlot = (
 // long Slack thread could cross it and park on eve's Continue/Stop card, which
 // Slack cannot answer. Output stays uncapped too: a run is billed per session,
 // not per line of output, and a cap blocked legitimate implementation runs.
-// Critic, vision and native delegates author no limit and use this one.
+// Critic and native delegates author no limit and use this one.
 //
 // Wrapped model instances resolve at step start: Eve cannot serialize provider
 // objects into durable session/turn selections. resolveModel retains live overrides.
-// The selection also carries the gateway routing for a DeepSeek id (see gatewayRouting).
+// The selection also carries the gateway routing for a DeepSeek override (see gatewayRouting).
 export default defineAgent({
   compaction: { thresholdPercent: 0.75 },
   limits: { sessionUsage: () => false },
