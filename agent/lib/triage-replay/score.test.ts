@@ -7,6 +7,7 @@ import {
   expectedMaster,
   fieldMatches,
   renderScorecard,
+  rootCauseMatches,
   type ScoreInput,
   sameDuplicates,
   scoreReplay,
@@ -16,6 +17,8 @@ const NO_LABEL = /no label: ENG-4/;
 const TWO_RUN_IDS = /more than one run id/;
 const REPEATED = /same case and run: ENG-1#1/;
 const OUTSIDE = /outside the cohort: ENG-99/;
+const ROOT_CAUSE_COLUMN = /\| root cause \|/;
+const NOT_SCORED = /root cause not scored 1 /;
 const MIXED_COMMITS = /more than one Foreman commit: /;
 const UNKNOWN_COMMIT = /unknown Foreman commit.*: ENG-1#1/;
 const ABOVE_RUNS = /runs above --runs 1: ENG-1#2/;
@@ -314,4 +317,55 @@ test("a label with ground truth says when its human outcome happened", () => {
     }).outcomeAt,
     null
   );
+});
+
+const withDocument = (text: string) =>
+  base({
+    results: base().results.map((result) => ({
+      ...result,
+      document: { text, updatedAt: "2026-09-01T10:05:00.000Z" },
+    })),
+  });
+
+test("root cause scores the labelled file and function in the document", () => {
+  const { train } = scoreReplay(base()).splits;
+  assert.deepEqual(train.all.rootCause, { correct: 4, notScored: 0, total: 4 });
+  assert.match(renderScorecard(scoreReplay(base())), ROOT_CAUSE_COLUMN);
+});
+
+test("a wrong diagnosis with identical routing lowers the root-cause score", () => {
+  const right = scoreReplay(base()).splits.train.all;
+  const wrong = scoreReplay(
+    withDocument("Root cause: renderPanel in services/billing/ledger.ts.")
+  ).splits.train.all;
+  assert.deepEqual(wrong.fields, right.fields);
+  assert.deepEqual(wrong.rootCause, { correct: 0, notScored: 0, total: 4 });
+});
+
+test("a label with functions needs a function too, so a file alone is wrong", () => {
+  const label = makeLabel("ENG-1");
+  assert.equal(rootCauseMatches(label, "The bug is in src/panel.ts."), false);
+  assert.equal(rootCauseMatches(label, "PANEL.TS calls RenderPanel."), true);
+  assert.equal(rootCauseMatches(label, "mypanel.ts calls renderPanel."), false);
+  assert.equal(
+    rootCauseMatches(label, "src/panel.tsx calls renderPanelLater."),
+    false
+  );
+  assert.equal(rootCauseMatches(label, null), false);
+});
+
+test("a text-only cause shows as not scored, never pass or fail", () => {
+  const input = base();
+  input.trainLabels = input.trainLabels.map((label) =>
+    label.id === "ENG-2" && label.rootCause
+      ? {
+          ...label,
+          rootCause: { ...label.rootCause, files: [], functions: [] },
+        }
+      : label
+  );
+  input.results = input.results.filter(({ caseId }) => caseId !== "ENG-3");
+  const { all } = scoreReplay(input).splits.train;
+  assert.deepEqual(all.rootCause, { correct: 2, notScored: 1, total: 3 });
+  assert.match(renderScorecard(scoreReplay(input)), NOT_SCORED);
 });

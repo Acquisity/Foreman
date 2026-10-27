@@ -69,7 +69,7 @@ export const makeResult = (
   caseId,
   critic: { blockingFindings: 0, failedCriteria: 0, verdict: "APPROVE" },
   document: {
-    text: "Root cause: renderPanel.",
+    text: "Root cause: renderPanel in apps/web/src/panel.ts clears the layout.",
     updatedAt: "2026-09-01T10:05:00.000Z",
   },
   evidenceMisses: [],

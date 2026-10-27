@@ -46,6 +46,7 @@ export interface GroupScore {
   evidenceMisses: { reads: number; rows: number };
   fields: Record<Field, Tally>;
   insufficient: number;
+  rootCause: Tally & { notScored: number };
   rows: number;
 }
 
@@ -152,8 +153,42 @@ const emptyGroup = (): GroupScore => ({
     FIELDS.map((field) => [field, { correct: 0, total: 0 }])
   ) as Record<Field, Tally>,
   insufficient: 0,
+  rootCause: { correct: 0, notScored: 0, total: 0 },
   rows: 0,
 });
+
+const REGEX_SPECIAL = /[.*+?^${}()|[\]\\]/g;
+const literal = (text: string) => text.replace(REGEX_SPECIAL, "\\$&");
+const baseName = (path: string) => path.split("/").at(-1) ?? path;
+
+const names = (document: string, name: string, before: string) =>
+  new RegExp(
+    `(^|[^${before}])${literal(name.toLowerCase())}(?![a-z0-9_$])`,
+    "u"
+  ).test(document);
+
+export const rootCauseScored = (label: TriageLabel) =>
+  !label.insufficient &&
+  label.rootCause !== null &&
+  label.rootCause.files.length + label.rootCause.functions.length > 0;
+
+export function rootCauseMatches(
+  label: TriageLabel,
+  document: string | null
+): boolean {
+  if (!(label.rootCause && document)) {
+    return false;
+  }
+  const text = document.toLowerCase();
+  const { files, functions } = label.rootCause;
+  const file =
+    files.length === 0 ||
+    files.some((path) => names(text, baseName(path), "a-z0-9_.\\-"));
+  const fn =
+    functions.length === 0 ||
+    functions.some((name) => names(text, name, "a-z0-9_$"));
+  return file && fn;
+}
 
 function fail(message: string, ids: readonly string[] = []): never {
   throw new Error(
@@ -271,6 +306,13 @@ function addRow(
     group.fields[field].total += 1;
     group.fields[field].correct += matches?.[field] ? 1 : 0;
   }
+  if (!rootCauseScored(label)) {
+    group.rootCause.notScored += 1;
+    return;
+  }
+  group.rootCause.total += 1;
+  group.rootCause.correct +=
+    scorable && rootCauseMatches(label, result?.document?.text ?? null) ? 1 : 0;
 }
 
 export function scoreReplay(input: ScoreInput): ScoreReport {
@@ -313,16 +355,16 @@ const pct = ({ correct, total }: Tally) =>
     : "n/a";
 
 function groupLines(name: string, group: GroupScore): string[] {
-  const { completion, evidenceMisses, fields } = group;
+  const { completion, evidenceMisses, fields, rootCause } = group;
   return [
-    `| ${name} | ${group.rows} | ${FIELDS.map((field) => pct(fields[field])).join(" | ")} |`,
-    `| | completion: ${COMPLETION.map((key) => `${key} ${completion[key]}`).join(", ")}; evidence misses ${evidenceMisses.rows} rows / ${evidenceMisses.reads} reads; insufficient ${group.insufficient} (excluded) |${" |".repeat(FIELDS.length)}`,
+    `| ${name} | ${group.rows} | ${FIELDS.map((field) => pct(fields[field])).join(" | ")} | ${pct(rootCause)} |`,
+    `| | completion: ${COMPLETION.map((key) => `${key} ${completion[key]}`).join(", ")}; evidence misses ${evidenceMisses.rows} rows / ${evidenceMisses.reads} reads; insufficient ${group.insufficient} (excluded); root cause not scored ${rootCause.notScored} (no labelled fix files or functions) |${" |".repeat(FIELDS.length + 1)}`,
   ];
 }
 
 export function renderScorecard(report: ScoreReport): string {
-  const header = `| lane | rows | ${FIELDS.join(" | ")} |`;
-  const rule = `|${" --- |".repeat(FIELDS.length + 2)}`;
+  const header = `| lane | rows | ${FIELDS.join(" | ")} | root cause |`;
+  const rule = `|${" --- |".repeat(FIELDS.length + 3)}`;
   const sections = (["train", "heldout"] as const).flatMap((name) => {
     const split = report.splits[name];
     return [
@@ -343,7 +385,7 @@ export function renderScorecard(report: ScoreReport): string {
     `Run ${report.runId ?? "none"}, ${report.runs} run(s) per case, Foreman commit ${report.foremanCommit ?? "none"}.`,
     "",
     ...sections,
-    "Every case counts once per run. A missing, failed or cancelled row scores wrong on every field. Text fields match trimmed and case-folded, and a field the label leaves null is unscored. Duplicates match as sets of issue ids, where null means not a duplicate. Master compares the label's master with the parent the run set; a master filed after the case means the run should have created a new one.",
+    "Every case counts once per run. A missing, failed or cancelled row scores wrong on every field. Text fields match trimmed and case-folded, and a field the label leaves null is unscored. Duplicates match as sets of issue ids, where null means not a duplicate. Master compares the label's master with the parent the run set; a master filed after the case means the run should have created a new one. Root cause is scored only for labels with known fix files or functions: the run's investigation document must name at least one labelled file by its file name (any path ending in it counts) and, when the label lists functions, at least one labelled function as a whole word, both case-insensitive. Every other label shows as not scored.",
     "",
   ].join("\n");
 }
