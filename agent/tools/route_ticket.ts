@@ -26,7 +26,10 @@ export default defineTool({
         signal: ctx.abortSignal,
       });
       logOpsEvent("triage.decision", {
-        ...routeDecisionEvent(triageDecisions.get(), input),
+        ...routeDecisionEvent(triageDecisions.get(), {
+          ...input,
+          duplicateOf: ticket.duplicateOf ?? undefined,
+        }),
         sessionId: ctx.session.id,
       });
       return { routed: true as const, ...ticket };

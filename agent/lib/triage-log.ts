@@ -85,11 +85,12 @@ const criticReply = z.object({
   verdict: z.enum(CRITIC_VERDICTS),
 });
 
-export interface CriticVerdictFields {
-  blockingFindings: number | null;
-  failedCriteria: number | null;
-  verdict: (typeof CRITIC_VERDICTS)[number] | "failed";
-}
+export const criticVerdictSchema = z.strictObject({
+  blockingFindings: z.int().nonnegative().nullable(),
+  failedCriteria: z.int().nonnegative().nullable(),
+  verdict: z.enum([...CRITIC_VERDICTS, "failed"]),
+});
+export type CriticVerdictFields = z.infer<typeof criticVerdictSchema>;
 
 export function criticVerdictFields(
   status: string,

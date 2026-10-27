@@ -331,6 +331,7 @@ export interface RouteTicketInput {
 
 export interface RouteTicketResult {
   assignee: string | null;
+  duplicateOf: string | null;
   identifier: string;
   labels: string[];
   parentIdentifier: string | null;
@@ -387,9 +388,11 @@ interface RouteIssue {
 
 const toResult = (
   issue: RouteIssue,
-  warnings: string[]
+  warnings: string[],
+  duplicateOf: string | null
 ): RouteTicketResult => ({
   assignee: issue.assignee?.name ?? null,
+  duplicateOf,
   identifier: issue.identifier,
   labels: issue.labels.nodes.map((label) => label.name),
   parentIdentifier: issue.parent?.identifier ?? null,
@@ -557,6 +560,7 @@ export async function routeTicket(
     warnings.push(`${message}: ${reason(error)}`);
   };
 
+  let duplicateOf: string | null = null;
   if (master) {
     try {
       const { issueRelationCreate } = await gql<{
@@ -572,6 +576,7 @@ export async function routeTicket(
         throw new Error("Linear did not confirm the relation.");
       }
       wrote = true;
+      duplicateOf = master.identifier;
     } catch (error) {
       warn(
         error,
@@ -607,12 +612,16 @@ export async function routeTicket(
   // routed, so report the pre-routing fields with a warning rather than a
   // failure that would send the caller back to route it again.
   try {
-    return toResult(await requireIssue(gql, input.issue), warnings);
+    return toResult(
+      await requireIssue(gql, input.issue),
+      warnings,
+      duplicateOf
+    );
   } catch (error) {
     warn(
       error,
       "The ticket was updated but could not be read back, so the fields below are from before routing"
     );
-    return toResult(issue, warnings);
+    return toResult(issue, warnings, duplicateOf);
   }
 }

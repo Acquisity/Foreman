@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { criticVerdictSchema } from "../triage-log.js";
 
 const asOf = <T extends z.ZodType>(value: T) =>
   z.union([value, z.literal("unknown")]);
@@ -88,22 +89,13 @@ export type TriageLabel = z.infer<typeof triageLabelSchema>;
 
 export const NEW_MASTER = "new";
 
+export const UNKNOWN_COMMIT = "unknown";
+
 export const RESULT_STATUSES = ["completed", "failed", "cancelled"] as const;
 
 export const triageResultSchema = z.strictObject({
   caseId: z.string().regex(/^ENG-\d+$/),
-  critic: z
-    .strictObject({
-      blockingFindings: z.int().nonnegative().nullable(),
-      failedCriteria: z.int().nonnegative().nullable(),
-      verdict: z.enum([
-        "APPROVE",
-        "CHALLENGE",
-        "INSUFFICIENT_EVIDENCE",
-        "failed",
-      ]),
-    })
-    .nullable(),
+  critic: criticVerdictSchema.nullable(),
   document: z
     .strictObject({ text: z.string(), updatedAt: z.string() })
     .nullable(),

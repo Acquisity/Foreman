@@ -37,7 +37,7 @@ const labelsFor = (master: boolean, readBack: boolean) => {
     : [{ id: "l-bug", name: "Bug" }];
 };
 
-const fakeLinear = ({ readBackFails = false } = {}) => {
+const fakeLinear = ({ readBackFails = false, relationFails = false } = {}) => {
   const calls: Call[] = [];
   const fetchStub: ProviderClient = (request) => {
     const body = {
@@ -121,7 +121,9 @@ const fakeLinear = ({ readBackFails = false } = {}) => {
       return json({ data: { issueUpdate: { success: true } } });
     }
     if (q === "linear.RouteRelation") {
-      return json({ data: { issueRelationCreate: { success: true } } });
+      return json({
+        data: { issueRelationCreate: { success: !relationFails } },
+      });
     }
     if (q === "linear.RouteAttachment") {
       return String(body.variables.url).includes("broken")
@@ -179,6 +181,17 @@ describe("routeTicket", () => {
     assert.equal(attachment?.variables.url, "https://app.intercom.com/c/1");
     assert.equal(result.projectId, "p-support");
     assert.deepEqual(result.labels, ["Bug", "Customer reported"]);
+    assert.equal(result.duplicateOf, "ENG-9");
+  });
+
+  it("reports no duplicate when the relation was not recorded", async () => {
+    const linear = fakeLinear({ relationFails: true });
+    const result = await routeTicket(
+      { duplicateOf: "ENG-9", issue: "ENG-1", state: "Done" },
+      { client: linear.fetchStub }
+    );
+    assert.equal(result.duplicateOf, null);
+    assert.equal(result.warnings.length, 1);
   });
 
   it("reports a failed link as a warning on a routed ticket", async () => {
