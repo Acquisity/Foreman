@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { CRITIC_CRITERIA } from "../subagents/critic/agent.js";
+import { formatOpsEvent } from "./ops-log.js";
 import {
   criticBlocked,
   criticVerdictFields,
@@ -155,5 +156,18 @@ describe("replay results", () => {
       triageResultSchema.shape.critic.safeParse(critic).success,
       true
     );
+  });
+});
+
+describe("the critic.verdict log line", () => {
+  it("carries how the result counted", () => {
+    const line = JSON.parse(
+      formatOpsEvent("critic.verdict", {
+        ...criticVerdictFields("completed", skillLoadFailure, "ENG-1"),
+        issue: "ENG-1",
+      })
+    );
+    assert.equal(line.counted, "failed");
+    assert.equal(line.verdict, "INSUFFICIENT_EVIDENCE");
   });
 });

@@ -21,6 +21,7 @@ const OPS_FIELD_KEYS = [
   "code",
   "connection",
   "conversationId",
+  "counted",
   "decision",
   "duplicateOf",
   "failedCriteria",
