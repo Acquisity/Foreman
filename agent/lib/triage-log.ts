@@ -239,6 +239,43 @@ export function settleDecision(
   } as const;
 }
 
+/**
+ * Records a new decision for its issue, triage or billing alike: it replaces
+ * the latest decision and advances the issue's decision generation, so a
+ * critic dispatched for an earlier decision settles as stale.
+ */
+export function recordDecision(
+  decisions: Readonly<Record<string, LatestTriageDecision>>,
+  rounds: Readonly<Record<string, CriticRounds>>,
+  decision: LatestTriageDecision
+) {
+  return {
+    ...settleDecision(decisions, decision),
+    rounds: reviewCycleAfterDecision(rounds, decision.issue),
+  };
+}
+
+/** Applies a settled critic result, unless it is stale for its issue. */
+export function applyCriticSettlement(
+  decisions: Readonly<Record<string, LatestTriageDecision>>,
+  rounds: Readonly<Record<string, CriticRounds>>,
+  packet: CriticPacket,
+  counted: CriticCount
+): {
+  decisions: Record<string, LatestTriageDecision>;
+  rounds: Record<string, CriticRounds>;
+  stale: boolean;
+} {
+  const settled = settleCriticPacket(rounds, packet, counted);
+  return {
+    decisions: settled.stale
+      ? { ...decisions }
+      : blockedDecision(decisions, settled.rounds, packet.issue),
+    rounds: settled.rounds,
+    stale: settled.stale,
+  };
+}
+
 export function billingDecisionFields(
   issue: string,
   route: BillingRoute

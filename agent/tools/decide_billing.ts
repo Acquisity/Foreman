@@ -2,7 +2,12 @@ import { defineTool } from "eve/tools";
 import { z } from "zod";
 import { LINEAR_ISSUE_ID_PATTERN } from "#lib/investigation-memory/scope.js";
 import { BILLING_BUCKETS, decideBilling } from "#lib/jev-decisions.js";
-import { billingDecisionFields, triageDecisions } from "#lib/triage-log.js";
+import {
+  billingDecisionFields,
+  criticRounds,
+  recordDecision,
+  triageDecisions,
+} from "#lib/triage-log.js";
 
 export default defineTool({
   approval: () => "not-applicable",
@@ -18,13 +23,16 @@ export default defineTool({
         signal: ctx.abortSignal,
       });
       if (issue) {
-        triageDecisions.update((decisions) => ({
-          ...decisions,
-          [issue]: billingDecisionFields(issue, {
+        const settled = recordDecision(
+          triageDecisions.get(),
+          criticRounds.get(),
+          billingDecisionFields(issue, {
             assignee: decision.route.assignee,
             project: decision.route.project,
-          }),
-        }));
+          })
+        );
+        triageDecisions.update(() => settled.decisions);
+        criticRounds.update(() => settled.rounds);
       }
       return { decided: true as const, decision };
     } catch (error) {

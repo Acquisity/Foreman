@@ -3,9 +3,13 @@ import { describe, it } from "node:test";
 import type { SessionAuthContext } from "eve/context";
 import { followUpDispatch, STATUS_ONLY_FOLLOW_UP } from "../channels/linear.js";
 import {
+  applyCriticSettlement,
+  BILLING_PATH,
+  billingDecisionFields,
   type CriticCount,
   type CriticRounds,
   criticBlocked,
+  recordDecision,
   reviewCycleAfterDecision,
   routeRefusal,
   settleCriticPacket,
@@ -113,6 +117,57 @@ describe("the review cycle", () => {
     const reviewed = settleCriticPacket(decidedB, packetB, "approve");
     assert.equal(reviewed.stale, false);
     assert.equal(routeRefusal(decisions, reviewed.rounds, routeInput), null);
+  });
+
+  it("keeps a billing decision when an objection dispatched before it settles", () => {
+    const sent = {
+      commit: "c".repeat(40),
+      documentId: "doc-1",
+      issue: "ENG-1",
+      updatedAt: "2026-10-27T10:00:00.000Z",
+    };
+    let state = recordDecision({}, {}, duplicate);
+    state = {
+      ...state,
+      ...applyCriticSettlement(
+        state.decisions,
+        state.rounds,
+        stampCriticPacket(state.rounds, sent),
+        "objection"
+      ),
+    };
+    state = recordDecision(state.decisions, state.rounds, duplicate);
+    const pending = stampCriticPacket(state.rounds, sent);
+    const route = { assignee: "Aaron Fraga", project: "Support" };
+    const billed = recordDecision(
+      state.decisions,
+      state.rounds,
+      billingDecisionFields("ENG-1", route)
+    );
+    const settled = applyCriticSettlement(
+      billed.decisions,
+      billed.rounds,
+      pending,
+      "objection"
+    );
+    assert.equal(settled.stale, true);
+    assert.deepEqual(settled.decisions["ENG-1"], {
+      classification: null,
+      issue: "ENG-1",
+      outcome: "route",
+      path: BILLING_PATH,
+      route,
+    });
+    assert.equal(criticBlocked(settled.rounds, "ENG-1"), false);
+    assert.equal(
+      routeRefusal(settled.decisions, settled.rounds, {
+        assignee: "Aaron Fraga",
+        issue: "ENG-1",
+        project: "Support",
+        state: "Todo",
+      }),
+      null
+    );
   });
 
   it("counts a result dispatched before its adjudication as that cycle's review", () => {

@@ -7,8 +7,7 @@ import {
   confidenceFields,
   criticRounds,
   decisionFields,
-  reviewCycleAfterDecision,
-  settleDecision,
+  recordDecision,
   triageDecisions,
 } from "#lib/triage-log.js";
 
@@ -38,11 +37,13 @@ export default defineTool({
         tool: "decide_triage",
       });
       const fields = decisionFields(input.identifier, decision);
-      const settled = settleDecision(triageDecisions.get(), fields);
-      triageDecisions.update(() => settled.decisions);
-      criticRounds.update((rounds) =>
-        reviewCycleAfterDecision(rounds, input.identifier)
+      const settled = recordDecision(
+        triageDecisions.get(),
+        criticRounds.get(),
+        fields
       );
+      triageDecisions.update(() => settled.decisions);
+      criticRounds.update(() => settled.rounds);
       logOpsEvent("triage.decision", {
         ...fields,
         ...confidenceFields(decision),

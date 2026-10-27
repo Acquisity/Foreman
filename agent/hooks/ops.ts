@@ -17,14 +17,13 @@
 import { defineHook } from "eve/hooks";
 import { logOpsEvent } from "../lib/ops-log.js";
 import {
-  blockedDecision,
+  applyCriticSettlement,
   type CriticPacket,
   criticRounds,
   criticTaskPacket,
   criticTaskPackets,
   criticVerdictFields,
   criticVerdictIssue,
-  settleCriticPacket,
   stampCriticPacket,
   triageDecisions,
 } from "../lib/triage-log.js";
@@ -143,16 +142,15 @@ export default defineHook({
         data.status === "completed" ? data.output : undefined,
         packet
       );
-      const { rounds, stale } = settleCriticPacket(
+      const { decisions, rounds, stale } = applyCriticSettlement(
+        triageDecisions.get(),
         criticRounds.get(),
         packet,
         verdict.counted
       );
       if (!stale) {
         criticRounds.update(() => rounds);
-        triageDecisions.update((decisions) =>
-          blockedDecision(decisions, rounds, issue)
-        );
+        triageDecisions.update(() => decisions);
       }
       logOpsEvent("critic.verdict", {
         ...verdict,
