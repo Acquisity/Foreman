@@ -6,12 +6,21 @@ import { pathToFileURL } from "node:url";
 const { default: rootAgent, rootModelSlot } = await import("./agent.js");
 
 describe("root agent limits", () => {
-  it("disables the default 40M per-session input budget and nothing else", () => {
-    // Cached prompt re-reads count as provider-reported input on every model
-    // call, so eve's default input budget can park a long Slack thread on an
-    // Approve/Stop card the channel cannot answer. Pin the exact object so no
-    // other limit (output cap, session timeout) gets configured by accident.
-    assert.deepEqual(rootAgent.limits, { maxInputTokensPerSession: false });
+  it("disables the default 40M usage window and nothing else", () => {
+    // eve's default usage window can park a long Slack thread on a
+    // Continue/Stop card the channel cannot answer. Pin the exact keys so no
+    // other limit (session timeout) gets configured by accident.
+    assert.deepEqual(Object.keys(rootAgent.limits ?? {}), ["sessionUsage"]);
+    const { sessionUsage } = rootAgent.limits ?? {};
+    assert.equal(typeof sessionUsage, "function");
+    const huge = { inputTokens: 1e12, outputTokens: 1e12 };
+    assert.equal(
+      (sessionUsage as (usage: unknown) => boolean)({
+        total: huge,
+        window: huge,
+      }),
+      false
+    );
   });
 });
 
@@ -46,7 +55,7 @@ it("accepts the wrapped root model under Eve's documented live-step contract", a
   t.mock.method(globalThis, "fetch", () =>
     Promise.reject(new Error("No network in this test"))
   );
-  // White-box regression against the lockfile's Eve 0.81.1 runtime. This private
+  // White-box regression against the lockfile's Eve 0.83.2 runtime. This private
   // import deliberately fails on internal API drift so upgrades require review.
   // It checks selection validation under the documented step -> live contract,
   // not lifecycle dispatch end to end; no public API exposes this validation.

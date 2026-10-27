@@ -169,13 +169,13 @@ describe("critic subagent", () => {
       tools: string[];
     };
     assert.ok(info.subagents.includes("critic"));
-    // P4.2 also rides this run: the compiled manifest must carry the root
-    // agent's disabled per-session input budget, proving agent.test.ts's
-    // source-level pin survives compilation into what eve actually runs.
+    // P4.2 also rides this run: the compiled manifest must record the root
+    // agent's sessionUsage callback, proving agent.test.ts's source-level pin
+    // survives compilation into what eve actually runs.
     const compiled = JSON.parse(
       readFileSync(info.artifacts.compiledManifest, "utf8")
-    ) as { config: { limits: { maxInputTokensPerSession: boolean } } };
-    assert.equal(compiled.config.limits.maxInputTokensPerSession, false);
+    ) as { config: { limits: unknown } };
+    assert.deepEqual(compiled.config.limits, { sessionUsage: true });
 
     const manifest = JSON.parse(
       readFileSync(info.artifacts.discoveryManifest, "utf8")
