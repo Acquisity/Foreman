@@ -354,7 +354,7 @@ describe("replay result", () => {
     assert.equal((await state()).criticObjections, 1);
   });
 
-  it("keeps a review when a decide_triage retry failed while it ran", async (t) => {
+  it("discards a review dispatched before a decide_triage retry failed, as live does", async (t) => {
     await replayProcess(t);
     noTransport(t);
     await toolResult(
@@ -367,9 +367,25 @@ describe("replay result", () => {
     await criticDispatched("critic-1");
     await toolResult("decide_triage", { decided: false, error: "Jev failed." });
     await criticSettled("critic-1", objection);
+    const stale = await state();
+    assert.equal(stale.critic, null);
+    assert.equal(stale.criticObjections ?? 0, 0);
+    await criticSettles("critic-2", objection);
     const settled = await state();
     assert.equal(settled.critic?.counted, "objection");
     assert.equal(settled.criticObjections, 1);
+  });
+
+  it("does not advance the cycle on a failed decide_billing, which live does not record", async (t) => {
+    await replayProcess(t);
+    noTransport(t);
+    await criticDispatched("critic-1");
+    await toolResult("decide_billing", {
+      decided: false,
+      error: "Jev failed.",
+    });
+    await criticSettled("critic-1", objection);
+    assert.equal((await state()).criticObjections, 1);
   });
 
   it("waits for the critic when the decision needs review", async (t) => {

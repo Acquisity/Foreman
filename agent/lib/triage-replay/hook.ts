@@ -16,7 +16,16 @@ const DECISIONS: Record<string, ReplayState["decisions"][number]["kind"]> = {
   decide_triage: "triage",
 };
 
-const made = (output: unknown): boolean =>
+/**
+ * Whether live records this decision tool result: decide_triage always does,
+ * a failed call as the fallback decision, and decide_billing only when Jev
+ * answered.
+ */
+const recordedLive = (
+  kind: ReplayState["decisions"][number]["kind"],
+  output: unknown
+): boolean =>
+  kind === "triage" ||
   (output as { decided?: unknown } | null)?.decided === true;
 
 /** Keeps the replay's objection count in step with the live rounds. */
@@ -62,7 +71,7 @@ export const triageReplayHook = defineHook({
       }
       await withReplayState(session.runId, session.caseKey, (state) => {
         state.decisions.push({ kind, output: result.output });
-        if (made(result.output)) {
+        if (recordedLive(kind, result.output)) {
           withRounds(
             state,
             reviewCycleAfterDecision(state.criticRounds ?? {}, state.case.id)
