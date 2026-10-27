@@ -424,6 +424,39 @@ describe("replay result", () => {
     assert.equal(result.final?.classification, null);
   });
 
+  it("scores a billing decision made after a blocked review as the billing route", async (t) => {
+    await replayProcess(t);
+    noTransport(t);
+    const closure = routeDecision({
+      needsCriticReview: true,
+      review: { kind: "duplicate", reason: "r", required: true },
+    });
+    await toolResult("decide_triage", closure);
+    await criticSettles("critic-1", objection);
+    await toolResult("decide_triage", closure);
+    await criticSettles("critic-2", objection);
+    assert.equal((await state()).criticObjections, 2);
+    await toolResult("decide_billing", {
+      decided: true,
+      decision: {
+        discretion: "needs-human",
+        notes: [],
+        route: { assignee: "Aaron Fraga", project: "Support" },
+        unconfirmed: [],
+      },
+    });
+    assert.equal((await state()).criticObjections, 0);
+    await routeTicket(
+      { issue: "ENG-100", priority: 3, state: "Todo" },
+      { client: executorClient(ctx) }
+    );
+    await endTurn();
+    const result = buildReplayResult(await state(), RUN);
+    assert.equal(result.status, "completed");
+    assert.equal(result.final?.outcome, "route");
+    assert.equal(result.final?.path, "Support/Financial");
+  });
+
   it("completes an unproven stop once its document is saved", async (t) => {
     await replayProcess(t);
     await toolResult("decide_triage", {

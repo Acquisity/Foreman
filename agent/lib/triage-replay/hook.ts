@@ -1,8 +1,11 @@
 import { defineHook } from "eve/hooks";
 import {
+  type CriticRounds,
   criticTaskPacket,
   criticVerdictFields,
-  nextObjections,
+  reviewCycleAfterDecision,
+  settleCriticPacket,
+  stampCriticPacket,
 } from "../triage-log.js";
 import { withReplayState } from "./backend.js";
 import { replaySessionOf } from "./mode.js";
@@ -13,11 +16,17 @@ const DECISIONS: Record<string, ReplayState["decisions"][number]["kind"]> = {
   decide_triage: "triage",
 };
 
-/** The live rule: only a decision that was made advances the generation. */
-const decisionGeneration = (state: ReplayState): number =>
-  state.decisions.filter(
-    (entry) => (entry.output as { decided?: unknown } | null)?.decided === true
-  ).length;
+const made = (output: unknown): boolean =>
+  (output as { decided?: unknown } | null)?.decided === true;
+
+/** Keeps the replay's objection count in step with the live rounds. */
+const withRounds = (
+  state: ReplayState,
+  rounds: Record<string, CriticRounds>
+) => {
+  state.criticRounds = rounds;
+  state.criticObjections = rounds[state.case.id]?.objections ?? 0;
+};
 
 const endRootTurn =
   (status: NonNullable<ReplayState["rootTurn"]>) =>
@@ -53,6 +62,12 @@ export const triageReplayHook = defineHook({
       }
       await withReplayState(session.runId, session.caseKey, (state) => {
         state.decisions.push({ kind, output: result.output });
+        if (made(result.output)) {
+          withRounds(
+            state,
+            reviewCycleAfterDecision(state.criticRounds ?? {}, state.case.id)
+          );
+        }
       });
     },
     "actions.requested": async (event, ctx) => {
@@ -71,7 +86,12 @@ export const triageReplayHook = defineHook({
         return;
       }
       await withReplayState(session.runId, session.caseKey, (state) => {
-        const generation = decisionGeneration(state);
+        const { generation } = stampCriticPacket(state.criticRounds ?? {}, {
+          commit: null,
+          documentId: null,
+          issue: state.case.id,
+          updatedAt: null,
+        });
         state.criticPackets = {
           ...state.criticPackets,
           ...Object.fromEntries(
@@ -95,19 +115,29 @@ export const triageReplayHook = defineHook({
         }
         state.criticCalls = [...(state.criticCalls ?? []), data.callId];
         const packet = state.criticPackets?.[data.callId] ?? null;
-        if (packet && packet.generation !== decisionGeneration(state)) {
-          return;
-        }
         const critic = criticVerdictFields(
           data.status,
           data.status === "completed" ? data.output : undefined,
           packet
         );
-        state.critic = critic;
-        state.criticObjections = nextObjections(
-          state.criticObjections ?? 0,
+        const rounds = state.criticRounds ?? {};
+        const settled = settleCriticPacket(
+          rounds,
+          packet
+            ? { ...packet, issue: state.case.id }
+            : stampCriticPacket(rounds, {
+                commit: null,
+                documentId: null,
+                issue: state.case.id,
+                updatedAt: null,
+              }),
           critic.counted
         );
+        if (settled.stale) {
+          return;
+        }
+        state.critic = critic;
+        withRounds(state, settled.rounds);
       });
     },
     "turn.cancelled": endRootTurn("cancelled"),
