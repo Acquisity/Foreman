@@ -355,10 +355,15 @@ export const confidenceFields = (decision: TriageDecision) => ({
   verdictConfidence: decision.confidence.verdict,
 });
 
+const CRITIC_RESULTS = ["PASS", "FAIL", "NOT_APPLICABLE"] as const;
+
 const criticReply = z.object({
   blocking_findings: z.array(z.unknown()),
   criteria_results: z.array(
-    z.object({ criterion: z.enum(CRITIC_CRITERIA), result: z.string() })
+    z.object({
+      criterion: z.enum(CRITIC_CRITERIA),
+      result: z.enum(CRITIC_RESULTS),
+    })
   ),
   reviewed: z
     .object({

@@ -216,6 +216,31 @@ describe("the critic policy", () => {
     assert.equal(criticBlocked(rounds, "ENG-1"), true);
   });
 
+  it("counts a result outside PASS, FAIL and NOT_APPLICABLE as a failed review, never an approval", () => {
+    const unknown = criteria().map((entry, i) =>
+      i === 0 ? { ...entry, result: "UNKNOWN" } : entry
+    );
+    const fields = criticVerdictFields(
+      "completed",
+      reply({ criteria_results: unknown }),
+      PACKET
+    );
+    assert.equal(fields.counted, "failed");
+    assert.equal(fields.verdict, "failed");
+    assert.equal(
+      criticVerdictFields(
+        "completed",
+        reply({
+          criteria_results: criteria().map((entry, i) =>
+            i === 0 ? { ...entry, result: "NOT_APPLICABLE" } : entry
+          ),
+        }),
+        PACKET
+      ).counted,
+      "approve"
+    );
+  });
+
   it("keeps the raw verdict and counts for the log", () => {
     assert.deepEqual(
       criticVerdictFields("completed", skillLoadFailure, PACKET),
