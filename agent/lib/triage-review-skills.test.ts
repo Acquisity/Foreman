@@ -133,6 +133,12 @@ test("a Bug the fallback decides after Jev failed still gets the review and the 
     reviewSection.includes("or the fallback decides one of these"),
     "Stage 5 sends a fallback decision to review"
   );
+  assert.ok(
+    reviewSection.includes(
+      "or the decision is recorded and, if it needs review, a review has settled the document"
+    ),
+    "Stage 5 completes a reviewed fallback decision only once it has settled"
+  );
 });
 
 test("the Intercom Bug branch defers to the shared review protocol", () => {
