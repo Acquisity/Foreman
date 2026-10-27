@@ -36,12 +36,16 @@ export const MODELS = {
   // 2026-09-28, 30 picks each on the full index: flash-lite p50 1.3s, max 1.6s,
   // with the same articles or better; flash p50 12.7s, max 27.8s.
   kbSelect: "google/gemini-3.5-flash-lite",
-  orchestrator: "deepseek/deepseek-v4-pro-0813",
+  // Root model for every other session: general Slack, intake-only and
+  // questions-only channels, Linear outside triage intake, GitHub, local eve
+  // and schedules. Moved off DeepSeek to Sonnet 5.5 on the CLI Proxy
+  // (ENG-16434); it reads images itself.
+  orchestrator: "anthropic/claude-sonnet-5.5",
   // Root model for sessions from the two Asks-receiver triage intake channels
   // (ENG-15226) and Linear tickets from #aqcuisity-migration's form; every
   // other session stays on the orchestrator.
   triage: "anthropic/claude-opus-5.5",
-  // Cheap and vision-capable: this slot reads pixels, it does not reason.
+  // Support widget screenshot reader (widget-screenshot.ts). Not the root.
   vision: "google/gemini-3.5-flash",
   // Support widget diagnosis: the investigator's write-up of what the evidence
   // shows, a question for the customer, and the reply. It runs once or twice an
@@ -132,7 +136,7 @@ export const writeModelOverrides = async (
 };
 
 // What a session actually runs on: the live override when one is saved, the compiled default
-// otherwise. The root, critic and vision resolve it at every step (step.started), so a swap
+// otherwise. The root and critic resolve it at every step (step.started), so a swap
 // reaches running sessions on their next step, after the cache window above.
 export const resolveModel = async (agent: AgentModelSlot): Promise<string> =>
   (await readModelOverrides())[agent] ?? MODELS[agent];
@@ -189,6 +193,7 @@ export const listProxyModels = async (): Promise<Set<string>> => {
 // mode must be passed back", HTTP 400, no fallback), while fireworks accepts the same history,
 // so baseten and the DeepSeek native endpoint are left off the list and the order runs the
 // providers that tolerate the history, fastest first. Unlisted providers stay as fallback.
+// No compiled root slot is DeepSeek any more, so this applies only to a DeepSeek override.
 export const gatewayRouting = (modelId: string) =>
   modelId.startsWith("deepseek/")
     ? {
@@ -206,6 +211,18 @@ export const gatewayRouting = (modelId: string) =>
         },
       }
     : undefined;
+
+// The root's Anthropic effort on the orchestrator and triage slots: Aaron's decision
+// (ENG-16434). A gateway model ignores the anthropic option, so an override to a
+// non-Claude id stays safe. Native delegates inherit it with the root's model.
+export const ROOT_EFFORT = "medium";
+
+export const rootCallOptions = (modelId: string) => ({
+  providerOptions: {
+    ...gatewayRouting(modelId)?.providerOptions,
+    anthropic: { effort: ROOT_EFFORT },
+  },
+});
 
 // For calls that reformat or summarise text they were handed rather than reason
 // about it. Measured on the support widget: on its defaults the fast model spends

@@ -36,7 +36,21 @@ import {
   postStopConfirmation,
   stopSlackSession,
 } from "../lib/slack-stop.js";
-import { isIntakeOnly, stampTriageIntake } from "../lib/trust.js";
+import {
+  alertDisputeId,
+  isStripeDisputeAlert,
+  isStripeDisputeApprovalText,
+  renderStripeDisputeAlert,
+  STRIPE_DISPUTES_CHANNEL,
+  stripeDisputeSessionAuth,
+  stripeDisputeSessionMessage,
+} from "../lib/stripe-dispute-trigger.js";
+import {
+  isIntakeOnly,
+  stampStripeDisputeApproval,
+  stampStripeDisputeId,
+  stampTriageIntake,
+} from "../lib/trust.js";
 
 /**
  * Slack channel: mentions and direct messages in, threaded progress out, via
@@ -111,12 +125,99 @@ import { isIntakeOnly, stampTriageIntake } from "../lib/trust.js";
  * post is rejected. A non-terminal turn failure posts Foreman's short text
  * with the error id; Foreman's `session.failed` notice owns terminal failures
  * so the thread sees one content-free message.
+ *
+ * Stripe dispute alerts (ENG-16255) arrive as mentions: Acquisity posts each
+ * one as the Dispute Alerts app and tags Foreman, because no untagged message
+ * from the private disputes channel reaches Foreman. The alert's own mention
+ * starts one unattended session in its thread. A person mentioning Foreman
+ * later in that thread gets the alert read back from the thread root.
  */
+
+/** How long dispatch waits for the alert thread's root message. */
+const ALERT_ROOT_TIMEOUT_MS = 5000;
+
+/**
+ * The alert this mention's thread hangs off, as one context line, when the
+ * mention is a reply in a disputes-channel alert thread. Any other channel or
+ * a top-level mention adds nothing and makes no call. A failed or slow read
+ * adds nothing either; the skill then asks for the dispute id.
+ *
+ * @remarks
+ * The root comes from eve's own thread refresh, the first page of 50 replies
+ * that history restoration shares, and must carry the Dispute Alerts app id.
+ */
+export const stripeDisputeAlertContext = async (
+  ctx: SlackInboundMessageContext,
+  message: SlackMessage
+): Promise<{ context: string; disputeId?: string } | undefined> => {
+  if (
+    message.channelId !== STRIPE_DISPUTES_CHANNEL ||
+    message.threadTs === message.ts
+  ) {
+    return;
+  }
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    const loaded = await Promise.race([
+      ctx.thread.refresh().then(() => true),
+      new Promise<false>((resolve) => {
+        timer = setTimeout(() => resolve(false), ALERT_ROOT_TIMEOUT_MS);
+      }),
+    ]);
+    const root = loaded
+      ? ctx.thread.recentMessages.find((entry) => entry.ts === message.threadTs)
+      : undefined;
+    if (root && isStripeDisputeAlert(message.channelId, root.raw)) {
+      return {
+        context: `This thread is a Stripe dispute alert. Load the stripe-disputes skill. The alert:\n${renderStripeDisputeAlert(root.raw)}`,
+        disputeId: alertDisputeId(root.raw),
+      };
+    }
+  } catch (error) {
+    console.error("Stripe dispute alert root read failed.", error);
+  } finally {
+    clearTimeout(timer);
+  }
+};
+
+/**
+ * The turn a new Stripe dispute alert starts: one unattended session in the
+ * alert's own thread. A redelivery that finds the session already there does
+ * nothing; the tool's dispute re-check covers whatever slips past this.
+ */
+const stripeDisputeAlertTurn = async (
+  ctx: SlackInboundMessageContext,
+  message: SlackMessage
+) => {
+  try {
+    if (await ctx.resolveSession()) {
+      return null;
+    }
+  } catch (error) {
+    console.error("Stripe dispute session lookup failed.", error);
+  }
+  return {
+    auth: stripeDisputeSessionAuth({
+      disputeId: alertDisputeId(message.raw),
+      teamId: message.teamId,
+      threadTs: message.ts,
+    }),
+    context: [
+      stripeDisputeSessionMessage(renderStripeDisputeAlert(message.raw)),
+    ],
+    title: "Stripe dispute",
+  };
+};
 
 export const dispatch = async (
   ctx: SlackInboundMessageContext,
   message: SlackMessage
 ) => {
+  // A Dispute Alerts post is not a person: it starts the automatic dispute
+  // session before any person-facing admission runs.
+  if (isStripeDisputeAlert(message.channelId, message.raw)) {
+    return await stripeDisputeAlertTurn(ctx, message);
+  }
   // Admission comes first: an event the auth check would reject must never
   // cancel work either, so the stop command runs only for an admitted
   // author.
@@ -164,6 +265,7 @@ export const dispatch = async (
   // stages a file dropped earlier in the thread, is not visible to dispatch.
   const attachmentContext = slackAttachmentContext(message.attachments);
   const history = await slackFreshSessionHistory(ctx, message);
+  const disputeAlert = await stripeDisputeAlertContext(ctx, message);
   // Who is asking, from the signed author id's Slack profile, never the text.
   const requesterContext = questionsOnly
     ? slackRequesterContext(await lookupSlackRequester(message.author?.userId))
@@ -172,9 +274,22 @@ export const dispatch = async (
     intakeOnly ? slackIntakeContext(message.channelId) : FINAL_SLACK_POST_RULE,
     ...(requesterContext ? [requesterContext] : []),
     ...(attachmentContext ? [attachmentContext] : []),
+    ...(disputeAlert ? [disputeAlert.context] : []),
     ...(history ? [history] : []),
   ];
-  return { auth: stamped, context };
+  // The only dispute this turn may write is the one its thread's alert names.
+  const bound = disputeAlert?.disputeId
+    ? stampStripeDisputeId(stamped, disputeAlert.disputeId)
+    : stamped;
+  // Only a person's literal "approve" in the alert thread may submit, so a
+  // question in the thread can never carry the model to a submit.
+  return {
+    auth:
+      disputeAlert?.disputeId && isStripeDisputeApprovalText(message.text)
+        ? stampStripeDisputeApproval(bound)
+        : bound,
+    context,
+  };
 };
 
 // --- Slack rendering through one renderer over eve's defaults ---------------

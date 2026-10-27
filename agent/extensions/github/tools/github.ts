@@ -52,7 +52,7 @@ export default defineDynamic({
         );
       }
       const tools = await resolve(event, ctx);
-      // Eve 0.81.1 treats a directory override as application-owned and does not
+      // Eve 0.83.2 treats a directory override as application-owned and does not
       // prefix a returned map. Qualify its keys while keeping each upstream
       // branded definition and its durable callbacks intact.
       return Object.fromEntries(

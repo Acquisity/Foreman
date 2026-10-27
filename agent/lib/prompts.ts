@@ -29,7 +29,7 @@ const DELEGATION = `# Delegation
 
 Give every delegated child a self-contained message because it does not see the parent conversation, and give parallel children non-overlapping write scopes in the shared sandbox. For repository work, include the selected \`owner/repo\` and tell the child to call \`prepare_repository\` before working. For scheduled support delegation, begin the child message with "${SUPPORT_DELEGATION_LABEL}", include the question, relevant source identifiers and existing findings, and require read-only evidence returned to the parent. The root keeps the investigation journal, Linear writes, and Slack delivery.
 
-An agent call returns a receipt at once. It is not the child's answer. The turn stays open, and the result arrives in this same turn as a task result once the task settles. Continue independent work meanwhile; when there is nothing to say until a result arrives, call \`eve__task_wait\`, and call \`eve__task_cancel\` to stop a task. Read the actual critic verdict or vision findings before relying on them; never treat a receipt as a completed investigation.`;
+An agent call returns a receipt at once. It is not the child's answer. The turn stays open, and the result arrives in this same turn as a task result once the task settles. Continue independent work meanwhile; when there is nothing to say until a result arrives, call \`eve__task_wait\`, and call \`eve__task_cancel\` to stop a task. Read the actual critic verdict before relying on them; never treat a receipt as a completed investigation.`;
 
 export const MEMORY = `# Investigation memory
 

@@ -2,7 +2,7 @@
 
 # Foreman
 
-Foreman is Acquisity's general-purpose agent, built on [eve](https://eve.dev). It answers questions, investigates connected systems, operates services, and makes well-scoped repository changes directly. It uses eve's native delegation for independent subtasks and retains critic and vision for triage review and image analysis.
+Foreman is Acquisity's general-purpose agent, built on [eve](https://eve.dev). It answers questions, investigates connected systems, operates services, and makes well-scoped repository changes directly. It uses eve's native delegation for independent subtasks and retains critic for triage review; the root reads images itself.
 
 ## Surfaces
 
@@ -10,7 +10,7 @@ Foreman runs on four channels, with a GitHub extension and one shared company-se
 
 - **GitHub** — trusted mentions (owners, members, collaborators) dispatch interactive sessions. Labels, PR opens, CI changes, reviews, and synchronizations do not launch work or automatic summaries.
 - **Linear** — Agent Sessions trusted by workspace membership. Assigned issues use the same general agent.
-- **Slack** — mentions and DMs trusted by channel membership. Channels listed as intake-only can investigate and answer but cannot ship code. An ask filed in the mismatched intake channel is handled in place: the reply notes which kind of ask it is and the matching triage procedure runs there, with the project and labels routed from the evidence rather than the channel. A screenshot or file attached to a mention is staged by eve under `/workspace/.eve/attachments` in the sandbox, and the Slack channel adds one context line naming the files and that directory, so the text-only chat model can hand the path to the vision subagent on the same turn.
+- **Slack** — mentions and DMs trusted by channel membership. Channels listed as intake-only can investigate and answer but cannot ship code. An ask filed in the mismatched intake channel is handled in place: the reply notes which kind of ask it is and the matching triage procedure runs there, with the project and labels routed from the evidence rather than the channel. A screenshot or file attached to a mention is staged by eve under `/workspace/.eve/attachments` in the sandbox, and the Slack channel adds one context line naming the files and that directory, so the root, which sees images up to 3 MiB directly, can call `read_image` with the path for any image it cannot see on the same turn.
 - **eve** — the HTTP channel for the local dev TUI and Vercel OIDC.
 
 The GitHub extension adds an API surface (reads, triage, PR authoring; no merge) running inside the sandbox.
@@ -19,13 +19,13 @@ Foreman reaches company services through Executor, using shared company accounts
 
 ## Skills
 
-Skills under `agent/skills/` are load-on-demand procedures the model pulls in when a task calls for them. They include triage and billing investigation, GitHub and code-quality review, GitHub-Linear bridging, SLA investigation, and writing and Slack wording guardrails. Loading a skill adds instructions only; it never adds tools.
+Skills under `agent/skills/` are load-on-demand procedures the model pulls in when a task calls for them. They include triage and billing investigation, Stripe dispute response, GitHub and code-quality review, GitHub-Linear bridging, SLA investigation, and writing and Slack wording guardrails. Loading a skill adds instructions only; it never adds tools.
 
 ## Execution
 
 Foreman handles conversation, investigation, service operations, and repository changes with one general prompt. For an authorized change it resolves the repository, prepares a workspace, creates a validated feature branch, makes the change, runs proportionate checks, pushes, and opens a pull request. Foreman never merges.
 
-The root can use eve's native `agent` tool for independent subtasks. On eve 0.81.1 each call creates a fresh copy with the root's instructions, tools, connections, and sandbox; the child starts with fresh history and state and cannot delegate recursively. Give children self-contained instructions and avoid concurrent edits to the same files. Critic remains the independent read-only triage reviewer. Vision reads staged screenshots in the shared sandbox. There is no authored station pipeline, run-state coordinator, or automatic GitHub stabilization.
+The root can use eve's native `agent` tool for independent subtasks. On eve 0.83.2 each call creates a fresh copy with the root's instructions, tools, connections, and sandbox; the child starts with fresh history and state and cannot delegate recursively. Give children self-contained instructions and avoid concurrent edits to the same files. Critic remains the independent read-only triage reviewer. The root reads staged screenshots itself, and `read_image` reads Linear-hosted ones. There is no authored station pipeline, run-state coordinator, or automatic GitHub stabilization.
 
 ## Trust and safety
 
@@ -38,7 +38,7 @@ There is no deployment-wide repository setting.
 - GitHub sessions use the repository from the signed webhook. Issue or comment text cannot redirect that signed binding.
 - Linear, Slack, and eve requests involving repository work must include exactly one `owner/repo` or GitHub URL. Ordinary conversation does not require a repository target.
 - Missing or ambiguous targets require clarification.
-- Workspaces clone at runtime when a GitHub channel checkout is unavailable. Native delegates and vision share the prepared parent workspace; critic keeps its own sandbox for independent review.
+- Workspaces clone at runtime when a GitHub channel checkout is unavailable. Native delegates share the prepared parent workspace; critic keeps its own sandbox for independent review.
 
 ## Durable state
 
@@ -72,7 +72,7 @@ Settled investigations, including ticketless Intercom and Slack ones and conclus
 | Variable | Default | Purpose |
 | --- | --- | --- |
 | `GITHUB_CONNECTOR` | `github/foreman-agent` | GitHub channel, API, and brokered git credentials |
-| `LINEAR_CONNECTOR` | `linear/foreman-agent` | Linear Agent Sessions and vision attachment reads |
+| `LINEAR_CONNECTOR` | `linear/foreman-agent` | Linear Agent Sessions and Linear attachment reads |
 | `SLACK_CONNECTOR` | `slack/acquisity-foreman` | Slack inbound delivery and replies |
 | `FOREMAN_BOT_NAME` | GitHub App slug | Mention and commit identity override |
 | `FOREMAN_REVIEW_BOT_LOGINS` | empty | Comma-separated lowercase bot logins for an explicitly requested AI review-bot loop; supply the chosen logins in the request because the sandbox cannot read this setting. It does not start automatic reviews. |
@@ -84,7 +84,7 @@ See [.env.example](.env.example) for the Executor and retained channel/personal 
 
 ### Session limits
 
-The root agent sets `limits: { maxInputTokensPerSession: false }` in [agent/agent.ts](agent/agent.ts). eve defaults to a 40M-token input budget per session, and cached prompt re-reads count as provider-reported input on every model call, so a long Slack thread can cross it and park the session on eve's Approve/Stop budget card, which Slack cannot answer. Output stays on eve's existing uncapped default.
+The root agent sets `limits: { sessionUsage: () => false }` in [agent/agent.ts](agent/agent.ts), so no session reaches a usage window. eve defaults to asking for approval after 40M new input tokens per window, so a long Slack thread can cross it and park the session on eve's Continue/Stop card, which Slack cannot answer. Critic and native delegates use the root's limit. Output stays on eve's existing uncapped default.
 
 ### Instantly admin workspace
 
@@ -107,6 +107,8 @@ pnpm report:capabilities
 ```
 
 `pnpm validate` checks generated Linear-spec drift, then runs Ultracite formatting and lint, TypeScript, `eve info` discovery, and unit tests, in that order: the capability-budget test reads the compiled manifest, so discovery must run first. `pnpm report:capabilities` measures the tool, skill, subagent, and schema characters each session lane carries: it compiles the manifest first, counts the GitHub extension's tools only after eve's own dynamic-tool preparation admits them, reads eve's subagent delegation schema from eve, and fails instead of publishing a partial total or one for tools eve would drop. It reports and gates nothing. The `validate` GitHub Actions workflow runs the same `pnpm validate` on every pull request to `main`, with placeholder connector UIDs as plain workflow environment variables so `eve info` compiles the manifest and the manifest-dependent tests run for real; it references no secret. Evals use real model calls. `routing/native-delegation` dispatches two real read-only child tasks. `routing/direct-scratch-repository` is opt-in: set `FOREMAN_SCRATCH_REPO=owner/repo` and `FOREMAN_SCRATCH_TICKET` to an existing test ticket; it requires an untrusted Eve eval principal, approves one scoped push, and opens a real PR into `main`, so use a scratch repository with that base branch only. Follow [.github/UAT-BATTERY.md](.github/UAT-BATTERY.md) on each PR.
+
+Live Preview smoke checks live under `evals/preview/` (tag `preview`). They drive the real front doors of one stable QA build: Slack mentions in the Preview sandbox channel, Linear Agent Sessions on team Sandbox issues, and the Acquisity QA Preview's support API in the demo workspace. Push the commit under test with `scripts/qa-preview-push.sh <sha>` (it force-pushes `qa/foreman-preview`, waits for READY and prints the deployment id), then run `pnpm eval --tag preview --url https://foreman-git-qa-foreman-preview-acquisity.vercel.app`. They need `QA_SLACK_TOKEN`, `LINEAR_SANDBOX_API_KEY`, `QA_ACQUISITY_URL` (an HTTPS `*-acquisity.vercel.app` Preview origin that matches the selected Orca tab), `QA_ORCA_PAGE` (the id of an Orca browser tab signed in to that origin in the demo workspace, from `orca-ide tab list --json`; the widget checks call the support API from inside it, since the session cookie is httpOnly) and a Vercel CLI login for the deployment and workflow-run lookups; `QA_PREVIEW_BRANCH` and `QA_SLACK_TICKET` override the branch and the S1 ticket. A check with a variable missing, or run without `--url`, skips and names what is missing, so `pnpm validate` and CI never post anywhere. The Linear checks cancel the SAN issue they file, also when an assertion fails. W8 (`preview/widget-ticket`) is opt-in under its own `preview-ticket` tag, outside the default `preview` set: run `pnpm eval --tag preview-ticket --url https://foreman-git-qa-foreman-preview-acquisity.vercel.app` once per upgrade. It files a real ENG ticket that production Foreman then triages and logs the identifier; the runner cancels that ticket by hand with a comment. The check does not read the ticket back because no ENG-capable key exists locally.
 
 The support widget's front door answers from the product guide, generated from the help center with `pnpm widget:guide` and regenerated after help-center changes ship; `WIDGET_CHAT=legacy` rolls it back to the help-center writer. See [evals/widget/README.md](evals/widget/README.md#front-door-cases). Acquisity's context route sends support office hours on every turn (ENG-15262). After hours (`officeHours.open === false` on a customer turn), Foreman never hands off: an explicit ask for a person, or findings that still need one after the eligibility check, file the conversation's one ticket instead (reusing an existing one) and the reply ends with a fixed line saying when the team is back, from the app's `nextOpenText` when `showReplyTime` is set. The rule lives in `ticketInsteadOfHandoff` in `agent/lib/widget-office-hours.ts`; front-door tickets are filed from code through the same `fileWidgetTicket` the investigator's `widget_file_ticket` uses (`agent/lib/widget-ticket.ts`), under the app principal. A confirmed filing receipt stays in the pending run's existing findings JSON, so a later tool call reuses it without depending on Linear search visibility. At finish, that receipt supplies the availability line even when the investigator resolves the issue or asks a clarification; a confirmed refund uses the same rule. Only the after-hours explicit-person answer gets a writer note preventing contradictory notification wording. Absent or malformed office hours, a teammate's inbox run, a failed ticket and a blocked reply all hand off as before, and Acquisity writes its own handoff line.
 

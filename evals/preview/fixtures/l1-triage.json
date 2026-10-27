@@ -1,0 +1,11 @@
+{
+  "title": "Timezone mismatch: leads' selected times not syncing correctly to closer's calendar",
+  "requester": "QA Requester",
+  "customerName": "Customer One",
+  "customerEmail": "customer.one@example.com",
+  "workspaceName": "Example Workspace",
+  "achieve": "When a lead selects a time to book a call, the time that appears on the closer's calendar does not match what the lead selected. Example from the call: a lead selected 2 PM GMT, but the appointment shows on the closer's calendar as 7 AM GMT, a 7-hour discrepancy. At least two other leads show times that don't match what they originally selected (several leads coming through in GMT time zones despite being targeted at the US market). The customer views the CRM in Pacific Time and is unsure whether the display issue is on their end or the closer's calendar end, but whatever time the AI SDR offers leads is not translating correctly when the appointment lands on the closer's calendar. Suspected impact: a possible contributor to no-shows if the closer and the lead expect the call at different times.",
+  "doing": "Submitting this ticket",
+  "instead": "Potential no shows due to time discrepancy",
+  "expected": "Resolve"
+}

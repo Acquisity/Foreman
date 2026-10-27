@@ -316,7 +316,7 @@ describe("ops hook action.result", () => {
           callId: "c3",
           kind: "subagent-result",
           output: "done",
-          toolName: "vision",
+          toolName: "critic",
         },
         status: "completed",
         turnId: "t1",

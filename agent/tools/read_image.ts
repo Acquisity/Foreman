@@ -1,37 +1,7 @@
 import { defineTool, toolOutput, toolOutputPart } from "eve/tools";
 import { z } from "zod";
 import { linearAuth } from "#lib/constants.js";
-
-// Byte payloads have to cross eve's durable JSON boundary as base64, and the
-// provider needs the media type declared, so it comes from the bytes, never
-// from a name: a JSON error body saved as shot.png is the failure this tool
-// exists to catch.
-const MAGIC: Array<{ mediaType: string; test: (b: Buffer) => boolean }> = [
-  {
-    mediaType: "image/png",
-    test: (b) =>
-      b.subarray(0, 8).equals(Buffer.from("89504e470d0a1a0a", "hex")),
-  },
-  {
-    mediaType: "image/jpeg",
-    test: (b) => b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff,
-  },
-  {
-    mediaType: "image/gif",
-    test: (b) => b.subarray(0, 4).toString("latin1") === "GIF8",
-  },
-  {
-    mediaType: "image/webp",
-    test: (b) =>
-      b.subarray(0, 4).toString("latin1") === "RIFF" &&
-      b.subarray(8, 12).toString("latin1") === "WEBP",
-  },
-];
-
-/** The media type the bytes declare, or null when they are not an image. */
-export const sniffImage = (bytes: Buffer): string | null =>
-  MAGIC.find(({ test }) => bytes.length >= 12 && test(bytes))?.mediaType ??
-  null;
+import { sniffImage } from "#lib/image.js";
 
 // eve warns above 3 MiB per content part, and providers reject beyond their own
 // limits with an opaque error. Fail here instead, where the message names the file.
@@ -72,11 +42,10 @@ const notAnImage = (what: string, bytes: Buffer) => {
  * Load an image into this session's context.
  *
  * @remarks
- * This is the one tool that puts pixels in front of a model in Foreman, and it
- * is authored only inside the vision station so the image stays in the cheap
- * child's history rather than the orchestrator's. A Linear screenshot is read
- * straight from `uploads.linear.app` with the app token, so the parent never
- * downloads it and the 300-second url signature never matters.
+ * The root and the critic read images with it. A tool-result image stays in
+ * the caller's history and is re-sent on later calls. A Linear screenshot is
+ * read straight from `uploads.linear.app` with the app token, so nothing
+ * downloads it first and the 300-second url signature never matters.
  */
 const imageSourceSchema = z.union([
   z.object({

@@ -16,6 +16,8 @@ ENG-13737 update: dynamic connections are now supported alongside tools, skills,
 
 Eve 0.81.1 update (ENG-15874): still unresolved. No release through 0.81.1 adds a mount availability resolver; 0.69.0 (b34bab8) only moved extension configuration and state to each logical mount. Keep the GitHub slot gate.
 
+Eve 0.83.2 update (ENG-16246): still open. No release from 0.82.0 through 0.83.2 changes this.
+
 Status: Still open on 0.81.1.
 
 ## 2. Remove a same-named authored tool from a dynamic resolver
@@ -32,13 +34,15 @@ ENG-13737 update: separate-file null suppression is still unavailable. Keep the 
 
 Eve 0.81.1 update (ENG-15874): still unresolved. 0.59.1 (1e872e3) added `tool: false` and a same-named `disableTool()`, but both hide a subagent's derived delegation tool, not a static authored tool from a separate resolver; see section 3. Keep the same-slot wrappers.
 
+Eve 0.83.2 update (ENG-16246): still open. No release from 0.82.0 through 0.83.2 changes this.
+
 Status: Still open on 0.81.1.
 
 ## 3. Gate a subagent's delegation tool without gating the subagent
 
 Checked against eve 0.44.0.
 
-`defineDynamic` in a subagent's `agent.ts` supports per-session availability. The factory-specific motivation is retired: Foreman now retains only critic and vision, both used by ordinary triage. No new child gate is needed for factory removal.
+`defineDynamic` in a subagent's `agent.ts` supports per-session availability. The factory-specific motivation is retired: Foreman now retains only critic, used by ordinary triage. No new child gate is needed for factory removal.
 
 At ENG-13737 eve still prepared the delegation schema for each declared subagent; Foreman does not supply a narrower custom schema. Launches now return working receipts and results arrive later. Resolved by eve 0.69 tasks: a call returns a receipt and its result arrives in the same held turn. The report uses each compiled node's prepared tool. `pnpm report:capabilities` reads the installed schema rather than preserving the former eight-station count. A narrower framework schema remains a possible upstream improvement; it is not an upgrade prerequisite.
 
@@ -56,13 +60,15 @@ Proposal: the mount-level availability resolver of section 1, which would gate a
 
 Eve 0.81.1 update (ENG-15874): no longer applies to Foreman. The eve 0.81.1 upgrade removed the browser extension, so `agent/extensions/` mounts only GitHub and no lane carries these 21 tools. The framework limit itself is section 1 and remains unresolved.
 
+Eve 0.83.2 update (ENG-16246): still open. No release from 0.82.0 through 0.83.2 changes this.
+
 Status: Still open on 0.81.1 as section 1; no longer applies to Foreman.
 
 ## 5. Gate eve's built-in tools per session (supported)
 
 The original Eve 0.44.0 check found only global `disableTool()` overrides. Since 0.45.0 (b3cf8ee), eve gives framework defaults the same file slots as authored tools, so a same-slot `defineDynamic` can return the imported default or `null` for that session. The requested mechanism is now available; no replacement gating system is needed.
 
-Foreman keeps its current choices: native `agent` enabled and `ask_question` not added on root, critic and vision. No extra per-session built-in gate is introduced by this upgrade. Framework defaults now appear in the compiled manifest; the capability report excludes them by their compiled owner bindings, while measuring Foreman's authored and extension contributions. Dynamic MCP connections are also now public; the support dispatcher below remains for its existing policy and journal requirements.
+Foreman keeps its current choices: native `agent` enabled and `ask_question` not added on root and critic. No extra per-session built-in gate is introduced by this upgrade. Framework defaults now appear in the compiled manifest; the capability report excludes them by their compiled owner bindings, while measuring Foreman's authored and extension contributions. Dynamic MCP connections are also now public; the support dispatcher below remains for its existing policy and journal requirements.
 
 Eve 0.81.1 update (ENG-15874): still resolved. The same-slot mechanism is unchanged. `ask_question` stopped being a default tool and `todo` was removed in 0.65.0 (60998d6); built-in tools moved into the reserved `eve` namespace (`eve__task_wait`, `eve__task_cancel`) in 0.76.0; and since 0.78.0 (db71190) a resolver no longer adds the catalog tools `eve__search`, `eve__tool`, and `eve__skill` on its own. The capability report still excludes every framework-owned tool by its compiled owner binding.
 
@@ -81,6 +87,8 @@ ENG-13737 update: eve added workflow-tool action variants but still supplied no 
 Eve 0.81.1 update (ENG-15874): resolved for instrumentation, not for hooks. 0.70.3 (3b1fe5c) gives `defineInstrumentation` providers a framework-measured `durationMs` on `tool.call.completed` and records `gen_ai.execute_tool.duration` on `execute_tool` spans. `ActionResultStreamEvent.data` still carries no timing field, so the `action.result` ops line stays duration-free; a duration belongs in an instrumentation provider if one is wanted.
 
 Proposal: put a framework-measured elapsed time, or a start timestamp, on `ActionResultStreamEvent.data`. eve already owns both ends of the execution it is projecting, so the measurement is free there and unreachable anywhere else.
+
+Eve 0.83.2 update (ENG-16246): still open. No release from 0.82.0 through 0.83.2 changes this.
 
 Status: Resolved in 0.70.3 for instrumentation providers; still open on 0.81.1 for hooks.
 
@@ -105,6 +113,8 @@ Eve 0.81.1 update: since 0.68.0 a hook that throws no longer fails the turn; eve
 
 Proposal: expose a runtime-owned per-run deadline on channel sends that cancels model calls, delegated work and token resolution durably.
 
+Eve 0.83.2 update (ENG-16246): still open. No release from 0.82.0 through 0.83.2 changes this.
+
 Status: Resolved in 0.68.0 for cancelling a turn from a hook; the runtime-owned per-run deadline is still open on 0.81.1.
 
 ## Register receive-only channels
@@ -114,6 +124,8 @@ Checked against eve 0.44.0 after ENG-13601's first production intake tick. The c
 ENG-13737 upgrade: retain the inert route and verify it in `channelRoutes.effective` of the compiled manifest. This upgrade does not remove the receive-only registration safeguard or expose an HTTP session-creation endpoint.
 
 Proposal: compile receive-only channels independently of routes and resolve cross-channel targets by durable channel identity.
+
+Eve 0.83.2 update (ENG-16246): still open. No release from 0.82.0 through 0.83.2 changes this.
 
 Status: Still open on 0.81.1. The 0.81.1 compiled manifest still carries channels only through `channelRoutes`, and `agent/lib/support/channel-registration.test.ts` still checks the inert route.
 
@@ -138,6 +150,8 @@ Foreman keeps those safety gates and records one tracked-only `.soft()` assertio
 
 Proposal: support a public post-activity not-scored result that retains failed safety gates and excludes uncovered runs from grading totals.
 
+Eve 0.83.2 update (ENG-16246): still open. No release from 0.82.0 through 0.83.2 changes this.
+
 Status: Still open on 0.81.1.
 
 ## Warm snapshot image tracks eve's sandbox image
@@ -145,5 +159,7 @@ Status: Still open on 0.81.1.
 Checked against Eve 0.81.1 for ENG-15910. When the sandbox source is a snapshot, `vercel-create-sdk.js` passes no `image` to `Sandbox.create`, so the session runs on the image the snapshot was built from. eve 0.81 moved its Vercel image to `vcr.vercel.com/vercel/eve/base:<eve version>` (`EVE_SANDBOX_IMAGE_TAG` overrides the tag), and its initialization command runs in the default `/vercel/sandbox`. A snapshot built from the previous eve's older `vercel/eve` image lacks that directory, so every session failed with "chdir /vercel/sandbox: no such file or directory". `agent/lib/repository-snapshot.ts` now derives the image the way eve does, because eve's resolver is not exported. Every eve upgrade requires a snapshot rebuild.
 
 Proposal: export the resolved sandbox image from a public entry, and reject or warn on a snapshot source built from a different image.
+
+Eve 0.83.2 update (ENG-16246): still open. No release from 0.82.0 through 0.83.2 changes this.
 
 Status: Still open on 0.81.1.

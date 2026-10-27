@@ -2,8 +2,8 @@ import { randomUUID } from "node:crypto";
 import { setTimeout as sleep } from "node:timers/promises";
 import { generateObject } from "ai";
 import { z } from "zod";
-import { sniffImage } from "../subagents/vision/tools/read_image.js";
 import { readRequestBody } from "./bounded-body.js";
+import { sniffImage } from "./image.js";
 import { fastCallOptions, modelFor, resolveModel } from "./models.js";
 import { logOpsEvent } from "./ops-log.js";
 import { verifyWidgetContext } from "./widget-context.js";
@@ -18,7 +18,7 @@ import { serviceSecretRefusal } from "./widget-service-secret.js";
  * text with the message; on send, that text travels beside the customer's words
  * and every front-door stage and the investigator read it as text. Jev only
  * reads text, so the image has to be words before routing. One direct call on
- * the vision slot, not the vision subagent: a child session costs extra round
+ * the vision slot: a child session costs extra round
  * trips the customer would wait on. Measured through the gateway 2026-09-24 on
  * six real app screenshots: gemini-3.5-flash 1.7 to 6s (about 2.7s average);
  * flash-lite about 1.4s but missed highlighted controls and banner text.
