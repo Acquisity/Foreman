@@ -3,8 +3,8 @@ import {
   type DisputeEvidence,
   type EvidenceDeps,
   gatherDisputeEvidence,
-} from "./dispute-evidence.js";
-import type { ProviderResult } from "./executor/operations.js";
+} from "../dispute-evidence.js";
+import type { ProviderResult } from "../executor/operations.js";
 export const NOW = Date.parse("2026-10-27T12:00:00Z");
 export const CHARGE = Date.parse("2026-10-04T00:00:00Z") / 1000;
 export const BA = "0b6c6f4e-3c1a-4d8e-9a77-2f1e5d4c3b2a";
@@ -35,6 +35,8 @@ export const json = (data: unknown, status = 200): Promise<ProviderResult> =>
   Promise.resolve({ data, status });
 
 export const TABLE = /\bfrom ("user"|[a-z_]+)/u;
+const COMBINED_TABLE =
+  /from \((select[\s\S]*?)\) evidence_rows\) as "([^"]+)"/gu;
 const ORG = /organization_id = '([^']+)'/u;
 /** A fake of every provider; `calls` records each read in order. */
 export const fake = (world: World = {}) => {
@@ -208,10 +210,14 @@ export const fake = (world: World = {}) => {
       if (world.failSql?.test(query)) {
         return Promise.reject(new Error("PlanetScale answered HTTP 422."));
       }
-      const table = TABLE.exec(query)?.[1] ?? "";
-      const org = ORG.exec(query)?.[1];
-      const rows = (org && tables[`${table}@${org}`]) || tables[table] || [];
-      return Promise.resolve(JSON.stringify(rows));
+      const combined: Obj = {};
+      for (const [, inner, alias] of query.matchAll(COMBINED_TABLE)) {
+        const table = TABLE.exec(inner)?.[1] ?? "";
+        const org = ORG.exec(inner)?.[1];
+        combined[alias] =
+          (org && tables[`${table}@${org}`]) || tables[table] || [];
+      }
+      return Promise.resolve(JSON.stringify([combined]));
     },
   };
   return { calls, deps, queries };

@@ -22,6 +22,7 @@ const MAX_HISTORY_PAGES = 5;
 const MAX_THREADS = 20;
 const MAX_SLACK_USERS = 30;
 const TEXT_CHARS = 1500;
+const WORKSPACE_SUFFIX = /['’]s workspace$/iu;
 const SLACK_USER = /^[UW][A-Z0-9]{2,30}$/u;
 /** Mailbox providers whose domain names no client. */
 const FREE_MAIL = new Set([
@@ -67,12 +68,21 @@ const slug = (value: string): string =>
 /** The terms a client channel name is matched on: workspace name and email domain. */
 export const channelTerms = (
   workspaceName: string | null,
-  emails: (string | null)[]
+  emails: (string | null)[],
+  names: (string | null)[] = []
 ): string[] => {
   const terms = new Set<string>();
-  const name = workspaceName ? slug(workspaceName) : "";
+  const name = workspaceName
+    ? slug(workspaceName.replace(WORKSPACE_SUFFIX, ""))
+    : "";
   if (name.length >= 3) {
     terms.add(name);
+  }
+  for (const person of names) {
+    const full = person ? slug(person) : "";
+    if (full.includes("-")) {
+      terms.add(full);
+    }
   }
   for (const email of emails) {
     const domain = email?.split("@")[1]?.toLowerCase();
@@ -232,7 +242,14 @@ export const readSlack = async (
 ) => {
   const terms = channelTerms(
     database.facts ? (database.facts.provisioned?.name ?? null) : null,
-    stripe.facts ? [stripe.facts.customer?.email ?? null] : []
+    stripe.facts ? [stripe.facts.customer?.email ?? null] : [],
+    [
+      stripe.facts?.customer?.name ?? null,
+      stripe.facts?.cardholder.name ?? null,
+      ...(database.facts?.members?.rows ?? [])
+        .filter((row) => row.role === "owner")
+        .map((row) => str(row.name)),
+    ]
   );
   const chargeDate = stripe.facts ? stripe.facts.charge.created : null;
   if (terms.length === 0 || !chargeDate) {
@@ -246,11 +263,19 @@ export const readSlack = async (
       "The client channel listing is incomplete; no channel was read."
     );
   }
-  if (matches.length !== 1) {
+  if (matches.length === 0) {
+    return {
+      channel: null as { id: string; name: string } | null,
+      messages: rowList([], 0),
+      reason:
+        "No client channel was found in the complete listing; refund promises and faults in that channel remain unverified.",
+      terms,
+      unavailable: [],
+    };
+  }
+  if (matches.length > 1) {
     throw new Error(
-      matches.length
-        ? "The client channel match is ambiguous; no channel was read."
-        : "No client channel matches the customer identity."
+      "The client channel match is ambiguous; no channel was read."
     );
   }
   const [channel] = matches;

@@ -4,12 +4,6 @@ import type { SessionAuthContext } from "eve/context";
 import type { ApprovalContext } from "eve/tools/approval";
 import { gatherDisputeEvidencePolicy } from "../tools/gather_dispute_evidence.js";
 import {
-  evidenceQueries,
-  fitResponse,
-  gatherDisputeEvidence,
-  sqlLiteral,
-} from "./dispute-evidence.js";
-import {
   AFTER,
   BA,
   BEFORE,
@@ -23,7 +17,13 @@ import {
   ORG_B,
   TABLE,
   type World,
-} from "./dispute-evidence-fixtures.js";
+} from "./__tests__/dispute-evidence-fixtures.js";
+import {
+  evidenceQueries,
+  fitResponse,
+  gatherDisputeEvidence,
+  sqlLiteral,
+} from "./dispute-evidence.js";
 import { member, WORKSPACE_ID } from "./instantly-fixtures.js";
 import { READ_BYTES } from "./stripe-dispute-read.js";
 import { stripeDisputeSessionAuth } from "./stripe-dispute-trigger.js";
@@ -109,7 +109,7 @@ describe("gatherDisputeEvidence sources", () => {
     const { result } = await gather({ failSql: FROM_MAIL_DOMAIN });
     assert.ok(
       result.sources.database.facts?.unavailable.some((entry) =>
-        entry.startsWith("domains:")
+        entry.includes("domains")
       )
     );
     assert.equal(result.verdict.deliveryStoppedBeforeCharge.value, null);
@@ -235,8 +235,8 @@ describe("verdictFacts", () => {
         ],
       },
     });
-    assert.equal(other.result.verdict.tiedToWorkspace.value, true);
-    assert.equal(other.result.verdict.usedAfterCharge.value, false);
+    assert.equal(other.result.verdict.tiedToWorkspace.value, null);
+    assert.equal(other.result.verdict.usedAfterCharge.value, null);
     assert.ok(
       other.queries
         .filter((query) => !TABLE.exec(query)?.[1]?.startsWith("organization"))
@@ -280,7 +280,8 @@ describe("database queries", () => {
     assert.match(queries.organizations, new RegExp(`'${BA}'`, "u"));
 
     const { queries: sent } = await gather();
-    assert.ok(sent.length > 10);
+    assert.equal(sent.length, 2);
+    assert.ok(sent.every((query) => query.includes("json_agg(evidence_rows)")));
     assert.ok(sent.every((query) => !TOKEN.test(query)));
   });
 
@@ -458,7 +459,8 @@ describe("dispute review regressions", () => {
         organization: [{ billing_account_id: BA, id: ORG_A, name: "Zeta" }],
       },
     });
-    assert.equal(result.sources.slack.checked, false);
+    assert.equal(result.sources.slack.checked, true);
+    assert.equal(facts(result, "slack").channel, null);
     assert.equal(calls.includes("slack.aia.history"), false);
   });
 
@@ -594,46 +596,12 @@ describe("dispute attribution boundaries", () => {
     { billing_account_id: BA, id: ORG_B, name: "Other" },
   ];
 
-  it("uses charge, invoice, or invoice-line metadata and scopes known orders", async () => {
-    for (const link of ["charge", "invoice", "line"] as const) {
-      const stub = fake({
-        charge: link === "charge" ? { metadata: { order_id: "order-1" } } : {},
-        invoices: [
-          {
-            id: "in_1",
-            lines: {
-              data:
-                link === "line" ? [{ metadata: { order_id: "order-1" } }] : [],
-            },
-            metadata:
-              link === "invoice" ? { domain_purchase_order_id: "order-1" } : {},
-          },
-        ],
-        tables: { organization: organizations },
-      });
-      // biome-ignore lint/performance/noAwaitInLoops: isolate the three metadata origins.
-      const result = await gatherDisputeEvidence("du_1", stub.deps);
-      assert.equal(facts(result, "database").provisioned?.orderId, "order-1");
-      for (const table of [
-        "mail_domain",
-        "mail_inbox",
-        "mail_domain_cancellation",
-        "cmr_subscription_cancellation",
-      ]) {
-        const query = stub.queries.find((value) =>
-          value.includes(`from ${table} `)
-        );
-        assert.ok(query?.includes("'order-1'"), `${link}: ${table}`);
-      }
-    }
-  });
-
-  it("rejects conflicting explicit links and ignores deleted fallback organizations", async () => {
-    const conflicting = await gather({
-      charge: { metadata: { order_id: "order-1", organization_id: ORG_B } },
+  it("does not guess a workspace from unobserved metadata keys", async () => {
+    const ambiguous = await gather({
+      charge: { metadata: { order_id: "order-1", organization_id: ORG_A } },
       tables: { organization: organizations },
     });
-    assert.equal(facts(conflicting.result, "database").provisioned, null);
+    assert.equal(facts(ambiguous.result, "database").provisioned, null);
     const live = await gather({
       tables: {
         organization: [
@@ -646,33 +614,18 @@ describe("dispute attribution boundaries", () => {
       facts(live.result, "database").provisioned?.organizationId,
       ORG_A
     );
-    const explicit = await gather({
-      charge: { metadata: { organizationId: ORG_B } },
-      tables: { organization: organizations },
-    });
-    assert.equal(
-      facts(explicit.result, "database").provisioned?.organizationId,
-      ORG_B
-    );
   });
 
-  it("does not resolve workspaces from truncated organization or order inventories", async () => {
-    for (const table of ["organization", "domain_purchase_order"]) {
-      const stub = fake({ charge: { metadata: { order_id: "order-1" } } });
-      const { sql } = stub.deps;
-      // biome-ignore lint/performance/noAwaitInLoops: each inventory fails independently.
-      const result = await gatherDisputeEvidence("du_1", {
-        ...stub.deps,
-        sql: async (query) => {
-          const raw = await sql(query);
-          return query.includes(`from ${table} `)
-            ? JSON.stringify({ rows: JSON.parse(raw), truncated: true })
-            : raw;
-        },
-      });
-      assert.equal(facts(result, "database").provisioned, null);
-      assert.equal(result.verdict.tiedToWorkspace.value, null);
-    }
+  it("does not resolve a workspace from an incomplete combined inventory", async () => {
+    const stub = fake();
+    const { sql } = stub.deps;
+    const result = await gatherDisputeEvidence("du_1", {
+      ...stub.deps,
+      sql: async (query) =>
+        JSON.stringify({ rows: JSON.parse(await sql(query)), truncated: true }),
+    });
+    assert.equal(result.sources.database.checked, false);
+    assert.equal(result.verdict.tiedToWorkspace.value, null);
   });
 
   it("preserves positive use despite truncation and treats negative use as unknown", async () => {
@@ -732,8 +685,10 @@ describe("dispute attribution boundaries", () => {
     for (const world of cases) {
       // biome-ignore lint/performance/noAwaitInLoops: isolate unsafe identity combinations.
       const { result, calls } = await gather(world);
-      assert.equal(result.sources.slack.checked, false);
       assert.equal(calls.includes("slack.aia.history"), false);
+      if (result.sources.slack.checked) {
+        assert.equal(result.sources.slack.facts.channel, null);
+      }
     }
     const stub = fake();
     const { slack } = stub.deps;
@@ -805,6 +760,12 @@ describe("dispute source completion", () => {
         "linear",
         "slack",
       ]);
+      assert.equal(
+        stub.calls.filter(
+          (call) => call === "instantly.workspace-group-members"
+        ).length,
+        1
+      );
       assert.equal(result.sources.instantly.checked, !fail);
       assert.ok(result.sources.instantly.facts?.campaigns);
     }

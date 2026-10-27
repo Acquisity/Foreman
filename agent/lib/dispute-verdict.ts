@@ -13,6 +13,7 @@ import {
   str,
   UUID,
 } from "./dispute-evidence-shared.js";
+import { matchChargeInvoice } from "./stripe-dispute-read.js";
 
 const ERRORING = /error|fail/iu;
 const WITHDRAWN = /cancel|reject/iu;
@@ -40,14 +41,7 @@ const before = (value: unknown, chargeMs: number) => {
   const at = ms(value);
   return at !== null && at < chargeMs;
 };
-const invoiceOf = (stripe: StripeFacts) =>
-  stripe.invoices?.rows.find(
-    (invoice) =>
-      (stripe.charge.invoice && invoice.id === stripe.charge.invoice) ||
-      (invoice.charge && invoice.charge === stripe.charge.id) ||
-      (invoice.paymentIntent &&
-        invoice.paymentIntent === stripe.charge.paymentIntent)
-  );
+const invoiceOf = (stripe: StripeFacts) => stripe.chargeInvoice.invoice;
 
 const refundedInFull = (stripe: StripeFacts): Flag => {
   const { amount, amountRefunded, refunds } = stripe.charge;
@@ -106,11 +100,10 @@ const duplicate = (stripe: StripeFacts): Flag => {
     ) {
       continue;
     }
-    const invoice = invoices.rows.find(
-      (row) =>
-        (other.invoice && row.id === other.invoice) ||
-        (other.id && row.charge === other.id) ||
-        (other.paymentIntent && row.paymentIntent === other.paymentIntent)
+    const { invoice } = matchChargeInvoice(
+      other,
+      invoices.rows,
+      !invoices.truncated
     );
     if (!invoice) {
       missing = true;
@@ -135,36 +128,79 @@ const duplicate = (stripe: StripeFacts): Flag => {
   );
 };
 
-const stoppedInDatabase = (
-  database: DatabaseFacts,
-  chargeMs: number
-): Fact[] => {
-  const because: Fact[] = [];
-  for (const row of database.domains?.rows ?? []) {
+const outage = (database: DatabaseFacts, chargeMs: number) => {
+  const { domains, inboxes } = database;
+  const stoppedDomains = (domains?.rows ?? []).flatMap((row) => {
     const status = str(row.status)?.toLowerCase();
     const date = [row.expires_at, row.updated_at].find((value) =>
       before(value, chargeMs)
     );
-    if ((status === "expired" || status === "suspended") && date) {
-      because.push({
-        date: str(date),
-        detail: `Domain ${str(row.domain)} was ${status}.`,
-        source: "database.mail_domain",
-      });
-    }
-  }
-  for (const row of database.inboxes?.rows ?? []) {
-    if (
-      (ERRORING.test(str(row.status) ?? "") || str(row.connection_error)) &&
-      before(row.last_retry_at, chargeMs)
-    ) {
-      because.push({
-        date: str(row.last_retry_at),
-        detail: `Inbox ${str(row.email)} was failing (${str(row.status)}).`,
-        source: "database.mail_inbox",
-      });
-    }
-  }
+    return (status === "expired" || status === "suspended") && date
+      ? [
+          {
+            date: str(date),
+            detail: `Domain ${str(row.domain)} was ${status}.`,
+            source: "database.mail_domain",
+          },
+        ]
+      : [];
+  });
+  const stoppedInboxes = (inboxes?.rows ?? []).flatMap((row) =>
+    (ERRORING.test(str(row.status) ?? "") || str(row.connection_error)) &&
+    before(row.last_retry_at, chargeMs)
+      ? [
+          {
+            date: str(row.last_retry_at),
+            detail: `Inbox ${str(row.email)} was failing (${str(row.status)}).`,
+            source: "database.mail_inbox",
+          },
+        ]
+      : []
+  );
+  const full = (list: RowList | null | undefined, affected: Fact[]) =>
+    !incomplete(list) &&
+    affected.length > 0 &&
+    affected.length === list?.rows.length;
+  const because = [
+    ...(full(domains, stoppedDomains) ? stoppedDomains : []),
+    ...(full(inboxes, stoppedInboxes) ? stoppedInboxes : []),
+  ];
+  const partial = (list: RowList | null | undefined, affected: Fact[]) =>
+    affected.length > 0 && affected.length < (list?.rows.length ?? 0);
+  const partialProof = [
+    ...(partial(domains, stoppedDomains) ? stoppedDomains : []),
+    ...(partial(inboxes, stoppedInboxes) ? stoppedInboxes : []),
+  ];
+  return {
+    because,
+    partial: {
+      ...flag(
+        partialProof,
+        incomplete(domains) || incomplete(inboxes)
+          ? "Delivery counts are incomplete."
+          : null
+      ),
+      counts: {
+        domains: {
+          affected: stoppedDomains.length,
+          total: domains?.rows.length ?? null,
+          truncated: domains?.truncated ?? true,
+        },
+        inboxes: {
+          affected: stoppedInboxes.length,
+          total: inboxes?.rows.length ?? null,
+          truncated: inboxes?.truncated ?? true,
+        },
+      },
+    },
+  };
+};
+
+const stoppedInDatabase = (
+  database: DatabaseFacts,
+  chargeMs: number
+): Fact[] => {
+  const { because } = outage(database, chargeMs);
   for (const row of database.deletionRequests?.rows ?? []) {
     if (
       !WITHDRAWN.test(str(row.status) ?? "") &&
@@ -187,10 +223,21 @@ const deliveryStoppedBeforeCharge = (
 ): Flag => {
   const because: Fact[] = [];
   const invoice = invoiceOf(stripe);
-  const canceled = stripe.subscriptions?.rows.find(
-    (row) =>
-      row.id === invoice?.subscription && before(row.canceledAt, chargeMs)
-  );
+  const subscriptionIds = [
+    ...new Set(
+      [
+        invoice?.subscription,
+        ...(invoice?.lines.map((line) => line.subscription) ?? []),
+      ].filter((id): id is string => Boolean(id))
+    ),
+  ];
+  const [subscription] = subscriptionIds;
+  const canceled =
+    subscriptionIds.length === 1
+      ? stripe.subscriptions?.rows.find(
+          (row) => row.id === subscription && before(row.canceledAt, chargeMs)
+        )
+      : undefined;
   if (canceled) {
     because.push({
       date: canceled.canceledAt,
@@ -205,10 +252,10 @@ const deliveryStoppedBeforeCharge = (
   const missing =
     !facts?.provisioned ||
     [facts.domains, facts.inboxes, facts.deletionRequests].some(incomplete) ||
-    (Boolean(stripe.charge.invoice) &&
-      (!invoice ||
-        incomplete(stripe.invoices) ||
-        incomplete(stripe.subscriptions)));
+    !invoice ||
+    subscriptionIds.length > 1 ||
+    incomplete(stripe.invoices) ||
+    incomplete(stripe.subscriptions);
   return flag(
     because,
     missing ? "Delivery or subscription evidence is incomplete." : null
@@ -281,6 +328,7 @@ export const verdictFacts = (sources: EvidenceSources) => {
       chargeDate: null,
       deliveryStoppedBeforeCharge: none,
       duplicate: none,
+      partialOutageBeforeCharge: none,
       refundedInFull: none,
       tiedToWorkspace: none,
       usedAfterCharge: none,
@@ -317,11 +365,8 @@ export const verdictFacts = (sources: EvidenceSources) => {
       because: [
         {
           date: null,
-          detail: `Workspace ${provisioned.name ?? provisioned.organizationId} is tied to the charge by ${provisioned.via}${provisioned.orderId ? ` ${provisioned.orderId}` : ""}.`,
-          source:
-            provisioned.via === "domain_purchase_order"
-              ? "database.domain_purchase_order"
-              : "database.organization",
+          detail: `Workspace ${provisioned.name ?? provisioned.organizationId} is the billing account's only live workspace.`,
+          source: "database.organization",
         },
       ],
       value: true,
@@ -349,7 +394,7 @@ export const verdictFacts = (sources: EvidenceSources) => {
     used = unknown("No workspace is tied to the charge.");
   } else {
     tiedToWorkspace = unknown(
-      "The charge's workspace could not be established from complete account and order evidence."
+      "The charge's workspace could not be established from complete account evidence."
     );
     used = unknown("The charge's workspace could not be established.");
   }
@@ -359,6 +404,10 @@ export const verdictFacts = (sources: EvidenceSources) => {
       ? deliveryStoppedBeforeCharge(stripe, sources.database, chargeMs)
       : unknown("Stripe reported no charge date."),
     duplicate: duplicate(stripe),
+    partialOutageBeforeCharge:
+      dated && database?.provisioned
+        ? outage(database, chargeMs).partial
+        : unknown("The workspace or charge date could not be established."),
     refundedInFull: refundedInFull(stripe),
     tiedToWorkspace,
     usedAfterCharge: used,

@@ -110,8 +110,7 @@ interface StripeRefund {
  */
 export const lookupIdentity = async (
   deps: StripeReadDeps,
-  chargeId: string | null,
-  options: { includeMetadata?: boolean } = {}
+  chargeId: string | null
 ) => {
   if (!chargeId) {
     return { error: "The dispute names no charge." };
@@ -122,7 +121,6 @@ export const lookupIdentity = async (
       operation: "stripe.charges.get",
     });
     const data = (charge.data ?? {}) as {
-      metadata?: Record<string, string>;
       amount?: number;
       amount_refunded?: number;
       billing_details?: { email?: string | null; name?: string | null };
@@ -140,7 +138,6 @@ export const lookupIdentity = async (
       name: data.billing_details?.name ?? null,
     };
     const chargeFacts = {
-      ...(options.includeMetadata ? { metadata: data.metadata ?? {} } : {}),
       amount: data.amount ?? null,
       amountRefunded: data.amount_refunded ?? 0,
       created: stripeDate(data.created),
@@ -186,3 +183,58 @@ export const lookupIdentity = async (
   }
 };
 export type DisputeIdentity = Awaited<ReturnType<typeof lookupIdentity>>;
+
+/** Prefer explicit API links; newer Stripe shapes need one unique paid invoice near the charge. */
+export const matchChargeInvoice = <
+  T extends {
+    id: string | null;
+    charge: string | null;
+    paymentIntent: string | null;
+    amountPaid: number | null;
+    status: string | null;
+    paidAt: string | null;
+  },
+>(
+  charge: {
+    id: string | null;
+    invoice: string | null;
+    paymentIntent: string | null;
+    amount: number | null;
+    created: string | null;
+  },
+  invoices: T[],
+  complete = true
+): { invoice: T | null; reason: string | null } => {
+  const linked = invoices.filter(
+    (invoice) =>
+      (charge.invoice && invoice.id === charge.invoice) ||
+      (charge.id && invoice.charge === charge.id) ||
+      (charge.paymentIntent && invoice.paymentIntent === charge.paymentIntent)
+  );
+  const chargeAt = charge.created ? Date.parse(charge.created) : Number.NaN;
+  const candidates = linked.length
+    ? linked
+    : invoices.filter(
+        (invoice) =>
+          invoice.status === "paid" &&
+          charge.amount !== null &&
+          invoice.amountPaid === charge.amount &&
+          invoice.paidAt &&
+          Math.abs(Date.parse(invoice.paidAt) - chargeAt) <= 120_000
+      );
+  if (!(linked.length || complete)) {
+    return {
+      invoice: null,
+      reason:
+        "The invoice inventory is incomplete, so a unique payment-time match cannot be established.",
+    };
+  }
+  return candidates.length === 1
+    ? { invoice: candidates[0], reason: null }
+    : {
+        invoice: null,
+        reason: candidates.length
+          ? "Several paid invoices match this charge; its invoice and subscription are unknown."
+          : "No unique paid invoice matches the charge amount within 120 seconds of its creation.",
+      };
+};
