@@ -12,6 +12,18 @@ export const LINEAR_OPERATIONS = {
 }`,
     kind: "query",
   },
+  IssueBodies: {
+    document: `query IssueBodies($filter: IssueFilter!) {
+  issues(filter: $filter, first: 25, includeArchived: true) {
+    nodes {
+      identifier title description url createdAt
+      state { name }
+      comments(first: 10) { nodes { body createdAt user { name } } }
+    }
+  }
+}`,
+    kind: "query",
+  },
   IssueDocuments: {
     document: `query IssueDocuments($id: String!, $title: String!) {
   issue(id: $id) {

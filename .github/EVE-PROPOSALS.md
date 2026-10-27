@@ -163,3 +163,8 @@ Proposal: export the resolved sandbox image from a public entry, and reject or w
 Eve 0.83.2 update (ENG-16246): still open. No release from 0.82.0 through 0.83.2 changes this.
 
 Status: Still open on 0.81.1.
+
+
+## Authored evidence tool deadlines (ENG-16494, Eve 0.83.2)
+
+The version-matched `docs/tools/overview.mdx` and `docs/agent-config.md` expose no numeric execution timeout for an authored `defineTool` call or agent step. `sessionTimeoutMs` is an idle-session limit and explicitly does not expire an open turn. `docs/tools/workflows.mdx` documents 30 seconds of JavaScript and five minutes total for the runtime-generated `workflow` program sandbox; those limits do not describe this authored tool. Eve's Vercel workflow-route output requests `maxDuration: "max"` (`dist/src/internal/nitro/host/vercel-build-output-config.js`), leaving the hosting ceiling to the deployment rather than promising a fixed Eve limit. The dispute gather therefore owns a conservative four-minute backstop and shorter independent source deadlines, with cancellation propagated into every provider read. It does not rely on the idle-session timeout or borrow a generated-program limit as an authored-tool guarantee.

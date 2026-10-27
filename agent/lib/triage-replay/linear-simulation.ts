@@ -229,6 +229,8 @@ const HANDLERS: Record<LinearOperation, Handler> = {
         : null,
     };
   },
+  // Only the dispute evidence tool reads ticket bodies; triage never does.
+  IssueBodies: () => ({ issues: { nodes: [] } }),
   IssueDocuments: (state, v) => {
     caseDocumentsOnly(state, v.id);
     return {

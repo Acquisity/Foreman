@@ -1,9 +1,9 @@
-import type { ToolContext } from "eve/tools";
 import { executorReadQuery } from "./executor/client.js";
+import type { ProviderContext } from "./executor/dispatch.js";
 
 /** The bounded query helper retains its result contract; only Executor performs provider calls. */
 export const callPlanetscaleReadQuery = (
-  ctx: ToolContext,
+  ctx: ProviderContext,
   args: Record<string, unknown>
 ): Promise<string> => executorReadQuery(ctx, args);
 

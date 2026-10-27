@@ -27,6 +27,25 @@ const confirmed = z.looseObject({ success: z.boolean() });
 const responses = {
   CreateDocument: z.looseObject({ documentCreate: documentWrite }),
   Document: z.looseObject({ document }),
+  IssueBodies: z.looseObject({
+    issues: nodes(
+      z.looseObject({
+        comments: nodes(
+          z.looseObject({
+            body: z.string(),
+            createdAt: z.string(),
+            user: z.looseObject({ name: z.string() }).nullable(),
+          })
+        ),
+        createdAt: z.string(),
+        description: z.string().nullable(),
+        identifier: z.string(),
+        state: z.looseObject({ name: z.string() }),
+        title: z.string(),
+        url: z.string(),
+      })
+    ),
+  }),
   IssueDocuments: z.looseObject({
     issue: z.looseObject({
       documents: nodes(z.looseObject({ id: z.string(), title: z.string() })),
@@ -76,6 +95,10 @@ const responses = {
   Users: z.looseObject({ users: nodes(named) }),
   WorkflowStates: z.looseObject({ workflowStates: nodes(named) }),
 } satisfies Record<LinearOperation, z.ZodType>;
+export type LinearResponse<O extends LinearOperation> = z.infer<
+  (typeof responses)[O]
+>;
+
 const envelope = z.looseObject({
   data: z.unknown().optional(),
   errors: z.array(z.looseObject({ message: z.string().optional() })).optional(),

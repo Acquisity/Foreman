@@ -15,7 +15,7 @@ Foreman runs on four channels, with a GitHub extension and one shared company-se
 
 The GitHub extension adds an API surface (reads, triage, PR authoring; no merge) running inside the sandbox.
 
-Foreman reaches company services through Executor, using shared company accounts for authorized investigations. Existing bounded helpers still perform customer lookup, billing, Instantly investigation, run searches, Linear routing, and help-center searches; their provider calls go through Executor. Root, native delegates, critic, and scheduled work use one shared Foreman toolkit. Company-service credentials stay in Executor; Vercel Connect brokers Foreman's Executor credential and the retained channel and personal connections. See [.github/EXECUTOR-CONTRACT.md](.github/EXECUTOR-CONTRACT.md) for the shared toolkit, exact helper bindings, and the preview-first cutover. This revision requires that setup before provider traffic is enabled.
+Foreman reaches company services through Executor, using shared company accounts for authorized investigations. Existing bounded helpers still perform customer lookup, billing, Instantly investigation, run searches, Linear routing, Stripe dispute evidence, and help-center searches; their provider calls go through Executor. Root, native delegates, critic, and scheduled work use one shared Foreman toolkit. Company-service credentials stay in Executor; Vercel Connect brokers Foreman's Executor credential and the retained channel and personal connections. See [.github/EXECUTOR-CONTRACT.md](.github/EXECUTOR-CONTRACT.md) for the shared toolkit, exact helper bindings, and the preview-first cutover. This revision requires that setup before provider traffic is enabled.
 
 ## Skills
 

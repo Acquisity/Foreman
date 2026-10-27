@@ -118,11 +118,17 @@ const fakeStripe = (
       if (request.operation === "stripe.charges.get") {
         return Promise.resolve({
           data: {
+            amount: 18_500,
+            amount_refunded: 18_500,
             billing_details: {
               email: "cardholder@example.com",
               name: "Eric Mead",
             },
+            created: 1_759_536_000,
             customer: "cus_1",
+            refunds: {
+              data: [{ amount: 18_500, created: 1_760_000_000, id: "re_1" }],
+            },
           },
           status: 200,
         });
@@ -130,7 +136,7 @@ const fakeStripe = (
       return Promise.resolve({
         data: {
           email: "owner@example.com",
-          metadata: { autumn_id: "ba_1" },
+          metadata: { autumn_id: "0b6c6f4e-3c1a-4d8e-9a77-2f1e5d4c3b2a" },
           name: "Owner",
         },
         status: 200,
@@ -252,8 +258,24 @@ describe("respond_stripe_dispute rule 3", () => {
     assert.equal(facts.networkReasonCode, "10.4");
     assert.deepEqual(facts.identity, {
       cardholder: { email: "cardholder@example.com", name: "Eric Mead" },
+      charge: {
+        amount: 18_500,
+        amountRefunded: 18_500,
+        created: "2025-10-04T00:00:00.000Z",
+        id: "ch_1",
+        invoice: null,
+        paymentIntent: null,
+        refunds: [
+          {
+            amount: 18_500,
+            created: "2025-10-09T08:53:20.000Z",
+            id: "re_1",
+            status: null,
+          },
+        ],
+      },
       customer: {
-        autumnId: "ba_1",
+        autumnId: "0b6c6f4e-3c1a-4d8e-9a77-2f1e5d4c3b2a",
         email: "owner@example.com",
         id: "cus_1",
         name: "Owner",
