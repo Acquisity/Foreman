@@ -134,6 +134,21 @@ assert.deepEqual(
   ["not_fixed", "received"]
 );
 
+await store.markSent(
+  "ENG-20",
+  ["received", "owner"],
+  "We've received your report and Sam is looking after it.",
+  null,
+  "comment-20"
+);
+assert.deepEqual(
+  (await store.rows("ENG-20"))
+    .map((row) => row.stage)
+    .sort((a, b) => a.localeCompare(b)),
+  ["owner", "received"],
+  "an owner row written under 0013 still reads back"
+);
+
 await store.markWaiting("ENG-3", "sha-1");
 await store.markWaiting("ENG-3", "sha-2");
 assert.equal(await store.anyWaiting(), true);
