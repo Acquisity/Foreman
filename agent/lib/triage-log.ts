@@ -3,21 +3,6 @@ import { z } from "zod";
 import { CRITIC_CRITERIA, CRITIC_VERDICTS } from "../subagents/critic/agent.js";
 import type { TriageDecision } from "./jev-decisions.js";
 
-/**
- * Countable triage outcomes (ENG-16049). Every line carries the issue id, so
- * verdicts and later corrections can be counted per ticket. `decide_triage`
- * logs `triage.decision` each time it settles (`decide`, then `adjudicate`
- * when the critic's adjudication re-runs it), unproven outcomes included, and
- * keeps the latest decision per issue; `route_ticket` logs a `route` line for
- * every routed issue, with `code` `skill_fallback` when no Jev decision
- * exists for it (the skill decided after a Jev failure) and `billing` for a
- * `decide_billing` route. `decide_billing` keeps its decision per issue beside
- * the triage ones, so the later of the two for an issue wins; one made before
- * its ticket exists waits and binds to the first ticket routed to match it.
- * The root's hook logs `critic.verdict` against
- * the issue named on the dispatch's first line, and logs nothing for a
- * critic call that named none.
- */
 export interface LatestTriageDecision {
   classification: string | null;
   issue: string;
@@ -36,16 +21,6 @@ export interface BillingRoute {
   assignee: string;
   project: string;
 }
-
-export interface PendingBilling {
-  id: string;
-  route: BillingRoute;
-}
-
-export const billingRoutes = defineState<PendingBilling | null>(
-  "foreman.billingRoute",
-  () => null
-);
 
 export const criticTaskIssues = defineState<Record<string, string>>(
   "foreman.criticTaskIssues",
@@ -116,10 +91,6 @@ export interface CriticVerdictFields {
   verdict: (typeof CRITIC_VERDICTS)[number] | "failed";
 }
 
-/**
- * Reads the critic's settled output. A delegation error, a cancellation, or a
- * reply that doesn't match the critic's contract is a failed review.
- */
 export function criticVerdictFields(
   status: string,
   output: unknown
@@ -195,27 +166,11 @@ export function routeDecisionEvent(
   };
 }
 
-export function bindBilling(
-  decisions: Readonly<Record<string, LatestTriageDecision>>,
-  pending: PendingBilling | null,
-  issue: string,
-  decisionId: string | undefined
-) {
-  const binds = pending !== null && decisionId === pending.id;
-  return {
-    decisions: binds
-      ? { ...decisions, [issue]: billingDecisionFields(issue, pending.route) }
-      : decisions,
-    pendingBilling: binds ? null : pending,
-  };
-}
-
 export const criticVerdictIssue = (
   bindings: Readonly<Record<string, string>>,
   callId: string
 ): string | null => bindings[callId] ?? null;
 
-/** The route's assignee as a kind, never a person's name in the log. */
 export const assigneeKind = (input: {
   assignee?: string;
   inheritAssigneeFrom?: string;

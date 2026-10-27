@@ -1,7 +1,6 @@
 import { defineSandbox } from "eve/sandbox";
 import { VercelSandbox } from "eve/sandbox/vercel";
 import { boundedRun } from "#lib/sandbox-deadline.js";
-import { isTriageReplay } from "#lib/triage-replay/mode.js";
 import { isWidgetSupport } from "#lib/widget-scope.js";
 
 /**
@@ -47,16 +46,10 @@ export const environment = VercelSandbox.environment(
     : { resources: { vcpus: 2 } }
 );
 
-/**
- * Widget sessions and every triage replay session run with no network. A
- * replay process also never has a warm snapshot (its boot guard refuses
- * VERCEL_SANDBOX_BASE_SNAPSHOT_ID), so its sandbox holds only the case's
- * pinned archive.
- */
 export const sandboxSessionOptions = (
   initiator: Parameters<typeof isWidgetSupport>[0]
 ) =>
-  isWidgetSupport(initiator) || isTriageReplay()
+  isWidgetSupport(initiator)
     ? { networkPolicy: "deny-all" as const }
     : undefined;
 

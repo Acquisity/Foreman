@@ -1,12 +1,5 @@
 import { z } from "zod";
 
-/**
- * The triage replay's three file shapes (ENG-16049): a frozen case, a label,
- * and one replay result. The replay reads cases only; labels are read by the
- * trusted scorer alone, and held-out labels never sit in this repository.
- */
-
-/** A field rebuilt as of the case's creation, or `unknown` when history can't settle it. */
 const asOf = <T extends z.ZodType>(value: T) =>
   z.union([value, z.literal("unknown")]);
 
@@ -70,7 +63,6 @@ export const triageLabelSchema = z
     id: z.string().regex(/^ENG-\d+$/),
     insufficient: z.boolean(),
     labelSource: z.array(z.string()),
-    /** The master or parent that survived human edits, when there is one. */
     master: z.string().nullable().optional(),
     notes: z.string(),
     outcomeAt: z.iso.datetime().nullable(),
@@ -96,20 +88,10 @@ export type TriageLabel = z.infer<typeof triageLabelSchema>;
 
 export const NEW_MASTER = "new";
 
-/** Where a run input came from: seeded from the case, or written during this replay. */
-export const PROVENANCE = ["seeded", "generated"] as const;
+export const RESULT_STATUSES = ["completed", "failed", "cancelled"] as const;
 
-export const RESULT_STATUSES = [
-  "completed",
-  "failed",
-  "cancelled",
-  "boundary_error",
-] as const;
-
-/** One replay of one case, written by the runner and read by the scorer. */
 export const triageResultSchema = z.strictObject({
   caseId: z.string().regex(/^ENG-\d+$/),
-  cohortSha256: z.string().regex(/^[0-9a-f]{64}$/),
   critic: z
     .strictObject({
       blockingFindings: z.int().nonnegative().nullable(),
@@ -122,13 +104,10 @@ export const triageResultSchema = z.strictObject({
       ]),
     })
     .nullable(),
-  /** The last document version the run saved, read back from the simulated store. */
   document: z
     .strictObject({ text: z.string(), updatedAt: z.string() })
     .nullable(),
-  estimatedUsd: z.number().nonnegative(),
   evidenceMisses: z.array(z.string()),
-  /** The last decision for the case, with what the store applied to the case ticket. */
   final: z
     .strictObject({
       assignee: z.string().nullable(),
@@ -141,18 +120,6 @@ export const triageResultSchema = z.strictObject({
     })
     .nullable(),
   foremanCommit: z.string().min(1),
-  /** Every input the run saw, whole, with provenance and, for evidence as of the case, the case's creation time. */
-  inputs: z.array(
-    z.strictObject({
-      availableAt: z.iso.datetime().nullable(),
-      content: z.string(),
-      provenance: z.enum(PROVENANCE),
-      source: z.string().min(1),
-    })
-  ),
-  listMembershipUnknown: z.array(
-    z.enum(["labels", "projects", "states", "users"])
-  ),
   run: z.int().positive(),
   runId: z.string().min(1),
   startedAt: z.iso.datetime(),

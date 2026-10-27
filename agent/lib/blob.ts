@@ -1,12 +1,4 @@
-import {
-  BlobNotFoundError,
-  BlobPreconditionFailedError,
-  del,
-  get,
-  head,
-  list,
-  put,
-} from "@vercel/blob";
+import { BlobNotFoundError, del, get, head, put } from "@vercel/blob";
 
 /**
  * Foreman's shared Blob layer: the reserved-namespace registry and the document helpers
@@ -56,9 +48,6 @@ export const MODEL_OVERRIDES_PREFIX = "model-overrides/";
 /** Blob path prefix holding the daily SLA report's last successful dispatch marker. */
 export const SLA_REPORT_PREFIX = "sla-report/";
 
-/** Blob path prefix holding triage replay state, admission ledgers and repository archives (ENG-16049). */
-export const TRIAGE_REPLAY_PREFIX = "triage-replay/";
-
 /**
  * A Blob path prefix that a general-purpose Blob tool must not touch.
  *
@@ -97,11 +86,6 @@ const RESERVED_NAMESPACES: Readonly<Record<string, ReservedNamespace>> = {
     label: "the daily SLA report dispatch marker",
     readTool: "no tool; the sla-report schedule owns this namespace",
     writeTool: "no tool; the sla-report schedule owns this namespace",
-  },
-  [TRIAGE_REPLAY_PREFIX]: {
-    label: "triage replay state",
-    readTool: "no tool; the triage replay owns this namespace",
-    writeTool: "no tool; the triage replay owns this namespace",
   },
   [REPOSITORY_KNOWLEDGE_PREFIX]: {
     label: "repository knowledge",
@@ -189,29 +173,22 @@ export const reservedReadMessage = (namespace: ReservedNamespace): string =>
  * output shape.
  *
  * @param key - The exact Blob pathname, derived by the owning feature module.
- * @param options - `access: "private"` reads a private object uncached, so a conditional write
- * can use the `etag` it returns; the default is the store's public read.
- * @returns The document `content`, `etag` and `uploadedAt` (ISO string) when found.
+ * @returns The document `content` and `uploadedAt` (ISO string) when found.
  */
 export const readDocument = async (
-  key: string,
-  options: { access?: "private" | "public" } = {}
+  key: string
 ): Promise<
-  | { found: false }
-  | { content: string; etag: string; found: true; uploadedAt: string }
+  { found: false } | { content: string; found: true; uploadedAt: string }
 > => {
   const result = await get(key, {
     abortSignal: AbortSignal.timeout(BLOB_TIMEOUT_MS),
-    ...(options.access === "private"
-      ? { access: "private", useCache: false }
-      : { access: "public" }),
+    access: "public",
   });
   if (!result?.stream) {
     return { found: false };
   }
   return {
     content: await new Response(result.stream).text(),
-    etag: result.blob.etag,
     found: true,
     uploadedAt: result.blob.uploadedAt.toISOString(),
   };
@@ -229,70 +206,21 @@ export const readDocument = async (
  * @param key - The exact Blob pathname, derived by the owning feature module.
  * @param contents - The full document (Markdown unless `contentType` says otherwise).
  * @param options - Whether an existing document at the key may be replaced, and an optional
- * content type for the rare non-Markdown document (the model overrides are JSON). With
- * `access: "private"` the write is conditional on `ifMatch`, the `etag` a private read returned
- * (`null` creates the key and refuses to replace one), and the result is `written` or `conflict`
- * instead of the stored blob's metadata.
- * @returns The stored blob's metadata (callers report `pathname`), or `written` / `conflict`
- * for a conditional write.
+ * content type for the rare non-Markdown document (the model overrides are JSON).
+ * @returns The stored blob's metadata (callers report `pathname`).
  */
-export function writeDocument(
+export const writeDocument = (
   key: string,
   contents: string,
   options: { allowOverwrite: boolean; contentType?: string }
-): ReturnType<typeof put>;
-export function writeDocument(
-  key: string,
-  contents: string,
-  options: { access: "private"; contentType: string; ifMatch: string | null }
-): Promise<"conflict" | "written">;
-export function writeDocument(
-  key: string,
-  contents: string,
-  options:
-    | { allowOverwrite: boolean; contentType?: string }
-    | { access: "private"; contentType: string; ifMatch: string | null }
-) {
-  if (!("ifMatch" in options)) {
-    return put(key, contents, {
-      abortSignal: AbortSignal.timeout(BLOB_TIMEOUT_MS),
-      access: "public",
-      addRandomSuffix: false,
-      allowOverwrite: options.allowOverwrite,
-      contentType: options.contentType ?? "text/markdown",
-    });
-  }
-  return writeConditionally(key, contents, options);
-}
-
-async function writeConditionally(
-  key: string,
-  contents: string,
-  options: { contentType: string; ifMatch: string | null }
-): Promise<"conflict" | "written"> {
-  try {
-    await put(key, contents, {
-      abortSignal: AbortSignal.timeout(BLOB_TIMEOUT_MS),
-      access: "private",
-      addRandomSuffix: false,
-      allowOverwrite: options.ifMatch !== null,
-      contentType: options.contentType,
-      ...(options.ifMatch === null ? {} : { ifMatch: options.ifMatch }),
-    });
-    return "written";
-  } catch (error) {
-    if (error instanceof BlobPreconditionFailedError) {
-      return "conflict";
-    }
-    if (
-      options.ifMatch === null &&
-      (await readDocument(key, { access: "private" })).found
-    ) {
-      return "conflict";
-    }
-    throw error;
-  }
-}
+) =>
+  put(key, contents, {
+    abortSignal: AbortSignal.timeout(BLOB_TIMEOUT_MS),
+    access: "public",
+    addRandomSuffix: false,
+    allowOverwrite: options.allowOverwrite,
+    contentType: options.contentType ?? "text/markdown",
+  });
 
 /**
  * Delete a document from the store by its exact key.
@@ -317,33 +245,4 @@ export const deleteDocument = async (
   }
   await del(key, { abortSignal: AbortSignal.timeout(BLOB_TIMEOUT_MS) });
   return { existed: true };
-};
-
-export const readPrivateBytes = async (
-  urlOrKey: string,
-  timeoutMs: number
-): Promise<Uint8Array> => {
-  const result = await get(urlOrKey, {
-    abortSignal: AbortSignal.timeout(timeoutMs),
-    access: "private",
-  });
-  if (!result?.stream) {
-    throw new BlobNotFoundError();
-  }
-  return new Uint8Array(await new Response(result.stream).arrayBuffer());
-};
-
-export const listPrivateDocuments = async (
-  prefix: string,
-  cursor?: string
-): Promise<string[]> => {
-  const page = await list({
-    abortSignal: AbortSignal.timeout(BLOB_TIMEOUT_MS),
-    cursor,
-    prefix,
-  });
-  const keys = page.blobs.map((blob) => blob.pathname);
-  return page.hasMore && page.cursor
-    ? [...keys, ...(await listPrivateDocuments(prefix, page.cursor))]
-    : keys;
 };

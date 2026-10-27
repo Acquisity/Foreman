@@ -1,7 +1,7 @@
 import { defineDynamic } from "eve";
 import { defineTool } from "eve/tools";
 import { z } from "zod";
-import { withReplayState } from "#lib/triage-replay/backend.js";
+import { readReplayState } from "#lib/triage-replay/backend.js";
 import { replaySessionOf } from "#lib/triage-replay/mode.js";
 import { replayCatalog } from "#lib/triage-replay/views.js";
 
@@ -17,16 +17,7 @@ export const tool = defineTool({
     if (!session) {
       throw new Error("Triage replay session required.");
     }
-    return await withReplayState(session.runId, session.caseId, (state) => {
-      const catalog = replayCatalog(state);
-      state.inputs.push({
-        availableAt: state.case.createdAt,
-        content: JSON.stringify(catalog),
-        provenance: "seeded",
-        source: "list_triage_replay_catalog",
-      });
-      return catalog;
-    });
+    return replayCatalog(await readReplayState(session.runId, session.caseKey));
   },
   inputSchema: z.strictObject({}),
 });

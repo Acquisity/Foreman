@@ -22,7 +22,7 @@ export const tool = defineTool({
     }
     const identifier = await withReplayState(
       session.runId,
-      session.caseId,
+      session.caseKey,
       (state) => createReplayIssue(state, input)
     );
     return { created: true as const, identifier };

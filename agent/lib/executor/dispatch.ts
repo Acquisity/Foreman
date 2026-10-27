@@ -3,8 +3,6 @@ import type { ToolContext } from "eve/tools";
 import { z } from "zod";
 import { PRODUCTION_READ_QUERY_ARGS } from "../lookup-customer.js";
 import { supportOperationPolicy } from "../support/policy.js";
-import { recordReplayEvidenceMiss } from "../triage-replay/client.js";
-import { isTriageReplay } from "../triage-replay/mode.js";
 import { widgetOperationPolicy } from "../widget-policy.js";
 import {
   isWidgetSupport,
@@ -143,11 +141,6 @@ export async function invokeProvider(
   operationKey?: string,
   options: { maxBytes?: number; timeoutMs?: number } = {}
 ): Promise<ExecutorOutcome> {
-  // A replay answers only the typed Linear helpers, through its simulated store.
-  if (isTriageReplay()) {
-    await recordReplayEvidenceMiss(ctx.session?.auth.initiator, path);
-    throw new ExecutorError("replay_unsupported", 503, { dispatched: false });
-  }
   assertLaneOperation(ctx, path, input);
   const policy = operationPolicy(ctx);
   policy?.assert(path, input);
@@ -196,10 +189,6 @@ export async function invokeProvider(
 }
 
 export async function describeProvider(ctx: ProviderContext, path: string) {
-  if (isTriageReplay()) {
-    await recordReplayEvidenceMiss(ctx.session?.auth.initiator, path);
-    throw new ExecutorError("replay_unsupported", 503, { dispatched: false });
-  }
   const policy = operationPolicy(ctx);
   // Describing a dispatcher is permitted; operation arguments are checked only when called.
   policy?.describe(path);

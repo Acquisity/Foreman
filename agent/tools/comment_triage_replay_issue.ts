@@ -20,7 +20,7 @@ export const tool = defineTool({
     }
     const posted = await withReplayState(
       session.runId,
-      session.caseId,
+      session.caseKey,
       (state) => addReplayComment(state, issue, body)
     );
     return posted

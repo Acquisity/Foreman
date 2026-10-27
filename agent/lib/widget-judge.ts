@@ -1,3 +1,4 @@
+import { spawn } from "node:child_process";
 import {
   existsSync,
   mkdirSync,
@@ -5,8 +6,8 @@ import {
   readFileSync,
   writeFileSync,
 } from "node:fs";
+import { tmpdir } from "node:os";
 import { z } from "zod";
-import { runClaudeJson, withClaudeSlot } from "./claude-headless.js";
 import { getHelpArticleContent, helpArticleSlug } from "./help-center.js";
 import { toRequest, type WidgetCase, widgetCaseSchema } from "./widget-case.js";
 import { judgeToolCapabilities } from "./widget-judge-tools.js";
@@ -315,6 +316,8 @@ const judgeSchema = z.strictObject({
 
 /** A headless Claude Code start plus an Opus answer on a large input. */
 export const JUDGE_TIMEOUT_MS = 240_000;
+/** Concurrent `claude -p` processes; a replay batch runs up to eight cases at once. */
+const JUDGE_CONCURRENCY = 3;
 
 /** One judge call: the system prompt and input in, the structured object out. */
 export type JudgeRunner = (
@@ -327,14 +330,73 @@ export type JudgeRunner = (
 const { $schema: _draft, ...judgeJsonSchema } = z.toJSONSchema(judgeSchema);
 const JUDGE_JSON_SCHEMA = JSON.stringify(judgeJsonSchema);
 
-export const claudeJudge: JudgeRunner = (system, input, signal) =>
-  runClaudeJson({
-    input,
-    jsonSchema: JUDGE_JSON_SCHEMA,
-    model: CLAUDE_MODEL,
-    signal,
-    system,
+let running = 0;
+const queued: (() => void)[] = [];
+
+/**
+ * `claude -p` with no tools, settings, MCP servers or saved session, the input
+ * on stdin and the reply held to the judge schema. Anthropic credentials are
+ * stripped so it can only use the local Claude Code login.
+ */
+export const claudeJudge: JudgeRunner = async (system, input, signal) => {
+  const env = { ...process.env };
+  for (const key of [
+    "ANTHROPIC_API_KEY",
+    "ANTHROPIC_AUTH_TOKEN",
+    "ANTHROPIC_BASE_URL",
+  ]) {
+    delete env[key];
+  }
+  const child = spawn(
+    "claude",
+    [
+      "-p",
+      "--model",
+      CLAUDE_MODEL,
+      "--system-prompt",
+      system,
+      "--tools",
+      "",
+      "--setting-sources",
+      "",
+      "--strict-mcp-config",
+      "--no-session-persistence",
+      "--output-format",
+      "json",
+      "--json-schema",
+      JUDGE_JSON_SCHEMA,
+    ],
+    { cwd: tmpdir(), env, signal, stdio: ["pipe", "pipe", "pipe"] }
+  );
+  const out: Buffer[] = [];
+  const err: Buffer[] = [];
+  child.stdout.on("data", (chunk: Buffer) => out.push(chunk));
+  child.stderr.on("data", (chunk: Buffer) => err.push(chunk));
+  child.stdin.on("error", () => undefined);
+  child.stdin.end(input);
+  const code = await new Promise<number | null>((resolve, reject) => {
+    child.once("error", reject);
+    child.once("close", resolve);
   });
+  const text = Buffer.concat(out).toString("utf8");
+  const result = (() => {
+    try {
+      return JSON.parse(text) as {
+        is_error?: boolean;
+        result?: string;
+        structured_output?: unknown;
+      };
+    } catch {
+      return null;
+    }
+  })();
+  if (code !== 0 || !result || result.is_error || !result.structured_output) {
+    throw new Error(
+      `claude -p failed (exit ${code}): ${(result?.result ?? Buffer.concat(err).toString("utf8")).slice(0, 300)}`
+    );
+  }
+  return result.structured_output;
+};
 
 const MAX_REASON = 240;
 
@@ -378,7 +440,7 @@ export const parseGaps = (raw: unknown): Gap[] =>
     }));
 
 /** One judge call for one case's answer: a verdict per claim and the answer's gap sentences. */
-export function judgeAnswer(
+export async function judgeAnswer(
   recorded: WidgetCase,
   answer: string,
   claims: Claim[],
@@ -386,7 +448,12 @@ export function judgeAnswer(
   run: JudgeRunner = claudeJudge,
   articles: CitedArticle[] = []
 ): Promise<{ gaps: Gap[]; verdicts: Verdict[] }> {
-  return withClaudeSlot(async () => {
+  while (running >= JUDGE_CONCURRENCY) {
+    // biome-ignore lint/performance/noAwaitInLoops: wait for a free slot.
+    await new Promise<void>((resolve) => queued.push(resolve));
+  }
+  running += 1;
+  try {
     // Started once a slot is free, so time spent queued never counts against it.
     const deadline = AbortSignal.timeout(JUDGE_TIMEOUT_MS);
     const object = judgeSchema.parse(
@@ -402,7 +469,10 @@ export function judgeAnswer(
       gaps: parseGaps(object),
       verdicts: parseVerdicts(claims, object),
     };
-  });
+  } finally {
+    running -= 1;
+    queued.shift()?.();
+  }
 }
 
 /** Ignored output root; each eval invocation writes `<root>/<timestamp>/`. */

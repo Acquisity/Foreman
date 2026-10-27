@@ -76,7 +76,6 @@ export function replayCatalog(state: ReplayState) {
   };
 }
 
-/** The text of a document this replay wrote, for the critic's read. */
 export function replayDocumentText(
   state: ReplayState,
   id: string
@@ -97,33 +96,33 @@ const issueText = (fields: IssueFields) => ({
 export function replayIssueView(
   state: ReplayState,
   identifier: string
-): { generated: unknown; seeded: unknown } | null {
+): { issue: unknown; replay: unknown } | null {
   const comments = state.comments
     .filter((comment) => comment.issue === identifier)
     .map((comment) => comment.body);
   if (isCase(state, identifier)) {
     return {
-      generated: { comments, fields: issueText(state.issue) },
-      seeded: {
+      issue: {
         attachmentKinds: state.case.ticket.attachmentKinds,
         createdAt: state.case.createdAt,
         description: state.case.ticket.description,
         identifier: state.case.id,
         title: state.case.ticket.title,
       },
+      replay: { comments, fields: issueText(state.issue) },
     };
   }
   const created = createdIssue(state, identifier);
   if (created) {
     return {
-      generated: {
+      issue: null,
+      replay: {
         comments,
         description: created.description,
         fields: issueText(created.fields),
         identifier: created.identifier,
         title: created.title,
       },
-      seeded: null,
     };
   }
   const related = state.case.relatedSnapshot.find((r) => r.id === identifier);
@@ -131,8 +130,8 @@ export function replayIssueView(
     return null;
   }
   return {
-    generated: comments.length > 0 ? { comments } : null,
-    seeded: related,
+    issue: related,
+    replay: comments.length > 0 ? { comments } : null,
   };
 }
 

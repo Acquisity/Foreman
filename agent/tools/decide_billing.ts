@@ -1,13 +1,8 @@
-import { randomUUID } from "node:crypto";
 import { defineTool } from "eve/tools";
 import { z } from "zod";
 import { LINEAR_ISSUE_ID_PATTERN } from "#lib/investigation-memory/scope.js";
 import { BILLING_BUCKETS, decideBilling } from "#lib/jev-decisions.js";
-import {
-  billingDecisionFields,
-  billingRoutes,
-  triageDecisions,
-} from "#lib/triage-log.js";
+import { billingDecisionFields, triageDecisions } from "#lib/triage-log.js";
 
 export default defineTool({
   approval: () => "not-applicable",
@@ -22,20 +17,16 @@ export default defineTool({
       const decision = await decideBilling(billing, {
         signal: ctx.abortSignal,
       });
-      const route = {
-        assignee: decision.route.assignee,
-        project: decision.route.project,
-      };
       if (issue) {
         triageDecisions.update((decisions) => ({
           ...decisions,
-          [issue]: billingDecisionFields(issue, route),
+          [issue]: billingDecisionFields(issue, {
+            assignee: decision.route.assignee,
+            project: decision.route.project,
+          }),
         }));
-        return { decided: true as const, decision };
       }
-      const decisionId = randomUUID();
-      billingRoutes.update(() => ({ id: decisionId, route }));
-      return { decided: true as const, decision, decisionId };
+      return { decided: true as const, decision };
     } catch (error) {
       if (ctx.abortSignal.aborted) {
         throw error;
@@ -72,7 +63,7 @@ export default defineTool({
       .regex(LINEAR_ISSUE_ID_PATTERN)
       .optional()
       .describe(
-        "The ticket's issue id, such as ENG-123, when the ticket exists. Leave it out only when you create the ticket after this decision; the result then carries a decisionId, and the route_ticket call for the new ticket passes it as billingDecision."
+        "The ticket's issue id, such as ENG-123, when the ticket exists. Leave it out only when you create the ticket after this decision."
       ),
     sourceLabels: z
       .array(z.string().trim().min(1).max(120))

@@ -4,10 +4,6 @@ import {
   startReplay,
 } from "../lib/triage-replay/route.js";
 
-/**
- * Triage replay routes (ENG-16049). Both answer 404 outside a replay process;
- * see agent/lib/triage-replay/route.ts for the server-side guards.
- */
 export default defineChannel({
   routes: [
     POST("/internal/triage/replay", (request, args) =>

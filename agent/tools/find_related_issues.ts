@@ -2,7 +2,7 @@ import { defineTool } from "eve/tools";
 import { z } from "zod";
 import { executorClient } from "#lib/executor/client.js";
 import { findRelatedIssues } from "#lib/linear-api.js";
-import { withReplayState } from "#lib/triage-replay/backend.js";
+import { readReplayState } from "#lib/triage-replay/backend.js";
 import { replaySessionOf } from "#lib/triage-replay/mode.js";
 import { isIntakeOnly, isLinearSession } from "#lib/trust.js";
 
@@ -27,16 +27,11 @@ export default defineTool({
     "Each hit lists the phrases that matched it. truncated true means candidates were dropped, so narrow the phrases. Read every hit before deciding; a keyword match is not a duplicate.",
   async execute(input, ctx) {
     const auth = ctx.session.auth.current;
-    // A replay searches as the Linear session that triaged the case did, on the case's own clock.
     const replay = replaySessionOf(ctx.session.auth.initiator);
     try {
       const now = replay
         ? new Date(
-            await withReplayState(
-              replay.runId,
-              replay.caseId,
-              (state) => state.case.createdAt
-            )
+            (await readReplayState(replay.runId, replay.caseKey)).case.createdAt
           )
         : undefined;
       return await findRelatedIssues(

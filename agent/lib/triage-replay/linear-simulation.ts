@@ -1,7 +1,4 @@
-import {
-  LINEAR_OPERATIONS,
-  type LinearOperation,
-} from "../linear-operations.js";
+import type { LinearOperation } from "../linear-operations.js";
 import {
   asOfCase,
   asOfList,
@@ -88,7 +85,6 @@ function routeIssue(state: ReplayState, id: unknown) {
 
 type Filter = Record<string, unknown>;
 
-/** Evaluates the IssueFilter shapes findRelatedIssues builds, against a snapshot issue. */
 function matches(
   filter: Filter,
   issue: { createdAt: string; description: string; title: string }
@@ -113,7 +109,6 @@ function matches(
       case "team":
         return true;
       default:
-        // An unrecognized filter key matches nothing rather than everything.
         return false;
     }
   });
@@ -169,7 +164,6 @@ function saveDocument(
     doc = {
       content: String(input.content ?? ""),
       id: `replay-doc-${state.documents.length + 1}`,
-      issueId: CASE_ISSUE_ID,
       title: String(input.title ?? ""),
       updatedAt,
     };
@@ -185,7 +179,6 @@ function saveDocument(
   };
 }
 
-/** Applies a RouteIssueUpdate input to one issue's fields, resolving ids back to names. */
 function applyUpdate(state: ReplayState, issue: IssueFields, input: Filter) {
   const nameOf = (list: { id: string; name: string }[], id: unknown) =>
     list.find((item) => item.id === id)?.name ?? null;
@@ -213,76 +206,47 @@ function applyUpdate(state: ReplayState, issue: IssueFields, input: Filter) {
   }
 }
 
-export class ReplayUnsupportedError extends Error {
-  constructor(operation: string) {
-    super(`Triage replay has no answer for ${operation}.`);
-    this.name = "ReplayUnsupportedError";
-  }
-}
+type Handler = (state: ReplayState, variables: Filter) => unknown;
 
-interface Answer {
-  data: unknown;
-  provenance: "seeded" | "generated";
-}
-type Handler = (state: ReplayState, variables: Filter) => Answer;
-
-const seeded = (data: unknown): Answer => ({ data, provenance: "seeded" });
-const generated = (data: unknown): Answer => ({
-  data,
-  provenance: "generated",
-});
-
-/** One answer per authored Linear operation; reads as the case was, writes into the store. */
 const HANDLERS: Record<LinearOperation, Handler> = {
-  CreateDocument: (state, v) =>
-    generated({ documentCreate: saveDocument(state, null, v.input as Filter) }),
+  CreateDocument: (state, v) => ({
+    documentCreate: saveDocument(state, null, v.input as Filter),
+  }),
   Document: (state, v) => {
     const doc = state.documents.find((d) => d.id === v.id);
-    return generated({
+    return {
       document: doc
         ? { id: doc.id, updatedAt: doc.updatedAt, url: urlOf(state.case.id) }
         : null,
-    });
+    };
   },
-  IssueDocuments: (state, v) =>
-    generated({
-      issue: {
-        documents: {
-          nodes: state.documents
-            .filter((d) => d.title === v.title)
-            .map(({ id, title }) => ({ id, title })),
-        },
-        id: CASE_ISSUE_ID,
-        identifier: state.case.id,
+  IssueDocuments: (state, v) => ({
+    issue: {
+      documents: {
+        nodes: state.documents
+          .filter((d) => d.title === v.title)
+          .map(({ id, title }) => ({ id, title })),
       },
-    }),
-  Projects: (state, v) =>
-    seeded({
-      projects: { nodes: byName(asOfCase(state, "projects"), v.name) },
-    }),
-  RelatedIssues: (state, v) => seeded(relatedIssues(state, v)),
-  RouteAttachment: () => generated({ attachmentLinkURL: { success: true } }),
-  RouteIssue: (state, v) => {
-    const answer = { issue: routeIssue(state, v.id) };
-    // The case ticket read back after routing shows this replay's own writes.
-    return (isCase(state, v.id) && state.routes.length > 0) ||
-      createdIssue(state, v.id)
-      ? generated(answer)
-      : seeded(answer);
-  },
+      id: CASE_ISSUE_ID,
+      identifier: state.case.id,
+    },
+  }),
+  Projects: (state, v) => ({
+    projects: { nodes: byName(asOfCase(state, "projects"), v.name) },
+  }),
+  RelatedIssues: (state, v) => relatedIssues(state, v),
+  RouteAttachment: () => ({ attachmentLinkURL: { success: true } }),
+  RouteIssue: (state, v) => ({ issue: routeIssue(state, v.id) }),
   RouteIssueUpdate: (state, v) => {
     if (isCase(state, v.id)) {
       applyUpdate(state, state.issue, v.input as Filter);
-      state.routes.push({
-        input: v.input as Record<string, unknown>,
-        seq: state.writes.length,
-      });
+      state.routes.push(v.input as Record<string, unknown>);
     }
     const created = createdIssue(state, v.id);
     if (created) {
       applyUpdate(state, created.fields, v.input as Filter);
     }
-    return generated({ issueUpdate: { success: true } });
+    return { issueUpdate: { success: true } };
   },
   RouteRelation: (state, v) => {
     const input = v.input as Filter;
@@ -291,44 +255,33 @@ const HANDLERS: Record<LinearOperation, Handler> = {
       relatedIssueId: String(input.relatedIssueId ?? ""),
       type: String(input.type ?? ""),
     });
-    return generated({ issueRelationCreate: { success: true } });
+    return { issueRelationCreate: { success: true } };
   },
-  TeamLabels: (state) =>
-    seeded({
-      issueLabels: {
-        nodes: asOfCase(state, "labels").map(({ id, name }) => ({ id, name })),
-        pageInfo: { endCursor: null, hasNextPage: false },
-      },
-    }),
-  UpdateDocument: (state, v) =>
-    generated({
-      documentUpdate: saveDocument(state, String(v.id), v.input as Filter),
-    }),
-  Users: (state, v) =>
-    seeded({
-      users: { nodes: usersMatching(asOfCase(state, "users"), v.name) },
-    }),
-  WorkflowStates: (state, v) =>
-    seeded({
-      workflowStates: { nodes: byName(asOfCase(state, "states"), v.name) },
-    }),
+  TeamLabels: (state) => ({
+    issueLabels: {
+      nodes: asOfCase(state, "labels").map(({ id, name }) => ({ id, name })),
+      pageInfo: { endCursor: null, hasNextPage: false },
+    },
+  }),
+  UpdateDocument: (state, v) => ({
+    documentUpdate: saveDocument(state, String(v.id), v.input as Filter),
+  }),
+  Users: (state, v) => ({
+    users: { nodes: usersMatching(asOfCase(state, "users"), v.name) },
+  }),
+  WorkflowStates: (state, v) => ({
+    workflowStates: { nodes: byName(asOfCase(state, "states"), v.name) },
+  }),
 };
 
-/**
- * Answers one authored Linear operation against the store. Mutates `state`
- * for writes. Returns the GraphQL `data` payload the real API would.
- */
 export function answerLinear(
   state: ReplayState,
   operation: LinearOperation,
   variables: Filter
-): Answer {
+): unknown {
   const handler = HANDLERS[operation];
   if (!handler) {
-    throw new ReplayUnsupportedError(`linear.${String(operation)}`);
-  }
-  if (LINEAR_OPERATIONS[operation].kind === "mutation") {
-    state.writes.push({ operation, seq: state.writes.length + 1, variables });
+    throw new Error(`Triage replay has no answer for linear.${operation}.`);
   }
   return handler(state, variables);
 }

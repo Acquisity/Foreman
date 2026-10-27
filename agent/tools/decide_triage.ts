@@ -99,15 +99,11 @@ export default defineTool({
       .array(z.object({ description: text(300).optional(), name: text(120) }))
       .min(1)
       .max(60)
-      .describe(
-        "The team's active product projects, read from Linear now; in a triage replay, from list_triage_replay_catalog."
-      ),
+      .describe("The team's active product projects, read from Linear now."),
     rootCauseLabels: z
       .array(text(120))
       .max(40)
-      .describe(
-        "The team's Root Cause label names, read from Linear now; in a triage replay, from list_triage_replay_catalog."
-      ),
+      .describe("The team's Root Cause label names, read from Linear now."),
     sourceLabels: z
       .array(text(120))
       .max(3)
