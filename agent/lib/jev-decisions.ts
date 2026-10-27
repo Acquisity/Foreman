@@ -21,6 +21,7 @@ import {
   resolveOwnership,
 } from "./triage-ownership.js";
 import {
+  BILLING_INBOX_REVIEW,
   type BillingCheck,
   type BillingFacts,
   gateInboxError,
@@ -178,6 +179,8 @@ const PATH_STATE: Record<HandlingPath, string> = {
   "Support/Product follow-up": "Todo",
   "User Error": "Done",
 };
+
+const SUPPORT_PROJECT = "Support";
 
 /** Paths whose band is Low unless data loss or money raises it. */
 const LOW_PATHS = new Set<HandlingPath>([
@@ -522,6 +525,27 @@ const barGap = (
   return null;
 };
 
+const routedPath = (
+  billed: boolean,
+  match: DuplicateMatch,
+  choice: string
+): HandlingPath => {
+  if (billed) {
+    return "Support/Financial";
+  }
+  return match ? "Duplicate" : (choice as HandlingPath);
+};
+
+const routeProjectOf = (
+  billed: boolean,
+  project: string | null
+): { project?: string } => {
+  if (billed) {
+    return { project: SUPPORT_PROJECT };
+  }
+  return project ? { project } : {};
+};
+
 /** Turns Jev's answers into the triage decision. Pure, so it is tested alone. */
 export function resolveTriage(
   input: TriageInput,
@@ -565,43 +589,38 @@ export function resolveTriage(
   const gate = gateInboxError({
     answers,
     classification,
-    confidence,
     duplicate,
     input,
     notes,
     now,
     signal: BARS.signal,
-    supportRoute: (supportPath) => ({
-      priority: resolvePriority(supportPath, undefined, answers, notes),
-      state: PATH_STATE[supportPath],
-    }),
-    verdict,
   });
-  if (gate && "decision" in gate) {
-    return gate.decision;
+  if (gate?.kind === "unproven") {
+    return unproven(gate.missing);
   }
-  const billingCheck = gate?.billingCheck;
-
-  const gap = barGap({
-    answers,
-    classification,
-    classificationConfidence: classificationPick.confidence,
-    duplicate,
-    input,
-    pathConfidence: pathPick.confidence,
-  });
+  const billed = gate?.kind === "billing";
+  const gap = billed
+    ? null
+    : barGap({
+        answers,
+        classification,
+        classificationConfidence: classificationPick.confidence,
+        duplicate,
+        input,
+        pathConfidence: pathPick.confidence,
+      });
   if (gap) {
     notes.push(gap.note);
     return unproven(gap.missing);
   }
 
-  const path: HandlingPath = duplicate
-    ? "Duplicate"
-    : (pathPick.choice as HandlingPath);
+  const settled = billed ? "Platform Limitation" : classification;
+  const match = billed ? undefined : duplicate;
+  const path = routedPath(billed, match, pathPick.choice);
   const project = choiceOf(answers.project);
   const projectSettled =
     project.choice !== UNDETERMINED && project.confidence >= BARS.project;
-  if (!projectSettled) {
+  if (!(billed || projectSettled)) {
     notes.push(
       "The evidence does not settle the owning project; say which evidence is missing in the document."
     );
@@ -609,37 +628,41 @@ export function resolveTriage(
   const ownership = resolveOwnership({
     answers,
     bar: BARS.project,
-    classification,
+    billing: billed,
+    classification: settled,
     closed: ["Done", "Duplicate"].includes(PATH_STATE[path]),
-    duplicate: duplicate !== undefined,
+    duplicate: match !== undefined,
     input,
     notes,
     path,
     project: projectSettled ? project.choice : null,
   });
-  const labels = resolveLabels(input, classification, answers);
+  const labels = billed
+    ? [...new Set(input.sourceLabels)]
+    : resolveLabels(input, classification, answers);
   const priority = resolvePriority(
     ownership.path,
-    duplicate?.candidate.priority,
+    match?.candidate.priority,
     answers,
     notes
   );
-  const review = reviewOf(input, answers, {
-    classification,
-    closes: PATH_STATE[ownership.path] === "Done",
-    duplicate: Boolean(duplicate),
-    path: ownership.path,
-    signal: BARS.signal,
-  });
-
+  const review = billed
+    ? BILLING_INBOX_REVIEW
+    : reviewOf(input, answers, {
+        classification,
+        closes: PATH_STATE[ownership.path] === "Done",
+        duplicate: Boolean(match),
+        path: ownership.path,
+        signal: BARS.signal,
+      });
   return {
     approval: ownership.approval,
     area: ownership.area,
     assignee: ownership.assignee,
-    ...(billingCheck ? { billingCheck } : {}),
-    classification,
+    ...(gate ? { billingCheck: gate.billingCheck } : {}),
+    classification: settled,
     confidence,
-    ...(classification === "Bug" && ownership.path !== "Duplicate"
+    ...(settled === "Bug" && ownership.path !== "Duplicate"
       ? { hotlane: resolveHotlane(answers, BARS.incident) }
       : {}),
     needsCriticReview: review.required,
@@ -651,11 +674,11 @@ export function resolveTriage(
       ...ownershipRoute(ownership, labels),
       priority,
       state: PATH_STATE[ownership.path],
-      ...(projectSettled ? { project: project.choice } : {}),
-      ...(duplicate
+      ...routeProjectOf(billed, projectSettled ? project.choice : null),
+      ...(match
         ? {
-            duplicateOf: duplicate.candidate.identifier,
-            inheritAssigneeFrom: duplicate.candidate.identifier,
+            duplicateOf: match.candidate.identifier,
+            inheritAssigneeFrom: match.candidate.identifier,
           }
         : {}),
     },
@@ -842,7 +865,7 @@ export interface BillingDecision {
     addLabels: string[];
     assignee: typeof SUPPORT_OWNER;
     priority: number;
-    project: "Support";
+    project: typeof SUPPORT_PROJECT;
     state: "Todo";
   };
   unconfirmed: string[];
@@ -918,7 +941,7 @@ export function resolveBilling(
         probabilityOf(answers.active_blocker) >= BARS.signal
           ? PRIORITY.high
           : PRIORITY.medium,
-      project: "Support",
+      project: SUPPORT_PROJECT,
       state: "Todo",
     },
     unconfirmed,

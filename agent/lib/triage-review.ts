@@ -4,7 +4,6 @@ import type {
   DuplicateMatch,
   HandlingPath,
   TriageClassification,
-  TriageDecision,
   TriageInput,
 } from "./jev-decisions.js";
 
@@ -106,25 +105,29 @@ export const UNPROVEN_REVIEW: ReviewDecision = {
   required: false,
 };
 
+export const BILLING_INBOX_REVIEW: ReviewDecision = {
+  kind: "billing_inbox",
+  reason: "an inbox error was set aside as billing, not code",
+  required: true,
+};
+
 interface InboxGateContext {
   answers: Answers;
   classification: TriageClassification;
-  confidence: TriageConfidence;
   duplicate: DuplicateMatch;
   input: TriageInput;
   notes: string[];
   now: Date;
   signal: number;
-  /** The Support/Financial route's priority and state, from the caller's rules. */
-  supportRoute: (path: HandlingPath) => { priority: number; state: string };
-  verdict: { confidence: number; value: string };
 }
 
-export const gateInboxError = (
-  context: InboxGateContext
-): { billingCheck: BillingCheck } | { decision: TriageDecision } | null => {
-  const { answers, classification, confidence, duplicate, input, notes } =
-    context;
+export type InboxGate =
+  | { billingCheck: BillingCheck; kind: "billing" | "checked" }
+  | { kind: "unproven"; missing: string[] }
+  | null;
+
+export const gateInboxError = (context: InboxGateContext): InboxGate => {
+  const { answers, classification, duplicate, input, notes } = context;
   if (
     probabilityOf(answers.inbox_error) < context.signal ||
     !(classification === "Bug" || duplicate)
@@ -136,20 +139,11 @@ export const gateInboxError = (
     notes.push(
       "An inbox error cannot be called a bug or linked to a master before the billing check."
     );
-    return {
-      decision: {
-        confidence,
-        missing: inspected.gaps,
-        notes,
-        outcome: "unproven",
-        review: UNPROVEN_REVIEW,
-        verdict: context.verdict,
-      },
-    };
+    return { kind: "unproven", missing: inspected.gaps };
   }
   if (inspected.outcome === "passed") {
     notes.push("The billing check passed: paid, not failing, domains live.");
-    return { billingCheck: inspected };
+    return { billingCheck: inspected, kind: "checked" };
   }
   notes.push(
     `The inbox error is billing, not a code bug: ${inspected.failures.join(" ")}`
@@ -159,33 +153,7 @@ export const gateInboxError = (
       `The match with ${duplicate.candidate.identifier} was set aside.`
     );
   }
-  const path: HandlingPath = "Support/Financial";
-  return {
-    decision: {
-      approval: "not-applicable",
-      area: null,
-      assignee: "Aaron Fraga",
-      billingCheck: inspected,
-      classification: "Platform Limitation",
-      confidence,
-      needsCriticReview: true,
-      notes,
-      outcome: "route",
-      path,
-      review: {
-        kind: "billing_inbox",
-        reason: "an inbox error was set aside as billing, not code",
-        required: true,
-      },
-      route: {
-        addLabels: [...new Set(input.sourceLabels)],
-        assignee: "Aaron Fraga",
-        ...context.supportRoute(path),
-        project: "Support",
-      },
-      verdict: context.verdict,
-    },
-  };
+  return { billingCheck: inspected, kind: "billing" };
 };
 
 export const reviewOf = (

@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import type { JevAnswer } from "./jev.js";
 import {
@@ -6,7 +7,15 @@ import {
   type TriageInput,
   triageQuestions,
 } from "./jev-decisions.js";
+import { SUPPORT_OWNER } from "./owner-map.js";
 import { bugAnswers, pick, triageInput, yes } from "./triage-fixtures.js";
+import { ownershipRoute, resolveOwnership } from "./triage-ownership.js";
+import { gateInboxError } from "./triage-review.js";
+
+const REVIEW_SOURCE = readFileSync(
+  new URL("./triage-review.ts", import.meta.url),
+  "utf8"
+);
 
 const NOW = new Date("2026-10-23T10:00:00.000Z");
 const LANE_REASON = /could not run/u;
@@ -320,4 +329,61 @@ test("triage asks about customer-seen failures and inbox errors", () => {
   const questions = triageQuestions(triageInput());
   assert.equal(questions.customer_saw_failure.type, "boolean");
   assert.equal(questions.inbox_error.type, "boolean");
+});
+
+test("the billing gate returns a disposition and the owner map builds the billing route", () => {
+  const input = inboxInput({
+    billingFacts: billingFacts({ domainsLive: false }),
+  });
+  const answers = inboxAnswers();
+  const gate = gateInboxError({
+    answers,
+    classification: "Bug",
+    duplicate: undefined,
+    input,
+    notes: [],
+    now: NOW,
+    signal: 0.5,
+  });
+  assert.deepEqual(gate, {
+    billingCheck: {
+      failures: ["The domains are not live at the supplier."],
+      outcome: "failed",
+    },
+    kind: "billing",
+  });
+  const decision = resolveTriage(input, answers, NOW);
+  assert.ok(decision.outcome === "route");
+  const ownership = resolveOwnership({
+    answers,
+    bar: 0.5,
+    billing: true,
+    classification: "Platform Limitation",
+    closed: false,
+    duplicate: false,
+    input,
+    notes: [],
+    path: "Support/Financial",
+    project: null,
+  });
+  assert.equal(decision.assignee, SUPPORT_OWNER);
+  assert.deepEqual(decision.route, {
+    ...ownershipRoute(ownership, input.sourceLabels),
+    priority: decision.route.priority,
+    project: "Support",
+    state: "Todo",
+  });
+  assert.ok(!REVIEW_SOURCE.includes(SUPPORT_OWNER));
+});
+
+test("a billed inbox error stays a support follow-up even when a lifted limit is wanted", () => {
+  const decision = resolveTriage(
+    inboxInput({ billingFacts: billingFacts({ domainsLive: false }) }),
+    inboxAnswers({ wants_limit_lifted: yes() }),
+    NOW
+  );
+  assert.ok(decision.outcome === "route");
+  assert.equal(decision.approval, "not-applicable");
+  assert.equal(decision.route.assignee, SUPPORT_OWNER);
+  assert.ok(!decision.route.addLabels.includes("Needs approval"));
 });
