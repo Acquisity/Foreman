@@ -95,6 +95,10 @@ const responses = {
   Users: z.looseObject({ users: nodes(named) }),
   WorkflowStates: z.looseObject({ workflowStates: nodes(named) }),
 } satisfies Record<LinearOperation, z.ZodType>;
+export type LinearResponse<O extends LinearOperation> = z.infer<
+  (typeof responses)[O]
+>;
+
 const envelope = z.looseObject({
   data: z.unknown().optional(),
   errors: z.array(z.looseObject({ message: z.string().optional() })).optional(),

@@ -37,7 +37,7 @@ export const gatherDisputeEvidencePolicy = (
 export default defineTool({
   approval: gatherDisputeEvidencePolicy,
   description:
-    "Read every evidence source for one Stripe dispute, in a fixed order, every time: Stripe (dispute, charge with refunds, customer, invoices, subscriptions, other charges, credit notes), the Acquisity database for the workspace this charge provisioned (members, sign-up and first session IP, sign-ins, domains, inboxes, orders, campaigns and sends, plan changes, cancellations, support chats, renewal notices), Autumn, Instantly, Linear tickets with their text, and the AI Acquisition client channel around the purchase. Each source comes back checked with its facts, or checked false with an error: a failed source is unverified, not empty. verdict holds refundedInFull, deliveryStoppedBeforeCharge, duplicate, tiedToWorkspace and usedAfterCharge, each true, false, or null when the facts that decide it could not be read, with the dated facts behind it. Lists carry a truncated flag when a limit cut them. Read only.",
+    "Read every evidence source for one Stripe dispute, in a fixed order, every time: Stripe (dispute, charge with refunds, customer, invoices, subscriptions, other charges, credit notes), the Acquisity database for the workspace this charge provisioned (members, sign-up and first session IP, sign-ins, domains, inboxes, orders, campaigns and sends, plan changes, cancellations, support chats, renewal notices), Autumn, Instantly, Linear tickets with their text, and the AI Acquisition client channel around the purchase. A source is checked only when all its required reads succeeded. A failed source has checked false and an error, and may retain partial facts under facts. Use only facts actually returned; missing facts are unverified, not empty. verdict holds refundedInFull, deliveryStoppedBeforeCharge, duplicate, tiedToWorkspace and usedAfterCharge, each true, false, or null when the facts that decide it could not be read, with the dated facts behind it. Lists carry truncated when rows or text were cut; proofTruncated marks shortened proof arrays. Incomplete inputs cannot prove a negative. An error means the evidence could not fit the response limit. Read only.",
   async execute({ disputeId }, ctx) {
     if (ctx.abortSignal.aborted) {
       throw ctx.abortSignal.reason;
@@ -61,7 +61,9 @@ export default defineTool({
     if (ctx.abortSignal.aborted) {
       throw ctx.abortSignal.reason;
     }
-    return { ok: true, result };
+    return result.error
+      ? { ok: false, reason: result.error, result }
+      : { ok: true, result };
   },
   inputSchema: gatherInputSchema,
   outputSchema: gatherOutputSchema,

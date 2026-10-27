@@ -22,6 +22,7 @@ import {
   disputeSchema,
   errorReason,
   lookupIdentity,
+  READ_BYTES,
   readDispute,
   type StripeDispute,
   type StripeReadDeps,
@@ -54,7 +55,6 @@ import {
  */
 
 const NEEDS_RESPONSE = new Set(["needs_response", "warning_needs_response"]);
-const READ_BYTES = 256 * 1024;
 const MAX_FIELD_CHARS = 20_000;
 const MAX_TOTAL_CHARS = 150_000;
 const MAX_FILE_BYTES = 4_500_000;

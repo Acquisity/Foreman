@@ -4,242 +4,39 @@ import type { SessionAuthContext } from "eve/context";
 import type { ApprovalContext } from "eve/tools/approval";
 import { gatherDisputeEvidencePolicy } from "../tools/gather_dispute_evidence.js";
 import {
-  type DisputeEvidence,
-  type EvidenceDeps,
   evidenceQueries,
   fitResponse,
   gatherDisputeEvidence,
-  type RowList,
   sqlLiteral,
 } from "./dispute-evidence.js";
-import type { ProviderResult } from "./executor/operations.js";
+import {
+  AFTER,
+  BA,
+  BEFORE,
+  CHARGE,
+  facts,
+  fake,
+  gather,
+  json,
+  type Obj,
+  ORG_A,
+  ORG_B,
+  TABLE,
+  type World,
+} from "./dispute-evidence-fixtures.js";
+import { member, WORKSPACE_ID } from "./instantly-fixtures.js";
 import { READ_BYTES } from "./stripe-dispute-read.js";
 import { stripeDisputeSessionAuth } from "./stripe-dispute-trigger.js";
 import { stampIntakeOnly } from "./trust.js";
 
-const NOW = Date.parse("2026-10-27T12:00:00Z");
-const CHARGE = Date.parse("2026-10-04T00:00:00Z") / 1000;
-const BA = "0b6c6f4e-3c1a-4d8e-9a77-2f1e5d4c3b2a";
-const ORG_A = "11111111-1111-4111-8111-111111111111";
-const ORG_B = "22222222-2222-4222-8222-222222222222";
-const AFTER = "2026-10-10 09:00:00+00";
-const BEFORE = "2026-09-20 09:00:00+00";
-
-type Obj = Record<string, unknown>;
-
-interface World {
-  autumnId?: string;
-  charge?: Obj;
-  charges?: Obj[];
-  email?: string;
-  failSql?: RegExp;
-  invoices?: Obj[];
-  slackChannels?: Obj[];
-  slackError?: string;
-  slackMessages?: Obj[];
-  subscriptions?: Obj[];
-  /** Rows by table, or by `table@organization` for one workspace. */
-  tables?: Record<string, Obj[]>;
-}
-
-const json = (data: unknown, status = 200): Promise<ProviderResult> =>
-  Promise.resolve({ data, status });
-
-const TABLE = /\bfrom ("user"|[a-z_]+)/u;
-const ORG = /organization_id = '([^']+)'/u;
 const FROM_ORGANIZATION = /from organization/u;
 const FROM_MAIL_DOMAIN = /from mail_domain /u;
 const HTTP_422 = /422/u;
 const MISSING_SCOPE = /missing_scope/u;
 const TOKEN = /token/iu;
 const LIMITED = /limit \d+$/u;
+const DOMAINS_ERROR = /domains/u;
 const ESCAPED_ORG = /organization_id = 'o''x'/u;
-
-/** A fake of every provider; `calls` records each read in order. */
-const fake = (world: World = {}) => {
-  const calls: string[] = [];
-  const queries: string[] = [];
-  const tables: Record<string, Obj[]> = {
-    domain_purchase_order: [
-      {
-        created_at: "2026-09-01 00:00:00+00",
-        id: "order-1",
-        organization_id: ORG_A,
-        paid_at: "2026-09-01 00:00:00+00",
-      },
-    ],
-    organization: [{ billing_account_id: BA, id: ORG_A, name: "Acme" }],
-    ...world.tables,
-  };
-  const deps: EvidenceDeps = {
-    linear: (request) => {
-      calls.push(request.operation);
-      if (request.operation === "linear.RelatedIssues") {
-        return json({
-          data: {
-            issues: {
-              nodes: [
-                {
-                  assignee: null,
-                  createdAt: "2026-10-12T00:00:00Z",
-                  id: "i1",
-                  identifier: "CSP-12",
-                  labels: { nodes: [] },
-                  parent: null,
-                  state: { name: "Done", type: "completed" },
-                  title: "Refund request",
-                  url: "https://linear.app/x/CSP-12",
-                },
-              ],
-              pageInfo: { hasNextPage: false },
-            },
-          },
-        });
-      }
-      return json({
-        data: {
-          issues: {
-            nodes: [
-              {
-                comments: {
-                  nodes: [
-                    {
-                      body: "We will not refund.",
-                      createdAt: "2026-10-13T00:00:00Z",
-                      user: { name: "Support" },
-                    },
-                  ],
-                },
-                createdAt: "2026-10-12T00:00:00Z",
-                description: "Customer asks for a refund.",
-                identifier: "CSP-12",
-                state: { name: "Done" },
-                title: "Refund request",
-                url: "https://linear.app/x/CSP-12",
-              },
-            ],
-          },
-        },
-      });
-    },
-    now: () => NOW,
-    read: (request) => {
-      calls.push(request.operation);
-      switch (request.operation) {
-        case "stripe.disputes.get":
-          return json({
-            amount: 25_200,
-            charge: "ch_1",
-            evidence_details: { due_by: NOW / 1000 + 86_400 },
-            id: "du_1",
-            reason: "fraudulent",
-            status: "needs_response",
-          });
-        case "stripe.charges.get":
-          return json({
-            amount: 25_200,
-            amount_refunded: 0,
-            billing_details: { email: "card@example.com", name: "Abdul" },
-            created: CHARGE,
-            customer: "cus_1",
-            id: "ch_1",
-            invoice: "in_1",
-            refunds: { data: [] },
-            ...world.charge,
-          });
-        case "stripe.customers.get":
-          return json({
-            email: world.email ?? "owner@acme.io",
-            metadata: { autumn_id: world.autumnId ?? BA },
-            name: "Owner",
-          });
-        case "stripe.invoices.list":
-          return json({ data: world.invoices ?? [], has_more: false });
-        case "stripe.subscriptions.list":
-          return json({ data: world.subscriptions ?? [], has_more: false });
-        case "stripe.charges.list":
-          return json({ data: world.charges ?? [], has_more: false });
-        case "stripe.credit_notes.list":
-          return json({ data: [], has_more: false });
-        case "autumn.customer":
-          return json({ id: BA, purchases: [], subscriptions: [] });
-        default:
-          return Promise.reject(new Error(`unexpected ${request.operation}`));
-      }
-    },
-    slack: (request) => {
-      calls.push(request.operation);
-      if (world.slackError) {
-        return json({ error: world.slackError, ok: false });
-      }
-      switch (request.operation) {
-        case "slack.aia.channels":
-          return json({
-            channels: world.slackChannels ?? [
-              { id: "G0ACME", name: "acme-client" },
-              { id: "G0BETA", name: "beta-co" },
-            ],
-            ok: true,
-            response_metadata: { next_cursor: "" },
-          });
-        case "slack.aia.history":
-          return json({
-            messages: world.slackMessages ?? [
-              {
-                reply_count: 1,
-                text: "Domains are live",
-                ts: "1759800000.000100",
-                user: "U0STAFF",
-              },
-            ],
-            ok: true,
-          });
-        case "slack.aia.replies":
-          return json({
-            messages: [
-              { text: "Domains are live", ts: "1759800000.000100" },
-              { text: "Thanks!", ts: "1759800100.000100", user: "U0CLIENT" },
-            ],
-            ok: true,
-          });
-        default:
-          return json({ ok: true, user: { real_name: "Staff" } });
-      }
-    },
-    sql: (query) => {
-      calls.push("sql");
-      queries.push(query);
-      if (world.failSql?.test(query)) {
-        return Promise.reject(new Error("PlanetScale answered HTTP 422."));
-      }
-      const table = TABLE.exec(query)?.[1] ?? "";
-      const org = ORG.exec(query)?.[1];
-      const rows = (org && tables[`${table}@${org}`]) || tables[table] || [];
-      return Promise.resolve(JSON.stringify(rows));
-    },
-  };
-  return { calls, deps, queries };
-};
-
-const gather = (world?: World) => {
-  const stub = fake(world);
-  return gatherDisputeEvidence("du_1", stub.deps).then((result) => ({
-    ...stub,
-    result,
-  }));
-};
-
-const facts = <K extends keyof DisputeEvidence["sources"]>(
-  result: DisputeEvidence,
-  source: K
-) => {
-  const read = result.sources[source];
-  assert.ok(read.checked, `${source} failed: ${!read.checked && read.error}`);
-  return read.facts as Extract<
-    DisputeEvidence["sources"][K],
-    { checked: true }
-  >["facts"];
-};
 
 /** The first call of each source, in the order they ran. */
 const sourceOrder = (calls: string[]) => [
@@ -270,14 +67,14 @@ describe("gatherDisputeEvidence sources", () => {
     const linear = facts(result, "linear");
     assert.equal(
       linear.tickets.rows[0]?.description,
-      "Customer asks for a refund."
+      "Customer asks for a refund. owner@acme.io"
     );
     assert.equal(
       linear.tickets.rows[0]?.comments[0]?.body,
       "We will not refund."
     );
     const slack = facts(result, "slack");
-    assert.deepEqual(slack.channel, { id: "G0ACME", name: "acme-client" });
+    assert.deepEqual(slack.channel, { id: "G0ACME", name: "acme-io-client" });
     assert.deepEqual(
       slack.messages.rows.map((message) => [message.text, message.author]),
       [
@@ -311,7 +108,7 @@ describe("gatherDisputeEvidence sources", () => {
   it("names a failed table instead of treating it as empty", async () => {
     const { result } = await gather({ failSql: FROM_MAIL_DOMAIN });
     assert.ok(
-      facts(result, "database").unavailable.some((entry) =>
+      result.sources.database.facts?.unavailable.some((entry) =>
         entry.startsWith("domains:")
       )
     );
@@ -387,6 +184,7 @@ describe("verdictFacts", () => {
   it("a duplicate bills the same item for the same period, not the same amount", async () => {
     const line = (price: string) => ({
       lines: { data: [{ period: { end: 2, start: 1 }, price: { id: price } }] },
+      subscription: price === "price_domains" ? "sub_domains" : "sub_inboxes",
     });
     const other = {
       amount: 25_200,
@@ -417,8 +215,8 @@ describe("verdictFacts", () => {
   it("use after the charge counts only in the workspace the charge provisioned", async () => {
     const used = await gather({
       tables: {
-        user_activity: [
-          { activity_date: AFTER, activity_type: "login", user_id: "u1" },
+        session: [
+          { active_organization_id: ORG_A, created_at: AFTER, user_id: "u1" },
         ],
       },
     });
@@ -426,8 +224,9 @@ describe("verdictFacts", () => {
     assert.equal(used.result.verdict.usedAfterCharge.value, true);
 
     const other = await gather({
+      charge: { metadata: { order_id: "order-1" } },
       tables: {
-        [`user_activity@${ORG_B}`]: [
+        [`session@${ORG_B}`]: [
           { activity_date: AFTER, activity_type: "login", user_id: "u2" },
         ],
         organization: [
@@ -466,7 +265,7 @@ describe("database queries", () => {
     const { calls, result } = await gather({ autumnId: "x' or '1'='1" });
     assert.equal(calls.includes("sql"), false);
     assert.equal(result.sources.database.checked, false);
-    assert.equal(result.verdict.tiedToWorkspace.value, false);
+    assert.equal(result.verdict.tiedToWorkspace.value, null);
   });
 
   it("escapes literals, never selects the session token, and limits every query", async () => {
@@ -571,18 +370,16 @@ describe("bounds", () => {
     );
   });
 
-  it("fitResponse halves the largest list until it fits", () => {
-    const big: { a: RowList; b: RowList } = {
-      a: {
-        rows: Array.from({ length: 100 }, () => ({ v: "y".repeat(100) })),
-        truncated: false,
-      },
-      b: { rows: [{ v: 1 }], truncated: false },
-    };
-    const fitted = fitResponse(big, 2000);
-    assert.ok(Buffer.byteLength(JSON.stringify(fitted)) <= 2000);
-    assert.equal(fitted.a.truncated, true);
-    assert.equal(fitted.b.truncated, false);
+  it("fitResponse returns an explicit bounded failure when the envelope cannot fit", async () => {
+    const { result } = await gather();
+    const fitted = fitResponse(result, 2000);
+    assert.ok(fitted.error);
+    assert.ok(
+      Buffer.byteLength(
+        JSON.stringify({ ok: false, reason: fitted.error, result: fitted })
+      ) < READ_BYTES
+    );
+    assert.equal(fitted.verdict.usedAfterCharge.value, null);
   });
 });
 
@@ -611,5 +408,405 @@ describe("gather_dispute_evidence access", () => {
       (approval(stampIntakeOnly(automatic)) as { type: string }).type,
       "denied"
     );
+  });
+});
+
+// Review regressions: these cases exercise the provider boundaries, not just
+// separately scoped fake table names.
+describe("dispute review regressions", () => {
+  it("finding 1: never chooses another workspace by order date", async () => {
+    const { result } = await gather({
+      tables: {
+        domain_purchase_order: [
+          {
+            id: "unrelated",
+            organization_id: ORG_B,
+            paid_at: "2026-10-04 12:00:00+00",
+          },
+        ],
+        organization: [
+          { billing_account_id: BA, id: ORG_A, name: "Acme" },
+          { billing_account_id: BA, id: ORG_B, name: "Other" },
+        ],
+      },
+    });
+    assert.equal(facts(result, "database").provisioned, null);
+    assert.equal(result.verdict.tiedToWorkspace.value, null);
+  });
+
+  it("finding 2: global user activity cannot prove workspace use", async () => {
+    const { result, queries } = await gather({
+      tables: {
+        member: [{ last_login: AFTER, user_id: "shared" }],
+        user_activity: [{ activity_date: AFTER, user_id: "shared" }],
+      },
+    });
+    assert.equal(result.verdict.usedAfterCharge.value, false);
+    assert.ok(
+      queries.some((query) =>
+        query.includes(`active_organization_id = '${ORG_A}'`)
+      )
+    );
+    assert.ok(queries.every((query) => !query.includes("from user_activity")));
+  });
+
+  it("finding 3: uses the whole email domain and whole workspace tokens", async () => {
+    const { result, calls } = await gather({
+      email: "owner@acme.io",
+      slackChannels: [{ id: "G0OTHER", name: "client-acme-other" }],
+      tables: {
+        organization: [{ billing_account_id: BA, id: ORG_A, name: "Zeta" }],
+      },
+    });
+    assert.equal(result.sources.slack.checked, false);
+    assert.equal(calls.includes("slack.aia.history"), false);
+  });
+
+  it("finding 4: drops ticket bodies without exact customer ownership", async () => {
+    const { result } = await gather({
+      linearDescription:
+        "A different customer's refund request. other@elsewhere.io",
+    });
+    assert.equal(facts(result, "linear").tickets.rows.length, 0);
+    assert.equal(
+      (facts(result, "linear") as { droppedCandidates?: number })
+        .droppedCandidates,
+      1
+    );
+  });
+
+  it("finding 5: another subscription at the same price is not a duplicate", async () => {
+    const line = (subscription: string, period = true) => ({
+      lines: {
+        data: [
+          {
+            price: { id: "price_shared" },
+            ...(period ? { period: { end: 2, start: 1 } } : {}),
+          },
+        ],
+      },
+      subscription,
+    });
+    const charges = [
+      {
+        amount: 25_200,
+        amount_refunded: 0,
+        id: "ch_2",
+        invoice: "in_2",
+        status: "succeeded",
+      },
+    ];
+    const different = await gather({
+      charges,
+      invoices: [
+        { id: "in_1", ...line("sub_A") },
+        { id: "in_2", ...line("sub_B") },
+      ],
+    });
+    assert.equal(different.result.verdict.duplicate.value, false);
+    const missing = await gather({
+      charges,
+      invoices: [
+        { id: "in_1", ...line("sub_A", false) },
+        { id: "in_2", ...line("sub_A", false) },
+      ],
+    });
+    assert.equal(missing.result.verdict.duplicate.value, null);
+  });
+
+  it("finding 6: a truncated list cannot prove a negative verdict", async () => {
+    const stub = fake({
+      invoices: [
+        {
+          id: "in_1",
+          lines: { data: [{ period: { end: 2, start: 1 } }] },
+          subscription: "sub_A",
+        },
+      ],
+    });
+    const { read } = stub.deps;
+    const result = await gatherDisputeEvidence("du_1", {
+      ...stub.deps,
+      read: (request, options) =>
+        request.operation === "stripe.charges.list"
+          ? json({ data: [], has_more: true })
+          : read(request, options),
+    });
+    assert.equal(result.verdict.duplicate.value, null);
+  });
+
+  it("finding 7: a failed constituent marks the source failed with partial facts", async () => {
+    const { result } = await gather({ failSql: FROM_MAIL_DOMAIN });
+    assert.equal(result.sources.database.checked, false);
+    assert.ok("facts" in result.sources.database);
+    if (!result.sources.database.checked) {
+      assert.match(result.sources.database.error, DOMAINS_ERROR);
+    }
+  });
+
+  it("finding 8: oversized proof and scalar text never escape the output cap", async () => {
+    const { result } = await gather({
+      tables: {
+        member: Array.from({ length: 50 }, () => ({
+          email: "x".repeat(6000),
+          last_login: AFTER,
+        })),
+      },
+    });
+    assert.ok(
+      Buffer.byteLength(JSON.stringify({ ok: true, result })) < READ_BYTES
+    );
+  });
+
+  it("finding 9: verdict logic is usable independently of provider adapters", async () => {
+    const verdict = await import("./dispute-verdict.js");
+    const { result } = await gather();
+    assert.deepEqual(verdict.verdictFacts(result.sources), result.verdict);
+  });
+
+  it("finding 10: an unread replies page marks the conversation incomplete", async () => {
+    const stub = fake();
+    const { slack } = stub.deps;
+    const result = await gatherDisputeEvidence("du_1", {
+      ...stub.deps,
+      slack: async (request, options) => {
+        const response = await slack(request, options);
+        return request.operation === "slack.aia.replies"
+          ? {
+              ...response,
+              data: {
+                ...(response.data as Obj),
+                has_more: true,
+                response_metadata: { next_cursor: "next" },
+              },
+            }
+          : response;
+      },
+    });
+    assert.equal(facts(result, "slack").messages.truncated, true);
+  });
+});
+
+// Explicit-link and completeness edges supplement the ten review regressions.
+describe("dispute attribution boundaries", () => {
+  const organizations = [
+    { billing_account_id: BA, id: ORG_A, name: "Acme" },
+    { billing_account_id: BA, id: ORG_B, name: "Other" },
+  ];
+
+  it("uses charge, invoice, or invoice-line metadata and scopes known orders", async () => {
+    for (const link of ["charge", "invoice", "line"] as const) {
+      const stub = fake({
+        charge: link === "charge" ? { metadata: { order_id: "order-1" } } : {},
+        invoices: [
+          {
+            id: "in_1",
+            lines: {
+              data:
+                link === "line" ? [{ metadata: { order_id: "order-1" } }] : [],
+            },
+            metadata:
+              link === "invoice" ? { domain_purchase_order_id: "order-1" } : {},
+          },
+        ],
+        tables: { organization: organizations },
+      });
+      // biome-ignore lint/performance/noAwaitInLoops: isolate the three metadata origins.
+      const result = await gatherDisputeEvidence("du_1", stub.deps);
+      assert.equal(facts(result, "database").provisioned?.orderId, "order-1");
+      for (const table of [
+        "mail_domain",
+        "mail_inbox",
+        "mail_domain_cancellation",
+        "cmr_subscription_cancellation",
+      ]) {
+        const query = stub.queries.find((value) =>
+          value.includes(`from ${table} `)
+        );
+        assert.ok(query?.includes("'order-1'"), `${link}: ${table}`);
+      }
+    }
+  });
+
+  it("rejects conflicting explicit links and ignores deleted fallback organizations", async () => {
+    const conflicting = await gather({
+      charge: { metadata: { order_id: "order-1", organization_id: ORG_B } },
+      tables: { organization: organizations },
+    });
+    assert.equal(facts(conflicting.result, "database").provisioned, null);
+    const live = await gather({
+      tables: {
+        organization: [
+          organizations[0],
+          { ...organizations[1], deleted_at: BEFORE },
+        ],
+      },
+    });
+    assert.equal(
+      facts(live.result, "database").provisioned?.organizationId,
+      ORG_A
+    );
+    const explicit = await gather({
+      charge: { metadata: { organizationId: ORG_B } },
+      tables: { organization: organizations },
+    });
+    assert.equal(
+      facts(explicit.result, "database").provisioned?.organizationId,
+      ORG_B
+    );
+  });
+
+  it("does not resolve workspaces from truncated organization or order inventories", async () => {
+    for (const table of ["organization", "domain_purchase_order"]) {
+      const stub = fake({ charge: { metadata: { order_id: "order-1" } } });
+      const { sql } = stub.deps;
+      // biome-ignore lint/performance/noAwaitInLoops: each inventory fails independently.
+      const result = await gatherDisputeEvidence("du_1", {
+        ...stub.deps,
+        sql: async (query) => {
+          const raw = await sql(query);
+          return query.includes(`from ${table} `)
+            ? JSON.stringify({ rows: JSON.parse(raw), truncated: true })
+            : raw;
+        },
+      });
+      assert.equal(facts(result, "database").provisioned, null);
+      assert.equal(result.verdict.tiedToWorkspace.value, null);
+    }
+  });
+
+  it("preserves positive use despite truncation and treats negative use as unknown", async () => {
+    const domains = Array.from({ length: 201 }, () => ({
+      domain: "acme.io",
+      provisioned_at: BEFORE,
+    }));
+    const noProof = await gather({ tables: { mail_domain: domains } });
+    assert.equal(noProof.result.verdict.usedAfterCharge.value, null);
+    const proof = await gather({
+      tables: {
+        mail_domain: [
+          { domain: "new.acme.io", provisioned_at: AFTER },
+          ...domains,
+        ],
+      },
+    });
+    assert.equal(proof.result.verdict.usedAfterCharge.value, true);
+  });
+
+  it("retains verified refund facts when another Stripe read fails", async () => {
+    const stub = fake({ charge: { amount_refunded: 25_200 } });
+    const { read } = stub.deps;
+    const result = await gatherDisputeEvidence("du_1", {
+      ...stub.deps,
+      read: (request, options) =>
+        request.operation === "stripe.credit_notes.list"
+          ? json(null, 500)
+          : read(request, options),
+    });
+    assert.equal(result.sources.stripe.checked, false);
+    assert.ok(result.sources.stripe.facts?.charge);
+    assert.equal(result.verdict.refundedInFull.value, true);
+    assert.equal(result.sources.database.checked, true);
+  });
+
+  it("fails closed on incomplete or conflicting Slack identities and free mail", async () => {
+    const cases: World[] = [
+      {
+        slackChannels: [
+          { id: "G0NAME", name: "acme-client" },
+          { id: "G0DOMAIN", name: "acme-io-client" },
+        ],
+      },
+      {
+        email: "owner@gmail.com",
+        slackChannels: [{ id: "G0MAIL", name: "gmail-com-client" }],
+        tables: {
+          organization: [{ billing_account_id: BA, id: ORG_A, name: "Zeta" }],
+        },
+      },
+      {
+        email: "owner@gmail.com",
+        slackChannels: [{ id: "G0PART", name: "acmeology-client" }],
+      },
+    ];
+    for (const world of cases) {
+      // biome-ignore lint/performance/noAwaitInLoops: isolate unsafe identity combinations.
+      const { result, calls } = await gather(world);
+      assert.equal(result.sources.slack.checked, false);
+      assert.equal(calls.includes("slack.aia.history"), false);
+    }
+    const stub = fake();
+    const { slack } = stub.deps;
+    const result = await gatherDisputeEvidence("du_1", {
+      ...stub.deps,
+      slack: async (request, options) => {
+        const response = await slack(request, options);
+        return request.operation === "slack.aia.channels"
+          ? {
+              ...response,
+              data: {
+                ...(response.data as Obj),
+                response_metadata: { next_cursor: "more" },
+              },
+            }
+          : response;
+      },
+    });
+    assert.equal(result.sources.slack.checked, false);
+    assert.equal(stub.calls.includes("slack.aia.history"), false);
+  });
+
+  it("exact Linear ownership rejects email substrings and marks limited text", async () => {
+    const wrong = await gather({
+      linearDescription: "Another customer: owner@acme.io.evil",
+    });
+    assert.equal(facts(wrong.result, "linear").tickets.rows.length, 0);
+    const exact = await gather({
+      linearDescription: `Workspace ${ORG_A}. ${"text ".repeat(1000)}`,
+    });
+    assert.equal(facts(exact.result, "linear").tickets.rows.length, 1);
+    assert.equal(facts(exact.result, "linear").tickets.truncated, true);
+  });
+});
+
+describe("dispute source completion", () => {
+  it("runs positive Instantly reads between Autumn and Linear and retains partial failures", async () => {
+    for (const fail of [false, true]) {
+      const stub = fake({
+        tables: {
+          outreach_provider: [
+            { provider: "instantly", workspace_id: WORKSPACE_ID },
+          ],
+        },
+      });
+      const { read } = stub.deps;
+      // biome-ignore lint/performance/noAwaitInLoops: isolate success and constituent failure.
+      const result = await gatherDisputeEvidence("du_1", {
+        ...stub.deps,
+        read: (request, options) => {
+          if (!request.operation.startsWith("instantly.")) {
+            return read(request, options);
+          }
+          stub.calls.push(request.operation);
+          if (request.operation === "instantly.workspace-group-members") {
+            return json({ items: [member()] });
+          }
+          if (request.operation === "instantly.accounts" && fail) {
+            return json(null, 403);
+          }
+          return json({ items: [] });
+        },
+      });
+      assert.deepEqual(sourceOrder(stub.calls), [
+        "stripe",
+        "database",
+        "autumn",
+        "instantly",
+        "linear",
+        "slack",
+      ]);
+      assert.equal(result.sources.instantly.checked, !fail);
+      assert.ok(result.sources.instantly.facts?.campaigns);
+    }
   });
 });

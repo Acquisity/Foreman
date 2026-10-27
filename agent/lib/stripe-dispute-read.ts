@@ -79,8 +79,23 @@ export const errorReason = (error: unknown): string => {
   return error instanceof Error ? error.message : "The call could not run.";
 };
 
-const iso = (seconds: number | null | undefined): string | null =>
-  typeof seconds === "number" ? new Date(seconds * 1000).toISOString() : null;
+export const stripeDate = (seconds: unknown): string | null =>
+  typeof seconds === "number" &&
+  Number.isFinite(seconds) &&
+  Math.abs(seconds * 1000) <= 8.64e15
+    ? new Date(seconds * 1000).toISOString()
+    : null;
+export const stripeId = (value: unknown): string | null => {
+  if (typeof value === "string") {
+    return value;
+  }
+  return value &&
+    typeof value === "object" &&
+    "id" in value &&
+    typeof value.id === "string"
+    ? value.id
+    : null;
+};
 
 interface StripeRefund {
   amount?: number;
@@ -95,7 +110,8 @@ interface StripeRefund {
  */
 export const lookupIdentity = async (
   deps: StripeReadDeps,
-  chargeId: string | null
+  chargeId: string | null,
+  options: { includeMetadata?: boolean } = {}
 ) => {
   if (!chargeId) {
     return { error: "The dispute names no charge." };
@@ -106,6 +122,7 @@ export const lookupIdentity = async (
       operation: "stripe.charges.get",
     });
     const data = (charge.data ?? {}) as {
+      metadata?: Record<string, string>;
       amount?: number;
       amount_refunded?: number;
       billing_details?: { email?: string | null; name?: string | null };
@@ -118,22 +135,21 @@ export const lookupIdentity = async (
     if (charge.status !== 200) {
       return { error: `Stripe charge read failed with HTTP ${charge.status}.` };
     }
-    const idOf = (value: string | { id: string } | null | undefined) =>
-      typeof value === "string" ? value : (value?.id ?? null);
     const cardholder = {
       email: data.billing_details?.email ?? null,
       name: data.billing_details?.name ?? null,
     };
     const chargeFacts = {
+      ...(options.includeMetadata ? { metadata: data.metadata ?? {} } : {}),
       amount: data.amount ?? null,
       amountRefunded: data.amount_refunded ?? 0,
-      created: iso(data.created),
+      created: stripeDate(data.created),
       id: chargeId,
-      invoice: idOf(data.invoice),
-      paymentIntent: idOf(data.payment_intent),
+      invoice: stripeId(data.invoice),
+      paymentIntent: stripeId(data.payment_intent),
       refunds: (data.refunds?.data ?? []).map((refund) => ({
         amount: refund.amount ?? null,
-        created: iso(refund.created),
+        created: stripeDate(refund.created),
         id: refund.id ?? null,
         status: refund.status ?? null,
       })),
