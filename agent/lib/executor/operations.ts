@@ -141,6 +141,44 @@ export const disputeOperationInputs = {
   }),
 };
 
+/**
+ * The arguments Executor's dispute-write operations take, from validated
+ * input: path and header parameters at the top, the request fields under
+ * `body`, and the PDF as a `ToolFile` Executor sends as multipart.
+ */
+export const disputeWireArgs = (
+  operation: keyof typeof disputeOperationInputs,
+  input: unknown
+): Record<string, unknown> => {
+  if (operation === "stripe.files.create") {
+    const { file, purpose } =
+      disputeOperationInputs["stripe.files.create"].parse(input);
+    return {
+      body: {
+        file: {
+          _tag: "ToolFile",
+          byteLength: Buffer.from(file, "base64").length,
+          data: file,
+          encoding: "base64",
+          mimeType: "application/pdf",
+          name: "evidence.pdf",
+        },
+        purpose,
+      },
+    };
+  }
+  const {
+    dispute_id,
+    "Idempotency-Key": idempotencyKey,
+    ...body
+  } = disputeOperationInputs["stripe.disputes.update"].parse(input);
+  return {
+    body,
+    dispute_id,
+    ...(idempotencyKey ? { "Idempotency-Key": idempotencyKey } : {}),
+  };
+};
+
 type ApiRequest = {
   [K in keyof typeof operationInputs]: {
     operation: K;

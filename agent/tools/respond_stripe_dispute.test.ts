@@ -8,7 +8,10 @@ import {
   DISPUTE_WRITE_CONNECTION,
   invokeProvider,
 } from "#lib/executor/dispatch.js";
-import type { OperationRequest } from "#lib/executor/operations.js";
+import {
+  disputeWireArgs,
+  type OperationRequest,
+} from "#lib/executor/operations.js";
 import {
   STRIPE_DISPUTES_CHANNEL,
   stripeDisputeSessionAuth,
@@ -700,6 +703,50 @@ describe("respond_stripe_dispute write surface", () => {
 });
 
 describe("dispute write dispatch", () => {
+  // The shapes Executor accepted for both operations against the Stripe sandbox
+  // (ENG-16255): request fields under body, the PDF as a ToolFile.
+  it("sends Executor its body and ToolFile argument shapes", () => {
+    assert.deepEqual(
+      disputeWireArgs("stripe.disputes.update", {
+        dispute_id: ID,
+        evidence: { uncategorized_text: "Signed in daily." },
+        "Idempotency-Key": "foreman-dispute-stage-abc",
+        submit: false,
+      }),
+      {
+        body: {
+          evidence: { uncategorized_text: "Signed in daily." },
+          submit: false,
+        },
+        dispute_id: ID,
+        "Idempotency-Key": "foreman-dispute-stage-abc",
+      }
+    );
+    const pdf = Buffer.from("%PDF-1.7 proof").toString("base64");
+    assert.deepEqual(
+      disputeWireArgs("stripe.files.create", {
+        file: pdf,
+        purpose: "dispute_evidence",
+      }),
+      {
+        body: {
+          file: {
+            _tag: "ToolFile",
+            byteLength: 14,
+            data: pdf,
+            encoding: "base64",
+            mimeType: "application/pdf",
+            name: "evidence.pdf",
+          },
+          purpose: "dispute_evidence",
+        },
+      }
+    );
+    assert.throws(() =>
+      disputeWireArgs("stripe.disputes.update", { close: true, dispute_id: ID })
+    );
+  });
+
   it("runs in the foreman-disputes toolkit and carries the idempotency key", async (t: TestContext) => {
     const bodies: { url: string; request: Record<string, unknown> }[] = [];
     t.mock.method(globalThis, "fetch", (url: string, init?: RequestInit) => {

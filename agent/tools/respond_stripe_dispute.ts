@@ -14,7 +14,8 @@ import {
 import {
   DISPUTE_FILE_SLOTS,
   DISPUTE_TEXT_FIELDS,
-  disputeOperationInputs,
+  type disputeOperationInputs,
+  disputeWireArgs,
   type OperationRequest,
 } from "#lib/executor/operations.js";
 import { ExecutorError } from "#lib/executor/transport.js";
@@ -817,7 +818,7 @@ const liveDeps = (
       invokeProvider(
         ctx,
         operationPath(operation),
-        disputeOperationInputs[operation].parse(input)
+        disputeWireArgs(operation, input)
       ),
   };
 };
