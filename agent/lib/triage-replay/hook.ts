@@ -65,9 +65,15 @@ export const triageReplayHook = defineHook({
         return;
       }
       await withReplayState(session.runId, session.caseKey, (state) => {
+        const generation = state.decisions.length;
         state.criticPackets = {
           ...state.criticPackets,
-          ...Object.fromEntries(packets),
+          ...Object.fromEntries(
+            packets.map(([callId, packet]) => [
+              callId,
+              { ...packet, generation },
+            ])
+          ),
         };
       });
     },
@@ -82,10 +88,14 @@ export const triageReplayHook = defineHook({
           return;
         }
         state.criticCalls = [...(state.criticCalls ?? []), data.callId];
+        const packet = state.criticPackets?.[data.callId] ?? null;
+        if (packet && packet.generation !== state.decisions.length) {
+          return;
+        }
         const critic = criticVerdictFields(
           data.status,
           data.status === "completed" ? data.output : undefined,
-          state.criticPackets?.[data.callId] ?? null
+          packet
         );
         state.critic = critic;
         state.criticObjections = nextObjections(

@@ -24,7 +24,8 @@ import {
   criticTaskPackets,
   criticVerdictFields,
   criticVerdictIssue,
-  settleCriticRound,
+  settleCriticPacket,
+  stampCriticPacket,
   triageDecisions,
 } from "../lib/triage-log.js";
 
@@ -75,7 +76,10 @@ export default defineHook({
         }
         const packet = criticTaskPacket(action.input);
         if (packet) {
-          bindings[action.callId] = packet;
+          bindings[action.callId] = stampCriticPacket(
+            criticRounds.get(),
+            packet
+          );
         }
       }
       if (Object.keys(bindings).length > 0) {
@@ -139,17 +143,20 @@ export default defineHook({
         data.status === "completed" ? data.output : undefined,
         packet
       );
-      const rounds = settleCriticRound(
+      const { rounds, stale } = settleCriticPacket(
         criticRounds.get(),
-        issue,
+        packet,
         verdict.counted
       );
-      criticRounds.update(() => rounds);
-      triageDecisions.update((decisions) =>
-        blockedDecision(decisions, rounds, issue)
-      );
+      if (!stale) {
+        criticRounds.update(() => rounds);
+        triageDecisions.update((decisions) =>
+          blockedDecision(decisions, rounds, issue)
+        );
+      }
       logOpsEvent("critic.verdict", {
         ...verdict,
+        code: stale ? "stale" : null,
         issue,
         sessionId: ctx.session.id,
         turnId: data.turnId,

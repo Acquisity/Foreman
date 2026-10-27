@@ -336,6 +336,24 @@ describe("replay result", () => {
     assert.equal(settled.critic?.counted, "failed");
   });
 
+  it("ignores a critic result dispatched for an earlier decision", async (t) => {
+    await replayProcess(t);
+    noTransport(t);
+    const closure = routeDecision({
+      needsCriticReview: true,
+      review: { kind: "duplicate", reason: "r", required: true },
+    });
+    await toolResult("decide_triage", closure);
+    await criticDispatched("critic-a");
+    await toolResult("decide_triage", closure);
+    await criticSettled("critic-a", objection);
+    const stale = await state();
+    assert.equal(stale.critic, null);
+    assert.equal(stale.criticObjections ?? 0, 0);
+    await criticSettles("critic-b", objection);
+    assert.equal((await state()).criticObjections, 1);
+  });
+
   it("waits for the critic when the decision needs review", async (t) => {
     await replayProcess(t);
     noTransport(t);

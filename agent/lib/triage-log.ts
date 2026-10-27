@@ -28,6 +28,8 @@ export interface BillingRoute {
 export interface CriticPacket {
   commit: string | null;
   documentId: string | null;
+  /** The issue's decision generation when the critic was dispatched. */
+  generation?: number;
   issue: string;
   updatedAt: string | null;
 }
@@ -39,10 +41,12 @@ export const criticTaskPackets = defineState<Record<string, CriticPacket>>(
 
 /**
  * One review cycle per decision: `ran` says the critic settled after the
- * latest decision, `reviews` counts this cycle's reviews, and `last` is how
- * the latest one counted.
+ * latest decision, `reviews` counts this cycle's reviews, `last` is how the
+ * latest one counted, and `generation` counts the issue's decisions, so a
+ * critic dispatched for an earlier one is recognised when it settles.
  */
 export interface CriticRounds {
+  generation?: number;
   last: CriticCount | null;
   objections: number;
   ran: boolean;
@@ -72,11 +76,44 @@ export function settleCriticRound(
   return {
     ...rounds,
     [issue]: {
+      generation: rounds[issue]?.generation ?? 0,
       last: counted,
       objections: nextObjections(rounds[issue]?.objections ?? 0, counted),
       ran: true,
       reviews: (rounds[issue]?.reviews ?? 0) + 1,
     },
+  };
+}
+
+const generationOf = (
+  rounds: Readonly<Record<string, CriticRounds>>,
+  issue: string
+): number => rounds[issue]?.generation ?? 0;
+
+export const stampCriticPacket = (
+  rounds: Readonly<Record<string, CriticRounds>>,
+  packet: CriticPacket
+): CriticPacket => ({
+  ...packet,
+  generation: generationOf(rounds, packet.issue),
+});
+
+/**
+ * Settles a critic result into its issue's rounds, unless it was dispatched
+ * for an earlier decision: that result is stale and changes nothing, so the
+ * newer decision still needs its own review.
+ */
+export function settleCriticPacket(
+  rounds: Readonly<Record<string, CriticRounds>>,
+  packet: CriticPacket,
+  counted: CriticCount
+): { rounds: Record<string, CriticRounds>; stale: boolean } {
+  if ((packet.generation ?? 0) !== generationOf(rounds, packet.issue)) {
+    return { rounds: { ...rounds }, stale: true };
+  }
+  return {
+    rounds: settleCriticRound(rounds, packet.issue, counted),
+    stale: false,
   };
 }
 
@@ -104,12 +141,13 @@ export function reviewCycleAfterDecision(
   issue: string
 ): Record<string, CriticRounds> {
   const prior = rounds[issue];
+  const generation = generationOf(rounds, issue) + 1;
   return {
     ...rounds,
     [issue]:
       prior && adjudicates(rounds, issue)
-        ? { ...prior, ran: false }
-        : { last: null, objections: 0, ran: false, reviews: 0 },
+        ? { ...prior, generation, ran: false }
+        : { generation, last: null, objections: 0, ran: false, reviews: 0 },
   };
 }
 

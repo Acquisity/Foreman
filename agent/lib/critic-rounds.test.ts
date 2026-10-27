@@ -8,7 +8,9 @@ import {
   criticBlocked,
   reviewCycleAfterDecision,
   routeRefusal,
+  settleCriticPacket,
   settleCriticRound,
+  stampCriticPacket,
 } from "./triage-log.js";
 import { isStatusFollowUp } from "./trust.js";
 
@@ -85,6 +87,71 @@ describe("the review cycle", () => {
         steps.join(" ")
       );
     }
+  });
+
+  it("ignores a critic result that was dispatched for an earlier decision", () => {
+    const sent = {
+      commit: "c".repeat(40),
+      documentId: "doc-1",
+      issue: "ENG-1",
+      updatedAt: "2026-10-27T10:00:00.000Z",
+    };
+    const decidedA = run(["decide"]);
+    const packetA = stampCriticPacket(decidedA, sent);
+    const decidedB = reviewCycleAfterDecision(decidedA, "ENG-1");
+    for (const counted of ["approve", "objection", "failed"] as const) {
+      const settled = settleCriticPacket(decidedB, packetA, counted);
+      assert.equal(settled.stale, true, counted);
+      assert.deepEqual(settled.rounds, decidedB, counted);
+      assert.match(
+        routeRefusal(decisions, settled.rounds, routeInput) ?? "",
+        FIRST_LINE_RULE,
+        counted
+      );
+    }
+    const packetB = stampCriticPacket(decidedB, sent);
+    const reviewed = settleCriticPacket(decidedB, packetB, "approve");
+    assert.equal(reviewed.stale, false);
+    assert.equal(routeRefusal(decisions, reviewed.rounds, routeInput), null);
+  });
+
+  it("counts a result dispatched before its adjudication as that cycle's review", () => {
+    const decided = run(["decide"]);
+    const first = settleCriticPacket(
+      decided,
+      stampCriticPacket(decided, {
+        commit: null,
+        documentId: null,
+        issue: "ENG-1",
+        updatedAt: null,
+      }),
+      "objection"
+    );
+    const adjudicated = reviewCycleAfterDecision(first.rounds, "ENG-1");
+    const second = settleCriticPacket(
+      adjudicated,
+      stampCriticPacket(adjudicated, {
+        commit: null,
+        documentId: null,
+        issue: "ENG-1",
+        updatedAt: null,
+      }),
+      "objection"
+    );
+    assert.equal(first.stale || second.stale, false);
+    assert.equal(criticBlocked(second.rounds, "ENG-1"), true);
+    assert.equal(second.rounds["ENG-1"].generation, 2);
+    const late = stampCriticPacket(adjudicated, {
+      commit: null,
+      documentId: null,
+      issue: "ENG-1",
+      updatedAt: null,
+    });
+    const next = reviewCycleAfterDecision(
+      settleCriticPacket(adjudicated, late, "approve").rounds,
+      "ENG-1"
+    );
+    assert.equal(settleCriticPacket(next, late, "approve").stale, true);
   });
 
   it("starts a new cycle when a blocked ticket gets a new decision, still reviewed before it routes", () => {
