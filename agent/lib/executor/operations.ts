@@ -17,6 +17,9 @@ const resource = {
   status: z.number().int().optional(),
   "x-as-workspace": id,
 };
+/** The AI Acquisition client Slack reads, mirroring `.github/executor/specs/aia-slack.json`. */
+const slackChannel = z.string().regex(/^[CG][A-Z0-9]{2,30}$/u);
+const slackLimit = z.number().int().min(1).max(200);
 const runs = {
   cursor: z.string().optional(),
   from: z.string().optional(),
@@ -64,6 +67,31 @@ export const operationInputs = {
   "sentry.issueRead": z.object({
     arguments: z.record(z.string(), z.unknown()),
     name: z.enum(["get_issue_details", "search_issue_events"]),
+  }),
+  "slack.aia.channels": z.object({
+    cursor: z.string().optional(),
+    exclude_archived: z.boolean().optional(),
+    limit: slackLimit.optional(),
+    types: z.literal("private_channel"),
+  }),
+  "slack.aia.history": z.object({
+    channel: slackChannel,
+    cursor: z.string().optional(),
+    inclusive: z.boolean().optional(),
+    latest: z.string().optional(),
+    limit: slackLimit.optional(),
+    oldest: z.string().optional(),
+  }),
+  "slack.aia.replies": z.object({
+    channel: slackChannel,
+    cursor: z.string().optional(),
+    latest: z.string().optional(),
+    limit: slackLimit.optional(),
+    oldest: z.string().optional(),
+    ts: z.string().regex(/^\d{1,12}\.\d{1,8}$/u),
+  }),
+  "slack.aia.user": z.object({
+    user: z.string().regex(/^[UW][A-Z0-9]{2,30}$/u),
   }),
   "stripe.charges.get": z.object({
     charge_id: id,

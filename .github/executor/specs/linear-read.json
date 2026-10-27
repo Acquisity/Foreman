@@ -25,6 +25,7 @@
                   "query": {
                     "enum": [
                       "query Document($id: String!) {\n  document(id: $id) { id updatedAt url }\n}",
+                      "query IssueBodies($filter: IssueFilter!) {\n  issues(filter: $filter, first: 25, includeArchived: true) {\n    nodes {\n      identifier title description url createdAt\n      state { name }\n      comments(first: 10) { nodes { body createdAt user { name } } }\n    }\n  }\n}",
                       "query IssueDocuments($id: String!, $title: String!) {\n  issue(id: $id) {\n    id identifier\n    documents(filter: { title: { eq: $title } }, first: 50) { nodes { id title } }\n  }\n}",
                       "query Projects($name: String!, $teamId: ID!) {\n  projects(first: 5, filter: { name: { eqIgnoreCase: $name }, accessibleTeams: { some: { id: { eq: $teamId } } } }) {\n    nodes { id name }\n  }\n}",
                       "query RelatedIssues($filter: IssueFilter!, $first: Int!, $after: String, $includeArchived: Boolean!) {\n  issues(filter: $filter, first: $first, after: $after, includeArchived: $includeArchived, orderBy: createdAt) {\n    nodes {\n      id identifier title url createdAt\n      state { name type }\n      assignee { name }\n      parent { identifier }\n      labels { nodes { name } }\n    }\n    pageInfo { hasNextPage endCursor }\n  }\n}",
