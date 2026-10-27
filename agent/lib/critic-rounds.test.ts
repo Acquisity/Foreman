@@ -71,6 +71,22 @@ describe("the review cycle", () => {
     assert.equal(routeRefusal(decisions, settled, routeInput), null);
   });
 
+  it("reviews a new decision after two failed reviews, or after an adjudicated one was settled", () => {
+    for (const steps of [
+      ["decide", "failed", "failed", "decide"],
+      ["decide", "failed", "decide", "objection", "decide", "decide"],
+      ["decide", "objection", "decide", "decide"],
+    ] as Step[][]) {
+      const rounds = run(steps);
+      assert.equal(rounds["ENG-1"].reviews, 0, steps.join(" "));
+      assert.match(
+        routeRefusal(decisions, rounds, routeInput) ?? "",
+        FIRST_LINE_RULE,
+        steps.join(" ")
+      );
+    }
+  });
+
   it("starts a new cycle when a blocked ticket gets a new decision, still reviewed before it routes", () => {
     const fresh = run(["decide", "objection", "decide", "objection", "decide"]);
     assert.equal(criticBlocked(fresh, "ENG-1"), false);

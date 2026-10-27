@@ -72,18 +72,36 @@ export function settleCriticRound(
   };
 }
 
+/**
+ * Whether a decision is the one adjudication of a review that just settled:
+ * an objection that has not blocked, or a first review that failed. Any
+ * other decision starts a new cycle with its own reviews.
+ */
+const adjudicates = (
+  rounds: Readonly<Record<string, CriticRounds>>,
+  issue: string
+): boolean => {
+  const prior = rounds[issue];
+  if (!prior?.ran || criticBlocked(rounds, issue)) {
+    return false;
+  }
+  return (
+    prior.last === "objection" ||
+    (prior.last === "failed" && prior.reviews < CRITIC_REVIEW_LIMIT)
+  );
+};
+
 export function reviewCycleAfterDecision(
   rounds: Readonly<Record<string, CriticRounds>>,
   issue: string
 ): Record<string, CriticRounds> {
   const prior = rounds[issue];
-  const fresh =
-    !prior || prior.last === "approve" || criticBlocked(rounds, issue);
   return {
     ...rounds,
-    [issue]: fresh
-      ? { last: null, objections: 0, ran: false, reviews: 0 }
-      : { ...prior, ran: false },
+    [issue]:
+      prior && adjudicates(rounds, issue)
+        ? { ...prior, ran: false }
+        : { last: null, objections: 0, ran: false, reviews: 0 },
   };
 }
 
