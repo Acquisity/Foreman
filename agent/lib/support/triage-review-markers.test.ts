@@ -91,3 +91,28 @@ test("a ticket the critic blocked completes once the support owner holds it, wit
     SupportRefusal
   );
 });
+
+test("a reviewed decision that adjudication left unproven completes on its Adjudicated line", () => {
+  const untouched = { ...closed, priority: null, status: "Backlog" };
+  assert.doesNotThrow(() =>
+    assertTriageOutputs(
+      untouched,
+      doc(
+        "Not settled",
+        `Adjudicated ${pin}: CHALLENGE; the duplicate target was ruled out, so the claim stays unproven`
+      ),
+      linked
+    )
+  );
+  for (const review of [
+    `Approved ${pin}`,
+    "Adjudicated 2026-10-27T10:00:00.000Z",
+    "Pending critic",
+  ]) {
+    assert.throws(
+      () => assertTriageOutputs(untouched, doc("Not settled", review), linked),
+      SupportRefusal,
+      review
+    );
+  }
+});

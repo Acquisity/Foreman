@@ -158,7 +158,11 @@ export function assertTriageOutputs(
   if (handedToPerson && issue.assignee === SUPPORT_OWNER) {
     return;
   }
-  if (classification === "Not settled" && NOT_REQUIRED.test(review)) {
+  if (
+    classification === "Not settled" &&
+    (NOT_REQUIRED.test(review) ||
+      (review.startsWith("Adjudicated ") && SETTLED_REVIEW.test(review)))
+  ) {
     return;
   }
   if (
