@@ -125,9 +125,7 @@ export const receivedText = (what: string | null): string =>
 
 export const fixedText = (what: string | null, steps: string | null): string =>
   firstFitting([
-    what && steps
-      ? `Fixed: ${what}. ${steps} Reply here if it's still not right.`
-      : null,
+    what && steps ? `Fixed: ${what}. ${steps}` : null,
     what
       ? `Fixed: ${what}. Give it a go, and reply here if it's still not right.`
       : null,

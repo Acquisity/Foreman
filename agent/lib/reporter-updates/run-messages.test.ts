@@ -175,10 +175,7 @@ describe("fixed message for a bug", () => {
     const what = "the Resume session card no longer blocks your search bar";
     const steps =
       "In your second tab, click Not in this tab on the card to hide it. Your dialling keeps running.";
-    assert.equal(
-      fixedText(what, steps),
-      `Fixed: ${what}. ${steps} Reply here if it's still not right.`
-    );
+    assert.equal(fixedText(what, steps), `Fixed: ${what}. ${steps}`);
     assert.equal(
       fixedText(what, `${steps} ${steps}`),
       `Fixed: ${what}. Give it a go, and reply here if it's still not right.`
