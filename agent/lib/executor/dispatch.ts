@@ -3,6 +3,7 @@ import type { ToolContext } from "eve/tools";
 import { z } from "zod";
 import { PRODUCTION_READ_QUERY_ARGS } from "../lookup-customer.js";
 import { supportOperationPolicy } from "../support/policy.js";
+import { isTriageReplay } from "../triage-replay/mode.js";
 import { widgetOperationPolicy } from "../widget-policy.js";
 import {
   isWidgetSupport,
@@ -141,6 +142,9 @@ export async function invokeProvider(
   operationKey?: string,
   options: { maxBytes?: number; timeoutMs?: number } = {}
 ): Promise<ExecutorOutcome> {
+  if (isTriageReplay()) {
+    throw new ExecutorError("triage_replay_closed", 503, { dispatched: false });
+  }
   assertLaneOperation(ctx, path, input);
   const policy = operationPolicy(ctx);
   policy?.assert(path, input);
