@@ -17,6 +17,7 @@ const TWO_RUN_IDS = /more than one run id/;
 const REPEATED = /same case and run: ENG-1#1/;
 const OUTSIDE = /outside the cohort: ENG-99/;
 const MIXED_COMMITS = /more than one Foreman commit: /;
+const UNKNOWN_COMMIT = /unknown Foreman commit.*: ENG-1#1/;
 const ABOVE_RUNS = /runs above --runs 1: ENG-1#2/;
 const RUNS_FLOOR = /--runs must be a whole number of at least 1/;
 const WRONG_SPLIT = /wrong split: ENG-3/;
@@ -112,6 +113,18 @@ test("refuses results from different Foreman commits, and reports the commit", (
     ],
   });
   assert.throws(() => scoreReplay(mixed), MIXED_COMMITS);
+  assert.throws(
+    () =>
+      scoreReplay(
+        base({
+          results: base().results.map((result) => ({
+            ...result,
+            foremanCommit: "unknown",
+          })),
+        })
+      ),
+    UNKNOWN_COMMIT
+  );
   assert.throws(() => checkScoreInput(mixed), MIXED_COMMITS);
   const card = renderScorecard(scoreReplay(base()));
   assert.ok(card.includes(`Foreman commit ${"1".repeat(40)}`));

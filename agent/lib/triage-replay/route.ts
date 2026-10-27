@@ -1,6 +1,6 @@
-import { createHash, timingSafeEqual } from "node:crypto";
 import type { SessionAuthContext } from "eve/context";
 import { z } from "zod";
+import { diagnosticsSecretRefusal } from "../diagnostics-secret.js";
 import { BILLING_PATH } from "../triage-log.js";
 import { stampTriageIntake, stampUnattended } from "../trust.js";
 import { loadReplayState, seedReplayStore } from "./backend.js";
@@ -9,7 +9,11 @@ import {
   TRIAGE_REPLAY_CASE_ATTRIBUTE,
   TRIAGE_REPLAY_RUN_ATTRIBUTE,
 } from "./mode.js";
-import { type TriageResult, triageCaseSchema } from "./schema.js";
+import {
+  type TriageResult,
+  triageCaseSchema,
+  UNKNOWN_COMMIT,
+} from "./schema.js";
 import {
   frozenListsSchema,
   type ReplayState,
@@ -28,27 +32,23 @@ export const startRequestSchema = z.strictObject({
 });
 export type StartRequest = z.infer<typeof startRequestSchema>;
 
-const digest = (value: string) => createHash("sha256").update(value).digest();
-
 const json = (body: unknown, status = 200) =>
   Response.json(body, { headers: { "cache-control": "no-store" }, status });
 
-export function replayRefusal(
+export const replayRefusal = (
   request: Request,
   env: NodeJS.ProcessEnv = process.env
-): Response | null {
-  if (!isTriageReplay(env)) {
-    return json({ error: "Not found." }, 404);
-  }
-  const expected = env.FOREMAN_DIAGNOSTICS_SECRET;
-  if (!expected || expected.length < 32) {
-    return json({ error: "Replay is not configured." }, 503);
-  }
-  const given = request.headers.get(REPLAY_SECRET_HEADER) ?? "";
-  return timingSafeEqual(digest(given), digest(expected))
-    ? null
-    : json({ error: "Forbidden." }, 403);
-}
+): Response | null =>
+  diagnosticsSecretRefusal(
+    request,
+    {
+      enabled: isTriageReplay(env),
+      forbidden: "Forbidden.",
+      header: REPLAY_SECRET_HEADER,
+      notConfigured: "Replay is not configured.",
+    },
+    env
+  );
 
 export function replayAuth(runId: string, caseKey: string): SessionAuthContext {
   return stampUnattended(
@@ -124,7 +124,10 @@ export async function startReplay(
       caseKey: key,
       lists: start.lists,
       stamp: {
-        foremanCommit: process.env.VERCEL_GIT_COMMIT_SHA?.trim() || "unknown",
+        foremanCommit:
+          process.env.TRIAGE_REPLAY_COMMIT?.trim() ||
+          process.env.VERCEL_GIT_COMMIT_SHA?.trim() ||
+          UNKNOWN_COMMIT,
         startedAt: new Date().toISOString(),
       },
     }),

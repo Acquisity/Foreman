@@ -4,6 +4,7 @@ import {
   type TriageCase,
   type TriageLabel,
   type TriageResult,
+  UNKNOWN_COMMIT,
 } from "./schema.js";
 
 export const splitSchema = z.strictObject({
@@ -214,6 +215,14 @@ export function checkScoreInput(input: ScoreInput): string | null {
   const commits = new Set(
     input.results.map(({ foremanCommit }) => foremanCommit)
   );
+  if (commits.has(UNKNOWN_COMMIT)) {
+    fail(
+      "Results with an unknown Foreman commit; set TRIAGE_REPLAY_COMMIT on the replay server",
+      input.results
+        .filter(({ foremanCommit }) => foremanCommit === UNKNOWN_COMMIT)
+        .map(({ caseId, run }) => rowKey(caseId, run))
+    );
+  }
   if (commits.size > 1) {
     fail("Results come from more than one Foreman commit", [...commits]);
   }
