@@ -250,8 +250,9 @@ async function readThread(
  * What a relayed Slack reply needs from Foreman, whether it opened a session
  * or was prompted into the ticket's existing one, decided
  * before the model runs so a skip costs one read and one Jev call instead of
- * a full turn. A person writing to Foreman directly is judged only on a chat
- * widget ticket (ENG-14674); on every other ticket that returns null.
+ * a full turn. A person writing to Foreman directly is judged in full only on
+ * a chat widget ticket (ENG-14674); on every other ticket only a status move
+ * is returned (ENG-16055), and anything else returns null.
  */
 export async function relayedFollowUpOutcome(
   issue: string,
@@ -259,19 +260,40 @@ export async function relayedFollowUpOutcome(
   credentials: LinearChannelCredentials,
   signal?: AbortSignal
 ): Promise<FollowUpOutcome | null> {
-  const { comments, foreman, plan, widgetFeedback } = await readThread(
-    issue,
-    credentials
+  return judgeFollowUp(
+    await readThread(issue, credentials),
+    trigger,
+    (followUp) => decideFollowUp(followUp, { signal })
   );
-  const followUp =
-    (trigger.prompted
-      ? promptedFollowUp(comments, plan, trigger.commentId)
-      : relayedFollowUp(comments, plan, trigger.commentId)) ??
-    (widgetFeedback ? directFollowUp(comments, foreman, trigger) : null);
+}
+
+/**
+ * Judges the follow-up a trigger names. A person writing to Foreman directly
+ * on an ordinary ticket is acted on only when the whole ask is a status move
+ * (ENG-16055); anything else there runs as a normal session, as before.
+ */
+export async function judgeFollowUp(
+  thread: {
+    comments: readonly ThreadComment[];
+    foreman: ForemanUser;
+    plan: ReplyPlan;
+    widgetFeedback: boolean;
+  },
+  trigger: { commentId: string; prompted: boolean },
+  decide: (followUp: FollowUpInput) => Promise<FollowUpOutcome>
+): Promise<FollowUpOutcome | null> {
+  const { comments, foreman, plan, widgetFeedback } = thread;
+  const relayed = trigger.prompted
+    ? promptedFollowUp(comments, plan, trigger.commentId)
+    : relayedFollowUp(comments, plan, trigger.commentId);
+  const followUp = relayed ?? directFollowUp(comments, foreman, trigger);
   if (followUp === null) {
     return null;
   }
-  const outcome = await decideFollowUp(followUp, { signal });
+  const outcome = await decide(followUp);
+  if (!(relayed || widgetFeedback)) {
+    return outcome === "status" ? outcome : null;
+  }
   // Before Foreman has spoken there is nothing a reply could leave settled,
   // so only a status move is acted on; anything else runs as before.
   return followUp.lastReply === "" && outcome === "skip" ? null : outcome;

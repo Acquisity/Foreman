@@ -92,7 +92,8 @@ const issueOf = (event: LinearAgentSessionEvent): string | undefined =>
 
 /**
  * Judges a follow-up before the model runs: a relayed Slack reply on any
- * ticket, or a comment written to Foreman on a chat widget ticket.
+ * ticket, or a comment written to Foreman (any outcome on a chat widget
+ * ticket, only a status move on any other).
  */
 const followUpOutcome = (
   event: LinearAgentSessionEvent

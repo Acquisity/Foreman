@@ -1,9 +1,11 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import type { FollowUpOutcome } from "./follow-up-decisions.js";
 import {
   assertThreadComplete,
   createThreadComment,
   directFollowUp,
+  judgeFollowUp,
   planReply,
   promptedFollowUp,
   relayedFollowUp,
@@ -428,5 +430,48 @@ test("assertThreadComplete refuses a thread it cannot read in full", () => {
   assert.throws(
     () => assertThreadComplete("ENG-1", true),
     ThreadIncompleteError
+  );
+});
+
+test("acts on a person's direct status request on an ordinary ticket, and on nothing else there", async () => {
+  const markDone = said(
+    "d1",
+    "aaron",
+    "2026-10-02T20:09:00Z",
+    "@acquisityforeman1 mark this Done"
+  );
+  const thread = {
+    comments: [...sessionThread, markDone],
+    foreman: foremanUser,
+    plan: planReply([...sessionThread, markDone], FOREMAN),
+    widgetFeedback: false,
+  };
+  const trigger = { commentId: "d1", prompted: true };
+  const judged: string[][] = [];
+  const answer =
+    (outcome: FollowUpOutcome) => (input: { replies: string[] }) => {
+      judged.push(input.replies);
+      return Promise.resolve(outcome);
+    };
+  assert.equal(
+    await judgeFollowUp(thread, trigger, answer("status")),
+    "status"
+  );
+  assert.deepEqual(judged, [["@Foreman mark this Done"]]);
+  assert.deepEqual(
+    await Promise.all(
+      (["respond", "skip"] as const).map((outcome) =>
+        judgeFollowUp(thread, trigger, answer(outcome))
+      )
+    ),
+    [null, null]
+  );
+  assert.equal(
+    await judgeFollowUp(
+      { ...thread, widgetFeedback: true },
+      trigger,
+      answer("skip")
+    ),
+    "skip"
   );
 });
