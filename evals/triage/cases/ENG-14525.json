@@ -1,0 +1,227 @@
+{
+  "id": "ENG-14525",
+  "provenance": "seeded",
+  "createdAt": "2026-09-30T15:38:11.151Z",
+  "lane": "billing",
+  "stratum": "billing",
+  "ticket": {
+    "title": "Negative credit balance (-6,833) in AI Name 25 and missing outreach credits after renewal",
+    "description": "#### Customer Name\n\nName 27\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nCompany Two\n\n#### Screenshot\n\n#### What are you trying to achieve?\n\nThe client is trying to understand their billing and credit usage. They want to know why they have negative 6,833 credits in the Name 25 and why their outreach credits dropped from 18,000 to 11,000 after renewing their subscription.\n\n#### What are you doing to achieve it?\n\nThe client reached out to support on Sept 24th and followed up again after support provided a confusing answer about shared credit pools allowing negative balances.\n\n#### What is happening instead?\n\nThe client is stuck with a massive negative credit balance for the Name 25, is unsure if they have to purchase 7,000 credits just to get back to zero\n\n#### What is the expected outcome?\n\nTechnical/billing review of the client's account to verify if the negative credit balance is a system error, and a clear resolution so they can resume using the Name 25 without paying for an erroneous deficit.",
+    "attachmentKinds": ["slack"]
+  },
+  "repoCommitAtCreate": "b04cbee18776d3d6ab506a98c3a563bba4ef6cbd",
+  "flags": {
+    "descriptionEditedAfterCreate": false,
+    "needsProductionData": true,
+    "alreadyFixedAtTriage": false
+  },
+  "asFiled": {
+    "assignee": "Aaron Fraga",
+    "labels": [],
+    "parent": null,
+    "priority": 2,
+    "project": "Support"
+  },
+  "relatedSnapshot": [
+    {
+      "id": "ENG-3680",
+      "createdAt": "2025-12-11T17:18:34.826Z",
+      "title": "Investigate negative credit balance shown in billing",
+      "state": "Done",
+      "assignee": "Tyler Olsen",
+      "parent": "ENG-3596",
+      "labels": ["Bug"],
+      "description": "A new client workspace for Name 1 is showing a negative credit usage value in Billing and Cold Email Agent settings.\n\nScreenshots show:\n\n <image> \n\n <image> \n\nThe Billing view displays credits as “-2,259 / 10,000 credits used (-23%)”, and the Cold Email Agent settings show the same negative usage while also listing 12,259 credits remaining. This is causing confusion about how many credits the workspace actually has and how usage is calculated.\n\nPlease investigate why credits can appear as a negative used value and ensure the balance and usage display correctly."
+    },
+    {
+      "id": "ENG-5327",
+      "createdAt": "2026-02-09T16:03:17.364Z",
+      "title": "AI SDR shows “insufficient credits” after purchasing credits",
+      "state": "Done",
+      "assignee": "Beth Newton",
+      "parent": null,
+      "labels": [],
+      "description": "A workspace saw an AI SDR message stating “insufficient credits”. After purchasing 2,500 credits (and having some credits already), it’s unclear whether the AI SDR will resume working. Support noted this is a known case to escalate to developers."
+    },
+    {
+      "id": "ENG-7987",
+      "createdAt": "2026-04-21T13:54:28.292Z",
+      "title": "Reinstate 4,700 lead credits for client due to campaign issue",
+      "state": "Done",
+      "assignee": "Beth Newton",
+      "parent": null,
+      "labels": ["Refund"],
+      "description": "#### Workspace Name\n\nName 2's workspace\n\n#### Request Type\n\nLead credit\n\n#### Reason for request\n\nThe client is currently escalated at a high refund risk due to technical issues that were previously raised through separate tickets and have already been resolved.\n\nHowever, the main issue now is that a campaign was created using the podcast method, despite the client being clear that he did not want to proceed with that approach. This has increased his frustration.\n\nCredits were used from his account for this campaign, and he is requesting that those lead credits be reinstated. The total amount in question is 4,700 credits.\n\nFor reference, his login email on the platform is <email>."
+    },
+    {
+      "id": "ENG-5619",
+      "createdAt": "2026-02-17T18:51:37.061Z",
+      "title": "AI Consultant shows “insufficient credits” despite having credits",
+      "state": "Done",
+      "assignee": "Beth Newton",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "user: <email>\n\nA workspace named “Name 3's Workspace” reports seeing an “insufficient credits” error when trying to type/use the AI Consultant.\n\nIt appears to happen across all 4 AI Consultant modes even though credits are available."
+    },
+    {
+      "id": "ENG-10778",
+      "createdAt": "2026-06-24T18:46:08.569Z",
+      "title": "Autumn manual credit grants show as 0 in sidebar",
+      "state": "Todo",
+      "assignee": "Tyler Olsen",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "Manual lead/website credit grants completed through the admin flow still show as 0 in the customer sidebar for Autumn-backed billing accounts.\n\nAffected examples from Slack thread:\n\n* Name 4 / <email>\n* Name 5 / <email>\n* Name 6 / <email>\n\nInitial investigation found completed manual credit grant records with new balance 500, but the UI/customer billing path reads Autumn customer feature config instead of Autumn runtime balances. This is distinct from the support-only missing-credit assignment in ENG-10724 and should own the code fix."
+    },
+    {
+      "id": "ENG-5586",
+      "createdAt": "2026-02-16T23:00:36.655Z",
+      "title": "AI Consultant shows “Insufficient credits” error",
+      "state": "Canceled",
+      "assignee": "Jared Stauffer",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "user: <email>\n\nuser: <email>\n\nuser; <email>\n\nAI Consultant opens and saved chats are visible, but running a prompt fails with an error: “Insufficient credits. Add more using <url> Support notes AI Consultant shouldn’t use credits.\n\n <image> \n\nAlso mentioned: AI SDR inbox sometimes shows nothing until refresh, and an error message appears when opening the AI SDR inbox."
+    },
+    {
+      "id": "ENG-7739",
+      "createdAt": "2026-04-13T11:07:09.366Z",
+      "title": "Audit Name 100's account for missing inboxes and credits",
+      "state": "Done",
+      "assignee": "Beth Newton",
+      "parent": null,
+      "labels": ["Refund"],
+      "description": "#### Workspace Name\n\nName 7\n\n#### Request Type\n\nRefund\n\n#### Reason for request\n\nHey team, I've got Name 100 on a call just now and there's a serious billing/technical issue that needs urgent attention before this turns into a refund request.\n**The situation:** Name 100 has paid for 33 domains across multiple invoices (totaling $420 per invoice, 10 domains per invoice = 30 inboxes per invoice). He's got receipts showing he paid for 99 inboxes total. The platform is only showing 72 inboxes active on his account. Additionally, he purchased 200k credits, but the system now shows a much lower amount — he says it used to say 210,000 and now it's dropped. Some of those credits appear to have disappeared after a previous backend support interaction where someone said they'd \"fix it on the back end.\"\n**What's blocking him right now:** He can't create new email campaigns because his leads capacity is maxed at 61k out of the 200k he bought. The system won't let him upload more or add campaigns without deleting leads from old ones first. This is a legitimate product limitation, but it's compounded by the fact that his billing doesn't match what's actually provisioned.\n**What we need:** Pull Name 100's account audit trail and figure out where the 27 missing inboxes went (99 paid for vs. 72 showing). Also track down what happened to his credits — if they were adjusted or removed in a previous backend fix, we need to know why and restore them. Once you've got clarity, let me know if this is a data sync issue, a provisioning bug, or if something got accidentally deleted.\nName 100's got another payment coming up with us and he's frustrated because he's been bounced between multiple team members (Name 8, Name 9, Name 10, Name 101, Name 11, Name 12) who all said they'd fix things on the back end, and nothing has stuck. He's also frustrated because he was sold on podcast booking and other methods during sales that aren't actually available in the platform yet. He's not asked for a refund yet, but he's close. He's asking for either a credit, payment deferral, or some form of compensation while we sort this out. He's been a good customer and has invested heavily (multiple domain purchases, 200k credits), so this is worth saving. Can you review his contract and what was promised vs. what's actually provisioned, and give me a recommendation on what we can offer him?\nI'm going to message Name 100 on Slack that this is now our top priority, but I need you to move quickly. Once the audit is done, we can determine what's fair compensation-wise. Let me know what you find."
+    },
+    {
+      "id": "ENG-5639",
+      "createdAt": "2026-02-18T09:57:32.822Z",
+      "title": "Fix Name 13 AI credit error for client with sufficient credits",
+      "state": "Duplicate",
+      "assignee": "Jared Stauffer",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "#### Customer Name\n\nName 14\n\n#### Customer Email\n\n<email> | <email>\n\n#### Workspace name\n\nName 14\n\n#### Screenshot\n\n <image> \n\n#### What are you trying to achieve?\n\n\"What's the deal with this I'm paying $10,000 should be plenty of credits?\" - client is seeing the jordan ai credit error even though he has plenty of credits\n\n#### What are you doing to achieve it?\n\nflagging here\n\n#### What is happening instead?\n\n* \n\n#### What is the expected outcome?\n\nget this fixed"
+    },
+    {
+      "id": "ENG-8165",
+      "createdAt": "2026-04-28T20:30:10.528Z",
+      "title": "Request to restore 10,000 credits for campaign redo",
+      "state": "Done",
+      "assignee": "Beth Newton",
+      "parent": null,
+      "labels": ["Refund"],
+      "description": "#### Workspace Name\n\nName 15\n\n#### Request Type\n\nLead credit\n\n#### Reason for request\n\nWas directed to the wrong niche at the on-boarding so all needed to be done again. Niche, website, linkedin, logo etc.\n\nSays he did not know enough and that was counting on better guidance from start.\n\nWants that campaign back in credits, which is 10,000 credits."
+    },
+    {
+      "id": "ENG-7897",
+      "createdAt": "2026-04-16T18:43:40.911Z",
+      "title": "Request 10k lead credits for client remediation",
+      "state": "Done",
+      "assignee": "Beth Newton",
+      "parent": null,
+      "labels": ["Refund"],
+      "description": "#### Workspace Name\n\nCompany Three\n\n#### Request Type\n\nLead credit\n\n#### Reason for request\n\n10k lead credits.\n\nThese guys were not upgraded to Zoom Pro for 4 months due to VA errors in Dec. They are demanding a remediation. Previous risky clients, so we need to calm them down.\n\nApproved by Name 16."
+    },
+    {
+      "id": "ENG-8042",
+      "createdAt": "2026-04-22T20:42:28.755Z",
+      "title": "Apply credits for client: 12 inboxes, domains, 2 months Acquisity",
+      "state": "Done",
+      "assignee": "Beth Newton",
+      "parent": null,
+      "labels": ["Refund"],
+      "description": "#### Workspace Name\n\nName 17's Workspace (email is <email>)\n\n#### Request Type\n\nDiscount code\n\n#### Reason for request\n\nTHIS IS A HIGHLY ESCALATED SITUATION\n\nThis client was misinformed multiple times by our team that he could delete his Company One and ReachOutly accounts and still transfer the warmed custom domains and inboxes over to our platform. Obviously, that’s incorrect since we currently can’t import external email accounts into our workspace. We can only either provide pre-warmed accounts or set up and warm up done-for-you accounts.\n\nHe’s very frustrated because he said he had a gut feeling the info was wrong, but still chose to trust us as the experts. Now he feels burned because he lost time with no real progress, and also wasted money buying domains, accounts, and subscriptions on Company One and ReachOutly that he can’t use with us.\n\nHe vented quite a lot on a call with me just now, and also earlier during office hours. This has definitely escalated. He’s clearly upset and is blaming us for the wasted time and money.\n\nTo calm things down and avoid further escalation, I walked him through how we’ll set things up properly moving forward, and I offered some credits to make up for the situation. I told him we would cover inboxes and domains, plus give him some extra time on the platform since he now has to go through the warm-up process again.\n\nWhat I agreed on the call:\n\n1. 12 DFY inboxes covered for 3 months\n2. Custom domains covered for 1 year\n3. 1 month of Acquisity for free\n\n\nIf possible, I’d like to extend the Acquisity credits to 2 months instead of 1, just to go a bit above what was promised and help smooth things over further. If that’s not possible, no worries, but at least the 1 month should definitely be added.\n\nLet me know if we can get these credits applied asap."
+    },
+    {
+      "id": "ENG-7702",
+      "createdAt": "2026-04-10T15:59:05.744Z",
+      "title": "Urgent approval for retention credits to prevent client churn",
+      "state": "Done",
+      "assignee": "Beth Newton",
+      "parent": null,
+      "labels": ["Refund"],
+      "description": "#### Workspace Name\n\n<email>\n\n#### Request Type\n\nDiscount code\n\n#### Reason for request\n\nHi team, I’m requesting urgent approval to apply retention credits for a client who was on the verge of requesting a full refund after expressing serious dissatisfaction with programme. After a call to de-escalate, I was able to retain him by offering a full transition away from Company One and into a more hands-on solution. To secure this, we need to credit 3 months of Acquisity 3 months of inboxes (21 inboxes), and 1 year of domains (7 domains). This was the key condition to prevent churn, and the client has already responded positively and agreed to continue pending this being applied. Given the risk of losing the account, this is time-sensitive and critical to finalize as soon as possible."
+    },
+    {
+      "id": "ENG-7898",
+      "createdAt": "2026-04-16T18:50:30.510Z",
+      "title": "Request 5k lead credit for client goodwill gesture",
+      "state": "Done",
+      "assignee": "Beth Newton",
+      "parent": null,
+      "labels": ["Refund"],
+      "description": "#### Workspace Name\n\nName 102\n\n#### Request Type\n\nLead credit\n\n#### Reason for request\n\n5k lead credit as a recompense for client not having the ZOOM Pro for 4 months due to personnel error in December.\n\nA goodwill gesture to make them happy."
+    },
+    {
+      "id": "ENG-8199",
+      "createdAt": "2026-04-29T22:07:05.775Z",
+      "title": "Request for 2 months free Acquisity and 10,000 lead credits",
+      "state": "Done",
+      "assignee": "Beth Newton",
+      "parent": null,
+      "labels": ["Refund"],
+      "description": "#### Workspace Name\n\nName 18\n\n#### Request Type\n\nDiscount code\n\n#### Reason for request\n\nRefund Save\n\nPlease action 2 Months Acquisity & Inboxes for free\n\n&\n\n10 000 lead credits"
+    },
+    {
+      "id": "ENG-8527",
+      "createdAt": "2026-05-13T15:41:35.241Z",
+      "title": "Apply discount code and credit 10,000 lead credits",
+      "state": "Done",
+      "assignee": "Jared Stauffer",
+      "parent": null,
+      "labels": ["Refund"],
+      "description": "#### Workspace Name\n\nName 19 (<email>)\n\n#### Request Type\n\nDiscount code\n\n#### Reason for request\n\nRR save.\n\nCover cost of acquisity and inboxes for 3 months. She has an active account, please apply directly on the back end.\n\nPlease credit 10,000 lead credits to her account,"
+    },
+    {
+      "id": "ENG-8213",
+      "createdAt": "2026-04-30T16:55:42.769Z",
+      "title": "Apply discount code and award 10,000 lead credits",
+      "state": "Done",
+      "assignee": "Beth Newton",
+      "parent": null,
+      "labels": ["Refund"],
+      "description": "#### Workspace Name\n\nName 20 ( <email>)\n\n#### Request Type\n\nDiscount code\n\n#### Reason for request\n\nRR Save.\n\n3 months to cover acquisity and inboxes. Please apply code directly to his account on the back end.\n\nPlease award 10,000 lead credits"
+    },
+    {
+      "id": "ENG-13283",
+      "createdAt": "2026-08-31T10:33:14.791Z",
+      "title": "Name 21 refund of Acquisity credits",
+      "state": "Done",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [],
+      "description": "#### User Email\n\n<email>\n\n#### Workspace Name\n\nName 21\n\n#### Request Type\n\nLead credit\n\n#### Reason for request\n\nThe client requested that we target a different niche in Acquisity. Therefore the cold email campaigns were paused; however someone turned them back on and we wasted credits emailing the wrong niche. Therefore I would like to request a refund of 3,000 Acquisity credits for this client."
+    },
+    {
+      "id": "ENG-5384",
+      "createdAt": "2026-02-10T12:20:21.011Z",
+      "title": "Investigate credit leakage and restore credits for new campaign",
+      "state": "Done",
+      "assignee": "Beth Newton",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "#### Customer Name\n\nName 22\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 22 Name 23 AI..\n\n#### Screenshot\n\n <image> \n\n <image> \n\n#### What are you trying to achieve?\n\nTo get a new campaign launched\n\n#### What are you doing to achieve it?\n\nTry to launch through Acquisity. Checked settings to make sure everything was right but apparently all credits have been used\n\n#### What is happening instead?\n\nAs all of credit has been used up we can't launch a new campaign. But the system automatically started leaking credits out as we didn't even scrape 10,000 leads- a new campaign also got launched by AI?\n\n#### What is the expected outcome?\n\nTo have credits sent back to his account so we can launch a new campaign. Also to investigate what the potential leakage could have been and where the credits have gone"
+    },
+    {
+      "id": "ENG-12837",
+      "createdAt": "2026-08-17T18:03:19.676Z",
+      "title": "Website-builder (v0) metered usage drives shared credits wallet negative, blocking campaign lead imports",
+      "state": "Triage",
+      "assignee": "Anuj Bhatt",
+      "parent": null,
+      "labels": ["fast-lane"],
+      "description": "BUG: Yes\n\nEVIDENCE:\n\n* Name 24's Workspace (org <uuid>), billing account <uuid>, provider autumn.\n* billing_account.credit_balance = -8937 (lifetime_purchased 0, lifetime_granted 0, lifetime_used 8937). The ledger is negative and never offset by a purchase or grant.\n* credit_transaction: 73 rows, all reference_type 'v0_usage' (\"v0 website generation usage\"), sum -8937, dated 2026-07-27 to 2026-08-14.\n* Operator reports the customer's Autumn 'credits' feature shows balance 248 (sidebar) and 9185 remaining (billing = included_usage - usage). Trying to import 1100 leads returns \"Requested 1100 leads exceeds remaining credits\".\n* apps/web/lib/billing/providers/autumn/client.ts:281 — getEffectiveAutumnGenericCreditsBalance = getBalanceAutumn(balance) + internal billing_account.credit_balance = 248 + (-8937) = -8689. It ignores the recurring grant (included_usage - usage = 9185).\n* client.ts:442 canSpend('credits') returns (balance >= quantity) → -8689 >= 1100 → false, so the lead import is denied.\n* apps/web/lib/outreach/db/usage.ts canScrapeLeads returns \"Requested N leads exceeds remaining credits\" on that false.\n* Client-side apps/web/hooks/billing/use-billing-credits.ts + lib/billing/display/credit-info.ts compute remaining = included_usage - usage = 9185 and ignore the internal ledger, so the UI shows \"enough credits\" while the server denies.\n\nBLAST RADIUS:\n\n* Re-counted 2026-09-14T00:12 across all organizations: 428 organizations with confirmed misrouted v0 charges. credit_transaction rows with reference_type 'v0_usage' and 'website_agent_run' total 7,496 rows and about -671,007 credits, settled 2026-03-24 to 2026-09-13T21:41 and still settling (grown from 7,474 rows / -669,740 credits on 2026-09-13T20:03). Count query: SELECT reference_type, count(*), count(DISTINCT organization_id), sum(amount) FROM credit_transaction WHERE reference_type IN ('v0_usage','website_agent_run') GROUP BY reference_type. The v0 usage settlement job is global (V0_USAGE_SETTLEMENT_SCOPE = 'global' in apps/web/lib/billing/v0-usage-settlement.ts) and charges every website-builder user's 'credits' wallet with overdraft allowed, so any other Autumn customer who uses the Name 25 and then runs campaigns is exposed; confirmed charged and exposed-but-unconfirmed are separate and the exposed set is not counted above. The user figure is a bound: metered settlement rows carry no user id. Second independent report on this cause, from a different workspace, is ENG-13628 (2026-09-09).\n\nPOTENTIAL FIX:\n\n* Charge v0/website-generation metered usage to a dedicated wallet instead of the shared lead-credit 'credits' wallet, or exclude the metered-overdraft ledger from the lead-credit canSpend path.\n* Include the recurring grant (included_usage - usage) in the effective balance used by canSpend('credits').\n* Make sidebar/billing surfaces reflect the effective balance (or surface the negative overdraft) so customers are not shown positive credits while the spend is denied.\n\nWHATS NEEDED TO RESOLVE:\n\n* Confirm the intended wallet design after ENG-10788/10798 (unified credits wallet) and whether website metered usage should gate lead credits.\n* For this customer: credit the account or move the -8937 v0 usage out of the lead-credit wallet to unblock the 1100-lead import.\n\nCONFIDENCE: High — the negative internal ledger is verified in production and alone explains the block. Autumn feature values (248 / 9185) were not independently readable this run (Autumn lookup returned no customer); those two numbers come from the operator's screenshots.\n\nTRIAGE SCOPE: No branch, commit, PR, deployment, migration, patch, or code/docs/config change was created in this session.\n\n---\n\nINTERCOM: <url:app.intercom.com>\nSLACK THREAD: not captured\nORGANIZATION: <uuid>\nFiled by Support from a CS investigation."
+    },
+    {
+      "id": "ENG-13304",
+      "createdAt": "2026-08-31T16:48:39.083Z",
+      "title": "Name 26 - Bug with lead credits available",
+      "state": "Duplicate",
+      "assignee": "Anuj Bhatt",
+      "parent": null,
+      "labels": ["Bug", "Credit/Billing Mismatch", "Customer reported"],
+      "description": "#### Customer Name\n\nName 26\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 26's Workspace\n\n#### Screenshot\n\n <image> \n\n <image> \n\n#### What are you trying to achieve?\n\nAddress discrepancy between lead credits available and total number of credits showing on the dashboard for Name 26's workspace - dashboard shows 407, but when she goes to the campaign view to create a new campaign and scrape leads, it reflects 5,099 lead credits remaining\n\n#### What are you doing to achieve it?\n\nScreen share to confirm client information and experience and took a screenshot, then submit this ticket\n\n#### What is happening instead?\n\nName 26 is unable to scrape leads using the lead credits remaining balance shown in the view when she creates a new campaign. The number of lead credits available or remaining does not match what she sees on the dashboard\n\n#### What is the expected outcome?\n\nTotal lead credits available matches from the dashboard view and also inside the campaign view so the client can begin scraping leads from within Acquisity in order to generate a campaign and launch"
+    }
+  ]
+}

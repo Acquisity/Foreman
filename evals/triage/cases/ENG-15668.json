@@ -1,0 +1,232 @@
+{
+  "id": "ENG-15668",
+  "provenance": "seeded",
+  "createdAt": "2026-10-18T01:51:13.134Z",
+  "lane": "triage",
+  "stratum": "unproven",
+  "ticket": {
+    "title": "AI SDR using incorrect podcast name in outreach (Company Three)",
+    "description": "#### Customer Name\n\nName 26\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 26\n\n#### Screenshot\n\n#### What are you trying to achieve?\n\nGet the AI SDR to use the correct podcast name, \"Company Three\", in his outreach campaign.\n\n#### What are you doing to achieve it?\n\nRunning the standard podcast guest outreach campaign.\n\n#### What is happening instead?\n\nThe AI SDR is calling the podcast \"Company Ten\". A prospect just replied calling out the discrepancy, noting that Name 27 is not the host of that show, which is burning the lead and exposing the AI content.\n\n#### What is the expected outcome?\n\nhe AI SDR's prompt and campaign variables are updated immediately to use \"Company Three\" so he can resume outreach without losing credibility.",
+    "attachmentKinds": ["slack"]
+  },
+  "repoCommitAtCreate": "fbcd9b57b8bbcd14d85ed619e85b6779eb1121ec",
+  "flags": {
+    "descriptionEditedAfterCreate": false,
+    "needsProductionData": false,
+    "alreadyFixedAtTriage": false
+  },
+  "asFiled": {
+    "assignee": "Aaron Fraga",
+    "labels": [],
+    "parent": null,
+    "priority": 2,
+    "project": "Support"
+  },
+  "relatedSnapshot": [
+    {
+      "id": "ENG-10572",
+      "createdAt": "2026-06-19T16:27:40.458Z",
+      "title": "Cold email agent: capture, persist & reuse podcast name (wizard step + generate-and-confirm + settings)",
+      "state": "Done",
+      "assignee": "James Keeble",
+      "parent": null,
+      "labels": [],
+      "description": "PR 2 of 2. **Blocked by** ENG-10571 (the prompt must already consume `podcastName`). Plan: `/Users/jmske/.claude/plans/let-s-create-a-plan-tender-yeti.md` (§2.x + H9-H14).\n\n## Problem\n\nProven podcast copy needs a real, credible show name, but there's nowhere to capture, store, or reuse one. Asking every campaign is friction; generic \"the podcast\" underperforms.\n\n## Solution\n\nPersist one podcast name per workspace, ask/generate it once, reuse everywhere, editable. Never hard-block.\n\n1. **Migration:** nullable `podcastName: text('podcast_name')` on `aiSdrSettingTable` (`lib/db/schema/ai-sdr.ts` ~:53). `bun db:generate`; single ADD COLUMN, no rename; must apply before app serves (H13).\n2. **Settings tRPC** (`trpc/routers/ai-sdr.ts`): `getSettings` returns `podcastName ?? null` (~:289). New `updatePodcastName` as `mutationRestrictedProcedure` (match :301) **+ org-membership/write check (H9)**; normalize `trim()`, blank→`null`; upsert ONLY `podcast_name` (no full-settings clobber — confirm `updateSettings.set()` excludes it, H10).\n3. **Thread** `podcastName` **through the allowlist chain (each hop):** `CreateCampaignInput` + campaign schemas (`lib/outreach/schemas/campaigns.ts`) → `createOrUpdateCampaign` mutation (`trpc/routers/outreach/campaigns.ts:~1655`) → `parseCampaignCreationRequirements inputData` **allowlist (**`lib/services/util.ts:102` **— silent-drop choke point)** → service (`lib/services/campaign-creator.ts:102`) → `campaignCreatorInputSchema` (`lib/inngest/functions/campaign/types.ts`) → `processCampaignCreator` (`:~128`, destructure + fallback to stored setting). Also add to standalone `coldEmailPodcastSchema` (`schemas/submissions/cold-email-writer.ts:28`).\n4. **Standalone form (DUPLICATED schema):** add `podcastName` to the local `podcastSchema` (`components/acquisition/cold-email-writer-form.tsx:58`); optional \"Name 1 name\" input on the podcast branch, pre-filled from `aiSdr.getSettings()`, with a \"Generate for me\" button; persist via `updatePodcastName` (H11: save failure → toast but still pass entered name; non-blocking submit).\n5. **Wizard substep (BOTH generation entry points):** add `PodcastName` to `SequenceSubStep` (`types/campaign.ts:832`) + `podcastName`/`setPodcastName` state (`hooks/campaign/use-campaign-wizard.ts`); route to it when `method===Name 1` AND stored `podcastName?.trim()` empty, in **both** `handleEmailMethodNext` (`campaign-wizard.tsx:328,352`) AND the CSV/simple-targeting path (`:471`→onCreateCampaign `:499`); render branch alongside `:709/:719`; back→method/targeting, next→input or Generate→confirm→`updatePodcastName`→continue. New step component in `components/campaigns/new/steps/`.\n6. **Generate-and-confirm + auto-persist (§2.8, H12):** `generatePodcastName({ targetIndustry, niche, researchBrief? })` (small Sonnet call → `{ name }`, ChatGPT naming rules: 2-4 words, credible, niche-fit, no em-dash); tRPC `aiSdr.generatePodcastName` powers the Generate buttons. In `processCampaignCreator`, when no name in event/settings → generate, **persist to** `ai_sdr_setting.podcast_name` **(first-write-wins, race-guarded)**, log secret-safe, use it.\n\n## Scope\n\n**In:** podcast-name capture/persist/reuse/edit across wizard + standalone form + automated paths; generate-and-confirm.\n**Out:** generation/prompt/model changes (ENG-10571); onboarding (its duplicated schemas at `lib/inngest/functions/onboarding/cold-email.ts:41,81` stay generic, untouched — add a compile/regression test); hard-blocking any path; interview (uses a generated study title, no stored name).\n\n## Saved model / behavior\n\nSingle source of truth: `ai_sdr_setting.podcast_name` (org-level, nullable). Blank stored as `null`. Wizard skip logic checks `podcastName?.trim()`. Partial write only (never clobbers other AI SDR settings). Automated/no-UI paths auto-generate once and persist (first-write-wins) → consistent across the org's campaigns, editable later.\n\n## Permissions / ownership\n\n`updatePodcastName` + `generatePodcastName`: `mutationRestrictedProcedure`, caller must belong to `organizationId` with write permission. Org-scoped read in `getSettings`.\n\n## UX behavior\n\n* Wizard podcast path with no saved name → a \"Name 1 name\" substep (text input + \"Generate for me\" → confirm/edit). If a name exists → skipped silently.\n* Standalone podcast form → optional \"Name 1 name\" field pre-filled from the saved value, with a Generate button; edits persist for reuse.\n* Name is reused on every subsequent podcast campaign; never asked twice.\n* Spin/name visible in campaign sequence editor as the saved value (not a merge tag).\n\n## Acceptance criteria\n\n* New podcast campaign with empty saved name → substep appears via **both** wizard entry points; saving/generating persists org-level; next campaign skips the step.\n* Standalone form pre-fills from saved value and persists edits without clobbering other AI SDR settings.\n* `parseCampaignCreationRequirements` carries `podcastName` end-to-end into the prompt.\n* Automated path with no name auto-generates + persists once; reused thereafter.\n* Blank input stored as `null`; `getSettings` returns `null`.\n* `updatePodcastName`/`generatePodcastName` reject callers outside the org.\n* Onboarding caller compiles + runs unchanged.\n\n## Open design follow-ups\n\n* Should the wizard \"Generate for me\" reuse the ENG-10571 research brief's Podcast-name guidance when available, or always generate fresh?\n* Per-campaign override vs strictly org-level (currently org-level only).\n\n## Outcome\n\nA persisted, reusable, editable podcast name with generate-and-confirm UX, so proven podcast copy ships with a real show name and is never asked twice.\n\nAI_CONTEXT:\nTicket/PR: PR 2 — podcast-name capability. Blocked by ENG-10571.\nGoal: capture/generate-and-confirm a podcast name once per workspace, persist org-level, reuse, edit; never block.\nNon-goals: generation/prompt/model (ENG-10571); onboarding; hard-block.\nConstraints: single org-level source of truth; partial mutation (no clobber); migration before deploy; no em-dashes in generated names; no AI-authorship mentions.\nCode map: lib/db/schema/ai-sdr.ts (+migration), trpc/routers/ai-sdr.ts, lib/outreach/schemas/campaigns.ts, trpc/routers/outreach/campaigns.ts, lib/services/util.ts, lib/services/campaign-creator.ts, lib/inngest/functions/campaign/types.ts, lib/inngest/functions/campaign/process-campaign-creator.ts, schemas/submissions/cold-email-writer.ts, components/acquisition/cold-email-writer-form.tsx, hooks/campaign/use-campaign-wizard.ts, components/campaigns/new/campaign-wizard.tsx, types/campaign.ts, components/campaigns/new/steps/ (new).\nData context: read-only DB only if inspecting ai_sdr_setting rows; else code-only.\nFeature flags: inherits ENG-10571's COLD_EMAIL_SONNET_RESEARCH_ENABLED.\nTests: allowlist threading; updatePodcastName trim/null/no-clobber/org-guard; generatePodcastName clean name + first-write-wins; schema round-trip; wizard reducer both entry points + back/refresh/duplicate-Next; onboarding unchanged.\nQA: wizard podcast (empty + pre-set), standalone pre-fill/persist, generate-for-me, automated auto-persist.\nRisks: allowlist silent-drop (util.ts:102); full-settings clobber; migration/deploy ordering (H13); wizard two-entry-point state-order (H14).\nReview focus: every allowlist hop, partial-mutation tenancy, both wizard entry points, auto-persist race, onboarding untouched."
+    },
+    {
+      "id": "ENG-11543",
+      "createdAt": "2026-07-13T10:05:08.303Z",
+      "title": "AI SDR using incorrect podcast host name",
+      "state": "Todo",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": ["intercom-sourced"],
+      "description": "#### Customer Name\n\nName 2\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 2's workspace\n\n#### Screenshot\n\n <image> \n\n#### What are you trying to achieve?\n\nRun the campaign, it had wrong podcast host name spelling\n\n#### What are you doing to achieve it?\n\nChanged and updated the correct spelling in sequences and AI SDR KB\n\n#### What is happening instead?\n\nAI SDR is talking with a potential lead and spelling the name wrong and trying to convince them that the client and the host are two different people with the same spelling?\n\n#### What is the expected outcome?\n\nRectify the situation and tell the prospects that it was a spelling mistake and that the podcast will be with Name 3. There is no Name 101."
+    },
+    {
+      "id": "ENG-15377",
+      "createdAt": "2026-10-14T07:10:05.542Z",
+      "title": "Cold email agent sometimes drops the podcast name from an email body its framework names twice",
+      "state": "Todo",
+      "assignee": null,
+      "parent": "ENG-14843",
+      "labels": [],
+      "description": "## Overview\n\nFound in Jil's real-model QA of PR 7212 (ENG-15367) on 14 Oct 2026. In run 2 of 4, CE-03's email 3 named the show (`The Long Build`) only in its signature. Its podcast framework names it twice, in the body and the signature. The weekly copy check (PR 7200) correctly fails that case. The locked subject, CTA and `{{industry}}` were all correct. The saved outputs show the same miss once before (final4 CE-03). A prospect who doesn't see the show name in the body is less likely to understand the invite, which costs replies.\n\n## What's included\n\n* Find why the writer drops the body mention: the prompt wording for that framework, or postprocessing.\n* Fix it so the show name appears where the framework puts it, without loosening the check.\n\n## Done when\n\n- [ ] CE-03 passes in 5 consecutive real-model copy evaluation runs, with run IDs and cost recorded."
+    },
+    {
+      "id": "ENG-12124",
+      "createdAt": "2026-07-29T13:12:42.168Z",
+      "title": "AI SDR keeps using stale knowledge-base facts after KB edits and an outreach-method switch",
+      "state": "Backlog",
+      "assignee": "Koppany Kondricz",
+      "parent": null,
+      "labels": ["Bug", "intercom-sourced", "triaged-by-devin"],
+      "description": "## Name 6 signal (daily triage 2026-07-29)\n\nName 6 cluster *AI SDR ignores updated knowledge base, uses stale facts with prospects* — severity medium, confidence 0.80, **new**.\n\nName 4 has an open bug thread today with screenshots: after switching his campaign from the **Name 1** method to **Name 5** and updating his knowledge base entries, the AI SDR keeps emailing prospects with the old/wrong information. Customer-facing emails therefore contain facts the customer has already corrected.\n\nName 6 topic: <url>\n\n## Why this is a new issue\n\nNo open canonical covers \"KB edits and a method switch are not reflected in generated emails\":\n\n* ENG-11543 \"AI SDR using incorrect podcast host name\" — Support-project ticket about one wrong fact, not the KB-refresh mechanism\n* ENG-9109 \"AI SDR ignoring screening questions in knowledge base\" — closed out as out-of-scope behaviour, different ask\n* ENG-7557 \"Improved Escalation UX: Knowledge Gap Feedback & KB Training Prompts\" — Done, feature work\n* ENG-6367 \"AI SDR not responding after knowledge base upload\" — different symptom\n\n## Suggested starting points\n\n* Whether the AI SDR reads a cached/snapshotted knowledge-base or method configuration at campaign or thread start rather than at generation time\n* What happens to in-flight threads when the outreach method changes (Name 1 → Name 5): do they keep the original method's prompt context?\n\n## Triage metadata\n\n* Name 7 key: `modem_daily_triage:v1/<uuid>/2026-07-29`\n* Window: 2026-07-28 13:02 UTC → 2026-07-29 13:02 UTC\n* Recurrence: new"
+    },
+    {
+      "id": "ENG-2577",
+      "createdAt": "2025-11-05T01:17:47.884Z",
+      "title": "AI SDR Name 8 in Outbound Emails",
+      "state": "Canceled",
+      "assignee": "Koppany Kondricz",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "**Issue**: The AI SDR is making up a name for the user's podcast that isn't defined (see screenshot)\n\n <image> \n\nCustomer claims: \n\n> \"It's sending emails changing the name of my podcast (nearly every time).\"\n\nThe user tried to define the name of their podcast in the AI SDR Knowledge Base:\n\n* `Great to connect! We've launched \"A Name 10, Company Seven: The People Working to Make It Happen\"`\n* `Title: Name 1: Name 11 Name 12, Founder  at  Company Nine`\n\nNote: This isn't the intended purpose of the knowledge base, so not surprising the agent isn't aware to reference a podcast name there.\n\n## Acceptance Criteria\n\n- [ ] AI no longer produces invented podcast names\n- [ ] When the podcast name is not explicitly provided, the agent defaults to neutral phrasing (e.g., “our podcast”)\n\n---\n\nCustomer Name: Name 9 Name 13\n\nSlack report from beta user: <url:thegrowthpartner.slack.com>\n\n"
+    },
+    {
+      "id": "ENG-9192",
+      "createdAt": "2026-05-25T14:23:12.715Z",
+      "title": "AI SDR KB providing incorrect podcast names",
+      "state": "Canceled",
+      "assignee": "Koppany Kondricz",
+      "parent": null,
+      "labels": [],
+      "description": "#### Customer Name\n\nName 14\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 14's workspace\n\n#### Screenshot\n\n <image> \n\n <image> \n\n#### What are you trying to achieve?\n\nAI responses to prospects\n\n#### What are you doing to achieve it?\n\nAI SDR KB\n\n#### What is happening instead?\n\nAI is replying with two diff podcast names to prospects.\n\n#### What is the expected outcome?\n\nThe podcast name is mentioned in AI SDR KB"
+    },
+    {
+      "id": "ENG-15633",
+      "createdAt": "2026-10-16T16:43:12.405Z",
+      "title": "Campaign Backend Error & Lead Replacement Request",
+      "state": "Done",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": ["Customer reported"],
+      "description": "#### Customer Name\n\nName 15\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nnot provided\n\n#### Screenshot\n\n#### What are you trying to achieve?\n\nFix a backend campaign error that pulled incorrect variables, and authorize replacement leads for the ones burned by the glitch.\n\n#### What are you doing to achieve it?\n\nEscalating to engineering to verify the backend error and approve the lead credit.\n\n#### What is happening instead?\n\nA recent campaign pulled the wrong podcast name and signed all emails with Name 15's name instead of the individual warm inbox names. This caused prospect confusion, made them look unprofessional, and effectively burned the leads.\n\n#### What is the expected outcome?\n\nFix the backend variable/signature error for her campaign, and replace the leads that were ruined by the wrong messaging."
+    },
+    {
+      "id": "ENG-11779",
+      "createdAt": "2026-07-18T00:04:03.185Z",
+      "title": "Missing discovery calls in direct campaign",
+      "state": "In Progress",
+      "assignee": "Koppany Kondricz",
+      "parent": null,
+      "labels": [
+        "Bug",
+        "intercom-sourced",
+        "triaged-by-devin",
+        "weekend-fastlane"
+      ],
+      "description": "#### Customer Name\n\nName 16\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 16 Workspace\n\n#### Screenshot\n\n#### What are you trying to achieve?\n\nTrying to figure out why his account says there are 5 calls booked on a direct campaign, but no discovery calls are showing up.\n\n#### What are you doing to achieve it?\n\nNot sure\n\n#### What is happening instead?\n\nThere are no discovery calls booked\n\n#### What is the expected outcome?\n\nnot sure"
+    },
+    {
+      "id": "ENG-3113",
+      "createdAt": "2025-11-29T17:20:32.711Z",
+      "title": "Cold email agent inserts random podcast name in emails",
+      "state": "Done",
+      "assignee": "Anuj Bhatt",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "Cold email campaign agent variants are inserting a random podcast name into the cold email copy.\n\nExample from the screenshot shows the email signature including a podcast producer title and a specific podcast name that does not belong to the user.\n\n <image> "
+    },
+    {
+      "id": "ENG-12772",
+      "createdAt": "2026-08-14T18:48:04.458Z",
+      "title": "Cold Email: one email variant sends \"just following up\" as the first (step 1) email instead of the invitation",
+      "state": "Triage",
+      "assignee": "Anthony Adewale",
+      "parent": null,
+      "labels": [],
+      "description": "BUG: Yes\n\nEVIDENCE:\n\n* In \"Influencer outreach\" campaign (id <uuid>), A/B variant 11 sends \"Hey [Name], just following up!\" as the step-1 (is_first: true) email, while the subject line is \"Name 18 [Name], you're invited!\" — a body/subject mismatch.\n* 1,747 such step-1 sends since 2026-05-19, still ongoing (last seen 2026-08-14). Variant-11 leads receive no step-2/step-3 follow-up afterward.\n* Every other variant (8, 10, 4, 5, 13, 9, 7, 2, 6, 12, 3, 1) sends the proper invitation copy (\"Hi [Name], my colleague Name 17 found you on LinkedIn…\").\n* A prospect reply confirms the impact (<email>): \"Thank you for following up. I'm open to reviewing the opportunity, but I don't have the original invitation details in this message.\"\n\nBLAST RADIUS:\n\n* Verified: 1 org (Name 17's Workspace), 1 campaign, 1,747 prospects. Copy generation is a shared path, so other orgs may be affected but were not verifiable from this org's data.\n\nPOTENTIAL FIX:\n\n* Regenerate/repair variant 11's step-1 copy so it carries the invitation, not the follow-up line; trace the variant generator to see why a follow-up message was produced for step 1.\n\nWHATS NEEDED TO RESOLVE:\n\n* Locate the podcast \"5-variant + 2 follow-up\" copy generator and confirm how variant 11 got follow-up copy assigned to step 1; check whether other campaigns/orgs have a variant whose step-1 body is the follow-up line.\n\nCONFIDENCE: High — copy and step/is_first flags read directly from Company One webhook payloads; the unverified item is whether the same broken variant reproduces in other orgs.\n\n---\n\nINTERCOM: <url:app.intercom.com>\nSLACK THREAD: not captured\nORGANIZATION: <uuid>\nFiled by Support from a CS investigation."
+    },
+    {
+      "id": "ENG-2539",
+      "createdAt": "2025-11-04T07:22:20.544Z",
+      "title": "AI SDR responding to positive responses with pass emails",
+      "state": "Done",
+      "assignee": "Koppany Kondricz",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "**Found Problem:**\nThe AI SDR is incorrectly sending \"pass\" emails to prospects who have responded positively to outreach. This creates confusion and potentially damages relationships with interested leads.\n\n**Reproduction Steps:**\n\n1. AI SDR sends initial outreach to prospect\n2. Prospect responds with positive interest (e.g., \"That is fine then\")\n3. AI SDR incorrectly interprets the positive response as a rejection\n4. AI SDR sends a pass/rejection email instead of continuing the conversation\n\n <image> \n\n**User Information:**\n\n* User: Name 9 Name 13 (<email>)\n* Email thread shows AI SDR sending pass email after prospect agreed to scheduling\n\n**Expected Behavior:**\nAI SDR should recognize positive responses and continue the conversation flow appropriately, moving to next steps like scheduling or providing more information.\n\n**Example Evidence:**\nSee screenshots in Slack thread showing email exchange where prospect agreed (\"That is fine then\") but received a pass email from AI SDR.\n\n**Slack Thread:**\n<url:app.slack.com>"
+    },
+    {
+      "id": "ENG-11914",
+      "createdAt": "2026-07-21T10:27:35.395Z",
+      "title": "AI SDR tagged companion as the Host and used a different podcast name",
+      "state": "Duplicate",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": ["Bug", "intercom-sourced", "triaged-by-devin"],
+      "description": "**Customer Name**\nName 19\n\n**Customer Email**\n<email>\n\n**Workspace name**\nCompany Two\n\n**Screenshot**\n<optional>\n\n**What is the user trying to achieve?**\nClient is trying to fix the information that the AI SDR is giving out. It uses a different podcast name and has sthe wrong host.\n\n**What is the user doing to achieve it?**\nreached out to intercom. agent checked knowledge base and campaign seems to be all good\n\n**What is happening instead?**\nwrong details. Host should be Name 100 but the AI SDR is saying Name 20. wrong podcast name too\n\n**What is the expected outcome?**\nAI Sdr to use the correct information and email sequences"
+    },
+    {
+      "id": "ENG-12933",
+      "createdAt": "2026-08-19T15:22:25.536Z",
+      "title": "RAINDROP ISSUE - improve fabrication details",
+      "state": "Done",
+      "assignee": "Koppany Kondricz",
+      "parent": null,
+      "labels": [],
+      "description": "Suggested title: Prevent AI SDR copywriter from fabricating names and podcast details\n\n## Problem\n\nAI SDR copy occasionally invents customer-facing details that are not supported by the knowledge base or conversation context. Examples include:\n\n* Incorrect host names such as “Name 21 Name 22.”\n* Internal campaign labels presented as podcast names, such as “Company Six.”\n* Unsupported operational claims such as “the show is still in the early stages of launching.”\n\nOn August 17, `fabricated_detail` appeared in 17 terminal copy-review failures out of 1,531 reviewed runs: **1.11%**.\n\n## Root cause\n\nThe generated context presents the campaign name as general campaign context without clearly identifying it as internal metadata. The copywriter can consequently reinterpret the label as a public-facing podcast or show name.\n\nAdditionally, when copy review rejects a response for `fabricated_detail`, the retry receives the generic review feedback but no targeted instructions explaining that unsupported details must be removed rather than renamed or replaced.\n\n## Proposed change\n\nUpdate the runtime-generated AI SDR context pack to:\n\n* Mark campaign names as internal operational labels.\n* Explicitly prohibit using campaign labels as podcast, show, event, company, product, or offer names unless supported by authoritative knowledge.\n* Add targeted retry guidance for `fabricated_detail`.\n* Instruct retries to remove unsupported people, titles, launch-status claims, and operational details.\n* Prevent retries from replacing one unsupported detail with another plausible fabrication.\n* Recommend generic phrasing or deferral when the required information is unavailable.\n\n## Acceptance criteria\n\n* Internal campaign labels are clearly distinguished from customer-facing facts.\n* A `fabricated_detail` rejection produces targeted grounding instructions on the next copywriter attempt.\n* Retry guidance covers incorrect host names, podcast/show names, and unsupported launch or maturity claims.\n* Unsupported details are removed or generalized rather than replaced.\n* Regression tests cover the reported examples.\n* Database-backed agent prompts are not modified.\n* Booking, availability, slot offering, and rejected-slot logic are unchanged.\n\n## Out of scope\n\n* False booking-confirmation classification.\n* Slot selection or alternative-slot generation.\n* Reoffering previously rejected slots.\n* Changes to active database agent submissions.\n* Database schema or Inngest workflow changes."
+    },
+    {
+      "id": "ENG-14758",
+      "createdAt": "2026-10-05T21:41:48.522Z",
+      "title": "New AI SDR follow-up writer: Sonnet 5.5 on a follow-up-only prompt, switched on for all follow-ups",
+      "state": "In Progress",
+      "assignee": "Koppany Kondricz",
+      "parent": "ENG-14756",
+      "labels": [],
+      "description": "## Overview\n\nFollow-up emails get written by Claude Sonnet 5.5 on a prompt built only for follow-ups, with the facts it needs. James decided on 6 Oct: Sonnet 5.5, switched on for **every** follow-up on day one. No gradual rollout and no A/B split. We measure the difference by comparing results before and after the switch.\n\nIn a blind test on 51 real quiet threads, Sonnet 5.5 with this prompt scored 8.0 out of 10, against 2.8 for today's follow-ups, at about $0.015 per email.\n\n## Problem\n\n* Today's follow-ups are generic \"just checking in\" notes. The writer uses the general reply prompt and knows nothing about the campaign, the sender or the prospect.\n* In the blind test, today's follow-ups gave a clear next step in 1 of 51 cases and read like a template in almost all of them.\n\n## User experience\n\n* A prospect who went quiet gets a short email (20 to 60 words) in the same thread, from the same sender, that:\n  * picks up on what they last said or asked;\n  * gives one easy next step: point back to the times we offered that are still open, or ask \"want me to send two times for next week?\";\n  * never invents times, links, episodes, prices or history.\n* For threads that need a person (the prospect sent their own booking link, our earlier reply contradicts the campaign, a pricing deadlock), the AI sends nothing and creates a task for the deal owner instead.\n* Live times come in the next ticket. Until then this writer offers no new times.\n\n## What's included\n\n1. **The new writer**, as a new arm in the writer setup from ENG-14757:\n   * an agent row of type `followup-writer`, version 1;\n   * model `anthropic/claude-sonnet-5.5`, effort **low**, no temperature, max output tokens 4000. Use exactly this. Medium effort was only tested with the older prompt, so don't switch to it;\n   * the prompt is prompt v3, full text in the AI context. Copy it exactly.\n2. **Fact sheet**, built by code for each follow-up (field list and sources in the AI context):\n   * the cold email variant they received\n   * our earlier emails as real text\n   * their words\n   * the campaign offer, method, niche and industry\n   * show and host as written in this campaign's emails\n   * sender first name, and the workspace's signature rule if it has one\n   * title, company and company one-liner\n   * today's date in the prospect's time zone\n   * the situation and the step's job\n   * which offered times are still open\n   * allowed links\n3. **Placeholders filled by code.** The model never types a time or a link:\n   * `{{OFFERED_TIMES_OPEN}}` is replaced by the times we already offered that are still more than 2 hours away, in the prospect's time zone.\n   * `{{LINK:id}}` is replaced by an allowed URL.\n   * `{{TIMES}}` is not allowed yet. Treat it as a check failure.\n4. **Code checks before send**, on every email from the new writer:\n   * typed days, dates or times\n   * raw URLs\n   * banned phrases (\"just checking in\", \"circling back\" and the rest of the list)\n   * false history (\"thanks for getting back\")\n   * \"the link I sent\" when no link was sent\n   * wrong sign-off name\n   * leftover template text\n   * over 80 words\n   * a placeholder that could not be filled\n\n   On failure, regenerate once with the reasons. If it fails again, skip this follow-up (`check_failed`). Never send, never escalate.\n5. **Writer says \"don't send\"** (`send: false`): skip the follow-up (`writer_declined`) and create a CRM task for the deal owner with the reason.\n6. **Subject line**: reuse the subject of our last sent email in the thread, never an out-of-office subject.\n7. **Switch-on, in this order. Do not skip a step:**\n   1. **Baseline.** ENG-14757 must have been live in production, with today's writer at 100%, for at least 14 full days. Those days are the \"before\" numbers. One week is not enough: results swing a lot from week to week. Its history fix and policy switches change today's results, so older data is not a fair baseline.\n   2. **Gate.** Run the 51-case replay (AI context) in preview. All 51 must pass the code checks after at most one regeneration. Read 20 of the outputs yourself. Attach the pass/fail table and your notes to the PR. If either fails, fix before switching on.\n   3. **Switch on.** In production, set the new writer's arm to weight 100 and today's writer (control) to weight 0. Leave control `active`: it is the instant rollback. Pausing the new arm sends every thread back to today's writer on its next follow-up, with no deploy.\n   4. **Record the switch time.** Post the exact UTC timestamp as a comment on this ticket. The before/after report uses it.\n   5. **First 3 days:** read 20 sent emails a day and post one line per day on this ticket (\"20 read, 0 problems\" or what you found).\n8. **Measure.** Run the before/after report from ENG-14757 at 1, 2 and 4 weeks after the switch, and post the output on this ticket. Follow-ups rely on the code checks in this ticket. The ENG-14745 reply checker covers replies only (agreed 12 Oct 2026).\n\n**Stop limits.** Pause the new arm (one database update) and tell James in Slack if any of these happen:\n\n* \"no\" plus do-not-contact replies per follow-up sent run more than 2 points above the baseline rate, over at least 300 sends;\n* any email goes to the wrong person or names the wrong sender, show or company;\n* more than 15% of follow-ups are skipped by the checks;\n* a mailbox gets a spam complaint traced to the new writer.\n\nAlso tell James (don't pause) if positive replies to follow-up 1 are more than 4 points below baseline after 1,000 sends.\n\n## Blocked by\n\n* ENG-14757: writer setup, logging, the history fix and the before/after report.\n\n## Done when\n\n- [ ] Replaying the 51 cases (fixture list in the AI context) in preview gives no email that fails the code checks after one regeneration, and the table plus 20 read emails are in the PR.\n- [ ] No email from the new writer can contain a typed time, a raw URL, a banned phrase or a wrong sender name (code check and unit tests).\n- [ ] `{{OFFERED_TIMES_OPEN}}` renders the correct still-open times in the prospect's time zone, and the email is skipped (not broken) when none are left.\n- [ ] Writer-declined threads create a CRM task for the deal owner.\n- [ ] Pausing the new arm in preview sends the next follow-up through today's writer (rollback tested).\n- [ ] In production the new arm is at weight 100 and control at weight 0 (still active), after at least 14 days of baseline. The switch timestamp is posted on this ticket.\n- [ ] Its `agent_executions` rows show the full fact sheet and v3 prompt.\n- [ ] Three daily read-throughs and the 1, 2 and 4-week before/after reports are posted on this ticket.\n\n## Implementation context\n\n* Plan, bake-off results and prompt evolution: AI SDR Follow-ups v2\n* Full prompt v3, fact-sheet fields with their sources, the check list, and the replay fixture list are in this ticket's AI context.md.\n* The model decision comment of 6 Oct (Sonnet 5.5 only, 100%) replaces the earlier comment about Opus and Sonnet arms."
+    },
+    {
+      "id": "ENG-13856",
+      "createdAt": "2026-09-14T16:23:47.266Z",
+      "title": "AI SDR follow-up invents a website URL for the podcast link a prospect requested",
+      "state": "Duplicate",
+      "assignee": "Koppany Kondricz",
+      "parent": null,
+      "labels": ["Bug", "Customer reported", "intercom-sourced"],
+      "description": "**Customer report (Intercom-sourced)**\n\n**Intercom conversation**: <url:app.intercom.com>\n\n**Conversation context**: Workspace owner reports that the AI SDR sent a prospect \"a link to a website that is not associated with my company\" when the prospect asked for the podcast link, and states the URL \"was never provided to the AI SDR\".\n\n**Testable claim**: On an automated AI SDR follow-up, the generated email told the prospect \"Here's the link you asked for: <url>\", a URL that appears nowhere in the workspace knowledge base, resources, campaign configuration, or thread; the only source of that domain is the show name \"Company Four\" in the outreach copy.\n\n**Evidence (production, 2026-09-14)**\n\n* `scheduled_followup` row (sequence 2 of 4) status `sent`, executed 2026-09-14T15:06:31Z, message id <uuid>.\n* `crm_message` (direction sent, source_provider Company One, `isManualReply: false`) body: \"Just wanted to circle back on this. Here's the link you asked for: <url>\".\n* `ai_sdr_setting.resources = []` for the workspace; the knowledge base contains no URL; the campaign scripts payload contains only the show name, no domain.\n* A human then corrected the thread (“I am sorry, I sent the wrong url”) after the automated email went out.\n\n**Impact**: Fabricated URL sent to a prospect on an automated follow-up; this path does not run the copy-review fabrication guard used on reply emails.\n\n**Unblock**: A human already corrected the thread. Workspace-side, the AI should not emit any podcast link until an approved link exists; adding the approved link to Resources would give the model a grounded source.\n\nForeman support operation: <id>\nIntercom source: <url:app.intercom.com>"
+    },
+    {
+      "id": "ENG-8143",
+      "createdAt": "2026-04-27T22:47:25.135Z",
+      "title": "AI SDR can reference an unused podcast name",
+      "state": "Canceled",
+      "assignee": "Beth Newton",
+      "parent": null,
+      "labels": [],
+      "description": "AI SDR referenced the podcast name \"Company Five\" even though that podcast name was never configured or used.\n\nThe reference could not be found again later, so reproducible steps are not available.\n\n <image> "
+    },
+    {
+      "id": "ENG-3782",
+      "createdAt": "2025-12-15T13:05:39.802Z",
+      "title": "AI SDR mishandles prospect \"more info\" requests",
+      "state": "Done",
+      "assignee": "Pieter Venter",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "When prospects ask the AI SDR for more information, it does not explain the podcast offer or provide relevant details. Instead, it responds with confusing or incorrect statements (e.g. referencing being from the UK) and jumps straight to proposing call times without clarifying the context.\n\nThere are at least two affected conversations captured in Jam recordings:\n\n* Screen recording 1\n* Screen recording 2\n\nThe expectation is that when a prospect asks for more information, the AI SDR should prioritize clearly explaining the podcast (what it is, why they were invited, what to expect) before attempting to book a call."
+    },
+    {
+      "id": "ENG-5492",
+      "createdAt": "2026-02-12T22:51:31.383Z",
+      "title": "Fix emailScriptsMethod DB default from 'podcast' to null and backfill existing campaigns",
+      "state": "Done",
+      "assignee": "Jared Stauffer",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "## Problem\n\nThe `emailScriptsMethod` column on `outreach__campaign` defaults to `'podcast'`. Any campaign where the type wasn't explicitly set (or was created before this field existed) silently becomes a podcast campaign, causing discovery/direct campaigns to be booked as pre-podcast calls.\n\n## Current State\n\nPR #2534 adds an AI-based campaign type detection step to the V2 workflow as a V2-scoped fix. However, the underlying DB default should also be corrected to prevent this class of bug from recurring in other codepaths.\n\n## Proposed Fix\n\n1. Change the DB column default from `'podcast'` to `null`\n2. Update `getCallType` and any other consumers to handle `null` gracefully (already handles `undefined` → `discovery`)\n3. Backfill existing campaigns that have `emailScriptsMethod = 'podcast'` but are actually discovery/direct campaigns\n\n## Affected Workspaces\n\n* Name 24 (<email>) - Company Eight\n* Name 23 (<email>)\n\n## References\n\n* Related PR: <url:github.com>\n* Schema: `lib/db/schema/outreach.ts` line 100-102"
+    },
+    {
+      "id": "ENG-8144",
+      "createdAt": "2026-04-27T22:47:41.160Z",
+      "title": "Original sender email is grayed out in inbox",
+      "state": "Done",
+      "assignee": "Koppany Kondricz",
+      "parent": null,
+      "labels": [],
+      "description": "User: <email>\nIn the AI SDR inbox, a lead reply was escalated for manual review, but the original sender email is grayed out when trying to respond manually.\n\nThe conversation indicates the thread was originally sent from `<email>`, and replying from a different email may confuse the recipient. The affected email account is shown as active in Email Accounts, but it is not selectable in the reply composer.\n\nThis was observed on the escalated thread UI showing \"Escalated for Review\".\n\n <image> \n\n <image> \n\n <image> "
+    },
+    {
+      "id": "ENG-4958",
+      "createdAt": "2026-01-29T13:30:01.689Z",
+      "title": "AI email sends invalid LinkedIn link and host name",
+      "state": "Canceled",
+      "assignee": "Jared Stauffer",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "user: <email>\n\nAI email outreach sent to a contact (Name 25) includes an invalid LinkedIn link and references a host name that does not exist.\n\nThe email text includes:\n\n\"Thanks for your interest! Our podcast is hosted by Name 102, and you can find her on LinkedIn here: <url> We're just launching this series, so you'd be among our first guests!\"\n\nThe LinkedIn URL is invalid and there appears to be no such person, which makes the message look unprofessional. The reporter provided a screen recording of the behavior: <url:jam.dev>"
+    }
+  ]
+}

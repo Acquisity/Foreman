@@ -1,0 +1,247 @@
+{
+  "id": "ENG-15782",
+  "provenance": "seeded",
+  "createdAt": "2026-10-20T07:11:07.718Z",
+  "lane": "triage",
+  "stratum": "bug_master",
+  "ticket": {
+    "title": "Lead filtering in campaigns doesn't work",
+    "description": "#### Customer Name\n\nName 10\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nCompany Four\n\n#### Screenshot\n\n <image> \n\n#### What are you trying to achieve?\n\nFiltering on a type of leads in a campaign so I can download that specific type of leads so I can reuse them\n\n#### What are you doing to achieve it?\n\nFiltering on them\n\n#### What is happening instead?\n\nDoesn't show any leads whilst there are 4k+ leads that received email 1 and 2 (so completed lead)\n\n#### What is the expected outcome?\n\nFiltering on specific statuses works",
+    "attachmentKinds": ["image", "slack"]
+  },
+  "repoCommitAtCreate": "b1b95d93e2bd85c46dfc39ae147483eed69ee07e",
+  "flags": {
+    "descriptionEditedAfterCreate": false,
+    "needsProductionData": false,
+    "alreadyFixedAtTriage": false
+  },
+  "asFiled": {
+    "assignee": "Aaron Fraga",
+    "labels": [],
+    "parent": null,
+    "priority": 3,
+    "project": "Support"
+  },
+  "relatedSnapshot": [
+    {
+      "id": "ENG-3549",
+      "createdAt": "2025-12-08T15:47:25.575Z",
+      "title": "Fix leads filter not working in campaign view and update response message",
+      "state": "Duplicate",
+      "assignee": "Rohit Gupta",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "Filtering is not working in Campaigns > Leads view. Fix this.\n\nAlso, update the message returned when you use the filter and no leads are returned. Change from \"No leads found. Upload leads to get started.\" to \"No leads found.\" Make sure you only update this response message when the user is using the filter or search functionality.\n\n <image> \n\n <image> "
+    },
+    {
+      "id": "ENG-12737",
+      "createdAt": "2026-08-14T15:13:34.072Z",
+      "title": "Picking a filter on campaign leads breaks the list before you type anything",
+      "state": "Backlog",
+      "assignee": null,
+      "parent": null,
+      "labels": [],
+      "description": "## Overview\n\nIn a campaign's Leads tab, choosing what to filter on immediately breaks the list, before the user has entered a value. Other fields do something quieter but worse: they show a filter that is not actually filtering.\n\n## Problem\n\nA user opens a campaign, clicks Filter, and picks Email. The list errors straight away. They have not done anything wrong or even finished the action, and the error gives them no way forward except removing the filter.\n\nSome fields behave differently and hide a second problem. Picking one of those applies a filter matching every single lead, while showing a filter chip suggesting the list is narrowed. The user believes they are looking at a filtered set when they are looking at everything.\n\nThat second one matters more than it sounds, because this list feeds bulk actions. Someone can select \"delete all matching\" believing a filter is applied when it is not.\n\nThis is not new and was not caused by any recent change.\n\n## Proposed fix\n\nTreat a filter that has been started but not filled in as unfinished: do not run it, and do not show it as an active filter.\n\nSeparately, an unusable rule reaching the server should not throw an error at the user. It should resolve to a decided behaviour.\n\n## What's included\n\nThe campaign leads list, and all four places that read its filters: the list itself, the filtered delete, the export, and the active-filter count.\n\n## Blocked by\n\nNone: can start immediately.\n\n## How it should work\n\nAn unfinished filter does nothing until it has a value. Once it has one, it applies everywhere consistently.\n\nAll four consumers must read the same rules. If they diverge, a chip on screen means one thing to the table and something else to a bulk delete, which is the dangerous version of this bug.\n\n## Who can do what\n\nNo permission change.\n\n## What the user sees\n\nChoosing a field to filter on opens the value input without breaking anything. No filter chip appears until the filter actually does something.\n\n## Done when\n\n- [ ] Choosing any filterable field never errors the list before a value is entered.\n- [ ] An unfinished filter never quietly matches every lead while showing a chip.\n- [ ] The list, the filtered delete, the export and the filter count all read the same rules.\n- [ ] A genuinely unusable rule resolves to a documented behaviour rather than throwing.\n\n## Open questions\n\nFor a rule that is genuinely unusable rather than just unfinished: ignore it, or return nothing? Recommended default: return nothing. The CRM made the same choice for the same reason, that ignoring a rule silently widens the list, and that reasoning is stronger here because this list feeds bulk delete.\n\n## Expected outcome\n\nFiltering campaign leads is safe to use, and a filter chip always means what it says.\n\n## Implementation context\n\nTwo halves that each look reasonable alone. The filter editor publishes the rule the moment a field is chosen, seeded with an empty value. The server treats a missing value as a malformed rule and throws. So \"the user has not finished typing\" and \"this rule is broken\" end up as the same outcome.\n\nThe client-side fix is now the cheap one. Recent work added the idea of an unfinished rule to the shared filter editor, with helpers that strip those before querying. The CRM screens already use it. The leads table was deliberately left on the old behaviour rather than half-converted, so this is the conversion.\n\nConfirmed to hit the error path: Email. Fields handled before that check instead build a match-everything condition, which is where the silent version comes from. Three further fields are likely to error too but were not confirmed."
+    },
+    {
+      "id": "ENG-4189",
+      "createdAt": "2026-01-06T03:54:51.650Z",
+      "title": "Lead filters shrink count and consume credits",
+      "state": "Done",
+      "assignee": "Anthony Adewale",
+      "parent": null,
+      "labels": ["Credit/Billing Mismatch"],
+      "description": "When filtering for residential roofing company owners in the US, adjusting filters repeatedly (removing and then re-adding filters) consistently decreases the total lead count until it is close to zero.\n\nThis behavior was reproduced on both Chrome and Safari.\n\nAt the end of the flow an error is shown and it is not possible to continue to create the campaign. Despite not clicking \"create campaign\" at the end of the campaign creation flow, the account shows that 2,823 credits were used.\n\nThe expectation is that credits are not consumed when campaign creation is not completed, and that changing filters should not progressively and incorrectly shrink the lead count.\n\n <image> \n\n <image> "
+    },
+    {
+      "id": "ENG-3987",
+      "createdAt": "2025-12-23T16:55:32.609Z",
+      "title": "Bounced lead filtering not working in cold email agent",
+      "state": "Done",
+      "assignee": "Pieter Venter",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "In the Cold Email Agent, lead filtering for bounced leads is not working.\n\nFor campaign \"AI Business Audit – Service Businesses (Cold Outbound)\", the sender reports a 4.8% bounce rate, but when filtering for bounced leads, none are shown. This suggests bounced status is being recorded (or at least reported in aggregate) but not reflected in the lead-level filter results."
+    },
+    {
+      "id": "ENG-13982",
+      "createdAt": "2026-09-17T13:32:57.020Z",
+      "title": "Cold email campaign Leads cannot be sorted by Company: column header is inert and the Company sort reads an unlinked source",
+      "state": "Todo",
+      "assignee": "Anthony Adewale",
+      "parent": "ENG-13983",
+      "labels": ["Bug", "Customer reported", "intercom-sourced"],
+      "description": "## Source\n\nIntercom conversation: <url:app.intercom.com>\n\n## Bounded conversation context\n\nCustomer, a Member in one cold email workspace, asked how to clean up leads in a campaign that is already running. She wants to remove 200+ of roughly 2,280 leads, and asked to sort the Leads tab alphabetically by Company to make that easier. She reported that clicking the Company column header does nothing across repeated attempts; the AI agent's filter/search/hard-refresh suggestions did not help, and the conversation was escalated to a human. The support teammate replied that alphabetical sorting \"is not working at the moment\" and had no timeline. She also asked whether she could restore her own workspace role after accidentally changing herself from Admin to Member.\n\n## Testable claim\n\nA customer with \\~2,280 leads in a running cold email campaign cannot sort the campaign Leads table by Company: clicking the Company column header does not sort, and no control on that table sorts it by Company (the Advanced Sort control exists but reads a different source) even though the help centre documents \"Click any column header to sort by that column. Click again to reverse the sort.\"\n\n## Verified root cause (summary)\n\nTwo defects in the same path, confirmed in code at commit 5979f0a2bafdc542892528970a26e60c323f5daa:\n\n1. The campaign Leads table renders column headers with no sort affordance at all. The table's useReactTable config has no getSortedRowModel, sorting state, or onSortingChange, and the header cell renders the column header through flexRender with no toggle-sorting handler, so a header click is inert. Documented behaviour in apps/web/content/docs/cold-email-agent/campaigns/managing-campaigns/leads.mdx contradicts the shipped UI.\n2. The Company sort field reads a different source than the displayed Company value. buildCampaignLeadListQuery maps company to lead_scrape_lead.company reached through outreach_campaign_lead.internal_lead_id, while the displayed Company column is resolved by resolveCampaignLeadEnrichment, which falls back to the provider payload when that link is absent. Production shows every live lead in the affected campaign with internal_lead_id NULL and a provider company name present, so a Company sort silently no-ops while the column still shows companies. Refresh note: the Company advanced filter is NOT affected (buildLeadFilterCondition already reads the provider fallbacks), and the id sort tiebreaker already exists.\n\n## Related\n\nENG-12119 owns the sort-key alignment half of root cause 2 for a different customer and campaign; it predates the 30-day intake cutoff, so it is related rather than used as this report's parent.\n\nFull evidence, queries, blast radius, and code path: see the Triage investigation document on this ticket."
+    },
+    {
+      "id": "ENG-6659",
+      "createdAt": "2026-03-12T14:52:11.198Z",
+      "title": "Email Sent filter shows zero contacted leads",
+      "state": "Backlog",
+      "assignee": "Anthony Adewale",
+      "parent": null,
+      "labels": ["Dashboard Metrics"],
+      "description": "For the campaign `SaaS | Leadership | UK | Direct`, Analytics reports 156 leads contacted, but applying the `Email Sent = Contacted` filter in the Leads tab shows zero results.\n\nThe issue persisted after clearing filters, refreshing, and logging out and back into the workspace. The mismatch makes it unclear whether emails were actually sent from the campaign or whether the leads table filter is not reflecting campaign activity."
+    },
+    {
+      "id": "ENG-12397",
+      "createdAt": "2026-08-07T14:55:18.631Z",
+      "title": "Restore missing AI lead-search keywords in Campaign Options",
+      "state": "Done",
+      "assignee": "James Keeble",
+      "parent": null,
+      "labels": ["Bug", "Triage: Quick Win"],
+      "description": "## Problem\n\nCampaign Options no longer shows every filter used for AI lead searches. Name 1 are missing from the **Lead search filters** panel even though the search itself still applies them.\n\nThis regressed when Company One changed its enrichment response on **15 July 2026** from snake_case `search_filters.keyword_filter` to camelCase `search_filters.keywordFilter`. Acquisity stores that response and currently prefers the whole response object over the saved scrape input, so the renderer never sees the canonical keyword key.\n\nRead-only production analysis found the display regression affects **1,234 campaigns across 677 organizations**. Lead scraping was not affected and the historical keyword values remain stored, so no migration or backfill is required.\n\nRelated original feature: ENG-5891.\n\n## Scope\n\n* Normalize known Company One camelCase filter aliases to Acquisity's canonical filter keys at the read boundary.\n* Merge response filters per key with the saved scrape input so partial vendor responses do not hide filters that were applied.\n* Keep response values authoritative when both sources contain the same filter.\n* Add focused regression coverage using the exact current Company One response shape.\n\n## Acceptance criteria\n\n* Campaign Options shows included and excluded keywords from current `keywordFilter` responses.\n* Existing snake_case historical rows continue to render.\n* Partial response snapshots fill missing filters from the saved scrape input without overwriting response-owned values.\n* Known camelCase aliases render through the existing friendly filter labels.\n* No database migration or production writes are required.\n* Focused unit/component tests cover the regression and pass."
+    },
+    {
+      "id": "ENG-4799",
+      "createdAt": "2026-01-23T18:05:46.250Z",
+      "title": "Campaign lead filter fields clear after 10 seconds",
+      "state": "Done",
+      "assignee": "Anthony Adewale",
+      "parent": null,
+      "labels": ["Bug", "Lead Scraping"],
+      "description": "user: <email>\n\nWhen adding leads to an active \"med spa\" campaign without using a CSV, the manual filter/keyword fields clear themselves after about 10 seconds, preventing leads from being added.\n\nUser flow described:\n\n* User is creating a growth plan and using the only active campaign (\"med spa\").\n* User types information/keywords into the manual filter box fields instead of uploading a CSV.\n* After roughly 10 seconds, all entered information in these fields disappears.\n* This blocks the user from adding leads and progressing.\n\nRelevant screenshots:\n\n <image> \n\n <image> "
+    },
+    {
+      "id": "ENG-15306",
+      "createdAt": "2026-10-13T16:21:39.497Z",
+      "title": "Confirm Lead Targeting Capabilities",
+      "state": "Done",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": ["Customer reported", "Feature Request", "Internal reported"],
+      "description": "#### Customer Name\n\nName 2\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nCompany Two\n\n#### Screenshot\n\n#### What are you trying to achieve?\n\nClient would like to know how he can assure his insurance brokerage prospect receives appointments exclusively with employers who have 5–50 employees enrolled in a medical plan. This seems super niche for any data set, but I wanted to ask so I can be straight with Name 2 if no such assurances can be made.\n\n#### What are you doing to achieve it?\n\nN/A\n\n#### What is happening instead?\n\nN/A\n\n#### What is the expected outcome?\n\nClient has a sales pitch in coming days and niche targeting is going to be key. Hoping for some insight into what level of targeting we can achieve for the cold email campaigns."
+    },
+    {
+      "id": "ENG-3932",
+      "createdAt": "2025-12-19T23:09:38.683Z",
+      "title": "Industries and keyword filters reset and return 0 leads",
+      "state": "Canceled",
+      "assignee": "Anthony Adewale",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "User: Name 3 <email> (single workspace)\nPlan: Legacy Pro\n\nUser on Acquisity reports multiple issues with lead filtering:\n\n* When adding all required industries and keywords, the UI reports 0 leads, even though equivalent filters in Apollo show \\~30k leads.\n* Previously, pressing enter after entering all keywords would wipe out the selected industries and keywords, effectively resetting filters.\n* After recent fixes, industries appear to stay selected, but adding keywords (any set of 4) drastically reduces the lead count to 0.\n* In a later campaign attempt, industries disappeared again.\n\nUser provided a Loom showing the behavior: <loom>\n\nScreenshot from the follow-up Slack thread:\n\n <image> "
+    },
+    {
+      "id": "ENG-3398",
+      "createdAt": "2025-12-04T14:29:33.965Z",
+      "title": "Lead Status Filters Not Applying/Updating List",
+      "state": "Duplicate",
+      "assignee": "Tyler Olsen",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "Same ticket as ENG-3390 leaving it open for more information.\n\n**Description:** \\__Context:\\__The \"Filter by Status\" UI exists in the Leads tab, but it appears to be non-functional. Selecting a filter does not update the table, or it returns empty results even when data exists.\n**Evidence (Shown in Video):**\n\n* **Current State:** This campaign has **1 Positive Response** (confirmed in analytics).\n* **Bug:** When I select the **\"Interested\"** (or \"Reply Received\") filter, the list does not update to show that lead. It either stays the same or shows no results.\n  **Reproduction Steps:**\n\n1. Navigate to a Campaign > Leads tab.\n2. Ensure the campaign has at least one lead with a specific status (e.g., \"Interested\").\n3. Click **Filters** > Select **\"Interested\"**.\n4. Observe that the lead list **does not filter** correctly (fails to show the specific lead).\n\nWatch the screen recording here:\n\n<uuid>\n\n---\n\n**Name 4 URL:**\n<url>\n\n**Device and browser info:**\nChrome 143.0.7499.40 (1601x1251) | macOS (arm) 15.6.1\n\n**Date and time:**\nDecember 4th 2025 | 2:29pm UTC\n\n**View developer information (console logs, network requests & timing):**\njam.dev/c/<uuid>\n\n---\n\n*Captured with* *jam.dev*"
+    },
+    {
+      "id": "ENG-15335",
+      "createdAt": "2026-10-13T18:59:35.083Z",
+      "title": "Set the new lead search filters in the campaign wizard",
+      "state": "Done",
+      "assignee": "James Keeble",
+      "parent": "ENG-15333",
+      "labels": [],
+      "description": "## Overview\n\nPart of ENG-15333: users can set every new lead search filter in the campaign wizard, so they can target by tech stack, hiring and intent signals without the API.\n\n## Problem\n\nThe wizard's advanced filters only offer what the builder supported before. Once ENG-15334 ships, API callers can use filters that app users can't see or set.\n\n## User experience\n\nIn \"Select Your Leads\", the advanced filters gain:\n\n* Tech stack and hiring roles, as tag inputs.\n* Intent signals: a signal type, \"within N days\", and optional keywords.\n* Exclude locations, and a toggle for matching on the person's location or the company HQ.\n* Broad industries (include and exclude) and excluded industries.\n* An exact-match toggle next to job titles and excluded titles, and \"match any / all\" next to keywords.\n* The full news, funding stage and seniority lists.\n\nThe lead count preview refreshes after each change. The saved campaign shows a chip per filter, a duplicated campaign keeps them, and a section opens automatically when it holds a value.\n\n## How it works\n\n```mermaid\nflowchart LR\n  C[New controls] --> F[Campaign form state] --> L[Lead count preview] --> S[Save]\n  S --> D[Detail page chips]\n  S --> U[Duplicate keeps filters]\n```\n\n## What's included\n\n* The controls above, their form fields and defaults, the auto-open sections, the count preview input and save.\n* PostHog through the repo's activation tracking skill: the filter step records which advanced filters were used (names only, never the values typed).\n\n## Out of scope\n\n* Filter engine, API and MCP: ENG-15334.\n* AI search: ENG-15336.\n\n## Blocked by\n\nENG-15334\n\n## Done when\n\n* Changing each new control fires a count preview request that carries that filter. How to check: the network log on the PR preview.\n* A campaign saved with every new filter shows a chip for each on its detail page, and its duplicate shows the same values in the filter step.\n* At 390 px wide, no new control overflows sideways.\n* The advanced-filter event lands in PostHog with the filter names.\n\n## Implementation context\n\n* Follow the `acquisity-frontend` rules for the controls. James approves the screenshots before the code review hand-off."
+    },
+    {
+      "id": "ENG-12119",
+      "createdAt": "2026-07-29T12:56:00.087Z",
+      "title": "Campaign Leads tab: sorting by Company/Title/Industry silently does nothing for non-scrape leads",
+      "state": "Todo",
+      "assignee": "Koppany Kondricz",
+      "parent": null,
+      "labels": ["Bug", "intercom-sourced", "triaged-by-devin"],
+      "description": "BUG: Yes\n\nEVIDENCE:\n\n* Customer (Name 5, <email>, workspace \"<workspace-slug>\") reports that in the Cold Email campaign Leads tab, sorting by Company (or other columns) only appears to sort by contact name. Persisted after clearing cache; support could not reproduce on a different campaign (a campaign whose leads WERE scrape-sourced).\n* Root cause is a mismatch between how column values are DISPLAYED vs how they are SORTED in `getAllCampaignLeads` (apps/web/lib/outreach/db/campaign.ts).\n  * Display resolution (~lines 15028-15082) resolves company/title/industry/etc. via a fallback chain: `userOverrides` -> `leadScrapeLead` join -> `instantlyData.payload` -> `metadata.company/title/...`.\n  * Sort field mapping (~lines 14637-14676) maps `company`, `title`, `industry`, `linkedinUrl`, `state`, `country` ONLY to `leadScrapeLeadTable.*` columns (the scrape-lead join). Fields backed by `outreachCampaignLeadTable` (fullName, email, status, emailSentCount, createdAt) sort correctly.\n  * For any lead not linked to a scrape (`internal_lead_id` NULL) — i.e. Company One/CSV/metadata-sourced leads — the sort column is NULL for every row, so ORDER BY is a no-op. There is no secondary tiebreaker when a sort rule is present, so rows return in effectively unchanged order (looks like the default name-ish order), matching the report.\n* Confirmed against production for campaign <uuid>: all 5026 leads have `internal_lead_id` NULL and company/title live in `metadata->>'company'` / `metadata->>'title'` (0 scrape FKs, 0 instantly-payload company, 0 userOverrides). So `leadScrapeLeadTable.company`/`.title` are NULL for every row -> sort by Company/Title does nothing. This is why support (testing a scrape-sourced campaign) saw it \"work\" while the customer did not.\n* Docs (apps/web/content/docs/.../managing-campaigns/leads.mdx) state \"Click any column header to sort by that column\", so expected behavior is that these sorts work. Not a docs gap.\n\nPOTENTIAL FIX:\n\n* Make the sort key mapping for company/title/industry/linkedinUrl/state/country use the SAME fallback the display uses, via a COALESCE across `leadScrapeLead` join column, `metadata->'instantlyData'->'payload'->>'...'`, `metadata->'userOverrides'->>'...'`, and `metadata->>'...'` (mirroring the resolution at ~15028-15082). Add a stable secondary ORDER BY tiebreaker (e.g. `createdAt`/`id`) so results are deterministic. Keep it aligned with the search/filter logic which already reads from metadata (see ~line 13664+, 14413).\n\nWHATS NEEDED TO RESOLVE:\n\n* Refactor the sort expression builder in `getAllCampaignLeads` to compute sortable scrape-lead-style fields from the same COALESCE fallback used for display, plus a deterministic tiebreaker; verify parity with filter/search handling; regression test with a campaign whose leads are metadata/CSV/Instantly-sourced (no scrape FK).\n\nSeparate note (not this bug): the customer's second complaint — \"No email accounts connected\" despite connected inboxes and campaign stops sending — matches the known recurring bug ENG-11571 (do not duplicate). The low-daily-volume/warmup concern is expected ramp-up behavior and is documented.\n\nINTERCOM: <url:app.intercom.com>\nSLACK THREAD: <url:acquisityworkspace.slack.com>\nDEVIN SESSION: <url>"
+    },
+    {
+      "id": "ENG-4460",
+      "createdAt": "2026-01-12T14:32:59.434Z",
+      "title": "Failed to count leads in manual filter setup",
+      "state": "Canceled",
+      "assignee": "Jared Stauffer",
+      "parent": null,
+      "labels": [],
+      "description": "Client reports an issue when running a manual filter with a list of no-contact companies. When attempting to action the list in the campaign flow, the UI shows the banner \"Failed to count leads\" and a notification \"Failed to start lead scraping: No valid session.\" This blocks configuring manual filters for the campaign.\n\n <image> "
+    },
+    {
+      "id": "ENG-15518",
+      "createdAt": "2026-10-15T18:52:14.657Z",
+      "title": "Stop re-sending a campaign's existing leads on each new lead search and reporting them as skipped",
+      "state": "Done",
+      "assignee": "Koppany Kondricz",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "## Overview\n\nWhen someone adds a new lead search to a campaign, we send Company One every lead that's already in the campaign along with the new ones. Company One skips the leads it already has, and the Leads tab banner counts them as skipped without saying why. Users then see thousands of unexplained \"skipped\" leads, think their leads were dropped, and contact support.\n\n## Problem\n\nThe banner says something like \"6432 leads were skipped during upload (3 already exist in other campaigns, 4 blocked by email security (Mimecast), 29 on the do-not-contact list)\". The listed reasons cover only a small share of the total. The help center says the card spells out every reason. Nothing is actually lost: the skipped leads are already in the same campaign and being emailed.\n\n## Root cause\n\n`apps/web/lib/outreach/db/campaign.ts` `getAvailableCampaignLeadFilters` picks the leads for a dispatch, through `claimAvailableCampaignLeadPageForDispatch` and `getAvailableLeadsByCampaignId` in `process-campaign-add-leads.ts`. It filters on org, campaign, not deleted, and an optional source, batch, ids or dispatch id. Nothing excludes leads that already have a provider lead id, so every later lead-search run sends the whole campaign again.\n\nThe bulk add uses `skip_if_in_campaign: true` (`out-reach-service.ts`), so Company One skips the leads it already has and returns them in `skipped_count`. `mergeAcquisitySkipCounts` keeps that count. On the legacy banner path, `getCampaignLeadSkippedStats` sums it across runs. `buildLegacyBannerText` / `buildSkipCategories` have no category for leads that are already in this campaign, so those leads are counted but never named.\n\nIn the reported case, the three lead-search runs on one campaign sent 2,956, 3,454 and 3,480 leads to Company One, which accepted 2,956, 512 and 26 of them. Only 539 new campaign leads were created on the later two runs. The skipped counts were 2, 2,959 and 3,471, for a banner total of 6,432 with 36 named. Read at commit ecdd2712501d061be40225fa84c124b519d5b487.\n\n## Blast radius\n\n* Potentially exposed, counted 16 Oct 2026: 483 campaigns in 344 orgs (325 users), with 2,265,849 unnamed skipped leads. Base: lead_scrape_run rows created since 15 Sep 2026, excluding each campaign's first run, where `skipped_count` is above the sum of the named categories. Including first runs: 665 campaigns in 454 orgs.\n* These come from stored counters, so they're an upper bound on banners users actually see.\n* Confirmed affected: 1 org, the report below.\n\n## Proposed fix\n\nA new lead search should send Company One only leads that haven't been accepted yet. Any skips Company One still reports should get a named reason in the banner, so the total and the reasons always add up.\n\n## What's included\n\n* Scope the add-leads dispatch so it skips leads that already have a provider lead id, or scope it to the run's own leads.\n* Name provider-side skips in the legacy banner, or reconcile the total to the named reasons.\n* Check whether re-sent leads used up lead credits or capacity reservations (`billingRequired` depends on `existingScrape`). That's not verified yet.\n* Help center wording, if any skip is still unnamed after the fix.\n\nExcluded: the CSV upload banner path (`csvUploadStats`), which has its own counters.\n\n## Regression seam\n\nAdd a second lead-search run to a campaign whose leads already have provider ids.\n\n* Red before the fix: `total_sent` includes the existing leads and `skipped_count` rises by that number.\n* Green after the fix: only the new leads are sent, and the banner total equals its named reasons.\n\n## Done when\n\n* A second lead search on a campaign sends only leads that don't yet have a provider id.\n* The Leads tab banner's total equals the sum of the reasons it names.\n* A regression test covers the dispatch selection at `getAvailableCampaignLeadFilters`.\n\n## Reports\n\n* ENG-15429"
+    },
+    {
+      "id": "ENG-11226",
+      "createdAt": "2026-07-07T16:08:57.193Z",
+      "title": "\"Could not count leads\": SuperSearch preview 400s when saved industry filters aren't valid Company One subIndustry enum values",
+      "state": "Backlog",
+      "assignee": "Anthony Adewale",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "## Name 7 investigation\n\n**Finding:** Bug — Lead preview/count silently fails with \"Could not count leads\" whenever a campaign's saved (AI-generated) `industry` filter contains a value that is not in Company One's allowed `subIndustry` enum.\n\n**Decision:** Engineering Todo\n\nReported via Lucent (user <email>) on the Scrape Leads page after clicking \"Use last search filters\". Lucent issue: <url>\n\n### Root cause\n\n`buildSuperSearchFilters` maps the app's `industry` values directly into Company One's `search_filters.subIndustry.include` verbatim:\n\n* `apps/web/lib/outreach/Company One/utils/build-supersearch-filters.ts:161-165`\n* also `apps/web/lib/outreach/supersearch-filters.ts:497,581` and `apps/web/lib/outreach/campaign-agent-display-filters.ts:146`\n\nCompany One's API validates `subIndustry` against a strict enum, but our request input schema types it as free-form strings (`apps/web/lib/outreach/Company One/schemas/supersearch-enrichment.ts:325-330`, `subIndustry.include: z.array(z.string())`), so invalid values are forwarded unchecked. Company One then returns `400: body/search_filters/subIndustry/include/0 must be equal to one of the allowed values`.\n\nThe tRPC procedure `previewLeadsFromSuperSearch` (`apps/web/trpc/routers/outreach/providers.ts:1292-1412`) catches this and re-throws `INTERNAL_SERVER_ERROR`, which the UI renders as \"Could not count leads\" (`apps/web/components/campaigns/lead-count-badge.tsx:94`) with an empty results area.\n\n**Why \"Use last search filters\" reliably triggers it:** that button re-seeds the campaign's previously-saved filters (`apps/web/components/campaigns/campaign-scrape-leads-client.tsx:546`, via `hiddenSuperSearchFilters`). If the saved industry value is not a valid Company One subIndustry, the preview count fails every time — deterministic for the affected org.\n\n**Prior art:** ENG-4014 (Done) added guardrails to reduce AI-hallucinated industry values causing Company One 400s during campaign creation. That guard does not cover this preview/count path or already-saved/seeded filters, so invalid values still slip through here.\n\n### Evidence checked\n\n* **Axiom** (`acquisity`, 30d): 112 `Failed to preview leads from SuperSearch`. Excluding a June 15-16 spike (93, unrelated older deploy, empty error field), the recurring pattern is 16 × `Company One API Client Error (400): body/search_filters/subIndustry/include/N must be equal to one of the allowed values` + 3 × `Company One API Server Error (500)` (the 500 variant is ENG-10269, Done). Reproduced today 2026-07-07 15:22:48/49 UTC for userId `<uuid>`, org `<uuid>` — the exact subIndustry 400.\n* **Prod DB** (read-only): user <email> = `<uuid>`; org `<uuid>` = \"Company Three's Workspace\" (partner_id null); most recent active campaign \"Med-Tech - June-26 - 5K\". Confirms the failing Axiom user is the reported Lucent user.\n* **Sentry**: not queryable (403 / no permission for this session).\n* **Name 6**: ENG-4014 (Done, same root-cause family, campaign-creation path) and ENG-10269 (Done, the 500 counting variant). No open issue covers the subIndustry-enum 400 on the preview/count path.\n\n### Recommended next step\n\nValidate/normalize `industry` values against Company One's allowed `subIndustry` enum before building the request in `build-supersearch-filters.ts` (drop or map unknown values instead of forwarding them), and apply the same normalization to saved/seeded filters used by \"Use last search filters\". As a fallback, catch Company One's 400 in `previewLeadsFromSuperSearch` and either retry without the offending filter or surface a clear, non-generic message instead of \"Could not count leads\". Consider extending ENG-4014's guardrail to this path.\n\n**Potential fix, if engineering bug:** enum-guard the industry→subIndustry mapping (see above).\n\n### Triage scope confirmation\n\nNo branch, commit, PR, deployment, migration, patch, code/docs/config change, or other implementation action was created in this session."
+    },
+    {
+      "id": "ENG-4641",
+      "createdAt": "2026-01-19T04:42:27.428Z",
+      "title": "Delete all on filtered leads removes entire workspace leads",
+      "state": "Canceled",
+      "assignee": "Anthony Adewale",
+      "parent": null,
+      "labels": ["Bug", "Lead Scraping"],
+      "description": "In workspace \"Company Five 1\", the cold email campaign leads list experienced incorrect behavior when deleting filtered results.\n\nA user had \\~2,800 leads already uploaded and scraped another \\~3,500 leads. After manually cleaning leads (deleting \\~20% per page), they used the leads filter to narrow results to 14 leads, then clicked \"delete all\". The UI confirmed \"Are you sure you want to delete all 14?\", but after confirming, all leads in the workspace were removed instead of only the 14 filtered leads.\n\nAfter this, a yellow banner appeared stating \"6969 leads were skipped during upload\" and the campaign shows 0 leads uploaded. Previously, the same delete action had been used many times and only affected the selected/on‑screen leads.\n\nLeads appear to be the only impacted entity. The affected campaign was scheduled to start at 9:00 AM the next day.\n\nCredits used for scraping these leads were consumed and are still shown as used, despite the leads being deleted by this bug."
+    },
+    {
+      "id": "ENG-1323",
+      "createdAt": "2025-09-19T17:53:05.347Z",
+      "title": "Improve Lead Scraping: Consider Previous Filters and Avoid Duplicate Parameters",
+      "state": "Done",
+      "assignee": "Anthony Adewale",
+      "parent": null,
+      "labels": [],
+      "description": "## Problem\n\nThe campaign agent currently scrapes new leads without taking into account previous filters and scrape runs. This can result in:\n\n* Getting similar/duplicate leads\n* Name 8 the same parameters repeatedly\n* Not leveraging historical scraping data to improve targeting\n\n## Requirements\n\nEnhance the lead scraping functionality to:\n\n1. **Historical Context Integration**\n   * Analyze previously scraped leads to understand successful patterns\n   * Store and reference past filter configurations\n   * Track scrape run history and outcomes\n2. **Smart Parameter Variation**\n   * Identify leads similar to previously successful ones\n   * Use different parameters/approaches to find similar quality leads\n   * Avoid exact parameter duplication that leads to identical results\n3. **Deduplication Logic**\n   * Implement checks to prevent scraping the same leads multiple times\n   * Create similarity scoring to identify potential duplicates\n   * Maintain a database of previously scraped leads for comparison\n\n## Acceptance Criteria\n\n- [ ] System analyzes previous scrape runs before starting new ones\n- [ ] Algorithm finds leads similar to successful previous leads using varied parameters\n- [ ] Duplicate lead detection prevents re-scraping identical prospects\n- [ ] Historical filter data is stored and referenced for optimization\n- [ ] Performance metrics show improved lead quality and reduced duplicates\n\n## Technical Considerations\n\n* Need to implement lead similarity scoring algorithm\n* Require persistent storage for scrape history and lead database\n* Consider performance impact of historical data analysis\n* Implement configurable similarity thresholds"
+    },
+    {
+      "id": "ENG-5154",
+      "createdAt": "2026-02-05T14:00:40.336Z",
+      "title": "Add filter for leads not yet contacted in Leads tab",
+      "state": "Backlog",
+      "assignee": "Anthony Adewale",
+      "parent": null,
+      "labels": ["Feature"],
+      "description": "user: <email>\n\nRequest to filter/view leads in a campaign that have not been contacted yet (e.g., never received the first email) so campaign progress/remaining time can be tracked.\n\nCurrent metrics appear confusing: 2799 leads uploaded vs 3533 sequences started, and counts also don’t match what’s shown in Company One."
+    },
+    {
+      "id": "ENG-3008",
+      "createdAt": "2025-11-26T11:30:18.190Z",
+      "title": "Add an option for manually selecting filters during campaign lead scraping",
+      "state": "Done",
+      "assignee": "Anthony Adewale",
+      "parent": null,
+      "labels": ["Feature"],
+      "description": "Instead of having AI create the filters OR having to manually upload a CSV, let users select the filters manually"
+    },
+    {
+      "id": "ENG-7429",
+      "createdAt": "2026-04-01T13:09:44.540Z",
+      "title": "Backfill Completed/Completed No Reply statuses from Company One analytics",
+      "state": "Backlog",
+      "assignee": "Anthony Adewale",
+      "parent": null,
+      "labels": [],
+      "description": "## Problem\n\nThe \"Completed\" and \"Completed No Reply\" status filters in the leads table return 0 results for campaigns where leads have been completed, despite the campaign stats showing thousands of completed leads (e.g. \"Leads Completed: 2,155\").\n\n## Root Cause\n\nThe \"Leads Completed\" stat comes from Company One's analytics metadata (stored in `outreachCampaignTable` stats columns), but the actual `completed` / `completed_no_reply` status values were never synced into our `outreach_campaign_lead_status` history table. The status filters query `outreach_campaign_lead_status`, so they find no matching rows.\n\nThe backfill migration added in ENG-7209 only covers leads that have a legacy `status` column value — it cannot infer completion status for leads where that data only exists in Company One's analytics.\n\n## Proposed Solution\n\nInvestigate syncing completion status data from Company One analytics into `outreach_campaign_lead_status` rows, either via:\n\n1. A one-time backfill script that reads Company One campaign analytics and inserts corresponding status rows\n2. Updating the import/sync pipeline to map Company One's completion signals to our status table going forward\n\n## Related\n\n* ENG-7209: Leads section update (status filters, select all, export)\n* The status filter infrastructure is already in place — this is purely a data availability issue"
+    },
+    {
+      "id": "ENG-8605",
+      "createdAt": "2026-05-15T15:33:36.331Z",
+      "title": "Update all lead statuses immediately from webhooks",
+      "state": "In Progress",
+      "assignee": "James Keeble",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "## Overview\n\nApply supported Company One and EmailBison lead-status webhooks immediately after saving them, so the Leads table, filters and exports stay current during sending bursts without waiting for a status-job queue.\n\nThis continues the outcome delivered by Acquisity/Acquisity#6231 and Acquisity/Acquisity#6409. The permanent change is one implementation PR.\n\n## Problem\n\nQueued status jobs repeatedly read complete lead histories and compete with duplicate reconciliation work. During heavy traffic, saved contact activity can take too long to reach the visible lead status.\n\nCustomer reports remain tracked in the paused-campaign report and the historical missing-identity report.\n\n## User experience\n\nKeep the existing Status column, Current/Ever filters, separate history control, URL state and automatic refresh. All exports remain available, including Not Yet Contacted. Keep freshness monitoring for operators only; do not show customer-facing freshness messages. A Not Yet Contacted filter excludes known saved contact activity even before the displayed status catches up; an unfiltered export still includes contacted leads.\n\n## Proposed fix\n\nSave each webhook first, then apply that exact saved event through one indexed, idempotent database operation. Remove per-webhook status jobs and duplicate campaign-status reconciliation after campaign activation. A single bounded scheduled repair job retries saved events that could not be applied.\n\n## What's included\n\n* Preserve all existing provider mappings, organization/provider/campaign boundaries, soft-deleted lead handling, Current/Ever history and out-of-order/duplicate safety.\n* Preserve HTTP 200 for internal storage or processing failures. Existing authentication and malformed-request handling stay unchanged.\n* Preserve automatic reply as distinct from human reply; lead_closed maps to Converted and lead_meeting_completed to Completed.\n* Keep campaign analytics, pipeline and reply/bounce workflow effects asynchronous and intact.\n* Add durable application state, deterministic Current ordering, bounded recovery and operator-controlled campaign activation.\n* Ship additive schema, implementation, tests and compatibility in one PR. Production rollout is staged separately.\n\n## How it should work\n\nA saved event remains pending until all status/history writes commit. Failure leaves it available for bounded retry. Imports cannot overwrite webhook Current; delayed bounce work cannot overwrite a newer status.\n\nName 9 starts disabled, catches up one internal campaign, and expands only after correctness and database-capacity checks pass. Interrupted catch-up resumes from a saved checkpoint. A global pause stops immediate updates while retaining saved events and repair processing.\n\nThe guarantee covers durably known campaign facts at export validation time. Undelivered or unsaved events may require targeted provider recovery; HTTP 200 and an empty pending queue do not prove that no event was lost.\n\n## Done when\n\n* Supported events update Current, Ever history and contact evidence correctly without creating new status jobs for activated campaigns.\n* Duplicate/out-of-order, tenant isolation, legacy baseline, bounce, import and interrupted recovery cases pass focused and real-database tests.\n* Representative burst/load tests establish the activation limits without unbounded pool pressure.\n* Dashboard/API filters and exports agree on known contact evidence, and freshness never disables exports.\n* Exact-head browser QA, CI and independent correctness/risk reviews pass before CR readiness.\n* The PR includes an executable migration, staged activation, monitoring and rollback procedure. Production activation remains separate from CR and merge.\n\n## Implementation context\n\nAI context.md records the settled architecture, compatibility, recovery and verification contract."
+    }
+  ]
+}

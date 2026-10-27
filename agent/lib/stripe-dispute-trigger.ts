@@ -176,17 +176,63 @@ export const stripeDisputeSessionMessage = (alert: string): string =>
   ].join("\n");
 
 const MENTION = /<@[A-Z0-9]+(?:\|[^>]*)?>/gu;
-const CLOSING_PUNCTUATION = /[.!]+$/u;
+
+const APPROVAL_WORDS = new Set([
+  "acquisity",
+  "ahead",
+  "and",
+  "approve",
+  "approved",
+  "dispute",
+  "evidence",
+  "foreman",
+  "go",
+  "it",
+  "lgtm",
+  "now",
+  "ok",
+  "okay",
+  "please",
+  "send",
+  "ship",
+  "submit",
+  "the",
+  "this",
+  "to",
+  "yes",
+]);
+const GO_AHEAD =
+  /\b(?:approve|approved|submit|lgtm|ship it|send it|go ahead)\b/u;
+const NO_CHANGES = /(?:^|[,.!:;-])\s*no changes\s*(?=[,.!:;-]|$)/gu;
+const PUNCTUATION = /[.,!:;]+/gu;
+const CURLY_APOSTROPHE = /\u2019/gu;
+const WHITESPACE = /\s+/u;
 
 /**
- * Whether a person's thread reply is a literal approval: "approve" with only
- * mentions, case and closing punctuation around it. Anything else, a question
- * or "approve but change X", is not.
+ * Whether a person's thread reply approves the submit. Fail closed: after
+ * tags, the bot's name and a "no changes," clause are removed, every word must be
+ * approval vocabulary and one must say to go ahead. So "approve", "Foreman
+ * approve", "approve to submit", "no changes, approve" and "go ahead and
+ * submit" pass, while a question, a refusal, a condition or any other request
+ * ("I cannot approve", "approve only after finance confirms", "go ahead and
+ * update the evidence") does not.
  */
-export const isStripeDisputeApprovalText = (text: string): boolean =>
-  text.length <= 200 &&
-  text
-    .replace(MENTION, "")
+export const isStripeDisputeApprovalText = (text: string): boolean => {
+  if (text.length > 200 || text.includes("?")) {
+    return false;
+  }
+  const said = text
+    .replace(MENTION, " ")
+    .toLowerCase()
+    .replace(CURLY_APOSTROPHE, "'")
     .trim()
-    .replace(CLOSING_PUNCTUATION, "")
-    .toLowerCase() === "approve";
+    .replace(NO_CHANGES, " ")
+    .replace(PUNCTUATION, " ")
+    .trim();
+  const words = said.split(WHITESPACE).filter(Boolean);
+  return (
+    words.length > 0 &&
+    words.every((word) => APPROVAL_WORDS.has(word)) &&
+    GO_AHEAD.test(said)
+  );
+};

@@ -91,7 +91,7 @@ test("Intercom non-Bug outcomes end in the skill without the shared stages", () 
   assert.ok(nonBug.includes("## Step 8: Record the case"));
   assert.ok(nonBug.includes("## Step 9: Reply in Slack"));
   for (const outcome of [
-    "User Error, Platform Limitation, ordinary feedback, or an unproven claim",
+    "User Error, a Platform Limitation nobody wants lifted, ordinary feedback, or an unproven claim",
     "Support/Product follow-up",
   ]) {
     assert.ok(nonBug.includes(outcome), outcome);
@@ -102,12 +102,12 @@ test("Intercom non-Bug outcomes end in the skill without the shared stages", () 
   assert.equal(nonBug.includes("engineering-handoff"), false);
   assert.ok(
     productSkill.includes(
-      "Steps 7 and 8 below are not for a Bug; its Slack reply is Step 9"
+      "Steps 7 and 8 below are not for these; their Slack reply is Step 9"
     )
   );
   assert.ok(
     productSkill.includes(
-      "A Bug is recorded by `triage-handling` Stage 7 under its ticket identifier once its review has settled"
+      "A Bug or feature request is recorded by `triage-handling` Stage 7 under its ticket identifier"
     )
   );
   assert.ok(

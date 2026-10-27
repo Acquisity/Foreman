@@ -1,0 +1,227 @@
+{
+  "id": "ENG-15286",
+  "provenance": "seeded",
+  "createdAt": "2026-10-13T14:55:04.905Z",
+  "lane": "triage",
+  "stratum": "user_error",
+  "ticket": {
+    "title": "Static meeting link not working",
+    "description": "#### Customer Name\n\nName 13\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nCompany Two\n\n#### Screenshot\n\n#### What are you trying to achieve?\n\nGet the clients clients static meeting link working\n\n#### What are you doing to achieve it?\n\nreaching out to you\n\n#### What is happening instead?\n\nstatic meeting link isn't working and populating meetings\n\n#### What is the expected outcome?\n\nGet the clients clients meetings booked into the calendar",
+    "attachmentKinds": ["slack"]
+  },
+  "repoCommitAtCreate": "966d34d0e3b026f0ef99bce9933caf81dca81629",
+  "flags": {
+    "descriptionEditedAfterCreate": false,
+    "needsProductionData": true,
+    "alreadyFixedAtTriage": false
+  },
+  "asFiled": {
+    "assignee": "Aaron Fraga",
+    "labels": [],
+    "parent": null,
+    "priority": 1,
+    "project": "Support"
+  },
+  "relatedSnapshot": [
+    {
+      "id": "ENG-13957",
+      "createdAt": "2026-09-17T07:43:45.129Z",
+      "title": "AI SDR is not booking meetings and escalating with an Error - Meeting Location unavailable",
+      "state": "Todo",
+      "assignee": "Koppany Kondricz",
+      "parent": "ENG-13278",
+      "labels": ["Bug", "Customer reported", "fast-lane"],
+      "description": "#### Customer Name\n\nName 1\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 1\n\n#### Screenshot\n\n <image> \n\n <image> \n\n <image> \n\n <image> \n\n <image> \n\n#### What are you trying to achieve?\n\nAI SDR to book meetings as per prospects availability\n\n#### What are you doing to achieve it?\n\nZoom and email are connected.\n\n#### What is happening instead?\n\nAI SDR is escalating the threads instead of booking the call, with the error - Meeting Location Unavailable\n\n#### What is the expected outcome?\n\nPlease investigate and resolve"
+    },
+    {
+      "id": "ENG-3900",
+      "createdAt": "2025-12-18T18:27:59.784Z",
+      "title": "Conferencing setting: “Static meeting link” cannot be disabled and meeting link cannot be cleared",
+      "state": "Canceled",
+      "assignee": "Anuj Bhatt",
+      "parent": null,
+      "labels": ["Bug", "Power User Request"],
+      "description": "In **Workspace Settings → Conferencing**, the option **“Static meeting link (Same link for all meetings)”** cannot be turned off. Additionally, the meeting link field does not persist deletions: when a user enters a client’s Name 3 Meet link and later deletes it, the link reappears or is not actually removed after saving/reloading.\n\nThis prevents users from disabling static links and creates incorrect behavior where a previously entered meeting link remains active even after being cleared.\n\nUser: Name 2\n\nSlack: <url:fegrowthpartner.slack.com>\n\n**Impact**\n\n* Users cannot switch away from a static meeting link setup.\n* Users may unintentionally keep using an outdated or incorrect meeting link for meetings.\n* Confusing and breaks expected “save” behavior for workspace settings.\n\n### Testing\n\n**Repro steps**\n\n 1. Open the app and navigate to a specific workspace (example: Company Three).\n 2. Go to **Settings → Conferencing**.\n 3. Observe the toggle: **“Static meeting link (Same link for all meetings)”**.\n 4. Try to turn the toggle **off**, then **Save**.\n 5. Refresh the page or navigate away and back.\n 6. Enter a valid meeting link (example: a Name 3 Meet URL) into the static meeting link input.\n 7. **Save**.\n 8. Delete the meeting link value so the field is empty.\n 9. **Save** again.\n10. Refresh / revisit the page.\n\n**Expected**\n\n* Toggle state persists: if turned off and saved, it remains off when returning.\n* If the meeting link input is cleared and saved, it stays empty when returning.\n* When toggle is off, the static meeting link should not be used by the scheduling/booking flow.\n\n**Actual**\n\n* Toggle cannot be turned off (or reverts to on after save/reload).\n* Deleted meeting link is not removed (reappears or persists).\n\n**Test variations**\n\n* Repeat in multiple workspaces to confirm setting is truly workspace-scoped.\n* Test with multiple users (owner/admin) if roles exist.\n* Test on Chrome and Safari.\n\n### Definition of Done\n\n* User can successfully toggle **Static meeting link** on/off in **Settings → Conferencing**, and the state persists after save, refresh, and re-login.\n* User can clear the static meeting link input, save, and it remains cleared after refresh/navigation.\n* Backend persists `null`/empty value correctly (no fallback re-population unless explicitly intended).\n* When static meeting link is **off**, meeting creation/booking does **not** use the static link.\n* Add automated coverage:\n  * Unit/integration test verifying update + persistence of conferencing settings (toggle and link value).\n  * E2E test verifying UI save and reload behavior for toggle + clearing link.\n* Confirm workspace isolation: changing conferencing settings in one workspace does not affect another workspace."
+    },
+    {
+      "id": "ENG-1462",
+      "createdAt": "2025-09-26T10:54:50.436Z",
+      "title": "Static meeting links",
+      "state": "Done",
+      "assignee": "Mahmut Jomaa",
+      "parent": null,
+      "labels": ["Feature"],
+      "description": "Allow static meeting links and disable zoom until verification is done."
+    },
+    {
+      "id": "ENG-2004",
+      "createdAt": "2025-10-17T12:28:45.913Z",
+      "title": "Check if static meeting link field allows for Name 3 Meet links",
+      "state": "Done",
+      "assignee": "Mahmut Jomaa",
+      "parent": null,
+      "labels": [],
+      "description": "if not, why not?"
+    },
+    {
+      "id": "ENG-6487",
+      "createdAt": "2026-03-09T18:16:39.247Z",
+      "title": "Fix automation errors in AI-SDR cold email campaign",
+      "state": "Done",
+      "assignee": "Jared Stauffer",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "#### Customer Name\n\nName 4\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 4\n\n#### Screenshot\n\n#### What are you trying to achieve?\n\nRun a standard AI-SDR cold email campaign with automated meeting booking so prospects who reply can easily schedule calls using the connected calendar and Zoom meeting link.  The goal is for the AI to respond to replies and allow prospects to book one valid meeting within the allowed calendar window (9am–5pm CST).\n\n#### What are you doing to achieve it?\n\nThe client launched an AI-SDR campaign inside Acquisity.  Steps taken:  • Configured AI campaign using the standard AI configuration template • Connected calendar for automated meeting booking • Set calendar rules to allow booking 9am–5pm CST only • Added Zoom meeting link inside AI configuration • Assigned the correct salesperson calendar (Name 5) • Campaign was turned on and began receiving replies  Campaign produced 14 positive replies within the first week.\n\n#### What is happening instead?\n\nMultiple automation and booking errors are occurring:  • AI sending multiple meeting invites to the same prospect • Prospects receiving duplicate booking links in the same thread • Prospects receiving multiple calendar invites across different days • AI referencing incorrect dates in emails • AI offering calendar times that are actually blocked • Calls being booked outside the allowed time window • Zoom link sometimes sending <domain> instead of the configured meeting link  Additional UI / workflow issues:  • If a prospect CCs another person, the CC contact does not appear in the Acquisity UI • One email thread is locked and cannot be opened or replied to • AI responded to a thread even though it was flagged for manual response  The client paused the campaign because these issues were causing confusion with prospects.\n\n#### What is the expected outcome?\n\nExpected behavior:  • AI should send one booking link only • Prospects should receive one meeting invite • Calendar should only offer available times within the allowed window • Meeting invite should include the correct Zoom link • If a thread is flagged for manual response, AI should not reply automatically • CC recipients should be visible in the Acquisity UI • Email threads should remain clickable and editable  Campaign should run normally without sending duplicate invites or incorrect scheduling information."
+    },
+    {
+      "id": "ENG-3709",
+      "createdAt": "2025-12-12T08:11:48.305Z",
+      "title": "SDR sending Zoom despite static URL configured",
+      "state": "Canceled",
+      "assignee": "Pieter Venter",
+      "parent": "ENG-3683",
+      "labels": ["Bug"],
+      "description": "Booking confirmations are sending Zoom links even though conferencing is configured with a static Riverside URL.\n\nSupport has confirmed with the customer that:\n\n* Conferencing is already set to Static Link with the Riverside URL.\n* Zoom/Riverside settings and general troubleshooting steps have been reviewed but the behavior persists."
+    },
+    {
+      "id": "ENG-2109",
+      "createdAt": "2025-10-20T12:21:23.508Z",
+      "title": "Failed to update static link when entering a URL without https:// in front",
+      "state": "Done",
+      "assignee": "Mahmut Jomaa",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "### Problem:\n\n <image> \n\nUsers are entering the conferencing URL without the https:// preceding the domain\n\n### Solution\n\nUse normalizedFlexibleUrlSchema that accepts no https:// or http:// in front of the domain"
+    },
+    {
+      "id": "ENG-13146",
+      "createdAt": "2026-08-26T14:18:54.954Z",
+      "title": "Acquisity Zoom connection EU Block",
+      "state": "Done",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": ["Customer reported"],
+      "description": "#### Customer Name\n\nName 6\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nCompany One\n\n#### Screenshot\n\n <image> \n\n#### What are you trying to achieve?\n\ncoming here, need help with getting this fixed\n\n#### What are you doing to achieve it?\n\n* \n\n#### What is happening instead?\n\nMy client Name 6 has a new client (Company One) that he is trying to onboard into acquisity, he had a bunch of problems inviting him to his workspace as client view & believe they just had to set up a new workspace together from Name 7 laptop on a call. Upon trying to connect his zoom to acquisity - it's saying it's blocked in the EU, is this true & if so, what is the workaround????\n\n#### What is the expected outcome?\n\nclarity on solution"
+    },
+    {
+      "id": "ENG-12429",
+      "createdAt": "2026-08-08T13:44:58.248Z",
+      "title": "AI SDR Missing Meeting Links on Some Bookings",
+      "state": "Todo",
+      "assignee": "Koppany Kondricz",
+      "parent": null,
+      "labels": ["Bug", "intercom-sourced"],
+      "description": "**Customer Name**\nName 1\n\n**Customer Email**\n<email>\n\n**Customer Email**\n<email>\n\n**Workspace name**\nName 1's Workspace\n\n**Screenshot**\n<optional>\n\n**What is the user trying to achieve?**\nEnsure that every meeting booked by the AI SDR includes the configured Zoom meeting link.\n\n**What is the user doing to achieve it?**\nThe user has a static Zoom meeting link configured, and the same salesperson is assigned to all campaigns. The setup has previously worked correctly, and the user is monitoring the calendar events created by the AI SDR.\n\n**What is happening instead?**\nTwo recently booked meetings were created without the Zoom meeting link, while other AI SDR bookings from the same setup have the link correctly included. We reviewed the conversations for both affected prospects and found nothing unusual that would explain the missing link. Both prospects simply selected available times and the AI SDR confirmed the bookings normally.\n\n**What is the expected outcome?**\nAll AI SDR-created calendar events should consistently include the configured Zoom meeting link. Please investigate why the conferencing link was omitted from these two bookings and whether this could be an intermittent issue with AI SDR event creation."
+    },
+    {
+      "id": "ENG-11307",
+      "createdAt": "2026-07-09T07:10:16.414Z",
+      "title": "Manual AI SDR events omit \"Join Meeting\" button in booking notification email (static/custom conferencing link)",
+      "state": "Todo",
+      "assignee": "Koppany Kondricz",
+      "parent": null,
+      "labels": ["Bug", "intercom-sourced"],
+      "description": "BUG: Yes\n\nEVIDENCE:\nCustomer (Name 8, <email>) reports that AI SDR auto-booked meetings send a notification email with both \"Join Meeting\" and \"View Conversation\" buttons, but meetings created manually inside an AI SDR conversation (\"Create Appointment from Thread\") send an email with only \"View Conversation\" — the \"Join Meeting\" button is missing, even though Zoom conferencing is configured.\n\nConfirmed root cause in code + prod DB:\n\n* The email template `packages/mail/src/templates/ai-sdr-booking-notification-email.tsx` only renders the \"Join Meeting\" button when the `meetingUrl` prop is present/safe.\n* `bookingService.bookAppointment` derives `meetingUrl` from `videoMeetingManager.resolveMeetingLocation` (`apps/web/lib/scheduling/services/video-meeting-manager.ts`). That function only resolves a `meetingUrl` when the passed `location` is empty or exactly `'zoom_video'`. If a concrete link/string is passed as `location`, it skips the block and `meetingUrl` stays undefined (the link is stored only in `location`).\n* Auto-booking (`apps/web/lib/ai-sdr-v2/workflow/steps/booking.ts`) calls `bookAppointment` with NO `location`, so for a static-link user it sets `meetingUrl = conferencingStaticLink` -> button shows.\n* Manual flow (`apps/web/components/ai-sdr/create-appointment-from-thread-modal.tsx` -> `appointments.createFromThread` -> `bookAppointment`): when `conferencingPreferences.linkType === 'static'`, the modal hides the \"Zoom Video\" option, forces `locationType='custom'`, and pre-fills `customLocation` with the static link. On submit it passes that link as `location`. `resolveMeetingLocation` then skips (location is a real URL, not `'zoom_video'`), so `meetingUrl` is undefined -> email shows only \"View Conversation\". Both paths send the same email (gate is `if (threadId)` in booking-service.ts).\n* Prod DB confirms this user: `conferencing_link_type = 'static'`, `conferencing_static_link = <url:us05web.zoom.us>`. So the static-link branch is exactly what they hit.\n\nNet: a valid Zoom link exists on the appointment (in `location`) but the notification email's \"Join Meeting\" button is suppressed for manual events because it keys off `meetingUrl`, which the manual/static/custom path never populates.\n\nPOTENTIAL FIX:\n\n* In `bookAppointment`/notification, fall back to the resolved `location` (when it is a safe URL) for the email's `meetingUrl` prop when `meetingUrl` is empty; OR\n* In `resolveMeetingLocation`, when a static/custom link is supplied as `location`, also set `meetingUrl` to that link (for static-link users, mirror the auto-booking behavior); OR\n* Have the email template fall back to a safe `location` URL when `meetingUrl` is absent.\n  Ensure this stays consistent with static vs dynamic conferencing and with the calendar event link.\n\nWHATS NEEDED TO RESOLVE:\n\n* Decide which layer owns the fallback (resolveMeetingLocation vs booking-service email props vs email template).\n* Confirm expected behavior for custom non-URL locations (physical address) so the button isn't shown for non-join locations.\n* Regression tests covering static-link + manual createFromThread producing a Join Meeting button.\n\nINTERCOM: <url:app.intercom.com>\nSLACK THREAD: <url:acquisityworkspace.slack.com>\nDEVIN SESSION: <url>"
+    },
+    {
+      "id": "ENG-1574",
+      "createdAt": "2025-10-01T17:32:52.561Z",
+      "title": "Fix calendar invite not sending actual conference link",
+      "state": "Canceled",
+      "assignee": "Declan Lupari",
+      "parent": null,
+      "labels": [],
+      "description": "The current scheduling does not provide the actual conference / saved zoom link from the user settings in the meeting invitation\n\n <image> \n\n <image> "
+    },
+    {
+      "id": "ENG-13311",
+      "createdAt": "2026-08-31T17:37:53.559Z",
+      "title": "Unable to add closer to Name 9's Acquisity Account",
+      "state": "Done",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": ["Customer reported"],
+      "description": "#### Customer Name\n\nName 9\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 10's Workspace\n\n#### Screenshot\n\n <image> \n\n#### What are you trying to achieve?\n\nI have added the client's closer to Acquisity as a member; however I cannot assign the call handling to the closer. It does not give me the option\n\n#### What are you doing to achieve it?\n\nI went to settings then I went to AI SDR agent, then I went to Call Assignment and it does not show the option to tick the closer\n\n#### What is happening instead?\n\nIt is just showing automatic assignment or the client Name 9's name\n\n#### What is the expected outcome?\n\nAdd the closer in the call assignment and have all meetings flow into his calendar"
+    },
+    {
+      "id": "ENG-13874",
+      "createdAt": "2026-09-14T22:19:42.454Z",
+      "title": "Acquisity-created Zoom meetings start 4 hours late (UTC time sent together with a local timezone)",
+      "state": "Done",
+      "assignee": "Anuj Bhatt",
+      "parent": "ENG-13875",
+      "labels": ["Bug", "Customer reported", "fast-lane", "intercom-sourced"],
+      "description": "**Intercom conversation**: <url:app.intercom.com>\n\n**Conversation context**: CS teammate (Jam) reports on behalf of the workspace owner that Acquisity-generated Zoom meetings consistently appear four hours later than the matching Acquisity and Name 3 Calendar appointments. Workspace Availability, Name 3 Calendar and the Zoom profile are all America/New_York. Directly created Zoom meetings are correct.\n\nExamples given:\n\n* \"G City\": Acquisity/Name 3 Calendar 2026-09-16 10:30 AM Eastern -> Zoom shows 2:30 PM\n* \"Name 11\": Acquisity/Name 3 Calendar 2026-09-18 11:00 AM Eastern -> Zoom shows 3:00 PM\n\n**Testable claim**: When Acquisity creates a dynamic Zoom meeting, it sends a UTC (`Z`) start_time together with a local `timezone` field, so Zoom re-applies the workspace's UTC offset: an appointment stored at 2026-09-16T14:30:00Z (10:30 AM Eastern) produces a Zoom meeting shown at 2:30 PM Eastern, four hours late, while directly created Zoom meetings are correct.\n\n**Feature area**: AI SDR / CRM booking -> conferencing (Zoom)."
+    },
+    {
+      "id": "ENG-14421",
+      "createdAt": "2026-09-28T20:21:52.919Z",
+      "title": "Master: Resuming AI SDR does not re-run it, so the response-timeout monitor re-escalates the thread",
+      "state": "Done",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": ["Bug", "fast-lane"],
+      "description": "## Overview\n\nWhen an operator returns an AI SDR thread to automation - Resume AI SDR after an escalation, dismissing an escalation back to automated, or re-enabling the AI SDR toggle - the AI SDR never processes the prospect reply that is still waiting. The response-timeout monitor escalates the thread again within about 15 minutes, it reads as AI SDR Disabled / Needs Attention again, and prospects stay unanswered for days. The operator cannot hand a conversation back to the AI SDR.\n\n## Problem\n\nFrom the operator's side: they review an escalated thread, resolve the reason it escalated, resume the AI SDR, and it is escalated again within one monitor tick with no AI SDR attempt. The same thread loops however often it is resumed, which is reported by customers as the AI SDR switching itself off.\n\n## Root cause\n\n`resumeFromEscalation` and `dismissEscalation` in `apps/web/trpc/routers/ai-sdr.ts` (about lines 1588 and 1516) and the re-enable toggle (about line 860) end at `updateControlLevel` plus `escalationDismissedAt`. None of them emits `ai-sdr-v2/message.received`, the only trigger of `aiSdrV2Workflow` (`apps/web/lib/ai-sdr-v2/workflow/workflow.ts`), so the pending prospect reply is never processed.\n\n`monitor-ai-sdr-response-timeout.ts` (`check-for-timeouts`, cron `*/15 * * * *`) then escalates any `controlLevel='automated'` thread whose newest recorded message is an inbound reply older than 2 hours and which has never booked, and it never reads `escalation_dismissed_at`. The resume is therefore undone at the next tick.\n\nScope note for the fix: ENG-8377 (\"AI SDR: Allow automation to resume after escalation\", Done) defines Resume as making \"the next inbound prospect reply\" pass the eligibility check, so not re-running the AI SDR for the pending reply was the shipped intent. That points at the monitor side (honour the resume - the newest resume timestamp in `control_level_history` or `escalation_dismissed_at` - or reset the 2-hour clock on resume) unless product decides Resume should also process the pending reply.\n\n## Blast radius\n\nCounted 2026-09-28, 45-day window, all organizations: 2104 resume-then-re-escalation pairs, 1105 distinct threads, 275 distinct organizations, 258 distinct operator users. An independent recount with the same pairing logic returned a slightly higher 2802 pairs / 1208 threads / 280 organizations / 263 users, so the recorded figure is conservative. In every pair measured, zero AI SDR agent executions occur between the resume and the re-escalation.\n\nQuery: pairs where a `crm_message_thread.control_level_history` entry `to='automated'` from `'escalated'` or `'human_takeover'` is followed within 2 hours by an entry `to='escalated'` with `updatedBy='monitor-ai-sdr-response-timeout'` (jsonb_array_elements joined on thread_id, `m.ts > r.ts AND m.ts <= r.ts + interval '2 hours'`), left-checked against `agent_executions` in the interval.\n\nPotentially exposed: every thread an operator returns to automated after an escalation.\n\n## Proposed fix\n\nMake the either/or explicit and implement it: a thread returned to automated must not be re-escalated by the response-timeout monitor before the AI SDR has had a chance on it. Either honour the resume when evaluating timeout candidates, or trigger the AI SDR on resume for the pending reply.\n\n## What's included\n\nThe monitor/resume decision and its regression test. Related, not included: ENG-14111 (a sent AI SDR reply is never recorded, which the same monitor also turns into an escalation) and ENG-10060 (periodic provider-versus-local thread/message reconciliation).\n\n## Regression seam\n\n`check-for-timeouts` in `apps/web/lib/inngest/functions/monitor-ai-sdr-response-timeout.ts`. Red before: a thread whose control level returned to `automated` with no new inbound is escalated by the monitor at the next tick. Green after: such a thread is not escalated, or, if Resume is redefined, the AI SDR runs for the pending reply. `apps/web/tests/lib/inngest/functions/monitor-ai-sdr-response-timeout-db.test.ts` already exercises the candidate filters against Postgres and is the place to add the resumed-thread case.\n\n## Done when\n\n* A thread returned to automated after an escalation is not re-escalated by the response-timeout monitor before the AI SDR has acted or the resume has been honoured.\n* No prospect reply is left unanswered because a resume silently did nothing.\n* A regression test proves the behaviour at the named seam.\n\n## Reports\n\n* ENG-14415"
+    },
+    {
+      "id": "ENG-13277",
+      "createdAt": "2026-08-30T16:31:39.750Z",
+      "title": "AI SDR pauses booking for assigned host Name 12: Zoom shows connected but is invalid, no static fallback",
+      "state": "Done",
+      "assignee": "Koppany Kondricz",
+      "parent": "ENG-13278",
+      "labels": ["Bug", "Customer reported", "intercom-sourced"],
+      "description": "**Intercom source: **<url:app.intercom.com>\n\n**Customer:** Name 1 — \"Name 1's Workspace\"\n\n## Claim\n\nThe workspace's AI SDR assigned call handler (Name 12, set to Zoom-connect mode) has a Zoom account that is marked disconnected in the backend while the settings UI still shows Zoom as connected, and has no static meeting-link fallback, so the AI SDR pauses booking with \"meeting location unavailable\" instead of booking confirmed meetings.\n\n## Context\n\nThe customer says their sales agent Name 100 already has his Zoom link set in the app, but the AI SDR is not booking meetings. Separately, when they create an appointment manually from a thread and pick Name 100 as host, Name 100's meeting link and email are not auto-filled (the location pre-fills with the owner's own static link instead).\n\n## What we found\n\n* Name 100 is this workspace's assigned AI SDR call handler, in Zoom-connect (dynamic) mode with no static link.\n* Name 100's Zoom account is marked invalid (disconnected) in the backend as of 2026-08-27, even though the conferencing UI presents it as connected.\n* The owner's account has a static Riverside link set, but it belongs to the owner, not Name 100.\n* The AI SDR therefore cannot resolve a meeting location for Name 100 and escalates rather than booking (the fail-closed behavior shipped to prevent linkless bookings).\n\nSee the attached Triage investigation document for the full production-data, code-path, and blast-radius readout."
+    },
+    {
+      "id": "ENG-2388",
+      "createdAt": "2025-10-28T12:55:52.819Z",
+      "title": "SDR sending a google link for meetings, instead of the specified and supplied Zoom link",
+      "state": "Canceled",
+      "assignee": "Pieter Venter",
+      "parent": null,
+      "labels": [],
+      "description": "<url:thegrowthpartner.slack.com>\n\n <image> \n\n <image> \n\n <image> "
+    },
+    {
+      "id": "ENG-3683",
+      "createdAt": "2025-12-11T18:51:17.010Z",
+      "title": "AI SDR booking outside availability and forcing Zoom links",
+      "state": "Done",
+      "assignee": "Pieter Venter",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "Customer reports two issues with the AI SDR:\n\n1. Meetings are being scheduled on days that are set as unavailable in Settings → Availability.\n2. Booking confirmations are sending Zoom links even though conferencing is configured with a static Riverside URL.\n\nSupport has confirmed with the customer that:\n\n* Availability settings already reflect only the desired working days.\n* Conferencing is already set to Static Link with the Riverside URL.\n* Zoom/Riverside settings and general troubleshooting steps have been reviewed but the behavior persists.\n\nThere is a screen recording of the behavior here: Jam recording."
+    },
+    {
+      "id": "ENG-3337",
+      "createdAt": "2025-12-03T09:26:42.172Z",
+      "title": "Fix zoom app appointment creation and AI SDR usage",
+      "state": "Done",
+      "assignee": "Anuj Bhatt",
+      "parent": null,
+      "labels": ["Chore"],
+      "description": "The zoom connection was initially QAd:\n\nQA the Zoom integration in production:\n\n* Verify that new appointments created in the CRM get a dynamic Zoom link correctly.\n* Verify that AI SDR uses the Zoom link properly when scheduling and handling appointments.\n\nZoom app has been approved and is available in production.\n\n---\n\nAnd now has to be fixed"
+    },
+    {
+      "id": "ENG-3229",
+      "createdAt": "2025-12-01T21:40:18.968Z",
+      "title": "Request for Calendly Integration Instead of Name 3 Calendar",
+      "state": "Canceled",
+      "assignee": "Mahmut Jomaa",
+      "parent": null,
+      "labels": [],
+      "description": "Customer requests replacing Name 3 Calendar integration with Calendly integration to enable direct booking of meetings through Calendly.\n\n---\n\nConversation:\nName 101: <p>I have a feature request</p>\n\nbot: Thank you for helping us improve.\n\nbot: Please describe your feature request. What problem would this feature solve for you? Any examples or use cases?\n\nName 101: instead of the google calendar integration let us do a Calendly integration so it books the meeting straight in our Calendly\n\nbot: Got it — thanks for your feedback! 💬 Our team reviews all requests regularly, and we’ll reach out if we have any updates."
+    },
+    {
+      "id": "ENG-3409",
+      "createdAt": "2025-12-04T17:27:27.045Z",
+      "title": "Support Calendly links for AI SDR meeting booking",
+      "state": "Duplicate",
+      "assignee": "Pieter Venter",
+      "parent": null,
+      "labels": ["Feature"],
+      "description": "Customer wants to attach a Calendly link instead of a static Zoom link for AI SDR handoff. This would allow different meeting types to be scheduled directly, instead of the AI sending meetings for manual booking and requiring close monitoring."
+    }
+  ]
+}

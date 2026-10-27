@@ -1,0 +1,227 @@
+{
+  "id": "ENG-14386",
+  "provenance": "seeded",
+  "createdAt": "2026-09-28T13:34:58.179Z",
+  "lane": "triage",
+  "stratum": "user_error",
+  "ticket": {
+    "title": "Campaigns not sending due to inactive status and connection error",
+    "description": "#### Customer Name\n\nAaron Fraga\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nDemo workspace\n\n#### What are you trying to achieve?\n\nResume campaign sending for Cold Email Agent campaigns.\n\n#### What are you doing to achieve it?\n\nChecked campaign statuses (all are paused, draft, or completed). Investigated connection status; found Company One connection is user-managed with a saved error. Suggested resuming campaigns and checking the Company One connection.\n\n#### What is happening instead?\n\nNo campaigns are sending. Example: CMP-14 Sales-call scorecard is paused (last sent 2026-06-11). Company One connection shows a saved error. Live account health is unknown due to user-managed connection.\n\n#### What is the expected outcome?\n\nCampaigns should send emails when set to active and with a healthy connection.\n\n---\n\nWorkspace ID: <uuid>\nSupport conversation: <uuid>\nOpened from the support inbox by Aaron Fraga",
+    "attachmentKinds": ["other"]
+  },
+  "repoCommitAtCreate": "ade0987e6365fd7591a7eb3cb398c7d0821eb09a",
+  "flags": {
+    "descriptionEditedAfterCreate": false,
+    "needsProductionData": true,
+    "alreadyFixedAtTriage": false
+  },
+  "asFiled": {
+    "assignee": "Aaron Fraga",
+    "labels": [],
+    "parent": null,
+    "priority": 2,
+    "project": null
+  },
+  "relatedSnapshot": [
+    {
+      "id": "ENG-14225",
+      "createdAt": "2026-09-24T13:21:40.602Z",
+      "title": "Campaigns not sending due to inactive status and inbox mismatch",
+      "state": "Canceled",
+      "assignee": "James Keeble",
+      "parent": null,
+      "labels": [],
+      "description": "#### Customer Name\n\nAaron Fraga\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nDemo workspace\n\n#### What are you trying to achieve?\n\nCustomer wants their campaigns to send emails as expected.\n\n#### What are you doing to achieve it?\n\nReviewed the campaign list: all campaigns are currently in draft, completed, or paused status, with none active or sending. For CMP-14 (Sales-call scorecard), found 78 inboxes assigned but 0 matched to owned accounts. Checked sending account connection and found a recorded connection error, but it's unconfirmed if this is a live issue. No send activity recorded since July 20 for CMP-14.\n\n#### What is happening instead?\n\nNo campaigns are sending. All campaigns are paused, draft, or completed. CMP-14 shows 78 assigned inboxes but 0 matched, and no emails have been sent since July 20. A sending account connection error is flagged, but it's unclear if this is currently affecting sends.\n\n#### What is the expected outcome?\n\nCampaigns should send emails when set to active, with inboxes correctly matched and no connection errors.\n\n---\n\nWorkspace ID: <uuid>\nSupport conversation: <uuid>\nOpened from the support inbox by Aaron Fraga"
+    },
+    {
+      "id": "ENG-11916",
+      "createdAt": "2026-07-21T13:09:55.399Z",
+      "title": "Campaign shows Active with connected inboxes but dispatches zero emails (multi-day complete send outage)",
+      "state": "Todo",
+      "assignee": "Anthony Adewale",
+      "parent": null,
+      "labels": ["Bug", "Campaign Stops Sending"],
+      "description": "## Problem\n\nCampaigns show *Active*, inboxes show *connected*, and sending windows pass — yet zero emails are dispatched, for days. This is a complete send outage, distinct from the false \"no accounts connected\" warning (ENG-11571) and from the step-2 follow-up stall (ENG-9720): here step 1 itself never goes out and no error/false-warning is surfaced.\n\n## Name 5 signal\n\n* Severity: Urgent | Confidence: 0.95 | Track: engineering | Recurrence: recurring (3 customers confirmed today)\n* Name 5 topic: <uuid>\n* Name 1 — 4-day stall, 1,564 leads, 0 sent\n* Name 2 — 2-week stall, 1,442 leads, 0 sent\n* Name 3 Name 6 — confirmed today\n\n## Why new\n\nNo open canonical matches this exact symptom. ENG-11571 (Todo) is the false \"no email accounts connected\" warning variant; ENG-9720 tracks follow-ups (step 2) stalling after bulk import; ENG-4577 (Canceled) and ENG-9492 (Done) are older/closed. None cover \"Active + connected + windows passing + literally zero dispatch\" at this volume/duration. Filed as a distinct urgent to track the dispatch-pipeline failure.\n\n## Source\n\n* Name 5 topic: <url>\n\n## Name 4\n\nmodem-<uuid>-2026-07-21"
+    },
+    {
+      "id": "ENG-4200",
+      "createdAt": "2026-01-06T16:30:41.737Z",
+      "title": "Email campaign shows 'no sending accounts available' after pause",
+      "state": "Canceled",
+      "assignee": "Blaise Gulaj",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "Customer paused the email campaign \"Medical Practices December 2025\" over Name 7. After attempting to restart it, the campaign shows the error message \"No sending accounts available\" despite being synced to Company One.\n\nSupport confirmed that none of the sending inboxes for this campaign are in a healthy, connected state, even though they appear active in the UI for the customer. When inboxes are re-authenticated, they temporarily appear active but then fall back into an error state again, preventing the campaign from sending.\n\nImpact observed so far:\n\n* Campaign does not resume sending after reactivation\n* \"Leads Contacted\" metric is not increasing\n* Outbound emails are not visible in AI SDR Inbox\n\nScreen recordings from the user:\n\n* Jam recording 1\n* Jam recording 2\n* Jam recording 3"
+    },
+    {
+      "id": "ENG-9492",
+      "createdAt": "2026-05-29T14:29:32.256Z",
+      "title": "Campaigns show no connected accounts and stop sending",
+      "state": "Done",
+      "assignee": "James Keeble",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "User: <email>\nA workspace is reporting campaign delivery issues across multiple active campaigns.\n\nTwo campaigns show a `No email accounts connected. Add one to start sending.` prompt even though the campaign options show 24 inboxes selected. The same workspace also reports only 2 campaigns appearing in the AI SDR inbox while 3 campaigns are active.\n\nThe affected campaigns called out are:\n\n* Name 8 | Healthcare - Functional & Medical Clinics | US | 1-50 employees | AIA created\\*\n* Name 8 | Healthcare | US | 1-50 employees | AIA created\\*\n* Name 8 | Healthcare - Functional & Medical Clinics | US | 11-200 Employees | $0-$50mm\n\nThe customer reports emails have not sent for days and lead contact counts appear stuck.\n\n* `Name 8 | Healthcare - Functional & Medical Clinics | US | 1-50 employees | AIA created*`: 6,266 contacted the other day and 6,266 yesterday and 6,266 today\n* `Name 8 | Healthcare | US | 1-50 employees | AIA created*`: 5,860 contacted the other day and 5,860 yesterday  and 5,860 today\n\nOne of the campaigns was said to be sending and due to resume at 9am, but the customer later reported that nothing was moving and asked for tech investigation.\n\n <image> \n\n <image> \n\n <image> \n\n <image> "
+    },
+    {
+      "id": "ENG-11571",
+      "createdAt": "2026-07-13T13:14:09.566Z",
+      "title": "Campaigns show \"no email accounts connected\" and stop sending despite green/active inboxes (recurring regression)",
+      "state": "Canceled",
+      "assignee": "Anthony Adewale",
+      "parent": null,
+      "labels": ["Bug", "intercom-sourced"],
+      "description": "## Problem\n\nCampaigns abruptly report zero connected inboxes and stop sending even though the accounts are set up and showing green/Active in settings. Also surfaces in the campaign Options tab as \"no active accounts\" while every inbox indicator is green, so customers can't tell whether sending is live.\n\n## Name 5 signal\n\n* Name 5 topics: `<uuid>` (HIGH, conf 0.88, recurring — 12 customers in 30d) and `<uuid>` (LOW, conf 0.65, new — \"green light accounts show no active accounts\"). Same underlying symptom, clustered together.\n* Track: Engineering. Window: 2026-07-12 → 2026-07-13.\n\n## Why new\n\nNo open canonical. All prior tickets for this exact symptom are closed: ENG-9492 (Done, Jun), ENG-7810 (Done, Apr — synced email accounts to provider on campaign settings create), ENG-9432 (Duplicate). The symptom is recurring again at high volume (12 in 30d), indicating a regression or a new manifestation with no ticket tracking it.\n\n## Source\n\n* Name 9 — no accounts connected\n* Name 9 — green light no active accounts\n\n## Name 4\n\n`modem-<uuid>-2026-07-13`"
+    },
+    {
+      "id": "ENG-14286",
+      "createdAt": "2026-09-25T16:22:37.023Z",
+      "title": "campaigns arent sending",
+      "state": "Done",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": ["Customer reported"],
+      "description": "#### Customer Name\n\nAaron Fraga\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nAaron Fraga's Workspace\n\n#### Screenshot\n\n#### What are you trying to achieve?\n\nSend my campaign \"this is a fin test\".\n\n#### What are you doing to achieve it?\n\nOpened the campaign and checked its sending accounts before launching.\n\n#### What is happening instead?\n\nThe campaign lists three sending inboxes (<email>, <email>, <email>), but my Email Accounts page shows none, and the campaign won't launch.\n\n#### What is the expected outcome?\n\nThe campaign sends from those three inboxes."
+    },
+    {
+      "id": "ENG-13179",
+      "createdAt": "2026-08-27T00:28:23.421Z",
+      "title": "Name 10 - Variant E isn't sending",
+      "state": "Triage",
+      "assignee": "Anthony Adewale",
+      "parent": null,
+      "labels": ["Bug", "Customer reported"],
+      "description": "#### Customer Name\n\nName 10\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nCompany Two\n\n#### Screenshot\n\n <image> \n\n#### What are you trying to achieve?\n\nClient has a screenshot from yesterday - number of sends has been at 230. He is concerned as this is his winner variant and he only created 2 new ones today and each has sent 90x.\n\n#### What are you doing to achieve it?\n\n* \n\n#### What is happening instead?\n\n* \n\n#### What is the expected outcome?\n\nresolution"
+    },
+    {
+      "id": "ENG-14197",
+      "createdAt": "2026-09-23T23:47:00.246Z",
+      "title": "Customer report: all 15 pre-warmed inboxes stuck in Error, Reconnect returns \"Mailbox not found\", campaigns cannot send",
+      "state": "Todo",
+      "assignee": "Anthony Adewale",
+      "parent": "ENG-13178",
+      "labels": ["Bug", "Customer reported", "fast-lane", "intercom-sourced"],
+      "description": "## Source\n\nIntercom conversation: <url:app.intercom.com>\n\n## Bounded conversation context\n\nCustomer reports (2026-09-22) that every pre-warmed inbox in the workspace shows an Error status, that reconnect attempts stay at \"Reconnect in Progress\" for over 48 hours, and that toggling an inbox to enabled briefly shows Active before it returns to Error. On 2026-09-23 she adds that her campaign stopped running and that she cannot start any new campaigns. Frontline agent reactivated the inboxes on 2026-09-22 and confirmed they still failed, then escalated to the tech team.\n\n* Product area named on the conversation: Email accounts & domains\n* Workspace: cold email agent email-accounts page, 15 pre-warmed inboxes across 5 domains (5 completed pre-warmed orders, all provisioned 2026-03-30)\n\n## Testable claim\n\nEvery pre-warmed inbox in the workspace is in Error and cannot be reconnected: the Reconnect path sends a mailbox id ColdMailReseller does not resolve, so the provider answers \"Mailbox not found\" and the inbox never returns to Active, which leaves the workspace with no sending accounts and blocks campaign sending.\n\n## Current evidence\n\n* 15/15 mail_inbox rows status=error, connected=false; 14 carry \"Disconnected via Company One account_error webhook\", 1 carries the \"Mailbox not found\" OAuth exception.\n* 53 Company One account_error webhook events between 2026-09-19T15:07Z and 2026-09-23T05:57Z for these accounts.\n* 15 failed cea_oauth_sessions, each with \"Mailbox OAuth connection threw an exception: Mailbox not found. Context: mailboxId=<stored provider_id>, email=<address>\", between 2026-09-20 and 2026-09-22.\n* Last email_sent webhook for the workspace: 2026-09-18T19:37Z. One campaign is still \"active\" with no sends; three campaigns sit in draft.\n* Provider side: the corresponding Company One accounts exist in the workspace sub-workspace and report warmup activity, so the durable failure is the Acquisity reconnect path, not a missing provider account.\n\n## Suspected code path\n\n* apps/web/lib/inngest/functions/campaign/workspaces/process-account-error-reconnect.ts (processAccountErrorReconnect) marks the inbox Error and invokes processConnectOAuth with mailboxId = stored mail_inbox.provider_id.\n* apps/web/trpc/routers/outreach/email-accounts.ts (triggerOAuthReconnect) sends mailboxId: undefined for a customer-initiated Reconnect.\n* apps/web/lib/inngest/functions/campaign/workspaces/process-connect-oauth.ts forwards that id to ColdMailReseller POST /mailboxes/oauth."
+    },
+    {
+      "id": "ENG-4577",
+      "createdAt": "2026-01-15T20:39:13.891Z",
+      "title": "Campaign emails not sending despite active status and inboxes on",
+      "state": "Canceled",
+      "assignee": "Anthony Adewale",
+      "parent": null,
+      "labels": ["Bug", "Campaign Stops Sending"],
+      "description": "Customer reports that a cold email campaign stopped delivering around Name 11 9.\n\nKey context from investigation and troubleshooting so far:\n\n* Campaign previously delivered successfully (1,151 leads contacted, 16 replies, 6 positive replies, 3 booked calls).\n* Volume trend: normal through Name 11 4–6, then sharp drop, then near-flat from around Name 11 9 and never recovered.\n* Customer adjusted settings based on prior guidance (reduced daily max, test emails per day, etc.), but still sees no replies or signs of delivery.\n* In the current tool, sending is controlled via Cold Email Agent → Email Accounts; customer has turned accounts on as instructed.\n* New test campaign was created with a small lead list; campaign is active and has been running for more than 2 hours with no emails showing as sent.\n* AI SDR Inbox only shows the older campaign; new test campaign doesn’t appear there yet.\n* Support suspects sending inboxes may not be fully eligible to send or that the campaign queue/sending infrastructure did not initialize correctly.\n\nRelevant screenshots from the customer environment are attached below.\n\n <image> \n\n <image> \n\n <image> "
+    },
+    {
+      "id": "ENG-14068",
+      "createdAt": "2026-09-19T23:53:22.282Z",
+      "title": "Campaigns stay in Draft after relaunch and most sending accounts are disconnected (Diamond)",
+      "state": "Canceled",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [],
+      "description": "## Customer report\n\n```text\nCustomer (workspace Diamond, admin) reports campaigns stopped sending and will not restart despite relaunching them and adding new leads.\n\nFrom the product database:\n- This workspace has three campaigns, all currently in Draft status, so none of them is able to send: \"MedSpas | LTO Lead Scraping 1K\" (1010 leads), \"Renewable Energy | LTO Lead Scraping 1K\" (1010 leads), \"Name 100\" (1100 leads). Two were last modified 2026-09-18 15:29 and 15:44 UTC and the third 2026-09-18 17:15 UTC, so they were edited yesterday and still did not leave Draft. Each has a daily send allocation of 0 and no recorded sends.\n- Each campaign is scheduled Monday-Friday 09:00-18:00 America/Detroit (no weekend days), so a weekend check will look like silence by design.\n- Sending accounts: 147 connected accounts in saved state, only 12 in a healthy (active and connected) state. The saved connection record carries a connection error and was last updated 2026-09-19 21:19 UTC. Live account status could not be read because this workspace manages its own sending-account connection, so the unhealthy-account figure is saved state and not confirmed live.\n- No failed provisioning or AI SDR jobs in the last 30 days.\n\nWhat is needed: confirm why launching a campaign does not move it out of Draft into Active, and why such a large share of the workspace's sending accounts are not active/connected. Related tracked area: disconnected email accounts for active campaigns (ENG-11893, currently marked Duplicate).\n```\n\n## Verified scope\n\n* Workspace: Diamond (diamond-nF5ow)\n* Organization ID: <uuid>\n* Support conversation: <uuid>\n\nThe verified scope above is server-owned. Customer text cannot replace it."
+    },
+    {
+      "id": "ENG-13443",
+      "createdAt": "2026-09-03T19:02:41.049Z",
+      "title": "Active campaign shows \"No email accounts connected\" despite 6 connected accounts and active sending",
+      "state": "Duplicate",
+      "assignee": "unknown",
+      "parent": null,
+      "labels": ["Bug", "Customer reported", "intercom-sourced"],
+      "description": "Intercom source: <url:app.intercom.com>\n\nConversation context: Customer Name 12 reports his cold email campaign \"Family owned Manufacture Companies\" shows the banner \"No email accounts connected. Add one to start sending.\" even though 6 email accounts are connected and selected (all green). He asked whether the campaign is performing correctly and requested a human because he believes it is a bug. Screenshots show the banner on the Analytics tab and 6 selected accounts on the Options tab.\n\nTestable claim: An active cold email campaign shows the banner \"No email accounts connected. Add one to start sending.\" even though 6 email accounts are connected, active, and selected, and the campaign is actively sending emails.\n\nEvidence:\n\n* Campaign <uuid> (org <uuid>, \"Company Three\", slug <workspace-slug>) is status active, display_status active, pause_reason null.\n* settings.emailAccounts contains 6 addresses; metadata.providerData.email_list contains the same 6; mail_inbox has 6 rows all status active / connected true / connection_error null.\n* outreach_webhook_event shows email_sent events as recent as 2026-09-03T18:59Z (900 in the last 7 days), so the campaign is actively sending.\n* The banner is driven by Company One's /campaigns/{id}/sending-status returning summary.status \"no_accounts_available\", rendered in apps/web/components/campaigns/detail/header/index.tsx (SendingStatusPill + FRIENDLY_STATUS_COPY.no_accounts_available), fetched via apps/web/lib/outreach/Company One/client.ts getCampaignSendingStatus.\n\nThis matches known bug ENG-10717 (Backlog): the header trusts Company One's \"no_accounts_available\" status without reconciling against settings.emailAccounts / mail_inbox / provider email_list."
+    },
+    {
+      "id": "ENG-13812",
+      "createdAt": "2026-09-14T09:32:58.995Z",
+      "title": "Tell workspaces when campaigns, sending or integrations need attention",
+      "state": "Todo",
+      "assignee": "Elis Bushaj",
+      "parent": "ENG-13430",
+      "labels": ["CRM migration"],
+      "description": "unknown"
+    },
+    {
+      "id": "ENG-5223",
+      "createdAt": "2026-02-06T15:12:41.915Z",
+      "title": "Company One inboxes active but AIA shows no sending accounts",
+      "state": "Done",
+      "assignee": "Tyler Olsen",
+      "parent": null,
+      "labels": ["Data/Config Mismatch", "Triage: Blocked/External"],
+      "description": "user: <email>\n\nA workspace sees the warning “No sending accounts available” in AIA even though the sending inboxes appear active (green) in Company One.\n\nSupport notes AIA may not be seeing the inboxes due to the Company One connection/API auth or inbox availability/assignment for the workspace; customer reports the accounts are active and the AIA Email Accounts view shows them as active.\n\n <image> \n\n <image> "
+    },
+    {
+      "id": "ENG-10717",
+      "createdAt": "2026-06-23T18:35:30.524Z",
+      "title": "Campaign header says no accounts connected despite selected external Company One accounts",
+      "state": "Backlog",
+      "assignee": "Koppany Kondricz",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "BUG: Yes\nEVIDENCE:\nIntercom conversation 215474815491860 shows Company Four campaign <uuid> displaying the header warning \"No email accounts connected. Add one to start sending\" while the Options tab shows 18 selected email accounts. Prod DB confirms outreach_campaign.settings.emailAccounts contains 18 addresses, campaign status/display_status are active, provider is active with no connection_error, and mail_inbox has 0 rows because these are external/user-owned Company One inboxes. Axiom logs at 2026-06-23T18:22:26-18:22:27Z show Updating campaign settings, Updating campaign in provider, Database update completed, and Triggered daily email limit recalculation for the same campaign, but the customer still saw the header warning. Customer also hit a generic Application Error after trying support's pause/remove/re-add/resume workaround; Axiom at 2026-06-23T18:24:24Z logs Failed to initiate campaign resume because the campaign was already active, which appears covered separately by ENG-9785. Prior completed tickets ENG-7810/ENG-8081/ENG-8101 had the same symptom, suggesting regression or incomplete fix.\nPOTENTIAL FIX:\nAudit campaign detail header status derivation for external Company One campaigns. If provider sending status returns no_accounts_available while the campaign has selected settings.emailAccounts and provider update succeeded, reconcile with provider campaign email_list and/or surface a sync-specific warning instead of saying no accounts are connected. Also avoid sending users into resume when campaign is already active.\nWHATS NEEDED TO RESOLVE:\nReproduce with org <uuid> / campaign <uuid>, inspect Company One campaign <uuid> email_list and status response, then fix header/resync behavior for external inbox campaigns.\nDEVIN SESSION:\n<url>"
+    },
+    {
+      "id": "ENG-13064",
+      "createdAt": "2026-08-24T14:29:59.104Z",
+      "title": "Error - Email acacounts not connected",
+      "state": "Duplicate",
+      "assignee": "Koppany Kondricz",
+      "parent": null,
+      "labels": ["Bug", "Customer reported", "Instantly Sync Failure"],
+      "description": "#### Customer Name\n\nName 12\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nCompany Three\n\n#### Screenshot\n\n <image> \n\n <image> \n\n#### What are you trying to achieve?\n\nRunning campaign\n\n#### What are you doing to achieve it?\n\nLaunched campaign\n\n#### What is happening instead?\n\nError - Email acacounts not connected\n\n#### What is the expected outcome?\n\nPlease investigate and resolve asap"
+    },
+    {
+      "id": "ENG-5590",
+      "createdAt": "2026-02-17T03:10:48.352Z",
+      "title": "Emails not sending in cold email campaign",
+      "state": "Canceled",
+      "assignee": "Anthony Adewale",
+      "parent": null,
+      "labels": ["Bug", "Campaign Stops Sending"],
+      "description": "#### Customer Name\n\nName 13\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 13\n\n#### Screenshot\n\n <image> \n\n#### What are you trying to achieve?\n\nSend cold email\n\n#### What are you doing to achieve it?\n\nCreated campaign - see the screenshot, there looks to be an issue with inboxes.\n\n#### What is happening instead?\n\nnothing sending\n\n#### What is the expected outcome?\n\nemails send"
+    },
+    {
+      "id": "ENG-14096",
+      "createdAt": "2026-09-21T21:52:12.274Z",
+      "title": "Campaign emails are not sending consistently, and the AI SDR is failing to book confirmed meetings, resulting in 3 missed calls. The campaign has been paused pending resolution.",
+      "state": "Todo",
+      "assignee": "Koppany Kondricz",
+      "parent": "ENG-13949",
+      "labels": ["Bug", "Customer reported", "fast-lane"],
+      "description": "#### Customer Name\n\nName 14\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 14\n\n#### Screenshot\n\n <image> \n\n#### What are you trying to achieve?\n\nThe user wants their new campaign to successfully send emails and have the AI SDR properly book meetings when prospects confirm a time.\n\n#### What are you doing to achieve it?\n\nThey launched a new campaign and verified that their email accounts are connected and working. They also reviewed the SDR Inbox to check prospect responses and confirmed meeting requests.\n\n#### What is happening instead?\n\nThe campaign shows a “no email accounts connected” alert intermittently, and emails are not consistently being sent. More importantly, the AI SDR is acknowledging prospects who selected meeting times but is not creating the calendar events. The user identified at least 3 missed meetings.\n\n#### What is the expected outcome?\n\nThe campaign should send emails normally, and when a prospect confirms a meeting time, the AI SDR should automatically create the calendar event and book the meeting correctly."
+    },
+    {
+      "id": "ENG-14041",
+      "createdAt": "2026-09-18T17:21:54.874Z",
+      "title": "Investigate: cold email campaign \"Built for Success-Saas\" (Name 15) shows no emails sent for two days after manual toggle, despite Active status and connected inboxes",
+      "state": "Todo",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": ["Customer reported", "intercom-sourced"],
+      "description": "## Source\n\nIntercom conversation: <url:app.intercom.com>\nIntercom conversation id: 21547599575186\n\n## Claim (testable)\n\nA cold email customer reports that the campaign \"Built for Success-Saas\" (workspace <workspace-slug>) stopped sending emails for two days after the campaign was toggled from automatic back on, even though the campaign shows Active, 9 inboxes are connected, and enough leads are uploaded; the same page also reports 4,928 leads skipped during upload. Hypothesis to verifying stage: the campaign's own daily send limits (daily_limit / daily_max_leads) were zeroed by the even-split planner during the 2026-09-17 pause/resume while a second campaign existed in the workspace, and no send window has elapsed since, so the campaign reports Active but cannot send.\n\n## Bounded conversation context\n\n* 2026-09-18 (customer, first message): \"Help! None of no emails went out in my campaign and I don't know why.\" Campaign link: Built for Success-Saas.\n* Customer follow-up: \"My campaign was turned off because I had it set to automatic, and now that I turned it back on, no emails have been sent from the campaign for the past two days\"; campaign shows the email addresses, is active, and has enough leads uploaded.\n* Customer: \"It says 4,928 leads were skipped during upload, 5 on the do not contact list. I need help ... It needs to be running by Monday.\"\n* Fin AI answered with generic checks (campaign status, sending schedule, inboxes) and escalated to a human; a teammate acknowledged.\n\n## Requested follow-up\n\nConfirm the cause, record the blast radius from current production data, identify the first divergent hop if the campaign limits are not the cause, and provide the exact unblock (which field a human must correct and its value). The customer needs the campaign sending before Monday."
+    },
+    {
+      "id": "ENG-13009",
+      "createdAt": "2026-08-21T13:51:49.365Z",
+      "title": "Error message saying no accounts are connected",
+      "state": "Canceled",
+      "assignee": "Aaron Fraga",
+      "parent": "ENG-11571",
+      "labels": ["Bug", "Customer reported", "Instantly Sync Failure"],
+      "description": "#### Customer Name\n\nName 16\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\n* \n\n#### Screenshot\n\n <image> \n\n <image> \n\n#### What are you trying to achieve?\n\nPlease have a look at the screenshots, and you'll see that there is an error message saying that no accounts are connected and therefore no emails can be sent out, but you'll see that there are actually 27 inboxes connected. If you have a look at the other screenshot, you will see that actually zero emails have been sent out on this campaign\n\n#### What are you doing to achieve it?\n\n* \n\n#### What is happening instead?\n\n* \n\n#### What is the expected outcome?\n\n* "
+    },
+    {
+      "id": "ENG-9431",
+      "createdAt": "2026-05-28T19:55:27.249Z",
+      "title": "Prewarmed inboxes are shown as Normal status",
+      "state": "Backlog",
+      "assignee": "James Keeble",
+      "parent": null,
+      "labels": [],
+      "description": "Customer details:\n\n* Name 17\n* <email>\n* Company Five workspace\n* MAC Test campaign\n\nIn the Company Five workspace, a campaign launched yesterday with 9 inboxes that had been warming for 6–8 weeks is sending far below expected volume.\n\nThe inboxes are showing a status of “Normal” instead of “Prewarmed.” Support suspected the system may still be applying conservative sending limits because the inboxes are not being recognized as prewarmed.\n\nObserved sending volume was 18 emails on day 1 and 36 on day 2."
+    }
+  ]
+}

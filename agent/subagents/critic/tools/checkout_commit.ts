@@ -7,6 +7,12 @@ import {
 } from "../../../lib/github/git-remote.js";
 import { readPreparedRepository, remoteUrl } from "../../../lib/repository.js";
 import { boundedRun } from "../../../lib/sandbox-deadline.js";
+import { replayCommitNote } from "../../../lib/triage-replay/archive.js";
+import { readReplayState } from "../../../lib/triage-replay/backend.js";
+import {
+  isTriageReplay,
+  replaySessionOf,
+} from "../../../lib/triage-replay/mode.js";
 import { environment } from "../../../sandbox.js";
 
 const COMMIT_SHA_PATTERN = /^[a-f0-9]{40}$/iu;
@@ -38,6 +44,24 @@ export default defineTool({
       };
     }
     const sha = commit.toLowerCase();
+    if (isTriageReplay()) {
+      const session = replaySessionOf(ctx.session.auth.initiator);
+      const pinned = session
+        ? (await readReplayState(session.runId, session.caseKey)).archive.commit
+        : null;
+      if (pinned !== sha) {
+        return {
+          error: `This replay holds only commit ${pinned}, the one the case was created at.`,
+          success: false as const,
+        };
+      }
+      return {
+        commit: sha,
+        note: replayCommitNote(sha),
+        success: true as const,
+        worktree: "/workspace/repo",
+      };
+    }
     const sandbox = await ctx.getSandbox(environment);
     const prepared = await readPreparedRepository(sandbox);
     if (prepared.slug.toLowerCase() !== REVIEWED_REPOSITORY) {

@@ -1,0 +1,227 @@
+{
+  "id": "ENG-15488",
+  "provenance": "seeded",
+  "createdAt": "2026-10-15T14:25:19.674Z",
+  "lane": "triage",
+  "stratum": "bug_master",
+  "ticket": {
+    "title": "Name 15 - purchased domains but theyre not showing",
+    "description": "#### Customer Name\n\nName 15\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nCompany Two\n\n#### Screenshot\n\n#### What are you trying to achieve?\n\nClient has purchased 6 domains & 18 inboxes yesterday - only 2 domains and 6 inboxes seem to be provisioned\n\n#### What are you doing to achieve it?\n\ni need to have all 18 inboxes active and sending\n\n#### What is happening instead?\n\nonly 6 inboxes are sending\n\n#### What is the expected outcome?\n\nhaving 6 domains and 18 inboxes in total active",
+    "attachmentKinds": []
+  },
+  "repoCommitAtCreate": "bebf66ce9db1faa8fe8230df34d5b76becf092e3",
+  "flags": {
+    "descriptionEditedAfterCreate": false,
+    "needsProductionData": true,
+    "alreadyFixedAtTriage": false
+  },
+  "asFiled": {
+    "assignee": "Aaron Fraga",
+    "labels": [],
+    "parent": null,
+    "priority": 1,
+    "project": "Support"
+  },
+  "relatedSnapshot": [
+    {
+      "id": "ENG-4425",
+      "createdAt": "2026-01-11T18:54:50.593Z",
+      "title": "Purchased domains not appearing in account after billing",
+      "state": "Done",
+      "assignee": "Tyler Olsen",
+      "parent": null,
+      "labels": ["Inbox/Domain Not Created"],
+      "description": "Customer reports purchasing 6 domains with 18 inboxes, which are visible on billing but the domains have not appeared in the account UI yet.\n\nRequest is to investigate why the purchased domains/inboxes are not provisioned or visible despite successful billing."
+    },
+    {
+      "id": "ENG-4699",
+      "createdAt": "2026-01-20T18:03:24.321Z",
+      "title": "Purchased pre-warmed domains not appearing in dashboard",
+      "state": "Done",
+      "assignee": "Tyler Olsen",
+      "parent": null,
+      "labels": ["Inbox/Domain Not Created"],
+      "description": "Customer reports purchasing 6 pre-warmed domains and email inboxes yesterday.\n\nAfter more than 30 minutes (overnight), the domains and inboxes are still not visible in the dashboard:\n\n* No notification received that domains/inboxes are ready\n* Nothing appears under Cold Email Agent > Email Accounts after refreshing the dashboard\n\nSupport confirmed this is a known bug and requested dev team review."
+    },
+    {
+      "id": "ENG-3898",
+      "createdAt": "2025-12-18T17:05:34.674Z",
+      "title": "Purchased domains and email accounts not appearing",
+      "state": "Done",
+      "assignee": "Tyler Olsen",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "Customer reports purchasing 4 domains and 12 email accounts, but they are not showing up in the account.\n\nDetails:\n\n* Purchase was completed well over 30 minutes ago (beyond normal 10–30 minute setup window)\n* Domains and email accounts are not visible where expected in the app\n* Billing section under Settings > Cold Email Agent does not show the purchase\n* Customer confirms they are working in \"Name 1's Workspace\"\n\nA support teammate has confirmed the issue and requested escalation to developers to investigate the missing purchase records and provisioning for this workspace."
+    },
+    {
+      "id": "ENG-10787",
+      "createdAt": "2026-06-24T22:19:54.585Z",
+      "title": "Pre-warmed domain checkout retry can cancel paid order after Autumn subscription exists",
+      "state": "Done",
+      "assignee": "Tyler Olsen",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "BUG: Yes\n\nEVIDENCE:\n\n* Support investigation for Intercom conversation 215474831432769 found customer order `<uuid>` paid successfully in Stripe for `$84.00` at 2026-06-24 17:30 UTC, receipt `2736-7406`, charge `py_3TlubOGPuqjknq341kmSW0B1`.\n* Prod DB shows the order ended `status = refunded`, `domains_provisioned = 0`, `inboxes_provisioned = 0`, with no `mail_domain` / `mail_inbox` rows for the selected domains.\n* Axiom shows repeated checkout retries after payment failed with `subscription_id '<domain>' is already in use for this customer`, then reservations were released and reconcile marked the order refunded because paid balance existed but reservations were missing.\n* Stripe shows `amount_refunded = 0`; cancellation left `$84` as customer credit (`customer.balance = -8400`) rather than provisioning the purchased domains/inboxes or issuing a card refund.\n\nPOTENTIAL FIX:\n\n* In the pre-warmed domain checkout initiation/retry path, treat Autumn `subscription_id ... is already in use for this customer` as a signal that the checkout/subscription may already exist and route to payment confirmation/reconciliation instead of surfacing checkout creation failure.\n* Prevent a pending/cancel action from releasing reservations when Stripe/Autumn indicates the order has already been paid or corresponding subscriptions exist.\n* Add a targeted regression test around retrying `initiateDomainPurchaseCheckout` after a successful Autumn multiAttach/Stripe payment but before `confirmDomainPurchase` has marked the order paid.\n\nWHATS NEEDED TO RESOLVE:\n\n* Reproduce the payment retry state with mocked Autumn multiAttach returning duplicate subscription ID after an initial successful payment.\n* Patch checkout confirmation/reconcile behavior so paid orders cannot be cancelled/released due to duplicate subscription IDs.\n* Decide customer remediation separately: provision 2 domains + 6 inboxes using existing credit, or issue an actual Stripe refund.\n\nDEVIN SESSION:\n<url>"
+    },
+    {
+      "id": "ENG-4181",
+      "createdAt": "2026-01-05T21:44:53.954Z",
+      "title": "Purchased domains and emails not appearing in Acquisity",
+      "state": "Done",
+      "assignee": "Tyler Olsen",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "For client workspace \"Name 2's Workspace\" (user email: <email>), four domains and 12 associated email accounts were purchased in Acquisity but are not showing up in the account.\n\nThe UI for creating a Cold Email Agent campaign shows the message: \"No active email accounts found. Please add email accounts in settings first\" despite the recent purchase.\n\nScreenshot of the issue:\n\n <image> "
+    },
+    {
+      "id": "ENG-8287",
+      "createdAt": "2026-05-04T06:29:01.887Z",
+      "title": "Purchased domains and inboxes not appearing",
+      "state": "Done",
+      "assignee": "Tyler Olsen",
+      "parent": null,
+      "labels": [],
+      "description": "Name 4\n<email>\nName 3's workspace\n\nPayment was accepted for email domains and inboxes, but they do not appear in the system. After waiting about an hour, there are still zero domains and zero credits visible.\n\nThe reported checks did not resolve it: the accounts were not visible under Cold Email Agent → Email Accounts or Campaigns, there was no sync option available, and the issue persisted after reviewing provider connection guidance."
+    },
+    {
+      "id": "ENG-4212",
+      "createdAt": "2026-01-06T17:16:00.763Z",
+      "title": "Newly purchased domains and inboxes not appearing",
+      "state": "Done",
+      "assignee": "Tyler Olsen",
+      "parent": null,
+      "labels": [],
+      "description": "Customer reports purchasing 4 new domains that are not showing up in the platform over 30 minutes later. Their account currently shows only 5 inboxes, but they expect 18 inboxes total (missing 4 domains and 12 inboxes).\n\nScreenshot of the current inbox list:\n\n <image> "
+    },
+    {
+      "id": "ENG-7816",
+      "createdAt": "2026-04-14T19:56:58.764Z",
+      "title": "Purchased domains not fully available in campaigns",
+      "state": "Done",
+      "assignee": "Tyler Olsen",
+      "parent": null,
+      "labels": [],
+      "description": "User: <email>\nIn the Name 5 workspace, not all purchased domains are showing as available in campaigns.\n\nA support review indicated the last 3 inboxes encountered provisioning errors. The UI shows: \"Provisioning requires attention\" and \"6/9 domains provisioned, but your order is taking longer than expected. We'll keep trying, please be patient!\"\n\nThe issue has been present since yesterday.\nError: Provisioning stopped after partial success. Remaining capacity requires manual review.\n\n <image> \n\n <image> "
+    },
+    {
+      "id": "ENG-4820",
+      "createdAt": "2026-01-24T15:51:56.832Z",
+      "title": "Newly purchased domain not appearing in workspace",
+      "state": "Done",
+      "assignee": "Jared Stauffer",
+      "parent": null,
+      "labels": ["Inbox/Domain Not Created"],
+      "description": "In the Company Three workspace, a newly purchased domain (bought through Acquisity as an additional cold email domain) is not visible anywhere it is expected to appear.\n\nObserved:\n\n* User purchased one additional domain via Acquisity for Company Three.\n* In the Cold Email Agent / domains and inboxes list, only the previously existing domains are visible (e.g. <domain>…, <domain>…, <domain>…, <domain>…, <domain>…).\n* Support can also only see the existing domains and inboxes and cannot identify the new one.\n* User expects domain count to have increased by one (from \\~18 to 19 domains) after purchase, but the new domain cannot be selected or managed.\n\nRelevant context:\n\n <image> "
+    },
+    {
+      "id": "ENG-13116",
+      "createdAt": "2026-08-25T18:01:59.029Z",
+      "title": "TRPCError: Failed query: select \"assigned_at\", \"auto_renew\", \"created_at\", \"customer_price_cents\", \"domain\", \"expires_at\", \"hosting_provider\", \"id\", \"organization_id\", \"registrar_provider\", \"source\", \"status\", \"website_id\" from \"website_domain\" \"websiteDomainTable...",
+      "state": "Done",
+      "assignee": "James Keeble",
+      "parent": null,
+      "labels": ["Bug", "fast-lane"],
+      "description": "## Overview\n\nThe Name 6 Domains list cannot load in any workspace where the AI Funnel Builder is not enabled: the owned-domains query applies its funnel-visibility filter to the wrong table and fails at the database, so the tab shows \"Domains could not be loaded\" and every domain the workspace owns is hidden. It also hides domains customers have just paid for.\n\n## Problem\n\nA customer opens AI Name 6 > Domains, expects to see the domains the workspace owns and assign one to a website, and instead gets \"Domains could not be loaded\" with a Retry button that never helps. Workspaces whose Funnel Builder entitlement is off lose the whole surface, including domains bought through the platform minutes earlier.\n\n## Root cause\n\napps/web/trpc/routers/website/owned-domain-management-procedures.ts -> listOwnedDomains emits the funnel visibility filter only when isFunnelBuilderEnabledForOrganization is false, and passes it into db.query.websiteDomainTable.findMany:\n\nnot (legacyWebsiteHasActiveFunnelProjectCondition({ organizationId: websiteDomainTable.organizationId, websiteId: websiteDomainTable.websiteId }))\n\napps/web/lib/website/funnel-inventory.ts -> legacyWebsiteHasActiveFunnelProjectCondition returns a raw sql correlated EXISTS over website_project whose predicates reference websiteProjectTable.organizationId, websiteProjectTable.deletedAt and website_project.metadata->>'legacyWebsiteId'. Rendered inside the website_domain query those project-side references resolve against the outer websiteDomainTable, producing:\n\n... where (\"websiteDomainTable\".\"organization_id\" = $1 and not (exists (select 1 from \"website_project\" where \"websiteDomainTable\".\"organization_id\" = \"websiteDomainTable\".\"organization_id\" and \"websiteDomainTable\".\"deleted_at\" is null and \"websiteDomainTable\".\"metadata\"->>'legacyWebsiteId' = (\"websiteDomainTable\".\"website_id\")::text and \"websiteDomainTable\".\"metadata\"->>'projectKind' = 'funnel')))\n\nwebsite_domain has neither a deleted_at nor a metadata column (confirmed against production), so the query raises \"column websiteDomainTable.deleted_at does not exist\" and the tRPC procedure returns INTERNAL_SERVER_ERROR.\n\nIntroduced by 1ca9f4b3 (\"fix(ENG-13033): price self-serve Cold Email at $185 and disable self-serve funnels\"), 2026-08-25. Its unit test mocks the database, so the malformed SQL was never exercised at that seam; the Sentry issue's first-seen (2026-08-25T14:50:19Z) matches that commit.\n\n## Blast radius\n\nConfirmed affected (Sentry ACQUISITY-4TP, procedure website.domainMarketplace.listOwnedDomains, release d7e59db005ccecf428a5f2661ef9c71de43fa8ad, measured 2026-09-11):\n\n* 602 users / 2,776 error events since first seen 2026-08-25T14:50:19Z; 474 users / 1,980 events in the 7 days to 2026-09-11. Every event is the same failing query.\n* Unresolved and ongoing.\n\nPotentially exposed (PlanetScale production, counted 2026-09-11):\n\n* 185 workspaces hold website_domain rows (200 rows), so they have domains that the broken list would hide; the exact split by Funnel Builder entitlement is not reachable read-only because the filter keys off a per-workspace entitlement resolved from organization.feature_flags plus partner grants.\n* The malformed fragment is emitted for every workspace without the entitlement, and AI Funnel Builder is opt-in (OPT_IN_FEATURES in apps/web/lib/features.ts), so the exposed set is the large majority of workspaces rather than a small subset.\n* 19 workspaces hold linked funnel projects (55 rows), the narrow case the filter was written for and the shape it breaks on.\n\n## Proposed fix\n\nMake the funnel-visibility filter render against the table it actually queries, or drop the correlation to website_domain columns entirely, so website.domainMarketplace.listOwnedDomains runs for workspaces without the AI Funnel Builder entitlement and returns their owned domains. The intended behaviour is unchanged: workspaces with the entitlement see their funnel-backed domains through the existing path, and workspaces without it see all their owned website domains.\n\n## What's included\n\n* The predicate fix in legacyWebsiteHasActiveFunnelProjectCondition and/or its call site in listOwnedDomains.\n* Regression protection at the real query seam so a mocked database cannot hide this class of malformed SQL again.\n* Related, not in scope: the two earlier customer reports of the same symptom whose cause was unproven (ENG-13282, ENG-13592) and this newest one (ENG-13738) all belong to this master; no separate containment or recovery work is needed because the purchase and registration paths were unaffected.\n\n## Regression seam\n\nBoundary: the website.domainMarketplace.listOwnedDomains tRPC query against a real database schema. Trigger: a workspace without the AI Funnel Builder entitlement that owns at least one website_domain row. Observable, red-before/green-after: before, the query throws \"column websiteDomainTable.deleted_at does not exist\" and the procedure returns INTERNAL_SERVER_ERROR; after, it returns the owned domains and the Domains tab renders them. A schema-validating test (real columns, not a mocked db) proves the causal mechanism.\n\n## Done when\n\n* A workspace without the AI Funnel Builder entitlement loads its Domains tab and sees every domain it owns, including platform-purchased ones.\n* A workspace with the entitlement still sees exactly the funnel-backed domains the filter is meant to show, with no regression for assigned or unassigned domains.\n* Sentry ACQUISITY-4TP stops receiving events on the release carrying the fix.\n* A regression test at the listOwnedDomains query seam proves the malformed correlated predicate cannot render again.\n\n## Reports\n\n* ENG-13738 Customer report: purchased domain <domain> invisible because Name 6 Domains list fails to load\n* ENG-13592 Name 6 Domains tab shows 'Domains could not be loaded' for days\n* ENG-13282 Customer can't access purchased website domain — Domains tab fails to load"
+    },
+    {
+      "id": "ENG-14144",
+      "createdAt": "2026-09-23T02:29:58.581Z",
+      "title": "Client purchased a domain for her website, but the domain is not appearing in the domain dashboard.",
+      "state": "Duplicate",
+      "assignee": "James Keeble",
+      "parent": null,
+      "labels": ["Bug", "Customer reported", "Internal reported"],
+      "description": "#### Customer Name\n\nName 7\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nCompany One\n\n#### Screenshot\n\n <image> \n\n#### What are you trying to achieve?\n\nWe’re trying to get the domain populated into the client’s account so she can connect it to her website.\n\n#### What are you doing to achieve it?\n\nI collected proof of payment from the client to confirm the domain purchase.\n\n#### What is happening instead?\n\nThe domain is not showing up on the client’s dashboard/account.\n\n#### What is the expected outcome?\n\nHave the purchased domain added and available in the client’s account so she can connect it to her website."
+    },
+    {
+      "id": "ENG-3905",
+      "createdAt": "2025-12-18T20:39:51.101Z",
+      "title": "Investigate missing domains and email accounts after purchase",
+      "state": "Done",
+      "assignee": "unknown",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "Customer Name 1 purchased 4 domains and 12 email accounts and was charged $116.10, but no domains or email accounts are showing in the account.\n\nDetails provided:\n\n* Customer login email: <email>\n* Workspace: Name 1's Workspace\n* Billing account ID: <uuid>\n\nNothing related to this purchase is visible in the customer account. Please investigate why the purchase completed billing without provisioning domains/email accounts, verify the transaction, and remedy the missing domains/email accounts if possible so a refund might be avoided."
+    },
+    {
+      "id": "ENG-4744",
+      "createdAt": "2026-01-22T10:30:05.066Z",
+      "title": "Purchased domains and inboxes not appearing in account",
+      "state": "Done",
+      "assignee": "Tyler Olsen",
+      "parent": null,
+      "labels": ["Bug", "Inbox/Domain Not Created"],
+      "description": "user: <email>\n\nBilling UUID: <uuid>\n\n12 inboxes, 4 domains purchased on 20th/12, none on account.\n\nCustomer reports purchasing domains and email inboxes on 20 January for 130.46 GBP. Processing should complete within 30 minutes, but after 48+ hours the domains and inboxes still do not appear in the Cold Email Agent under Email Accounts. Support also cannot see the email inboxes on the account and is requesting operations to investigate why provisioning did not complete and ensure the purchased domains/inboxes are added to the customer account."
+    },
+    {
+      "id": "ENG-3638",
+      "createdAt": "2025-12-10T18:44:29.538Z",
+      "title": "Purchased domains and inboxes not added to account",
+      "state": "Done",
+      "assignee": "Jared Stauffer",
+      "parent": "ENG-3684",
+      "labels": ["Bug"],
+      "description": "A client purchased 4 domains and 12 inboxes, but only the 3 free inboxes are visible in the account.\n\nUser email: <email>\n\nRelevant purchase screenshot:\n\n <image> "
+    },
+    {
+      "id": "ENG-7410",
+      "createdAt": "2026-03-31T19:36:47.334Z",
+      "title": "Purchased domains and inboxes never appear after provisioning",
+      "state": "Done",
+      "assignee": "Tyler Olsen",
+      "parent": null,
+      "labels": ["Inbox/Domain Not Created"],
+      "description": "Domains and inboxes were purchased, but none have appeared in **Cold Email Agent → Email Accounts** even after more than a day.\n\nWorkspace: Name 8's Workspace\nUser email: <email>\n\nNo campaigns have been set up yet."
+    },
+    {
+      "id": "ENG-7621",
+      "createdAt": "2026-04-08T17:07:19.562Z",
+      "title": "Domains purchased not showing under accounts or billing",
+      "state": "Done",
+      "assignee": "Tyler Olsen",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "#### Customer Name\n\nName 9\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 9\n\n#### Screenshot\n\n#### What are you trying to achieve?\n\nhe says he bought domains but they dont show up under accounts or billing\n\n#### What are you doing to achieve it?\n\nchecked his workspace to verify, it is accurate\n\n#### What is happening instead?\n\nna\n\n#### What is the expected outcome?\n\nsolve the issue"
+    },
+    {
+      "id": "ENG-4805",
+      "createdAt": "2026-01-23T21:58:59.764Z",
+      "title": "Pre-warmed domains and inboxes not appearing after purchase",
+      "state": "Done",
+      "assignee": "Jared Stauffer",
+      "parent": null,
+      "labels": ["Inbox/Domain Not Created"],
+      "description": "user: <email>\n\nCustomer reports purchasing 6 domains and 18 pre-warmed inboxes 2 days ago for use in the Cold Email Agent, but they are not visible in **Cold Email Agent > Email Accounts**.\n\nNormal provisioning time (per help center) is 5–30 minutes, and the user has already waited 2 days and refreshed the Email Accounts page without the accounts appearing.\n\nPlease investigate why these purchased domains and inboxes have not been provisioned and surfaced in the Cold Email Agent UI."
+    },
+    {
+      "id": "ENG-3608",
+      "createdAt": "2025-12-09T22:50:32.140Z",
+      "title": "Missing domains/email boxes after purchase",
+      "state": "Done",
+      "assignee": "Anthony Adewale",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "Users:\n\n* <email>\n* <email>\n\nSlack in CEA channel: <url:fegrowthpartner.slack.com> <url:fegrowthpartner.slack.com>\n\nBoth users reporting that they bought domains and email boxes and they are not showing up in their accounts. \n\nName 10: she bought 18 inboxes, 6 domains twice and nothing appeared in her account.\n\nName 11: bought inboxes on the 5th and still not received them but account has been charged - $97.75 and $134.35."
+    },
+    {
+      "id": "ENG-3386",
+      "createdAt": "2025-12-04T03:29:55.638Z",
+      "title": "Purchased email domains not appearing in Email Accounts after 24 hours",
+      "state": "Done",
+      "assignee": "Anthony Adewale",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "Customer purchased email domains for campaigns but they have not appeared in the Email Accounts section after 24 hours, exceeding expected propagation time.\n\n---\n\nConversation:\nName 12: <p>I just purchased domain subscriptions and now I am trying to work out how to use them. The payment has gone through but where do I select my domains?</p>\n\nbot: Great! Your domains should automatically connect to your account within a few minutes of purchase. To access and use your domains: For Cold Email Campaigns: Go to the Cold Email Agent and when creating a new campaign, you'll see your pre-warmed domains and inboxes in the \"Domain & Inboxes\" step. You can select which ones to use for that campaign. To view all your domains: Click into any campaign and go to the Options tab - you'll see your purchased domains and inboxes with status indicators showing which are active and available. The setup process can take up to 10 minutes, so if you don't see them yet, they should appear shortly. Once they're ready, you can assign them to your campaigns right away. Source: What are Pre-Warmed Domains and Inboxes | Help Center - AI Acquisition\n\nbot: Is that what you were looking for?\n\nbot: If you still need help with using your domain subscriptions, I'm here to assist you! Would you like to share more about what you're trying to do or any issues you're encountering?\n\nbot: Thanks for your patience with this delay. 24 hours is definitely longer than expected - domains should typically sync within 5-30 minutes after purchase. To help resolve this quickly, I need a few details: What were you trying to do when you noticed the domains weren't showing? Which page were you checking for your domains (campaign creation, options tab, etc.)? Can you share a screenshot of what you're seeing? Is this completely blocking your workflow or can you work around it for now? Thanks for sharing those details — I'm going to pass this to a human teammate to help you as soon as possible. We're working through a higher than usual support load, but we'll get back to you as quickly as we can. Source: What are Pre-Warmed Domains and Inboxes | Help Center - AI Acquisition\n\nName 12: I have already been through this woith you. I want to speak to a human\n\nbot: I'll connect you with someone from our team right away. Meanwhile, could you please share any additional details about your issue? This will help them assist you more efficiently.\n\nName 12: I purchased email domains to start running campaigns They havent show up in my Email Accounts section of my platform.\n\nName 12: Is there humans on the support team?\n\nName 14: Your recording is in progress. Navigate back to the Jam tab when you're finished.\n\nName 14:\n\n🟡 Note from Name 14: ↑ Upload started... Screen recording uploading (29.9 MB)\n\n🟡 Note from Name 14: Jam created! View the screen recording here: <url:jam.dev>\n\nName 12: Screen recorded successfully!\n\nName 12: Hello, did you receive the screen recording ok?\n\nName 14: Hi Name 13 thanks I have seen your recording.\n\nName 14: While domain propagation does take time, it should not extend up to 24 hours. Since this duration has already passed, I will report this to the tech team immediately for review."
+    },
+    {
+      "id": "ENG-4253",
+      "createdAt": "2026-01-07T14:32:10.308Z",
+      "title": "Email domains not provisioning after purchase",
+      "state": "Done",
+      "assignee": "Tyler Olsen",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "A customer purchased 3 domains and 9 email addresses and was charged in full, but the domains and inboxes have not appeared in the Email Accounts section after 2 days.\n\nDomains are expected to provision within 15–30 minutes, so this suggests a provisioning or post-purchase processing issue for this account."
+    }
+  ]
+}

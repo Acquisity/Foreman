@@ -5,6 +5,7 @@ import { questionsOnlyPolicy } from "#lib/github/approval.js";
 import { rewriteDraft } from "#lib/intake-writer.js";
 import { LINEAR_ISSUE_ID_PATTERN } from "#lib/investigation-memory/scope.js";
 import { replyToRequester } from "#lib/requester-reply.js";
+import { replayReply } from "#lib/triage-replay/client.js";
 import { isTriageIntake } from "#lib/trust.js";
 
 const MESSAGE_MAX_CHARS = 4000;
@@ -15,6 +16,10 @@ export default defineTool({
     "Reply to the requester in the thread behind an intake ticket (a Slack thread, or the support team's notes on an Acquisity inbox conversation), as Acquisity Foreman. Use it only in a Linear session; in a Slack conversation, answer in the thread directly instead. Post exactly one message: your answer. " +
     "It refuses a second post until the requester replies, and fails when the issue has no requester thread. On a follow-up, Jev decides whether their reply needs an answer; posted false with an outcome means it posted nothing, so follow its reason and do not post the message anywhere else. Never put the investigation itself here; that belongs in the document.",
   async execute({ issue, message }, ctx) {
+    const replayed = replayReply(ctx.session.auth.initiator, issue);
+    if (replayed) {
+      return replayed;
+    }
     try {
       return await replyToRequester(
         issue,

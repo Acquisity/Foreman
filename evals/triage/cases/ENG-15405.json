@@ -1,0 +1,227 @@
+{
+  "id": "ENG-15405",
+  "provenance": "seeded",
+  "createdAt": "2026-10-14T16:14:55.024Z",
+  "lane": "triage",
+  "stratum": "bug_master",
+  "ticket": {
+    "title": "Issue with AI SDR Booking Calls",
+    "description": "#### Customer Name\n\nName 24\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 24\n\n#### Screenshot\n\n <image> \n\n <image> \n\n#### What are you trying to achieve?\n\nThe SDR scheduling tool (AI scheduler) is suggesting meeting times that conflict with existing calendar blocks and buffers.\n\nWhat happened:\nThe SDR tool suggested Wednesday at 2:00 PM Pacific (10:00 PM UK) to a prospect, despite the following calendar blocks on that day:\n\nAn existing call at 9:00 PM UK time (45 minutes)\nA 30-minute buffer set after that call\n\nThe 10:00 PM UK slot falls directly within the buffer window following the 9:00 PM call, so it should have been excluded from available times.\n\nSecondary issue:\nThe tool also failed to suggest earlier available slots on Wednesday, despite the day being largely open (only one 4:00 PM EDT call on the calendar).\n\nImpact\n\nScheduling conflicts: The tool proposed a time that overlaps with a buffer, risking a double-booked or rushed meeting.\nPoor prospect experience: An unsuitable time (10:00 PM UK) was surfaced to a prospect, which is outside reasonable working hours for them.\nMissed optimization: Name 25, more appropriate slots on the same day were ignored without apparent reason.\n\n#### What are you doing to achieve it?\n\nSubmitting a ticket\n\n#### What is happening instead?\n\nMeetings are getting booked at incorrect times and overlapping each other and not respecting the buffer time in between.\n\n#### What is the expected outcome?\n\nResolve the issue",
+    "attachmentKinds": ["image", "slack"]
+  },
+  "repoCommitAtCreate": "2469595bc6b45eb27d4ff3b98e8d22f319d18133",
+  "flags": {
+    "descriptionEditedAfterCreate": false,
+    "needsProductionData": true,
+    "alreadyFixedAtTriage": false
+  },
+  "asFiled": {
+    "assignee": "Aaron Fraga",
+    "labels": [],
+    "parent": null,
+    "priority": 1,
+    "project": "Support"
+  },
+  "relatedSnapshot": [
+    {
+      "id": "ENG-4063",
+      "createdAt": "2025-12-30T17:20:11.616Z",
+      "title": "AI booking double books or fails to book calls",
+      "state": "Canceled",
+      "assignee": "Blaise Gulaj",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "A customer reports issues with AI-driven call booking and lead limits.\n\nProblem\n\n* Contacted leads have exceeded the configured limit.\n* When the AI attempts to book calls, it either double books the same client or fails to book them at all.\n\nAdditional context\n\nScreen recordings of the issue were captured using Jam:\n\n* Recording 1\n* Recording 2\n\nThe customer mentioned that during a drop-in session they were told an engineer should look directly into their account."
+    },
+    {
+      "id": "ENG-9538",
+      "createdAt": "2026-05-31T19:13:43.990Z",
+      "title": "Dashboard booked calls not reflecting scheduled meetings",
+      "state": "Done",
+      "assignee": "Anuj Bhatt",
+      "parent": null,
+      "labels": [],
+      "description": "User details:\n\n* Name 1\n* <email>\n* Name 1's Workspace\n\nThis is also happening to:\n\n* Name 4\n* <email>\n* Company Three\n\nThis is also happening to:\n\n* Name 2\n* <email>\n* Name 2's Workspace\n\nThis is also happening to:\n\n* Name 3\n* <email>\n* Name 3's Workspace\n  \n  \n  The main dashboard is reporting `Booked Calls` as 0 even though meetings have been scheduled and are visible in the AI SDR inbox and the calendar attached to SDR.\n\nThe issue has persisted for over a week, including for meetings scheduled days earlier. This appears to be a dashboard reporting or sync issue rather than a booking issue.\n\nRelevant context from the conversation:\n\n* The dashboard overview shows `Booked Calls` as 0.\n* The AI SDR Inbox filtered to `Meeting Booked` shows booked meetings.\n* The customer confirmed the meetings are visible in the SDR-connected calendar.\n\n <image> \n\n <image> "
+    },
+    {
+      "id": "ENG-15156",
+      "createdAt": "2026-10-11T23:04:57.236Z",
+      "title": "Reps' calls fail or hang up when billing jobs hold the phone balance lock",
+      "state": "Backlog",
+      "assignee": null,
+      "parent": null,
+      "labels": [],
+      "description": "## Overview\n\nReps' calls still fail, or get hung up before the prospect's phone rings, when a background billing job holds the workspace's phone balance lock. Fixing it means every dial reaches a prospect, so reps make more calls and book more meetings. From 6 to 9 Oct 2026 our server hung up 74 sales-team calls this way, and the 9 Oct fix in ENG-14996 didn't stop it. This ticket stops a busy lock from ever blocking a rep's call.\n\n## Problem\n\nAn SDR in the AI Acquisition Sales Team workspace reported on 10 Oct 2026 that \"every 5 or so calls\" a popup said they were out of credits and to try again later, and that calls \"randomly hang up\". We think both are this bug, seen at two steps:\n\n* At the start of a call, the browser asks for a call token. If the lock is busy, the rep sees a popup: \"Your phone balance is being checked. Please try again shortly.\" Reps read this as being out of credits.\n* When Twilio connects the rep, it asks our answer webhook what to do. If the lock is still busy there, our server speaks the same sentence and hangs up. The rep hears about 5 seconds of message, then silence, and has to dial again.\n\nThe webhook returns HTTP 200, so these hang-ups never reach Sentry or Twilio's error log. 75 of the 76 we found also left a CRM call event stuck at \"pending\" with no call row, so the attempt is missing from the person's timeline.\n\n## Root cause\n\nEvery call, text and billing job in the workspace shares one phone balance lock. A call checks funding twice, once for the token and once at the answer webhook, and each check needs the lock. Since 9 Oct a call waits up to 2 seconds for it. But the settlement job holds the lock for 1.6 seconds at the median and 3.1 seconds at p99 (max 9.8 seconds), and the rating job took it 108,373 times from 6 to 11 Oct. So at busy times the 2 second wait runs out and the call still fails.\n\nToday:\n\n```mermaid\nflowchart TD\n  A[Rep clicks call] --> B[Token: funding check takes lock]\n  B -- busy over 2 s --> X[Name 5: balance being checked]\n  B --> C[Answer webhook: funding check takes lock]\n  C -- busy over 2 s --> Y[Speak message and hang up]\n  C --> D[Dial prospect]\n```\n\nAfter this change:\n\n```mermaid\nflowchart TD\n  A[Rep clicks call] --> B[CHANGED: one balance read, no lock]\n  B --> C[CHANGED: admit call, settle later]\n  C --> D[Dial prospect]\n  E[Billing jobs] --> F[CHANGED: short lock holds only]\n```\n\nThe rep's call no longer waits on, or fails because of, a lock that a background job holds.\n\n## Who's affected\n\nOnly the AI Acquisition Sales Team workspace pays for calls from the phone balance today, so it's one workspace and all its reps. From our answer-webhook logs, calls hung up by the balance message per Name 6 day were 9 on 6 Oct, 24 on 7 Oct, 35 on 8 Oct and 6 on 9 Oct, which is 4.1% of browser calls from 5 to 9 Oct and up to 10% on the worst days. 12 of 30 reps hit it, one of them 30 times. After the fix went live on 9 Oct at 1:24 pm Name 6, 7 more busy failures hit reps that evening. The weekend since had only 76 calls, so we can't yet say how often it happens now at weekday volume. We haven't matched a failure to the SDR who reported it, because the report doesn't name them.\n\n## Proposed fix\n\n* Check the balance once per call with a read that doesn't take the lock. Only steps that move money take it.\n* At the answer webhook, never hang up a call because the lock is busy. Admit it and settle the cost afterwards (see Decisions needed).\n* Make the settlement and rating jobs hold the lock only around the write, not across whole-workspace work, so a rep's step rarely waits.\n* Log every funding denial at the webhook to Sentry, and write the call row even when admission fails, so the attempt shows on the timeline.\n* If a call still can't start, show a plain message that says it's temporary and isn't about credits.\n\n## How it should work\n\n* A real low balance still blocks a call, with the existing \"balance is too low\" message. Only a busy lock stops blocking.\n* A call admitted while the lock was busy is settled by the next settlement run, and its cost is never lost. If settlement then finds the balance negative, the existing recharge or hold rules apply.\n* Retries stay on the jobs' own schedule. A rep's call never retries for longer than Twilio's 15 second webhook limit.\n\n## Who can do what\n\nNothing changes in who can call. Reps with calling access keep it. Only billing jobs and the money-moving step write to the phone balance.\n\n## Name 7 and rollback\n\nThis changes billing admission, so release it behind a flag for the sales workspace first. Watch one weekday evening (5 to 11 pm Name 6) for busy failures and for any call admitted without a later settlement. Rolling back the flag returns to today's behaviour, and calls admitted during the rollout still settle normally.\n\n## Decisions needed\n\n* **When the lock is busy at the answer webhook, should we let the call through and settle later, or wait longer?** Recommended: let it through and settle later, because a lost dial costs more than one call's charge, and the settlement job already reconciles every call. Decider: the billing owner. Blocks: the webhook change.\n\n## Done when\n\n* A call placed while another holder keeps the lock for 5 seconds goes through, and its cost is settled afterwards. How to check: a database test holds the lock for 5 s and places a call.\n* A call with a genuinely low balance is still refused with the low-balance message.\n* The answer webhook writes a call row and a Sentry event for every funding denial.\n* On a weekday evening after release, our logs show 0 calls hung up by the balance message, against 24 to 35 a day on 7 and 8 Oct.\n\n## Implementation context\n\n* Lock and wait budget: `account-lock.ts`, admission in `admission.ts`, the message in `errors.ts`.\n* Token check: `voice.ts` line 639. Answer webhook admission and spoken hang-up: `answer/route.ts` lines 240 and 292 to 312.\n* Whole-workspace settlement inside the lock: `funded-call.ts` line 130.\n* Lock hold times by holder, 6 to 11 Oct: settle p50 1.6 s, p99 3.1 s, max 9.8 s (1,115 holds); rating 108,373 holds; call admission p50 about 1 s. Source: Axiom \"Phone funding account operation finished\".\n* Prior fix: Acquisity/Acquisity#6994.\n\n## Reports\n\n* ENG-14909\n* ENG-14995\n* ENG-15076\n* SDR feedback relayed by the sales manager in Slack, 10 Oct 2026 at 3:15 pm Name 6."
+    },
+    {
+      "id": "ENG-13880",
+      "createdAt": "2026-09-15T00:34:15.993Z",
+      "title": "Name 8 - Call Assignee issue",
+      "state": "Done",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": ["Customer reported"],
+      "description": "#### Customer Name\n\nName 8\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nCompany One\n\n#### Screenshot\n\n <image> \n\n <image> \n\n#### What are you trying to achieve?\n\nCall Handler assignment on AI SDR Agent settings does not match  the Cold Email Agent.\n\nName 9 should be the only call handler but our Client, Name 8, is worried that his client, the CEO, will get booked in for calls.\n\n#### What are you doing to achieve it?\n\n* \n\n#### What is happening instead?\n\n* \n\n#### What is the expected outcome?\n\n* "
+    },
+    {
+      "id": "ENG-11609",
+      "createdAt": "2026-07-14T06:02:53.488Z",
+      "title": "Sales Call Analyzer upload and transcript limit issues",
+      "state": "Done",
+      "assignee": "Jil Patel",
+      "parent": null,
+      "labels": [],
+      "description": "#### Customer Name\n\nName 10\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 10\n\n#### Screenshot\n\n <image> \n\n#### What are you trying to achieve?\n\nThis issue is across multiple different client workspaces but opening a ticket here as per Blaise. The Sales Call Analyzer is not working well. Call uploads are not going through due to size despite multiple shrinking attempts and the 'paste transcript' option is limited to  175 characters. This is an urgent issue that we need looked at as it has been significantly time consuming to have to manually review multiple calls per day manually and GPs have also flagged that they aren't utilizing the tool\n\n#### What are you doing to achieve it?\n\n* \n\n#### What is happening instead?\n\n* \n\n#### What is the expected outcome?\n\n* "
+    },
+    {
+      "id": "ENG-8148",
+      "createdAt": "2026-04-28T11:39:35.060Z",
+      "title": "Fix call booking issue with missing invite notifications",
+      "state": "Done",
+      "assignee": "Koppany Kondricz",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "#### Customer Name\n\nName 11\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 11\n\n#### Screenshot\n\n#### What are you trying to achieve?\n\nMessage from the client - \"The agent is telling clients that it has booked a call, chosen a time slot that I am not available for, and then not sending any invites. I've had 3 email threads now where people thought I stood them up because they agreed to a call and then never got an invite follow-up.\"\n\n#### What are you doing to achieve it?\n\ncreated this ticket\n\n#### What is happening instead?\n\nissue not resolved\n\n#### What is the expected outcome?\n\nresolve the issue"
+    },
+    {
+      "id": "ENG-12701",
+      "createdAt": "2026-08-13T17:41:23.403Z",
+      "title": "Name 12 - Issue with Assigned Call Handler",
+      "state": "Todo",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [],
+      "description": "#### Customer Name\n\nName 12 & Name 13\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nCompany Two\n\n#### Screenshot\n\n#### What are you trying to achieve?\n\nCompany Two is Name 12's client. Name 12 is the owner and the AIA client. Name 12 needs to continue having owner access however, he does not want to be an option under the 'assigned call handler' - the reason is there are 3 closers in the Company Two business and he would like to have the assignment set up as automatic to book in 3 other calendars as opposed to selecting one specific closer.\n\n#### What are you doing to achieve it?\n\nRetry of ENG-12699. Its Eve session failed before any investigation or findings were produced. Please investigate this ticket; do not close it as an already-investigated duplicate.\n\n#### What is happening instead?\n\nRetry of ENG-12699. Its Eve session failed before any investigation or findings were produced. Please investigate this ticket; do not close it as an already-investigated duplicate.\n\n#### What is the expected outcome?\n\nRetry of ENG-12699. Its Eve session failed before any investigation or findings were produced. Please investigate this ticket; do not close it as an already-investigated duplicate."
+    },
+    {
+      "id": "ENG-12699",
+      "createdAt": "2026-08-13T17:15:44.882Z",
+      "title": "Name 12 - Issue with Assigned Call Handler",
+      "state": "Triage",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [],
+      "description": "#### Customer Name\n\nName 12 & Name 13\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nCompany Two\n\n#### Screenshot\n\n <image> \n\n#### What are you trying to achieve?\n\nCompany Two is Name 12's client. Name 12 is the owner and the AIA client. Name 12 needs to continue having owner access however, he does not want to be an option under the 'assigned call handler' - the reason is there are 3 closers in the Company Two business and he would like to have the assignment set up as automatic to book in 3 other calendars as opposed to selecting one specific closer.\n\n#### What are you doing to achieve it?\n\n* \n\n#### What is happening instead?\n\n* \n\n#### What is the expected outcome?\n\n* "
+    },
+    {
+      "id": "ENG-12576",
+      "createdAt": "2026-08-12T01:31:03.617Z",
+      "title": "GP was also promised 20k leads in the sales call but was only issued 10k",
+      "state": "Todo",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [],
+      "description": "#### User Email\n\n<email>\n\n#### Workspace Name\n\nName 14's Workspace\n\n#### Request Type\n\nLead credit\n\n#### Reason for request\n\nPlease issue 10k leads as a part of a refund save strategy"
+    },
+    {
+      "id": "ENG-12202",
+      "createdAt": "2026-07-31T13:52:37.717Z",
+      "title": "Calendar sync issue",
+      "state": "Canceled",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [],
+      "description": "#### Customer Name\n\nName 15/Name 16\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 17's workspace\n\n#### Screenshot\n\n <image> \n\n <image> \n\n#### What are you trying to achieve?\n\nClient is facing multiple tech issues with the workspace. She's frustrated and a refund risk. There is a discrepancy in the time zone of calls getting booked. And half of the calls are not showing on her calendar.\n\n#### What are you doing to achieve it?\n\nChecked her workspace and there is a discrepancy in the call times. See attached screenshots.\n\n#### What is happening instead?\n\nCalls are getting booked at wrong time, time zone and a few calls are not showing up on the calendar\n\n#### What is the expected outcome?\n\nCalls to get booked on calendar as per the correct time zone"
+    },
+    {
+      "id": "ENG-7738",
+      "createdAt": "2026-04-13T10:47:09.915Z",
+      "title": "Backdate calls",
+      "state": "Triage",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [],
+      "description": "The automation was fixed after a field name change. Remaining work is to backdate recent call transcriptions and recording links in Airtable.\n\n---\n\n## Name 20 investigation\n\n**Finding:** Support/Product follow-up — This is an internal operational data backfill task, not a product bug. The underlying automation (n8n workflow syncing call transcriptions/recording links to Airtable) was already fixed after a field name change. The remaining work is to retroactively populate Airtable records missed during the broken automation period.\n\n**Decision:** Support/Product follow-up\n\n**Confidence:** High\n\n**Evidence checked:**\n\n* Issue description states the automation was already fixed; remaining work is data backfill only\n* No comments, no prior investigation, no linked Intercom conversation with additional context\n* Slack attachment (Name 18 asking about missing transcriptions in Airtable) confirms this was an ops data gap, not a code bug\n* Project \"DOBE\" is archived/deleted and not in the active Engineering project list\n* Issue has been archived since 2026-05-28 with no priority set, no activity for 2+ months\n* No duplicate issues found — ACQ-937 (add recordings to Airtable) and ACQ-3215 (Name 19 Recording Processing) are related but different scope\n* Slack MCP unavailable (401); could not inspect the full Slack thread for additional context\n\n**Recommended next step:**\n\n* Aaron to determine whether this Airtable backfill is still needed (issue is 2+ months old and archived)\n* If still needed, this is an ops/data task (likely involving running the n8n workflow retroactively or manually updating Airtable), not an engineering code change\n* If no longer needed, close the ticket\n\n**Potential fix, if engineering bug:**\n\n* N/A — not an engineering bug. The automation code fix was already applied."
+    },
+    {
+      "id": "ENG-7431",
+      "createdAt": "2026-04-01T14:20:09.761Z",
+      "title": "Sales Call Analyzer shows application error on add call",
+      "state": "Canceled",
+      "assignee": "Jared Stauffer",
+      "parent": null,
+      "labels": [],
+      "description": "Sales Call Analyzer fails when trying to add a call. After clicking Sales Call Analyzer and then Add a Call, the page shows an application error with the message \"Something went wrong!\"\n\nThe issue was reported as blocking use ahead of a pitch that day.\n\n <image> \n\n <image> "
+    },
+    {
+      "id": "ENG-13609",
+      "createdAt": "2026-09-09T17:42:29.372Z",
+      "title": "Calendar booking issue with Name 21",
+      "state": "Done",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [],
+      "description": "#### Customer Name\n\nName 21\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 21's workspace\n\n#### Screenshot\n\n#### What are you trying to achieve?\n\nI am trying to get the AI SDR to correctly book and send booking links to prospects, which show the true availability of this client. Right now some prospects get the correct link, which shows availability, and other prospects are receiving links which show zero availability.\n\n#### What are you doing to achieve it?\n\nI've already checked to see if there are any issues with the booking link or the calendar setup, which does not seem to be the case, and some prospects are being correctly booked in for calls however some aren't, where the booking link they are being sent shows no availability\n\n#### What is happening instead?\n\nThe AI SDR is having issues where it is not showing availability to book calls for some prospects but it is then booking calls for other prospects. There must be some issue with the sync with the calendar\n\n#### What is the expected outcome?\n\nTo successfully send the correct booking link, which shows the client's true availability"
+    },
+    {
+      "id": "ENG-3570",
+      "createdAt": "2025-12-08T22:58:35.133Z",
+      "title": "Login Issues, Password Reset Issues",
+      "state": "Done",
+      "assignee": "Koppany Kondricz",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "Users are reporting they cannot login and are not getting the password reset emails.\n\nUsers:\n<email>\n<email>\n<email>\n\nSlack: <url:fegrowthpartner.slack.com>\n\n <image> \n\n <image> "
+    },
+    {
+      "id": "ENG-8301",
+      "createdAt": "2026-05-04T15:29:07.836Z",
+      "title": "Investigate AI misclassification and hallucination issues",
+      "state": "Done",
+      "assignee": "Koppany Kondricz",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "#### Customer Name\n\nName 11\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 11's Workspace\n\n#### Screenshot\n\n <image> \n\n <image> \n\n <image> \n\n#### What are you trying to achieve?\n\nHey team, flagging two critical issues impacting this client:  **1) Pipeline misclassification by AI** The AI is assigning leads to pipeline stages that don’t make sense. This is not limited to one or two cases, it appears to be a broader issue with how stages are being selected.  For example, in the screenshots, there is a lead placed under “Deal Lost” who simply asked to be removed from the list. That should either be a DNC stage or not in the pipeline at all. There are other examples like “Ghosting” or even calls being logged under stages like “Name 22” where no actual call took place.  If you review the email threads for these leads, the stage assignments clearly don’t align with the actual conversations. This suggests the AI logic for pipeline classification is off across the board and needs urgent review.  **2) Hallucination on LinkedIn request** In another case (also in the screenshots), a prospect asked for the client’s LinkedIn and the AI SDR’s LinkedIn.  At the time, there was no LinkedIn information in the knowledge base (we have since fixed that on the call). However, instead of escalating to human intervention, the AI hallucinated:  \\* It provided a random LinkedIn URL for Name 11 that does not work \\* It also generated a LinkedIn profile URL for itself, which obviously makes no sense  This should have triggered a fallback to human instead of generating incorrect information.  Both issues need to be investigated and resolved ASAP given the client impact.\n\n#### What are you doing to achieve it?\n\n* \n\n#### What is happening instead?\n\n* \n\n#### What is the expected outcome?\n\n* \n\n<!-- preview-url-start -->\n**Preview:** <url:1778230239-aiacquisition.vercel.app> — PR #3808\n<!-- preview-url-end -->"
+    },
+    {
+      "id": "ENG-8372",
+      "createdAt": "2026-05-07T13:13:28.356Z",
+      "title": "CRM padding issue and lagging issue",
+      "state": "Done",
+      "assignee": "Anuj Bhatt",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "There is something that made the filters and views weirdly delayed + added margin between the top row and bottom row above the pipelines.\n\nCleanShot 2026-05-07 at 14.40.36.mp4"
+    },
+    {
+      "id": "ENG-6823",
+      "createdAt": "2026-03-18T16:58:30.469Z",
+      "title": "Sales Call Analyzer call stays pending after final report",
+      "state": "Canceled",
+      "assignee": "Anuj Bhatt",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "A call in Sales Call Analyzer for Name 23 goes through all processing steps, including compiling the final report, but remains in a pending state instead of finalizing.\n\nSupport advised not to redo the call yet because the data may still exist in the background and duplicating it could create confusion. The issue was escalated for developer review."
+    },
+    {
+      "id": "ENG-1839",
+      "createdAt": "2025-10-13T10:04:54.453Z",
+      "title": "Sales call not found for bot",
+      "state": "Done",
+      "assignee": "Jose Cervino",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "Sentry Issue: AI-CLIENTS-15D\n\n```\nSales call not found for bot\n```"
+    },
+    {
+      "id": "ENG-2458",
+      "createdAt": "2025-10-30T11:27:03.258Z",
+      "title": "Add a way to mark flagged deliverability issues as checked/not an issue",
+      "state": "Canceled",
+      "assignee": "Anthony Adewale",
+      "parent": null,
+      "labels": ["Improvement"],
+      "description": "<url:thegrowthpartner.slack.com>\n\nAgent flags deliverability issues as a possibility.\n\nAfter the user tests and everything is good, there should be a way to tick that off/mark as \"issue investigated and all good\" so that the agent does not keep making decisions based on that."
+    },
+    {
+      "id": "ENG-13753",
+      "createdAt": "2026-09-12T14:45:03.180Z",
+      "title": "AI SDR inbox New Appointment books the extracted duration instead of the selected meeting type's duration",
+      "state": "Backlog",
+      "assignee": "Koppany Kondricz",
+      "parent": null,
+      "labels": ["Bug", "master"],
+      "description": "## Overview\n\nWhen an operator creates an appointment from a thread in the AI SDR inbox \"New Appointment\" screen, the meeting length comes from the duration the AI read out of the email thread instead of from the meeting type selected in the form. The appointment and its calendar invite are then booked at the wrong length, and nothing in the form shows the operator which length will be saved.\n\n## Problem\n\nAn operator picks a meeting type whose configured duration is, say, 30 minutes. The form displays that meeting type with its configured duration, but saves and books a different length, most often 15 minutes or the extraction's 45-minute fallback. The operator only finds out after the prospect has an invite for the wrong length, and there is no field in the form where the duration can be seen or corrected.\n\n## Root cause\n\n`apps/web/components/ai-sdr/create-appointment-from-thread-modal.tsx` fills the form from the AI extraction returned by `generateAppointmentDetails` (`apps/web/trpc/routers/appointments.ts`), which includes a free-form `durationInMinutes` (\"Default to 45 if not specified in the conversation\"). The form resets `durationInMinutes` to that extracted value, renders no duration control, and `onSubmit` submits the extracted value. The selected meeting type's configured duration is re-applied only when the Call Type control reports an actual value change, which does not happen when the intended type is already the selected one. `createFromThread` passes the submitted duration through to `bookingService.bookAppointment` (`apps/web/lib/scheduling/services/booking-service.ts`), which persists it with origin `sdr_inbox` instead of the resolved call type duration. The AI SDR automatic booking path is unaffected: `apps/web/lib/ai-sdr-v2/workflow/steps/booking.ts` resolves the call type and books its configured duration.\n\n## Blast radius\n\n72 organizations and 73 users, 216 appointments, origin `sdr_inbox`, created 2026-07-14 through 2026-09-12, counted 2026-09-12. Query: `scheduling_appointment a LEFT JOIN scheduling_call_type ct ON ct.id = a.call_type_id`, plus a VALUES mapping of the ten legacy built-in call-type ids to their default durations, filtered to `a.origin = 'sdr_inbox' AND a.deleted_at IS NULL AND COALESCE(ct.duration_minutes, legacy.dur) <> a.duration_in_minutes`. Fleet contrast over the same window: `sdr_inbox` 216 of 484 rows mismatched, `ai_sdr` 172 of 9669, `manual` 5 of 588. Potentially exposed: every workspace that uses this form. Limitation: the mismatch compares against each call type's current configured duration, so a later duration edit also counts; the rate contrast against the two paths that derive their duration from the call type is what isolates this cause.\n\n## Proposed fix\n\nThe duration that gets saved should follow the meeting type the operator selected. Either treat the extracted duration as an explicit override that the operator must opt into, or render an editable duration field so the form can never silently disagree with the meeting type it displays. If the extraction keeps proposing a duration, the form should show it.\n\n## What's included\n\nThe manual New Appointment form for a thread and the duration it submits. Excluded: the AI SDR automatic booking path (already correct), the calendar page appointment modal (already derives duration from the call type), and meeting-type configuration itself.\n\n## Regression seam\n\nCreating an appointment from the AI SDR inbox with a meeting type selected and no deliberate duration change must persist `scheduling_appointment.duration_in_minutes` equal to that call type's `duration_minutes`. Red before: an extracted duration (for example 15 or 45) is stored against a 30-minute type. Green after: the stored duration matches the selected type unless the operator overrides it.\n\n## Done when\n\n* An appointment created from the inbox form stores the selected meeting type's configured duration unless the operator deliberately changes it.\n* The form shows the length that will be saved.\n* A regression test proves the stored duration follows the selected meeting type at the named seam.\n\n## Reports\n\n* A customer report from an Intercom conversation is parented to this master."
+    }
+  ]
+}

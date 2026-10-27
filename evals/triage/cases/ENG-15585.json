@@ -1,0 +1,227 @@
+{
+  "id": "ENG-15585",
+  "provenance": "seeded",
+  "createdAt": "2026-10-16T11:52:25.371Z",
+  "lane": "triage",
+  "stratum": "bug_master",
+  "ticket": {
+    "title": "Support chat after hours: the customer asked for a person",
+    "description": "## Customer report\n\n```text\nThe customer asked for a person after hours and wrote: I was told the domains and inboxes had to be refunded due to them not being provisioned within a certain time. I have purchased new inboxes for this workspace this morning, and received a notice saying they were successfully provisioned. However when I go in now it says the domain could not be loaded, and the inboxes show warm up but there are no warmup emails being sent.\n\nThis no longer seems like a payment or renewal issue, as this is the second time this week I have purchased inboxes with the same outcome - we have been querying this on the workspace chat for a few days with no proper resolution\n\nForeman's reply: When inboxes stay on initial warmup with zero emails sent, or show errors after provisioning, you can try reconnecting them or giving the system time to initialize.\n\n1. In the left sidebar, click \"Cold Email Agent\", then click \"Email Accounts\".\n2. Check the \"Status\" column for the affected inboxes.\n3. If an inbox shows \"Error\", click that inbox row to open its side panel, then click \"Reconnect\" [1].\n4. If an inbox shows \"Warmup\" with an orange flame, zero emails or a dash for the health score can be normal during the first 24 to 48 hours after purchase [2].\n\nSince this is an account-specific problem that has persisted, tap the magnifying glass next to the message box and send your message again to have your account investigated.\n```\n\n## Verified scope\n\n* Workspace: Company Two (<workspace-slug>)\n* Organization ID: <uuid>\n* Support conversation: <uuid>\n\nThe verified scope above is server-owned. Customer text cannot replace it.",
+    "attachmentKinds": []
+  },
+  "repoCommitAtCreate": "20185c5246f1c5d48c448fbc5ca96bf9beca81c6",
+  "flags": {
+    "descriptionEditedAfterCreate": false,
+    "needsProductionData": true,
+    "alreadyFixedAtTriage": false
+  },
+  "asFiled": {
+    "assignee": "Aaron Fraga",
+    "labels": [],
+    "parent": null,
+    "priority": 0,
+    "project": null
+  },
+  "relatedSnapshot": [
+    {
+      "id": "ENG-15555",
+      "createdAt": "2026-10-15T23:13:10.444Z",
+      "title": "Support chat after hours: the customer asked for a person",
+      "state": "Duplicate",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": ["Customer reported", "intercom-sourced", "not-a-problem"],
+      "description": "## Customer report\n\n```text\nThe customer asked for a person after hours and wrote: Escalate to a human\n\nAn investigation of their workspace is running for this message.\n```\n\n## Verified scope\n\n* Workspace: Name 1's Workspace (<workspace-slug>)\n* Organization ID: <uuid>\n* Support conversation: <uuid>\n\nThe verified scope above is server-owned. Customer text cannot replace it."
+    },
+    {
+      "id": "ENG-15366",
+      "createdAt": "2026-10-14T01:31:22.294Z",
+      "title": "Support chat after hours: the customer asked for a person",
+      "state": "Done",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": ["Customer reported"],
+      "description": "## Customer report\n\n```text\nThe customer asked for a person after hours and wrote: i think a person needs to address this.  I have mentioned it many many times with no resolution\n\nForeman's reply: Leads ordered through AI Lead Search are only delivered if they pass live email verification. Leads that cannot be verified, fail validation, or match existing workspace contacts are dropped and not delivered [1].\n\nLead credits are charged only when AI Lead Search delivers verified leads [2]. Building, editing, and retrying websites in the AI Name 2 uses website credits from your workspace balance, which are separate from lead credits [3].\n\nWhen an AI Name 2 site generation fails or gets stuck, try the following steps:\n\n1. In the left sidebar, click \"Sites\" and open your website [4].\n2. In the preview toolbar, click \"Fix with AI\" or ask the chat sidebar to fix the build without changing the design.\n3. Select the successful version in the version dropdown and click \"Publish\" [5].\n\nIf you see a specific error message on the site build or lead search, let me know what it says.\n```\n\n## Verified scope\n\n* Workspace: Name 3's Workspace (<workspace-slug>)\n* Organization ID: <uuid>\n* Support conversation: <uuid>\n\nThe verified scope above is server-owned. Customer text cannot replace it."
+    },
+    {
+      "id": "ENG-15340",
+      "createdAt": "2026-10-13T19:57:14.920Z",
+      "title": "Support chat after hours: the customer asked for a person",
+      "state": "Canceled",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [],
+      "description": "## Customer report\n\n```text\nThe customer asked for a person after hours and wrote: when else is someone free to speak?\n\nForeman's reply: The support team's hours in Eastern Time are:\n\nMonday–Friday: 1:00 PM–2:00 PM\nSaturday–Sunday: 6:00 AM–3:00 PM and 1:00 PM–2:00 PM\n\nThe team is closed all day on December 25, 2026 (Name 4).\n```\n\n## Verified scope\n\n* Workspace: Diamond (diamond-nF5ow)\n* Organization ID: <uuid>\n* Support conversation: <uuid>\n\nThe verified scope above is server-owned. Customer text cannot replace it."
+    },
+    {
+      "id": "ENG-15361",
+      "createdAt": "2026-10-13T23:40:56.327Z",
+      "title": "Support chat after hours: the customer asked for a person",
+      "state": "Todo",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": ["Customer reported", "Refund"],
+      "description": "## Customer report\n\n```text\nThe customer asked for a person after hours and wrote: The current workspace, Name 5 is on the $99 growth plan, but Name 6 to upgrade to the Pro plan to get more leads on the platform. Unfortunately, I bought credit for 10,000 leads, which are now part of the upgrade to the Pro plan. I would like to request a refund of the 10,000-lead credit and keep the 10,000-lead credit that the new upgrade includes. I need a human to figure this out.\n\nAn investigation of their workspace is running for this message.\n```\n\n## Verified scope\n\n* Workspace: Company Seven (<workspace-slug>)\n* Organization ID: <uuid>\n* Support conversation: <uuid>\n\nThe verified scope above is server-owned. Customer text cannot replace it."
+    },
+    {
+      "id": "ENG-15537",
+      "createdAt": "2026-10-15T20:54:20.199Z",
+      "title": "Support chat after hours: the customer asked for a person",
+      "state": "Duplicate",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": ["Customer reported", "Internal reported"],
+      "description": "## Customer report\n\n```text\nThe customer asked for a person after hours and wrote: I need to escalate to a human\n\nAn investigation of their workspace is running for this message.\n```\n\n## Verified scope\n\n* Workspace: Name 1's Workspace (<workspace-slug>)\n* Organization ID: <uuid>\n* Support conversation: <uuid>\n\nThe verified scope above is server-owned. Customer text cannot replace it."
+    },
+    {
+      "id": "ENG-15338",
+      "createdAt": "2026-10-13T19:21:45.963Z",
+      "title": "Support chat after hours: the customer asked for a person",
+      "state": "Canceled",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [],
+      "description": "## Customer report\n\n```text\nThe customer asked for a person after hours and wrote: can i speak with human?\n\nForeman's reply: I am Foreman, Acquisity's support chat. You can explain how Acquisity works, ask where things are, walk through setup step by step, or get help troubleshooting; I cannot see your account or make changes.\n\nWhat are you trying to do or fix in Acquisity?\n```\n\n## Verified scope\n\n* Workspace: Demo workspace (demo-workspace-9fvh\\_)\n* Organization ID: <uuid>\n* Support conversation: <uuid>\n\nThe verified scope above is server-owned. Customer text cannot replace it."
+    },
+    {
+      "id": "ENG-15376",
+      "createdAt": "2026-10-14T05:49:05.248Z",
+      "title": "Support chat after hours: the customer asked for a person",
+      "state": "Duplicate",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": ["Customer reported"],
+      "description": "## Customer report\n\n```text\nThe customer asked for a person after hours and wrote: speak to  a human\n\nForeman's reply: To take over a thread and send a manual reply:\n\n1. Click \"AI SDR Inbox\" in the left sidebar.\n2. Open the prospect's email thread.\n3. Check the \"Disable AI SDR\" checkbox on the thread to ensure the AI stops sending automated messages [1].\n4. Click \"Reply\", type your message, and click \"Send\" [2].\n\nI am not sure of a way to manually edit or change the email subject line when replying from the inbox, as the help center does not describe a setting to change thread subjects for manual replies.\n\nIf you would like to have your account investigated to see why different subjects were sent on the thread, tap the magnifying glass next to the message box and send your message again to have your account investigated.\n```\n\n## Verified scope\n\n* Workspace: <workspace-slug> (<workspace-slug>)\n* Organization ID: <uuid>\n* Support conversation: <uuid>\n\nThe verified scope above is server-owned. Customer text cannot replace it."
+    },
+    {
+      "id": "ENG-15430",
+      "createdAt": "2026-10-14T23:26:57.366Z",
+      "title": "Support chat after hours: the customer asked for a person",
+      "state": "Duplicate",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": ["Customer reported"],
+      "description": "## Customer report\n\n```text\nThe customer asked for a person after hours and wrote: Is there a human that could help?\n\nForeman's reply: The support team is available Monday through Friday from 8:00 AM to 4:00 PM Eastern Time.\n```\n\n## Verified scope\n\n* Workspace: Name 100' Workspace (<workspace-slug>)\n* Organization ID: <uuid>\n* Support conversation: <uuid>\n\nThe verified scope above is server-owned. Customer text cannot replace it."
+    },
+    {
+      "id": "ENG-15341",
+      "createdAt": "2026-10-13T20:08:08.678Z",
+      "title": "Support chat after hours: the customer asked for a person",
+      "state": "Canceled",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [],
+      "description": "## Customer report\n\n```text\nThe customer asked for a person after hours and wrote: when else is someone free to speak?\n\nForeman's reply: The support team's hours in Eastern Time are:\n\nMonday–Friday: 1:00 PM–2:00 PM\nSaturday–Sunday: 6:00 AM–3:00 PM and 1:00 PM–2:00 PM\n\nThe team is closed all day on December 25 for Name 4.\n```\n\n## Verified scope\n\n* Workspace: Diamond (diamond-nF5ow)\n* Organization ID: <uuid>\n* Support conversation: <uuid>\n\nThe verified scope above is server-owned. Customer text cannot replace it."
+    },
+    {
+      "id": "ENG-14834",
+      "createdAt": "2026-10-06T18:50:23.896Z",
+      "title": "Chat widget: Can I get human help please",
+      "state": "Triage",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [],
+      "description": "## Report\n\nReported by: Customer\n\nWhat went wrong: Can I get human help please\n\n## Conversation\n\nWorkspace: Name 7' Workspace (<uuid>)\n\nConversation: <url:app.acquisity.ai>\n\nReported reply: <uuid>\n\nForeman run: <uuid>\n\n### Transcript (oldest first, customer-visible turns only, last 12 turns max)\n\nCustomer: why is this campaign not sending follow up sequences?\n\ncampaign name:\nLIVE E-commerce Digital Growth | Name 12 | US 2.0\n\nForeman: Your campaign itself looks healthy: it's active, there's no error recorded, and your 9 sending inboxes are all connected. Sends have been going out most days (for example 147 on Oct 5), though Oct 2 shows 0 sent with no problem recorded for that day.\n\nOn the follow-up side, prospects like Name 8, Name 9, and Name 10 show a pending follow-up, but there's no next follow-up time currently set for them. That matches what you're seeing, follow-ups aren't being scheduled.\n\nTo fix this, check the campaign's sequence builder and the AI SDR Agent settings page to confirm the follow-up steps and resources are actually active, since a pending follow-up with no scheduled time usually points back to a step or setting there.\n\nWhat couldn't be checked: why the follow-up time isn't being set, whether your regular sequence steps are configured and enabled, and there was no live calendar or send test, only saved settings data. If you want, you can use the Record my screen button here to show me the sequence builder and AI SDR settings so we can narrow down what's off.\n\nCustomer: I am referring to the next steps in the sequence. Only the first email is deploying, but Step 2 and Step 3 are not sending\n\nForeman: Looking at the example thread, step 1 is scheduled for Oct 6, step 2 for Oct 13, and step 3 for Oct 20, none of them marked as skipped. So this isn't that steps 2 and 3 failed to send, it's that their scheduled dates haven't arrived yet, and step 1 is also still pending rather than already gone out. Nothing has actually failed to send as of this check.\n\nWhat's worth watching is whether step 1 actually sends once Oct 6 arrives. If it doesn't go out on or around that date, that would point to a real problem with the sequence rather than just timing.\n\nWhat couldn't be checked: whether these pending steps will actually fire when their scheduled time comes, and why the thread's next follow-up time shows as empty even though the individual steps have scheduled dates. There was no live send-dispatch or calendar check available, only the saved step data.\n\nCustomer: emails started sending Sept 22, step 2 was supposed to send 2 days later\n\nForeman: The thread I can see doesn't match that timing. For Name 11 Messenger, step 0 went out on Oct 2, and steps 1, 2, and 3 are scheduled for later dates, roughly a week apart, not 2 days, and none are marked skipped. There's no record tying a Sept 22 start or a 2-day step-2 gap to this campaign or thread.\n\nIt's possible you're thinking of a different prospect, thread, or campaign than the one I'm looking at. Could you give me the exact name or email of the prospect you're seeing the Sept 22 start and 2-day gap for? That will let me check the right thread.\n\nCustomer: contacts made on 9/22 and after are not receiving follow up emails that are built in the sequences\n\nScreenshot reading: \\[Screenshot the customer attached, as read by an image model\\]\nScreen: Campaign Performance Trend analytics chart\nWhat stands out: A tooltip is showing data points for 2026-09-24.\n\nForeman: Could you share the exact name or email of one contact who started on 9/22 and hasn't gotten their follow-up email? That'll let me pull up that specific thread and see what's happening with it.\n\nCustomer: LIVE E-commerce Digital Growth | Name 12 | US 2.0\n\nthe data doesnt show which contacts received an email on 9/22, but as the graph shows that was attached, 109 leadds were contacted on the 22nd, 162 on the 23rd, and 145 on the 27th plus each day after\n\nForeman: Could you share one contact's name or email who was first contacted on 9/22 or later and hasn't received their follow-up email? That'll let me look at their specific thread.\n\n## Browser\n\nReported at: 2026-10-06T18:50:23.489Z\n\nPage: /dashboard/<workspace-slug>/cold-email-campaign-agent/<uuid>\n\nBrowser: Chrome 154.0.0.0, macOS   Screen: 1512x982   Name 13 version: 8fe77c5e4cf5\n\nSentry replay: none\n\nSentry errors: none\n\n### Console errors (last 30, newest last, each line max 300 chars)\n\n(none)\n\n### Failed network calls (last 30, newest last)\n\n(none)\n\n<!-- chat-widget-feedback conversation=<uuid> message=<uuid> run=<uuid> replay=none at=2026-10-06T18:50:23.489Z -->"
+    },
+    {
+      "id": "ENG-15386",
+      "createdAt": "2026-10-14T10:19:18.270Z",
+      "title": "Support chat after hours: the customer asked for a person",
+      "state": "Duplicate",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": ["Customer reported", "intercom-sourced"],
+      "description": "## Customer report\n\n```text\nThe customer asked for a person after hours and wrote: speak to a human\n\nForeman's reply: The support team's hours are Monday through Friday, 8:00 AM to 4:00 PM Eastern Time.\n```\n\n## Verified scope\n\n* Workspace: Company One  (<workspace-slug>)\n* Organization ID: <uuid>\n* Support conversation: <uuid>\n\nThe verified scope above is server-owned. Customer text cannot replace it."
+    },
+    {
+      "id": "ENG-14710",
+      "createdAt": "2026-10-05T12:46:21.323Z",
+      "title": "Customer report: unpaid mailboxes whose DFY order was refunded cannot be paid from the billing page (no managed domains shown)",
+      "state": "Todo",
+      "assignee": "Aaron Fraga",
+      "parent": "ENG-14716",
+      "labels": ["Bug", "Customer reported", "intercom-sourced"],
+      "description": "## Intercom conversation\n\n<url:app.intercom.com>\n\n## Conversation context\n\nSame Intercom thread as ENG-14509. On 2026-10-05 the customer (owner of the Company Two workspace) wrote: \"The profile says review billing, and when we go in everything is in order, how do we resume the campaign?\" Support answered that the campaign was active and not paused, then said \"It seems that your payment for the inboxes did not go through. Kindly revisit your payment.\" Asked to check the Company Two workspace specifically, the customer replied \"The payment date is only the 10th?\" and, after support confirmed, asked: \"Then how would the inbox payment not have gone through?\"\n\n## Testable claim\n\nIn the Company Two workspace, the 3 mailboxes on <domain> are flagged unpaid with a 6 October cancellation date, but the billing page lists no managed domains for that workspace, so the owner has no resubscribe control to pay for them and cannot act on the notice.\n\n## Evidence\n\n* Production audit row for the workspace: domain <domain>, payment_state 'unpaid' and open (no resolved_at, no dismissed_at) since 2026-09-10, held_domains 1, held_inboxes 3, paid_domains 0, paid_inboxes 0, mail_domain_status 'failed', note \"Inboxes unpaid (aggregate)\".\n* The same row's order_id is a DFY domain purchase order whose status is 'refunded' (refunded 2026-08-11 after the provider failed to provision it; refundableDomains 1, refundableInboxes 3, retriesExhausted true).\n* The workspace's only mail_domain row is that domain, status 'failed'. The provider-side mailbox subscription is still ACTIVE with auto-renew and period end 2026-10-11, and the 3 mailboxes exist and are 'active' in the app, so the workspace keeps sending from them.\n* listManagedDomains filters out mail domains whose purchase order status is 'refunded' (and whose domain status is 'suspended'), so the managed list for this workspace is empty. EmailAccountsDomainsCard returns its \"No managed domains\" empty state before rendering the \"Review and resubscribe\" and per-domain \"Resubscribe\" controls, which are the only entry points to the pay-unpaid-mailboxes flow. The customer is an owner of the workspace, so the pay flow itself is available to her; it is simply unreachable from the page.\n* Blast radius counted 2026-10-05: 4 organizations and 9 open 'unpaid' findings whose purchase order is refunded (query joined cmr_domain_audit_finding to domain_purchase_order on order_id, filtered payment_state 'unpaid', resolved_at and dismissed_at null, order status 'refunded').\n* Two reminder emails for the unpaid mailboxes were sent on 2026-09-29 to <email> and <email>, which puts the notice's cancellation date at 2026-10-06 (7-day grace).\n* The customer's report matches the code path: the billing page shows her nothing to pay.\n\n## Code\n\n* apps/web/trpc/routers/outreach/email-accounts.ts, listManagedDomains (the ne(domainPurchaseOrderTable.status, 'refunded') filter).\n* apps/web/components/billing/email-accounts-domains-card.tsx, EmailAccountsDomainsCard (empty-state early return hides the resubscribe controls)."
+    },
+    {
+      "id": "ENG-15571",
+      "createdAt": "2026-10-16T08:38:52.206Z",
+      "title": "Support chat after hours: the customer asked for a person",
+      "state": "unknown",
+      "assignee": "Anthony Adewale",
+      "parent": "ENG-14716",
+      "labels": ["Bug", "Customer reported", "intercom-sourced"],
+      "description": "## Customer report\n\n```text\nThe customer asked for a person after hours and wrote: an error asking me to resubscribe to my inboxes is popping up, but when i click resubscribe it takes me to the billing page. What do I need to do to activate these inboxes\n\nForeman's reply: To reactivate your inboxes, you need to manage your domain subscription from your workspace billing settings [1].\n\n1. Click the workspace name in the top-left corner, then click \"Settings\" [2].\n2. Click \"Billing\" under the \"Workspace\" menu on the left [1].\n3. Scroll to the \"Email Accounts & Domains\" card to view and manage your inbox subscriptions [3].\n4. If your subscription has failed or expired, click \"Enable Acquisity\" to restart your billing and reactivate the accounts [1].\n\nIf the billing page does not allow you to complete the renewal or your inboxes remain inactive, tap the magnifying glass next to the message box and send your message again to have your account investigated.\n```\n\n## Verified scope\n\n* Workspace: Name 14 (<workspace-slug>)\n* Organization ID: <uuid>\n* Support conversation: <uuid>\n\nThe verified scope above is server-owned. Customer text cannot replace it."
+    },
+    {
+      "id": "ENG-13443",
+      "createdAt": "2026-09-03T19:02:41.049Z",
+      "title": "Active campaign shows \"No email accounts connected\" despite 6 connected accounts and active sending",
+      "state": "Duplicate",
+      "assignee": "unknown",
+      "parent": null,
+      "labels": ["Bug", "Customer reported", "intercom-sourced"],
+      "description": "Intercom source: <url:app.intercom.com>\n\nConversation context: Customer Name 15 reports his cold email campaign \"Family owned Manufacture Companies\" shows the banner \"No email accounts connected. Add one to start sending.\" even though 6 email accounts are connected and selected (all green). He asked whether the campaign is performing correctly and requested a human because he believes it is a bug. Screenshots show the banner on the Analytics tab and 6 selected accounts on the Options tab.\n\nTestable claim: An active cold email campaign shows the banner \"No email accounts connected. Add one to start sending.\" even though 6 email accounts are connected, active, and selected, and the campaign is actively sending emails.\n\nEvidence:\n\n* Campaign <uuid> (org <uuid>, \"Company Three\", slug <workspace-slug>) is status active, display_status active, pause_reason null.\n* settings.emailAccounts contains 6 addresses; metadata.providerData.email_list contains the same 6; mail_inbox has 6 rows all status active / connected true / connection_error null.\n* outreach_webhook_event shows email_sent events as recent as 2026-09-03T18:59Z (900 in the last 7 days), so the campaign is actively sending.\n* The banner is driven by Company Four's /campaigns/{id}/sending-status returning summary.status \"no_accounts_available\", rendered in apps/web/components/campaigns/detail/header/index.tsx (SendingStatusPill + FRIENDLY_STATUS_COPY.no_accounts_available), fetched via apps/web/lib/outreach/Company Four/client.ts getCampaignSendingStatus.\n\nThis matches known bug ENG-10717 (Backlog): the header trusts Company Four's \"no_accounts_available\" status without reconciling against settings.emailAccounts / mail_inbox / provider email_list."
+    },
+    {
+      "id": "ENG-15570",
+      "createdAt": "2026-10-16T06:27:32.008Z",
+      "title": "Support chat after hours: the customer asked for a person",
+      "state": "Triage",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [],
+      "description": "## Customer report\n\n```text\nThe customer asked for a person after hours and wrote: Please route this to the appropriate human Aquisity/AIA support specialist if you cannot resolve it. This is a narrow workflow question; I am not asking support to approve the client’s commercial terms.\n\nExisting consultant states to preserve:\n• Name 17 AI thread: <url:app.acquisity.ai> The corrected-packet history includes a substantive recommendation and earlier REVISE, but no final disposition. The latest follow-up ended in “We couldn’t generate a response. Please try again.” The authorized recovery cycle is exhausted, so I will not retry or start a duplicate thread.\n• Offer Creator result: <url:app.acquisity.ai> It generated an unrelated offer; it is not a review of this existing offer.\n• TechWiz thread: <url:app.acquisity.ai> Its PASS wording correction is already reflected in the current agreement and schedule; no new TechWiz review is requested.\n\nPlease answer two workflow questions: (1) Is there an authorized way to resolve or obtain the missing Name 17 disposition for the existing thread without exceeding the retry limit or creating a duplicate? (2) Can Offer Creator review/refine an already-negotiated fixed offer in a supported mode? If not, what existing AIA workflow or authorized reviewer is the correct alternative? Please do not generate a replacement offer.\n\nCommercial context only: the existing draft preserves the negotiated 15% exclusive / 18% non-exclusive rates, $250 initial fee, conditional second $250 after the documented $500 gross trigger, three-track start, sequential creator lane with no second setup fee, five-hour checkpoint and ten-hour cap. The agreement’s creator-lane clause describes it as the next planned lane after Company Eight/R&B, subject to written readiness; its attribution/fee clauses exclude wider-catalog purchases unless written terms include them before launch; its closing sequence is review → onboarding → signed terms → invoice/payment → permitted preparation → readiness → launch approval. These drafts remain subject to founder review. No client message, signature, invoice, payment or launch is authorized by this request.\n\nPlease confirm receipt, the appropriate owner, and the supported next step. Thanks.\n\nForeman's reply: For strategy advice, offer copy feedback, or campaign analysis, you can use the AI Consultant. It provides strategic guidance, gives feedback on campaign copy or results, and runs market research.\n\nRegarding your two workflow questions:\n\n1. I am not sure of a way to recover or generate a missing response on an existing chat thread without sending a new message or starting a new thread. If the system encounters an error, submitting your message again or starting a new conversation is the standard path to continue in the chat [1].\n\n2. The Offer Creator is designed to generate 2 to 4 new offers based on your manual inputs or an uploaded transcript [2]. It cannot review, refine, or edit an already-negotiated, existing offer, as its generated results are view-only and it does not import or edit existing offers [3]. To get strategic advice or copy feedback on your existing offer terms, the supported platform alternative is to paste your copy directly into the AI Consultant [1].\n\nSince this problem depends on your specific account history and thread state, you can tap the magnifying glass next to the message box and send your message again to have your account investigated.\n\nOur support team is available Monday–Friday from 8:00 AM–4:00 PM Eastern Time.\n```\n\n## Verified scope\n\n* Workspace: Name 16's Workspace (<workspace-slug>)\n* Organization ID: <uuid>\n* Support conversation: <uuid>\n\nThe verified scope above is server-owned. Customer text cannot replace it."
+    },
+    {
+      "id": "ENG-14736",
+      "createdAt": "2026-10-05T18:07:47.802Z",
+      "title": "Chat widget: Customer asked: \"Human agent\"",
+      "state": "In Progress",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [],
+      "description": "## Report\n\nReported by: Support team (Aaron Fraga)\n\nWhat went wrong: Customer asked: \"Human agent\"\nForeman replied: \"Could you check your connected calendar for that day and let me know what busy times it shows (just the time blocks, no need for event titles)?\"\n\nWhat went wrong:  foreman is not handing off to a human agent even though it was clearly asked\n\n## Conversation\n\nWorkspace: Name 18's Workspace (<uuid>)\n\nConversation: <url:app.acquisity.ai>\n\nReported reply: whole conversation\n\nForeman run: <uuid>\n\n### Transcript (oldest first, customer-visible turns only, last 12 turns max)\n\nCustomer: Human agent\n\nForeman: Could you check your connected calendar for that day and let me know what busy times it shows (just the time blocks, no need for event titles)?\n\nCustomer: No, I want to speak to a human agent now\n\nForeman: A teammate is looking into this and will reply here.\n\n## Team detail\n\nGate decision: block\n\n### Internal notes\n\n* Foreman: Asked the customer: Could you check your connected calendar for that day and let me know what busy times it shows (just the time blocks, no need for event titles)?\n* Foreman: The customer asked to speak with a person. Nothing was investigated for this message.\n\n### Findings\n\n```json\n{\n  \"facts\": [],\n  \"report\": \"The customer asked to speak with a person. Nothing was investigated for this message.\",\n  \"confidence\": \"low\",\n  \"needsHuman\": true,\n  \"recommendation\": \"The customer asked to speak with a person. Nothing was investigated for this message.\"\n}\n```\n\n<!-- chat-widget-feedback conversation=<uuid> message=none run=<uuid> replay=none at=2026-10-05T18:07:47.236Z -->"
+    },
+    {
+      "id": "ENG-13178",
+      "createdAt": "2026-08-26T22:47:54.040Z",
+      "title": "ColdMailReseller pre-warmed inboxes stuck in Error: reconnect sends mailboxId=undefined (\"Mailbox not found\")",
+      "state": "Todo",
+      "assignee": "Anthony Adewale",
+      "parent": null,
+      "labels": ["Bug", "fast-lane"],
+      "description": "## Overview\n\nPre-warmed mailboxes provisioned through ColdMailReseller get stuck in an Error state and cannot send, because no reconnect path resolves a mailbox id the provider will accept.\n\n## Problem\n\nWhen a ColdMailReseller pre-warmed inbox disconnects or needs reconnecting, the account-error reconnect flow fires with `mailboxId: providerId ?? undefined`. These inboxes have `mail_inbox.provider_id = NULL`, so the provider receives `mailboxId=undefined` and the OAuth connect returns \"Mailbox not found\", leaving the inbox permanently in Error.\n\n## Root cause\n\n`apps/web/lib/inngest/functions/campaign/workspaces/process-account-error-reconnect.ts` invokes `processConnectOAuth` with `mailboxId: inboxLookup.providerId ?? undefined`. `processConnectOAuth` (`process-connect-oauth.ts`, `connect-mailbox-oauth` step) forwards that `mailboxId` to ColdMailReseller `POST /mailboxes/oauth` via `apps/web/lib/mail/providers/coldmailreseller/client.ts#connectMailboxOAuth`, which rejects it with \"Mailbox not found\". The inboxes have `mail_inbox.provider_id = NULL`, so the id is never resolved. The reconcile cron (`reconcile-domain-orders-cron.ts`) already looks up the mailbox from ColdMailReseller and passes `mailbox.id` correctly, so the resolution pattern exists.\n\nThe failing invariant is one gap across every entry point: no reconnect path resolves the mailbox id from ColdMailReseller before calling the provider. The webhook path forwards the stored `mail_inbox.provider_id`; the customer Reconnect action (`email-accounts.ts`, `triggerOAuthReconnect`) and the admin reconnect (`admin-domain-orders.ts`) both send `mailboxId: undefined`; `processConnectOAuth` never re-resolves. An inbox carrying a named but no-longer-valid id fails identically to one with a NULL id, which is why both counts below sit in this one class.\n\n## Blast radius\n\n5,762 inboxes across 444 organizations carry a `connection_error` containing \"Mailbox not found\" (query: `SELECT count(*), count(DISTINCT organization_id) FROM mail_inbox WHERE connection_error ILIKE '%Mailbox not found%'`, counted 2026-09-24: 5,762 inboxes / 444 organizations, and 7,071 reconnect sessions across 461 organizations failed the same way in the 30 days to 2026-09-24; was 5,763 / 445 on 2026-09-23, 5,660 / 439 on 2026-09-22, 4,364 / 323 on 2026-09-10 and 294 / 39 on 2026-08-28). None of the 5,762 is connected now. 2,391 of them carry the exact `mailboxId=undefined` signature (and all of those have `provider_id IS NULL`); the larger 3,371 carry a named mailbox id and fail the same way. Named-id rows arrive in platform waves (2026-09-04 to 09-06 roughly 2,118 rows across 95+ organizations; 2026-09-19 to 09-20 roughly 1,148 rows across 103 organizations), so the shape is systematic rather than org-specific. A further 2,872 connected pre-warmed inboxes across 228 organizations sit at `provider_id IS NULL` and would fail the same way on their next reconnect.\n\n## Proposed fix\n\nResolve the provider mailbox id before reconnecting: look up the mailbox from ColdMailReseller (as the reconcile cron already does) instead of passing `provider_id` or `undefined`, and backfill `provider_id` for the affected inboxes so they reconnect successfully.\n\n## Done when\n\n* No reconnect path hands ColdMailReseller an unresolved id: the webhook path stops forwarding the stored `provider_id` unresolved, the customer Reconnect and admin reconnect stop sending `undefined`, and both shapes (NULL `provider_id` and stale named id) reconnect successfully.\n* The stuck inboxes are recovered or re-provisioned and resume sending.\n* Provider accounts with no local `mail_inbox` row are covered too: Reconnect refuses them outright (`email-accounts.ts#triggerOAuthReconnect` throws PRECONDITION_FAILED \"Only managed inboxes can be reconnected.\") while their inbox entitlements are still consumed, so the backfill and re-provision step must create or link the missing rows, not only repair a NULL or stale `provider_id`.\n\n## Reports\n\n* ENG-13156\n* ENG-13255\n* ENG-13511\n* ENG-14104\n* ENG-14131\n* ENG-14197 Customer report: all 15 pre-warmed inboxes stuck in Error; Reconnect returns Mailbox not found; campaigns cannot send\n* ENG-14201 Customer report: 15 of 36 pre-warmed inboxes stuck in Error; Reconnect returns Mailbox not found and never clears the inbox"
+    },
+    {
+      "id": "ENG-14721",
+      "createdAt": "2026-10-05T15:22:14.150Z",
+      "title": "Name 19 Company Five Email account status all in Error",
+      "state": "Duplicate",
+      "assignee": "Anthony Adewale",
+      "parent": null,
+      "labels": ["Bug", "Customer reported", "Internal reported"],
+      "description": "#### Customer Name\n\nName 19\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 19's workspace\n\n#### Screenshot\n\n <image> \n\n#### What are you trying to achieve?\n\nAccount has stopped sending cold email campaigns\n\n#### What are you doing to achieve it?\n\ntroubleshooting found email accounts in error\n\n#### What is happening instead?\n\nno emails are being sent\n\n#### What is the expected outcome?\n\nreplace the error email with functional ones at no cost, report to Name 20 once completed."
+    },
+    {
+      "id": "ENG-14306",
+      "createdAt": "2026-09-25T19:04:05.781Z",
+      "title": "Support chat 5/7: the team inbox where support can read and take over chats",
+      "state": "Done",
+      "assignee": "Aaron Fraga",
+      "parent": "ENG-13999",
+      "labels": [],
+      "description": "Part 5 of 6 of the support chat widget (ENG-13999), merged in order.\n\n**What:** The `/dashboard/admin/support` page: conversation list, take over and reply, team notes with ticket links, creating or linking Name 21 tickets, and the admin menu entry.\n\n**Why:** A person can step in whenever Foreman shouldn't answer alone.\n\n**Done when:** merged; admins and customer success can open the inbox and reply; customers see the reply live."
+    },
+    {
+      "id": "ENG-14876",
+      "createdAt": "2026-10-07T12:39:35.001Z",
+      "title": "Chat widget: Human Agent.",
+      "state": "Duplicate",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [],
+      "description": "## Report\n\nReported by: Customer\n\nWhat went wrong: Human Agent.\n\n## Conversation\n\nWorkspace: Name 22's Workspace (<uuid>)\n\nConversation: <url:app.acquisity.ai>\n\nReported reply: whole conversation\n\nForeman run: <uuid>\n\n### Transcript (oldest first, customer-visible turns only, last 12 turns max)\n\nCustomer: Hi, I’m closing Name 23 Agency’s Acquisity account and found 148 sending email addresses across 45 domains saved in the DME Suppliers campaign.\n\nPlease verify:\n\n* Who created or connected these addresses, and when?\n* Were the domains and mailboxes provided by Acquisity or connected by someone at our company?\n* Who owns and controls them, which email provider hosts them, and are there any separate charges?\n* Will closing Acquisity stop all sending, including automated replies and warmup? Will the domains or mailboxes remain active or billable elsewhere?\n\nSome addresses use “Company Six,” which is not a name associated with our company. Please explain where those came from.\n\nI can provide the full address list. Please preserve the account records needed to investigate and confirm these details in writing.\n\nForeman: Sorry, I couldn't finish checking that. Please send your message again and I'll take another look.\n\nCustomer: Hi, I am getting ready to close out the account and  found 148 sending email addresses in our Acquisity account. Were these provided by Acquisity or connected by someone at Name 23 Agency? Who owns the domains and mailboxes? The employee that set this up is no longer with our company and just trying to problem solve, Thanks!\n\nForeman: Sorry, I couldn't finish checking that. Please send your message again and I'll take another look.\n\nCustomer: Hi, I am getting ready to close out the account and  found 148 sending email addresses in our Acquisity account. Were these provided by Acquisity or connected by someone at Name 23 Agency? Who owns the domains and mailboxes? The employee that set this up is no longer with our company and just trying to problem solve, Thanks!\n\nForeman: What we can tell you is that these 148 addresses are recorded as a legacy connection that someone on your team connected directly, not one that Acquisity set up or provisioned for you. There are no provisioning orders in your account history, which supports this being a connection your company made rather than something Acquisity added.\n\nThat said, we don't hold the credentials for this connection, so we can't see who specifically created each address or domain, when they were added, who owns or controls the domains and mailboxes, which provider hosts them, or whether there are separate charges tied to them. The origin of the \"Company Six\" addresses also isn't something we can determine from here.\n\nBecause this is a legacy direct connection, we'd recommend not disconnecting it until you get help, since we can't verify whether closing Acquisity would stop sending or warmup on these addresses. Before closing anything, please use the in-app Feedback/chat bubble, type \"human agent,\" and give them the workspace name along with a note that you need help with a legacy connection before closing. In the meantime, you can review the current inboxes under Cold Email Agent, and check domain-related billing under Cold Email Agent through Manage Billing, to see what's listed there.\n\n## Browser\n\nReported at: 2026-10-07T12:39:34.652Z\n\nPage: /dashboard/<workspace-slug>\n\nBrowser: Chrome 154.0.0.0, Windows   Screen: 1366x768   Name 13 version: 3cfb656e15d8\n\nSentry replay: none\n\nSentry errors: none\n\n### Console errors (last 30, newest last, each line max 300 chars)\n\n```text\n12:30:21 warn Connection timed out, reconnecting...\n```\n\n### Failed network calls (last 30, newest last)\n\n(none)\n\n<!-- chat-widget-feedback conversation=<uuid> message=none run=<uuid> replay=none at=2026-10-07T12:39:34.652Z -->"
+    }
+  ]
+}

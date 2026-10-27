@@ -3,6 +3,11 @@ import { z } from "zod";
 import { LINEAR_ISSUE_ID_PATTERN } from "#lib/investigation-memory/scope.js";
 import { decideTriage } from "#lib/jev-decisions.js";
 import { logOpsEvent } from "#lib/ops-log.js";
+import {
+  decisionFields,
+  settleDecision,
+  triageDecisions,
+} from "#lib/triage-log.js";
 
 const identifier = z.string().trim().regex(LINEAR_ISSUE_ID_PATTERN);
 const text = (max: number) => z.string().trim().min(1).max(max);
@@ -11,10 +16,10 @@ export default defineTool({
   approval: () => "not-applicable",
   description:
     "Jev decides the Stage 5 handling for a triage ticket from the completed Stage 4 evidence record: verdict, classification, duplicate, handling path, final state, priority, labels, and project. " +
-    "Code applies the Bug bar, the state for each path, the priority rules, and the Aaron fallback. " +
+    "Code applies the Bug bar, the state for each path, the priority rules, and the owner map. " +
     "outcome unproven means take the unproven branch with the missing confirmations it lists. " +
     "For a Bug that is not a Duplicate, hotlane carries the incident-hotlane route, impact, and proposed label. " +
-    "outcome route carries the exact state, priority, addLabels, project, and duplicate fields for route_ticket; pass them unchanged. assignee 'area owner' means the roster owner for the chosen project. " +
+    "outcome route carries the exact state, priority, addLabels (including the Area label), project, assignee, and duplicate fields for route_ticket; pass them unchanged. decision.assignee is the mapped owner of the area it chose, James Keeble when no area fits, and null when the ticket may not go to a developer (not a confirmed Bug, or a feature request nobody approved); decision.area names the Area label the route already carries. approval needed means a feature request waits for James to approve it. " +
     "Put every note in the Triage investigation document. " +
     "decided false means Jev could not answer: decide by the skill's rules and say so in the document.",
   async execute(input, ctx) {
@@ -25,6 +30,14 @@ export default defineTool({
         outcome: decision.outcome === "route" ? decision.path : "unproven",
         sessionId: ctx.session.id,
         tool: "decide_triage",
+      });
+      const fields = decisionFields(input.identifier, decision);
+      const settled = settleDecision(triageDecisions.get(), fields);
+      triageDecisions.update(() => settled.decisions);
+      logOpsEvent("triage.decision", {
+        ...fields,
+        decision: settled.stage,
+        sessionId: ctx.session.id,
       });
       return { decided: true as const, decision };
     } catch (error) {
@@ -85,7 +98,7 @@ export default defineTool({
     projects: z
       .array(z.object({ description: text(300).optional(), name: text(120) }))
       .min(1)
-      .max(40)
+      .max(60)
       .describe("The team's active product projects, read from Linear now."),
     rootCauseLabels: z
       .array(text(120))
@@ -95,5 +108,11 @@ export default defineTool({
       .array(text(120))
       .max(3)
       .describe("The sourceLabels classify_ask returned."),
+    ticketLabels: z
+      .array(text(120))
+      .max(60)
+      .describe(
+        "Every label already on the ticket, read from Linear now (an empty list when it has none), not the sourceLabels; the Approved label releases a feature request to a developer."
+      ),
   }),
 });

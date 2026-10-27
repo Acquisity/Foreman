@@ -1,0 +1,227 @@
+{
+  "id": "ENG-14559",
+  "provenance": "seeded",
+  "createdAt": "2026-10-01T13:12:21.586Z",
+  "lane": "triage",
+  "stratum": "duplicate",
+  "ticket": {
+    "title": "Name 1 - has created multiple workspaces and needs to consolidate",
+    "description": "#### Customer Name\n\nName 22\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 2's workspace\n\n#### Screenshot\n\n#### What are you trying to achieve?\n\nclient needs to update login email address to: <email> and remove anything else linked to Name 1 or Name 22\n\n#### What are you doing to achieve it?\n\n* \n\n#### What is happening instead?\n\n* \n\n#### What is the expected outcome?\n\n* ",
+    "attachmentKinds": []
+  },
+  "repoCommitAtCreate": "9939f50adfcde4c4eae199eea936d4a0d08011da",
+  "flags": {
+    "descriptionEditedAfterCreate": false,
+    "needsProductionData": false,
+    "alreadyFixedAtTriage": false
+  },
+  "asFiled": {
+    "assignee": "Aaron Fraga",
+    "labels": [],
+    "parent": null,
+    "priority": 1,
+    "project": "Support"
+  },
+  "relatedSnapshot": [
+    {
+      "id": "ENG-14278",
+      "createdAt": "2026-09-25T13:42:39.930Z",
+      "title": "Consolidate Name 1’s Duplicate Accounts & Credits",
+      "state": "Todo",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": ["Customer reported", "Feature Request"],
+      "description": "#### Customer Name\n\nName 1\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 1 / Company One\n\n#### Screenshot\n\n#### What are you trying to achieve?\n\nConsolidate Name 2’s two accounts. She wants to retain the account currently under <email>, where her existing campaign is located, but use <email> as the email going forward. The separate account under <email> currently holds 2,500 credits, which should be transferred/consolidated with her main account if possible.\n\n#### What are you doing to achieve it?\n\n<email> is already associated with a separate account, so the email cannot simply be changed on the main account. Both accounts need to be reviewed before making changes to avoid losing Name 2’s existing campaign or the 2,500 credits.\n\n#### What is happening instead?\n\nName 2 currently has two separate accounts. Her existing campaign is under <email>, while the 2,500 credits are under <email>. The business email is already tied to the second account, preventing everything from being consolidated under one account.\n\n#### What is the expected outcome?\n\nName 2 wants one account using <email> that retains her existing campaign and the 2,500 credits, without losing any existing data."
+    },
+    {
+      "id": "ENG-14003",
+      "createdAt": "2026-09-17T16:56:52.787Z",
+      "title": "Workspace deletion is switched off platform-wide, leaving a sole owner with no self-serve way to delete workspace or account",
+      "state": "Todo",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": ["intercom-sourced"],
+      "description": "Support/Product follow-up from the Intercom intake (second question on the same conversation).\n\nIntercom source: <url:app.intercom.com>\nConversation context: The customer says his workspace is not deleted, asks for further payments to be cancelled, and wants the account deleted. He told the agent the workspace still exists. Investigator was asked to check whether there is a bug deleting the workspace, because the client cannot delete it.\n\nFinding (workspace deletion is switched off platform-wide, not failing):\n\n* packages/db/src/types/organization-lifecycle.ts sets ORGANIZATION_SOFT_DELETE_ROLLOUT_ENABLED = false. That is a compile-time constant, so it is off for every environment and every user.\n* Every deletion entry point is gated on it: the owner-facing Danger Zone card (apps/web/components/organization/delete-organization-card.tsx) returns null and is only rendered when the flag is true on the General settings page; the tRPC organizations.deleteOrganization returns PRECONDITION_FAILED \"Workspace deletion is temporarily unavailable.\"; the admin deleteById and deleteManyById mutations do the same; and the public API DELETE /workspaces/{id} returns 409 conflict. The API description documents this state as \"staged and currently unavailable\".\n* Consequence for this customer: he is the only active member and sole owner of one active workspace, so the account-deletion guard (apps/web/lib/auth/delete-account.ts, getOwnedActiveWorkspacesForAccountDeletion / assertAccountDeletionAllowedForUser) blocks deleting his personal account until another owner is added or the workspace is deleted. The blocking dialog in apps/web/components/user/delete-account-card.tsx offers a \"Delete workspace\" button that links to the workspace General settings page, where the delete card is not rendered. So both self-serve exits lead nowhere.\n* The public help article \"General Settings\" and the FAQ on cancelling a workspace still instruct customers to use Settings - General - Danger Zone - Delete Workspace, which no longer exists in the product.\n\nBlast radius (current query, 17 Sep 2026): 9,735 active workspaces have no self-serve delete control while the flag is off, and 8,737 of them have exactly one owner member, so those accounts also cannot be deleted by their owner.\n\nProposed human action: (1) unblock this customer, since he has no self-serve path to remove himself; (2) decide whether the deletion rollout is enabled now, or whether the account-deletion dialog and the public help articles should stop pointing at a disabled control. This is a product/limitation finding, not a runtime failure, so it is filed for a human decision rather than as engineering root-cause work."
+    },
+    {
+      "id": "ENG-13680",
+      "createdAt": "2026-09-11T10:40:06.576Z",
+      "title": "Merge 2 workspaces for client",
+      "state": "Done",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": ["Customer reported", "Feature Request"],
+      "description": "#### Customer Name\n\nName 3\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\n1. Name 3's Workspace 2. Name 3 - Company Two\n\n#### Screenshot\n\n <image> \n\n#### What are you trying to achieve?\n\nClient created a new workspace instead of activating his Cold email agent in his existing workspac after the onboarding call. The new workspace (Name 3 - Company Two) is showing as 'inactive' but is where he will be running his campaign from once he bought his inboxes.\n\nThe initial workspace (Name 3's workspace) has got his niche and offer information on.\n\nHe wants to use Name 3 - Company Two so we need to make it active and move data form other worskpace over\n\n#### What are you doing to achieve it?\n\nconfirmed which workspace will be used going forward\n\n#### What is happening instead?\n\nwe don't have the access to merge of make the new workspace active\n\n#### What is the expected outcome?\n\nMake Name 3 - Company Two active and move data form other worskpace over.\n\nName 4 has got a call with him today to help set up his inboxes and AI SDR knowledge base and would like to give feedback"
+    },
+    {
+      "id": "ENG-5912",
+      "createdAt": "2026-02-25T14:48:46.308Z",
+      "title": "Separate workspaces for distinct client niches and approaches",
+      "state": "Done",
+      "assignee": "Anuj Bhatt",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "#### Customer Name\n\nName 5\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\n* Company Three = their workspace  - Company Four = their clients workspace\n\n#### Screenshot\n\n#### What are you trying to achieve?\n\nTo generate the correct copy, with the right niche and approach - to launch their clients campaign\n\n#### What are you doing to achieve it?\n\nTheir clients on-boarding form is merging with their own, generating the wrong approach and niche for their client. Hence their campaign cannot be launched - and they are having doubts about the workspace as software for their clients\n\n#### What is happening instead?\n\nThey are getting their own niche and their own approach on the copy, leading to the wrong campaign and they cannot launch. So they cannot take on more clients.\n\n#### What is the expected outcome?\n\nTo have two seperate workspaces, with two seperate niches and two seperate approaches"
+    },
+    {
+      "id": "ENG-11444",
+      "createdAt": "2026-07-10T15:24:42.916Z",
+      "title": "Transfer 7000 lead credits between workspaces",
+      "state": "Done",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [],
+      "description": "#### Customer Name\n\nName 6 & Name 7\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 8's workspace\n\n#### Screenshot\n\n#### What are you trying to achieve?\n\nConsolidate this client's lead credits into a single workspace. The client (Name 6 / Name 7) has two workspaces: the Name 6 workspace and the Company Seven workspace. I need roughly 7,000 lead credits moved out of the Name 6 workspace and into the Company Seven workspace so all his credits sit in one place. - the latest credit purchase made by the client.\n\n#### What are you doing to achieve it?\n\nThe client purchased additional lead credits but loaded them into the Name 6 workspace by mistake. I have checked both workspaces and confirmed the \\~7,000 credits are currently sitting in the Name 6 workspace.\n\n#### What is happening instead?\n\nThe \\~7,000 credits are stuck in the Name 6 workspace, split from his main Company Seven workspace, with no self-serve option to transfer them. As a result the client cannot run all his leads and campaigns from one workspace.\n\n#### What is the expected outcome?\n\nApproximately 7,000 lead credits transferred from the Name 6 workspace into the Company Seven workspace, so all of the client's credits are consolidated in JD and he can run everything from one place. If a transfer is not possible, a clear confirmation so I can set the right expectation with the client."
+    },
+    {
+      "id": "ENG-2987",
+      "createdAt": "2025-11-25T19:47:18.906Z",
+      "title": "Create lower-privilege user accounts for IBG workspace",
+      "state": "Canceled",
+      "assignee": null,
+      "parent": null,
+      "labels": ["Chore"],
+      "description": "Create multiple user accounts with lower privileges for the IBG workspace.\n\n1. Sign up for a new Company Five account with your email address <mention> \n2. Create a sub-workspace per dev in that new account and copy workspace ID for each (it's in the settings)\n3. Send a message to Company Five's team on Slack to let them know we're deleting the old dev workspaces and need these upgraded to Hypergrowth plan so they can develop and test features locally"
+    },
+    {
+      "id": "ENG-5721",
+      "createdAt": "2026-02-19T22:16:33.495Z",
+      "title": "Merge two separate workspaces under one account",
+      "state": "Duplicate",
+      "assignee": "Beth Newton",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "#### Customer Name\n\nName 9\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 9\n\n#### Screenshot\n\n#### What are you trying to achieve?\n\nconnect to partner's workspace - Name 10 (<email>)\n\n#### What are you doing to achieve it?\n\ntried to connect in onboarding, but could not\n\n#### What is happening instead?\n\n2 separate workspaces\n\n#### What is the expected outcome?\n\nwant both workspaces under 1 account"
+    },
+    {
+      "id": "ENG-12040",
+      "createdAt": "2026-07-24T18:23:40.664Z",
+      "title": "Refund for duplicate accounts",
+      "state": "Done",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [],
+      "description": "#### Customer Name\n\nName 11\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nN\n\n#### Screenshot\n\n <image> \n\n#### What are you trying to achieve?\n\nName 11 has duplicate acquisity accounts he has been charged for so please process a refund for the 2 duplicates\n\n#### What are you doing to achieve it?\n\nSubmitting a ticket\n\n#### What is happening instead?\n\nClient is being charged when he shouldn't\n\n#### What is the expected outcome?\n\nRefund"
+    },
+    {
+      "id": "ENG-12228",
+      "createdAt": "2026-08-03T12:01:24.121Z",
+      "title": "Client is saying that he is being asked to create a new workspace even though he already had one earlier",
+      "state": "Canceled",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [],
+      "description": "#### Customer Name\n\nName 12\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 12\n\n#### Screenshot\n\n <image> \n\n <image> \n\n#### What are you trying to achieve?\n\nTo get the workspace back\n\n#### What are you doing to achieve it?\n\nNA\n\n#### What is happening instead?\n\nThe workspace was created earlier, but can't find it anymore, it is asking to create a workspace again from scratch\n\n#### What is the expected outcome?\n\nTo get the workspace that was created earlier"
+    },
+    {
+      "id": "ENG-2929",
+      "createdAt": "2025-11-24T11:05:40.948Z",
+      "title": "Generate SQL for users with multiple workspaces and details",
+      "state": "Canceled",
+      "assignee": "unknown",
+      "parent": null,
+      "labels": ["Chore"],
+      "description": "Check all users who have more than 1 workspace and generate an SQL query to list: user name, email address, user ID, workspace name, and workspace ID."
+    },
+    {
+      "id": "ENG-2928",
+      "createdAt": "2025-11-24T11:05:40.948Z",
+      "title": "Delete 0-submission workspaces for multi-workspace users",
+      "state": "Canceled",
+      "assignee": "unknown",
+      "parent": null,
+      "labels": ["Chore"],
+      "description": "Delete all workspaces with 0 submissions among users with multiple workspaces identified in the recent analysis (96 of 247)."
+    },
+    {
+      "id": "ENG-11182",
+      "createdAt": "2026-07-06T16:11:43.579Z",
+      "title": "Migrate credits and data to new white label account",
+      "state": "Duplicate",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [],
+      "description": "#### Customer Name\n\nName 13\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nCompany Six\n\n#### Screenshot\n\n#### What are you trying to achieve?\n\nClient wants to pull all of his credits and information from his previous Acquisity into his new white label account.\n\n#### What are you doing to achieve it?\n\nTrying to find help on how to do this\n\n#### What is happening instead?\n\nNothing\n\n#### What is the expected outcome?\n\nPull the client's credits and information from Acquisity into white label because client is getting risky"
+    },
+    {
+      "id": "ENG-2354",
+      "createdAt": "2025-10-27T16:03:34.148Z",
+      "title": "One user had 2 workpaces created on signup",
+      "state": "Done",
+      "assignee": "Anuj Bhatt",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "I can see 2 workspaces in his account but dont know how to check if that was a human error or if the system created 2 for him in error\n<url:thegrowthpartner.slack.com>"
+    },
+    {
+      "id": "ENG-4329",
+      "createdAt": "2026-01-09T02:49:15.679Z",
+      "title": "Name 14 domains across client workspaces",
+      "state": "Done",
+      "assignee": "Tyler Olsen",
+      "parent": null,
+      "labels": ["Inbox/Domain Not Created"],
+      "description": "Customer with email <email> requested splitting 14 domains/inboxes across multiple workspaces instead of having them all in one.\n\nRequested allocation:\n\n* 3 to Name 15\n* 4 to Company Nine\n* 4 to Name 16\n* 3 to Company Eight"
+    },
+    {
+      "id": "ENG-3963",
+      "createdAt": "2025-12-22T16:51:23.936Z",
+      "title": "Need to move domains/emails to other workspace",
+      "state": "Done",
+      "assignee": "Tyler Olsen",
+      "parent": null,
+      "labels": ["Bug", "intercom-sourced"],
+      "description": "See the comment from support rep Name 17 below.\n\nUser: <email>"
+    },
+    {
+      "id": "ENG-4645",
+      "createdAt": "2026-01-19T13:24:02.650Z",
+      "title": "Workspace data not isolated across customer workspaces",
+      "state": "Canceled",
+      "assignee": "Beth Newton",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "Workspace-specific settings appear to affect other workspaces.\n\nAn external user reports the following behavior:\n\n* Multiple workspaces are in use (own workspace and customer workspaces).\n* A Name 18 Meet link and calendar configured in one workspace are visible in another workspace.\n* Deleting the meeting link and calendar in a customer workspace also removes them from the user’s own workspace.\n\nThis suggests a workspace data sync or scoping issue where meeting links/calendars are not properly isolated per workspace.\n\nAdditional context:\n\n* The behavior and steps can be seen in this screen recording: Jam recording."
+    },
+    {
+      "id": "ENG-12048",
+      "createdAt": "2026-07-24T23:17:27.397Z",
+      "title": "Consolidate duplicate zod versions in the workspace",
+      "state": "Canceled",
+      "assignee": "Jared Stauffer",
+      "parent": null,
+      "labels": ["Chore", "triaged-by-devin"],
+      "description": "The monorepo currently resolves more than one `zod` version (e.g. `apps/web` on zod 4.x while `apps/api` has pulled zod 3.x). Because the class identity differs across copies, `error.cause instanceof ZodError` is unreliable in tests: a `ZodError` thrown by a router is not identity-equal to any single imported `ZodError`.\n\nWorkaround in place: `apps/web/tests/support/zod-helpers.ts` (`getZodIssues`) inspects `cause.issues` structurally instead of using `instanceof`. This is version-agnostic but is a symptom, not a fix.\n\n### Ask\n\n* Name 19 `zod` to a single workspace version (pin/override so all packages resolve one copy).\n* Once deduped, tests can assert `instanceof ZodError` directly and the structural helper can be simplified or removed.\n\n### Context\n\nSurfaced during review of PR #5781 (ENG-11996) — <url:github.com>"
+    },
+    {
+      "id": "ENG-3243",
+      "createdAt": "2025-12-01T23:48:05.148Z",
+      "title": "Create new workspace creation flow for conference users",
+      "state": "Done",
+      "assignee": "Pieter Venter",
+      "parent": null,
+      "labels": ["Feature"],
+      "description": "Conference attendee's (Name 20 is getting a list of users) were promised a either 4 or 8 workspaces for free depending on which plan they extended on. We need to create a flow to allow these workspaces to be provisioned. in the admin tool that support can click to create on a users behalf.\n\n1. Create a tool that allows support to create workspaces on behalf of a user from inside the admin tool.\n2. For each new workspace to be created, prompt the support rep to input the required info for the workspace.\n3. Add an option in the users dropdown in the Admin Panel like \"Issue X number of free workspaces\" that will create workspaces 1/2/3/4/5 etc for that user on Legacy plans only.\n\nSee how the other processes existing in the code create workspaces. Follow the DRY principle.\n\nFor billing these need to be free workspaces. <mention> can you add here how these should be accounted for from a billing standpoint?"
+    },
+    {
+      "id": "ENG-2955",
+      "createdAt": "2025-11-24T22:58:50.611Z",
+      "title": "Prevent duplicate workspace setup on repeated onboarding runs",
+      "state": "Done",
+      "assignee": "Mahmut Jomaa",
+      "parent": null,
+      "labels": [],
+      "description": "Users can reset onboarding multiple times and repeat the workspace setup process. This may create duplicate workspaces and unnecessary costs. Consider preventing duplicates (e.g., enforce a unique workspaceId based on the user slug) so reruns fail gracefully if a workspace already exists."
+    },
+    {
+      "id": "ENG-7165",
+      "createdAt": "2026-03-25T08:42:01.860Z",
+      "title": "Workspace details and membership are not staying separate",
+      "state": "Canceled",
+      "assignee": "Beth Newton",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "Name 21\n<email>\n\nA newly created client workspace is not behaving as a separate workspace.\n\nThe client appears in the creator's personal workspace even though they were not added there, and profile details updated in the client workspace are also reflected in the personal workspace. The personal calendar is also showing in the client workspace despite not being intentionally connected there.\n\nThis is creating confusion for the customer and raises concern that the client may be able to access the personal workspace and other company information.\n\nSeparately, domains appeared under the personal workspace instead of the client workspace, but the latest support follow-up said the main concern was forwarded to the tech team for backend review."
+    }
+  ]
+}

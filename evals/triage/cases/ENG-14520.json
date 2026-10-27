@@ -1,0 +1,237 @@
+{
+  "id": "ENG-14520",
+  "provenance": "seeded",
+  "createdAt": "2026-09-30T13:56:04.676Z",
+  "lane": "billing",
+  "stratum": "billing",
+  "ticket": {
+    "title": "Name 29 - 12-18 new inboxes enquired",
+    "description": "#### User Email\n\n<email>\n\n#### Workspace Name\n\nName 29\n\n#### Request Type\n\nDiscount code\n\n#### Reason for request\n\nName 29 needs a code to get 12-18 new inboxes. The inboxes we have been sending the cold email campaigns from had poor health and majority of the campaigns had been landing in spam for the last two months. This was only flagged yesterday after I indicated significant drop in campaign performance the last few months. We need to provide healthy inboxes to avoid refund and so we can get campaigns live asap.",
+    "attachmentKinds": ["slack"]
+  },
+  "repoCommitAtCreate": "b04cbee18776d3d6ab506a98c3a563bba4ef6cbd",
+  "flags": {
+    "descriptionEditedAfterCreate": false,
+    "needsProductionData": true,
+    "alreadyFixedAtTriage": false
+  },
+  "asFiled": {
+    "assignee": "Aaron Fraga",
+    "labels": [],
+    "parent": null,
+    "priority": 0,
+    "project": null
+  },
+  "relatedSnapshot": [
+    {
+      "id": "ENG-14431",
+      "createdAt": "2026-09-29T00:38:09.650Z",
+      "title": "Customer report: 12 of 18 pre-warmed inboxes fail OAuth connect with account_exists, stay in Error and never become usable email accounts",
+      "state": "Duplicate",
+      "assignee": "Anthony Adewale",
+      "parent": null,
+      "labels": ["Bug", "Customer reported", "intercom-sourced"],
+      "description": "## Intercom source\n\n<url:app.intercom.com>\n\n## Conversation context\n\nCustomer (owner of workspace \"Company One\") opened the Intercom conversation asking for a human agent, then reported: \"12 of my 18 emails have errored and and are not showing up in Cold Email Agent email accounts\". No refund, credit, or subscription request was made. The workspace bought a 6-domain / 3-inbox-per-domain pre-warmed (DFY) order on 2026-08-26.\n\n## Testable claim\n\n12 of the 18 pre-warmed inboxes in this workspace fail OAuth connection with the provider error `account_exists - Account already exists in another workspace`, remain `status=error` / `connected=false` forever while the reconcile loop retries them toward exhaustion, and never become usable email accounts.\n\n## Evidence found so far\n\n* Production: 18 `mail_inbox` rows for the workspace; 12 with `status='error'`, `connected=false`, `connection_error='OAuth connection failed: account_exists - Account already exists in another workspace'`, `retry_count` 18-25, most recent retry 2026-09-28. The other 6 are `active`/`connected=true`.\n* Order `bd6fc7f5` (pre_warmed, 6 domains x 3 inboxes) is `requires_attention`, `completed_at` null; 4 of its 6 domains are `partial`, 2 are `active`.\n* Name 1: `billing.reconcile-domain-orders-cron` runs every 30 minutes and is still re-invoking the connect for this order's still-eligible failed inboxes.\n* Code: `processConnectOAuth` consumes retry budget on this permanent provider conflict; `reconcileDomainOrdersCron` re-invokes until `MAX_INBOX_RETRY_ATTEMPTS = 24` is exhausted; `finalizeUnfulfillableOrderAfterRetries` releases seats only when the billing provider is Whop, so an Autumn account keeps the never-connected seats.\n* Blast radius (counted 2026-09-28): 122 inboxes across 11 organizations share the `account_exists` connect signature (max retry_count 25, earliest inbox 2026-03-05, latest 2026-08-27).\n\nThis matches open bug master ENG-14187 exactly."
+    },
+    {
+      "id": "ENG-14453",
+      "createdAt": "2026-09-29T10:18:33.464Z",
+      "title": "Name 2 – 12 of 18 inboxes provisioning error",
+      "state": "Duplicate",
+      "assignee": "Anthony Adewale",
+      "parent": null,
+      "labels": ["Bug", "Customer reported", "Internal reported"],
+      "description": "#### Customer Name\n\nName 2\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nCompany One\n\n#### Screenshot\n\n#### What are you trying to achieve?\n\nGet all 18 of the client’s purchased inboxes successfully provisioned and showing under Email Accounts in the Cold Email Agent.\n\n#### What are you doing to achieve it?\n\nEllaine confirmed that this is a provisioning error. The client has also reached out through multiple support channels and has been waiting 3–4 days for resolution.\n\n#### What is happening instead?\n\n12 of the client’s 18 inboxes are showing as errored/not provisioned and are not appearing under Email Accounts. Only 6 of the 18 inboxes appear to have provisioned successfully.\n\n#### What is the expected outcome?\n\nAll 18 inboxes are successfully provisioned and visible under Email Accounts in the Cold Email Agent, with the 12 affected inboxes no longer showing provisioning errors."
+    },
+    {
+      "id": "ENG-14187",
+      "createdAt": "2026-09-23T21:05:22.215Z",
+      "title": "Pre-warmed mailbox connect conflicts are retried to exhaustion and the unconnected seats stay billed after finalization",
+      "state": "Todo",
+      "assignee": "Anthony Adewale",
+      "parent": null,
+      "labels": ["Bug", "fast-lane"],
+      "description": "## Overview\n\nPre-warmed Done-For-You mailboxes that the mail provider already reports as owned by another workspace can never be connected, and the seats are billed anyway. Operators pay for inboxes that have never worked, and the orders they belong to are closed out without releasing the charge.\n\n## Problem\n\nAn operator buys pre-warmed domains with three inboxes each. Some of the mailboxes in the assignment cannot be connected to the buyer's workspace, so those domains are left half-built: the domain is provisioned, its inboxes sit in an error state, and the order is eventually closed out with the seats still granted and still billed. There is no customer-side reconnect for a managed inbox in this state, and nothing in the finalization path releases the charge.\n\n## Root cause\n\nA permanent provider conflict is treated as a transient connect failure, and finalization releases no seats on Autumn accounts.\n\n* `apps/web/lib/inngest/functions/billing/process-domain-purchase-order.ts`, `processDomainPurchaseOrder`: invokes `processConnectOAuth` per mailbox; on a failure result it logs and pushes `{success:false, error}` and continues, and the domain is later written as `partial` when any inbox did not connect.\n* `apps/web/lib/inngest/functions/campaign/workspaces/process-connect-oauth.ts`, `processConnectOAuth`: surfaces the provider's failure text (\"OAuth connection failed: account_exists - Account already exists in another workspace\") and consumes retry budget.\n* `apps/web/lib/mail/db/mail-repository.ts`: `MAX_INBOX_RETRY_ATTEMPTS = 24`, and `isEligibleForRetry: row.retryCount < MAX_INBOX_RETRY_ATTEMPTS`.\n* `apps/web/lib/inngest/functions/billing/reconcile-domain-orders-cron.ts`, `reconcileDomainOrdersCron`: the `find-orders-requiring-attention` loop re-invokes the connect for every still-eligible failed inbox each cycle, so a conflict that can never succeed burns \\~24 cycles over several weeks; once `eligibleForRetry.length === 0 && failedInboxes.length > 0` it calls `finalizeUnfulfillableOrderAfterRetries`.\n* `apps/web/lib/billing/order-finalization.ts`, `finalizeUnfulfillableOrderAfterRetries`: for an order with provisioned items it writes `status: 'requires_attention'`, `completedAt` and `errorDetails.retriesExhausted = true`, and calls `applyManagedDomainCancellationAdjustment` only inside `if (billingProvider === 'whop' ...)`. On Autumn billing accounts no seats are released or refunded, so the never-connected inboxes stay granted and billed after the order terminalizes.\n\nThe upstream contributing cause is that the pipeline assigns mailboxes to a paying order without checking that they are free at the provider.\n\n## Blast radius\n\n122 inboxes across 11 organizations on 15 orders share the `account_exists` connect signature (max retry_count 25, earliest inbox row 2026-03-05, most recent 2026-08-27). 81 of those inboxes sit on 8 orders still in `requires_attention` with `completed_at` null; 41 sit on 7 orders already `completed` (3 organizations), where the seats remain billed after finalization; 20 are at or above the 24-attempt cap. Query: `SELECT count(*), count(DISTINCT organization_id), max(retry_count), min(created_at), max(created_at) FROM mail_inbox WHERE status='error' AND connection_error LIKE '%account_exists%'`, counted 2026-09-23. Confirmed affected: 11 organizations. Not settled: the population that traversed the path without confirmed failure (every pre-warmed order that assigned a mailbox already claimed at the provider), because no query separates it.\n\n## Proposed fix\n\nA mailbox that the provider reports as already owned elsewhere is a permanent conflict: detect it at connect time, stop retrying it, and surface it as a terminal, operator-visible failure instead of burning the retry budget. When an order is finalized with unconnected inboxes, release or refund those seats for every billing provider, not only Whop. Prevent the conflict upstream by not assigning a mailbox that is already claimed at the provider.\n\n## What's included\n\nDetecting the permanent conflict as non-retryable, terminal finalization that releases unconnected seats on Autumn, and a provider-availability check before assignment. Not included: reclaiming a mailbox from the workspace that already holds it, and the general billing reconciliation between supplier inventory and customer entitlements, which belongs to the existing billing-drift master.\n\n## Regression seam\n\nEntry: a pre-warmed order whose mailbox the provider reports as already owned by another workspace. Observable red-before behavior: the reconcile loop keeps re-invoking the connect until `MAX_INBOX_RETRY_ATTEMPTS` is exhausted, then finalizes with the seats still granted. Green-after: the permanent conflict is classified immediately and the unconnected seats are released or refunded at finalization for an Autumn account. A test at `finalizeUnfulfillableOrderAfterRetries` and one at the connect-result handling in the provider-agnostic path prove it.\n\n## Done when\n\n* A provider-reported `account_exists` conflict stops being retried rather than consuming the 24-attempt budget.\n* Finalizing an order with unconnected inboxes releases or refunds those seats on an Autumn billing account, and the granted-seat count on the billing account matches the number of connected inboxes.\n* A regression test proves the causal mechanism at the named seam.\n\n## Reports\n\n* ENG-14185"
+    },
+    {
+      "id": "ENG-4672",
+      "createdAt": "2026-01-19T19:29:49.310Z",
+      "title": "Add 18 inboxes for client ASAP due to ongoing issues",
+      "state": "Done",
+      "assignee": "Tyler Olsen",
+      "parent": null,
+      "labels": ["Bug", "Inbox/Domain Not Created"],
+      "description": "#### Customer Name\n\nName 3\n\n#### Customer Email\n\n<email>\n\n#### Screenshot\n\n#### Clear description of what the problem is\n\nBought 18 inboxes 3+ hours ago, none have appeared - this is a client thats not had campaigns working for over a week and had lots of back and forth. We're tryng to replace faulty inboxes. Please could we get the 18 added for him ASAP? \n\nCustomer bought 15 inboxes on 4th/12/2025 - he them bought 18 on 19/01/2026, none of which have appeared"
+    },
+    {
+      "id": "ENG-4255",
+      "createdAt": "2026-01-07T16:10:04.397Z",
+      "title": "Missing one purchased inbox in campaigns selection",
+      "state": "Done",
+      "assignee": "Tyler Olsen",
+      "parent": null,
+      "labels": [],
+      "description": "Customer purchased 18 inboxes yesterday but only 17 appear when selecting inboxes for sending in campaigns. The Email Accounts page shows 18 purchased inboxes, but the campaign inbox selection only lists 17.\n\nPlease investigate why one inbox from the recent purchase is not available for campaign sending and ensure it is provisioned and selectable in campaigns."
+    },
+    {
+      "id": "ENG-11769",
+      "createdAt": "2026-07-17T18:17:28.922Z",
+      "title": "Create discount code for 18 inboxes and domain purchase",
+      "state": "Done",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": ["triaged-by-devin"],
+      "description": "#### Customer Name\n\nName 4\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\n* \n\n#### Screenshot\n\n#### What are you trying to achieve?\n\nThis was requested by Name 5. please create a code for us to cover 18 inboxes for 3 months for the client + the domains purchase of course\n\n#### What are you doing to achieve it?\n\n* \n\n#### What is happening instead?\n\n* \n\n#### What is the expected outcome?\n\n* "
+    },
+    {
+      "id": "ENG-9248",
+      "createdAt": "2026-05-26T14:36:19.314Z",
+      "title": "Purchased inbox provisioning for 25 days",
+      "state": "Done",
+      "assignee": "Tyler Olsen",
+      "parent": null,
+      "labels": [],
+      "description": "Purchased domains are still provisioning after 25 days.\n\nUser details:\n\n* Name 101\n* <email>\n* Name 101's workspace\n  \n\n   <image> \n\n <image> \n\n <image> "
+    },
+    {
+      "id": "ENG-7442",
+      "createdAt": "2026-04-01T22:40:12.379Z",
+      "title": "Only 3 inboxes populated instead of 18 in GP cold email agent",
+      "state": "Done",
+      "assignee": "Beth Newton",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "#### Customer Name\n\nName 6\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 6\n\n#### Screenshot\n\n <image> \n\n#### What are you trying to achieve?\n\nPurchase and activte 18 inboxes in GP cold email agent\n\n#### What are you doing to achieve it?\n\nWent throught onboarding process and walk-through purchasing 6 domains / 18 inboxes with GP.  Name 7 check that the number was correct and the transaction went through\n\n#### What is happening instead?\n\nonly 3 inboxes populated in GP's cold email agent, and not 18 as we purchased\n\n#### What is the expected outcome?\n\nHaving the full 6 Domains / 18 inboxes in GP's workspace"
+    },
+    {
+      "id": "ENG-7988",
+      "createdAt": "2026-04-21T14:12:00.021Z",
+      "title": "Duplicate inbox purchase charged without provisioning inboxes",
+      "state": "Canceled",
+      "assignee": "Beth Newton",
+      "parent": null,
+      "labels": [],
+      "description": "A workspace was charged **US$18** on 20 Apr 2026 for 3 inboxes, but those inboxes did not appear in the account. The same 3 inboxes were purchased again on 21 Apr 2026. The card ending in **8062** was used for both charges, and a refund was requested for the earlier purchase.\n\nA screenshot of current subscriptions shows two separate US$18 subscriptions for inboxes.\n\n <image> "
+    },
+    {
+      "id": "ENG-4966",
+      "createdAt": "2026-01-29T17:59:39.328Z",
+      "title": "Purchased domains and email inboxes not appearing in workspace",
+      "state": "Done",
+      "assignee": "Tyler Olsen",
+      "parent": null,
+      "labels": ["Inbox/Domain Not Created"],
+      "description": "user: <email>\n\nworkspace: Name 10 and Name 11 - <workspace-slug>\n\n36 inboxes missing from Name 9 17 and Name 9 27 purchases (18 inboxes each)\n\nUser purchased 6 domains and 18 email inboxes on January 27, 2026 at \\~10:30pm using Name 8\u0019s credit card (Gold) for $252 plus $8/month for the emails. Almost three days later, the domains and inboxes still do not appear in the Email Accounts / campaign options, so variants cannot be created.\n\n <image> "
+    },
+    {
+      "id": "ENG-4774",
+      "createdAt": "2026-01-23T00:35:24.094Z",
+      "title": "Status update on new inboxes and domains for GP",
+      "state": "Done",
+      "assignee": "Tyler Olsen",
+      "parent": null,
+      "labels": ["Inbox/Domain Not Created"],
+      "description": "#### Customer Name\n\nName 12 (Name 13) Name 14\n\n#### Customer Email\n\n<email>\n\n#### Screenshot\n\n <image> \n\n <image> \n\n#### Clear description of what the problem is\n\nGP ordered more inboxes and domains on the 20th but is still yet to see them active in his account, any status updates on when these are coming?\n\nThis verified, 15 inboxes bought on the 14th/01 visible in account. \n\n15 inboxes bought on 21st/01 not visible in account \n\n <image> \n\n <image> "
+    },
+    {
+      "id": "ENG-4627",
+      "createdAt": "2026-01-18T05:46:44.551Z",
+      "title": "New inboxes bought but it went to the wrong workspace",
+      "state": "Duplicate",
+      "assignee": "Tyler Olsen",
+      "parent": "ENG-4618",
+      "labels": ["Inbox/Domain Not Created"],
+      "description": " <image> \n\n <image> \n\nSimilar issue to 4132\n\nUser: <email>\n\nUser purchased 18 emails on workspace Company Four (<uuid>) but were credited to Name 15. He needs them moved over. \n\nHe is also requesting 12 inboxes be moved from Company Five to Name 16 "
+    },
+    {
+      "id": "ENG-7377",
+      "createdAt": "2026-03-31T06:05:24.551Z",
+      "title": "Attach new inboxes - credits applied",
+      "state": "Done",
+      "assignee": "Tyler Olsen",
+      "parent": null,
+      "labels": ["Refund"],
+      "description": "#### Workspace Name\n\nName 17\n\n#### Request Type\n\nDiscount code\n\n#### Reason for request\n\nName 18 is currently blocked from moving forward due to all of his inboxes being compromised during the last campaign. He does not have the funds to purchase new inboxes at this time, which means he’s unable to run any campaigns or generate new opportunities.\n\nHe previously spoke with Name 100, who acknowledged earlier gaps in fulfillment and told him that his inbox costs would be covered. The issue is that the inboxes that were creditted during that time are now compromised and unusable, so that coverage didn’t actually result in anything usable for him.\n\nRight now, the ask is to honor that original commitment by covering a fresh set of inboxes so he can get back up and running. This would allow him to restart campaigns and move toward generating his first deal.\n\nWithout resolving this, he’s effectively stuck and unable to take action."
+    },
+    {
+      "id": "ENG-13225",
+      "createdAt": "2026-08-27T21:11:32.761Z",
+      "title": "Refunds for extra domains and inboxes bought by accident",
+      "state": "Done",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [],
+      "description": "#### User Email\n\n<email>\n\n#### Workspace Name\n\nName 19's Workspace\n\n#### Request Type\n\nRefund\n\n#### Reason for request\n\nHe is a LTO client with very bad reception, he wanted to buy 18 inboxes and bought 18 domains instead. This is after we discussed this over 2x calls and I share the step-by-step video on buy pre-warmed inboxes.\n\nI told him to cancel the extra domains and inboxes because he was complaining about the extra money that went off.\n\nIs it possible to refund him some of the money?"
+    },
+    {
+      "id": "ENG-8618",
+      "createdAt": "2026-05-15T19:19:39.821Z",
+      "title": "Verify inbox cancellation dates against May billing charges",
+      "state": "Done",
+      "assignee": "Jared Stauffer",
+      "parent": null,
+      "labels": [],
+      "description": "Customer disputes May charges for 18 inboxes and asks for an audit of cancellation timing versus billing.\n\nReported timeline in the conversation:\n\n* 18 inboxes were canceled at the end of April.\n* 6 additional inboxes were canceled on May 14.\n* No active inboxes are currently visible in the account.\n* Billing still showed six $24 invoice charges in May ($144 total) for inbox bundles of 3, with invoice periods such as May 10–June 10 and May 12–June 12.\n* Billing also showed upcoming June charges for inbox bundles despite no active inboxes.\n\nSupport checked internal logs and stated that only 3 inboxes were removed in late April and that the remaining 18 were removed on May 14. The customer strongly disputes that audit trail and says only 6 inboxes remained to remove on May 14.\n\nNeeds confirmation of the exact inbox/domain deletion dates from system records and whether the May–June charges were valid.\n\n**Customer details:**\n\n* Email: <email>\n* Workspace: Name 20's workspace\n\n <image> \n\n <image> \n\n <image> "
+    },
+    {
+      "id": "ENG-4756",
+      "createdAt": "2026-01-22T16:45:21.579Z",
+      "title": "Inboxes not added for Name 21, blocking campaign launch",
+      "state": "Done",
+      "assignee": "Tyler Olsen",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "#### Customer Name\n\nName 21\n\nWorkspace: Name 22\n\n#### Customer Email\n\n21 inboxes were purchased and are visible on the account, they are all sho\n\n#### Screenshot\n\n#### Clear description of what the problem is\n\nPurchased 21 inboxes yesterday morning (Name 9 21st), his inboxes have still not been added and is unable to launch campaigns. Very impatient to launch his campaigns.\n\nChecked his account and he has paid + subscription active.\n\nWorkspace: Company Two's workspace"
+    },
+    {
+      "id": "ENG-4744",
+      "createdAt": "2026-01-22T10:30:05.066Z",
+      "title": "Purchased domains and inboxes not appearing in account",
+      "state": "Done",
+      "assignee": "Tyler Olsen",
+      "parent": null,
+      "labels": ["Bug", "Inbox/Domain Not Created"],
+      "description": "user: <email>\n\nBilling UUID: <uuid>\n\n12 inboxes, 4 domains purchased on 20th/12, none on account.\n\nCustomer reports purchasing domains and email inboxes on 20 January for 130.46 GBP. Processing should complete within 30 minutes, but after 48+ hours the domains and inboxes still do not appear in the Cold Email Agent under Email Accounts. Support also cannot see the email inboxes on the account and is requesting operations to investigate why provisioning did not complete and ensure the purchased domains/inboxes are added to the customer account."
+    },
+    {
+      "id": "ENG-7953",
+      "createdAt": "2026-04-20T12:56:10.939Z",
+      "title": "12 email inboxes not visible in workspace after purchase",
+      "state": "Done",
+      "assignee": "Tyler Olsen",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "#### Customer Name\n\nName 25\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nCompany Three\n\n#### Screenshot\n\n <image> \n\n <image> \n\n <image> \n\n#### What are you trying to achieve?\n\nWe want to build and launch this client's campaign\n\n#### What are you doing to achieve it?\n\nWe had him buy 12 email inboxes on call with Name 26 (Name 23)\n\n#### What is happening instead?\n\nName 24 and client confirmed that they did buy 12 inboxes on call but those don't show up in the workspace\n\n#### What is the expected outcome?\n\n12 inboxes should be visible in the workspace"
+    },
+    {
+      "id": "ENG-12284",
+      "createdAt": "2026-08-04T14:44:35.013Z",
+      "title": "Requesting 4 months of acquisity & 18 inboxes/6 domains covered by us",
+      "state": "Done",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [],
+      "description": "#### User Email\n\n<email>\n\n#### Workspace Name\n\nName 27\n\n#### Request Type\n\nDiscount code\n\n#### Reason for request\n\nRequesting 4 months of acquisity &  18 inboxes/6 domains covered by us as part of AI Auto DFY tier.  Client is not running ads model and will be shifting to cold email approach instead."
+    },
+    {
+      "id": "ENG-3966",
+      "createdAt": "2025-12-22T17:44:29.842Z",
+      "title": "Customer missing purchased pre-warmed inboxes in account",
+      "state": "Done",
+      "assignee": "Tyler Olsen",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "Customer reports purchasing pre-warmed email assets that should total 27 inboxes, but only 12 inboxes are currently active and visible in the Email Accounts section.\n\nThey initially believed the package was for 18 domains / 18 inboxes, later clarified via purchase proof that it should be 27 inboxes in total. Support confirmed only 12 active inboxes are present on the account.\n\nRelevant screenshots from the purchase and current Email Accounts view:\n\n <image> \n\n <image> "
+    },
+    {
+      "id": "ENG-13012",
+      "createdAt": "2026-08-21T15:44:09.046Z",
+      "title": "Coupon Code to purchase more Outreach Inboxes",
+      "state": "Todo",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": ["Billing", "Discount"],
+      "description": "#### User Email\n\n<email>\n\n#### Workspace Name\n\nName 28\n\n#### Request Type\n\nDiscount code\n\n#### Reason for request\n\nHalf of the Outreach Inboxes in Client's workspace are showing an Error and not sending outreach. Client has been facing this issue since more than a month. This is affecting his ability to run campaigns effectively. He's a refund risk and escalated because of this issue. Please provide a coupon code so that he can purchase additional inboxes to run campaign successfully.\n\nHere's the ongoing tech ticket - <url:fegrowthpartner.slack.com>"
+    }
+  ]
+}

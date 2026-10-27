@@ -1,0 +1,232 @@
+{
+  "id": "ENG-14818",
+  "provenance": "seeded",
+  "createdAt": "2026-10-06T15:58:34.980Z",
+  "lane": "triage",
+  "stratum": "unproven",
+  "ticket": {
+    "title": "URGENT Name 25 CAN NOT LOG IN - NEEDS WHITE LABEL",
+    "description": "#### Customer Name\n\nName 26\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 26\n\n#### Screenshot\n\n#### What are you trying to achieve?\n\nName 25 is not able to log into his acquisity. I told. him to reset his password but he is not getting the password email sent to him and it is not in his spam. Please let's get him this password reset email so he can log in.\n\n#### What are you doing to achieve it?\n\nI sent him instructions on how to reset his password.\n\n#### What is happening instead?\n\nCannot login\n\n#### What is the expected outcome?\n\nSend password reset email so he can log in.",
+    "attachmentKinds": ["slack"]
+  },
+  "repoCommitAtCreate": "a7ebe00e6553d7d1775a9207fd08a261280f3ae1",
+  "flags": {
+    "descriptionEditedAfterCreate": false,
+    "needsProductionData": true,
+    "alreadyFixedAtTriage": false
+  },
+  "asFiled": {
+    "assignee": "Aaron Fraga",
+    "labels": [],
+    "parent": null,
+    "priority": 1,
+    "project": "Support"
+  },
+  "relatedSnapshot": [
+    {
+      "id": "ENG-11328",
+      "createdAt": "2026-07-09T13:18:19.715Z",
+      "title": "#### Customer Name",
+      "state": "Canceled",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [],
+      "description": "#### Customer Name\n\nName 1\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 1\n\n#### Screenshot\n\n <image> \n\n#### What are you trying to achieve?\n\nHe cannot sign in to his 'become a partner' / whitelabel portal\n\n#### What are you doing to achieve it?\n\nhow can he get into his whitelabel portal?\n\n#### What is happening instead?\n\nhe cannot get in & when he is pressing forgot password it is not sending him a new link to sign in or reset password\n\n#### What is the expected outcome?\n\nsupport"
+    },
+    {
+      "id": "ENG-13072",
+      "createdAt": "2026-08-24T15:48:34.117Z",
+      "title": "Name 2 - whitelabel partner space inactive/non functional",
+      "state": "Triage",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [],
+      "description": "#### Customer Name\n\nName 2\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 2's Studio\n\n#### Screenshot\n\n#### What are you trying to achieve?\n\nShe is saying her whitelabel partner space is inactive and non functional. The workspace she created for her first client is now gone. She said she has reached out to the tech team and has not gotten any help with this\n\n#### What are you doing to achieve it?\n\nreaching out to the Acquisity tech team\n\n#### What is happening instead?\n\nshe no longer has partner portal access and is worries she cannot build a workspace for her client\n\n#### What is the expected outcome?\n\nfor her to have partner portal access and to create a sub account/workspace for the client she just landed"
+    },
+    {
+      "id": "ENG-13217",
+      "createdAt": "2026-08-27T20:25:56.421Z",
+      "title": "Cant connect whop to acquisity URGENT",
+      "state": "Done",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": ["Customer reported"],
+      "description": "#### Customer Name\n\nName 3\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\n* \n\n#### Screenshot\n\n <image> \n\n#### What are you trying to achieve?\n\nclient cant connect whop to his acquisity and we need it asap to collect a 10k payment from a client.\n\nhe's saying there's an error when trying to connect whop to acquisity. \"authenticatoin failed: check the whop API key and try again\"\n\nplease see screenshot attached\n\n#### What are you doing to achieve it?\n\n* \n\n#### What is happening instead?\n\n* \n\n#### What is the expected outcome?\n\n* "
+    },
+    {
+      "id": "ENG-14025",
+      "createdAt": "2026-09-18T13:02:07.631Z",
+      "title": "Name 4 - WL failure",
+      "state": "Done",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": ["Customer reported", "Refund"],
+      "description": "#### User Email\n\n<email>\n\n#### Workspace Name\n\nName 6\n\n#### Request Type\n\nRefund\n\n#### Reason for request\n\nName 5 created a white label account after trying to register to become a partner on the partner portal.  Name 5 was intending to use this like we use normal workspaces for clients.  He had nothing but problems trying to get things setup and even gain access.  We ended up resetting him up on a regular workspace.  Name 5 is asking for the $99 back that he spent on the WL fiasco"
+    },
+    {
+      "id": "ENG-12352",
+      "createdAt": "2026-08-05T19:51:25.649Z",
+      "title": "Workspace- Partner Workspace Displays \"Workspace Plan Unavailable\" After Partner Setup",
+      "state": "Triage",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": ["Bug", "intercom-sourced"],
+      "description": "**Customer Name**\nName 4\n\n**Customer Email**\n<email>\n\n**Customer Email**\n<Enter text>\n\n**Workspace name**\nNA\n\n**Screenshot**\n<optional>\n\n**What is the user trying to achieve?**\nThe customer is trying to access and complete the setup of their Partner (White Label) portal so they can manage their white-label environment. However, they are blocked by a \"Workspace plan unavailable\" error, preventing them from accessing the Partner workspace and continuing the setup.\n\n**What is the user doing to achieve it?**\nThe user created and configured a Partner (White Label) portal, logged in through their white-label domain, and attempted to access the Partner workspace to continue the setup. After being redirected to the Partner portal, they encountered the \"Workspace plan unavailable\" error, preventing them from proceeding.\n\n**What is happening instead?**\nAfter successfully creating the Partner (White Label) portal and logging in through the white-label domain, the customer is unable to access the Partner workspace. Instead, they receive the following error:\n\n\"Activate your workspace. Choose your workspace plan to continue.\n\nWorkspace plan unavailable.\nA workspace plan has not been configured yet. Contact support before continuing.\"\n\nAs a result, the customer is unable to continue setting up or managing their Partner portal.\n\n**What is the expected outcome?**\nThe customer should be able to access their Partner workspace after completing the Partner setup without being blocked by a workspace plan activation error.\n\n <image> "
+    },
+    {
+      "id": "ENG-13861",
+      "createdAt": "2026-09-14T17:16:16.631Z",
+      "title": "White-label self-serve workspace activation dead-ends on \"Workspace plan unavailable\" when the partner's Whop workspace plan is not registered",
+      "state": "Duplicate",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": ["Customer reported", "intercom-sourced"],
+      "description": "**Source**: Intercom conversation <url:app.intercom.com>\n\n**Bounded conversation context (Sep 8-14)**\n\nOwner of the white-label partner portal Company One LLC (portal host <domain>) is standing up the client workspace \"Company Two\" (Company Ten) and is blocked at two steps:\n\n* Cold email provider: in the Company Ten workspace, Cold Email Agent > email accounts shows the \"Connect a Provider to Buy Email Accounts\" modal; clicking Enable Acquisity raises the toast \"Unable to switch providers automatically. Please contact support.\" (screenshot).\n* Workspace activation: from the partner portal, <domain>/dashboard/onboarding?step=10 renders \"Activate your workspace. / Choose your workspace plan to continue.\" with the card \"Workspace plan unavailable / A workspace plan has not been configured yet. Contact support before continuing.\" and no action available (screenshot).\n* Customer summary: \"I paid $185 back on Sept 5th to upgrade the cold email campaign ... I can not connect to email provider and the system is not activated.\"\n\n**Finding**\n\nPredominant ask is product (get the client workspace working); it is not a money ask.\n\n1. Workspace plan step. For a partner-governed workspace, resolveOnboardingPlanPresentation (apps/web/lib/onboarding/onboarding-plan-presentation.server.ts) resolves the plan via getWhopPlanBySlot(partnerId, WorkspaceMonthly). Partner \"Company One LLC\" (<uuid>) has no whop partner-scope billing provider config and zero billing_provider_product rows, so the presentation has workspacePlan = null and PlansScreen (apps/web/components/onboarding/onboarding-screens.tsx) takes the empty pricedPlans branch and renders the hard dead-end card above. Partners that do have a whop config (Name 7 AI, Customer Workspace, Name 8 Test) are unaffected. Counted 2026-09-14: 869 partner-governed organizations, of which 169 across 134 partners (all whop-billed) sit under a partner with no configured Whop workspace-monthly plan. The same symptom was filed on 2026-08-05 as ENG-12352 (<domain> // <workspace-slug>), also still in Triage.\n2. Provider step. Company Ten has no outreach_provider row and its billing account provider is 'whop', which is the already-tracked partner/whitelabel provider dead-end in ENG-13499. This conversation's earlier report was ENG-13600, already marked Duplicate of ENG-13499.\n\n**Payment, for completeness**\n\nNot the problem. A $185.00 usd partner subscription was paid 2026-09-03 and is active to 2026-10-03, alongside a $10 / 1,000-credit purchase; the app shows the 1,000-credit balance. The customer's Sep 8 observations (\"No active subscription found\", no Manage Billing button, no managed domains or email accounts) are consistent with the missing plan mapping; worth a second look if the workspace still reads as unsubscribed after the plan is registered.\n\n**Human action needed**\n\nRegister the partner's Whop workspace-monthly plan for Company Eight (internal admin only: billing provider config + product sync via partner-billing syncPlan); the partner has no self-serve path to do this, which is why the screen says to contact support. Then confirm whether the Company Ten workspace still needs manual email provider provisioning under ENG-13499."
+    },
+    {
+      "id": "ENG-13862",
+      "createdAt": "2026-09-14T17:23:55.010Z",
+      "title": "Marketing sidebar has no AI Name 9 in a client workspace under a self-serve white-label partner (Acquisity-controlled ads feature not enabled on the workspace)",
+      "state": "Todo",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": ["Customer reported", "intercom-sourced"],
+      "description": "**Source**: Intercom conversation <url:app.intercom.com> (follow-up message, 2026-09-14)\n\n**Ask**\n\n\"on Company Two Dashboard, under Marketing Tab there is no AI Name 10\". This is a second, separate issue from the workspace-activation finding already tracked as ENG-13861.\n\n**Finding**\n\nThe Marketing sidebar entry \"AI Name 9\" (apps/web/lib/sidebar/catalog.ts, key ai-ads-maker, route /dashboard/\\[organizationSlug\\]/ai-ads-maker) is shown only when the workspace has ADS_CREATOR, ECOM_ADS_MAKER, ECOM_AD_SPY or FACEBOOK_ADS_MANAGER. All of those are Acquisity-controlled partner features (apps/web/lib/features.ts, ACQUISITY_CONTROLLED_PARTNER_FEATURES), and applyAcquisityControlledPartnerFeatureGate (apps/web/lib/auth/feature-access.ts) resolves each of them as: the workspace's own feature flag === true, OR (partner mode is big_client AND the partner config grants it). A self-serve partner cannot grant them, and these keys are excluded from the partner-owner editable set.\n\nProduction state for the workspace in question (Company Two, <uuid>): organization.feature_flags is null, and its partner (Company One LLC) is mode self_serve, so every ads feature resolves false and the sidebar entry is hidden. The requester's role there is owner, so the client-role gate (notClient) is not the cause. The partner's own workspace does have ads_creator: true in its feature flags, which is why the tab appears there but not in the client workspace.\n\nCounted 2026-09-14: 133 non-deleted workspaces across 102 self-serve-partner workspaces have no ads feature enabled at workspace level (upper bound for the same gate).\n\n**Human action needed**\n\nAn internal admin has to enable the ads feature on that client workspace (admin organization feature flags: ads_creator, or ecom_ads_maker / ecom_ad_spy / facebook_ads_manager as appropriate) if the client is meant to have AI Name 9. Neither the partner nor the workspace can self-serve it."
+    },
+    {
+      "id": "ENG-13823",
+      "createdAt": "2026-09-14T10:23:19.489Z",
+      "title": "Name 11 OB New client BLOCKERS",
+      "state": "Done",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [
+        "Bug",
+        "Customer reported",
+        "Workspace Setup Issues",
+        "intercom-sourced"
+      ],
+      "description": "#### Customer Name\n\nName 11\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nCompany Three\n\n#### Screenshot\n\n <image> \n\n <image> \n\n#### What are you trying to achieve?\n\nI believe he has tried to set up WL (WhiteLabel) on Acquisity in order to cleanly onboard his new client (Company Nine) ahead of his OB call with them this afternoon & he has run into blockers. Hard for me to give more details as I have not had experience within WL Workspaces before or WL Set up on clients end.\n\n#### What are you doing to achieve it?\n\n* \n\n#### What is happening instead?\n\nNeed someone to URGENTLY investigate this & help me or Name 12 work through blockers in order to be set up ASAP so he can professionally OB his client\n\n#### What is the expected outcome?\n\nTroubleshoot - Clarity on what we or he needs to do to fix // or FIX\n\n#### Intercom source\n\n<url:app.intercom.com>\n\n#### Conversation context\n\nName 11 (white-label partner Company Four, <domain>) reports two blockers stopping him onboarding his first client (Company Nine): the client workspace onboarding ends on \"Workspace plan unavailable\", and Partner Panel > Emails would not save a sender identity for <email>.\n\n#### Claim\n\nA white-label partner's client workspace cannot finish onboarding because the activation screen offers no workspace plan, and the partner cannot save a custom sender identity from the Partner Panel."
+    },
+    {
+      "id": "ENG-10941",
+      "createdAt": "2026-06-26T18:25:32.530Z",
+      "title": "Bug in White Label instructions setup — user screen recording shared",
+      "state": "Canceled",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": ["intercom-sourced"],
+      "description": "## Problem\\nA user encountered a reproducible bug while setting up White Label instructions and shared a screen recording documenting the exact failure.\\n\\n## Context\\n- Reported via Intercom on Jun 26, 2026\\n- User captured a screen recording — support agent should retrieve and attach to this issue\\n- Lifecycle state: <stripe-id> (escalated)\\n\\n## Acceptance Criteria\\n- [ ] Retrieve screen recording from Intercom conversation and attach here\\n- [ ] Reproduce the bug in White Label instructions setup\\n- [ ] Fix the identified defect so White Label setup completes without errors\\n\\n## Resources\\n- Name 13\\n\\n**Triage Search Terms Used:** \"white label instructions bug\", \"white label setup error\", \"whitelabel configuration bug\""
+    },
+    {
+      "id": "ENG-13731",
+      "createdAt": "2026-09-11T17:32:51.479Z",
+      "title": "White-label partner clients have no in-app support chat because the partner's chat credentials are unconfigured",
+      "state": "Todo",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": ["Customer reported", "intercom-sourced"],
+      "description": "## Source\n\nIntercom conversation: <url:app.intercom.com>\nContact: the owner of client workspaces under the white-label partner \"Company Eleven\" (<domain>).\n\n## Bounded conversation context\n\n2026-09-11: the customer opened the portal chat asking for a live agent, then wrote that they have a white label workspace in their white label on their website and need assistance with it, followed by \"We did not find a chat room in it. Is there one or can we get help here\". A teammate picked the conversation up mid-thread.\n\n## Finding\n\nNot a product defect. The partner's per-partner chat integration is not configured.\n\n* The in-app support chat is the Intercom messenger. For a white-label partner the client app loads the partner's own chat credentials only: the chat component takes the partner's Intercom app id, with no fallback to the platform app id, so when the partner record has no app id the messenger never starts, the lower-right launcher never appears, and the Feedback entry that opens the same messenger does nothing.\n* The partner record for \"Company Eleven\" has no chat app id and no identity-verification secret saved. Its client workspaces are active with onboarding skipped, so this is configuration rather than an outage.\n* The entry point itself is not missing: Feedback lives in the bottom-left sidebar profile menu and appears for every member who is not in the client role, so most members should have a working entry once the partner's chat app is configured.\n* Blast radius, counted 2026-09-11: 76 active partners (74 self-serve) have no chat app id saved, so their clients have no in-app route to support at all.\n* Not a duplicate: no Name 14 issue was found for partner chat credentials going unconfigured.\n\n## Proposed human action\n\nSupport/partner ops: confirm the partner's own chat workspace and its identity-verification secret, then save the partner's chat app id (and secret) on the \"Company Eleven\" partner record so its clients get the launcher and a working Feedback entry. Then reply to this thread telling the customer where support lives in their portal and asking them to paste their issue back into the open conversation.\n\n## Wording note (follow-up, not a defect)\n\nThe local support articles tell readers that Feedback in the bottom-left sidebar is the fastest route to support and attribute a missing launcher to ad blockers. That reads badly in a portal where the launcher is absent for a partner-configuration reason. Worth reviewing if partner clients are a supported audience for those articles."
+    },
+    {
+      "id": "ENG-13499",
+      "createdAt": "2026-09-04T17:56:47.011Z",
+      "title": "Partner/whitelabel workspaces dead-end on \"Connect email sending provider\" with an unending \"In progress\" spinner",
+      "state": "Todo",
+      "assignee": "Anthony Adewale",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "## Overview\n\nWhitelabel/Whop partner workspaces that hold an active subscription but have no email sending provider get permanently stuck on the cold-email onboarding step \"Connect email sending provider\", which shows an endless \"In progress\" spinner with no reachable path to recover.\n\n## Problem\n\nA partner workspace with no provider reaches the \"Before you create your first campaign\" checklist. The provider step renders an animated \"In progress\" spinner, and both that step's action and the primary \"Continue\" button are disabled. The workspace has no way to connect a provider or trigger provisioning, so it cannot create campaigns.\n\n## Root cause\n\nIn `apps/web/components/campaigns/onboarding/cold-email-onboarding-flow.tsx` the provider step's status is `needsProvider ? (canAdjustProvider ? 'incomplete' : '<stripe-id>') : 'complete'`, so a workspace with `provider_not_configured` and `canAdjustProvider === false` renders a permanent spinner. `checkCanAdjustProvider` (`apps/web/lib/services/outreach-provider.ts`) returns false for a Whop partner org with zero providers on the assumption it will be auto-provisioned, and the only recovery path (provider-selection modal -> `handleEnableAcquisityFlow` -> workspace setup) is gated behind the same `canAdjustProvider` flag, so it is unreachable.\n\n## Blast radius\n\n452 Whop workspaces have an active partner subscription and no `outreach_provider` row (upper bound), counted 2026-09-04. Confirmed affected: 1 workspace.\n\n```sql\nSELECT count(*) FROM organization o\nJOIN billing_account ba ON ba.id = o.billing_account_id\nWHERE ba.provider = 'whop' AND o.deleted_at IS NULL\nAND NOT EXISTS (SELECT 1 FROM outreach_provider op WHERE op.organization_id = o.id)\nAND EXISTS (SELECT 1 FROM partner_subscription ps\n            WHERE ps.organization_id = o.id AND ps.status IN ('active','trialing','past_due'));\n```\n\n## Proposed fix\n\nPartner workspaces with an active subscription must either get their provider reliably auto-provisioned, or be given an actionable path (self-serve connection, or an explicit message with a timeline and owner) instead of an unending spinner. The recovery path must not be gated behind the same flag that identifies the stuck state.\n\n## What's included\n\nFixing the onboarding dead-end and the gating of the recovery path. Excluded until confirmed by a domain expert: whether auto-provisioning on Whop subscription is expected to fire and is silently not firing (needs investigation to pin the exact trigger).\n\n## Regression seam\n\nThe provider readiness item in `ColdEmailOnboardingFlow`: a partner workspace with an active subscription and no provider must not remain `<stripe-id>` with a disabled action. Assert that such a workspace is actionable or shows an explicit non-spinner state.\n\n## Done when\n\n* A partner workspace with a subscription and no provider is no longer left on an endless \"In progress\" spinner.\n* The connect/recovery path is reachable for this workspace class.\n* A regression test proves the provider step reaches a non-dead-end state for this input.\n\n## Reports\n\n* ENG-13496"
+    },
+    {
+      "id": "ENG-13600",
+      "createdAt": "2026-09-09T13:57:08.014Z",
+      "title": "Cold email agent can't be enabled on Whitelabel (Name 15)",
+      "state": "Duplicate",
+      "assignee": "Anthony Adewale",
+      "parent": null,
+      "labels": ["Bug", "Customer reported"],
+      "description": "#### Customer Name\n\nName 15\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nCompany Two (Company Five)\n\n#### Screenshot\n\n#### What are you trying to achieve?\n\n\"Name 16 ... still can't get the Cold Email working on the Company Seven on White Label Dashboard ... still can not connect to email provider and when I click on \"Enable Acquisity\" it keeps coming up as \"unable to switch providers automatically ... please contact support\" ... I need Tech help to get this Dashboard set up for Name 17. I used the chat bubble yesterday and did not get any resolution there either\"\n\n#### What are you doing to achieve it?\n\n* \n\n#### What is happening instead?\n\n* \n\n#### What is the expected outcome?\n\n* "
+    },
+    {
+      "id": "ENG-9669",
+      "createdAt": "2026-06-03T16:52:43.775Z",
+      "title": "General Help Name 18 update and White Label docs",
+      "state": "Done",
+      "assignee": "James Keeble",
+      "parent": null,
+      "labels": [],
+      "description": "## Goal\n\nUpdate the Name 19 so customer-facing documentation matches what is currently available, and add clear private-beta documentation for White Label & Partners.\n\n## Scope\n\n* Add a new White Label & Partners docs section for private beta partners.\n* Update AI SDR docs for Outlook calendar connection, scheduling buffers, and self-learning knowledge base behaviour.\n* Update Cold Email Agent Leads docs for status filtering, select-all behaviour, and CSV export changes.\n* Update CRM/account calendar docs for Name 20 or Outlook calendar sync and scheduling buffers.\n* Clean up Sales Call Analyzer docs so they only describe generally available upload/transcript analysis, not live-call joining.\n* Update integration/workflow/API language so gated or unreleased functionality is clearly marked as coming soon / not available to general users yet.\n\n## Non-goals\n\n* Do not document AI Funnel Builder.\n* Do not document public API keys/access tokens as self-serve functionality.\n* Do not document Workflows as generally available.\n* Do not document ecommerce/Store Builder/Ad Spy/Name 20 Manager/Shopify functionality.\n\n## QA\n\nReview the Name 19 pages for White Label & Partners, AI SDR setup/calendar, Leads export, Sales Call Analyzer, CRM calendar/settings, and integration/workflow FAQs before rollout.\n\n<!-- preview-url-start -->\n**Preview:** <url:general-help-centre-update-and-white-label-docs-aiacquisition.vercel.app> — PR #4480\n<!-- preview-url-end -->"
+    },
+    {
+      "id": "ENG-10997",
+      "createdAt": "2026-06-29T20:10:11.765Z",
+      "title": "Error when upgrading to White Label on Acquisity",
+      "state": "Done",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [],
+      "description": "#### Customer Name\n\nName 21\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\n#Company Six\n\n#### Screenshot\n\n <image> \n\n#### What are you trying to achieve?\n\nConfirm upgrade on Acquisity\n\n#### What are you doing to achieve it?\n\nSubmitting this ticket\n\n#### What is happening instead?\n\nError message\n\n#### What is the expected outcome?\n\nTo enable upgrade \"White Label\""
+    },
+    {
+      "id": "ENG-14020",
+      "createdAt": "2026-09-18T11:54:41.262Z",
+      "title": "Self-serve white-label workspaces cannot buy inboxes or domains: checkout fails before payment",
+      "state": "Done",
+      "assignee": "James Keeble",
+      "parent": null,
+      "labels": ["Bug", "Payments"],
+      "description": "## Overview\n\nClient workspaces under a self-serve white-label partner can't buy pre-warmed inboxes and domains. Every checkout attempt shows \"payment failed\", no payment is taken, and the setup step sits on \"In progress\" until the order expires. After this fix the checkout opens on our Whop store, the client pays, and the inboxes are set up like any other order.\n\n## Problem\n\nReported on 18 September 2026 by Company Four (<domain>) while onboarding their first client workspace, Company Nine. The client picked 6 domains with 3 Name 20 inboxes each and pressed pay four times between 11:24 and 11:30 UTC. Each attempt failed before reaching Whop, so nothing was charged. The order was then auto-cancelled at 11:40 when the domain reservation expired.\n\nNo self-serve partner workspace has ever completed an inbox order. Past Whop inbox orders all came from big-client partners (Customer Workspace, Name 7 AI) that have their own Whop store set up with us. Self-serve partners are meant to use our own Whop store, which already works for their subscriptions, credit top-ups and website domains (ENG-11291). The inbox checkout was never updated to do the same.\n\n## User experience\n\n* Today: Cold Email Agent setup > Setup inboxes > choose domains > pay shows \"payment failed\". The step stays \"In progress\" and retrying doesn't help.\n* After: the same flow opens a Whop checkout for the order total. After payment, the order moves to provisioning and the inboxes appear as usual.\n* If our store isn't configured for this purchase, the customer sees a clear \"not available\" message, not a generic payment failure.\n\n## Done when\n\n* A self-serve partner's client workspace can check out a pre-warmed inbox order, and the payment starts provisioning.\n* Big-client partners' inbox checkout behaves exactly as before.\n* After payment, cancelling, repricing and refunding the order use the same store the customer paid in.\n* One real low-cost order in a self-serve test workspace completes in production and is refunded afterwards (preview environments cannot complete Whop payments).\n\n## Implementation context\n\n* Failure: `Whop is not configured for this billing provider config` (Sentry ACQUISITY-547). The inbox order checkout only reads partner or platform Whop settings saved in the database. Self-serve partners have none, and no platform Whop row exists.\n* Our webhook ignores payments on our own store unless it recognises the product. So the per-order plan must be created under our existing Email product, which the webhook maps to the email slot.\n* Follow the self-serve rule from ENG-11291: self-serve partners always use our store, big clients always use their own, with no fallback between them.\n* Don't add a platform Whop row in the database as a hotfix. It changes store selection for every partner."
+    },
+    {
+      "id": "ENG-13510",
+      "createdAt": "2026-09-04T20:25:18.017Z",
+      "title": "Cancel White Label Before Billing Date",
+      "state": "Done",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": ["Internal reported", "Refund"],
+      "description": "#### User Email\n\n<email>\n\n#### Workspace Name\n\nName 22\n\n#### Request Type\n\nRefund\n\n#### Reason for request\n\nThey are transitioning to the Low ticket affiliate funnel and need to cancel their acquisity white label before it gets billed on 5/9."
+    },
+    {
+      "id": "ENG-14203",
+      "createdAt": "2026-09-24T04:00:57.960Z",
+      "title": "Done-for-you domain and email-account orders are refused in self-serve white-label portals (\"Checkout unavailable - Self-serve Whop order checkout only supports pre-warmed orders\")",
+      "state": "Canceled",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": ["Customer reported", "intercom-sourced"],
+      "description": "**Source**: Intercom conversation <url:app.intercom.com> (follow-up report, 2026-09-24)\n\n**Ask**\n\nThe client reports that, after connecting a provider, buying domains and email accounts fails on Purchase with an error saying Whop is not set up for this workspace.\n\n**Finding**\n\nThe purchase is being refused by an intentional guard on done-for-you orders in self-serve white-label portals, not by anything missing on the client's or the partner's side.\n\napps/web/lib/whop/order-plan.ts resolveOrderPlanStore sends a self-serve partner's orders to the platform Whop store (orderPlanStoreForMode maps self_serve to 'platform'), and that branch refuses anything other than pre-warmed orders until DFY trial billing is verified on the platform store. A DFY order therefore returns \"Checkout unavailable - Self-serve Whop order checkout only supports pre-warmed orders until trial billing is verified.\"\n\nEvidence, production, verified 2026-09-24: workspace \"Company Ten\" (<uuid>, partner Company One LLC) has 7 domain_purchase_order rows created 2026-09-22 and 2026-09-23, every one order_type=dfy, every one status=cancelled, every one carrying exactly that error. No pre-warmed order has been attempted. The same workspace activated correctly (onboarding completed, one outreach_provider row), so the earlier plan-step and provider dead-ends are behind it.\n\n**Why it matters**\n\nThe UI still offers done-for-you as a purchase option in these portals, so a paying partner reaches a Purchase button that can only fail, and the message names Whop in a way that reads as a setup problem on their side. No ticket or owner currently covers this restriction; a Name 14 duplicate search for the error string and for DFY purchases in self-serve portals returns nothing.\n\n**Human action needed**\n\nEither verify DFY trial billing on the platform Whop store so these orders can be sold, or stop offering done-for-you in self-serve portals and say so in the UI. Until then the customer-facing answer is to order pre-warmed domains and email accounts, which goes through."
+    },
+    {
+      "id": "ENG-13229",
+      "createdAt": "2026-08-27T21:42:26.461Z",
+      "title": "$185 refund on Company Five",
+      "state": "Done",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [],
+      "description": "#### User Email\n\n<email>\n\n#### Workspace Name\n\n(Company Five)\n\n#### Request Type\n\nRefund\n\n#### Reason for request\n\nHey team, I have a client requesting a refund of the $185 he paid to create a new workspace on his white-label platform.\n\nHe is already paying $99/month for access to the white-label workspace, so he's confused about why he was then prompted to pay an additional $185 when he tried to create a new campaign. Unfortunately, the platform didn't allow him to create the campaign without making this additional payment.\n\nHe went ahead and paid the $185 because he needed to have the workspace ready to show a client tomorrow, but this caused quite a bit of frustration.\n\nI'm not entirely sure why he was charged the $99/month and then prompted for another $185 on top of that, so I'd appreciate it if someone could clarify what happened here.\n\nLong story short, this client has been escalating quite a bit recently due to multiple factors, mainly the lack of results and several technical issues he's experienced with the workspace since joining. I've already raised several tech tickets for different issues, particularly around booking confusion, calls being booked on his calendar versus the closer's calendar, and other related workflow issues that have created quite a bit of friction.\n\nIf possible, I think refunding the $185 as a gesture of goodwill would go a long way here and would be greatly appreciated. Thanks!"
+    },
+    {
+      "id": "ENG-13404",
+      "createdAt": "2026-09-02T23:58:53.072Z",
+      "title": "Activate workspace for Name 23",
+      "state": "Duplicate",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": ["Bug", "Internal reported", "Workspace Setup Issues"],
+      "description": "#### Customer Name\n\nName 23\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 23' Workspace\n\n#### Screenshot\n\n <image> \n\n#### What are you trying to achieve?\n\nUrgent: Name 23 is trying to set up a workspace in his white label for a client but when he goes to set it up, he gets an error message that he needs to activate the workspace. Please see attached file.\n\n#### What are you doing to achieve it?\n\nI'm on a call with him, trying to figure out how to activate it but I don't know how to do this\n\n#### What is happening instead?\n\nHe's unable to get a workspace going for his client that just enrolled\n\n#### What is the expected outcome?\n\nHave the workspace activated so he can fulfill his client"
+    },
+    {
+      "id": "ENG-7551",
+      "createdAt": "2026-04-06T16:23:16.614Z",
+      "title": "Client unable to log in due to password reset email issue",
+      "state": "Done",
+      "assignee": "Beth Newton",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "#### Customer Name\n\nName 24\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 24\n\n#### Screenshot\n\n#### What are you trying to achieve?\n\nClient cannot log in - tried resetting, but is not getting emails to reset password\n\n#### What are you doing to achieve it?\n\nlogging in\n\n#### What is happening instead?\n\nsaying invalid credentials\n\n#### What is the expected outcome?\n\nLog in"
+    }
+  ]
+}

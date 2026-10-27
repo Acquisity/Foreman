@@ -1,0 +1,247 @@
+{
+  "id": "ENG-14995",
+  "provenance": "seeded",
+  "createdAt": "2026-10-08T18:55:29.249Z",
+  "lane": "triage",
+  "stratum": "duplicate_hard_negative",
+  "ticket": {
+    "title": "my phone balance has been checked 20+ times today",
+    "description": "#### Customer Email\n\n<email>\n\n#### Workspace name\n\nAI Acquisition Sales Team\n\n#### Workspace ID\n\n<uuid>\n\n#### Which lead?\n\nall\n\n#### What's wrong?\n\ni go to call a prospect and it says \"your phone balance is being checked\" happening for every call i do now.\n\n#### Screenshot\n\n#### Video link\n\n<url:app.acquisity.ai>",
+    "attachmentKinds": ["slack"]
+  },
+  "repoCommitAtCreate": "e5b2aaa1838537b2654ad1a252e87df1dab29e7d",
+  "flags": {
+    "descriptionEditedAfterCreate": false,
+    "needsProductionData": true,
+    "alreadyFixedAtTriage": false
+  },
+  "asFiled": {
+    "assignee": "Aaron Fraga",
+    "labels": [],
+    "parent": null,
+    "priority": 1,
+    "project": "CRM"
+  },
+  "relatedSnapshot": [
+    {
+      "id": "ENG-14909",
+      "createdAt": "2026-10-07T19:07:57.941Z",
+      "title": "when i call it keeps saying balance being checked",
+      "state": "Triage",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [],
+      "description": "#### Customer Email\n\n<email>\n\n#### Workspace name\n\nAI Acquisition Sales Team\n\n#### Workspace ID\n\n<uuid>\n\n#### Which lead?\n\nloads\n\n#### What's wrong?\n\nwhen i give prospects a call on acquisity crm when i click the call buttom a call voice will say your phone balance is being checked (along those lines) but its happened 10+ times today\n\n#### Screenshot\n\n#### Video link\n\n<url:app.acquisity.ai>"
+    },
+    {
+      "id": "ENG-14839",
+      "createdAt": "2026-10-06T20:15:08.539Z",
+      "title": "PhoneFundingAccountBusyError: Your phone balance is being checked. Please try again shortly.",
+      "state": "Todo",
+      "assignee": null,
+      "parent": null,
+      "labels": [],
+      "description": ""
+    },
+    {
+      "id": "ENG-14817",
+      "createdAt": "2026-10-06T15:56:37.004Z",
+      "title": "PhoneFundingAccountBusyError: Your phone balance is being checked. Please try again shortly.",
+      "state": "Todo",
+      "assignee": null,
+      "parent": null,
+      "labels": [],
+      "description": ""
+    },
+    {
+      "id": "ENG-13744",
+      "createdAt": "2026-09-11T21:18:15.400Z",
+      "title": "Check funds before forwarding a call to a rep's phone",
+      "state": "Done",
+      "assignee": "Jil Patel",
+      "parent": "ENG-12603",
+      "labels": [],
+      "description": "## Overview\n\nWhen an incoming call is forwarded to a rep's own phone, Twilio places a paid outbound call. This applies the same balance check as other paid calls, so a workspace with no phone funds does not keep running up forwarded minutes.\n\n## What's included\n\n* The balance check for forwarded calls from Forward incoming calls to a rep's own phone.\n* Making sure forwarded call legs and phone-number verification charges are recorded correctly in Twilio cost tracking.\n\n## Blocked by\n\n* Check funds before starting Twilio calls\n* Ring a rep's own phone for incoming calls\n\n## How it should work\n\n* Before ringing the rep's phone, the forwarded call passes the same balance check as other paid calls. Workspaces billed through Whop count as unfunded.\n* With no funds, the phone is not rung and the caller gets the CRM voicemail. The browser ring is unaffected.\n* The check must finish within a few seconds because the caller is waiting on the line. A timeout or error sends the caller to voicemail.\n* A retried Twilio callback for the same call never counts funds twice.\n\n## Done when\n\n* An unfunded workspace's forwarded calls go to voicemail without ringing the phone; a funded workspace's calls forward normally.\n* A slow or failed balance check sends the caller to voicemail within the time limit.\n* Forwarded call costs and number-verification charges appear in cost tracking and reconcile."
+    },
+    {
+      "id": "ENG-12606",
+      "createdAt": "2026-08-12T18:07:13.234Z",
+      "title": "Let customers add phone funds",
+      "state": "Done",
+      "assignee": "Jil Patel",
+      "parent": "ENG-12603",
+      "labels": [],
+      "description": "## What this does\n\nLets an owner or admin make a one-time payment into either the Twilio or Sendblue balance. Autumn collects the payment, while Acquisity remains the only source of truth for the phone balance.\n\n## Done when\n\n* Twilio and Sendblue have separate top-up purchases.\n* A verified successful payment credits only the intended provider balance and only once.\n* Organization, billing account, provider, product, amount and currency must all match before credit is added.\n* Refunds, disputes and chargebacks reverse the original payment once and may create an amount due.\n* Browser redirects and replayed payment events cannot create funds.\n* Only owners/admins can pay; impersonated and cross-organization requests are rejected.\n\n## Investigation and PR planning included here\n\n* Start from the completed Autumn sandbox evidence in ENG-12722; separate provider balances, one-time top-ups, saved payment methods, failed payments, replay protection and automatic recharge all passed.\n* During PR planning, confirm the exact Autumn payment and webhook identities that make each credit or reversal happen once.\n* The PR must close the remaining evidence gap for refunds, disputes and chargebacks: implement one-time reversal of the original credit and record how it was verified. If Autumn still does not expose a supported sandbox path, keep that live verification visibly outstanding rather than assuming it passed.\n\n## Not included\n\nAutomatic recharge, phone purchases or customer billing screens.\n\n## Wait for\n\nENG-12605. ENG-12722 is retained as completed evidence, not as a blocker."
+    },
+    {
+      "id": "ENG-11584",
+      "createdAt": "2026-07-13T16:25:44.511Z",
+      "title": "My Day BE: today's calls endpoint (+ appointment user/date index)",
+      "state": "Done",
+      "assignee": "Anuj Bhatt",
+      "parent": "ENG-11657",
+      "labels": ["rep-command-center"],
+      "description": "## What\n\nThe data behind \"Today's calls\": every scheduled call for the **calling user** (MVP is self-only, no targetUserId — see umbrella ENG-11544), soonest first, with everything the card needs: time, lead name, phone, email, pipeline → stage, source, meeting URL for Join, and attendance.\n\n## Name 2\n\n`crm.myDay.getCalls({ organizationId, range: 'today' | 'next7days' })` (feature-gated per ENG-11583)\n\n## Query rules (exact)\n\n* Source: `scheduling_appointment` (`packages/db/src/schema/scheduling.ts:34`) — host `user_id`, start `date`, join link `meeting_url`, booked-at `created_at`, outcome `attendance`\n* Filter: `organization_id = org` AND `user_id = ctx.user.id` AND `status = 'scheduled'` (NOT `!= 'canceled'` — that would include `rejected`) AND `deleted_at IS NULL`\n* Timezone: use `user.timezone`, fall back to UTC only if the stored IANA value is invalid. `today = local day start, next local day start)`; `next7days = [local day start, +7 days)` (includes today)\n* Order: `date ASC`\n* **Migration:** add composite index `(organization_id, user_id, date)` — tenant key included; today only separate `user_id` and `date` indexes exist\n\n## Enrichment (this is real work, not a lookup)\n\n`appointment-repository.ts:243` relationship resolution returns **arrays of IDs**, possibly multiple — it does not return enriched records. Rules:\n\n* Precedence: external-booking `contact_id`/`deal_id` first, then message-thread relationship\n* If no unique relationship exists, return `contact: null` / `deal: null` — **never arbitrarily pick the first ID**\n* Note: the repository already supports `startsAfter`/`startsBefore` (appointment-repository.ts:32) — reuse for the range filter\n\n## Response shape (matches the umbrella's shared contracts)\n\n`{ id, startAt, durationMinutes, attendance, meetingUrl: string | null, contact: PersonRef | null, deal: DealRef | null, quickActions: QuickActions }`\n\n* `canCall` = PHONE_CALLING enabled AND contact AND phone; `canJoin` = meetingUrl present; `canAdvanceStage` = deal linked AND stage non-terminal. FE hides what's false.\n* Countdown is computed client-side from `startAt`; no server work\n\n## Pre-launch check\n\nMeasure linked-contact/phone coverage for the Name 1 workspace before go-live (how many of today's appointments resolve to a contact with a phone). If coverage is poor, flag to James — that's a data-linkage problem the dashboard can't fix.\n\n## Acceptance\n\n* A canceled or rejected or soft-deleted appointment never appears\n* An appointment with no linked contact renders with Call/Email hidden, not an error\n* Timezone boundaries verified for a non-UTC user\n\nParent: [ENG-11544. Name 3: <url>"
+    },
+    {
+      "id": "ENG-623",
+      "createdAt": "2025-06-26T06:19:35.043Z",
+      "title": "Add check to see if website has already been updated through N&O workbook",
+      "state": "Done",
+      "assignee": "Declan Lupari",
+      "parent": null,
+      "labels": ["Improvement"],
+      "description": "When people check Niche & Offer Workbook complete we want to avoid overwriting any changes the PGPs / Clients may have made - add a check to see "
+    },
+    {
+      "id": "ENG-13741",
+      "createdAt": "2026-09-11T21:17:41.420Z",
+      "title": "Ring a rep's own phone for incoming calls",
+      "state": "Done",
+      "assignee": "Jil Patel",
+      "parent": "ENG-13740",
+      "labels": ["CRM migration", "rep-command-center"],
+      "description": "## Overview\n\nWhen a rep has forwarding on, incoming calls to their CRM number also ring their own phone: at the same time as the browser, after it, or instead of it. The rep must press 1 before the caller is connected, so their phone's own voicemail can never swallow a call. Nothing changes for anyone until the settings in the next ticket let a rep turn forwarding on.\n\n## Problem\n\nIncoming calls can only ring the browser, and there is nowhere to store a forwarding choice. A phone's own voicemail also looks like a real answer to Twilio, so simply dialling a mobile would log unanswered calls as answered and lose voicemails outside the CRM.\n\n## What's included\n\n* Stored forwarding settings for each rep and a workspace setting that allows forwarding.\n* Routing for the three modes, the \"press 1\" screen, and logging calls answered on the phone.\n* Tests.\n* Recording, the settings screens and the balance check are separate tickets.\n\n## Blocked by\n\nNone: can start immediately.\n\n## How it should work\n\n* Each rep's settings in each workspace store a forwarding number, when and how it was verified, a mode (off, ring both at once, browser first then phone, or phone only) and a browser ring time (10, 15, 20 or 30 seconds, default 15). Forwarding is off by default. Each workspace has a setting that allows forwarding, on by default.\n* The phone rings only if, at the moment the call arrives, the assigned rep has forwarding on, their number is verified, and the workspace allows forwarding. Otherwise the call behaves exactly as today.\n* **Ring both at once:** the browser and the phone ring together for 20 seconds. Answering in the browser stops the phone; accepting on the phone stops the browser. If the phone is switched off, its voicemail may answer first and end the browser ring, and the caller gets the CRM voicemail.\n* **Browser first:** the browser rings for the rep's chosen time, then the phone rings for 20 seconds.\n* **Phone only:** the phone rings for 20 seconds straight away.\n* The phone shows the caller's real number. No caller ID override is set, which is the path Twilio supports going forward.\n* The rep hears a short prompt and has about 8 seconds to press 1. Any other key, silence, or the phone's own voicemail ends the forwarded ring and the caller hears the CRM voicemail.\n* A call counts as answered on the phone only when the rep pressed 1. Twilio's own answered status is not trusted for the phone. The key press only counts from a verified Twilio request, for a call we actually forwarded, once. If it cannot be saved, the forwarded ring ends and the caller gets voicemail, so a connected call is never logged as missed.\n* A call accepted on the phone is logged exactly like a browser answer: answered, talk time, contact and deal links, counted as a connect. A declined or unanswered forward is logged as missed and any voicemail is saved as today.\n* Repeated Twilio callbacks never ring the phone twice.\n* Premium-rate and shared-cost numbers cannot be used. A call Twilio refuses to connect because of a country or fraud rule goes to voicemail and is logged with its reason.\n* No phone numbers or names are put in webhook URLs or logs.\n\n## Who can do what\n\n* Forwarding only goes to the number stored on that rep's own settings in that workspace.\n* A removed or banned rep never has calls forwarded.\n\n## Done when\n\n* With forwarding off, incoming calls behave exactly as today.\n* In a preview, with a real mobile, in every mode: pressing 1 connects and logs an answered call with talk time; not pressing, declining, or the phone being off sends the caller to CRM voicemail and logs a missed call; in ring-both mode, answering in the browser logs a browser answer.\n* The same checks pass for a workspace on its own Twilio subaccount.\n* Automated tests cover each mode, browser versus phone answers, accepted versus not accepted when Twilio reports the call as completed, duplicate callbacks, an unverified number, a failed key-press save, and a number Twilio refuses.\n* High-risk country permissions are confirmed off on our main Twilio account.\n* The database change is additive only.\n\n## Implementation context\n\n* High-risk: live call routing, database change, and a paid outbound call leg with no balance check until the billing ticket for forwarded calls lands.\n* Twilio does not document the status it reports when the \"press 1\" screen hangs up, which is why acceptance is recorded by us.\n* Talk time for phone answers includes the few seconds of the prompt.\n* Call flow, code map, Twilio references and test matrix: AI context.md."
+    },
+    {
+      "id": "ENG-13740",
+      "createdAt": "2026-09-11T21:17:16.108Z",
+      "title": "Forward incoming calls to a rep's own phone",
+      "state": "Done",
+      "assignee": "Jil Patel",
+      "parent": null,
+      "labels": ["CRM migration", "master", "rep-command-center"],
+      "description": "## Overview\n\nReps can only answer calls to their CRM number in the browser, so calls they miss away from their desk go to voicemail. This lets a rep add their own phone, choose when it rings, and remove it at any time, while every call, recording and voicemail still lands in the CRM.\n\n## Problem\n\nReps step away, work from their phone or close the tab, and calls from prospects go straight to voicemail.\n\n## User experience\n\n1. In the phone settings, a rep adds their phone and confirms it is theirs with a code sent by text or by a phone call.\n2. They choose **Ring both at once**, **Ring my browser first, then my phone** (after 10, 15, 20 or 30 seconds) or **Ring my phone only**.\n3. When the phone rings it shows the caller's real number. On answering, the rep hears \"You have a call on your {workspace} line. Press 1 to accept.\"\n4. Pressing 1 connects the call. If they do not press 1, or their phone's own voicemail answers, the caller goes to the CRM voicemail.\n5. The call is logged and recorded in the CRM like any other answered call.\n6. The rep can remove their phone at any time. An admin can remove it for them, or turn forwarding off for the whole workspace.\n\n## What's included\n\n* Call routing for all three modes.\n* The settings, verification and removal for reps and admins.\n* Recording every answered incoming call.\n* The balance check for forwarded calls is owned by the calls and texting billing programme (Add Billing for calls and texting), not by this master.\n\n## Execution order\n\nUse the lowest-numbered eligible ticket first. Tickets grouped as parallel may start together when there is capacity, but they keep the priority order below. Waves show the earliest dependency unlock, not a barrier.\n\n### Wave 1: can start now\n\nParallel: none.\n\n1. Ring a rep's own phone for incoming calls: all three ring modes, the \"press 1\" screen and correct logging. Dormant until the settings ship.\n\n### Wave 2: starts when ticket 1 is done\n\nParallel: Let reps add, verify and remove a forwarding phone and Record every answered incoming call.\n\n2. Let reps add, verify and remove a forwarding phone: blocked by Ring a rep's own phone for incoming calls. This is when users get the feature.\n3. Record every answered incoming call: blocked by Ring a rep's own phone for incoming calls.\n\nCross-wave overlap: none verified.\n\nOutside this master: Check funds before forwarding a call to a rep's phone sits under the billing programme. It starts when ticket 1 and Check funds before starting Twilio calls are done, and may overlap tickets 2 and 3. Forwarding does not wait for it.\n\n## Done when\n\n* All children are done, and a rep has taken a real forwarded call in production that was logged and recorded correctly.\n* Call forwarding activation events are verified landing in PostHog.\n\n## Not included\n\n* Forwarding to another rep or team (see Add blind call transfer).\n* Business-hours schedules.\n* The missed-call inbox (Show reps their missed calls and voicemails).\n* Charging customers for minutes."
+    },
+    {
+      "id": "ENG-14796",
+      "createdAt": "2026-10-06T12:41:57.843Z",
+      "title": "Merge Phone Wallet Top-ups into Phone Calling",
+      "state": "In Progress",
+      "assignee": "Jil Patel",
+      "parent": "ENG-12603",
+      "labels": [],
+      "description": "unknown"
+    },
+    {
+      "id": "ENG-11657",
+      "createdAt": "2026-07-15T15:33:21.963Z",
+      "title": "My Day PR 1: foundation (flag · route · today's calls · page)",
+      "state": "Done",
+      "assignee": "Anuj Bhatt",
+      "parent": "ENG-11544",
+      "labels": ["rep-command-center"],
+      "description": "Groups the tickets Anuj shipped in Acquisity/Acquisity#5562 — the base of the stacked My Day PRs.\n\n**Bundled tickets:**\n\n* ENG-11583 — BE: feature flag, route, and default CRM landing\n* ENG-11584 — BE: today's calls endpoint (+ appointment user/date index)\n* ENG-11589 — FE: build the My Day page (closer view)\n\n**Stack:** `main → PR 1 (this) → PR 2 (#5592) → PR 3 (#5598)`\n\nStatus: in Code Review.\n\nParent: umbrella ENG-11544."
+    },
+    {
+      "id": "ENG-14146",
+      "createdAt": "2026-09-23T07:53:46.863Z",
+      "title": "I can't see Sales workspace in my Name 4 and also to request phone number",
+      "state": "Done",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [],
+      "description": "#### Customer Name\n\nName 5\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 5\n\n#### Screenshot\n\n#### What are you trying to achieve?\n\nSet up a phone number to call clients\n\n#### What are you doing to achieve it?\n\nI got the email and followed the instructions to join Workspace\n\n#### What is happening instead?\n\nSales workspace is not visible in my Acquisity. Also, I don't see a phone number. Only the option to request Phone Number\n\n#### What is the expected outcome?\n\nPlease look into it and request a phone number"
+    },
+    {
+      "id": "ENG-14282",
+      "createdAt": "2026-09-25T14:28:57.639Z",
+      "title": "Name 6 has been charged $144/month for nothing",
+      "state": "Done",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": ["Customer reported", "Internal reported", "Refund"],
+      "description": "#### User Email\n\n<email>\n\n#### Workspace Name\n\n#### Request Type\n\nDiscount code\n\n#### Reason for request\n\nSo he has been charged $144 for at least 6 months here, which I believe might be for domains and inboxes. Therefore I suggest we provide a code to provide 6 months' worth of domains and inboxes so that we can get his campaign up and running ASAP"
+    },
+    {
+      "id": "ENG-13656",
+      "createdAt": "2026-09-10T14:39:17.162Z",
+      "title": "Reconnect the browser phone line before dialing instead of timing out",
+      "state": "Done",
+      "assignee": "Ebubeker Rexha",
+      "parent": null,
+      "labels": [],
+      "description": "## Overview\n\nA rep whose Acquisity tab has been open for a while clicks Call and gets \"Call failed: Device registration timeout\" until they refresh the page. The dialer should reconnect the browser phone line itself before dialing, keep its token fresh, and report the failure when it cannot.\n\n## Problem\n\nOn 10 September Name 7 (AI Acquisition Sales Team) could text but could not call. His tab had been open since the previous evening. The browser's phone connection to Twilio had dropped while the laptop was asleep and its one hour token had expired. When he clicked Call, the dialer noticed the connection was not registered, pushed in a fresh token, then only waited 10 seconds for Twilio to reconnect on its own. It never asked the SDK to re-register, and the SDK's own reconnect backoff can take up to 20 seconds, so the wait lost the race. The attempt never reached Twilio: there is no call record, no Twilio error, and no server-side trace, because browser logs stay in the console.\n\nThis became possible when inbound ringing (ENG-12193, Acquisity/Acquisity#5943, merged 12 August) started creating the phone connection at page load and keeping it for the life of the tab. Before that a connection was created per call, so the passive wait added in Acquisity/Acquisity#5677 never mattered. The token refresh for that long-lived connection runs once with no retry, so a single failed refresh (for example waking before Wi-Fi is back) leaves the line dead until something else pushes a token in.\n\n## Proposed fix\n\nWhen a call starts and the phone line exists but is not registered, rebuild the line from scratch on a fresh connection with the new token, so the call goes through without a page refresh. Keep the token refresh alive by retrying it and by refreshing again after any Twilio authorization error. When a call still cannot start before dialing, record that failure so engineering can see it.\n\n## What's included\n\n* Outbound call start recovers an unregistered or stale phone line automatically.\n* Token refresh for the long-lived line retries on failure and re-runs after Twilio auth errors.\n* Pre-dial call failures are reported to Sentry with the reason and the SDK state, no personal data.\n* Regression tests for the unregistered-line path and the refresh retry.\n\nNot included: the inbound call card, readiness UI and recovery controls, which stay in ENG-13432; any change to call routing, caller ID, permissions or billing.\n\n## How it should work\n\n* If the line is not registered when Call is clicked, the dialer does not try to revive it: it discards the line and builds a new one with the fresh token on a fresh connection, then dials. (Sending anything over a dead connection makes the phone library report an error that the call screen treats as a failed call, which is why reviving it in place does not work.)\n* The user-facing error only appears after the rebuild also fails, and it names the real reason rather than a generic timeout.\n* The token refresh retries with a short backoff and gives up after a few attempts with a logged error; a later Twilio auth error triggers another refresh.\n* Inbound ringing keeps working after recovery: the rebuilt line is registered for incoming calls the same way the original was.\n* Recovery must not interrupt an active or ringing call; it only runs when no call is in progress.\n\n## Who can do what\n\nNot applicable: no permission or ownership changes. Existing call permission and calling setup checks are unchanged.\n\n## What the user sees\n\nClicking Call on a long-open tab connects normally after a short delay. If the line cannot be recovered, the existing \"Call failed\" toast shows a specific reason and refreshing the page still works as a fallback. No new screens.\n\n## Done when\n\n* A tab whose phone line has become unregistered can place a call without a page refresh.\n* A tab whose token expired while the refresh failed once can place a call without a page refresh.\n* An active or ringing call is never interrupted by recovery.\n* A pre-dial failure appears in Sentry with the SDK state and reason.\n* Unit tests cover the unregistered-line recovery, the rebuild path, and the refresh retry.\n\n## Open questions\n\nNone: all required decisions are settled.\n\n## Expected outcome\n\nReps stop hitting \"Device registration timeout\" on tabs left open, and any remaining pre-dial failure is visible to engineering instead of only in the rep's toast.\n\n## Implementation context\n\nAI context.md"
+    },
+    {
+      "id": "ENG-12347",
+      "createdAt": "2026-08-05T18:58:51.401Z",
+      "title": "There has been a bug. A client is paying a duplicate invoice for his Acquisity domains and inboxes",
+      "state": "Done",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [],
+      "description": "#### Customer Name\n\nName 8\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 8\n\n#### Screenshot\n\n <image> \n\n <image> \n\n <image> \n\n <image> \n\n#### What are you trying to achieve?\n\n\"one more thing: I'm still being charged twice for my inboxes. See the attached pictures that show two different invoice numbers. Can this be corrected so that I won't receive the double charges anymore please.\"\n\n\", take a look at the picture below. This is what my subscription looks like in Acquisity right now. It isn't showing a double subscription. If I cancel this, then this most likely will remove the inboxes and everything right now right?\"\n\n\"unfortunately, there's no option to cancel in the manage billing section. I'm not sure what other steps I can do without cancelling the domains and inboxes which is going to break the whole setup.\"\n\n#### What are you doing to achieve it?\n\nComing here\n\n#### What is happening instead?\n\nHe's being charged twice\n\n#### What is the expected outcome?\n\nTroubleshoot, fix, and refund the duplicates for however long they've been paid"
+    },
+    {
+      "id": "ENG-12604",
+      "createdAt": "2026-08-12T18:07:08.984Z",
+      "title": "Make phone pricing easy to change",
+      "state": "Done",
+      "assignee": "Jil Patel",
+      "parent": "ENG-12603",
+      "labels": [],
+      "description": "## What this does\n\nLets Acquisity price Twilio and Sendblue separately. Both start with a 20% markup, while platform admins can change future pricing without a code release.\n\n## Done when\n\n* Twilio and Sendblue each start at 20%.\n* Platform admins can set a future global percentage for either provider.\n* An approved organization-specific percentage overrides only that organization's chosen provider.\n* Provider, organization and effective dates cannot leak into another customer's pricing.\n* Old charges keep their original pricing and every change has an audit record.\n* Non-admin and impersonated sessions cannot change pricing.\n\n## Not included\n\nCustomer balances, payments or billing screens.\n\n## Wait for\n\nNothing."
+    },
+    {
+      "id": "ENG-275",
+      "createdAt": "2025-07-23T18:56:37.165Z",
+      "title": "Add a confirmation modal that the bot has been invited to the call",
+      "state": "Done",
+      "assignee": "Jose Cervino",
+      "parent": null,
+      "labels": [],
+      "description": "eg firefleis \n\n <image> "
+    },
+    {
+      "id": "ENG-11554",
+      "createdAt": "2026-07-13T11:07:16.706Z",
+      "title": "My Day BE: recent activity + my leads endpoints",
+      "state": "Done",
+      "assignee": "Anuj Bhatt",
+      "parent": "ENG-11544",
+      "labels": ["rep-command-center"],
+      "description": "## What\n\nThe bottom two sections of My Day for the **calling user** (self-only in MVP, umbrella ENG-11544). This is the agreed cut line: fine to slip to next week if the core runs long.\n\n## Recent activity — `crm.myDay.getRecentActivity({ organizationId, limit=10 })`\n\n* Non-deleted completed `call` and SMS `crm_event` rows, ordered newest `created_at` first (there is no generic \"occurrence\" column)\n* Include an event when `actor_id = ctx.user.id` OR its current contact/deal owner is the calling user; use `EXISTS` so an event matching both doesn't duplicate\n* ⚠️ Call directions in `CrmCallData` are `incoming` **/** `outgoing` (not inbound/outbound), and `duration` is a string (`packages/db/src/schema-support/crm-event.ts:84`). Map to UI labels (\"Missed call\", \"Inbound call\") client-side from direction + outcome\n* Response: `{ eventId, type, direction, outcome, occurredAt, snippet, contact: PersonRef | null, dealId: string | null }`\n* Today events are only queryable per-contact (`crm.contact.getContactEvents`); this is the org-wide-by-actor variant. The `(org, actor, created)` index exists.\n\n## My leads — `crm.myDay.getMyLeads({ organizationId, openOnly?: boolean })`\n\n* **One row per non-deleted deal** owned by the calling user (not per contact); include terminal deals unless `openOnly=true`\n* Response per row: `{ dealId, contact: PersonRef | null, deal: DealRef, lastTouchAt }` — PersonRef includes `linkedin` (the FE renders the LinkedIn icon only when present)\n* Primary phone/email = lowest `sort_order`, then id\n* `lastTouchAt` = latest non-deleted call, SMS, or email event on the deal/contact\n\n## Acceptance\n\n* Activity feed shows the same call events the contact timeline shows, newest first, no duplicates\n* My Leads matches the rep's Deals view under Owner: Current user\n* A lead with no phone renders with the Call icon hidden, not an error\n\nParent: ENG-11544. Name 3: <url> (frame 285:15711)"
+    },
+    {
+      "id": "ENG-11545",
+      "createdAt": "2026-07-13T11:06:02.046Z",
+      "title": "My Day BE: stats strip endpoint (won today / week / MTD + paid revenue MTD)",
+      "state": "Done",
+      "assignee": "Anuj Bhatt",
+      "parent": "ENG-11658",
+      "labels": ["rep-command-center"],
+      "description": "## What\n\nThe four tiles at the top of My Day, for the **calling user** (MVP is self-only — see umbrella ENG-11544): **Won today · Won this week · Won MTD · Paid revenue MTD**.\n\n⚠️ **Naming matters:** the tile formerly called \"Commission MTD\" is **paid revenue**, not commission. `listCommissionLineItemsForDealOwner` returns net owned-deal payment revenue; commission tiers in the Commissions UI are still sample data. Label it **Paid revenue MTD**. True commission is a separate future ticket blocked on a commission-rate model (open product decision with Name 9).\n\n## Name 2\n\n`crm.myDay.getStats({ organizationId })` (feature-gated per ENG-11583)\n\n## Rules (exact)\n\n* **Won tiles:** USD monetary value of won deals where `crm_deal.owner_id = ctx.user.id` AND `deleted_at IS NULL`, converted like the `cashCollected` metric (`apps/web/lib/analytics/operating-system.ts:826`). ⚠️ The existing analytics periods are **UTC** — compute these three periods fresh in `user.timezone` (day boundaries local; week starts Monday 00:00 local; MTD from the 1st local). Don't blindly reuse the UTC period helpers.\n* **Paid revenue MTD:** net value of `succeeded`/`partially_refunded` payments attributed by `deal_owner_id_at_payment` (fall back to current deal owner only for legacy null snapshots), via `CrmPaymentRepository.listCommissionLineItemsForDealOwner` (`packages/db/src/repositories/crm-payment-repository.ts:36`).\n* **Gating:** include the paid-revenue tile only when CRM_PAYMENTS is enabled and the member isn't a client (same compound gate as the Commissions tab, `crm-tabs.tsx:39-44`); otherwise return three tiles.\n\n## Response\n\n`{ currency: 'USD', wonToday: number, wonThisWeek: number, wonMonthToDate: number, paidRevenueMonthToDate?: number }`\n\n## Acceptance\n\n* Values are money, not counts; soft-deleted deals excluded\n* A rep in a non-UTC timezone sees today's win appear on their local \"today\"\n* Client-role members and non-CRM-Payments orgs get no fourth tile\n\nParent: ENG-11544. Name 3: <url> (frame 285:15711)"
+    },
+    {
+      "id": "ENG-5844",
+      "createdAt": "2026-02-24T01:23:31.396Z",
+      "title": "Check webinar signups missing phone number + GHL tagging",
+      "state": "Canceled",
+      "assignee": "John Pino",
+      "parent": null,
+      "labels": [],
+      "description": "Sunday webinar signup (e.g. <domain>/webinar-new-year) is not capturing/passing contact phone number, while the regular signup does.\n\nCurrent automation mentioned: n8n workflow DZ7RtGD8bdh7xIXz. Phone number may be optional (provided when requesting the free gift).\n\nVerify whether these signups are being added to GHL and, if needed, add a tag for them."
+    },
+    {
+      "id": "ENG-14708",
+      "createdAt": "2026-10-05T11:39:49.642Z",
+      "title": "Let workspace admins turn international calling on or off",
+      "state": "Done",
+      "assignee": "Jil Patel",
+      "parent": null,
+      "labels": [],
+      "description": "## Overview\n\nAdd one workspace setting that controls whether reps can call numbers outside the US and Canada, and enforce it on every outbound call. Today the only control is Twilio's account-wide country list, which is now fully open, so any workspace with calling can dial any country, including premium-rate numbers used for toll fraud.\n\n## Problem\n\n* Reps in AI Acquisition Sales Team need to call prospects in Name 10, New Name 11 and elsewhere. Until 5 Oct those calls failed with a raw \"Call failed: ConnectionError (31005): Error sent from gateway in HANGUP\" popup that told them nothing.\n* Twilio's country permissions were switched on for every country (low and high risk) on 5 Oct so those calls now work. That setting applies to every workspace on our Twilio account, and our app has no country check of its own.\n* A compromised login could therefore run up expensive calls to premium-rate numbers, and the workspace has never been told it carries that cost.\n\n## User experience\n\n* **Admin:** Settings, Phone, Calling shows a new \"International calls\" section with an \"Allow international calls\" switch.\n  * Turning it on shows: \"International calls cost more per minute and are charged to your phone balance. Your workspace is responsible for all calls made from it, including calls made if someone gets into your account.\" The admin ticks \"I understand\" before it saves.\n  * The section shows who turned it on and when.\n* **Rep, setting off:** calling a number outside the US and Canada does not connect. The dialler shows \"International calls are turned off for this workspace. Ask an admin to turn them on.\"\n* **Rep, setting on:** international calls connect as normal. Premium-rate and shared-cost numbers are still refused with \"This number can't be called from Acquisity.\"\n* **Rep, Twilio still refuses a call:** the dialler shows \"Calls to this country aren't available right now\" instead of the 31005 code.\n\n## What's included\n\n* One workspace-level on/off setting with the confirmation tick, saved with who and when.\n* A server-side check on every outbound browser call and every Power Dialler call.\n* Always blocking premium-rate and shared-cost numbers, whatever the setting.\n* Plain-language errors in the dialler for each blocked case and for Twilio's 31005 hang-up.\n* A 60-minute maximum length on international calls.\n* Turning the setting on automatically for workspaces that made a successful international call in the last 90 days (this includes AI Acquisition Sales Team), so nobody loses access.\n* PostHog activation tracking for the setting.\n\nNot included (follow-up ticket): choosing individual countries, per-country prices, daily spend caps, fraud-pattern detection, alerts, a platform-admin kill switch and terms-of-service changes.\n\n## How it should work\n\n* \"International\" means any destination whose country is not the US or Canada, worked out from the full number. Name 12 and other non-US/CA countries that share the +1 code count as international. Number type and country come from libphonenumber, which the repo already uses.\n* The check runs on the server before the call is placed, next to the existing do-not-contact check, for both normal and Power Dialler calls. A blocked call never reaches Twilio and is not charged.\n* Numbers saved without a country code are read using the workspace's country rather than having \"+\" stuck in front. Today a UK number saved as 07... becomes an invalid number.\n* Turning the setting off takes effect on the next call. Calls already in progress are not cut.\n* The 60-minute limit applies only to international calls. US and Canada calls are unchanged.\n* New workspaces start with the setting off.\n\n## Who can do what\n\n* Workspace owners and admins (`voice:manage_settings`) can see and change the setting. The server enforces this; hiding the section is not enough.\n* Reps cannot change it. They only see the dialler messages.\n* Platform admins can change it for any workspace through the normal settings access.\n\n## Done when\n\n* An admin can turn international calling on (with the tick) and off, and the page shows who turned it on and when.\n* With the setting off, a call to a Name 13 number is refused before it reaches Twilio, with the plain message, on both the dial pad and the Power Dialler.\n* With the setting on, the same call connects.\n* A premium-rate number (for example a UK 09 number) is refused even with the setting on.\n* A Name 12 +1 number (for example Name 14 +1-876) counts as international.\n* A non-admin member cannot change the setting through the API.\n* An international call ends automatically at 60 minutes. A US call does not.\n* After deploy, AI Acquisition Sales Team has the setting on and its reps' international calls still connect.\n* Twilio's 31005 hang-up shows the plain message instead of the raw code.\n* PostHog shows `tool.opened` for the setting and an event when it is turned on, verified landing.\n\n## Implementation context\n\nCode anchors, Twilio state on 5 Oct, call data and a suggested approach are in AI context.md. Treat it as point-in-time and re-check current code and the Twilio console before building."
+    },
+    {
+      "id": "ENG-14951",
+      "createdAt": "2026-10-08T13:25:30.865Z",
+      "title": "Missing leads calling me back",
+      "state": "unknown",
+      "assignee": "unknown",
+      "parent": "unknown",
+      "labels": "unknown",
+      "description": "#### Customer Email\n\n<email>\n\n#### Workspace name\n\nAI Acquisition Sales Team\n\n#### Workspace ID\n\n<uuid>\n\n#### Which lead?\n\nmany\n\n#### What's wrong?\n\nI see that I called a lead and they called me back but i completely missed it. There was no ringing or anything. It's happened more than 5 times. To actually answer a prospect calling me I have to be on the CRM looking at it at the right time as it's silent.\n\n#### Screenshot\n\n#### Video link\n\n<url:app.acquisity.ai>"
+    }
+  ]
+}

@@ -1,0 +1,227 @@
+{
+  "id": "ENG-15931",
+  "provenance": "seeded",
+  "createdAt": "2026-10-21T18:46:02.958Z",
+  "lane": "triage",
+  "stratum": "duplicate",
+  "ticket": {
+    "title": "Agent tab throws \"Application Error: Something went wrong!\"",
+    "description": "#### Customer Name\n\nName 26\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 26\n\n#### Screenshot\n\n#### What are you trying to achieve?\n\nAccess and use the Cold Email Agent inside Acquisity.\n\n#### What are you doing to achieve it?\n\nNavigated into the workspace (using Edge browser) and clicked on the \"Cold Email Agent\" tab\n\n#### What is happening instead?\n\nThe screen crashes with an \"Application Error: Something went wrong!\" modal.\n\n#### What is the expected outcome?\n\nThe Cold Email Agent tab loads normally without crashing.",
+    "attachmentKinds": []
+  },
+  "repoCommitAtCreate": "2a230ef921c516eca64d71e0139d56801b3bc6e5",
+  "flags": {
+    "descriptionEditedAfterCreate": false,
+    "needsProductionData": true,
+    "alreadyFixedAtTriage": true
+  },
+  "asFiled": {
+    "assignee": "Aaron Fraga",
+    "labels": [],
+    "parent": null,
+    "priority": 2,
+    "project": "Support"
+  },
+  "relatedSnapshot": [
+    {
+      "id": "ENG-15922",
+      "createdAt": "2026-10-21T17:22:39.753Z",
+      "title": "Gmail sync is slowing the whole app: skip empty history pages and cap wake-up runs",
+      "state": "Done",
+      "assignee": "James Keeble",
+      "parent": null,
+      "labels": [],
+      "description": "## Why\n\nSince ENG-15850 (Acquisity/Acquisity#7492) went live at 14:23 UTC on 21 Oct 2026, Gmail history runs went up about 100 times: about 1,750 mailboxes, each synced about once a minute. About 80% of those runs find nothing new, but each one still opens a DB transaction, locks the email account row and the member row, and rewrites the history cursor. The DB was already near its CPU limit in US afternoons, so every tRPC call slowed together. At the 15:10 UTC peak, 35.6% of calls took over 4 s, against under 1% normally.\n\nEvidence, comparing 14:30-16:40 UTC on 20 and 21 Oct (PlanetScale Insights):\n\n* Account row `FOR UPDATE` calls went from 10,479 to 259,363, and time spent in that lock from 16 s to 19,723 s.\n* History cursor upserts went from 1,784 to 254,876.\n\nFull write-up: `CRM/PLATFORM-STALL-2026-10-21/FINDINGS.md`.\n\n## Change\n\n1. `processGmailHistoryPage`: when a page has nothing to hydrate or retire and the checkpoint equals the start cursor, skip the transaction and the cursor write. Still log the page.\n2. `gmailSyncProcessHistoryWakeupsJob`: add a function-wide concurrency cap of 40 next to the per-mailbox key.\n3. Name 1 `30s / 2m` becomes `2m / 5m`.\n\n## Done when\n\n* A history page with no changes makes no DB write and takes no row lock. A unit test proves it.\n* A page with changes or a new checkpoint still writes exactly as today. Existing tests prove it.\n* The wake-ups function config shows the cap and the new debounce. The function-ids snapshot and config test prove it.\n* After deploy, cursor upserts per hour in Insights drop by at least 70% against 21 Oct, and Gmail sync lag stays within minutes."
+    },
+    {
+      "id": "ENG-15709",
+      "createdAt": "2026-10-19T13:35:14.137Z",
+      "title": "not letting me call",
+      "state": "Triage",
+      "assignee": "James Keeble",
+      "parent": null,
+      "labels": [],
+      "description": "#### Customer Email\n\n<email>\n\n#### Workspace name\n\nAI Acquisition Sales Team\n\n#### Workspace ID\n\n<uuid>\n\n#### Which lead?\n\nall\n\n#### What's wrong?\n\nits not letting me call its done this 5 times in a row\n\n#### Screenshot\n\n <image> \n\n#### Video link"
+    },
+    {
+      "id": "ENG-5946",
+      "createdAt": "2026-02-25T20:56:01.197Z",
+      "title": "Cold Email Agent campaign creation fails with \"Something went wrong\"",
+      "state": "Done",
+      "assignee": "Anthony Adewale",
+      "parent": null,
+      "labels": ["Bug", "Campaign State"],
+      "description": "user: <email>\n<email>\n<email>\n<email>\n\nA customer is unable to create a Cold Email Agent campaign; clicking New Campaign results in a \"Something went wrong\" error.\n\n <image> \n\n <image> "
+    },
+    {
+      "id": "ENG-7485",
+      "createdAt": "2026-04-02T21:08:21.991Z",
+      "title": "Client role causes application error in portal",
+      "state": "Done",
+      "assignee": "Mahmut Jomaa",
+      "parent": null,
+      "labels": [],
+      "description": "User: <email>\nIn the `Company Two` workspace, two accounts (`<email>` and `<email>`) hit an application error when set to the `Client` role and opening the AIA portal. The same accounts work when granted the `Member` role instead.\n\nThe issue was reproduced during impersonation and also crashes there.\n\n <image> \n\n <image> \n\nAnother user: <email>\n`Client email: <email>\n`W`as added as a client on Company Three workspac`e.`\n\n`When added as `Client, the acco`unt re`ceives the same application error. A workaround was attempte`d by c`hanging the role to Member, but while impersonating this user the app could no longer return to the dashboard.\n\n <image> "
+    },
+    {
+      "id": "ENG-4957",
+      "createdAt": "2026-01-29T12:11:49.413Z",
+      "title": "Error when saving changes in Cold Email Agent options",
+      "state": "Done",
+      "assignee": "Anthony Adewale",
+      "parent": null,
+      "labels": ["Data/Config Mismatch"],
+      "description": "#### Customer Name\n\nName 2\n\n#### Customer Email\n\n<email>\n\n#### Screenshot\n\n#### Clear description of what the problem is\n\nWorkspace: Customer Workspace \nIn Cold Email Agent -> Customer Workspace | Name 4 | Name 3 23 -> Options, when client tries to edit anything besides Assigned Salesperson when clicking save, it give error \"Something went wrong\""
+    },
+    {
+      "id": "ENG-12544",
+      "createdAt": "2026-08-11T17:53:35.475Z",
+      "title": "CRM Deals tab returns 500 \"Something went wrong\" (Error Loading Deals) for Name 5's Workspace",
+      "state": "Done",
+      "assignee": "Ebubeker Rexha",
+      "parent": null,
+      "labels": [],
+      "description": "BUG: Yes\nEVIDENCE:\n\n* CRM Deals tab returns INTERNAL_SERVER_ERROR, surfaced client-side as the \"Error Loading Deals\" header with the literal message \"Something went wrong\" (deals-kanban.tsx:2160 renders the header; apps/web/trpc/init.ts:112 maps a non-safe internal error to 'Something went wrong'). Reproduced by CS via impersonation of the account; other CRM tabs load fine; the operator's own workspace Deals tab is fine.\n* Name 7 <uuid> (\"Name 5's Workspace\") is single-owner (<email>, role owner, timezone America/New_York — valid). No crm_custom_field_definition rows for the org. 239 deals (235 active) across 6 pipelines / 130 stages, with zero cross-org pipeline or stage references and zero deals on soft-deleted pipelines.\n* No open Name 6 ticket matches; closest history ENG-9043 (Done) and ENG-9699 (Done — that was a client-side React crash, a different mechanism).\n  BLAST RADIUS: 1 org (this workspace); no other reports found in Name 6, extent otherwise unquantified.\n  POTENTIAL FIX: N/A — the throwing query is not yet identified.\n  WHATS NEEDED TO RESOLVE:\n* Pull the Sentry/backend error for crm.deals.getDeals / crm.deals.getKanbanData for org <uuid> around 2026-08-11 17:14-17:30Z to identify which query throws and why; reproduce via impersonation of the account.\n* Decide whether it is a data-shape edge (a specific deal/pipeline/stage/payment/thread value) or a code path, and whether other orgs can hit the same shape.\n  CONFIDENCE: Medium — internal failure is confirmed by reproduction, but the specific root cause/query is unconfirmed (no log/Sentry access this run; live-ness not re-verified after the last confirmation).\n  INTERCOM: <url:app.intercom.com>\n  SLACK THREAD: channel C0BCV1WBR42, thread 1786469706.224329\n  TRIAGE SCOPE: No branch, commit, PR, deployment, migration, patch, or code/docs/config change was created in this session.\n\n---\n\nINTERCOM: <url:app.intercom.com>\nSLACK THREAD: not captured\nORGANIZATION: <uuid>\nFiled by Support from a CS investigation."
+    },
+    {
+      "id": "ENG-12831",
+      "createdAt": "2026-08-17T15:19:50.517Z",
+      "title": "Client gets 404 something is wrong error message when trying to access settings",
+      "state": "Triage",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [],
+      "description": "#### Customer Name\n\nName 8\n\n#### Customer Email\n\nName 9\n\n#### Workspace name\n\nName 8 Name 9\n\n#### Screenshot\n\n#### What are you trying to achieve?\n\nName 8 messaged me saying whenever he clicks on the cold email agent settings he is getting the 404 Page Not Found Error Message.\n\n#### What are you doing to achieve it?\n\nTried to walk him through it, I wasn't able to pinpoint the issue.\n\n#### What is happening instead?\n\nNo visibility into his cold email agent.\n\n#### What is the expected outcome?\n\nTo gain visibility into his cold email agent."
+    },
+    {
+      "id": "ENG-2920",
+      "createdAt": "2025-11-24T07:04:11.894Z",
+      "title": "Application error on server components render",
+      "state": "Canceled",
+      "assignee": "Anthony Adewale",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "**Steps:**\n\n1. Navigate to the campaign creation page (00:34)\n2. Proceed through the campaign setup steps.\n3. Keep your email contents empty\n4. Click 'Next' to proceed to the final step (1:19)\n5. Click 'Create Campaign' (1:35)\n6. Observe the application error page (1:41)\n\nWatch the instant replay here: <url:jam.dev>\n\n---\n\n**Name 10 URL:**\n<url:implement-new-campaign-redesign-aiacquisition.vercel.app>\n\n**Device and browser info:**\nChrome 142.0.7444.162 (1920x984) | macOS (arm) 26.1.0\n\n**Date and time:**\nNovember 24th 2025 | 7:04am UTC\n\n**View developer information (console logs, network requests & timing):**\njam.dev/c/<uuid>\n\n---\n\n*Captured with* *jam.dev*"
+    },
+    {
+      "id": "ENG-5278",
+      "createdAt": "2026-02-09T01:08:15.132Z",
+      "title": "Niche agent tab stuck at 20% and then fails",
+      "state": "Duplicate",
+      "assignee": "Beth Newton",
+      "parent": null,
+      "labels": [],
+      "description": "User: <email>\n\nWhen reaching the final niche agent tab, loading stalls at 20% and then fails.\n\nTried rerunning the agent multiple times, signing in/out, clearing cache, and using a different browser.\n\n <image> "
+    },
+    {
+      "id": "ENG-7431",
+      "createdAt": "2026-04-01T14:20:09.761Z",
+      "title": "Sales Call Analyzer shows application error on add call",
+      "state": "Canceled",
+      "assignee": "Jared Stauffer",
+      "parent": null,
+      "labels": [],
+      "description": "Sales Call Analyzer fails when trying to add a call. After clicking Sales Call Analyzer and then Add a Call, the page shows an application error with the message \"Something went wrong!\"\n\nThe issue was reported as blocking use ahead of a pitch that day.\n\n <image> \n\n <image> "
+    },
+    {
+      "id": "ENG-4707",
+      "createdAt": "2026-01-20T20:43:37.307Z",
+      "title": "Workspace error when accessing Cold Email Agent",
+      "state": "Done",
+      "assignee": "Beth Newton",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "#### Customer Name\n\nName 11\n\n#### Customer Email\n\n<email>\n\n#### Screenshot\n\n <image> \n\n#### Clear description of what the problem is\n\nWorkspace error comes up when trying to access Cold Email Agent."
+    },
+    {
+      "id": "ENG-3330",
+      "createdAt": "2025-12-03T03:52:26.034Z",
+      "title": "Error persists in Cold Email Agent campaign setup",
+      "state": "Canceled",
+      "assignee": "Koppany Kondricz",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "Customer encounters a persistent error when setting up a new campaign in Cold Email Agent; error remains after refresh and customer is concerned about credit charges. Campaign ID: <uuid>.\n\nThe Cold Email Agent successfully completes all five steps of the “Writing Your Email Sequence” process and shows a status of 100% done. However, it fails to finalize the request. After reaching full completion, an error message appears at the bottom of the screen.\n\nError Message: “Something went wrong while processing your request. Please try again or contact support if the issue persists.”\n\n---\n\nConversation:\nName 12: <p>I have a feature request</p>\n\nbot: Thank you for helping us improve.\n\nbot: Please describe your feature request. What problem would this feature solve for you? Any examples or use cases?\n\nName 12: I love the AI SDR Inbox that is capable of booking meetings for me and in my calendar, but i'd like a notification to be sent to me or a meeting invite to see if a meeting was successfully booked\n\nbot: Got it — thanks for your feedback! 💬 Our team reviews all requests regularly, and we’ll reach out if we have any updates.\n\nName 12: Hi Name 15, I have a question, i have set up Company One on my cold email agent, I've started to set up a new campaign and I've bought 5000 credits, Blaise mentioned giving us 10000 credits for something, was that for something different?\n\nName 15: Hi Name 16, thanks for checking in. I’m not completely sure about the credits allocation, so I’ll confirm this with the team first. Once I have the details, I’ll get back to you right away.\n\nName 12: thank you, I also came across this error, can you please help me with this?\n\nName 15: Have you tried refreshing it? Does it shows the same error?\n\nName 12: yes, same error should I try by creating a new cmapaign in the Cold Email Agent\n\nName 12: ?\n\nName 12: will it charge me for another 5000 credits?\n\nName 13: Name 14 the error cleared?\n\nName 12: Hi Name 100, no it's still there\n\nName 13: Please hold off on doing anything let me escalate this to the tech team and see what they have to say, so you don't lose any credits. Thank you so much for your patience Name 16.\n\nName 12: thank you\n\nName 13: Please provide the org id/slug for this campaign\n\n🟡 Note from Name 13: Ellaine Fuente if he replies when am not here, this is what i was told to do Create a bug ticket with as much info as you can. Make sure you include the customers email address and the org id/slug from this campaign.\n\nName 12: HI Name 100, not sure if this is it - campaignId=<uuid> i got this from the url\n\nName 12: there is also this - <workspace-slug>\n\nName 12: Hi, any updates on this?"
+    },
+    {
+      "id": "ENG-7979",
+      "createdAt": "2026-04-21T10:05:24.100Z",
+      "title": "Bug: COPY_REVIEW agent missing from testInvokeAgent switch — always throws BAD_REQUEST",
+      "state": "Duplicate",
+      "assignee": "Arthur Li",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "## Problem\n\n`COPY_REVIEW` is a valid value in the `AgentType` zod enum and in `AGENT_TYPE_MAPPING`, but the `switch` statement in `testInvokeAgent` (`trpc/routers/admin/admin-playground.ts`) has no `case 'COPY_REVIEW'` branch. Any attempt to test the Copy Review agent in the playground hits the `default` branch and throws `BAD_REQUEST: Agent \"COPY_REVIEW\" is not supported`.\n\n## Fix\n\nIn `trpc/routers/admin/admin-playground.ts`, add a `case 'COPY_REVIEW'` branch to the `testInvokeAgent` switch statement that calls `reviewCopy(text, configOrId)` (already exported from ` at /lib/ai-sdr-v2/agents/copy-review`).\n\nChange only the switch statement — do not refactor surrounding code.\n\n## Test\n\nAdd a unit test that calls `testInvokeAgent` with `agent: 'COPY_REVIEW'` and asserts it does not throw `BAD_REQUEST`."
+    },
+    {
+      "id": "ENG-12126",
+      "createdAt": "2026-07-29T13:46:28.987Z",
+      "title": "Generic \"Something went wrong\" error displayed when inviting an already active organization member",
+      "state": "Done",
+      "assignee": "Anuj Bhatt",
+      "parent": null,
+      "labels": ["Bug", "triaged-by-devin"],
+      "description": "When attempting to invite a user who is already an **active member** of the organization, the application displays a generic **\"Something went wrong\"** error message. Instead, the system should show a clear and informative validation message indicating that the user is already an active member of the organization, preventing confusion and improving the user experience.\n\n <image> "
+    },
+    {
+      "id": "ENG-2581",
+      "createdAt": "2025-11-05T06:53:37.284Z",
+      "title": "Login fails with 'Application Error' for client",
+      "state": "Canceled",
+      "assignee": "Anuj Bhatt",
+      "parent": null,
+      "labels": [],
+      "description": "A client is unable to log in to AI Acquisition.\n\n* Email: <email>\n* Error on sign-in: \"Application Error – Something went wrong!\"\n* Link being used: <url>\n\nScreenshots:\n\n <image> \n\n <image> "
+    },
+    {
+      "id": "ENG-12391",
+      "createdAt": "2026-08-07T08:05:17.241Z",
+      "title": "[Workspace log in] -Recurring \"Something went wrong\" error prevents user from logging in after email migration and password reset",
+      "state": "Done",
+      "assignee": "Anuj Bhatt",
+      "parent": null,
+      "labels": ["Bug", "intercom-sourced"],
+      "description": "**Customer Name**\nName 17\n\n**Customer Email**\n<email>\n\n**Customer Email**\n<Enter text>\n\n**Workspace name****\n****Name 17's workspace**\n\n**Screenshot**\n<optional>\n\n**What is the user trying to achieve?**\nLog in to the Acquisity app using the active email address (<email>).\n\n**What is the user doing to achieve it?**\nAttempting to log in via app.acquisity.ai using multiple browsers (Chrome, Brave, and Bing), including Incognito/Private mode. The customer also completed a password reset and previously attempted an email migration from <email> to <email>.\n\n**What is happening instead?**\nThe customer consistently receives the error \"Something went wrong\" when attempting to log in. The issue temporarily worked in Incognito after the password reset but has since returned across all browsers and browsing modes.\n\n**What is the expected outcome?**\nThe customer should be able to log in successfully to the workspace using <email> without receiving the \"Something went wrong\" error."
+    },
+    {
+      "id": "ENG-13592",
+      "createdAt": "2026-09-09T11:46:55.253Z",
+      "title": "Name 10 Domains tab shows 'Domains could not be loaded' for days",
+      "state": "Todo",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": ["Customer reported", "intercom-sourced"],
+      "description": "Intercom conversation: <url:app.intercom.com>\n\nCustomer reported two things in the AI Name 10: AI website generation kept failing (\"failed to generate\", \"Sorry, something went wrong while generating your update\") and the Domains tab has shown \"Domains could not be loaded\" for days, with Retry not fixing it.\n\nFinding:\n\n* The workspace has no website-domain records (website_domain and website_domain_order are both empty). The two domains the customer is trying to use (shown under Email Accounts & Domains) are cold-email sending domains, a separate feature, so they will never appear in the Name 10 Domains tab.\n* A healthy Domains page for this workspace would render the empty \"No domains yet\" state, not the error state. The customer's only website (\"New AI Name 10\") was soft-deleted about 14 minutes after creation and never deployed.\n* The customer's credit balance was roughly full (about 9,901 of 10,000), so the generation failures are not a low-credit cause.\n\nName 18 evidence: no server-side error was logged for this org or for the listOwnedDomains procedure in the relevant window (Axiom clean; Sentry could not be read this session). The \"Domains could not be loaded\" error is not yet confirmed as an internal defect for this workspace.\n\nThis matches an existing open report (ENG-13282) for the same \"Domains tab fails to load\" symptom, whose root cause is also unproven.\n\nNext action: reply to the customer explaining the cold-email vs website domain distinction and that the builder is optional, and pull this workspace's client-side Domains-tab error to decide whether it is the same failure class as the existing report."
+    },
+    {
+      "id": "ENG-3051",
+      "createdAt": "2025-11-27T01:26:42.289Z",
+      "title": "Outreach Provider Connection and Campaign Creation Errors",
+      "state": "Canceled",
+      "assignee": "Koppany Kondricz",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "User experiences persistent 'Something went wrong with the connection to your outreach provider' error, cannot load email accounts, and receives 'Failed to create campaign draft' message; unable to fix via Cold Email Agent.\n\nThe user is encountering a complete failure of the Cold Email Agent integration. The core issue is a persistent \"Something went wrong with the connection to your outreach provider\" error, which the user cannot resolve because the \"Fix\" button directs them to a setup screen with no actionable steps. This connection failure prevents the system from loading email accounts, and all critical functions are broken, resulting in a \"Failed to create campaign draft\" error when attempting to start a campaign. Furthermore, the \"Buy email account\" button is unresponsive, leading the user to worry about accidental multiple charges.\n\nJam | Console logs, network requests, and more\n\n---\n\nConversation:\nName 19: <p>need help resolving: Something went wrong with the connection to your outreach provider. Please reconnect.</p>\n\nbot: This connection error usually happens when your integration needs to be refreshed. Here's how to fix it: First, try these quick steps: Refresh your browser page Clear your browser cache and log back in Check your internet connection If that doesn't work, reconnect your integration: Go to Settings > Email & Calendar Use the disconnect/trash icon to disconnect your current connection Follow the setup process again to reconnect During reconnection: Make sure your account allows third-party app access Don't close the browser window during the authorization process If you get \"No authorization code received,\" clear your browser cache and try again This should restore your outreach provider connection. The error typically resolves once the integration is properly reestablished. Sources: Setting Up AI SDR with Name 22 Calendar | Help Center - AI Acquisition Dashboard Overview: Understanding the Numbers | Help Center - AI Acquisition How to reset your password | Help Center - AI Acquisition Growth Plan Creator Guide | Help Center - AI Acquisition\n\nbot: Is that what you were looking for?\n\nbot: If you still need help resolving the connection issue, I'm here to assist you further. Would you like to provide more details about what you're trying to achieve or any specific problems you're encountering?\n\nbot: Since you're still seeing the same connection error, let's try a different approach: First, try these steps: Refresh your browser page Clear your browser cache completely, then log back in Check that your internet connection is stable If the error persists: The issue might be with your integration sync. Sometimes there's a delay between your integrations and our platform - data typically syncs within a few hours, but delays can occur. Try logging out completely, waiting a few minutes, then logging back in. If you're still getting the \"Failed to load\" type error, there should be a Retry button you can click. Let me know if these steps don't resolve it and I can help you dig deeper into what might be causing the connection issue. Source: Dashboard Overview: Understanding the Numbers | Help Center - AI Acquisition\n\nName 19: clicking fix takees me to the cold email agent\n\nbot: That's actually the correct behavior! When you click \"fix\" for the outreach provider connection error, it takes you to the Cold Email Agent because that's where you manage your email campaigns and integrations. From the Cold Email Agent, you can: Check your campaign settings and email provider connections Reconnect any disconnected integrations Access the settings to manage your email accounts and providers If you're still seeing connection issues once you're in the Cold Email Agent, look for your email provider settings or campaign configuration options to reestablish the connection. Source: Cold Email Agent Guide | Help Center - AI Acquisition\n\nbot: Was that helpful?\n\nName 19: not really\n\nbot: I'm sorry that didn't help! Would you like me to connect you with a human agent? Or if you can share more details about the issue, I’m happy to keep trying to assist you.\n\nName 19: what do i need to fix?\n\nName 19: yes\n\nbot: I'll connect you with someone who can help. Meanwhile, could you please share any additional details about the issue? This will help them assist you more efficiently.\n\nName 19: We couldn't load your email accounts Please refresh the page or try again later. If the problem persists, contact support.\n\nName 19: Something went wrong with the connection to your outreach provider. Please reconnect.\n\nName 19: Failed to create campaign draft: Something went wrong ​\n\nName 19: i feel like the acquisity thing needs to be re implemented or soemthing but i dont know how and dont want to screw it up\n\nName 19: yes\n\nName 19: at the top it says in yellow: something went wrong with your connection to your outreach provider. When I click to fix it, it takes me to the cold. Email agent set up screen. There's nothing in there for me to do to fix anything.\n\nName 19: Something went wrong with the connection to your outreach provider. Please reconnect.\n\nName 19: When I then go into the cold email agent in the main screen under marketing, there's nothing there. After a few seconds, it then says: We couldn't load your email accounts Please refresh the page or try again later. If the problem persists, contact support.\n\nName 19: I then hit by email account and click to make the purchase but then it doesn't do anything. I'm hoping that I'm not being charged each time. I click it cause I've now clicked it several times.\n\nName 19: Finally, when I go quick to create a campaign, it gives me the following error: Failed to create campaign draft: Something went wrong\n\nEllaine Fuente: Were you able to connect your email and Calendar, Name 23?\n\nName 19: i think?\n\nName 19: where would i see it\n\nEllaine Fuente: You can check it under Settings -> Email and Calendar\n\nName 19: yes they are connectede\n\nName 19: i feel like this is taking an extremely long tie to get anywhere\n\nEllaine Fuente: \\[Name 24: Jam for Customer Support\\]\n\nEllaine Fuente: Your recording is in progress. Navigate back to the Jam tab when you're finished.\n\nEllaine Fuente:\n\n🟡 Note from Ellaine Fuente: ↑ Upload started... Screen recording uploading (26.3 MB)\n\n🟡 Note from Ellaine Fuente: Jam created! View the screen recording here: <url:jam.dev>\n\nName 19: Screen recorded successfully!\n\nName 19: submitted it\n\nName 19: what happens if i reset workspace onboarding?\n\nName 19: also i want to make sure i am not being charged over and over again every time i click buy emails\n\nEllaine Fuente: As long as you do not click payment confirmation, I believe you wont get charged.\n\nName 19: ok so what hapens if i clikc reset workspace onboarding\n\nEllaine Fuente: it will reset your onboarding - from Niche research to your campaigns\n\nName 19: ohh then i dont want to do that\n\nName 19: so what do i need to do to fix this?\n\n🟡 Note from Ellaine Fuente: Name 20 do you know the error causing this? something went wrong with your connection to your outreach provider.\n\nName 19: ?\n\n🟡 Note from Name 20: Name 21 looks like a bug. Create a ticket for it. Make sure the Jam link is in it. Most importantly, add a lot of details. What the agent creates is often too minimal for the devs to use."
+    },
+    {
+      "id": "ENG-10682",
+      "createdAt": "2026-06-23T11:41:01.673Z",
+      "title": "Getting \"Something went wrong\" and HTTP 500 error on the All ads tab",
+      "state": "Done",
+      "assignee": "Aaron Kern",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": " <image> \n\n <image> "
+    },
+    {
+      "id": "ENG-3775",
+      "createdAt": "2025-12-15T06:05:33.816Z",
+      "title": "Error approving QC message shows 'something went wrong'",
+      "state": "Canceled",
+      "assignee": "Blaise Gulaj",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "Approving QC for a message in the Quality Control Review view shows a generic \"Something went wrong\" error and the approval does not go through.\n\nContext from the screenshot:\n\n* Seen in a Review panel for a contact named Name 25.\n* Banner at the top of the screen shows \"Something went wrong\" when trying to approve QC.\n\n <image> "
+    }
+  ]
+}

@@ -1,0 +1,227 @@
+{
+  "id": "ENG-15085",
+  "provenance": "seeded",
+  "createdAt": "2026-10-09T21:06:41.351Z",
+  "lane": "triage",
+  "stratum": "duplicate",
+  "ticket": {
+    "title": "Name 31 - Acquisity sending step 2 minutes after step 1",
+    "description": "#### Customer Name\n\nName 31\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nCompany Three\n\n#### Screenshot\n\n <image> \n\n#### What are you trying to achieve?\n\nSend cold email steps as designed\n\n#### What are you doing to achieve it?\n\nAll setting correct - set to wait 3 days between steps\n\n#### What is happening instead?\n\nStep 2 is sending minutes after step 1 - no delay\n\n#### What is the expected outcome?\n\nstep 2 sends 3 days after step 1",
+    "attachmentKinds": ["image"]
+  },
+  "repoCommitAtCreate": "65cb371a4eefda80adb2dfbe6a79e592041f8882",
+  "flags": {
+    "descriptionEditedAfterCreate": false,
+    "needsProductionData": false,
+    "alreadyFixedAtTriage": false
+  },
+  "asFiled": {
+    "assignee": "Aaron Fraga",
+    "labels": [],
+    "parent": null,
+    "priority": 1,
+    "project": "Support"
+  },
+  "relatedSnapshot": [
+    {
+      "id": "ENG-11996",
+      "createdAt": "2026-07-23T14:21:24.737Z",
+      "title": "Cold Email: follow-up step delay applied one step off — final follow-up sends ~1 day early instead of configured delay",
+      "state": "In Progress",
+      "assignee": "Anthony Adewale",
+      "parent": null,
+      "labels": ["Bug", "intercom-sourced", "triaged-by-devin"],
+      "description": "BUG: Yes\n\nEVIDENCE:\nCustomer: Name 1 (<email>). Workspace: Company Four (org <uuid>). Campaign: \"AMM Conference July 26-29, 2026\" (id <uuid>), provider Company One, provider_campaign_id <uuid>.\n\nSymptom: the second follow-up (Step 3, subject \"Great being part of AMM Name 4\" — a post-conference message) was configured to send 9 days after the prior step but went out ~1 day after Step 2, i.e. ~8 days early and before the conference it references. Customer paused the campaign because the premature follow-up made the outreach look automated ahead of a conference where he is a featured speaker.\n\nData:\n\n* Stored provider sequence (outreach_campaign.metadata.providerData.sequences[0].steps): step[0].delay=2, step[1].delay=1, step[2].delay=9. step[2] is the post-conference email the customer set to 9 days.\n* Provider webhook events (outreach_webhook_event) for representative leads: step 1 sent 2026-07-16, step 2 sent 2026-07-22, step 3 sent 2026-07-23. The step2->step3 gap = 1 day, which matches step[1].delay=1, NOT the step[2].delay=9 the customer configured for that follow-up.\n\nRoot-cause hypothesis (off-by-one between editor and provider delay semantics):\n\n* Provider treats a step's delay as the wait AFTER that step (before the next). See apps/web/lib/outreach/emailbison/client.ts: read maps `delay: normalizeDelay(group.main.wait_in_days)`, write maps `wait_in_days: step.delay`.\n* The sequence editor (apps/web/components/campaigns/detail/tabs/sequences/sequence-breakdown-editor.tsx) renders the delay control BETWEEN step cards and writes it to `stepIndex = group.stepNumber + 1` (the NEXT step), with aria-label \"Delay in days before sending next message\".\n* Net effect: every configured delay is applied one step off, and the LAST step's delay is effectively ignored. The customer's 9-day value landed on the final step (which governs nothing), while the actual gap before the final follow-up was taken from the previous step's delay (1 day) -> follow-up fired ~1 day after Step 2.\n* Help Center (apps/web/content/docs/cold-email-agent/campaigns/managing-campaigns/sequences.mdx) documents the intended behavior as \"Step 2, sent 2 days after Step 1\" (delay = wait before this step), which the observed behavior contradicts.\n* The campaign was paused 07-17..07-22 and resumed 07-22 (when the 07-16 cohort's follow-ups fired). Pause/resume explains the timing of the batch but does NOT explain a configured 9-day inter-step gap collapsing to 1 day — that is the delay-mapping defect.\n\nSources: Prod DB (read-only), codebase. Sentry: no related runtime errors (this is a silent mapping bug, not a thrown exception). Axiom: unavailable (token expired). No existing Name 2 issue matches this exact symptom (closest thematically: ENG-8367, done, different symptom).\n\nSecondary item (NOT a bug): customer also asked why only ~95 of 218 leads were sent. DB shows 216 active leads: 195 contacted, 10 not_yet_contacted, 4 interested, 3 out_of_office, 2 reply_received, 1 not_interested, 1 bounced; sends were spread across days (07-16: 139, 07-22: 98 new + 50 follow-ups, 07-23: 10). This is expected gradual sending (daily volume caps + sending window + multiple uploads/deletions) and is covered by existing Help Center docs. No docs gap.\n\nPOTENTIAL FIX:\nAlign the delay write-index in sequence-breakdown-editor.tsx with the provider's per-step delay semantics so a between-step delay maps to the gap the user sees, and ensure the final step's configured delay is honored (or consistently surfaced). Verify the wait_in_days<->delay round-trip in emailbison/client.ts and add a regression test for step-delay ordering.\n\nWHATS NEEDED TO RESOLVE:\n\n1. Name 3 provider's wait_in_days semantics and the exact editor->provider index mapping.\n2. Correct the mapping and add a step-delay round-trip regression test.\n3. Optionally recompute/repair pending follow-ups for affected campaigns so already-scheduled follow-ups honor configured delays.\n\nINTERCOM: <url:app.intercom.com>\nSLACK THREAD: <url:acquisityworkspace.slack.com>\nDEVIN SESSION: <url>"
+    },
+    {
+      "id": "ENG-14944",
+      "createdAt": "2026-10-08T06:32:27.468Z",
+      "title": "Chat widget: Customer asked: Why is my campaign sending step 2 after step 1 rig…",
+      "state": "Triage",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [],
+      "description": "## Report\n\nReported by: Support team (Ellaine Name 5)\n\nWhat went wrong: Customer asked: Why is my campaign sending step 2 after step 1 right away on the same day?\n\nForeman replied: \"A teammate is looking into this and will reply here.\"\n\nWhat went wrong:  sending followup emails should  take 3 days but SDR sent on the same day\n\n## Conversation\n\nWorkspace: Company Five (<uuid>)\n\nConversation: <url:app.acquisity.ai>\n\nReported reply: whole conversation\n\nForeman run: <uuid>\n\n### Transcript (oldest first, customer-visible turns only, last 12 turns max)\n\nCustomer: Why is my campaign sending step 2 after step 1 right away on the same day?\n\nForeman: You can customize your follow-up timing when creating or editing a campaign by opening the campaign, going to the Sequences tab, and editing the delay input directly on the step.\n\nCustomer: You have already selected the \"Follow up: send next message in 3 days\" option, but it's still sending on the same day.\n\nForeman: Which campaign is this happening on, and what delay value do you see saved on that follow-up step when you open its Sequences tab?\n\nForeman: Thanks, your recording came through. I'm going through it now.\n\nForeman: Thanks for sending that over. Your recording shows you navigating to the Sequences tab, but it didn't capture any interaction with the delay field itself, so I can't confirm what value was actually on screen at that moment from it.\n\nOn the configuration side, your campaign's saved delay for the first follow-up step is set to 3 days, matching what you described. The send counts do show that follow-up emails have gone out, alongside first emails, but I can't confirm from here whether any specific lead received both emails on the same calendar day.\n\nTo pin this down, could you give me one specific lead or prospect where you saw both the first email and the follow-up arrive on the same day, with the date and time of each? With that detail I can check the actual sends for that lead.\n\nCustomer: I dont know that but I started the campaign yesterday it should not have sent follow ups already\n\nForeman: Changes apply to future sends only, so leads partway through the sequence keep their existing cadence for steps they've already received.\n\nCustomer: I set the delay to 3 days but it sent the followups the same day it sent first email\n\nForeman: Since you started the campaign yesterday, any leads that were already partway through the sequence when you changed the timing would keep their existing cadence for steps they had already received, because changes apply to future sends only.\n\nCustomer: talk to human\n\nForeman: A teammate is looking into this and will reply here.\n\n## Team detail\n\nGate decision: block, investigation_requested, inbox_investigation\n\n### Internal notes\n\n* Foreman: Asked the customer: Which campaign is this happening on, and what delay value do you see saved on that follow-up step when you open its Sequences tab?\n* Foreman: Screen recording: <url:jam.dev>\n* Foreman: The 3-day follow-up delay is saved correctly and follow-ups are going out, but we can't check timing for a specific lead from here. The screen recording didn't capture enough to confirm anything was wrong. Ask the customer for one specific lead/date example so we can pinpoint it.\n* Foreman: The customer asked to speak with a person. Nothing was investigated for this message.\n* Ellaine Name 5: investigate if the follow up were sent on the same day and why did it not follow the 3 days delay?\n* Foreman: Saved settings show a 3-day delay, but send counts show follow-ups went out sooner. We cannot confirm if any individual lead received emails on the same day or why. Needs a person to check per-lead send timestamps.\n* Ellaine Name 5: please create a ticket\n* Foreman: Customer says a follow-up sent same-day despite a 3-day delay, but didn't give us which lead/campaign, and their screen recording didn't capture the delay field. Nothing confirmed wrong yet; needs a human to get the specific example and check it directly.\n\n### Findings\n\n```json\n{\n  \"facts\": [\n    {\n      \"claim\": \"The customer reports that follow-up emails sent on the same day as the first email, despite a configured 3-day delay on the first follow-up step, after starting the campaign yesterday.\",\n      \"evidence\": {\n        \"ref\": \"\",\n        \"tool\": \"investigation\"\n      },\n      \"entityIds\": []\n    },\n    {\n      \"claim\": \"A recent screen recording from the customer captured navigation to the Sequences tab but did not capture interaction with the delay field, so the value actually on screen at the time in question could not be confirmed from it.\",\n      \"evidence\": {\n        \"ref\": \"\",\n        \"tool\": \"screen recording\"\n      },\n      \"entityIds\": []\n    },\n    {\n      \"claim\": \"Campaign outreach data across the workspace's campaigns shows saved delay configuration and historical send counts per campaign, but no single lead or send pair was identified that ties a specific first email and follow-up to the same calendar day for the campaign in question, because the customer has not provided which lead or campaign this was observed on.\",\n      \"evidence\": {\n        \"ref\": \"\",\n        \"tool\": \"widget_outreach_health\"\n      },\n      \"entityIds\": []\n    },\n    {\n      \"claim\": \"The customer has not supplied a specific lead, date, or time for the same-day send they observed, which was asked for and not given.\",\n      \"evidence\": {\n        \"ref\": \"\",\n        \"tool\": \"investigation\"\n      },\n      \"entityIds\": []\n    },\n    {\n      \"claim\": \"The customer explicitly asked to speak with a human.\",\n      \"evidence\": {\n        \"ref\": \"\",\n        \"tool\": \"investigation\"\n      },\n      \"entityIds\": []\n    },\n    {\n      \"claim\": \"Which campaign and which lead showed the first email and follow-up both sending on the same day, with dates/times, remains unknown about the customer's workspace.\",\n      \"evidence\": {\n        \"ref\": \"\",\n        \"tool\": \"investigation\"\n      },\n      \"entityIds\": []\n    },\n    {\n      \"claim\": \"Whether this is a configuration issue, a display issue, or an actual delay-logic fault remains unknown about the customer's workspace.\",\n      \"evidence\": {\n        \"ref\": \"\",\n        \"tool\": \"investigation\"\n      },\n      \"entityIds\": []\n    }\n  ],\n  \"report\": \"Customer says a follow-up sent same-day despite a 3-day delay, but didn't give us which lead/campaign, and their screen recording didn't capture the delay field. Nothing confirmed wrong yet; needs a human to get the specific example and check it directly.\",\n  \"confidence\": \"low\",\n  \"needsHuman\": true,\n  \"recommendation\": \"A person should take over, since the customer asked for a human and the specific send pair needed to verify the complaint has not been identified.\"\n}\n```\n\n<!-- chat-widget-feedback conversation=<uuid> message=none run=<uuid> replay=none at=2026-10-08T06:32:27.143Z -->"
+    },
+    {
+      "id": "ENG-14705",
+      "createdAt": "2026-10-05T07:10:19.218Z",
+      "title": "Customer report: cold email follow-up sent minutes after the first email instead of the configured 3-day delay (Meat processors MN campaigns)",
+      "state": "Duplicate",
+      "assignee": "Anthony Adewale",
+      "parent": null,
+      "labels": ["Bug", "Customer reported", "intercom-sourced"],
+      "description": "**Intercom source**: <url:app.intercom.com>\n\n**Conversation context**: 2026-10-01 the customer (workspace \"Name 6's Workspace\") first asked for a team member, then reported that either his two newest campaigns are not working or the stats he sees are wrong. Asked for workspace and campaign names he named the workspace under his name and the campaigns \"Meat processors MN – beef/hog\" and \"Meat processors MN – A leads\": the A leads campaign \"says it sent out the second email in the sequence right after sending the first email. There should have been a 3 day delay between emails\", and the beef/hog campaign \"says it has some issue that needs attention\". On 2026-10-03 he asked again for a reply, saying he cannot start another email campaign until he knows whether this is fixed or not a problem. Conversation open, unassigned.\n\n**Claim**: In \"Name 6's Workspace\", cold email campaigns \"Meat processors MN – A leads\" (launched 2026-09-30) and \"Meat processors MN – beef/hog\" (launched 2026-10-01) sent sequence step 2 to each lead 14 minutes to \\~2 hours after step 1 instead of the configured 3-day delay, because the app writes each step's \"days to wait before this step\" value into the Company One step field whose documented meaning is the wait before the next email, so every wait is applied one step late and the final step's wait is ignored.\n\n**Evidence (2026-10-05, read-only)**\n\n* Company One provider email records, campaign \"Meat processors MN – A leads\" (provider campaign <uuid>): step 1 subject \"phones during deer season\" sent in batches 16:02:55-18:04:49 UTC 2026-09-30; step 2 subject \"Re: phones during deer season\" sent 18:19:24-20:03:26 the same day, on the same thread as each lead's step 1 (e.g. one lead 18:04:49 then 18:19:24, another 16:02:55 then 18:19:24). 23 of 26 leads got step 2 (2 bounced, 1 replied, stop_on_reply true).\n* Same pattern on \"Meat processors MN – beef/hog\" (provider campaign <uuid>): step 1 15:05:57-15:34:11, step 2 15:44:11-16:20:07 on 2026-10-01. 8 of 8 leads got both steps (16 delivered).\n* Company One's live campaign config still carries the intended delay: step 1 delay 0, step 2 delay 3 with delay_unit \"days\".\n* The app's own contract says the value is the wait before the step: the public API documents attach-sequence delayInDays as \"Days to wait before sending this step. First step is typically 0.\" (apps/api/src/schemas/campaigns.ts), and the sequence editor labels the control \"Delay in days before sending next message\". Company One's API documents sequences\\[\\].steps\\[\\].delay as \"the delay value before sending the NEXT email\", and Company One's help centre states the delay configured under Step 1 determines when Step 2 is sent.\n* Code: applyExactCampaignSequence maps delayInDays straight to the provider's per-step delay (apps/web/lib/outreach/apply-exact-campaign-sequence.ts, commit c5e3314fd5f9295021cd1f4d6bc8032c4f82473e), and writeCampaignSequenceToProvider PATCHes those steps to the provider unchanged.\n* Blast radius (counted 2026-10-05): 101 campaigns across 51 organizations that have sent have a first-step delay of 0, which under this mapping sends the first follow-up immediately after the first email; 11,390 sending campaigns across 2,483 organizations have a multi-step sequence and therefore a one-step-off wait.\n* Same workspace, same defect, different campaign: \"Name 7 | FinServ | LinkedIn Name 8 | R1\" (delays 0,3,3,7) sent 40 emails for 20 leads on its first day, then one step per 3 days, matching the shift.\n\n**Secondary finding (already tracked elsewhere)**: \"Meat processors MN – beef/hog\" carries pause_reason \"Provider reported the campaign completed, but no emails were sent. Re-verify the leads and restart the campaign.\" although 16 emails were delivered, because its 8 campaign-lead rows still read not_yet_contacted with no status event and no provider_lead_id. Same class as ENG-14098 (lead status writeback missing); it is what makes the app warn about a campaign that did send.\n\n**Impact**: follow-up spacing customers configure is not honoured (follow-ups arrive early; on step-1-delay-0 campaigns, minutes after the first email), and campaigns complete and stop within hours of launch, which also blocks the customer from launching further campaigns."
+    },
+    {
+      "id": "ENG-14726",
+      "createdAt": "2026-10-05T15:54:39.048Z",
+      "title": "Name 6 - Step 1 and Step 2 emails are being sent together",
+      "state": "Duplicate",
+      "assignee": "Anthony Adewale",
+      "parent": null,
+      "labels": ["Bug", "Customer reported"],
+      "description": "#### Customer Name\n\nName 6\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 6\n\n#### Screenshot\n\n <image> \n\n#### What are you trying to achieve?\n\nSet up a gap day of 3 days between step 1 email and step 2 email\n\n#### What are you doing to achieve it?\n\nrunning a test campaign and sent the outreach to self email\n\n#### What is happening instead?\n\nBoth the emails are being sent together\n\n#### What is the expected outcome?\n\nPlease investigate and see if this is a tech issue"
+    },
+    {
+      "id": "ENG-162",
+      "createdAt": "2025-04-25T15:42:56.210Z",
+      "title": "Create a Company One to Acquisity Name 9",
+      "state": "Canceled",
+      "assignee": "Rose Pilarek",
+      "parent": null,
+      "labels": [],
+      "description": "Upon call booked, send prospect into acquisity and add to cold email pipeline"
+    },
+    {
+      "id": "ENG-4710",
+      "createdAt": "2026-01-20T22:52:55.950Z",
+      "title": "Adjust Acquisity campaign to delay steps 2 and 3 by three days",
+      "state": "Done",
+      "assignee": "Beth Newton",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "#### Customer Name\n\nName 10 and Name 11\n\n#### Customer Email\n\n<email>\n\n#### Screenshot\n\n#### Clear description of what the problem is\n\nClient wants to adjust the aquisity campaign to send steps 2 and 3 three days after the prior step.  Is there a way to set this within Acquisity?"
+    },
+    {
+      "id": "ENG-5487",
+      "createdAt": "2026-02-12T20:43:24.630Z",
+      "title": "Increase time between steps in Acquisity for campaigns",
+      "state": "Canceled",
+      "assignee": "Beth Newton",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "#### Customer Name\n\nName 12\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 12\n\n#### Screenshot\n\n#### What are you trying to achieve?\n\nIncrease time between steps in Acquisity\n\n#### What are you doing to achieve it?\n\nnothing - cann't find a way\n\n#### What is happening instead?\n\nsending every 3 days\n\n#### What is the expected outcome?\n\nWould like to increase time between for a database reactivation campaign"
+    },
+    {
+      "id": "ENG-3267",
+      "createdAt": "2025-12-02T10:42:26.622Z",
+      "title": "User Paid to Switch to Acquisity, Stuck on Company One",
+      "state": "Done",
+      "assignee": "Tyler Olsen",
+      "parent": null,
+      "labels": ["Bug", "Customer reported"],
+      "description": "## Issue Identified\n\nCustomer paid to switch cold email engines from Company One to Acquisity. However, after making the change, the settings still shows connected to Company One, not Acquisity. \n\nJam | Console logs, network requests, and more\n\n**Steps to Reproduce:**\n\n1. Navigate to Cold Email Agent settings (00:17)\n2. Click on the 'Edit' button (00:33)\n3. Click on the 'Enable Acquisity' button (00:37)\n4. Observe that the 'Enable Acquisity' button is unresponsive and no action is taken (00:57)\n\n---\n\nConversation:\nName 13: <p>I'm having trouble with connecting my workspace to acquisity. I originally connected it to Company One, then I paid for an acquisity workspace on Friday and followed the steps to switch from instanlty to acquisity however it is not working. </p>\n<p>Can you please help to fix this asap</p>\n\nbot: Thanks for your patience with this transition! Let me help you get Acquisity working properly. Since you've already paid for Acquisity, here's what to check: First, verify the switch completed: Go to your Cold Email Agent settings Click \"Edit\" next to your current provider Make sure Acquisity is selected (not Company One) If you're still seeing Company One connected: Select \"Enable Acquisity\" option Complete the confirmation process This will disable Company One and set up your Acquisity workspace After switching, wait for setup: New Acquisity accounts need time to provision email accounts Don't launch campaigns immediately - wait for account status to show \"Active\" What specifically isn't working? Are you still seeing Company One as your provider, or is Acquisity connected but campaigns aren't sending? This will help me give you the exact next steps. Source: How to Enable Acquisity as Your Cold Email Sender | Help Center - AI Acquisition\n\nName 13: still seeing Company One as being connected, the acquisity button is not wokring and it's not switching over\n\nbot: Thanks for your patience with this transition issue. Let me help you troubleshoot the Acquisity button not working. Try these steps in order: First, check your current setup: Go to Cold Email Agent settings Click \"Edit\" next to your provider Look for \"Enable Acquisity\" option in the modal If the button isn't responding: Try refreshing the page and attempting again Make sure you're clicking \"Enable Acquisity\" (not just selecting it) Complete the confirmation process when prompted Alternative path: Look for \"Connect Provider\" button instead Select \"Acquisity (Built-in)\" from the provider modal Since you mentioned the button isn't working and you're still seeing Company One connected, this sounds like a technical issue with the interface. Can you share: What page you're on when trying this A screenshot of what you're seeing Whether you get any error messages This will help me get you the right solution quickly. Source: How to Enable Acquisity as Your Cold Email Sender | Help Center - AI Acquisition\n\nbot: Was that helpful?\n\nName 13: the acquisity button is not working when I click on it\n\nbot: Thanks for your patience with this issue and for sharing the screenshot. I can see you're in the provider selection modal but the \"Enable Acquisity\" button isn't responding when clicked. This sounds like a technical interface issue that's preventing the switch from completing properly. Since you've already paid for Acquisity and followed the correct steps, but the button functionality isn't working, I'm going to pass this to a human teammate to help you as soon as possible. We're working through a higher than usual support load, but we'll get back to you as quickly as we can. Source: How to Enable Acquisity as Your Cold Email Sender | Help Center - AI Acquisition\n\nName 13: ok\n\nbot: Thanks for your understanding! If you have any more details or questions while you wait, feel free to share them with me.\n\nbot: If you still need help with switching your workspace to Acquisity, I'm here to assist you further. Would you like to provide more details about what you're trying to resolve or any other issues you're facing?"
+    },
+    {
+      "id": "ENG-12289",
+      "createdAt": "2026-08-04T15:52:04.967Z",
+      "title": "Cold Email Agent - Step 2 Not Being Sent",
+      "state": "Triage",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": ["Bug", "intercom-sourced"],
+      "description": "**Customer Name**\nName 14\n\n**Customer Email**\n<email>\n\n**Workspace name**\n<domain>\n\n**Screenshot**\n<optional>\n\n**What is the user trying to achieve?**\nStep 2 should Send automatically\n\n**What is the user doing to achieve it?**\nCampaign is not on pause, first step was sent 2 weeks back, some of them should push through step 2 and 3 already.\n\n**What is happening instead?**\nAnalytic shows that 0 sent in step 2\n\n**What is the expected outcome?**\nStep 2 on his campaign should send automatically"
+    },
+    {
+      "id": "ENG-14748",
+      "createdAt": "2026-10-05T19:33:45.775Z",
+      "title": "Chat widget: Campaign started deploying 9/22, but only the first email is sendi…",
+      "state": "Done",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [],
+      "description": "## Report\n\nReported by: Customer\n\nWhat went wrong: Campaign started deploying 9/22, but only the first email is sending. The follow up sequencing emails are not deploying according to the sequence schedule\n\n## Conversation\n\nWorkspace: Name 14' Workspace (<uuid>)\n\nConversation: <url:app.acquisity.ai>\n\nReported reply: <uuid>\n\nForeman run: <uuid>\n\n### Transcript (oldest first, customer-visible turns only, last 12 turns max)\n\nCustomer: why is this campaign not sending follow up sequences?\n\ncampaign name:\nLIVE E-commerce Digital Growth | Name 19 | US 2.0\n\nForeman: Your campaign itself looks healthy: it's active, there's no error recorded, and your 9 sending inboxes are all connected. Sends have been going out most days (for example 147 on Oct 5), though Oct 2 shows 0 sent with no problem recorded for that day.\n\nOn the follow-up side, prospects like Name 15, Name 16, and Name 17 show a pending follow-up, but there's no next follow-up time currently set for them. That matches what you're seeing, follow-ups aren't being scheduled.\n\nTo fix this, check the campaign's sequence builder and the AI SDR Agent settings page to confirm the follow-up steps and resources are actually active, since a pending follow-up with no scheduled time usually points back to a step or setting there.\n\nWhat couldn't be checked: why the follow-up time isn't being set, whether your regular sequence steps are configured and enabled, and there was no live calendar or send test, only saved settings data. If you want, you can use the Record my screen button here to show me the sequence builder and AI SDR settings so we can narrow down what's off.\n\nCustomer: I am referring to the next steps in the sequence. Only the first email is deploying, but Step 2 and Step 3 are not sending\n\nForeman: Looking at the example thread, step 1 is scheduled for Oct 6, step 2 for Oct 13, and step 3 for Oct 20, none of them marked as skipped. So this isn't that steps 2 and 3 failed to send, it's that their scheduled dates haven't arrived yet, and step 1 is also still pending rather than already gone out. Nothing has actually failed to send as of this check.\n\nWhat's worth watching is whether step 1 actually sends once Oct 6 arrives. If it doesn't go out on or around that date, that would point to a real problem with the sequence rather than just timing.\n\nWhat couldn't be checked: whether these pending steps will actually fire when their scheduled time comes, and why the thread's next follow-up time shows as empty even though the individual steps have scheduled dates. There was no live send-dispatch or calendar check available, only the saved step data.\n\nCustomer: emails started sending Sept 22, step 2 was supposed to send 2 days later\n\nForeman: The thread I can see doesn't match that timing. For Name 18 Messenger, step 0 went out on Oct 2, and steps 1, 2, and 3 are scheduled for later dates, roughly a week apart, not 2 days, and none are marked skipped. There's no record tying a Sept 22 start or a 2-day step-2 gap to this campaign or thread.\n\nIt's possible you're thinking of a different prospect, thread, or campaign than the one I'm looking at. Could you give me the exact name or email of the prospect you're seeing the Sept 22 start and 2-day gap for? That will let me check the right thread.\n\n## Browser\n\nReported at: 2026-10-05T19:33:45.424Z\n\nPage: /dashboard/<workspace-slug>/cold-email-campaign-agent/<uuid>\n\nBrowser: Chrome 154.0.0.0, macOS   Screen: 1920x1080   Name 20 version: 828a16fe4329\n\nSentry replay: none\n\nSentry errors: none\n\n### Console errors (last 30, newest last, each line max 300 chars)\n\n(none)\n\n### Failed network calls (last 30, newest last)\n\n```text\n19:29:41 POST /api/client/available 403 542ms\n19:29:58 POST /api/client/available 403 280ms\n19:31:56 POST /api/client/available 403 284ms\n19:32:06 POST /api/client/available 403 526ms\n19:32:28 POST /api/client/available 403 296ms\n```\n\n<!-- chat-widget-feedback conversation=<uuid> message=<uuid> run=<uuid> replay=none at=2026-10-05T19:33:45.424Z -->"
+    },
+    {
+      "id": "ENG-8367",
+      "createdAt": "2026-05-07T12:06:18.820Z",
+      "title": "Cold Email Agent: step 2 sent count exceeds step 1",
+      "state": "Done",
+      "assignee": "Jared Stauffer",
+      "parent": null,
+      "labels": [],
+      "description": "Workspace : Company Six\n<email>\n\nA campaign in Cold Email Agent shows the first follow-up step sending more emails than step 1, which appears inconsistent with the configured delay.\n\nCampaign: `M&A | Direct | Trades & Construction`\n\nReported behavior: step 1 has four variants with 188 emails sent total, while step 2 shows 221-242 emails sent for a single variant. The campaign was set up on Tuesday, and step 2 is configured to send 3 days later, so step 2 should not have exceeded step 1 yet.\n\nSchedule is Monday-Friday, 9am-6pm, UK/Isle of Man. The campaign is currently paused.\n\n <image> \n\n <image> "
+    },
+    {
+      "id": "ENG-8199",
+      "createdAt": "2026-04-29T22:07:05.775Z",
+      "title": "Request for 2 months free Acquisity and 10,000 lead credits",
+      "state": "Done",
+      "assignee": "Beth Newton",
+      "parent": null,
+      "labels": ["Refund"],
+      "description": "#### Workspace Name\n\nName 21\n\n#### Request Type\n\nDiscount code\n\n#### Reason for request\n\nRefund Save\n\nPlease action 2 Months Acquisity & Inboxes for free\n\n&\n\n10 000 lead credits"
+    },
+    {
+      "id": "ENG-8036",
+      "createdAt": "2026-04-22T18:18:52.849Z",
+      "title": "Fix email sending issue for latest campaign in Acquisity",
+      "state": "Canceled",
+      "assignee": "Beth Newton",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "#### Customer Name\n\nName 22\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 22\n\n#### Screenshot\n\n <image> \n\n#### What are you trying to achieve?\n\nSend the emails to the leads for the latest campaign: Holistic Health and Wellness 2-50\n\n#### What are you doing to achieve it?\n\nscreenshare and confirm client new email campaign not showing she has email accounts connected but verify these are inside the settings/ options of the most recent Holistic health and wellness campaign\n\n#### What is happening instead?\n\nNot sending because acquisity says there is no email attached\n\n#### What is the expected outcome?\n\nBegin sending emails from latest draft campaign"
+    },
+    {
+      "id": "ENG-4303",
+      "createdAt": "2026-01-08T15:40:36.214Z",
+      "title": "Campaign step content intermittently not persisting in editor",
+      "state": "Canceled",
+      "assignee": "Jared Stauffer",
+      "parent": null,
+      "labels": [],
+      "description": "Customer reports that campaign step content appears to save but then disappears when returning to the campaign.\n\nObserved behavior:\n\n* In the campaign editor shown in the screenshots, there is no manual Save button; content should auto-save.\n* User created Step 1 content multiple times; after navigating away and back, Step 1 appears empty and previously entered content is missing.\n* At one point, the workspace/campaign reopened showing no content at all across steps.\n* UI can show empty state until a variant is reselected, making it appear as if data is lost.\n\nAdditional context:\n\n* This occurs in a campaign type where per-step delays are not configurable (system-default calendar-day spacing between steps).\n* Support has identified this as a backend persistence issue (campaign draft state / workspace sync / editor re-render) rather than user error.\n\nRelevant screenshots:\n\n <image> \n\n <image> "
+    },
+    {
+      "id": "ENG-11698",
+      "createdAt": "2026-07-16T14:00:46.340Z",
+      "title": "Increase daily outreach email sending volume",
+      "state": "Done",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [],
+      "description": "#### Customer Name\n\nName 23\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nCompany Two\n\n#### Screenshot\n\n <image> \n\n <image> \n\n#### What are you trying to achieve?\n\nSend outreach emails\n\n#### What are you doing to achieve it?\n\nName 24 6 domains and 15 inboxes to send outreach\n\n#### What is happening instead?\n\nIt's only sending 100 emails per day on average\n\n#### What is the expected outcome?\n\nIncrease the sending volume"
+    },
+    {
+      "id": "ENG-3046",
+      "createdAt": "2025-11-26T20:28:40.471Z",
+      "title": "Name 25 Caused 12 Domains to Be Charged Instead of 6",
+      "state": "Done",
+      "assignee": "Anthony Adewale",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "## Issue Identified\n\nA customer attempted to purchase **6 domains**, but a platform glitch resulted in **12 domains being purchased and charged**. The customer reported multiple “error has occurred” messages during checkout.\n\n* One initial charge went through, a second charge failed, then another charge went through again. Despite the charges, **no inboxes or domains appeared in their account**.\n\n <image> \n\n <image> \n\n**Customer Impact:**\n\n* Customer was charged for **double the intended domains**.\n* **No inboxes/domains** were provisioned despite multiple charges.\n* Customer is requesting an immediate resolution and a refund for the 6 unintended domain purchases.\n\n## Expected Behavior\n\nWhen user purchases 6 domains, they should only be billed for and receive 6 domains.\n\n**Question**: What is the refund process for situations like this? How can a charge for services be reversed? \n\n## User information:\n\nName: Name 26\n\nEmail: <email>"
+    },
+    {
+      "id": "ENG-8042",
+      "createdAt": "2026-04-22T20:42:28.755Z",
+      "title": "Apply credits for client: 12 inboxes, domains, 2 months Acquisity",
+      "state": "Done",
+      "assignee": "Beth Newton",
+      "parent": null,
+      "labels": ["Refund"],
+      "description": "#### Workspace Name\n\nName 27's Workspace (email is <email>)\n\n#### Request Type\n\nDiscount code\n\n#### Reason for request\n\nTHIS IS A HIGHLY ESCALATED SITUATION\n\nThis client was misinformed multiple times by our team that he could delete his Company One and ReachOutly accounts and still transfer the warmed custom domains and inboxes over to our platform. Obviously, that’s incorrect since we currently can’t import external email accounts into our workspace. We can only either provide pre-warmed accounts or set up and warm up done-for-you accounts.\n\nHe’s very frustrated because he said he had a gut feeling the info was wrong, but still chose to trust us as the experts. Now he feels burned because he lost time with no real progress, and also wasted money buying domains, accounts, and subscriptions on Company One and ReachOutly that he can’t use with us.\n\nHe vented quite a lot on a call with me just now, and also earlier during office hours. This has definitely escalated. He’s clearly upset and is blaming us for the wasted time and money.\n\nTo calm things down and avoid further escalation, I walked him through how we’ll set things up properly moving forward, and I offered some credits to make up for the situation. I told him we would cover inboxes and domains, plus give him some extra time on the platform since he now has to go through the warm-up process again.\n\nWhat I agreed on the call:\n\n1. 12 DFY inboxes covered for 3 months\n2. Custom domains covered for 1 year\n3. 1 month of Acquisity for free\n\n\nIf possible, I’d like to extend the Acquisity credits to 2 months instead of 1, just to go a bit above what was promised and help smooth things over further. If that’s not possible, no worries, but at least the 1 month should definitely be added.\n\nLet me know if we can get these credits applied asap."
+    },
+    {
+      "id": "ENG-6624",
+      "createdAt": "2026-03-11T16:56:05.964Z",
+      "title": "Step 2 emails not sending after configured 2-day delay",
+      "state": "Canceled",
+      "assignee": "Jared Stauffer",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "In the Name 28 Client workspace, the campaign `SaaS | Leadership | UK | Direct` launched on 2026-03-09 and no Step 2 emails have been sent by day 3.\n\nStep 2 variants are enabled and the Step 2 delay is set to 2 days. Support indicated the follow-ups should normally have started sending by now and that the send queue or follow-up scheduler may not have triggered correctly.\n\nCampaign: campaign link\n\n <image> "
+    },
+    {
+      "id": "ENG-10709",
+      "createdAt": "2026-06-23T17:39:48.329Z",
+      "title": "One-off recovery: backfill + AI SDR replay for the webhook-outage cohort (99 + 207)",
+      "state": "Done",
+      "assignee": "Nathan Foster",
+      "parent": "ENG-10708",
+      "labels": ["intercom-sourced"],
+      "description": "**Reopened 2026-06-23 per James (Slack P0 thread) — this is the live one-off recovery run for the webhook-outage cohort.** Previous cancellation reversed so the resync → backfill → AI-SDR-replay is tracked on record (not just in-flight Slack work).\n\n## Problem\n\nDuring the silent webhook outages, prospect replies arrived while webhooks were down. We've resynced + backfilled most affected workspaces but have NOT re-run AI SDR on those imported replies — importing does not trigger AI SDR (verified in code) — so prospects sit un-answered. Several clients have had this for a couple of weeks and think their campaigns aren't working.\n\nCohorts: 99 (May-20) resynced+backfilled, not replayed; 207 active-campaign silent dropouts (158 resynced+backfilled, ~49 pending resync, none replayed); plus the two named system-provisioned workspaces `<workspace-slug>` and `<workspace-slug>` (whose admin \"resync\" never actually re-registered — confirmed via Inngest: no resync run fired).\n\n## Plan (one-off scripts; reuse existing primitives; no new app code)\n\nStrictly ordered, with wait points (ordering is load-bearing):\n\n0. **Detect** — read-only script: active Company One provider + ≥1 active campaign + 0 `outreach_webhook_event` in last N days → org-id list. Confirm count ≈ cohort and that the two named workspaces appear.\n1. **Re-register** — fire `OUTREACH_EVENTS.RESYNC_WEBHOOKS` per org (batched; `processResyncWebhook` caps concurrency at 5; uses the shipped create-then-swap from PR #4945). Wait for completion.\n2. **Backfill (windowed)** — `OUTREACH_EVENTS.EMAIL_THREADS_BULK_IMPORT` `{ organizationIds, userId: <superadmin>, classifyInterest: true }`. Wait for completion.\n3. **Replay** — select positive / last-from-prospect / non-human-owned / non-terminal threads → `admin.sdrReplay.replayThreads` in ≤300-id batches (re-verifies prospect-sent-last before firing).\n\nDepends on PR #4945 (the safe-resync prerequisite). Every driver script ships with a `--dry-run`.\n\n## Acceptance criteria\n\n- [ ] All affected orgs (99 + 207 + the 2 named) re-registered and confirmed delivering.\n- [ ] Missed messages backfilled (windowed to the silent period; no full-history walk).\n- [ ] AI SDR replayed on unanswered prospect threads; no double-replies (idempotency/guards respected).\n- [ ] Never replays human-owned (`controlLevel` in human_takeover/dnc/paused/escalated) or terminal-lifecycle (booked/completed/declined) threads.\n- [ ] Per-phase structured summary (orgs resynced, threads imported, replays fired/skipped/failed).\n\nName 29 this flow (auto on every future reconnect) → ENG-10710. Detection / zombie webhooks → ENG-10661 + ENG-10711."
+    },
+    {
+      "id": "ENG-10818",
+      "createdAt": "2026-06-25T12:23:58.562Z",
+      "title": "Outreach emails not sending since June 17",
+      "state": "unknown",
+      "assignee": "Koppany Kondricz",
+      "parent": null,
+      "labels": ["intercom-sourced"],
+      "description": "#### Customer Name\n\nName 30\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 30\n\n#### Screenshot\n\n <image> \n\n#### What are you trying to achieve?\n\nSend outreach emails\n\n#### What are you doing to achieve it?\n\nRunning campaigns\n\n#### What is happening instead?\n\nNo email has been going out since June 17\n\n#### What is the expected outcome?\n\nCampaign to send emails"
+    }
+  ]
+}

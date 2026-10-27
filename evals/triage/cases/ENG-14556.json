@@ -1,0 +1,237 @@
+{
+  "id": "ENG-14556",
+  "provenance": "seeded",
+  "createdAt": "2026-10-01T08:16:23.979Z",
+  "lane": "billing",
+  "stratum": "billing",
+  "ticket": {
+    "title": "Name 34 - Cover costs of Acquisity and inboxes for 2 months",
+    "description": "#### User Email\n\n<email>\n\n#### Workspace Name\n\nName 35's Workspace\n\n#### Request Type\n\nDiscount code\n\n#### Reason for request\n\nRR Save. Cover costs of Acquisity and inboxes for 2 months",
+    "attachmentKinds": ["slack"]
+  },
+  "repoCommitAtCreate": "5786f43582071511fd3bbde01cb14f02b09a0bf5",
+  "flags": {
+    "descriptionEditedAfterCreate": false,
+    "needsProductionData": true,
+    "alreadyFixedAtTriage": false
+  },
+  "asFiled": {
+    "assignee": "Aaron Fraga",
+    "labels": [],
+    "parent": null,
+    "priority": 0,
+    "project": null
+  },
+  "relatedSnapshot": [
+    {
+      "id": "ENG-13654",
+      "createdAt": "2026-09-10T13:35:54.602Z",
+      "title": "Name 102 / Name 1 - Cover cost of Acquisity and inboxes for 2 months",
+      "state": "Done",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": ["Discount", "Internal reported"],
+      "description": "#### User Email\n\n<email>\n\n#### Workspace Name\n\nCompany Three\n\n#### Request Type\n\nDiscount code\n\n#### Reason for request\n\nRR save - AA clients -\n\nName 102 / Name 1 - Cover cost of Acquisity and inboxes for 2 months"
+    },
+    {
+      "id": "ENG-13368",
+      "createdAt": "2026-09-01T18:50:05.492Z",
+      "title": "requesting 2 additional months of acquisit & 18 inboxes promocode",
+      "state": "Done",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [],
+      "description": "#### User Email\n\n<email>\n\n#### Workspace Name\n\n#### Request Type\n\nDiscount code\n\n#### Reason for request\n\nThis was a refund save client, in order to avoid an escalation to RR we are requesting 2 months of acquisity & 18 inboxes covered by us."
+    },
+    {
+      "id": "ENG-12029",
+      "createdAt": "2026-07-24T07:15:36.948Z",
+      "title": "Request promo code for client onboarding",
+      "state": "Done",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": ["Discount", "triaged-by-devin"],
+      "description": "#### Customer Name\n\nName 2\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 2's Workspace\n\n#### Screenshot\n\n#### What are you trying to achieve?\n\nI'm requesting a promo code to cover two months of Acquisity Plus, inboxes, and domains for the client.  This was offered to the client by the closer as an incentive to move forward and to ensure a successful onboarding experience while addressing concerns that could have led to a refund request\n\n#### What are you doing to achieve it?\n\nI confirmed with the closer and with Name 3 that this offer was promised to the client.\n\n#### What is happening instead?\n\nI don't have the promo code yet\n\n#### What is the expected outcome?\n\nTo get the promo code valid for 2 months +domains+inboxes"
+    },
+    {
+      "id": "ENG-14222",
+      "createdAt": "2026-09-24T12:17:41.262Z",
+      "title": "GP Name 4. 2 months acquisity and 18 inboxes covered by us. 3 campaign launches and 10k free lead credits",
+      "state": "Todo",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": ["Credits", "Internal reported"],
+      "description": "#### User Email\n\n<email> or <email>\n\n#### Workspace Name\n\nCompany Five' Workspace and Name 5's Workspace\n\n#### Request Type\n\nDiscount code\n\n#### Reason for request\n\nGP - Name 4\n\nWe will launch 3 campaigns for him and wear costs including leads\nWe cover costs, run campaigns, if he closes at 5% and isn't happy in 60 days, we refund everything\n\nContext: DFY failed with 5200 upgrade, lacked support, no results. He is a very reasonable high level guy. Said \"I do not want to work with \"Name 100\", he is happy with Name 6."
+    },
+    {
+      "id": "ENG-14520",
+      "createdAt": "2026-09-30T13:56:04.676Z",
+      "title": "Name 7 - 12-18 new inboxes enquired",
+      "state": "unknown",
+      "assignee": "unknown",
+      "parent": "unknown",
+      "labels": "unknown",
+      "description": "#### User Email\n\n<email>\n\n#### Workspace Name\n\nName 7\n\n#### Request Type\n\nDiscount code\n\n#### Reason for request\n\nName 7 needs a code to get 12-18 new inboxes. The inboxes we have been sending the cold email campaigns from had poor health and majority of the campaigns had been landing in spam for the last two months. This was only flagged yesterday after I indicated significant drop in campaign performance the last few months. We need to provide healthy inboxes to avoid refund and so we can get campaigns live asap."
+    },
+    {
+      "id": "ENG-11937",
+      "createdAt": "2026-07-21T18:49:35.219Z",
+      "title": "Request for two month promo code due to fee concerns",
+      "state": "Todo",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": ["Billing", "Refund", "triaged-by-devin"],
+      "description": "#### Customer Name\n\nName 8 & Name 9\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 8\n\n#### Screenshot\n\n#### What are you trying to achieve?\n\nrequesting 2 month promo code to cover acquisity & domain/inboxes due to lack of communication regarding tech stack fees\n\n#### What are you doing to achieve it?\n\nobtain 2 month promo code\n\n#### What is happening instead?\n\nclient is not willing to pay for acquisity/inboxes\n\n#### What is the expected outcome?\n\nobtain 2 month code"
+    },
+    {
+      "id": "ENG-12872",
+      "createdAt": "2026-08-18T12:40:47.998Z",
+      "title": "Requesting promo code for 2 additional months of acquisity platform & 18 inboxes covered by us",
+      "state": "Done",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [],
+      "description": "#### User Email\n\n<email>\n\n#### Workspace Name\n\nName 103\n\n#### Request Type\n\nDiscount code\n\n#### Reason for request\n\nName 103 - Company Two asked if we could cover 2 additional months of acquisity platform and 18 inboxes instead of 1 month since with ads model we would cover closer to 1k in expenses"
+    },
+    {
+      "id": "ENG-12371",
+      "createdAt": "2026-08-06T17:44:58.897Z",
+      "title": "Marketing credit",
+      "state": "Done",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [],
+      "description": "#### User Email\n\n<email>\n\n#### Workspace Name\n\nName 10\n\n#### Request Type\n\nLead credit\n\n#### Reason for request\n\nHad a special situation where to get the sale over the line I had to offer 2 months on us for Acquisity and inboxes , I never do this to get a sale over the line but this was a very specific circumstance.\n\nOnboarding for this client will be Monday August 10th."
+    },
+    {
+      "id": "ENG-11305",
+      "createdAt": "2026-07-09T05:52:02.166Z",
+      "title": "Request for two months of complimentary Acquisity",
+      "state": "Done",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [],
+      "description": "#### Customer Name\n\nName 11\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 11's workspace\n\n#### Screenshot\n\n#### What are you trying to achieve?\n\nI'm requesting approval to offer Name 11 two complimentary months of Acquisity, including the associated domains and inboxes\n\n#### What are you doing to achieve it?\n\nI connected with the management team, specifically Name 12, and received approval to offer Name 11 two complimentary months of Acquisity, including the domains and inboxes.\n\n#### What is happening instead?\n\nDuring the onboarding call, it became clear that the ongoing operating costs (Acquisity, domains, and inboxes) were not communicated during the sales process. This created hesitation and a loss of trust with the client. We're addressing the situation by offering two complimentary months of Acquisity, along with the domains and inboxes, to rebuild confidence and help move the client forward.\n\n#### What is the expected outcome?\n\nThe expected outcome is to receive a promo code for two complimentary months of Acquisity, including the domains and inboxes, so we can finalize Name 11's setup, complete the onboarding process, and get his outbound infrastructure launched as quickly as possible."
+    },
+    {
+      "id": "ENG-11978",
+      "createdAt": "2026-07-22T13:53:04.809Z",
+      "title": "Request for account provisioning approval",
+      "state": "Done",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": ["Refund", "triaged-by-devin"],
+      "description": "#### Customer Name\n\nName 13 & Name 14\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nCompany One\n\n#### Screenshot\n\n#### What are you trying to achieve?\n\nI am trying to activate Name 13's system for his restart, per Name 15's note on the refund request: cover Acquisity costs, plus inboxes and domains, for 3 months.\n\n#### What are you doing to achieve it?\n\nCompleted the restart kickoff call with Name 13, Name 16 and Name 17. Enabled Acquisity ($1) live on the call and confirmed app and workspace access. The next step to fuel the system is provisioning Acquisity plus the inboxes and domains, per Name 15's agreement.\n\n#### What is happening instead?\n\nTo move forward, the account needs Acquisity provisioned along with inboxes and domains. Name 13 has drawn a hard line\n\n#### What is the expected outcome?\n\nApproval to cover, for 3 months, Acquisity plus 18 inboxes and their domains, to facilitate the platform migration. This is a refund-risk save on a $24,800 account per Name 15's agreement. Covering these removes his one stated blocker, gets his campaigns launched, and gives him a path to first revenue instead of a refund. I need sign-off before Friday's follow-up call so I can report the outcome to him."
+    },
+    {
+      "id": "ENG-8622",
+      "createdAt": "2026-05-15T21:01:53.399Z",
+      "title": "Implement discount code to cover costs for 2 months",
+      "state": "Done",
+      "assignee": "Jared Stauffer",
+      "parent": null,
+      "labels": [],
+      "description": "#### Workspace Name\n\nName 18 (<email>)\n\n#### Request Type\n\nDiscount code\n\n#### Reason for request\n\nRR save.\n\nCover the costs of acquisity and inboxes for 2 months.\n\nHis next billing date is on May 19th. If we can beat the clock here and implement the code for him not to be charged this month, that is preferred however if we cover june and july's payment, that is okay. Please just let me know."
+    },
+    {
+      "id": "ENG-14221",
+      "createdAt": "2026-09-24T11:24:08.841Z",
+      "title": "Name 19 - Cover costs for 1 month of Acquisity and inboxes",
+      "state": "Todo",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": ["Credits", "Internal reported"],
+      "description": "#### User Email\n\n<email>\n\n#### Workspace Name\n\nName 19's Workspace\n\n#### Request Type\n\nDiscount code\n\n#### Reason for request\n\nRR save,  Cover costs for 1 month of Acquisity and inboxes"
+    },
+    {
+      "id": "ENG-11607",
+      "createdAt": "2026-07-14T04:16:16.333Z",
+      "title": "Request for Acquisity promo code for client re-onboarding",
+      "state": "Done",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [],
+      "description": "#### Customer Name\n\nName 20\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 20's Workspace\n\n#### Screenshot\n\n#### What are you trying to achieve?\n\nhe was promised 3 months of Acquisity + domains +inboxes by the refund prevention team (Name 21)\n\n#### What are you doing to achieve it?\n\nI am re-onboarding the client\n\n#### What is happening instead?\n\nAcquisity is not set up yet\n\n#### What is the expected outcome?\n\nTo get a promo code so I can upgrade his acquisity account, get domains and inboxes"
+    },
+    {
+      "id": "ENG-13843",
+      "createdAt": "2026-09-14T14:02:44.364Z",
+      "title": "Name 22",
+      "state": "Todo",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": ["Credits", "Customer reported", "Internal reported"],
+      "description": "#### User Email\n\n<email>\n\n#### Workspace Name\n\nName 22's Workspace\n\n#### Request Type\n\nRefund\n\n#### Reason for request\n\nPart of her refund save was that we would cover all acqusiity costs for her for the next 3 months. Here is the whop link she created for us to cover month 1 (<url:whop.com>) - $329\n\nPlease make the ongoing costs for domains, inboxes, and the platform free going forward.\n\nEvidence:\n\nName 15\n<mention> <mention> 23 Name 101 ADS SAVE\n\nGP - Name 22\n\nAddendum\n\n• Cover the costs of acquisity and inboxes for 3 months .\n• Cover the cost of ad spend for 3 months ($1,500/mo) .\n• 3-month Account Manager Extension .\n\nContext\n\n• Program - DFY ads upsell - 15k.\n• Why won/lost - no contract - has had a good experience with Name 23 and Name 24 - opportunities are in the pipeline, and she is feeling the support.\n\nAcquisity Request - <url:fegrowthpartner.slack.com>"
+    },
+    {
+      "id": "ENG-11259",
+      "createdAt": "2026-07-08T15:11:37.411Z",
+      "title": "Request for Acquisity cost coverage and lead credits",
+      "state": "Done",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": ["Refund"],
+      "description": "#### Customer Name\n\nName 25\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 25 Workspace\n\n#### Screenshot\n\n#### What are you trying to achieve?\n\nCover costs of Acquisity and inboxes for 3 months and allocate 20,000 lead credits\n\n#### What are you doing to achieve it?\n\nRR save\n\n#### What is happening instead?\n\nRR save\n\n#### What is the expected outcome?\n\nCover costs of Acquisity and inboxes for 3 months and allocate 20,000 lead credits"
+    },
+    {
+      "id": "ENG-11295",
+      "createdAt": "2026-07-08T20:27:51.289Z",
+      "title": "Reverse charges for acquisity and inboxes",
+      "state": "Done",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [],
+      "description": "#### Customer Name\n\nName 26\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 26 Workspace\n\n#### Screenshot\n\n#### What are you trying to achieve?\n\nCover costs of acquisity and inboxes for 3 months\n\n#### What are you doing to achieve it?\n\nRR save - previously submitted\n\n#### What is happening instead?\n\nContinuing to be charged\n\n#### What is the expected outcome?\n\nCharges reversed"
+    },
+    {
+      "id": "ENG-10967",
+      "createdAt": "2026-06-28T10:05:56.338Z",
+      "title": "Data missing after workspace migration",
+      "state": "Done",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [],
+      "description": "#### Customer Name\n\nName 27\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 28's Workspace (New)\n\n#### Screenshot\n\n#### What are you trying to achieve?\n\nThere was a glitch in the client's workspace and so the tech team created a new workspace for them and moved all of their inboxes and domain to this new workspace but nothing has carried over and the billing section is empty\n\n#### What are you doing to achieve it?\n\nThere was a glitch in the client's workspace and so the tech team created a new workspace for them and moved all of their inboxes and domain to this new workspace but nothing has carried over and the billing section is empty\n\n#### What is happening instead?\n\nThere was a glitch in the client's workspace and so the tech team created a new workspace for them and moved all of their inboxes and domain to this new workspace but nothing has carried over and the billing section is empty\n\n#### What is the expected outcome?\n\nThere was a glitch in the client's workspace and so the tech team created a new workspace for them and moved all of their inboxes and domain to this new workspace but nothing has carried over and the billing section is empty"
+    },
+    {
+      "id": "ENG-14361",
+      "createdAt": "2026-09-28T11:00:33.466Z",
+      "title": "Name 29 & Name 30 - Cover costs for 1 month of Acquisity and inboxes",
+      "state": "Todo",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": ["Discount", "Internal reported"],
+      "description": "#### User Email\n\n<email>\n\n#### Workspace Name\n\nCompany Four\n\n#### Request Type\n\nDiscount code\n\n#### Reason for request\n\nClient needs 1 month cover for Acquisity and inboxes because of how long their onboarding process took and the full month being finished without anything launched. Their first free month was completed with very little movement on their account so we will need to provide a 1 month code to compensate for this."
+    },
+    {
+      "id": "ENG-13494",
+      "createdAt": "2026-09-04T16:01:18.437Z",
+      "title": "Name 31 - Cover costs of acquisity and inboxes for 3 months",
+      "state": "Triage",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [],
+      "description": "#### User Email\n\n<email>\n\n#### Workspace Name\n\nName 31' Workspace\n\n#### Request Type\n\nDiscount code\n\n#### Reason for request\n\nRR save - Cover costs of acquisity and inboxes for 3 months"
+    },
+    {
+      "id": "ENG-13160",
+      "createdAt": "2026-08-26T17:49:16.931Z",
+      "title": "Name 32 - Cover costs of acquisity and inboxes for 3 months",
+      "state": "Done",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [],
+      "description": "#### User Email\n\n<email>\n\n#### Workspace Name\n\nName 32's Name 33\n\n#### Request Type\n\nDiscount code\n\n#### Reason for request\n\nRR Save - Cover the costs of his acquisity and inboxes for 3 months"
+    },
+    {
+      "id": "ENG-13447",
+      "createdAt": "2026-09-03T21:36:27.554Z",
+      "title": "Promo codes still fail at checkout: single-plan Autumn checkout sends promo code via legacy reward field",
+      "state": "In Progress",
+      "assignee": "Koppany Kondricz",
+      "parent": null,
+      "labels": ["Bug", "Internal reported"],
+      "description": "## Overview\n\nUsers entering a discount code during a single-plan upgrade still get a generic \"Something went wrong\" at checkout, because that checkout path sends the code to Autumn through a legacy field Autumn no longer accepts.\n\n## Problem\n\nWhen a user enters an Autumn discount code and submits, `billing.createCheckout` fails and the UI shows \"Something went wrong\", blocking the upgrade.\n\n## Root cause\n\nIn `apps/web/lib/billing/providers/autumn/client.ts`, `createSubscriptionCheckout` passes `input.promoCode` to `autumn.attach()` through the legacy `reward` field. Autumn rejects Stripe/Autumn promotion codes sent this way with \"Reward <CODE> not found\", and the `billing.createCheckout` catch block converts that to a generic `INTERNAL_SERVER_ERROR` that tRPC masks as \"Something went wrong\". The sibling `createMultiAttachCheckout` already sends the code correctly via `discounts: [{ promotion_code }]` through `v2.multiAttach`, so the fix pattern exists; the single-plan attach path was never migrated.\n\n## Blast radius\n\n9 organizations / 9 users, ~66 \"Reward ... not found\" checkout errors over the last 30 days (codes such as AIAUTO100 and <promo-code>), counted from the Axiom `acquisity` dataset (`message contains \"attaching subscription\"`, grouped by the Autumn error message) on 2026-09-03.\n\n## Prior art\n\nRecurrence of the same root cause as [ENG-9213] (legacy `reward` field); that fix covered the multi-attach path but not the single-plan `createSubscriptionCheckout` path.\n\n## Proposed fix\n\nMigrate `createSubscriptionCheckout` off the legacy `reward` field to Autumn's current discount shape (`discounts: [{ promotion_code }]`), matching `createMultiAttachCheckout`, and surface a promo-code-specific error instead of the generic \"Something went wrong\".\n\n## Done when\n\n* Entering a valid Autumn promo code on a single-plan upgrade creates the checkout with the discount applied.\n* An invalid/expired promo code shows a clear promo-code error, not \"Something went wrong\".\n* A regression test proves the attach payload sends the promo code via the discount field, not `reward`."
+    }
+  ]
+}

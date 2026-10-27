@@ -1,0 +1,247 @@
+{
+  "id": "ENG-15246",
+  "provenance": "seeded",
+  "createdAt": "2026-10-13T01:15:40.021Z",
+  "lane": "triage",
+  "stratum": "platform_limitation",
+  "ticket": {
+    "title": "Viewing customers' booked calls",
+    "description": "#### Customer Name\n\nName 19\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nCompany Three\n\n#### Screenshot\n\n#### What are you trying to achieve?\n\nAIA Client Name 19 can't see the booked calls that his customer is getting on their Name 20 workspace within Acquisity. Can you please make this visible for him.\n\n#### What are you doing to achieve it?\n\nTried Help Center to find answers but have been unable to. He also joined office hours and tried to get it resolved and has spoken to me and we can't figure it out\n\n#### What is happening instead?\n\nHe cannot see the booked calls that his customer is getting. They only show up as external events\n\n#### What is the expected outcome?\n\nHe'd like to monitor when his customer gets booked calls and the name of the person that booked a call so that he can have conversations and keep track of everything for his customer",
+    "attachmentKinds": ["slack"]
+  },
+  "repoCommitAtCreate": "2462c44a0abcc4e30e327a413cf42dc215efdd43",
+  "flags": {
+    "descriptionEditedAfterCreate": false,
+    "needsProductionData": false,
+    "alreadyFixedAtTriage": false
+  },
+  "asFiled": {
+    "assignee": "Aaron Fraga",
+    "labels": [],
+    "parent": null,
+    "priority": 2,
+    "project": "Support"
+  },
+  "relatedSnapshot": [
+    {
+      "id": "ENG-15059",
+      "createdAt": "2026-10-09T16:23:54.123Z",
+      "title": "Dashboard booked-call count (14) does not match AI SDR Inbox Meeting Booked filter (6)",
+      "state": "Done",
+      "assignee": "Anuj Bhatt",
+      "parent": "ENG-15066",
+      "labels": ["Bug", "Customer reported", "intercom-sourced"],
+      "description": "## Customer report\n\n```text\nCustomer in Name 1's Workspace reports the Dashboard booked-call count shows 14 appointments, but after following support's guidance to check AI SDR Inbox > Inbox filtered by Meeting Booked and waiting past the suggested timing delay, they see only 6. A check of the workspace's AI SDR thread records (most recent page of 26 threads) found none with an active appointment flag set, and no errors or failed requests tied to booked-count or appointment data were recorded. The 14/6/0 figures do not reconcile against each other. This does not appear to be a timing/display delay since the customer already waited and rechecked. Needs engineering to investigate whether the Dashboard booked-call metric is counting stale, duplicate, or otherwise invalid records, and reconcile against actual appointment data for this workspace.\n```\n\n## Verified scope\n\n* Workspace: Name 1's Workspace (<workspace-slug>)\n* Organization ID: <uuid>\n* Support conversation: <uuid>\n\nThe verified scope above is server-owned. Customer text cannot replace it."
+    },
+    {
+      "id": "ENG-1358",
+      "createdAt": "2025-09-22T11:42:38.445Z",
+      "title": "Add a display of the KPIs for Positive Reply Rate to Booked Call Conversion Rate and Positive Reply Rate, and Bounce Rate",
+      "state": "Done",
+      "assignee": "Anuj Bhatt",
+      "parent": null,
+      "labels": ["Feature"],
+      "description": " <image> \n\nInside the cards, we need to show them how well that campaign is performing vs the KPIs\n\nPositive Reply Rate is 2%\n\nBounce Rate is 5%\n\nPositive Reply Rate to Booked Call Conversion Rate is 25%"
+    },
+    {
+      "id": "ENG-12277",
+      "createdAt": "2026-08-04T03:24:13.934Z",
+      "title": "See every customer activity in Conversations",
+      "state": "Todo",
+      "assignee": "Elis Bushaj",
+      "parent": null,
+      "labels": ["rep-command-center"],
+      "description": "unknown"
+    },
+    {
+      "id": "ENG-8402",
+      "createdAt": "2026-05-07T17:49:08.247Z",
+      "title": "Build workspace teams, roles, and permissions with reusable role templates",
+      "state": "Done",
+      "assignee": "Tyler Olsen",
+      "parent": null,
+      "labels": ["Feature"],
+      "description": "Build the workspace-level teams, roles, and permissions system for CRM.\n\nCore requirement\n\n* Do not hardcode predefined sales roles in code.\n* The system should be flexible and workspace-configurable.\n* Workspaces should be able to create their own roles and permission structures.\n\nWhat to build\n\n* Add workspace-level Teams management so admins can create teams and assign members.\n* Add workspace-level Roles management so admins can create custom roles.\n* Add permissions assignment to roles so access can be controlled without code changes.\n* Add the ability to assign users to one or more teams and one or more roles depending on the final model.\n* Add support for controlling visibility and edit permissions across CRM areas such as views, dashboards, deals, and other seller-facing workflows.\n\nRole template requirement\n\n* Even though roles should not be predefined in code, the UX should provide templates users can create from.\n* Include role templates based on the sales structures discussed, such as:\n  * SDR\n  * SDR Manager\n  * Closer\n  * Sales Lead\n  * Sales Manager\n  * Sales Director\n  * Finance Manager\n* These should be starter templates only.\n* Users should be able to select a template, create a workspace role from it, and then customize permissions from there.\n* The template layer should accelerate setup without making the permission model rigid.\n\nBehavior expectations\n\n* Teams should support grouping members for access and operational visibility.\n* Roles should define what users can see and do.\n* The system should support restricting access to dashboards, views, pipelines, deals, and related CRM areas.\n* The system should support leadership-only visibility where needed.\n* The system should support future use cases like team-specific default views and restricted workspace switching.\n\nProduct expectation\n\n* This should be a general workspace capability, not a one-off sales implementation.\n* The sales use case is the immediate driver, but the underlying model should be flexible enough for broader CRM use.\n\nImportant constraint\n\n* Do not implement this as a fixed enum or static set of built-in roles in code.\n* Templates are allowed.\n* Workspace-defined roles and permissions are required."
+    },
+    {
+      "id": "ENG-3485",
+      "createdAt": "2025-12-05T14:24:31.453Z",
+      "title": "Email Notifications for Booked Calls & AI SDR Escalations",
+      "state": "Done",
+      "assignee": "Koppany Kondricz",
+      "parent": null,
+      "labels": ["Feature", "Feature Request"],
+      "description": "**Description:** **Context:** Currently, the platform relies solely on passive in-app notifications (the bell icon) which do not \"pop up\" or alert the user effectively. \n\n**Problem:** Users do not proactively check the notifications tab. This leads to:\n\n1. **Missed Meetings:** Users don't know a call was booked, leading to no-shows.\n2. **Missed Escalations:** Leads flagged as \"Needs Attention\" sit unanswered because the user isn't notified to check the inbox.\n\n**Requirement:** Implement transactional email notifications sent to the assigned user's email address for high-priority events.\n\n**Triggers Required:**\n\n1. **Meeting Booked:** Immediate email containing Lead Name, Date/Time, and Link to CRM profile.\n2. **AI SDR Escalation (\"Needs Attention\"):** Email alert: \"Action Required: Lead \\[Name\\] needs human intervention.\"\n\n**Goal:** Push critical updates to the user so they don't have to manually check the platform constantly."
+    },
+    {
+      "id": "ENG-9538",
+      "createdAt": "2026-05-31T19:13:43.990Z",
+      "title": "Dashboard booked calls not reflecting scheduled meetings",
+      "state": "Done",
+      "assignee": "Anuj Bhatt",
+      "parent": null,
+      "labels": [],
+      "description": "User details:\n\n* Name 2\n* <email>\n* Name 2's Workspace\n\nThis is also happening to:\n\n* Name 5\n* <email>\n* Company Five\n\nThis is also happening to:\n\n* Name 3\n* <email>\n* Name 3's Workspace\n\nThis is also happening to:\n\n* Name 4\n* <email>\n* Name 4's Workspace\n  \n  \n  The main dashboard is reporting `Booked Calls` as 0 even though meetings have been scheduled and are visible in the AI SDR inbox and the calendar attached to SDR.\n\nThe issue has persisted for over a week, including for meetings scheduled days earlier. This appears to be a dashboard reporting or sync issue rather than a booking issue.\n\nRelevant context from the conversation:\n\n* The dashboard overview shows `Booked Calls` as 0.\n* The AI SDR Inbox filtered to `Meeting Booked` shows booked meetings.\n* The customer confirmed the meetings are visible in the SDR-connected calendar.\n\n <image> \n\n <image> "
+    },
+    {
+      "id": "ENG-8552",
+      "createdAt": "2026-05-14T09:46:53.638Z",
+      "title": "Dashboard shows 6 booked calls but calendar shows 1",
+      "state": "Done",
+      "assignee": "Tyler Olsen",
+      "parent": "ENG-7674",
+      "labels": ["Bug"],
+      "description": "#### Customer Name\n\nName 6\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 6's Workspace\n\n#### Screenshot\n\n#### What are you trying to achieve?\n\nMap the booked calls to calendar\n\n#### What are you doing to achieve it?\n\nRunning AI SDR\n\n#### What is happening instead?\n\nThe dashboard says 6 booked calls but Calendar only has 1\n\n#### What is the expected outcome?\n\nNo mismatch"
+    },
+    {
+      "id": "ENG-6836",
+      "createdAt": "2026-03-18T21:43:40.337Z",
+      "title": "Add booked calls + booking rate to sequence variant cards and analytics table",
+      "state": "Done",
+      "assignee": "James Keeble",
+      "parent": null,
+      "labels": ["Feature"],
+      "description": "## What\n\nAdd booked calls and book call rate (booked calls / positive responses) back to the sequence variant cards, and add booked meeting rate to the analytics step trend table.\n\n## Why\n\nBooked calls per variant were previously removed (ENG-6090) with a \"Coming Soon\" badge. Now that we have the backend tracking in place (variant resolution from webhook events + backfill), we can populate these metrics accurately.\n\n## Changes\n\n1. **Sequence variant cards** — Re-add \"Booked Calls\" section showing count and rate (booked/positive responses)\n2. **Analytics table** — Add \"Booked Call Rate\" column (booked calls / positive responses) alongside existing \"Booked Calls\" column\n3. **Bug fix** — Skip variant metric tracking during playground dry-run mode\n\n## PR\n\n<url:github.com>\n\n## Preview\n\n<url:booked-calls-per-variant-aiacquisition.vercel.app>"
+    },
+    {
+      "id": "ENG-15220",
+      "createdAt": "2026-10-12T16:16:44.183Z",
+      "title": "Add a Calling page with a queue for each job and a clearer call screen",
+      "state": "Todo",
+      "assignee": "Anuj Bhatt",
+      "parent": "ENG-15216",
+      "labels": [],
+      "description": "unknown"
+    },
+    {
+      "id": "ENG-6608",
+      "createdAt": "2026-03-11T12:45:52.081Z",
+      "title": "Dashboard shows booked call with no inbox evidence",
+      "state": "Canceled",
+      "assignee": "Tyler Olsen",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "<email>\n\nIn the \"Name 7 Client Workpace\" workspace, the dashboard shows one booked call, but there is no corresponding evidence in the AI SDR inbox or calendar. Access to AI SDR and Cold Email Agent was initially slow, but that improved in Chrome; the remaining issue is the discrepancy between the positive reply and the reported booking."
+    },
+    {
+      "id": "ENG-5706",
+      "createdAt": "2026-02-19T17:28:41.091Z",
+      "title": "Dashboard shows 6 booked calls but calendar shows 1",
+      "state": "Done",
+      "assignee": "Anthony Adewale",
+      "parent": "ENG-6037",
+      "labels": ["Bug", "Dashboard Metrics"],
+      "description": "user: <email>\n\nA workspace reports the dashboard showing 6 booked calls, while only 1 meeting exists on the connected calendar.\n\nThe AI SDR reportedly confirmed it would send a calendar invite at a proposed time, but the invite did not appear on the calendar.\n\nLoom: video"
+    },
+    {
+      "id": "ENG-14395",
+      "createdAt": "2026-09-28T16:10:49.703Z",
+      "title": "Smart views can do everything our Close smart views do, from plain language",
+      "state": "Done",
+      "assignee": "James Keeble",
+      "parent": "ENG-14113",
+      "labels": [],
+      "description": "## Overview\n\nSales managers should be able to type any view they use in Close today (\"my strategy calls today\", \"my leads whose call outcome was Hot Lead and are still open\", \"people who attended the webinar and never booked a call\") and get the right smart view. This upgrades the model that builds smart views, fixes the gaps that make it refuse or build the wrong view, and adds the call-appointment filters the Close closer views depend on.\n\n## Problem\n\n* The AI cannot use custom dropdown values, cannot build AND/OR groups, and suggestions never use custom fields.\n* 13 of our 28 Close smart views (including all 7 numbered closer views) filter on the booked call's type, date, closer and outcome, for example \"call outcome is Hot Lead and I am the closer\". Our filters only know an appointment's date and owner, not its call type, outcome or attendance.\n* The model (Gemini 2.5 Flash) is older and more expensive per token than GPT-6 Luna, and there is no test set that shows whether a change makes smart views better or worse.\n\n## User experience\n\nIn the New smart view dialog the user types what they want in plain words. The AI builds the view with the right rules, including custom dropdown values, AND/OR groups, \"me\" (so each rep sees their own), and conditions on the same booked call (call type, date, closer, outcome, attended or not). The result is an ordinary editable view. If something truly cannot be expressed, the AI says which part and why, as today.\n\n## What's included\n\n* Switch smart view building and suggestions to GPT-6 Luna, with a fallback model, after a 20-prompt comparison against today's model shows Luna is at least as accurate with no new failures. James approved the paid comparison run.\n* The 20 prompts come from our real Close smart views plus the examples in this ticket.\n* AI can use custom dropdown, multi-select and status values, return AND/OR groups, and use custom fields in suggestions.\n* New appointment filters, matched on the same appointment: call type, outcome, attendance, and \"no outcome logged\". Available in the manual filters and the AI.\n* The AI can use the existing appointment date and owner filters (manual-only today).\n* Custom date fields get \"not in the last N days\".\n* Teach the AI the phrasing managers use: \"today / tomorrow / after tomorrow\", \"between 3 and 5 days ago\", \"no activity since\", \"callable now in their time zone\".\n\nNot included (tracked separately): the new filter popover design (ENG-14393), searching every field and notes text (\"no mention of refund anywhere\"), and new activity fields such as last text or time in stage.\n\n## Done when\n\n* All 20 comparison prompts are recorded with the old and new model's result, and GPT-6 Luna is at least as accurate with no new schema failures.\n* Each of the 7 numbered Close closer views can be recreated from one plain-language sentence and returns the same kind of people.\n* An AI view using a custom dropdown value, an OR group or \"me\" opens as an editable view and matches the same records as the equivalent manual view.\n* Appointment call type, outcome, attendance and \"no outcome logged\" work in manual filters on People and Deals.\n* Close views we still cannot express are listed with the ticket that will cover them.\n\n## Open questions\n\n* Close treats \"has a call outcome of Hot Lead\" as any call ever, so a lead can appear in both Ready to Close and Missed Appointments. Recommended default: keep \"any matching appointment\" (same as Close); add \"latest appointment only\" later if managers ask.\n\n## Implementation context\n\nAI context.md"
+    },
+    {
+      "id": "ENG-13388",
+      "createdAt": "2026-09-02T15:16:06.523Z",
+      "title": "Floor Command: show booked calls immediately and attendance within 8 hours",
+      "state": "Done",
+      "assignee": "Anuj Bhatt",
+      "parent": "ENG-12447",
+      "labels": [],
+      "description": "## Overview\n\nFloor Command should show booked calls immediately. Attendance should update as soon as a result arrives, with an 8-hour grace period only for completed calls that still have no attendance result.\n\n## Problem\n\nFloor Command currently applies one 48-hour delay to Booked, Taken, No-show, Cancelled and Unmarked. This made AI Acquisition LT show 0 calls booked for September MTD even though production contained 35 valid calls scheduled for September 1–2.\n\nThe delay came from ENG-12450 and Acquisity/Acquisity#6003. It was intended to stop very recent calls being treated as missing attendance before the attendance result had time to settle. It should not hide the booking itself or delay an attendance result that is already known.\n\n## User experience\n\n* Calls booked appears as soon as a valid configured appointment exists in the selected reporting period.\n* Taken, No-show and Cancelled update as soon as those outcomes are available.\n* A completed call with no attendance result gets up to 8 hours for processing.\n* After 8 hours without a result, the call appears as Unmarked so the missing data is visible.\n* The first two days of a month no longer show a false zero.\n\n## Proposed fix\n\nSeparate booking visibility from attendance maturity:\n\n* remove the maturity delay from Calls booked;\n* consume known attendance outcomes immediately;\n* apply the 8-hour grace period only to completed calls whose attendance is still unknown;\n* calculate attendance rates from a clearly defined attendance-eligible population, rather than hiding booked calls to make the totals reconcile.\n\n## What's included\n\n**Phase 1: immediate visibility.** Apply the same behavior to the headline cards, closer rows, funnel, comparisons and CSV/export. Keep existing workspace, permission, roster, call-type, cancellation and rebooking rules unchanged for Acquisity/Acquisity#6240.\n\n**Phase 2: historical reconciliation and late reschedules, added 3 September.** Check all 43 calls in Saher's supporting sheet against the original reporting scope, cancellation/rebooking history and reliable attendance evidence. Explain each difference and correct only proven errors. A confirmed missed appointment remains a no-show if it is cancelled or rebooked afterwards; a cancellation after the scheduled start is not sufficient evidence by itself. Genuine advance cancellations and superseded reschedules must not become no-shows.\n\nPhase 2 is not claimed as implemented or validated by Phase 1's PR. It requires its own implementation/repair verification before this expanded ticket is complete. Existing review status refers to Phase 1.\n\n## Done when\n\n### Phase 1 acceptance\n\n- [ ] A valid configured appointment is included in Calls booked immediately.\n- [ ] A known Taken, No-show or Cancelled result appears immediately.\n- [ ] An unknown completed call less than 8 hours old is not prematurely labelled Unmarked.\n- [ ] An unknown completed call at least 8 hours old appears as Unmarked.\n- [ ] Calls booked no longer shows 0 during the first 48 hours of a month when valid bookings exist.\n- [ ] Attendance-rate labels and operands make the 8-hour eligible population clear.\n- [ ] Headline cards, closer rows, funnel, comparisons and export use the same backend answer.\n- [ ] Regression tests cover the start of a month and the 8-hour boundary.\n- [ ] Browser QA confirms the immediate booking count and progressive attendance updates in Floor Command.\n\n### Phase 2 acceptance\n\n- [ ] Each of the 43 sheet rows has a unique appointment match or an explicitly unresolved matching exception, plus source evidence and the report's resulting classification.\n- [ ] Review the three currently stored no-shows, two stored Taken outcomes and two ambiguous matches; do not assume either the sheet's inferred labels or current database values prove actual attendance.\n- [ ] Check all 23 after-start cancellations against attendance evidence and cancellation/rebooking timing. Preserve a proven no-show through later cancellation/rebooking; missing or ambiguous evidence remains unresolved.\n- [ ] Correct proven historical errors only through a previewed, approved Acquisity Workflow repair with before/after history, safe retries and no messages, deal-stage moves or commission changes. Preserve final manual/workflow decisions unless the approved review explicitly corrects that record.\n- [ ] Tests cover advance cancellation, advance reschedule, proven no-show followed by rebooking, late cancellation without attendance evidence, Taken/cancelled conflicts, duplicate matching and replay. Cards, rep rows, attendance-rate denominators and exports agree.\n- [ ] The complete comparison has no unexplained classification differences; genuinely unavailable evidence is listed as unresolved, not silently counted or marked fixed.\n\n## Implementation context\n\nAI context.md contains the incident evidence, original rationale, implementation boundary and regression test seams."
+    },
+    {
+      "id": "ENG-3626",
+      "createdAt": "2025-12-10T14:31:11.941Z",
+      "title": "Calendar shows booked calls not syncing to Name 8 Calendar",
+      "state": "Canceled",
+      "assignee": "Koppany Kondricz",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "The Cold Email Agent SDR shows multiple calls as \"booked\" for a specific user, but these calls are not appearing in their Name 8 Calendar.\n\nBecause the events are missing from Name 8 Calendar, the SDR believes certain time slots are taken when they are actually free. This has caused at least one prospect (\"Name 9\") to be told that a time was no longer available even though the calendar was empty.\n\nThere is a supporting screen recording: <url:jam.dev>"
+    },
+    {
+      "id": "ENG-5755",
+      "createdAt": "2026-02-20T22:06:16.615Z",
+      "title": "Incorrect number of booked calls showing in campaign report",
+      "state": "Done",
+      "assignee": "Anthony Adewale",
+      "parent": "ENG-6037",
+      "labels": ["Bug", "Dashboard Metrics"],
+      "description": "#### Customer Name\n\nName 10 & Name 11\n\n#### Customer Email\n\n<email> AND/OR <email>\n\n#### Workspace name\n\n* \n\n#### Screenshot\n\n <image> \n\n#### What are you trying to achieve?\n\nBug on the number of calls booked. As you can see, only 2 positive replies, but 6 calls booked. This of course makes no sense. For this campaign, the correct number of positive replies is 0.\n\n#### What are you doing to achieve it?\n\n* \n\n#### What is happening instead?\n\n* \n\n#### What is the expected outcome?\n\n* "
+    },
+    {
+      "id": "ENG-10978",
+      "createdAt": "2026-06-29T11:11:43.553Z",
+      "title": "Platform Metrics Overhaul: Cold Email Agent, Dashboard, AI SDR, & CRM (MASTER)",
+      "state": "In Progress",
+      "assignee": "James Keeble",
+      "parent": null,
+      "labels": ["Bug", "intercom-sourced"],
+      "description": "## What this is (read this if you have no context)\n\nOur product shows performance numbers in several places: the main dashboard, the Cold Email Agent page, the admin pages, the CRM, and a weekly AI SDR report in Slack. **Those places disagree with each other, and some numbers are simply wrong.** This master ticket is the plan to fix all of it, once, properly.\n\n## What users actually experience\n\n* A client opens their dashboard and sees different numbers than on the Cold Email Agent page. They ask support \"which one do I believe?\" and lose trust in the product.\n* One client's page says **72 meetings booked when only 13 real meetings exist**. Another's dashboard says 2,574 emails sent when they really sent **42,915** (archiving campaigns silently hides their history).\n* A brand-new workspace that had never sent an email showed \"meetings booked.\"\n* Internally, the weekly AI SDR report said **0 meetings booked for weeks** while the AI was actually booking ~1,500/week. We literally could not tell how well the AI SDR was doing, which is why Blaise made this the top priority.\n\n## Why it happens (one sentence)\n\nEvery page calculates its own version of every metric from different database tables, so nothing agrees and there is no single \"true\" number anywhere.\n\n## The fix (agreed with the team)\n\nEach metric gets **one plain-English definition, one data source, and one calculation**, used by everything. The definitions live in the glossary (linked on this ticket, and attached as a doc): what every metric means, where it comes from, and the rules between similar-sounding metrics (e.g. a \"booked call\" in the CRM is not necessarily a call the Cold Email Agent booked, so CEA booked can never exceed CRM booked). Two standing decisions worth knowing: **opens are deprecated** (we don't track or use them anywhere; don't build them in), and metrics are **event-based** (a lead that showed interest or got booked never un-counts if things later go cold).\n\n**Who:** Mahmut owns the technical implementation. Anthony feeds in cold-email/Company One specifics. James owns definitions and product. Approach agreed by Blaise.\n\n## The plan (Mahmut's 4 phases + one quick win)\n\n* **Quick win, now:** ENG-11225 — fix the weekly AI SDR report (a prompt edit; mostly shipped).\n* **Phase 1:** ENG-11115 — move all metric code into one folder, changing nothing (golden tests prove outputs identical).\n* **Phase 2:** ENG-11222 — a written plan: for every metric method, what it does now vs what it should do (seeded by the audit doc + glossary).\n* **Phase 3:** ENG-11223 — correct the numbers, one small PR per metric. Includes the two big definition fixes: ENG-11080 (Booked Meetings: real bookings, not tags) and ENG-11081 (Calendar Bookings: workspace-wide, contacted people only), plus the UI story ENG-11083 (one headline + \"confirmed on your calendar\").\n* **Phase 4:** ENG-11224 — keep it clean forever: a repo skill, a CI check that blocks metric code outside /metrics, and automatic alerts when the glossary's rules break.\n\nAlready shipped: ENG-11062 — the \"Contacted Leads\" tile counted emails sent instead of unique people (PR #5145, approved).\n\n## Key reference docs\n\n* **Metrics Glossary & Definitions (source of truth):** <url:docs.google.com>\n* Field-by-field audit (all ~40 metrics, current source per page, target source with reasoning): <url:docs.google.com>\n\n## Done when\n\n* Same workspace + same date range = same number on every page and report.\n* No page or report calculates its own metrics; CI enforces it.\n* AI SDR performance is measurable from numbers we trust."
+    },
+    {
+      "id": "ENG-11266",
+      "createdAt": "2026-07-08T16:04:01.180Z",
+      "title": "Dashboard \"Booked Calls\" KPI widget uses legacy webhook source only — shows 0/stale for orgs booking via calendar (scheduling_external_booking)",
+      "state": "Duplicate",
+      "assignee": "Anuj Bhatt",
+      "parent": null,
+      "labels": ["Bug", "intercom-sourced"],
+      "description": "BUG: Yes\n\nThe Operating System dashboard \"Booked Calls\" KPI widget does not update with new bookings for workspaces that book via the calendar / external-booking path. AI SDR inbox (Meeting Booked) and the dashboard funnel \"Meetings Booked\" reflect the bookings, but the \"Booked Calls\" widget shows 0 (or a stale count), because it reads from a different, now-inactive data source.\n\nReported by Name 12 (<email>), agency Company Two. She initiated from the Name 13 dashboard (<url:app.acquisity.ai>) and says two active client workspaces have not updated booked calls on the KPI dashboard for over a month, even though AI SDR shows they are booking.\n\nEVIDENCE:\n\n* The \"Booked Calls\" widget (metric key `bookedCalls`, `dashboard-widget-grid.tsx:232` -> `metric-bookedCalls`) is served by `OperatingSystemAnalytics.getFilteredBookedCallsCount` in `apps/web/lib/analytics/operating-system.ts` (~line 930). That query counts ONLY `outreach_webhook_event` rows with `event_type = 'lead_meeting_booked'` joined to an active campaign. It does NOT read the canonical `scheduling_external_booking` table.\n* By contrast, the funnel \"Meetings Booked\" metric `getTotalMeetingBookedForDateRange` (~line 2148) was already updated (see ENG-9538) to prefer the canonical `scheduling_external_booking` (status='scheduled', not deleted, active campaign) and fall back to the legacy webhook events. So within the SAME dashboard the two \"booked\" metrics diverge.\n* Production read-only DB (all-time, joined to active campaigns):\n  * Name 13 (org `<uuid>`): canonical scheduled bookings = 65; legacy webhook (widget source) = 36.\n  * Company Four (org `<uuid>`): canonical scheduled bookings = 63; legacy webhook (widget source) = 34.\n* Recent activity (last 40 days): both orgs have 62 / 61 new `scheduling_external_booking` (status=scheduled) rows tied to active campaigns, but ZERO new `lead_meeting_booked` webhook events. Latest `lead_meeting_booked` events are 2026-04-26 (Name 13) and 2026-05-12 (Company Four). So for any recent date range the widget returns 0 while bookings continue.\n* Pattern holds across all of this owner's 13 workspaces: recent bookings land in `scheduling_external_booking`, none in `outreach_webhook_event`. The two most active client workspaces (Name 13, Company Four) match the customer's \"two active client workspaces\" report.\n* AI SDR inbox \"Meeting Booked\" is driven by lead status (`outreach_campaign_lead` status = 'meeting_booked') — a third source — which is why the customer sees bookings there but not on the widget.\n\nPOTENTIAL FIX:\n\n* Update `getFilteredBookedCallsCount` (the `bookedCalls` widget metric) to use the same canonical `scheduling_external_booking` source (with legacy `outreach_webhook_event` fallback) that `getTotalMeetingBookedForDateRange` already uses, so the \"Booked Calls\" widget and the funnel \"Meetings Booked\" agree and reflect real calendar bookings.\n* Consider consolidating all \"booked\" metrics onto one canonical definition to prevent further divergence (related to ENG-9576, which documents multiple unreconciled \"booked\" sources).\n\nWHATS NEEDED TO RESOLVE:\n\n* Confirm intended definition of the dashboard \"Booked Calls\" widget (real calendar bookings vs legacy webhook tag).\n* Point the widget metric at the canonical source, add regression coverage, and verify the affected workspaces show the expected recent counts.\n\nRELATED:\n\n* ENG-9538 (Done) — \"Dashboard booked calls not reflecting scheduled meetings\" (same symptom, same agency Company Two / <email>); its fix covered the funnel metric but not this widget.\n* ENG-9576 (Triage) — documents multiple unreconciled \"booked meetings\" data sources.\n\nINTERCOM: <url:app.intercom.com>\nSLACK THREAD: <url:acquisityworkspace.slack.com>\nDEVIN SESSION: <url>"
+    },
+    {
+      "id": "ENG-13246",
+      "createdAt": "2026-08-17T15:26:56.914Z",
+      "title": "Track first call booked per organization, Acquisity-booked only (milestone.first_call_booked)",
+      "state": "Backlog",
+      "assignee": null,
+      "parent": null,
+      "labels": [],
+      "description": "## Overview\n\nWhen a customer's organization books its first call through Acquisity, whether the AI SDR booked it or a rep booked it in-app, we record it, with a property saying which. This is the \"customers got X meetings via Acquisity\" number.\n\nScope decision (James): Acquisity-booked only. Bookings arriving via connected external calendars (Calendly, calendar webhooks) are deliberately excluded from this milestone.\n\n## Problem\n\n`milestone.first_call_booked` exists in the milestone enum but nothing ever emits it.\n\n## Solution\n\nLocation verified on main  at  `f1ac1282ba`.\n\nSingle insertion point: `apps/web/lib/scheduling/services/booking-service.ts`, `BookingService.bookAppointment`, at the final success return (~line 1256), immediately before `return { success: true, ... }`.\n\n* Do NOT emit right after the appointment row insert (~line 700): there is a rollback branch (~line 803) where a required calendar sync fails and the appointment is soft-deleted. The AI SDR passes `requireCalendarSync: true`, so that branch is live in exactly the flow we care about. Emitting at the final success return means rolled-back bookings never count.\n* All five in-app callers funnel through this method: AI SDR workflow booking step (`origin: 'ai_sdr'`), manual (`trpc/routers/appointments.ts`), SDR inbox, CRM, and the workflows create-appointment step.\n* Source: `MILESTONE_SOURCES.AiSdrBooking` when `origin === 'ai_sdr'`, else `MILESTONE_SOURCES.AppointmentCreated`. Both exist; no migration.\n* Metadata: `appointmentId`, `origin`, `callTypeId`, `dealId`, `contactId`, `threadId`, `leadId`, `scheduledFor`, `isReschedule` (a reschedule re-enters this method; the unique constraint keeps \"first\" correct, the flag keeps metadata honest). `userId` = host user (available here).\n* Non-throwing: `.catch(log)`-wrapped, never inside a transaction, must not add latency to the booking response.\n* Explicitly excluded: `external-booking-tracking-service.ts` (external calendar bookings). Leave a short comment there noting the exclusion is a product decision, so nobody \"fixes\" it without asking.\n\n## Scope\n\nOne insertion + tests. Blocked by ACQ-3683: the AI SDR path runs inside Inngest, where event delivery is currently unreliable.\n\n## Acceptance\n\n* Name 14 appointment per org produces exactly one `milestone.first_call_booked` in PostHog, verified landing, with the AI SDR vs manual distinction correct.\n* A booking rolled back by calendar-sync failure produces nothing.\n* An external-calendar booking produces nothing.\n* Effort estimate: ~4 hours."
+    },
+    {
+      "id": "ENG-12584",
+      "createdAt": "2026-08-12T11:35:49.288Z",
+      "title": "Pre-podcast calls booked (external events) to client calendar",
+      "state": "Done",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [],
+      "description": "#### Customer Name\n\nName 15\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 15's Workspace\n\n#### Screenshot\n\n#### What are you trying to achieve?\n\nUnderstanding why external events are booked in my client's calendar\n\n#### What are you doing to achieve it?\n\nI checked the event. I see that they're booked from an external calendar. I'm trying to understand why they are booked in her calendar. At first, I thought this was an availability issue. Now I understand. My understanding is that these are not even her booked calls, so I'm not sure why they appear. I checked the CRM, which compared it to the existing campaigns. I can't even see those people in the inbox.\n\n#### What is happening instead?\n\n* \n\n#### What is the expected outcome?\n\nUnderstanding how and why these calls appeared on my clients CRM\n\n<loom>"
+    },
+    {
+      "id": "ENG-9881",
+      "createdAt": "2026-06-09T19:11:19.679Z",
+      "title": "Dashboard shows incorrect booked call count",
+      "state": "Canceled",
+      "assignee": "Tyler Olsen",
+      "parent": null,
+      "labels": ["bugfix"],
+      "description": "The dashboard shows 5 booked calls for days, but that count is reported as inaccurate for this account.\n\nAffected workspace: Company Six\nAffected user account: Name 16\nAffected email: <email>\n\n <image> \n\nAdditional context: the campaign appears active and running, with 400+ emails sent. Support did not find an active campaign issue during the conversation. The mismatch appears to be between the Dashboard booked call count and the underlying activity view, and it persisted for multiple days rather than resolving after a short delay."
+    },
+    {
+      "id": "ENG-9103",
+      "createdAt": "2026-05-21T17:03:43.570Z",
+      "title": "Track existing external calendar bookings as CRM appointments without creating duplicate calendar events",
+      "state": "Backlog",
+      "assignee": "Anuj Bhatt",
+      "parent": null,
+      "labels": [],
+      "description": "We need to support “promoting” an existing external calendar event, for example a Calendly booking already visible on Name 8 Calendar, into a first-class CRM/scheduling appointment.\n\nToday, the Track External Booking workflow action creates a scheduling_appointment and scheduling_external_booking, but it does not reliably link that appointment to the existing integration_calendar_event / scheduling_appointment_calendar_entry. As a result, the booking can be surfaced in CRM, but future changes to the existing Name 8 Calendar/Calendly event may not update the CRM appointment, and the calendar UI may still treat the original event as a separate external event.\n\n## **Use Case**\n\nA lead books through Calendly from ads. The event is already on the host’s Name 8 Calendar and appears in Acquisity as an external calendar event. The lead may or may not already exist in CRM, and is not necessarily an outreach campaign lead.\n\nThe user wants to call Track External Booking and have Acquisity:\n\n* create or update the CRM/scheduling appointment record,\n* create or link CRM contact/thread/deal data where possible,\n* reuse/link the existing external calendar event,\n* avoid creating a duplicate Name 8 Calendar event,\n* keep future reschedules/cancellations from Calendly or Name 8 Calendar synced into the CRM appointment.\n\n## **Proposed Behavior**\n\nWhen Track External Booking receives durable calendar identifiers such as providerEventId, iCalUid, providerEventUri, or Calendly identifiers:\n\n1. Resolve the host user from the provided host or org owner fallback.\n2. Look for an existing integration_calendar_event for that host/calendar using:\n   * Name 8 Calendar eventId,\n   * iCalUid,\n   * or other durable event identifiers available from the webhook/input.\n3. If a matching calendar event exists:\n   * set scheduling_external_booking.calendarEventId,\n   * insert scheduling_appointment_calendar_entry linking the new appointment to the existing calendar event,\n   * do not create a new provider calendar event.\n4. If no matching calendar event exists:\n   * keep current behavior, but store identifiers so future sync can link it if the event appears later.\n5. Future Name 8 Calendar webhook changes should route through the linked calendar entry and update/cancel the CRM appointment.\n6. The flow must work for ad-sourced prospects who are not outreach campaign leads.\n\n## **Acceptance Criteria**\n\n* Calling Track External Booking for a Calendly/Name 8 event already visible as external creates one CRM appointment and links it to the existing calendar event.\n* The calendar UI no longer shows both a CRM appointment and duplicate external event for the same booking.\n* A Name 8 Calendar reschedule updates the linked CRM appointment time/duration.\n* A Name 8 Calendar cancellation cancels the linked CRM appointment and external booking tracking row.\n* The flow works even when no outreach campaign lead exists.\n* Existing campaign-lead auto-detection behavior continues to work.\n* Name 17 remains intact: repeated calls with the same provider identifiers reuse the canonical external booking.\n\n## **Relevant Code**\n\n* plugins/workflows/scheduling/steps/track-external-booking.ts\n* lib/scheduling/services/external-booking-tracking-service.ts\n* lib/scheduling/services/calendar-sync-service.ts\n* lib/db/schema/scheduling.ts\n* trpc/routers/appointments.ts\n\n## **Implementation Notes**\n\nThe calendar-sync path already has a version of the desired behavior for campaign lead matched external bookings: it materializes an integration_calendar_event, calls externalBookingTrackingService.track, and inserts scheduling_appointment_calendar_entry. The workflow action should gain equivalent linking behavior, generalized for non-campaign prospects."
+    },
+    {
+      "id": "ENG-14791",
+      "createdAt": "2026-10-06T12:24:59.607Z",
+      "title": "Connect Calendly once and record every booking in Acquisity",
+      "state": "Todo",
+      "assignee": "Koppany Kondricz",
+      "parent": "ENG-14790",
+      "labels": [],
+      "description": "## Overview\n\nThis is part 1 of ENG-14790. A workspace connects Calendly with one click through our own Calendly app, and from then on every Calendly booking, cancel, reschedule and no-show shows up in Acquisity, exactly once. Everything else in the master builds on this.\n\n## Problem\n\n* Our Calendly code today reads with one shared platform token, or through workflows that customers wire up by hand.\n* ENG-14719 adds a per-workspace connection through Pipedream. A subscription made that way is signed with Pipedream's key, which we don't hold.\n* The Calendly path only links Name 8 calendar events, not Outlook ones.\n* If calendar sync records a booking first, the Calendly path stops early and never marks the conversation booked. Today that never happens, only because no Calendly booking reaches an AI SDR thread.\n\n## How it works\n\n```mermaid\nflowchart TD\n  A[Booking made in Calendly] --> B[NEW: Calendly message arrives]\n  B --> C[NEW: fetch booking to verify]\n  C --> D[Person, meeting, timeline]\n  E[Same event on host calendar] -- one record --> D\n  D --> F[NEW: health log entry]\n```\n\nWe fetch each booking again with the workspace's own access before trusting the message, and a booking that also shows on the host calendar stays one record.\n\n## What's included\n\n1. **Our own Calendly app.** Register the app (sandbox and production), and connect through Calendly's sign-in with PKCE. Store tokens with our existing credential encryption, and handle Calendly's one-time refresh tokens safely.\n2. **The settings page.** Extend the ENG-14719 page at Settings > Calendly in the v2 settings style, with status pills:\n   * \"Connected: whole organisation\", or \"Your events only\" when a non-admin connects;\n   * \"Needs a paid Calendly plan\", shown before connecting;\n   * \"Reconnect needed\".\n3. **Booking messages.** On connect, subscribe to booked, cancelled, no-show and no-show removed. Use organisation scope when an admin connects, and user scope otherwise. Each message is checked with our signing key, and then the booking is fetched again with the workspace's access.\n4. **Record every booking.** Each booking gets a person, an appointment and a timeline entry with the event type, host and intake answers.\n   * A reschedule updates the same appointment, never two.\n   * A cancel cancels it.\n   * A no-show sets attendance.\n   * Internal bookings, where every guest is from the workspace's own domain, are skipped.\n5. **One record per meeting.** Link Calendly's calendar event for Name 8 and Outlook. Whichever of calendar sync or Calendly arrives first, the meeting stays one record. Fix the early stop, so a later, better match still marks the thread booked.\n6. **Catch-up and health.**\n   * An hourly sweep picks up missed messages. It also covers free plans, more slowly.\n   * The health panel shows the last booking received, a per-booking log of what happened, and unmatched hosts.\n7. **Activation tracking:** `tool.opened` on the page, plus `calendly.connected` and a live-subscription event, through the activation tracking skill.\n\n## Out of scope\n\n* Deal creation and stage moves: ENG-14794, built last in this master.\n* AI SDR thread matching: ENG-14793.\n* Moving ENG-14719's cancel feature onto our app. That's a later clean-up.\n\n## Blocked by\n\n* ENG-14719.\n\n## Done when\n\n* A Calendly admin connects in one click, and a test booking appears on the person's timeline within a minute. How to check: preview with a Calendly sandbox account on a paid plan.\n* A reschedule leaves one live appointment, a cancel cancels it, and a no-show sets attendance.\n* Calendar sync and Calendly for the same meeting give one record, in either order. How to check: an integration test for each order.\n* A replayed message changes nothing, and a missed one is picked up within an hour.\n* The settings page passes browser QA in every status, and the PostHog events land.\n\n## Name 18 and rollback\n\n* Release behind a workspace flag: our own workspace first, then 5 to 10 customers who already use Calendly.\n* Undo: turn the flag off and delete the subscriptions. Records already written stay valid.\n\n## Implementation context\n\n* Booking tracker: external-booking-tracking-service.ts. The early stop is around lines 1102 to 1137, and the cancel path doesn't update the thread (around 2559 to 2646).\n* Calendly message handling today: calendly-booking-trigger.ts. It handles Name 8 only, around lines 322 to 345.\n* Pattern to copy: the Zoom sign-in callback and `credentialEncryptionService`.\n* Calendly docs:\n  * scopes;\n  * webhook subscriptions;\n  * signatures;\n  * reschedule payloads.\n* To check in the sandbox: whether a host cancelling sends a message.\n* Full detail: AI context.md."
+    }
+  ]
+}
