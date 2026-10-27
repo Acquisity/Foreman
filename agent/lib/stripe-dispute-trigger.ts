@@ -203,7 +203,7 @@ const APPROVAL_WORDS = new Set([
 ]);
 const GO_AHEAD =
   /\b(?:approve|approved|submit|lgtm|ship it|send it|go ahead)\b/u;
-const NO_CHANGES = /\bno changes\s*[,.!:;-]/gu;
+const NO_CHANGES = /(?:^|[,.!:;-])\s*no changes\s*(?=[,.!:;-]|$)/gu;
 const PUNCTUATION = /[.,!:;]+/gu;
 const CURLY_APOSTROPHE = /\u2019/gu;
 const WHITESPACE = /\s+/u;
@@ -225,6 +225,7 @@ export const isStripeDisputeApprovalText = (text: string): boolean => {
     .replace(MENTION, " ")
     .toLowerCase()
     .replace(CURLY_APOSTROPHE, "'")
+    .trim()
     .replace(NO_CHANGES, " ")
     .replace(PUNCTUATION, " ")
     .trim();
