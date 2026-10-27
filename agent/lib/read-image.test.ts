@@ -4,12 +4,12 @@ import { z } from "zod";
 
 process.env.LINEAR_CONNECTOR ??= "linear/test";
 
+const { sniffImage } = await import("./image.js");
 const {
   default: tool,
   fetchLinearUpload,
   readBounded,
-  sniffImage,
-} = await import("../subagents/vision/tools/read_image.js");
+} = await import("../tools/read_image.js");
 
 const PNG = Buffer.concat([
   Buffer.from("89504e470d0a1a0a", "hex"),
@@ -21,7 +21,7 @@ const OVER_LIMIT = /over the 3 MiB limit/u;
 const HTTP_401 = /HTTP 401 .*unauthorized/u;
 const STALLED = /did not finish reading within 0.005 seconds/u;
 
-describe("vision read_image", () => {
+describe("read_image", () => {
   it("publishes a flat object schema and preserves image source selection", () => {
     assert.ok(tool.inputSchema instanceof z.ZodType);
     const schema = z.toJSONSchema(tool.inputSchema, {

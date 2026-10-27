@@ -1,12 +1,12 @@
 import { setTimeout as sleep } from "node:timers/promises";
 import { generateObject } from "ai";
 import { z } from "zod";
-import { sniffImage } from "../subagents/vision/tools/read_image.js";
 import {
   getHelpArticleContent,
   HELP_CENTER_BASE_URL,
   helpArticleSlug,
 } from "./help-center.js";
+import { sniffImage } from "./image.js";
 import { fastCallOptions, modelFor, resolveModel } from "./models.js";
 import { logOpsEvent } from "./ops-log.js";
 import {

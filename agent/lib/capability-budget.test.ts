@@ -640,7 +640,6 @@ describe("capability report", () => {
     const manifest = readCompiledManifest(new URL("../../", import.meta.url));
     assert.deepEqual(manifest.subagents.map((entry) => entry.name).sort(), [
       "critic",
-      "vision",
     ]);
     const repositoryResolved = await resolveLaneCapabilities(
       manifest,
@@ -721,8 +720,8 @@ describe("capability report", () => {
       );
     }
     // No loss on the admitted side: the repository lane carries every authored
-    // tool except tools exclusive to scheduled support, plus both declared
-    // children.
+    // tool except tools exclusive to scheduled support, plus the declared
+    // critic.
     const entries = (
       lane: (typeof CAPABILITY_LANES)[number],
       kind: string,
