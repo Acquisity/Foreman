@@ -1,8 +1,8 @@
 import type { Stage } from "./copy.js";
 import type { DeployProbe } from "./deploy.js";
 import type { LinearPort, TicketView } from "./linear.js";
-import type { PullFacts, TicketFacts } from "./plan.js";
-import type { Deps, RunConfig } from "./run.js";
+import { DEPLOY_REPOSITORY, type PullFacts, type TicketFacts } from "./plan.js";
+import { type Deps, type RunConfig, reconcileTicket } from "./run.js";
 import { backoffMs, type LedgerRow, type ReporterStore } from "./store.js";
 
 export const SANDBOX = "C0AAAAAAAAA";
@@ -10,6 +10,18 @@ export const FOREMAN = "foreman-user";
 export const OLD_SHA = "1111111111111111111111111111111111111111";
 export const NEW_SHA = "2222222222222222222222222222222222222222";
 export const MERGE_SHA = "3333333333333333333333333333333333333333";
+export const PR_URL = `https://github.com/${DEPLOY_REPOSITORY}/pull/7`;
+export const NOW = Date.parse("2026-10-20T12:00:00Z");
+
+export const merged = (over: Partial<PullFacts> = {}): PullFacts => ({
+  mergeSha: MERGE_SHA,
+  number: 7,
+  repo: DEPLOY_REPOSITORY,
+  state: "merged",
+  ...over,
+});
+
+export const pullKey = (number: number) => `${DEPLOY_REPOSITORY}#${number}`;
 
 export const config = (over: Partial<RunConfig> = {}): RunConfig => ({
   channels: new Set([SANDBOX]),
@@ -477,3 +489,18 @@ export const waitingIssues = (memory: ReturnType<typeof memoryStore>) =>
       checkedSha: row.checkedSha,
       issue: k.split("|")[0],
     }));
+
+export const setup = (
+  tickets = [ticket()],
+  deploy: Parameters<typeof fakeDeploy>[0] = { liveSha: OLD_SHA, pulls: {} },
+  over: Partial<RunConfig> = {}
+) => {
+  const linear = fakeLinear(tickets);
+  const probe = fakeDeploy(deploy);
+  const memory = memoryStore();
+  const deps = depsOf(linear.port, probe.probe, memory.store, over);
+  return { deps, linear, memory, probe };
+};
+
+export const reconcile = (s: ReturnType<typeof setup>, identifier = "ENG-1") =>
+  reconcileTicket(identifier, s.deps, () => s.probe.probe.liveSha());
