@@ -791,7 +791,11 @@ export const evidenceDeps = (ctx: ProviderContext): EvidenceDeps => {
     slack: capped,
     sql: (query, signal) =>
       callPlanetscaleReadQuery(
-        { ...ctx, abortSignal: signal ?? ctx.abortSignal },
+        {
+          abortSignal: signal ?? ctx.abortSignal,
+          getToken: (definition) => ctx.getToken(definition),
+          ...(ctx.session ? { session: ctx.session } : {}),
+        },
         {
           ...PRODUCTION_READ_QUERY_ARGS,
           query,
