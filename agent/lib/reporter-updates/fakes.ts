@@ -8,6 +8,7 @@ import {
   type LedgerRow,
   type PendingTicket,
   type ReporterStore,
+  WAITING_RECHECK_MS,
 } from "./store.js";
 import type { ReporterWriter, WriterReply, WriterTask } from "./writer.js";
 
@@ -89,6 +90,7 @@ interface StoredRow extends LedgerRow {
   message: string;
   retryAfter: number;
   token: string | null;
+  updatedAt: number;
 }
 
 export const memoryStore = () => {
@@ -136,6 +138,7 @@ export const memoryStore = () => {
     stage,
     status: "waiting",
     token: null,
+    updatedAt: 0,
   });
   const markSent: ReporterStore["markSent"] = (
     issue,
@@ -278,6 +281,7 @@ export const memoryStore = () => {
           ...(existing ?? blank("fixed")),
           checkedSha,
           status: "waiting",
+          updatedAt: state.now,
         });
       }
       return Promise.resolve();
@@ -296,7 +300,8 @@ export const memoryStore = () => {
         if (
           k.endsWith("|fixed") &&
           row.status === "waiting" &&
-          row.checkedSha !== liveSha &&
+          ((liveSha !== null && row.checkedSha !== liveSha) ||
+            state.now - row.updatedAt >= WAITING_RECHECK_MS) &&
           !pending.has(k.split("|")[0] ?? "")
         ) {
           pending.set(k.split("|")[0] ?? "", {

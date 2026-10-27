@@ -74,7 +74,7 @@ export interface ReporterStore {
   ) => Promise<void>;
   markWaiting: (issue: string, checkedSha: string | null) => Promise<void>;
   nextPending: (limit: number) => Promise<PendingTicket[]>;
-  queueWaiting: (liveSha: string) => Promise<void>;
+  queueWaiting: (liveSha: string | null) => Promise<void>;
   readCursor: () => Promise<DiscoveryCursor>;
   release: (issue: string, stage: Stage, token: string) => Promise<void>;
   resolvePending: (
@@ -106,6 +106,9 @@ const cursorSchema = z.object({
 });
 
 const STALE_CLAIM = "10 minutes";
+const WAITING_RECHECK_MINUTES = 60;
+/** A waiting row is rechecked at least this often even with no new release, so a waiting duplicate notices its original change. */
+export const WAITING_RECHECK_MS = WAITING_RECHECK_MINUTES * 60_000;
 export const GIVE_UP_LOG_ATTEMPTS = 5;
 const BACKOFF_BASE_MINUTES = 5;
 const BACKOFF_MAX_HOURS = 6;
@@ -257,7 +260,9 @@ export const createReporterStore = (query: Query): ReporterStore => {
       await query(
         `INSERT INTO reporter_pending (issue)
          SELECT issue FROM reporter_updates
-         WHERE stage = 'fixed' AND status = 'waiting' AND checked_sha IS DISTINCT FROM $1
+         WHERE stage = 'fixed' AND status = 'waiting'
+           AND (($1::text IS NOT NULL AND checked_sha IS DISTINCT FROM $1)
+                OR updated_at < now() - interval '${WAITING_RECHECK_MINUTES} minutes')
          ON CONFLICT (issue) DO NOTHING`,
         [liveSha]
       );

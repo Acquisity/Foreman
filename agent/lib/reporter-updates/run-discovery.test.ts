@@ -73,6 +73,7 @@ describe("discovery", () => {
       stage: "received",
       status: "sent",
       token: null,
+      updatedAt: 0,
     });
     await run(s);
     assert.deepEqual(

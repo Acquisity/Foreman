@@ -219,6 +219,23 @@ assert.ok(
   "a refused claim says when it will be claimable"
 );
 
+await store.markWaiting("ENG-11", "same-sha");
+await store.queueWaiting("same-sha");
+assert.equal(
+  await due("ENG-11"),
+  false,
+  "a row checked against the live commit within the hour is not requeued"
+);
+await pool.query(
+  "UPDATE reporter_updates SET updated_at = now() - interval '61 minutes' WHERE issue = 'ENG-11'"
+);
+await store.queueWaiting("same-sha");
+assert.equal(
+  await due("ENG-11"),
+  true,
+  "a row last checked over an hour ago is requeued with no new release"
+);
+
 await pool.query("TRUNCATE reporter_updates, reporter_pending");
 await store.markWaiting("ENG-7", null);
 await store.enqueue([{ issue: "ENG-7", version: 1 }]);

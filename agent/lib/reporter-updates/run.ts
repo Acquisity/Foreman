@@ -289,7 +289,7 @@ export const reconcileTicket = async (
   return outcome;
 };
 
-const duplicateFollowUp = async (
+const originalFollowUp = async (
   view: TicketView,
   deps: Deps,
   liveSha: () => Promise<string | null>
@@ -319,16 +319,29 @@ const duplicateFollowUp = async (
     if (done) {
       return done;
     }
-    const closedAt = Date.parse(view.facts.closedAt ?? "");
-    if (
-      !Number.isNaN(closedAt) &&
-      (deps.now ?? Date.now)() - closedAt > DUPLICATE_WAIT_MS
-    ) {
-      return dropDuplicate(identifier, "expired", deps);
-    }
   }
   await deps.store.markWaiting(identifier, await liveSha());
   return { kind: "waiting" };
+};
+
+/**
+ * The fixed, live or done message for a duplicate once its original has one.
+ * Until then the duplicate waits, for at most 30 days after it was closed,
+ * whatever the original is waiting on.
+ */
+const duplicateFollowUp = async (
+  view: TicketView,
+  deps: Deps,
+  liveSha: () => Promise<string | null>
+): Promise<Planned | Outcome | null> => {
+  const next = await originalFollowUp(view, deps, liveSha);
+  const closedAt = Date.parse(view.facts.closedAt ?? "");
+  const expired =
+    !Number.isNaN(closedAt) &&
+    (deps.now ?? Date.now)() - closedAt > DUPLICATE_WAIT_MS;
+  return next !== null && !isPlanned(next) && next.kind === "waiting" && expired
+    ? dropDuplicate(view.facts.identifier, "expired", deps)
+    : next;
 };
 
 const DUPLICATE_WAIT_MS = 30 * 86_400_000;
@@ -472,10 +485,7 @@ export const runReporterUpdates = async (
   await discoverTickets(deps, nowMs, report);
   try {
     if (await deps.store.anyWaiting()) {
-      const live = await liveSha().catch(() => null);
-      if (live) {
-        await deps.store.queueWaiting(live);
-      }
+      await deps.store.queueWaiting(await liveSha().catch(() => null));
     }
   } catch (error) {
     report.errors.push(

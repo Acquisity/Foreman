@@ -351,6 +351,7 @@ describe("a slow deployment scan", () => {
       stage: "received",
       status: "sent",
       token: null,
+      updatedAt: 0,
     });
     const fake = fakeDeploy({
       liveSha: OLD_SHA,

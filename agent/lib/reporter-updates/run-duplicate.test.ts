@@ -138,4 +138,89 @@ describe("duplicate of an original that is Done without a linked change", () => 
       fields: { code: "original_canceled", issue: "ENG-1", outcome: "skipped" },
     });
   });
+
+  it("wakes a waiting duplicate when staff close the original with a change and no new release", async () => {
+    const dup = duplicate();
+    dup.updatedAt = "2026-10-11T10:00:00.000Z";
+    const original = ticket({ identifier: "ENG-9" });
+    original.anchorId = null;
+    const s = setup([dup, original], { liveSha: OLD_SHA, pulls: {} });
+    withLog(s);
+    const run = () => runReporterUpdates(s.deps, NOW, () => NOW);
+    await run();
+    await run();
+    assert.deepEqual(waitingIssues(s.memory), [
+      { checkedSha: OLD_SHA, issue: "ENG-1" },
+    ]);
+    Object.assign(original.facts, {
+      closingComments: [
+        {
+          author: "staff",
+          body: "Removed the wrong number from the CRM.",
+          createdAt: "2026-10-12T10:00:00Z",
+        },
+      ],
+      stateName: "Done",
+      stateType: "completed",
+    });
+    await run();
+    assert.equal(s.linear.posts.length, 1, "nothing before the recheck time");
+    s.memory.state.now += 61 * 60_000;
+    await run();
+    assert.deepEqual(
+      s.linear.posts.map((p) => p.body),
+      [
+        DUPLICATE_TEXT,
+        "Done: that number's been removed from the CRM. Reply here if anything still looks off.",
+      ]
+    );
+  });
+});
+
+describe("the 30-day limit on every waiting duplicate", () => {
+  const expired = { code: "expired", issue: "ENG-1", outcome: "skipped" };
+
+  it("stops waiting on an open original 30 days after the duplicate was closed", async () => {
+    const original = ticket({ identifier: "ENG-9" });
+    original.anchorId = null;
+    const s = setup([duplicate(31), original]);
+    const events = withLog(s);
+    await reconcile(s);
+    assert.deepEqual(await reconcile(s), {
+      kind: "skipped",
+      why: "nothing_due",
+    });
+    assert.deepEqual(events.at(-1), {
+      event: "reporter.update.duplicate_dropped",
+      fields: expired,
+    });
+  });
+
+  it("stops waiting on an original whose fix is not live yet", async () => {
+    const original = doneOriginal({ pullUrls: [PR_URL] });
+    const s = setup([duplicate(31), original], {
+      liveSha: OLD_SHA,
+      pulls: { [pullKey(7)]: merged() },
+    });
+    const events = withLog(s);
+    await reconcile(s);
+    assert.deepEqual(await reconcile(s), {
+      kind: "skipped",
+      why: "nothing_due",
+    });
+    assert.deepEqual(events.at(-1), {
+      event: "reporter.update.duplicate_dropped",
+      fields: expired,
+    });
+  });
+
+  it("still posts a fix that is live on day 31", async () => {
+    const s = setup(
+      [duplicate(31), doneOriginal({ pullUrls: [PR_URL] })],
+      LIVE
+    );
+    withLog(s);
+    await reconcile(s);
+    assert.deepEqual(await reconcile(s), { kind: "posted", stage: "fixed" });
+  });
 });
