@@ -821,9 +821,9 @@ export const prepareRepositoryWorkspace = async (
       ctx.session.auth.initiator,
       () => ctx.getSandbox(environment)
     );
-    return "refusal" in replay
-      ? refuse(replay.refusal.code, replay.refusal.error)
-      : replay;
+    return replay.success
+      ? replay
+      : refuse(replay.refusal.code, replay.refusal.error);
   }
   let target: ReturnType<typeof resolveTarget>;
   try {

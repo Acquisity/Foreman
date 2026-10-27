@@ -55,7 +55,7 @@ describe("replay workspace", () => {
       Promise.resolve(sandbox)
     );
     assert.equal(
-      "refusal" in unreadable && unreadable.refusal.code,
+      unreadable.success ? undefined : unreadable.refusal.code,
       "replay_archive_unavailable"
     );
   });
