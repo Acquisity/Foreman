@@ -176,6 +176,7 @@ export const stripeDisputeSessionMessage = (alert: string): string =>
   ].join("\n");
 
 const MENTION = /<@[A-Z0-9]+(?:\|[^>]*)?>/gu;
+const CLOSING_PUNCTUATION = /[.!]+$/u;
 
 /**
  * Whether a person's thread reply is a literal approval: "approve" with only
@@ -187,5 +188,5 @@ export const isStripeDisputeApprovalText = (text: string): boolean =>
   text
     .replace(MENTION, "")
     .trim()
-    .replace(/[.!]+$/u, "")
+    .replace(CLOSING_PUNCTUATION, "")
     .toLowerCase() === "approve";
