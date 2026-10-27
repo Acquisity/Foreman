@@ -5,7 +5,6 @@ import type {
 } from "./dispute-evidence.js";
 import {
   clip,
-  failure,
   num,
   type Obj,
   obj,
@@ -21,6 +20,7 @@ const MAX_CHANNEL_PAGES = 40;
 const MAX_HISTORY_PAGES = 5;
 const MAX_THREADS = 20;
 const MAX_SLACK_USERS = 30;
+const AUTHOR_BATCH = 5;
 const TEXT_CHARS = 1500;
 const WORKSPACE_SUFFIX = /['’]s workspace$/iu;
 const SLACK_USER = /^[UW][A-Z0-9]{2,30}$/u;
@@ -203,36 +203,43 @@ const readChannel = async (
   };
 };
 
-/** Display names for message authors; a failed lookup leaves the name null. */
+/**
+ * Display names for message authors. Names are a convenience, not evidence:
+ * a failed lookup leaves the name null and never fails the source.
+ */
 const authorNames = async (deps: EvidenceDeps, messages: SlackMessage[]) => {
   const names = new Map<string, string | null>();
-  const unavailable: string[] = [];
   const users = [
     ...new Set(
       messages
         .map((message) => message.user)
         .filter((user): user is string => SLACK_USER.test(user ?? ""))
     ),
-  ];
-  for (const user of users.slice(0, MAX_SLACK_USERS)) {
-    try {
-      // biome-ignore lint/performance/noAwaitInLoops: one Slack read at a time.
-      const data = await slackCall(deps, {
-        input: { user },
-        operation: "slack.aia.user",
-      });
-      const profile = obj(data.user);
-      names.set(
-        user,
-        str(obj(profile.profile).real_name) ??
-          str(profile.real_name) ??
-          str(profile.name)
-      );
-    } catch (error) {
-      unavailable.push(`user ${user}: ${failure(error)}`);
-    }
+  ].slice(0, MAX_SLACK_USERS);
+  let unresolved = 0;
+  for (let start = 0; start < users.length; start += AUTHOR_BATCH) {
+    // biome-ignore lint/performance/noAwaitInLoops: a few Slack reads at a time.
+    await Promise.all(
+      users.slice(start, start + AUTHOR_BATCH).map(async (user) => {
+        try {
+          const data = await slackCall(deps, {
+            input: { user },
+            operation: "slack.aia.user",
+          });
+          const profile = obj(data.user);
+          names.set(
+            user,
+            str(obj(profile.profile).real_name) ??
+              str(profile.real_name) ??
+              str(profile.name)
+          );
+        } catch {
+          unresolved += 1;
+        }
+      })
+    );
   }
-  return { cut: users.length > MAX_SLACK_USERS, names, unavailable };
+  return { names, unresolved };
 };
 
 export const readSlack = async (
@@ -271,6 +278,7 @@ export const readSlack = async (
         "No client channel was found in the complete listing; refund promises and faults in that channel remain unverified.",
       terms,
       unavailable: [],
+      unresolvedAuthors: 0,
     };
   }
   if (matches.length > 1) {
@@ -291,9 +299,10 @@ export const readSlack = async (
         author: message.user ? (authors.names.get(message.user) ?? null) : null,
       })),
       read.messages.length,
-      read.cut || authors.cut
+      read.cut
     ),
     terms,
-    unavailable: authors.unavailable,
+    unavailable: [],
+    unresolvedAuthors: authors.unresolved,
   };
 };

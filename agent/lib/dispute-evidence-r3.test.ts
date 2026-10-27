@@ -378,3 +378,20 @@ describe("duplicate candidates from live charge histories", () => {
     assert.equal(result.verdict.duplicate.value, null);
   });
 });
+
+it("a failed author name lookup leaves the Slack source checked", async () => {
+  const stub = fake();
+  const { slack } = stub.deps;
+  const result = await gatherDisputeEvidence("du_1", {
+    ...stub.deps,
+    slack: (request, options) =>
+      request.operation === "slack.aia.user"
+        ? Promise.reject(new ExecutorError("execution_not_dispatched"))
+        : slack(request, options),
+  });
+  assert.equal(result.sources.slack.checked, true);
+  const read = facts(result, "slack");
+  assert.ok(read.messages.rows.length > 0);
+  assert.ok(read.messages.rows.every((message) => message.author === null));
+  assert.ok(read.unresolvedAuthors > 0);
+});
