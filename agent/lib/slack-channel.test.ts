@@ -529,7 +529,8 @@ describe("slack channel", () => {
     const line = result.context[1] ?? "";
     assert.ok(line.includes('"screenshot.png", "trace.log"'));
     assert.ok(line.includes("/workspace/.eve/attachments"));
-    assert.ok(line.includes("vision subagent"));
+    assert.ok(line.includes("read_image"));
+    assert.ok(!line.includes("vision"));
   });
 
   it("treats instruction-like attachment names as bounded data", async () => {
@@ -614,7 +615,7 @@ describe("slack channel", () => {
     assert.deepEqual(result?.context, [FINAL_SLACK_POST_RULE]);
   });
 
-  it("does not list audio or video, which the vision subagent cannot read", async () => {
+  it("does not list audio or video, which reach the model as a path label only", async () => {
     const result = await dispatch(
       inboundContext(undefined),
       attached("listen to this", undefined, [
