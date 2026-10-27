@@ -8,6 +8,7 @@ import {
   type IssueFields,
   isCase,
   type ReplayState,
+  relatedAsOfCase,
   tick,
   usersMatching,
 } from "./store.js";
@@ -30,7 +31,7 @@ const masterOf = (state: ReplayState, duplicate: string | undefined) => {
   if (!duplicate) {
     return null;
   }
-  const target = state.case.relatedSnapshot.find((r) => r.id === duplicate);
+  const target = relatedAsOfCase(state, duplicate);
   return (target && asOfName(target.parent)) ?? duplicate;
 };
 
@@ -125,7 +126,7 @@ export function replayIssueView(
       },
     };
   }
-  const related = state.case.relatedSnapshot.find((r) => r.id === identifier);
+  const related = relatedAsOfCase(state, identifier);
   if (!related) {
     return null;
   }

@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { ENGINEERING_TEAM_ID } from "../linear-api.js";
 import { ticketUrl } from "../ticket-links.js";
+import type { CriticVerdictFields } from "../triage-log.js";
 import type { TriageCase } from "./schema.js";
 
 const named = z.strictObject({
@@ -57,11 +58,7 @@ export interface ReplayState {
   clock: number;
   comments: { body: string; issue: string }[];
   created: CreatedIssue[];
-  critic: {
-    blockingFindings: number | null;
-    failedCriteria: number | null;
-    verdict: "APPROVE" | "CHALLENGE" | "INSUFFICIENT_EVIDENCE" | "failed";
-  } | null;
+  critic: CriticVerdictFields | null;
   decisions: { kind: "billing" | "triage"; output: unknown }[];
   documents: StoredDocument[];
   evidenceMisses: string[];
@@ -129,6 +126,16 @@ export const asOfList = (value: string[] | "unknown"): string[] =>
 
 export const isCase = (state: ReplayState, id: unknown) =>
   id === CASE_ISSUE_ID || id === state.case.id;
+
+export const snapshotAsOfCase = (state: ReplayState) =>
+  state.case.relatedSnapshot.filter(
+    (related) => related.createdAt < state.case.createdAt
+  );
+
+export const relatedAsOfCase = (state: ReplayState, id: unknown) =>
+  snapshotAsOfCase(state).find(
+    (related) => related.id === id || issueIdOf(related.id) === id
+  );
 
 export const team = () => ({ id: ENGINEERING_TEAM_ID });
 export const createdIssue = (state: ReplayState, id: unknown) =>

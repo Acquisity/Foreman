@@ -24,6 +24,7 @@ import { NEW_MASTER } from "./schema.js";
 import { appliedRoute } from "./views.js";
 
 const TOKEN_REFRESH = /token refresh/u;
+const ONLY_CASE_DOCUMENTS = /documents only on ENG-100/u;
 
 const rootCtx = {
   session: { auth: { current: auth, initiator: auth }, id: "sess-root" },
@@ -216,6 +217,21 @@ describe("replay Executor client", () => {
   });
 });
 
+describe("replay documents", () => {
+  it("keeps documents on the case's ticket and refuses one for another issue", async (t) => {
+    await replayProcess(t);
+    noTransport(t);
+    await assert.rejects(
+      saveInvestigationDocument(
+        { content: "Other.", issue: "ENG-90", lane: "triage" },
+        { client: executorClient(ctx) }
+      ),
+      ONLY_CASE_DOCUMENTS
+    );
+    assert.deepEqual((await state()).documents, []);
+  });
+});
+
 describe("replay Linear tools", () => {
   const toolCtx = {
     ...ctx,
@@ -278,6 +294,11 @@ describe("replay Linear tools", () => {
     assert.match(JSON.stringify(read), TOKEN_REFRESH);
     const related = await readIssueTool.execute({ issue: "ENG-90" }, toolCtx);
     assert.equal((related as { issue: { state: string } }).issue.state, "Todo");
+    assert.equal(
+      (await outputOf(readIssueTool.execute({ issue: "ENG-130" }, toolCtx)))
+        .found,
+      false
+    );
     assert.equal(
       (await outputOf(readIssueTool.execute({ issue: "ENG-404" }, toolCtx)))
         .found,

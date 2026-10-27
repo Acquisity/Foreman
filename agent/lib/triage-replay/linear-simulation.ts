@@ -10,6 +10,8 @@ import {
   isCase,
   issueIdOf,
   type ReplayState,
+  relatedAsOfCase,
+  snapshotAsOfCase,
   team,
   tick,
   urlOf,
@@ -56,9 +58,7 @@ function routeIssue(state: ReplayState, id: unknown) {
       created.fields
     );
   }
-  const related = state.case.relatedSnapshot.find(
-    (r) => r.id === id || issueIdOf(r.id) === id
-  );
+  const related = relatedAsOfCase(state, id);
   if (!related) {
     return null;
   }
@@ -116,8 +116,7 @@ function matches(
 
 function relatedIssues(state: ReplayState, variables: Filter) {
   const filter = variables.filter as Filter;
-  const nodes = state.case.relatedSnapshot
-    .filter((r) => r.createdAt < state.case.createdAt)
+  const nodes = snapshotAsOfCase(state)
     .filter((r) =>
       matches(filter, {
         createdAt: r.createdAt,
@@ -208,10 +207,20 @@ function applyUpdate(state: ReplayState, issue: IssueFields, input: Filter) {
 
 type Handler = (state: ReplayState, variables: Filter) => unknown;
 
+function caseDocumentsOnly(state: ReplayState, issue: unknown) {
+  if (!isCase(state, issue)) {
+    throw new Error(
+      `Triage replay keeps documents only on ${state.case.id}, not ${String(issue)}.`
+    );
+  }
+}
+
 const HANDLERS: Record<LinearOperation, Handler> = {
-  CreateDocument: (state, v) => ({
-    documentCreate: saveDocument(state, null, v.input as Filter),
-  }),
+  CreateDocument: (state, v) => {
+    const input = v.input as Filter;
+    caseDocumentsOnly(state, input.issueId);
+    return { documentCreate: saveDocument(state, null, input) };
+  },
   Document: (state, v) => {
     const doc = state.documents.find((d) => d.id === v.id);
     return {
@@ -220,17 +229,20 @@ const HANDLERS: Record<LinearOperation, Handler> = {
         : null,
     };
   },
-  IssueDocuments: (state, v) => ({
-    issue: {
-      documents: {
-        nodes: state.documents
-          .filter((d) => d.title === v.title)
-          .map(({ id, title }) => ({ id, title })),
+  IssueDocuments: (state, v) => {
+    caseDocumentsOnly(state, v.id);
+    return {
+      issue: {
+        documents: {
+          nodes: state.documents
+            .filter((d) => d.title === v.title)
+            .map(({ id, title }) => ({ id, title })),
+        },
+        id: CASE_ISSUE_ID,
+        identifier: state.case.id,
       },
-      id: CASE_ISSUE_ID,
-      identifier: state.case.id,
-    },
-  }),
+    };
+  },
   Projects: (state, v) => ({
     projects: { nodes: byName(asOfCase(state, "projects"), v.name) },
   }),
