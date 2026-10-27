@@ -413,20 +413,17 @@ const toResult = (
   warnings,
 });
 
-/** Unions the labels to add with the ticket's current labels, minus the ones to remove; unknown names throw before any write. */
-async function resolveLabelIds(
+interface FinalLabels {
+  changed: boolean;
+  ids: string[];
+  names: string[];
+}
+
+async function teamLabelsNamed(
   gql: Gql,
   issue: RouteIssue,
-  addLabels: string[],
-  removeLabels: string[]
-): Promise<string[]> {
-  const removed = new Set(removeLabels.map((name) => name.toLowerCase()));
-  const kept = issue.labels.nodes.filter(
-    (label) => !removed.has(label.name.toLowerCase())
-  );
-  if (addLabels.length === 0) {
-    return kept.map((label) => label.id);
-  }
+  names: string[]
+): Promise<Named[]> {
   const labels: Named[] = [];
   let after: string | null = null;
   for (let page = 0; page < MAX_LABEL_PAGES; page += 1) {
@@ -443,9 +440,9 @@ async function resolveLabelIds(
     }
   }
   const byName = new Map(
-    labels.map((label) => [label.name.toLowerCase(), label.id])
+    labels.map((label) => [label.name.toLowerCase(), label])
   );
-  const unknown = addLabels.filter((name) => !byName.has(name.toLowerCase()));
+  const unknown = names.filter((name) => !byName.has(name.toLowerCase()));
   if (unknown.length > 0) {
     throw new Error(
       `Unknown label${unknown.length > 1 ? "s" : ""} ${unknown.map((name) => `"${name}"`).join(", ")}. Valid labels: ${labels
@@ -454,36 +451,42 @@ async function resolveLabelIds(
         .join(", ")}.`
     );
   }
-  return [
-    ...new Set([
-      ...kept.map((label) => label.id),
-      ...addLabels.map((name) => byName.get(name.toLowerCase()) ?? ""),
-    ]),
-  ].filter(Boolean);
+  return names.flatMap((name) => byName.get(name.toLowerCase()) ?? []);
 }
 
-const finalLabelNames = (
-  issue: RouteIssue,
-  input: RouteTicketInput
-): string[] => {
-  const removed = new Set(
-    (input.removeLabels ?? []).map((name) => name.toLowerCase())
-  );
-  return [
-    ...issue.labels.nodes
-      .map((label) => label.name)
-      .filter((name) => !removed.has(name.toLowerCase())),
-    ...(input.addLabels ?? []),
-  ];
-};
-
-async function chooseAssignee(
+/** The ticket's labels after the call: its current labels minus the ones to remove, then the ones to add; unknown names throw before any write. */
+async function resolveLabels(
   gql: Gql,
   issue: RouteIssue,
   input: RouteTicketInput
+): Promise<FinalLabels> {
+  const removed = new Set(
+    (input.removeLabels ?? []).map((name) => name.toLowerCase())
+  );
+  const kept = issue.labels.nodes.filter(
+    (label) => !removed.has(label.name.toLowerCase())
+  );
+  const added = input.addLabels?.length
+    ? await teamLabelsNamed(gql, issue, input.addLabels)
+    : [];
+  const final = [
+    ...new Map(
+      [...kept, ...added].map((label) => [label.id, label] as const)
+    ).values(),
+  ];
+  return {
+    changed: added.length > 0 || kept.length < issue.labels.nodes.length,
+    ids: final.map((label) => label.id),
+    names: final.map((label) => label.name),
+  };
+}
+
+async function chooseAssignee(
+  gql: Gql,
+  input: RouteTicketInput,
+  labels: string[]
 ): Promise<{ id?: string; warnings: string[] }> {
   const warnings: string[] = [];
-  const labels = finalLabelNames(issue, input);
   if (input.inheritAssigneeFrom !== undefined) {
     const source = await requireIssue(gql, input.inheritAssigneeFrom);
     const holder = source.assignee ? mappedOwner(source.assignee.name) : null;
@@ -528,15 +531,25 @@ async function chooseAssignee(
 async function resolveAssigneeId(
   gql: Gql,
   issue: RouteIssue,
-  input: RouteTicketInput
+  input: RouteTicketInput,
+  labels: FinalLabels
 ): Promise<{ id?: string | null; warnings: string[] }> {
-  const chosen = await chooseAssignee(gql, issue, input);
-  if (chosen.id !== undefined || !input.releaseDeveloper) {
+  const chosen = await chooseAssignee(gql, input, labels.names);
+  if (chosen.id !== undefined) {
     return chosen;
   }
   const holder = issue.assignee ? mappedOwner(issue.assignee.name) : null;
-  if (holder?.lane === "developer" && holder.name !== FALLBACK_OWNER) {
+  if (
+    input.releaseDeveloper &&
+    holder?.lane === "developer" &&
+    holder.name !== FALLBACK_OWNER
+  ) {
     return { id: null, warnings: chosen.warnings };
+  }
+  if (labels.changed && holder && !mayHoldTicket(holder, labels.names)) {
+    throw new Error(
+      `${issue.identifier} is held by ${holder.name}, a developer, and this label change would leave it labelled ${labels.names.length > 0 ? labels.names.join(", ") : "nothing"}, so nothing was written. A developer holds a ticket only when it is labelled ${BUG_LABEL}, or ${FEATURE_REQUEST_LABEL} and ${APPROVED_LABEL}; only ${FALLBACK_OWNER} may hold a ${FEATURE_REQUEST_LABEL} marked ${NEEDS_APPROVAL_LABEL}. Keep the label, assign someone who may hold it, or pass releaseDeveloper.`
+    );
   }
   return chosen;
 }
@@ -548,18 +561,9 @@ async function buildUpdate(
   input: RouteTicketInput
 ): Promise<{ update: Record<string, unknown>; warnings: string[] }> {
   const update: Record<string, unknown> = {};
-  const removing = (input.removeLabels ?? []).some((name) =>
-    issue.labels.nodes.some(
-      (label) => label.name.toLowerCase() === name.toLowerCase()
-    )
-  );
-  if (input.addLabels?.length || removing) {
-    update.labelIds = await resolveLabelIds(
-      gql,
-      issue,
-      input.addLabels ?? [],
-      input.removeLabels ?? []
-    );
+  const labels = await resolveLabels(gql, issue, input);
+  if (labels.changed) {
+    update.labelIds = labels.ids;
   }
   if (input.state !== undefined) {
     const { workflowStates } = await gql<{
@@ -581,7 +585,7 @@ async function buildUpdate(
       projects.nodes
     );
   }
-  const assignee = await resolveAssigneeId(gql, issue, input);
+  const assignee = await resolveAssigneeId(gql, issue, input, labels);
   if (assignee.id !== undefined) {
     update.assigneeId = assignee.id;
   }

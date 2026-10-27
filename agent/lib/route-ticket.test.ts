@@ -351,6 +351,12 @@ const JAMES_IS_A_DEVELOPER = /James Keeble is a developer/u;
 const A_DEVELOPER = /Ebubeker Rexha is a developer/u;
 const NOT_INHERITED =
   /not in the owner map, so the assignee was not inherited/u;
+const EBU_KEEPS_UNAPPROVED =
+  /ENG-1 is held by Ebubeker Rexha, a developer, and this label change would leave it labelled Feature Request, so nothing was written/u;
+const JAMES_KEEPS_UNAPPROVED =
+  /ENG-1 is held by James Keeble, a developer, and this label change would leave it labelled Feature Request, so nothing was written/u;
+const EBU_KEEPS_UNLABELLED =
+  /ENG-1 is held by Ebubeker Rexha, a developer, and this label change would leave it labelled Customer reported, so nothing was written/u;
 
 describe("routeTicket owner map", () => {
   it("refuses an assignee who is not in the owner map before any write", async () => {
@@ -681,6 +687,99 @@ describe("routeTicket owner map", () => {
       ),
       JAMES_IS_A_DEVELOPER
     );
+  });
+
+  it("refuses a label change that leaves the developer already holding the ticket ineligible", async () => {
+    const ebu = { id: "u-ebu", name: "Ebubeker Rexha" };
+    const approved = fakeLinear({
+      teamLabels: FEATURE_LABELS,
+      ticketAssignee: ebu,
+      ticketLabels: [
+        { id: "l-fr", name: "Feature Request" },
+        { id: "l-ok", name: "Approved" },
+      ],
+    });
+    await assert.rejects(
+      routeTicket(
+        { issue: "ENG-1", removeLabels: ["Approved"] },
+        { client: approved.fetchStub }
+      ),
+      EBU_KEEPS_UNAPPROVED
+    );
+    assert.equal(approved.updates().length, 0);
+    const bug = fakeLinear({
+      ticketAssignee: ebu,
+      ticketLabels: [
+        { id: "l-bug", name: "Bug" },
+        { id: "l-cr", name: "Customer reported" },
+      ],
+    });
+    await assert.rejects(
+      routeTicket(
+        { issue: "ENG-1", priority: 2, removeLabels: ["Bug"] },
+        { client: bug.fetchStub }
+      ),
+      EBU_KEEPS_UNLABELLED
+    );
+    assert.equal(bug.updates().length, 0);
+    const released = fakeLinear({
+      teamLabels: FEATURE_LABELS,
+      ticketAssignee: ebu,
+      ticketLabels: [
+        { id: "l-fr", name: "Feature Request" },
+        { id: "l-ok", name: "Approved" },
+      ],
+    });
+    await routeTicket(
+      { issue: "ENG-1", releaseDeveloper: true, removeLabels: ["Approved"] },
+      { client: released.fetchStub }
+    );
+    assert.deepEqual(released.updates()[0]?.variables.input, {
+      assigneeId: null,
+      labelIds: ["l-fr"],
+    });
+  });
+
+  it("keeps James on a feature request moved back to waiting for approval", async () => {
+    const linear = fakeLinear({
+      teamLabels: [...FEATURE_LABELS, { id: "l-need", name: "Needs approval" }],
+      ticketAssignee: { id: "u-james", name: "James Keeble" },
+      ticketLabels: [
+        { id: "l-fr", name: "Feature Request" },
+        { id: "l-ok", name: "Approved" },
+      ],
+    });
+    await routeTicket(
+      {
+        addLabels: ["Needs approval"],
+        issue: "ENG-1",
+        releaseDeveloper: true,
+        removeLabels: ["Approved"],
+      },
+      { client: linear.fetchStub }
+    );
+    assert.deepEqual(linear.updates()[0]?.variables.input, {
+      labelIds: ["l-fr", "l-need"],
+    });
+    const dropped = fakeLinear({
+      ticketAssignee: { id: "u-james", name: "James Keeble" },
+      ticketLabels: [
+        { id: "l-fr", name: "Feature Request" },
+        { id: "l-need", name: "Needs approval" },
+      ],
+    });
+    await assert.rejects(
+      routeTicket(
+        {
+          issue: "ENG-1",
+          releaseDeveloper: true,
+          removeLabels: ["Needs approval"],
+        },
+        { client: dropped.fetchStub }
+      ),
+      JAMES_KEEPS_UNAPPROVED
+    );
+    assert.equal(dropped.updates().length, 0);
   });
 
   it("lets a support owner take any ticket", async () => {
