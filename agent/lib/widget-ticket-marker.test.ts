@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { widgetScopeBlock } from "./executor/dispatch.js";
 import { readAskFrom } from "./requester-reply.js";
+import { widgetContextSchema } from "./widget-scope.js";
 import {
   isWidgetFiledDescription,
   WIDGET_SCOPE_NOTICE,
@@ -105,4 +106,28 @@ test("the intake read marks widget-filed, support-conversation and migration-for
   cases.forEach(([name, expected], index) => {
     assert.equal(reads[index].triageIntake, expected, name);
   });
+});
+
+test("the longest workspace line the scope block can write still counts", () => {
+  const longest = {
+    ...scope,
+    organizationName: "N".repeat(500),
+    organizationSlug: `s${"x".repeat(199)}`,
+  };
+  assert.equal(
+    widgetContextSchema.shape.organizationName.safeParse(
+      longest.organizationName
+    ).success,
+    true
+  );
+  assert.equal(
+    widgetContextSchema.shape.organizationSlug.safeParse(
+      longest.organizationSlug
+    ).success,
+    true
+  );
+  assert.equal(
+    isWidgetFiledDescription(`Inboxes fail.\n\n${widgetScopeBlock(longest)}`),
+    true
+  );
 });

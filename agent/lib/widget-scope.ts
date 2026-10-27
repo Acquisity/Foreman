@@ -48,6 +48,12 @@ export const officeHoursSchema = z.strictObject({
 });
 export type OfficeHours = z.infer<typeof officeHoursSchema>;
 
+export const ORGANIZATION_NAME_MAX = 500;
+export const ORGANIZATION_SLUG_MAX = 200;
+export const ORGANIZATION_SLUG = new RegExp(
+  `^[A-Za-z0-9][A-Za-z0-9_-]{0,${ORGANIZATION_SLUG_MAX - 1}}$`
+);
+
 const shape = {
   conversationId: z.uuid(),
   // Only the local live harness stamps the original conversation date.
@@ -56,8 +62,8 @@ const shape = {
   // Never stamped on the session: auth attributes hold strings only.
   officeHours: officeHoursSchema.optional(),
   organizationId: z.uuid(),
-  organizationName: z.string().min(1).max(500),
-  organizationSlug: z.string().regex(/^[A-Za-z0-9][A-Za-z0-9_-]{0,199}$/),
+  organizationName: z.string().min(1).max(ORGANIZATION_NAME_MAX),
+  organizationSlug: z.string().regex(ORGANIZATION_SLUG),
   partnerId: z.literal(DEFAULT_PARTNER_ID),
   // The Jam id of the screen recording this turn follows up on. Acquisity sets
   // it only after checking the recording's signed conversation reference.
