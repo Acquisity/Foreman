@@ -175,7 +175,7 @@ const DELEGATED_REASON =
 const SUBMIT_REASON =
   "A person approves every submit. Post the ready message and end the turn; a person replies in the thread to approve.";
 const APPROVAL_REASON =
-  'Submit runs only on a turn whose message is a person\'s plain "@Foreman approve" in this thread. Ask them to reply that if they want it submitted.';
+  "Submit runs only on a turn whose message is a person's clear go-ahead in this thread, like a tag that says approve. A question, a refusal or a change request is not one. Ask them to tag you and say approve if they want it submitted.";
 
 /** The refusal for this caller and action, or null when it may proceed. */
 export const disputeAccessRefusal = (
