@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { CRITIC_CRITERIA } from "../subagents/critic/agent.js";
 import { formatOpsEvent } from "./ops-log.js";
+import { CRITIC_FINDING } from "./triage-fixtures.js";
 import {
   assigneeKind,
   BILLING_PATH,
@@ -32,8 +33,19 @@ const criteria = (fail: number) =>
 
 describe("critic.verdict fields", () => {
   it("counts failed criteria and blocking findings on a settled review", () => {
+    const complete = {
+      advisory_notes: [],
+      reviewed: {
+        commit: "c".repeat(40),
+        document_id: "doc-1",
+        document_updated_at: "2026-10-27T10:00:00.000Z",
+        issue_id: "ENG-1",
+      },
+      summary: "s",
+    };
     assert.deepEqual(
       criticVerdictFields("completed", {
+        ...complete,
         blocking_findings: [],
         criteria_results: criteria(0),
         verdict: "APPROVE",
@@ -49,7 +61,8 @@ describe("critic.verdict fields", () => {
       criticVerdictFields(
         "completed",
         JSON.stringify({
-          blocking_findings: [{ claim: "x" }, { claim: "y" }],
+          ...complete,
+          blocking_findings: [CRITIC_FINDING, CRITIC_FINDING],
           criteria_results: criteria(2),
           verdict: "CHALLENGE",
         })

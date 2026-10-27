@@ -1,6 +1,11 @@
 import { defineState } from "eve/context";
 import { z } from "zod";
-import { CRITIC_CRITERIA, CRITIC_VERDICTS } from "../subagents/critic/agent.js";
+import {
+  CRITIC_CRITERIA,
+  CRITIC_VERDICTS,
+  type CriticReply,
+  criticReplySchema,
+} from "../subagents/critic/agent.js";
 import type { TriageDecision } from "./jev-decisions.js";
 import { SUPPORT_OWNER } from "./owner-map.js";
 
@@ -372,28 +377,6 @@ export const confidenceFields = (decision: TriageDecision) => ({
   verdictConfidence: decision.confidence.verdict,
 });
 
-const CRITIC_RESULTS = ["PASS", "FAIL", "NOT_APPLICABLE"] as const;
-
-const criticReply = z.object({
-  blocking_findings: z.array(z.unknown()),
-  criteria_results: z.array(
-    z.object({
-      criterion: z.enum(CRITIC_CRITERIA),
-      result: z.enum(CRITIC_RESULTS),
-    })
-  ),
-  reviewed: z
-    .object({
-      commit: z.string(),
-      document_id: z.string(),
-      document_updated_at: z.string(),
-      issue_id: z.string(),
-    })
-    .optional(),
-  verdict: z.enum(CRITIC_VERDICTS),
-});
-type CriticReply = z.infer<typeof criticReply>;
-
 export const CRITIC_COUNTS = ["approve", "objection", "failed"] as const;
 export type CriticCount = (typeof CRITIC_COUNTS)[number];
 
@@ -472,7 +455,7 @@ export function criticVerdictFields(
       return failed;
     }
   }
-  const parsed = criticReply.safeParse(value);
+  const parsed = criticReplySchema.safeParse(value);
   if (!parsed.success) {
     return failed;
   }

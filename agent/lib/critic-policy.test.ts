@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { CRITIC_CRITERIA } from "../subagents/critic/agent.js";
 import { formatOpsEvent } from "./ops-log.js";
+import { CRITIC_FINDING } from "./triage-fixtures.js";
 import {
   criticBlocked,
   criticTaskPacket,
@@ -66,7 +67,7 @@ describe("the critic policy", () => {
       criticVerdictFields(
         "completed",
         reply({
-          blocking_findings: [{ claim: "c" }],
+          blocking_findings: [CRITIC_FINDING],
           criteria_results: criteria(1),
           verdict: "CHALLENGE",
         }),
@@ -82,7 +83,7 @@ describe("the critic policy", () => {
       "failed"
     );
     const unpinned = reply({
-      blocking_findings: [{ claim: "c" }],
+      blocking_findings: [CRITIC_FINDING],
       reviewed: reviewed({ commit: "unpinned" }),
       verdict: "CHALLENGE",
     });
@@ -114,7 +115,7 @@ describe("the critic policy", () => {
   it("reads an echo that differs only in case, spacing or code marks as the same ticket and commit", () => {
     const challenge = (echo: Record<string, string>) =>
       reply({
-        blocking_findings: [{ claim: "c" }],
+        blocking_findings: [CRITIC_FINDING],
         criteria_results: criteria(1),
         reviewed: reviewed(echo),
         verdict: "CHALLENGE",
@@ -137,7 +138,7 @@ describe("the critic policy", () => {
   it("counts a review of another commit, document or version as failed, not as an objection", () => {
     const challenge = (echo: Record<string, string>) =>
       reply({
-        blocking_findings: [{ claim: "c" }],
+        blocking_findings: [CRITIC_FINDING],
         criteria_results: criteria(1),
         reviewed: reviewed(echo),
         verdict: "CHALLENGE",
@@ -191,7 +192,7 @@ describe("the critic policy", () => {
   it("treats an approval with failed criteria, blocking findings or missing slugs as an objection", () => {
     for (const output of [
       reply({ criteria_results: criteria(CRITIC_CRITERIA.length) }),
-      reply({ blocking_findings: [{ claim: "c" }] }),
+      reply({ blocking_findings: [CRITIC_FINDING] }),
       reply({ criteria_results: criteria(0, 11) }),
       reply({
         criteria_results: [...criteria(0, 11), criteria(0, 1)[0]],
@@ -203,12 +204,12 @@ describe("the critic policy", () => {
       );
     }
     const challenge = reply({
-      blocking_findings: [{ claim: "c" }],
+      blocking_findings: [CRITIC_FINDING],
       criteria_results: criteria(1),
       verdict: "CHALLENGE",
     });
     const hollow = reply({
-      blocking_findings: [{ claim: "c" }],
+      blocking_findings: [CRITIC_FINDING],
       criteria_results: criteria(CRITIC_CRITERIA.length),
     });
     const rounds = settle([challenge, hollow]);

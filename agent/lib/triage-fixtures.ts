@@ -57,3 +57,10 @@ export const bugAnswers = (
   wants_limit_lifted: no(),
   ...over,
 });
+
+export const CRITIC_FINDING = {
+  claim: "The duplicate target shares the cause.",
+  evidence: "ENG-9 fails in a different function.",
+  impact: "The ticket would close on another cause.",
+  next_check: "Compare the two code paths at the reviewed commit.",
+};

@@ -10,6 +10,7 @@ import { executorClient } from "../executor/client.js";
 import { executorTransport } from "../executor/transport.js";
 import { routeTicket, saveInvestigationDocument } from "../linear-api.js";
 import { SUPPORT_OWNER } from "../owner-map.js";
+import { CRITIC_FINDING } from "../triage-fixtures.js";
 import { routeRefusal, settleCriticRound } from "../triage-log.js";
 import { withReplayState } from "./backend.js";
 import {
@@ -78,7 +79,7 @@ const endTurn = () => replayHandler("turn.completed")({ data: {} }, rootCtx);
 
 const criticReply = (verdict: string, over: Record<string, unknown> = {}) => ({
   advisory_notes: [],
-  blocking_findings: verdict === "APPROVE" ? [] : [{ claim: "c" }],
+  blocking_findings: verdict === "APPROVE" ? [] : [CRITIC_FINDING],
   criteria_results: CRITIC_CRITERIA.map((criterion) => ({
     criterion,
     evidence: "read",
