@@ -49,6 +49,7 @@ describe("replay workspace", () => {
           error:
             "A replay process prepares repositories only for replay sessions.",
         },
+        success: false,
       }
     );
     const unreadable = await prepareReplayWorkspace(auth, () =>
