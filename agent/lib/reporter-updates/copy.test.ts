@@ -159,6 +159,21 @@ describe("cleanPhrase and cleanSteps", () => {
   });
 });
 
+describe("staff names never reach a reporter", () => {
+  it("refuses a phrase naming any owner-map person by first or full name, not only the assignee", () => {
+    assert.equal(
+      cleanPhrase("Aaron removed the incorrect number", 15, "James"),
+      null
+    );
+    assert.equal(cleanPhrase("Aaron Fraga removed the number", 15), null);
+    assert.equal(cleanPhrase("the number was removed by Fraga", 15), null);
+    assert.equal(
+      cleanPhrase("that number's been removed from the CRM", 15, "James"),
+      "that number's been removed from the CRM"
+    );
+  });
+});
+
 describe("recognising messages already in the thread", () => {
   it("still recognises every exact text the first version posted", () => {
     assert.deepEqual(coversOf(PAST_TEXTS.received[0] ?? ""), ["received"]);

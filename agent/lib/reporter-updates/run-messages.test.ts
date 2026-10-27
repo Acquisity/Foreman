@@ -266,6 +266,41 @@ describe("done without a pull request", () => {
   }
 });
 
+describe("staff names in written phrases", () => {
+  it("posts nothing for a Done phrase that names another staff member, as Devin's example", async () => {
+    const s = setup([
+      ticket({
+        assignee: "James Keeble",
+        closingComments: [
+          {
+            author: "staff",
+            body: "Aaron removed the incorrect number",
+            createdAt: "2026-10-12T10:00:00Z",
+          },
+        ],
+        stateType: "completed",
+      }),
+    ]);
+    withWriter(s, {
+      done: { steps: null, what: "Aaron removed the incorrect number" },
+    });
+    assert.deepEqual(await reconcile(s), {
+      kind: "skipped",
+      why: "no_evidence_of_change",
+    });
+    assert.equal(s.linear.posts.length, 0);
+  });
+
+  it("falls back on the received line when the phrase names another staff member", async () => {
+    const s = setup([ticket({ assignee: "James Keeble" })]);
+    withWriter(s, {
+      received: { steps: null, what: "the number Aaron is checking" },
+    });
+    await reconcile(s);
+    assert.equal(s.linear.posts[0]?.body, RECEIVED_FALLBACK);
+  });
+});
+
 describe("not a bug and closed reasons", () => {
   it("adds a short reason from the closing comments, and leaves it out when there is none", async () => {
     const t = ticket({

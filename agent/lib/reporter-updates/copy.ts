@@ -1,3 +1,4 @@
+import { ownerNames } from "../owner-map.js";
 import { commentIdFor } from "./comment-id.js";
 
 export type Stage = "received" | "fixed" | "not_fixed";
@@ -62,6 +63,16 @@ const mentions = (text: string, name: string | null): boolean =>
     "iu"
   ).test(text);
 
+/** Every owner-map person's full name and each part of it, so no staff name reaches a reporter. */
+const STAFF_NAMES: readonly string[] = [
+  ...new Set(
+    ownerNames().flatMap((name) => [
+      name,
+      ...name.split(WHITESPACE).filter(Boolean),
+    ])
+  ),
+];
+
 const usable = (
   text: string,
   maxWords: number,
@@ -71,7 +82,7 @@ const usable = (
   wordCount(text) <= maxWords &&
   !MARKUP.test(text) &&
   bannedWordsIn(text).length === 0 &&
-  !mentions(text, avoidName);
+  ![avoidName, ...STAFF_NAMES].some((name) => mentions(text, name));
 
 /**
  * A model-written phrase that sits inside a sentence: one line, no closing
