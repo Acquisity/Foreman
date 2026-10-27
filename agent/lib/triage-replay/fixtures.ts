@@ -2,24 +2,15 @@ import type { TestContext } from "node:test";
 import { evePackageUrl } from "../eve-dynamic-tools.js";
 import type { executorClient } from "../executor/client.js";
 import {
-  loadReplayState,
   memoryBackend,
-  replayStateKey,
+  readReplayState,
   seedReplayStore,
   setReplayBackend,
 } from "./backend.js";
 import { triageReplayHook } from "./hook.js";
-import {
-  type AdmissionLedger,
-  type LedgerEntries,
-  replayAuth,
-} from "./route.js";
+import { replayAuth } from "./route.js";
 import type { TriageCase, TriageLabel, TriageResult } from "./schema.js";
 import { seedReplayState } from "./store.js";
-
-/** Synthetic triage replay data for the scorer's tests; no real ticket content. */
-
-export const SHA = "a".repeat(64);
 
 export const makeCase = (
   id: string,
@@ -76,13 +67,11 @@ export const makeResult = (
   overrides: Partial<TriageResult> = {}
 ): TriageResult => ({
   caseId,
-  cohortSha256: SHA,
   critic: { blockingFindings: 0, failedCriteria: 0, verdict: "APPROVE" },
   document: {
     text: "Root cause: renderPanel.",
     updatedAt: "2026-09-01T10:05:00.000Z",
   },
-  estimatedUsd: 4,
   evidenceMisses: [],
   final: {
     assignee: "area owner",
@@ -94,8 +83,6 @@ export const makeResult = (
     project: "Platform",
   },
   foremanCommit: "1".repeat(40),
-  inputs: [],
-  listMembershipUnknown: [],
   run: 1,
   runId: "run-1",
   startedAt: "2026-09-01T10:00:00.000Z",
@@ -192,7 +179,6 @@ export const ctx = {
   session: { auth: { current: auth, initiator: auth } },
 } as unknown as Parameters<typeof executorClient>[0];
 
-/** A replay process with a memory store seeded for ENG-100, undone after the test. */
 export async function replayProcess(t: TestContext) {
   const prior = { ...process.env };
   process.env.TRIAGE_REPLAY = "1";
@@ -200,26 +186,22 @@ export async function replayProcess(t: TestContext) {
   delete process.env.FOREMAN_MEMORY_DATABASE_URL;
   delete process.env.VERCEL_SANDBOX_BASE_SNAPSHOT_ID;
   process.env.FOREMAN_DIAGNOSTICS_SECRET = TEST_SECRET;
-  const backend = memoryBackend();
-  setReplayBackend(backend);
+  setReplayBackend(memoryBackend());
   await seedReplayStore(
-    replayStateKey(RUN, KEY),
-    seedReplayState(triageCase, lists, ARCHIVE_URL),
-    backend
+    seedReplayState(triageCase, {
+      archiveUrl: ARCHIVE_URL,
+      caseKey: KEY,
+      lists,
+      stamp: { foremanCommit: "unknown", startedAt: CASE_CREATED },
+    }),
+    RUN
   );
   t.after(() => {
     process.env = prior;
   });
-  return backend;
 }
 
-export const state = async () => {
-  const loaded = await loadReplayState(replayStateKey(RUN, KEY));
-  if (!loaded) {
-    throw new Error("No seeded replay store.");
-  }
-  return loaded;
-};
+export const state = () => readReplayState(RUN, KEY);
 
 type ReplayHookEvent = keyof NonNullable<typeof triageReplayHook.events>;
 
@@ -244,32 +226,6 @@ export async function outputOf<T>(
   }
   return value as T;
 }
-
-export const sharedLedger = () => {
-  let stored: (LedgerEntries & { etag: string }) | null = null;
-  let version = 0;
-  return (): AdmissionLedger => ({
-    read: () =>
-      Promise.resolve(
-        stored
-          ? {
-              admitted: [...stored.admitted],
-              chargedUsd: stored.chargedUsd,
-              etag: stored.etag,
-              reserved: { ...stored.reserved },
-            }
-          : { admitted: [], chargedUsd: 0, etag: null, reserved: {} }
-      ),
-    write: (_run, entries, etag) => {
-      if ((stored?.etag ?? null) !== etag) {
-        return Promise.resolve("conflict" as const);
-      }
-      version += 1;
-      stored = { ...entries, etag: `v${version}` };
-      return Promise.resolve("written" as const);
-    },
-  });
-};
 
 interface EveContextModule {
   ContextContainer: new () => unknown;

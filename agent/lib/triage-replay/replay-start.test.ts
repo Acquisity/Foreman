@@ -1,384 +1,106 @@
 import assert from "node:assert/strict";
 import { describe, it, type TestContext } from "node:test";
+import { loadReplayState, memoryBackend, setReplayBackend } from "./backend.js";
+import { ARCHIVE_URL, lists, TEST_SECRET, triageCase } from "./fixtures.js";
 import {
-  loadReplayState,
-  memoryBackend,
-  type ReplayBackend,
-  replayStateKey,
-  setReplayBackend,
-  withReplayState,
-} from "./backend.js";
-import {
-  ARCHIVE_URL,
-  KEY,
-  lists,
-  RUN,
-  sharedLedger,
-  TEST_SECRET,
-  triageCase,
-} from "./fixtures.js";
-import {
-  type AdmissionLedger,
+  buildReplayResult,
   REPLAY_SECRET_HEADER,
-  RESERVATION_LEASE_MS,
-  readReplayResult,
-  replayStamp,
+  replayResultResponse,
   startReplay,
 } from "./route.js";
 
-const BLOB_DOWN = /blob down/u;
-const NEW_RUN_ID = /Use a new run id/u;
-const MAY_HAVE_STARTED = /may have started/u;
+const start = (runId: string, run = 1, secret = TEST_SECRET) =>
+  new Request("http://localhost/internal/triage/replay", {
+    body: JSON.stringify({
+      archiveUrl: ARCHIVE_URL,
+      case: triageCase,
+      lists,
+      run,
+      runId,
+    }),
+    headers: {
+      "content-type": "application/json",
+      [REPLAY_SECRET_HEADER]: secret,
+    },
+    method: "POST",
+  });
+
+function server(t: TestContext, env: Record<string, string> = {}) {
+  const prior = { ...process.env };
+  Object.assign(process.env, {
+    FOREMAN_DIAGNOSTICS_SECRET: TEST_SECRET,
+    TRIAGE_REPLAY: "1",
+    VERCEL_GIT_COMMIT_SHA: "c".repeat(40),
+    ...env,
+  });
+  setReplayBackend(memoryBackend());
+  t.after(() => {
+    process.env = prior;
+  });
+  const sent: string[] = [];
+  return {
+    args: {
+      from: (address: string) => ({
+        send: () => {
+          sent.push(address);
+          return Promise.resolve({ id: `sess-${sent.length}` });
+        },
+      }),
+    },
+    sent,
+  };
+}
 
 describe("starting a replay", () => {
-  const start = () =>
-    new Request("http://localhost/internal/triage/replay", {
-      body: JSON.stringify({
-        archiveUrl: ARCHIVE_URL,
-        case: triageCase,
-        cohortSha256: "0".repeat(64),
-        lists,
-        run: 1,
-        runId: RUN,
-      }),
-      headers: {
-        "content-type": "application/json",
-        [REPLAY_SECRET_HEADER]: TEST_SECRET,
-      },
-      method: "POST",
-    });
-
-  const server = (t: TestContext, backend: ReplayBackend) => {
-    const prior = { ...process.env };
-    Object.assign(process.env, {
-      FOREMAN_DIAGNOSTICS_SECRET: TEST_SECRET,
-      TRIAGE_REPLAY: "1",
-      TRIAGE_REPLAY_CONFIRM: "1",
-      TRIAGE_REPLAY_EST_USD_PER_CASE: "4",
-      TRIAGE_REPLAY_MAX_RUNS: "3",
-      TRIAGE_REPLAY_MAX_USD: "100",
-      TRIAGE_REPLAY_RUN_ID: RUN,
-    });
-    setReplayBackend(backend);
-    t.after(() => {
-      process.env = prior;
-    });
-    const sent: string[] = [];
-    let failSend = false;
-    const args = {
-      from: (address: string) => ({
-        send: (_message: string, _options: unknown) => {
-          sent.push(address);
-          return failSend
-            ? Promise.reject(new Error("session down"))
-            : Promise.resolve({ id: "sess-1" });
-        },
-      }),
-    };
-    return {
-      args,
-      failSendOnce: () => {
-        failSend = true;
-        return () => {
-          failSend = false;
-        };
-      },
-      sent,
-    };
-  };
-
-  const failOnce = <T extends keyof ReplayBackend>(
-    backend: ReplayBackend,
-    method: T
-  ): ReplayBackend => {
-    let failed = false;
-    return {
-      ...backend,
-      [method]: (...input: unknown[]) => {
-        if (!failed) {
-          failed = true;
-          return Promise.reject(new Error("blob down"));
-        }
-        return (backend[method] as (...args: unknown[]) => unknown)(...input);
-      },
-    };
-  };
-
-  const afterRetry = async (
-    ledger: ReturnType<typeof sharedLedger>,
-    backend: ReplayBackend
-  ) => {
-    const entries = await ledger().read(RUN);
-    const stored = await loadReplayState(replayStateKey(RUN, KEY), backend);
-    return {
-      admitted: entries.admitted,
-      charged: entries.chargedUsd,
-      inputs: stored?.inputs.length,
-      reserved: Object.keys(entries.reserved),
-    };
-  };
-
-  it("releases the reservation when seeding fails, so the retry starts", async (t) => {
-    const backend = failOnce(memoryBackend(), "write");
-    const { args, sent } = server(t, backend);
-    const ledger = sharedLedger();
-    await assert.rejects(startReplay(start(), args, ledger()), BLOB_DOWN);
-    assert.deepEqual(await afterRetry(ledger, backend), {
-      admitted: [],
-      charged: 0,
-      inputs: undefined,
-      reserved: [],
-    });
+  it("answers 404 outside a replay process and 403 without the secret", async (t) => {
+    const { args, sent } = server(t, { TRIAGE_REPLAY: "0" });
+    assert.equal((await startReplay(start("run-off-1"), args)).status, 404);
+    process.env.TRIAGE_REPLAY = "1";
+    assert.equal(
+      (await startReplay(start("run-off-1", 1, "x".repeat(40)), args)).status,
+      403
+    );
     assert.deepEqual(sent, []);
-    const retry = await startReplay(start(), args, ledger());
-    assert.equal(retry.status, 200);
-    assert.deepEqual(sent.length, 1);
-    assert.deepEqual(await afterRetry(ledger, backend), {
-      admitted: [KEY],
-      charged: 4,
-      inputs: 1,
-      reserved: [],
-    });
   });
 
-  it("reuses a store whose seed input failed, and adds that input once", async (t) => {
-    const backend = failOnce(memoryBackend(), "appendInputs");
-    const { args, sent } = server(t, backend);
-    const ledger = sharedLedger();
-    await assert.rejects(startReplay(start(), args, ledger()), BLOB_DOWN);
-    const retry = await startReplay(start(), args, ledger());
-    assert.equal(retry.status, 200);
-    assert.equal(sent.length, 1);
-    assert.deepEqual(await afterRetry(ledger, backend), {
-      admitted: [KEY],
-      charged: 4,
-      inputs: 1,
-      reserved: [],
+  it("seeds the case's store, sends the ticket as filed, and refuses a repeat", async (t) => {
+    const { args, sent } = server(t);
+    const started = await startReplay(start("run-seed-1"), args);
+    assert.equal(started.status, 200);
+    assert.deepEqual(await started.json(), {
+      caseKey: "ENG-100#1",
+      sessionId: "sess-1",
     });
-  });
-
-  it("keeps the reservation charged when a send fails, because the run may have started, and refuses a retry", async (t) => {
-    const backend = memoryBackend();
-    const { args, failSendOnce, sent } = server(t, backend);
-    const ledger = sharedLedger();
-    const restore = failSendOnce();
-    await assert.rejects(
-      startReplay(start(), args, ledger()),
-      MAY_HAVE_STARTED
+    assert.deepEqual(sent, ["triage-replay:run-seed-1:ENG-100#1"]);
+    const stored = await loadReplayState("run-seed-1", "ENG-100#1");
+    assert.equal(stored?.stamp.foremanCommit, "c".repeat(40));
+    assert.equal(stored?.archive.url, ARCHIVE_URL);
+    assert.equal(
+      stored && buildReplayResult(stored, "run-seed-1").status,
+      "failed"
     );
-    restore();
-    assert.deepEqual(await afterRetry(ledger, backend), {
-      admitted: [],
-      charged: 4,
-      inputs: 1,
-      reserved: [KEY],
-    });
-    const retry = await startReplay(start(), args, ledger());
-    assert.equal(retry.status, 429);
+    assert.equal((await startReplay(start("run-seed-1"), args)).status, 409);
     assert.equal(sent.length, 1);
-    assert.deepEqual(await afterRetry(ledger, backend), {
-      admitted: [],
-      charged: 4,
-      inputs: 1,
-      reserved: [KEY],
-    });
-  });
-
-  describe("when the ledger can't confirm a dispatched start", () => {
-    const dispatchedWithoutConfirm = async (t: TestContext) => {
-      const backend = memoryBackend();
-      const shared = sharedLedger();
-      let ledgerDown = false;
-      const ledger = (): AdmissionLedger => {
-        const inner = shared();
-        return {
-          read: inner.read,
-          write: (run, entries, etag) =>
-            ledgerDown
-              ? Promise.reject(new Error("ledger down"))
-              : inner.write(run, entries, etag),
-        };
-      };
-      const { args, sent } = server(t, backend);
-      const dispatching = {
-        from: (address: string) => ({
-          send: (message: string, options: unknown) => {
-            ledgerDown = true;
-            return args.from(address).send(message, options);
-          },
-        }),
-      };
-      const first = await startReplay(start(), dispatching, ledger());
-      ledgerDown = false;
-      const later = Date.now() + RESERVATION_LEASE_MS + 1;
-      t.mock.method(Date, "now", () => later);
-      return { args, backend, first, ledger: shared, sent };
-    };
-
-    const settled = async (ledger: ReturnType<typeof sharedLedger>) => {
-      const entries = await ledger().read(RUN);
-      return {
-        admitted: entries.admitted,
-        charged: entries.chargedUsd,
-        reserved: Object.keys(entries.reserved),
-      };
-    };
-
-    it("keeps the dispatched run and its charge, and refuses a retry as stuck", async (t) => {
-      const { args, first, ledger, sent } = await dispatchedWithoutConfirm(t);
-      assert.equal(first.status, 200);
-      const retry = await startReplay(start(), args, ledger());
-      assert.equal(retry.status, 429);
-      assert.match(await retry.text(), NEW_RUN_ID);
-      assert.equal(sent.length, 1);
-      assert.deepEqual(await settled(ledger), {
-        admitted: [],
-        charged: 4,
-        reserved: [KEY],
-      });
-    });
-
-    it("refuses a retry as stuck when the send succeeded but nothing after it could be saved", async (t) => {
-      const inner = memoryBackend();
-      const down: { writes: boolean } = { writes: false };
-      const backend: ReplayBackend = {
-        ...inner,
-        write: (key, state, etag) =>
-          down.writes
-            ? Promise.reject(new Error("blob down"))
-            : inner.write(key, state, etag),
-      };
-      const shared = sharedLedger();
-      let ledgerDown = false;
-      const ledger = (): AdmissionLedger => {
-        const live = shared();
-        return {
-          read: live.read,
-          write: (run, entries, etag) =>
-            ledgerDown
-              ? Promise.reject(new Error("ledger down"))
-              : live.write(run, entries, etag),
-        };
-      };
-      const { args, sent } = server(t, backend);
-      const dispatching = {
-        from: (address: string) => ({
-          send: (message: string, options: unknown) => {
-            const sending = args.from(address).send(message, options);
-            down.writes = true;
-            ledgerDown = true;
-            return sending;
-          },
-        }),
-      };
-      assert.equal(
-        (await startReplay(start(), dispatching, ledger())).status,
-        200
-      );
-      ledgerDown = false;
-      down.writes = false;
-      const later = Date.now() + RESERVATION_LEASE_MS + 1;
-      t.mock.method(Date, "now", () => later);
-      assert.equal((await startReplay(start(), args, ledger())).status, 429);
-      assert.equal(sent.length, 1);
-      assert.deepEqual(await settled(shared), {
-        admitted: [],
-        charged: 4,
-        reserved: [KEY],
-      });
-    });
-
-    it("never refunds a run whose session has already stepped", async (t) => {
-      const { args, ledger, sent } = await dispatchedWithoutConfirm(t);
-      await withReplayState(RUN, KEY, (state) => {
-        state.steps = 3;
-      });
-      const retry = await startReplay(start(), args, ledger());
-      assert.equal(retry.status, 429);
-      assert.equal(sent.length, 1);
-      assert.deepEqual(await settled(ledger), {
-        admitted: [],
-        charged: 4,
-        reserved: [KEY],
-      });
-    });
-
-    it("refuses a second request once the first one's lease has expired, and lets the first finish with one send", async (t) => {
-      const inner = memoryBackend();
-      const hold: { open: () => void; paused: boolean } = {
-        open: () => undefined,
-        paused: false,
-      };
-      const pausedAtMarker = new Promise<void>((reached) => {
-        hold.open = reached;
-      });
-      let resume: () => void = () => undefined;
-      const gate = new Promise<void>((resolve) => {
-        resume = resolve;
-      });
-      const backend: ReplayBackend = {
-        ...inner,
-        write: async (key, state, etag) => {
-          if (state.dispatchedSession === "attempted" && !hold.paused) {
-            hold.paused = true;
-            hold.open();
-            await gate;
-          }
-          return inner.write(key, state, etag);
-        },
-      };
-      const shared = sharedLedger();
-      const { args, sent } = server(t, backend);
-      const first = startReplay(start(), args, shared());
-      await pausedAtMarker;
-      const backstop = setTimeout(resume, 300);
-      t.after(() => clearTimeout(backstop));
-      const later = Date.now() + RESERVATION_LEASE_MS + 1;
-      t.mock.method(Date, "now", () => later);
-      const second = await startReplay(start(), args, shared());
-      assert.equal(second.status, 429);
-      assert.match(await second.text(), NEW_RUN_ID);
-      assert.equal(sent.length, 0);
-      assert.deepEqual(await settled(shared), {
-        admitted: [],
-        charged: 4,
-        reserved: [KEY],
-      });
-      resume();
-      assert.equal((await first).status, 200);
-      assert.equal(sent.length, 1);
-      assert.deepEqual(await settled(shared), {
-        admitted: [KEY],
-        charged: 4,
-        reserved: [],
-      });
-    });
-  });
-
-  it("stamps the result with the deployment's commit, the start time and the estimated cost", async (t) => {
-    const backend = memoryBackend();
-    const { args } = server(t, backend);
-    process.env.VERCEL_GIT_COMMIT_SHA = `${"c".repeat(40)}\n`;
-    const ledger = sharedLedger();
-    assert.equal((await startReplay(start(), args, ledger())).status, 200);
-    const read = await readReplayResult({
-      caseKey: KEY,
-      cohortSha256: "0".repeat(64),
-      runId: RUN,
-    });
-    assert.equal(read?.result.foremanCommit, "c".repeat(40));
-    assert.equal(read?.result.estimatedUsd, 4);
-    assert.ok(Date.now() - Date.parse(read?.result.startedAt ?? "") < 60_000);
-  });
-
-  it("records the commit as unknown when the deployment names none", () => {
-    assert.deepEqual(
-      replayStamp({ TRIAGE_REPLAY_EST_USD_PER_CASE: "2.5" }, new Date(0)),
-      {
-        estimatedUsd: 2.5,
-        foremanCommit: "unknown",
-        startedAt: "1970-01-01T00:00:00.000Z",
-      }
+    const polled = await replayResultResponse(
+      new Request(
+        "http://localhost/internal/triage/replay/result?caseKey=ENG-100%231&runId=run-seed-1",
+        { headers: { [REPLAY_SECRET_HEADER]: TEST_SECRET } }
+      )
     );
+    assert.equal(
+      ((await polled.json()) as { settled: boolean }).settled,
+      false
+    );
+  });
+
+  it("stops at TRIAGE_REPLAY_MAX_RUNS starts", async (t) => {
+    const { args, sent } = server(t, { TRIAGE_REPLAY_MAX_RUNS: "2" });
+    const statuses: number[] = [];
+    for (const run of [1, 2, 3]) {
+      // biome-ignore lint/performance/noAwaitInLoops: starts are counted in order.
+      statuses.push((await startReplay(start("run-cap-1", run), args)).status);
+    }
+    assert.equal(statuses.at(-1), 429);
+    assert.ok(sent.length <= 2);
   });
 });

@@ -6,7 +6,6 @@ import {
   assigneeKind,
   BILLING_PATH,
   billingDecisionFields,
-  bindBilling,
   criticTaskIssue,
   criticVerdictFields,
   criticVerdictIssue,
@@ -14,9 +13,6 @@ import {
   routeDecisionEvent,
   settleDecision,
 } from "./triage-log.js";
-import { prepareReplayArchive } from "./triage-replay/archive.js";
-
-const UNPACK = /tar -xzf .* && test ! -e \/workspace\/repo\/\.git/u;
 
 const criteria = (fail: number) =>
   CRITIC_CRITERIA.map((criterion, i) => ({
@@ -235,30 +231,6 @@ describe("issue-bound decisions", () => {
     );
   });
 
-  it("binds a billing decision made before its ticket exists only to the ticket that passes its id", () => {
-    const route = { assignee: "Aaron Fraga", project: "Support" };
-    const pending = { id: "d1", route };
-    const wrongId = bindBilling({}, pending, "ENG-20", "d2");
-    assert.deepEqual(wrongId, { decisions: {}, pendingBilling: pending });
-    const noId = bindBilling({}, pending, "ENG-20", undefined);
-    assert.deepEqual(noId, { decisions: {}, pendingBilling: pending });
-    assert.equal(
-      routeDecisionEvent(noId.decisions, { ...route, issue: "ENG-20" }).code,
-      "skill_fallback"
-    );
-    const bound = bindBilling({}, pending, "ENG-21", "d1");
-    assert.equal(bound.pendingBilling, null);
-    assert.equal(bound.decisions["ENG-21"].route?.project, "Support");
-    assert.equal(
-      routeDecisionEvent(bound.decisions, { ...route, issue: "ENG-21" }).code,
-      "billing"
-    );
-    assert.equal(
-      routeDecisionEvent(bound.decisions, { ...route, issue: "ENG-22" }).code,
-      "skill_fallback"
-    );
-  });
-
   it("binds a critic task to the source issue named on its dispatch's first line, never to a candidate it mentions", () => {
     const sourceAfterJevFailed = {
       message:
@@ -280,41 +252,5 @@ describe("issue-bound decisions", () => {
     assert.equal(criticTaskIssue({ message: 42 }), null);
     assert.equal(criticVerdictIssue({ c1: "ENG-3" }, "c1"), "ENG-3");
     assert.equal(criticVerdictIssue({ c1: "ENG-3" }, "c2"), null);
-  });
-});
-
-describe("replay archive", () => {
-  it("unpacks the pinned archive with no history and writes the repository marker", async () => {
-    const commands: string[] = [];
-    const files: Record<string, unknown> = {};
-    const sandbox = {
-      run: (options: { command: string }) => {
-        commands.push(options.command);
-        return Promise.resolve({ exitCode: 0, stderr: "", stdout: "" });
-      },
-      writeBinaryFile: (o: { content: unknown; path: string }) => {
-        files[o.path] = o.content;
-        return Promise.resolve();
-      },
-      writeTextFile: (o: { content: string; path: string }) => {
-        files[o.path] = o.content;
-        return Promise.resolve();
-      },
-    } as never;
-    const error = await prepareReplayArchive(
-      sandbox,
-      {
-        commit: "a".repeat(40),
-        url: "https://x.blob.vercel-storage.com/a.tgz",
-      },
-      () => Promise.resolve(new Uint8Array([1, 2, 3]))
-    );
-    assert.equal(error, null);
-    assert.match(commands[0], UNPACK);
-    assert.equal(
-      JSON.parse(String(files["/workspace/.foreman/repository.json"]))
-        .replayCommit,
-      "a".repeat(40)
-    );
   });
 });
