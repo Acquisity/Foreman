@@ -1,10 +1,8 @@
 import assert from "node:assert/strict";
 import { after, describe, it } from "node:test";
-import type { JevAnswer } from "./jev.js";
-import { resolveTriage, type TriageInput } from "./jev-decisions.js";
+import { resolveTriage } from "./jev-decisions.js";
 import { regressionDocumentGaps } from "./regression-document.js";
 import {
-  deployment,
   deps,
   FILE,
   history,
@@ -17,54 +15,22 @@ import {
 } from "./regression-fixtures.js";
 import { runCheckRegression } from "./regression-lane.js";
 import type { RegressionRecord } from "./regression-record.js";
-
-const pick = (choice: string): JevAnswer => ({
-  choice,
-  probabilities: { [choice]: 0.9 },
-  type: "choice",
-});
-const yes = (): JevAnswer => ({ probability: 0.9, type: "boolean" });
-const no = (): JevAnswer => ({ probability: 0.1, type: "boolean" });
-
-const answers: Record<string, JevAnswer> = {
-  classification: pick("bug"),
-  customer_saw_failure: no(),
-  data_loss_or_security: no(),
-  direct_evidence: yes(),
-  impact: {
-    probabilities: { "0": 0.05, "1": 0.8, "2": 0.1, "3": 0.05 },
-    score: 0,
-    type: "score",
-  },
-  inbox_error: no(),
-  incident: pick("standard"),
-  incident_impact: pick("MATERIALLY_IMPAIRED"),
-  money_blocker: no(),
-  path: pick("Engineering Todo"),
-  project: pick("AI SDR Core"),
-  verdict: pick("supported"),
-  wants_limit_lifted: no(),
-};
+import { bugAnswers, triageInput } from "./triage-fixtures.js";
 
 const decide = (record: RegressionRecord) => {
-  const triage: TriageInput = {
-    blastRadius: { countedAt: "2026-10-25", orgs: 3, query: "q", users: 4 },
-    claim: "Sends stop at the wrong count.",
-    codePath: { commit: record.commitRead, file: FILE, function: "limit" },
-    duplicateCandidates: [],
-    evidence: "Inngest run failed.",
-    identifier: record.issue,
-    projects: [{ name: "AI SDR Core" }],
-    regression: {
-      commit: record.commit,
-      kind: record.kind,
-      line: record.line,
-      reason: record.reason,
-    },
-    rootCauseLabels: [],
-    sourceLabels: ["Customer reported"],
-  };
-  const decision = resolveTriage(triage, answers);
+  const decision = resolveTriage(
+    triageInput({
+      codePath: { commit: record.commitRead, file: FILE, function: "limit" },
+      identifier: record.issue,
+      regression: {
+        commit: record.commit,
+        kind: record.kind,
+        line: record.line,
+        reason: record.reason,
+      },
+    }),
+    bugAnswers()
+  );
   assert.ok(decision.outcome === "route");
   return decision;
 };
@@ -78,7 +44,7 @@ const documentFor = (record: RegressionRecord, result = record.line) =>
     "**Review**: Pending critic",
     "",
     "## Regression check",
-    `**Deployed commit**: ${record.deployedCommit ?? "Not available: Vercel unreadable"}`,
+    `**Deployed commit**: ${record.deployedCommit ?? "Not available: production unreadable"}`,
     `**Commit read**: ${record.commitRead}`,
     `**Result**: ${result}`,
     "",
@@ -101,7 +67,7 @@ describe("planted tickets, end to end", () => {
       { [FILE]: sendLimit("count * 2") },
       "feat: double"
     );
-    const earlier = origin.commit(15, note("a"), "docs: a");
+    origin.commit(15, note("a"), "docs: a");
     const fix = origin.commit(
       5,
       { [FILE]: sendLimit("count") },
@@ -110,12 +76,8 @@ describe("planted tickets, end to end", () => {
     const head = origin.commit(4, note("b"), "docs: b");
     const record = recorded(
       await runCheckRegression(
-        deps(origin.clone(50), origin),
+        deps(origin.clone(50), origin, head),
         input({
-          deployments: {
-            current: deployment(head, 4),
-            timeline: [deployment(head, 4), deployment(earlier, 15)],
-          },
           labels: [
             { role: "fixed", sha: fix },
             { role: "introduced", sha: bug },
@@ -152,12 +114,8 @@ describe("planted tickets, end to end", () => {
     );
     const record = recorded(
       await runCheckRegression(
-        deps(origin.clone(50), origin),
+        deps(origin.clone(50), origin, served),
         input({
-          deployments: {
-            current: deployment(served, 15),
-            timeline: [deployment(served, 15)],
-          },
           labels: [
             { role: "fixed", sha: fix },
             { role: "introduced", sha: bug },
@@ -194,12 +152,8 @@ describe("planted tickets, end to end", () => {
     const head = origin.commit(9, note("after"), "docs: after");
     const record = recorded(
       await runCheckRegression(
-        deps(origin.clone(50), origin),
+        deps(origin.clone(50), origin, head),
         input({
-          deployments: {
-            current: deployment(head, 9),
-            timeline: [deployment(head, 9)],
-          },
           labels: [{ role: "introduced", sha: bug }],
           readCommit: head,
         })
