@@ -6,6 +6,7 @@ import {
   criticVerdictFields,
   settleCriticRound,
 } from "./triage-log.js";
+import { triageResultSchema } from "./triage-replay/schema.js";
 
 const COMMIT = "c".repeat(40);
 const reviewed = (over: Record<string, string> = {}) => ({
@@ -139,6 +140,20 @@ describe("the critic policy", () => {
         failedCriteria: 0,
         verdict: "INSUFFICIENT_EVIDENCE",
       }
+    );
+  });
+});
+
+describe("replay results", () => {
+  it("still reads a result written before the critic count was recorded", () => {
+    const critic = {
+      blockingFindings: 0,
+      failedCriteria: 0,
+      verdict: "APPROVE",
+    };
+    assert.equal(
+      triageResultSchema.shape.critic.safeParse(critic).success,
+      true
     );
   });
 });

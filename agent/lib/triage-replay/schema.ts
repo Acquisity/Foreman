@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { criticVerdictSchema } from "../triage-log.js";
+import { CRITIC_COUNTS, criticVerdictSchema } from "../triage-log.js";
 
 const asOf = <T extends z.ZodType>(value: T) =>
   z.union([value, z.literal("unknown")]);
@@ -95,7 +95,9 @@ export const RESULT_STATUSES = ["completed", "failed", "cancelled"] as const;
 
 export const triageResultSchema = z.strictObject({
   caseId: z.string().regex(/^ENG-\d+$/),
-  critic: criticVerdictSchema.nullable(),
+  critic: criticVerdictSchema
+    .extend({ counted: z.enum(CRITIC_COUNTS).optional() })
+    .nullable(),
   diagnosis: z.string().nullable(),
   document: z
     .strictObject({ text: z.string(), updatedAt: z.string() })
