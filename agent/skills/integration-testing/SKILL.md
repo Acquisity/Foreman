@@ -1,5 +1,5 @@
 ---
-description: "Test a named integration, critic, vision, or the full Foreman preview setup when asked to test Linear, Instantly, Sentry, another service, or all integrations."
+description: "Test a named integration, critic, image reading, or the full Foreman preview setup when asked to test Linear, Instantly, Sentry, another service, or all integrations."
 ---
 
 # Integration testing
@@ -26,9 +26,9 @@ For workspace discovery pagination, pass the returned `nextStartingAfter` value 
 
 Invoke critic with its normal declared output schema; never override that schema. The child must perform its own source reads through its own connection. A successful root read is not evidence of child access. A complete test includes a valid designated evidence packet and a deliberately incomplete packet. The incomplete packet must produce INSUFFICIENT_EVIDENCE, never invented approval. Verify that the critic follows its read-only instructions while sharing root company access. Check expected writes only on designated test records. Executor administration remains excluded; helper API operations are part of the shared toolkit.
 
-## Vision
+## Image reading
 
-Use an actual image attachment. Find the staged attachment path supplied by the channel and delegate that path and a precise visual question to vision. Report its answer, visible_text, and uncertainties. Do not fill in missing details from the message or alt text. Vision must open the image with read_image; it does not need company-service connections. A missing or unreadable image must produce an explicit limitation, never a claimed successful pixel read. Linear-hosted attachments also need a separate test because their download authorization differs from Slack's staging.
+Use an actual image attachment. A Slack image up to 3 MiB is already in your context, so read it with no tool call and report what it shows. Then test a Linear-hosted screenshot separately, because its download authorization differs from Slack's staging: call read_image with its uploads.linear.app url. Report visible text and uncertainties. Do not fill in missing details from the message or alt text. A missing or unreadable image must produce an explicit limitation, never a claimed successful pixel read.
 
 ## Read-only triage walkthrough
 
@@ -36,4 +36,4 @@ A request to walk every triage step is broader than a connection smoke test. Fol
 
 ## Full preview test
 
-Test providers, authored helpers, critic, and vision separately. Record failures and untested cases explicitly. Do not equate this conversational smoke test with production readiness. The release checklist also requires a real second requester, allowed attended writes on test records, backend negative policy checks, native delegation and schedule lanes, cancellation/timeouts, and deployment-specific configuration verification.
+Test providers, authored helpers, critic, and image reading separately. Record failures and untested cases explicitly. Do not equate this conversational smoke test with production readiness. The release checklist also requires a real second requester, allowed attended writes on test records, backend negative policy checks, native delegation and schedule lanes, cancellation/timeouts, and deployment-specific configuration verification.

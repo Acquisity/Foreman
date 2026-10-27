@@ -92,7 +92,7 @@ describe("authored outside calls stay bounded", () => {
   });
 
   it("inspected the call sites the inventory records", () => {
-    // Executor and vision HTTP, Blob, and Neon. A rule that
+    // Executor and Linear image HTTP, Blob, and Neon. A rule that
     // stopped matching anything would pass the sweep above in silence.
     assert.ok(
       authoredSurface().inspected >= 7,

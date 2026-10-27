@@ -42,7 +42,7 @@ Status: Still open on 0.81.1.
 
 Checked against eve 0.44.0.
 
-`defineDynamic` in a subagent's `agent.ts` supports per-session availability. The factory-specific motivation is retired: Foreman now retains only critic and vision, both used by ordinary triage. No new child gate is needed for factory removal.
+`defineDynamic` in a subagent's `agent.ts` supports per-session availability. The factory-specific motivation is retired: Foreman now retains only critic, used by ordinary triage. No new child gate is needed for factory removal.
 
 At ENG-13737 eve still prepared the delegation schema for each declared subagent; Foreman does not supply a narrower custom schema. Launches now return working receipts and results arrive later. Resolved by eve 0.69 tasks: a call returns a receipt and its result arrives in the same held turn. The report uses each compiled node's prepared tool. `pnpm report:capabilities` reads the installed schema rather than preserving the former eight-station count. A narrower framework schema remains a possible upstream improvement; it is not an upgrade prerequisite.
 
@@ -68,7 +68,7 @@ Status: Still open on 0.81.1 as section 1; no longer applies to Foreman.
 
 The original Eve 0.44.0 check found only global `disableTool()` overrides. Since 0.45.0 (b3cf8ee), eve gives framework defaults the same file slots as authored tools, so a same-slot `defineDynamic` can return the imported default or `null` for that session. The requested mechanism is now available; no replacement gating system is needed.
 
-Foreman keeps its current choices: native `agent` enabled and `ask_question` not added on root, critic and vision. No extra per-session built-in gate is introduced by this upgrade. Framework defaults now appear in the compiled manifest; the capability report excludes them by their compiled owner bindings, while measuring Foreman's authored and extension contributions. Dynamic MCP connections are also now public; the support dispatcher below remains for its existing policy and journal requirements.
+Foreman keeps its current choices: native `agent` enabled and `ask_question` not added on root and critic. No extra per-session built-in gate is introduced by this upgrade. Framework defaults now appear in the compiled manifest; the capability report excludes them by their compiled owner bindings, while measuring Foreman's authored and extension contributions. Dynamic MCP connections are also now public; the support dispatcher below remains for its existing policy and journal requirements.
 
 Eve 0.81.1 update (ENG-15874): still resolved. The same-slot mechanism is unchanged. `ask_question` stopped being a default tool and `todo` was removed in 0.65.0 (60998d6); built-in tools moved into the reserved `eve` namespace (`eve__task_wait`, `eve__task_cancel`) in 0.76.0; and since 0.78.0 (db71190) a resolver no longer adds the catalog tools `eve__search`, `eve__tool`, and `eve__skill` on its own. The capability report still excludes every framework-owned tool by its compiled owner binding.
 

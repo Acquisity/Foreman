@@ -6,7 +6,7 @@ Foreman is a repository-neutral Eve 0.83.2 agent with one general execution path
 
 ## Routing
 
-`agent/lib/prompts.ts` composes one general prompt for every interactive channel. The root handles repository changes directly and may delegate independent work through eve's native `agent` tool. Critic and vision remain declared children for triage review and image reads. GitHub starts work only for trusted mentions; factory labels, CI events, reviews, synchronizations, and PR opens do not dispatch work.
+`agent/lib/prompts.ts` composes one general prompt for every interactive channel. The root handles repository changes directly and may delegate independent work through eve's native `agent` tool. Critic remains the declared child for triage review; the root reads images itself. GitHub starts work only for trusted mentions; factory labels, CI events, reviews, synchronizations, and PR opens do not dispatch work.
 
 ## Repository binding
 
@@ -18,15 +18,15 @@ Foreman is a repository-neutral Eve 0.83.2 agent with one general execution path
 - An attended session may prepare a different validated repository later, and the checkout is replaced rather than the request refused. The old checkout is set aside to a tool-owned path first, so a clone that fails, times out, or is refused puts it back and keeps the marker it had. A rollback that itself fails clears the marker, and the session is left with no repository prepared. An interrupted switch is settled by the published checkout's own origin before either reuse or a switch trusts the marker. A signed GitHub checkout, an unattended run, and a checkout at `/workspace` are never replaced. A refreshed checkout reinstalls dependencies only when the repository's lockfile moved between the old and new HEAD, or when its install state is unknown. Every refusal returns `success: false` with the reason and leaves one bounded warning behind.
 - GitHub extension calls supply `owner` and `repo` explicitly. The extension has no fixed context.
 - The repository tools and the GitHub tool surface are resolved per lane by `agent/lib/repository-lane.ts`. A session with no selected repository, and no repository prepared carries neither; a repository-selected lane carries both, and a session that prepares a repository at runtime carries them from the next step of that turn. `prepare_repository` and `rebuild_warm_snapshot` stay static, because the first is how a lane names a repository at all; the slug it records lives in `agent/lib/repository-selection.ts`. The gate is catalog composition, not authorization: trust, approval, the intake-only denials, and signed webhook binding are unchanged by it.
-- Native root-agent copies and vision share the root sandbox. Critic has its own sandbox and can check out the exact commit for independent evidence review.
+- Native root-agent copies share the root sandbox. Critic has its own sandbox and can check out the exact commit for independent evidence review.
 
 Every clone, fetch, and push targets `https://github.com/<validated-owner>/<validated-repo>.git` literally. Installation credentials are injected by `brokerPolicy` at the sandbox firewall and removed in `finally`. `validateBranch` rejects protected or non-plain branch names; it is the whole gate, so `push_branch` delivers a human branch name such as `afragahaha/eng-13319` unchanged.
 
 ## Delegation and delivery
 
-Native `agent`, critic and vision calls return a receipt at once with a task ID. A receipt is not the child's answer and not a completed finding. The turn stays open, and each result arrives in that same turn as a task result once its task settles. The root continues independent work, calls `eve__task_wait` when it has nothing to say until a result arrives, and stops a task with `eve__task_cancel`. The root adjudicates the returned evidence and finishes dependent work. There is no authored polling loop or task tracker.
+Native `agent` and critic calls return a receipt at once with a task ID. A receipt is not the child's answer and not a completed finding. The turn stays open, and each result arrives in that same turn as a task result once its task settles. The root continues independent work, calls `eve__task_wait` when it has nothing to say until a result arrives, and stops a task with `eve__task_cancel`. The root adjudicates the returned evidence and finishes dependent work. There is no authored polling loop or task tracker.
 
-Native children inherit the root's configuration and sandbox with fresh history and state and cannot delegate recursively. Send self-contained tasks and avoid overlapping edits. Critic keeps its own tools, skill and independent sandbox. Vision shares the root sandbox, carries only `read_image`, and disables shell, file and web defaults.
+Native children inherit the root's configuration and sandbox with fresh history and state and cannot delegate recursively. Send self-contained tasks and avoid overlapping edits. Critic keeps its own tools, skill and independent sandbox.
 
 The root owns feature-branch and pull-request delivery. There is no station protocol, artifact handoff, automatic stabilization, or readiness state machine. Repository authority, protected branches, intake-only denials, and the human merge boundary remain enforced.
 
@@ -53,9 +53,9 @@ When an existing Slack thread has no active Eve session, dispatch restores earli
 
 ## Scheduled support lifecycle
 
-Each support lease starts a conversation session, allowing later critic/vision results to reach its root. Ordinary parent-turn completion does not settle the investigation. Explicit finish/quiet/skip actions retain the existing revision, review, journal and delivery checks. Root turn failures and terminal session failures use the claim seeded into auth and persisted channel state; child failures cannot release the root lease.
+Each support lease starts a conversation session, allowing later critic results to reach its root. Ordinary parent-turn completion does not settle the investigation. Explicit finish/quiet/skip actions retain the existing revision, review, journal and delivery checks. Root turn failures and terminal session failures use the claim seeded into auth and persisted channel state; child failures cannot release the root lease.
 
-One public durable state value counts at most 150 root model steps across turns, deduplicating retries, under the original eighteen-minute deadline. Support-only hooks reject input and authorization waits on the root, native delegates, critic and vision. An unfinished first intake gets the existing incomplete notice on the next claim after its twenty-minute lease expires; pending outboxes reconcile first, repeated identical notices are suppressed and unchanged follow-ups stay quiet. Dormant conversation sessions use Eve's default thirty-day lifetime from creation. Provider calls and writes remain fenced by the much shorter support lease. See [INTERCOM-SUPPORT-CRON.md](./INTERCOM-SUPPORT-CRON.md).
+One public durable state value counts at most 150 root model steps across turns, deduplicating retries, under the original eighteen-minute deadline. Support-only hooks reject input and authorization waits on the root, native delegates and critic. An unfinished first intake gets the existing incomplete notice on the next claim after its twenty-minute lease expires; pending outboxes reconcile first, repeated identical notices are suppressed and unchanged follow-ups stay quiet. Dormant conversation sessions use Eve's default thirty-day lifetime from creation. Provider calls and writes remain fenced by the much shorter support lease. See [INTERCOM-SUPPORT-CRON.md](./INTERCOM-SUPPORT-CRON.md).
 
 ## Storage
 
@@ -70,7 +70,7 @@ Investigation memory is a private Foreman-owned Postgres database, separate from
 
 ## Verification
 
-Every Foreman-authored outside call is inventoried in [OUTSIDE-CALLS.md](./OUTSIDE-CALLS.md). `pnpm validate` checks generated specs, Ultracite, TypeScript, `eve info`, and unit tests. `pnpm report:capabilities` reads manifest version 54, distinguishes framework defaults through compiled owner bindings, and measures each declared child's actual prepared delegation description and schema. It checks three lanes and admits GitHub dynamic tools through Eve's real preparation before counting them; all 31 must survive. Ordinary Slack must carry no more than 75% of the repository catalog. The compiled catalog must retain exactly critic and vision as declared children.
+Every Foreman-authored outside call is inventoried in [OUTSIDE-CALLS.md](./OUTSIDE-CALLS.md). `pnpm validate` checks generated specs, Ultracite, TypeScript, `eve info`, and unit tests. `pnpm report:capabilities` reads manifest version 54, distinguishes framework defaults through compiled owner bindings, and measures each declared child's actual prepared delegation description and schema. It checks three lanes and admits GitHub dynamic tools through Eve's real preparation before counting them; all 31 must survive. Ordinary Slack must carry no more than 75% of the repository catalog. The compiled catalog must retain exactly critic as the declared child.
 
 `pnpm verify:built-github` boots the actual server and reads its registered compiled module map, including the GitHub extension inlined by Eve 0.83.2. It verifies the exact 31-tool allowlist and all 31 execute, inputSchema, approvalPrompt, approvalRequest and toModelOutput callbacks, mounted lane gates, distinct approval policies and an unstamped negative fixture.
 

@@ -2,7 +2,6 @@ import assert from "node:assert/strict";
 import { mock, test } from "node:test";
 import hook from "../../hooks/support-bound.js";
 import criticHook from "../../subagents/critic/hooks/support-bound.js";
-import visionHook from "../../subagents/vision/hooks/support-bound.js";
 import { evePackageUrl } from "../eve-dynamic-tools.js";
 import { SUPPORT_MAX_STEPS, SUPPORT_RUN_MS } from "./bound.js";
 
@@ -83,7 +82,7 @@ test("deadline cancels the root while attended sessions and child steps are unco
 });
 
 test("support root and declared child hooks reject input and authorization waits", () => {
-  for (const definition of [hook, criticHook, visionHook]) {
+  for (const definition of [hook, criticHook]) {
     for (const event of [
       "input.requested",
       "authorization.required",

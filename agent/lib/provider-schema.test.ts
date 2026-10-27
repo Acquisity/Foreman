@@ -12,7 +12,7 @@ process.env.LINEAR_CONNECTOR ??= "linear/test";
 // actual AI SDK provider call. No authored tool or remote model is executed.
 const [{ default: image }, { default: instantly }, harness, serializer] =
   await Promise.all([
-    import("../subagents/vision/tools/read_image.js"),
+    import("../tools/read_image.js"),
     import("../tools/read_instantly_subworkspace.js"),
     import(
       new URL("./dist/src/harness/tools.js", evePackageUrl()).href
