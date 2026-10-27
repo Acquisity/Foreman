@@ -16,9 +16,16 @@ import {
   DISPUTE_TEXT_FIELDS,
   type disputeOperationInputs,
   disputeWireArgs,
-  type OperationRequest,
 } from "#lib/executor/operations.js";
-import { ExecutorError } from "#lib/executor/transport.js";
+import {
+  DISPUTE_ID,
+  disputeSchema,
+  errorReason,
+  lookupIdentity,
+  readDispute,
+  type StripeDispute,
+  type StripeReadDeps,
+} from "#lib/stripe-dispute-read.js";
 import { STRIPE_DISPUTES_CHANNEL } from "#lib/stripe-dispute-trigger.js";
 import {
   isIntakeOnly,
@@ -46,7 +53,6 @@ import {
  * that person was shown, which the fingerprint pins.
  */
 
-const DISPUTE_ID = /^du_[A-Za-z0-9]{1,64}$/u;
 const NEEDS_RESPONSE = new Set(["needs_response", "warning_needs_response"]);
 const READ_BYTES = 256 * 1024;
 const MAX_FIELD_CHARS = 20_000;
@@ -60,36 +66,6 @@ const FOREMAN_FIELDS = "foreman_fields";
 const MAX_METADATA_CHARS = 500;
 
 type Evidence = Record<string, unknown>;
-
-const disputeSchema = z.looseObject({
-  amount: z.number().optional(),
-  charge: z.union([z.string(), z.looseObject({ id: z.string() })]).nullish(),
-  currency: z.string().optional(),
-  evidence: z.record(z.string(), z.unknown()).default({}),
-  evidence_details: z
-    .looseObject({
-      due_by: z.number().nullish(),
-      has_evidence: z.boolean().optional(),
-      past_due: z.boolean().optional(),
-      submission_count: z.number().nullish(),
-    })
-    .optional(),
-  id: z.string(),
-  metadata: z.record(z.string(), z.string()).default({}),
-  payment_method_details: z
-    .looseObject({
-      card: z
-        .looseObject({
-          brand: z.string().nullish(),
-          network_reason_code: z.string().nullish(),
-        })
-        .nullish(),
-    })
-    .nullish(),
-  reason: z.string().optional(),
-  status: z.string(),
-});
-export type StripeDispute = z.infer<typeof disputeSchema>;
 
 const textField = z.enum(DISPUTE_TEXT_FIELDS);
 const fileSlot = z.enum(DISPUTE_FILE_SLOTS);
@@ -417,17 +393,13 @@ export const renderEvidencePdf = async (
 
 // --- Calls -------------------------------------------------------------------
 
-export interface DisputeDeps {
+export interface DisputeDeps extends StripeReadDeps {
   readonly auth: {
     current: SessionAuthContext | null;
     initiator?: SessionAuthContext | null;
   };
   readonly delegated: boolean;
   readonly now: () => number;
-  /** Shared-toolkit reads, returning the raw Stripe object. */
-  readonly read: (
-    request: OperationRequest
-  ) => Promise<{ data: unknown; status: number }>;
   /** Renders one file; tests replace it to reach the byte limit. */
   readonly render?: typeof renderEvidencePdf;
   /** Dispute-toolkit writes. */
@@ -436,20 +408,6 @@ export interface DisputeDeps {
     input: Record<string, unknown>
   ) => Promise<ExecutorOutcome>;
 }
-
-const readDispute = async (
-  deps: DisputeDeps,
-  disputeId: string
-): Promise<StripeDispute> => {
-  const response = await deps.read({
-    input: { dispute_id: disputeId },
-    operation: "stripe.disputes.get",
-  });
-  if (response.status !== 200) {
-    throw new Error(`Stripe dispute read failed with HTTP ${response.status}.`);
-  }
-  return disputeSchema.parse(response.data);
-};
 
 /** The written object, or the reason the write did not land. */
 const written = (
@@ -465,70 +423,6 @@ const written = (
     return { reason: `Stripe refused the write (HTTP ${status}).` };
   }
   return { data: outcome.data as Record<string, unknown> };
-};
-
-const errorReason = (error: unknown): string => {
-  if (error instanceof ExecutorError) {
-    if (
-      error.code === "operation_not_bound" ||
-      error.code === "operation_bindings_missing"
-    ) {
-      return `The Stripe dispute write is not provisioned yet (${error.code}). An operator has to bind it in the foreman-disputes toolkit.`;
-    }
-    return `Executor could not complete the call (${error.code}).`;
-  }
-  return error instanceof Error ? error.message : "The call could not run.";
-};
-
-const lookupIdentity = async (deps: DisputeDeps, chargeId: string | null) => {
-  if (!chargeId) {
-    return { error: "The dispute names no charge." };
-  }
-  try {
-    const charge = await deps.read({
-      input: { charge_id: chargeId, "expand[]": "refunds" },
-      operation: "stripe.charges.get",
-    });
-    const data = (charge.data ?? {}) as {
-      billing_details?: { email?: string | null; name?: string | null };
-      customer?: string | null;
-    };
-    if (charge.status !== 200) {
-      return { error: `Stripe charge read failed with HTTP ${charge.status}.` };
-    }
-    const cardholder = {
-      email: data.billing_details?.email ?? null,
-      name: data.billing_details?.name ?? null,
-    };
-    if (!data.customer) {
-      return { cardholder, customer: null };
-    }
-    const customer = await deps.read({
-      input: { customer_id: data.customer },
-      operation: "stripe.customers.get",
-    });
-    const record = (customer.data ?? {}) as {
-      email?: string | null;
-      metadata?: Record<string, string>;
-      name?: string | null;
-    };
-    return {
-      cardholder,
-      customer:
-        customer.status === 200
-          ? {
-              autumnId: record.metadata?.autumn_id ?? null,
-              email: record.email ?? null,
-              id: data.customer,
-              name: record.name ?? null,
-            }
-          : {
-              error: `Stripe customer read failed with HTTP ${customer.status}.`,
-            },
-    };
-  } catch (error) {
-    return { error: errorReason(error) };
-  }
 };
 
 const check = async (deps: DisputeDeps, dispute: StripeDispute) => {
