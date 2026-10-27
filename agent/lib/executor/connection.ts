@@ -4,6 +4,7 @@ import {
   QUESTIONS_ONLY_REASON,
 } from "../github/approval.js";
 import { sessionLane } from "../session-lane.js";
+import { isTriageReplay } from "../triage-replay/mode.js";
 import { executorAuth } from "./auth.js";
 import { toolkitUrl } from "./endpoint.js";
 
@@ -11,6 +12,13 @@ import { toolkitUrl } from "./endpoint.js";
 export const executorConnection = () =>
   defineMcpClientConnection({
     approval: (ctx) => {
+      if (isTriageReplay()) {
+        return {
+          reason:
+            "Triage replay: the Linear connection is closed. Read issues with read_triage_replay_issue, comment with comment_triage_replay_issue and create an issue with create_triage_replay_issue; production evidence is unavailable.",
+          type: "denied",
+        };
+      }
       // A questions-only Slack session never reaches Linear writes; one execute
       // call can run any company operation, so the whole gateway is denied.
       if (isQuestionsOnlySession(ctx.session.auth)) {

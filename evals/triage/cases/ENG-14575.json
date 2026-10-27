@@ -1,0 +1,227 @@
+{
+  "id": "ENG-14575",
+  "provenance": "seeded",
+  "createdAt": "2026-10-01T15:37:37.887Z",
+  "lane": "billing",
+  "stratum": "billing",
+  "ticket": {
+    "title": "Name 25 Acquisity RR",
+    "description": "#### User Email\n\n<email>\n\n#### Workspace Name\n\nName 25\n\n#### Request Type\n\nRefund\n\n#### Reason for request\n\nAuto Agency client - so meant to be covering marketing costs for him on the cold email side, so he's pushing hard to get a refund for the amount invested so far, which Aaron confirmed to be $425.00.",
+    "attachmentKinds": ["slack"]
+  },
+  "repoCommitAtCreate": "406eff1c98937b5b0a780087b8a8796687477e1c",
+  "flags": {
+    "descriptionEditedAfterCreate": false,
+    "needsProductionData": true,
+    "alreadyFixedAtTriage": false
+  },
+  "asFiled": {
+    "assignee": "Aaron Fraga",
+    "labels": [],
+    "parent": null,
+    "priority": 0,
+    "project": null
+  },
+  "relatedSnapshot": [
+    {
+      "id": "ENG-14550",
+      "createdAt": "2026-09-30T22:11:25.137Z",
+      "title": "Name 1 - Cover costs of acquisity and inboxes for 3 months",
+      "state": "Todo",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": ["Customer reported", "Discount"],
+      "description": "#### User Email\n\n<email>\n\n#### Workspace Name\n\nName 2's Workspace\n\n#### Request Type\n\nDiscount code\n\n#### Reason for request\n\nRR Save - Cover costs of acquisity and inboxes for 3 months"
+    },
+    {
+      "id": "ENG-13494",
+      "createdAt": "2026-09-04T16:01:18.437Z",
+      "title": "Name 3 - Cover costs of acquisity and inboxes for 3 months",
+      "state": "Triage",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [],
+      "description": "#### User Email\n\n<email>\n\n#### Workspace Name\n\nName 3' Workspace\n\n#### Request Type\n\nDiscount code\n\n#### Reason for request\n\nRR save - Cover costs of acquisity and inboxes for 3 months"
+    },
+    {
+      "id": "ENG-12898",
+      "createdAt": "2026-08-18T21:01:45.196Z",
+      "title": "Name 4 - Cover costs of Acquisity for 4 months",
+      "state": "Triage",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [],
+      "description": "#### User Email\n\n<email>\n\n#### Workspace Name\n\nName 5's Workspace\n\n#### Request Type\n\nDiscount code\n\n#### Reason for request\n\nRR Save - Cover costs of Acquisity for 4 months"
+    },
+    {
+      "id": "ENG-13550",
+      "createdAt": "2026-09-07T20:08:57.487Z",
+      "title": "3 Months Acquisity , Inboxes & Domains + 10 000 Lead Credits",
+      "state": "Done",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [],
+      "description": "#### User Email\n\n<email>\n\n#### Workspace Name\n\n#Name 100\n\n#### Request Type\n\nDiscount code\n\n#### Reason for request\n\nRefund save with the 90 Day Challenge\n\n3 Months Acquisity , Inboxes & Domains + 10 000 Lead Credits"
+    },
+    {
+      "id": "ENG-13160",
+      "createdAt": "2026-08-26T17:49:16.931Z",
+      "title": "Name 6 - Cover costs of acquisity and inboxes for 3 months",
+      "state": "Done",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [],
+      "description": "#### User Email\n\n<email>\n\n#### Workspace Name\n\nName 6's Name 7\n\n#### Request Type\n\nDiscount code\n\n#### Reason for request\n\nRR Save - Cover the costs of his acquisity and inboxes for 3 months"
+    },
+    {
+      "id": "ENG-13137",
+      "createdAt": "2026-08-26T01:06:42.284Z",
+      "title": "Name 8 - Cover cost of Acquisity and inboxes for 6 months",
+      "state": "Done",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [],
+      "description": "#### User Email\n\n<email>\n\n#### Workspace Name\n\nName 8's Workspace\n\n#### Request Type\n\nDiscount code\n\n#### Reason for request\n\nRR save - 50k client\n\nCover cost of Acquisity and inboxes for 6 months"
+    },
+    {
+      "id": "ENG-13497",
+      "createdAt": "2026-09-04T17:45:01.936Z",
+      "title": "Name 9 - Cover costs of Acquisity and inboxes for 3 months",
+      "state": "Done",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [],
+      "description": "#### User Email\n\n<email>\n\n#### Workspace Name\n\nName 9's Workspace\n\n#### Request Type\n\nDiscount code\n\n#### Reason for request\n\nRR save - Cover costs of acquisity and inboxes for 3 months"
+    },
+    {
+      "id": "ENG-14556",
+      "createdAt": "2026-10-01T08:16:23.979Z",
+      "title": "Name 10 - Cover costs of Acquisity and inboxes for 2 months",
+      "state": "Done",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": ["Discount", "Internal reported"],
+      "description": "#### User Email\n\n<email>\n\n#### Workspace Name\n\nName 11's Workspace\n\n#### Request Type\n\nDiscount code\n\n#### Reason for request\n\nRR Save. Cover costs of Acquisity and inboxes for 2 months"
+    },
+    {
+      "id": "ENG-14009",
+      "createdAt": "2026-09-17T21:18:44.987Z",
+      "title": "Name 12 - Cover costs of Acquisity and inboxes for 3 months",
+      "state": "Done",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": ["Customer reported", "Discount"],
+      "description": "#### User Email\n\n<email>\n\n#### Workspace Name\n\nName 12's Workspace\n\n#### Request Type\n\nDiscount code\n\n#### Reason for request\n\nRR save - Cover costs of Acquisity and inboxes for 3 months"
+    },
+    {
+      "id": "ENG-13934",
+      "createdAt": "2026-09-16T17:47:05.349Z",
+      "title": "Name 13 - Cover costs of acquisity and inboxes for 3 months",
+      "state": "Done",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": ["Credits", "Customer reported", "Internal reported"],
+      "description": "#### User Email\n\n<email>\n\n#### Workspace Name\n\nName 13's Workspace\n\n#### Request Type\n\nDiscount code\n\n#### Reason for request\n\nRR save - Cover costs of acquisity and inboxes for 3 months"
+    },
+    {
+      "id": "ENG-12248",
+      "createdAt": "2026-08-03T17:50:58.170Z",
+      "title": "Refund Acquisity Charges - $370",
+      "state": "Done",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [],
+      "description": "#### User Email\n\n<email>\n\n#### Workspace Name\n\nName 14's Workspace\n\n#### Request Type\n\nRefund\n\n#### Reason for request\n\nRR call - please ensure client is not charged in the future"
+    },
+    {
+      "id": "ENG-13482",
+      "createdAt": "2026-09-04T14:20:04.203Z",
+      "title": "Name 15 - Cover costs of acquisity and inboxes for 6 months",
+      "state": "Done",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [],
+      "description": "#### User Email\n\n<email>\n\n#### Workspace Name\n\nName 15's Workspace\n\n#### Request Type\n\nDiscount code\n\n#### Reason for request\n\nRR save - Cover costs of acquisity and inboxes for 6 months"
+    },
+    {
+      "id": "ENG-14221",
+      "createdAt": "2026-09-24T11:24:08.841Z",
+      "title": "Name 16 - Cover costs for 1 month of Acquisity and inboxes",
+      "state": "Todo",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": ["Credits", "Internal reported"],
+      "description": "#### User Email\n\n<email>\n\n#### Workspace Name\n\nName 16's Workspace\n\n#### Request Type\n\nDiscount code\n\n#### Reason for request\n\nRR save,  Cover costs for 1 month of Acquisity and inboxes"
+    },
+    {
+      "id": "ENG-11259",
+      "createdAt": "2026-07-08T15:11:37.411Z",
+      "title": "Request for Acquisity cost coverage and lead credits",
+      "state": "Done",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": ["Refund"],
+      "description": "#### Customer Name\n\nName 17\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 17 Workspace\n\n#### Screenshot\n\n#### What are you trying to achieve?\n\nCover costs of Acquisity and inboxes for 3 months and allocate 20,000 lead credits\n\n#### What are you doing to achieve it?\n\nRR save\n\n#### What is happening instead?\n\nRR save\n\n#### What is the expected outcome?\n\nCover costs of Acquisity and inboxes for 3 months and allocate 20,000 lead credits"
+    },
+    {
+      "id": "ENG-11461",
+      "createdAt": "2026-07-10T18:18:31.775Z",
+      "title": "Request to reverse charges and apply credits",
+      "state": "Done",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [],
+      "description": "#### Customer Name\n\nName 18 de Name 19\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 18's Workspace\n\n#### Screenshot\n\n#### What are you trying to achieve?\n\nReverse all charges since June 1st - previous submission - we agreed to cover costs of acquisity and inboxes for 3 months as well as award 10,000 lead credits\n\n#### What are you doing to achieve it?\n\nRR save\n\n#### What is happening instead?\n\nRR save\n\n#### What is the expected outcome?\n\nReverse all charges since June 1st - previous submission - we agreed to cover costs of acquisity and inboxes for 3 months as well as award 10,000 lead credits"
+    },
+    {
+      "id": "ENG-11295",
+      "createdAt": "2026-07-08T20:27:51.289Z",
+      "title": "Reverse charges for acquisity and inboxes",
+      "state": "Done",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [],
+      "description": "#### Customer Name\n\nName 20\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 20 Workspace\n\n#### Screenshot\n\n#### What are you trying to achieve?\n\nCover costs of acquisity and inboxes for 3 months\n\n#### What are you doing to achieve it?\n\nRR save - previously submitted\n\n#### What is happening instead?\n\nContinuing to be charged\n\n#### What is the expected outcome?\n\nCharges reversed"
+    },
+    {
+      "id": "ENG-12247",
+      "createdAt": "2026-08-03T16:50:25.505Z",
+      "title": "Cover costs of acquisity and inboxes for 3 months",
+      "state": "Done",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [],
+      "description": "#### User Email\n\n<email>\n\n#### Workspace Name\n\nName 21's Workspace\n\n#### Request Type\n\nRefund\n\n#### Reason for request\n\nRR Save"
+    },
+    {
+      "id": "ENG-13944",
+      "createdAt": "2026-09-16T21:20:07.016Z",
+      "title": "Name 22 - Cover Cost of Acquisity and Inboxes for 3 months",
+      "state": "Done",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": ["Credits", "Customer reported", "Internal reported"],
+      "description": "#### User Email\n\n<email>\n\n#### Workspace Name\n\nName 22's Workspace\n\n#### Request Type\n\nDiscount code\n\n#### Reason for request\n\nRR Save - Cover Cost of Acquisity and Inboxes for 3 months"
+    },
+    {
+      "id": "ENG-12874",
+      "createdAt": "2026-08-18T13:28:24.491Z",
+      "title": "Name 23 - Cover the costs of Acquisity for 3 months",
+      "state": "Done",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [],
+      "description": "#### User Email\n\n<email>\n\n#### Workspace Name\n\nName 23 Workspace\n\n#### Request Type\n\nDiscount code\n\n#### Reason for request\n\nRR save - cover the costs of your acquisity and inboxes for 3 months"
+    },
+    {
+      "id": "ENG-11594",
+      "createdAt": "2026-07-13T19:04:29.628Z",
+      "title": "Request for RR save credits and inbox cost coverage",
+      "state": "Done",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [],
+      "description": "#### Customer Name\n\nName 24\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 24's Workspace\n\n#### Screenshot\n\n#### What are you trying to achieve?\n\nRR save - Cover costs of acquisity and inboxes for 3 months & award 15,000 lead credits\n\n#### What are you doing to achieve it?\n\nRR save\n\n#### What is happening instead?\n\nRR save\n\n#### What is the expected outcome?\n\nRR save - Cover costs of acquisity and inboxes for 3 months & award 15,000 lead credits"
+    }
+  ]
+}

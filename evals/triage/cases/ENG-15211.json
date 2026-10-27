@@ -1,0 +1,232 @@
+{
+  "id": "ENG-15211",
+  "provenance": "seeded",
+  "createdAt": "2026-10-12T15:24:15.549Z",
+  "lane": "triage",
+  "stratum": "bug_master",
+  "ticket": {
+    "title": "Name 35 unable to access acquisity due to 'email mismatch' error",
+    "description": "#### Customer Name\n\nName 35\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nCompany Five\n\n#### Screenshot\n\n <image> \n\n#### What are you trying to achieve?\n\nGet them into acquisity\n\n#### What are you doing to achieve it?\n\ntried logging in manually and via google\n\n#### What is happening instead?\n\ncannot access, error message saying wrong email and password or emails mismatch\n\n#### What is the expected outcome?\n\naccess to acquisity",
+    "attachmentKinds": ["image", "slack"]
+  },
+  "repoCommitAtCreate": "076050116c5fc541c66506bdfc065207adb86b64",
+  "flags": {
+    "descriptionEditedAfterCreate": false,
+    "needsProductionData": true,
+    "alreadyFixedAtTriage": false
+  },
+  "asFiled": {
+    "assignee": "Aaron Fraga",
+    "labels": [],
+    "parent": null,
+    "priority": 2,
+    "project": "Support"
+  },
+  "relatedSnapshot": [
+    {
+      "id": "ENG-14390",
+      "createdAt": "2026-09-28T15:04:40.884Z",
+      "title": "Client is locked out of their Acquisity account",
+      "state": "Done",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": ["Internal reported"],
+      "description": "#### Customer Name\n\nName 1\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nCompany One\n\n#### Screenshot\n\n <image> \n\n <image> \n\n#### What are you trying to achieve?\n\nGetting them back into their account\n\n#### What are you doing to achieve it?\n\nWriting you.\n\n#### What is happening instead?\n\nThey sent me the error messages, I have posted them here.\n\n#### What is the expected outcome?\n\nTo log in to Acquisity"
+    },
+    {
+      "id": "ENG-3861",
+      "createdAt": "2025-12-17T18:04:03.551Z",
+      "title": "Workspace setup failed when signing up to Acquisity Pro",
+      "state": "Done",
+      "assignee": "Savinder Singh",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "Workspace setup fails for a new client when signing up to Acquisity Pro using Name 2 profile (email: <email>).\n\nThe UI shows the error message:\n\n> Workspace setup failed: Cannot read properties of null (reading 'username')\n\nScreenshot:\n\n <image> "
+    },
+    {
+      "id": "ENG-11571",
+      "createdAt": "2026-07-13T13:14:09.566Z",
+      "title": "Campaigns show \"no email accounts connected\" and stop sending despite green/active inboxes (recurring regression)",
+      "state": "Canceled",
+      "assignee": "Anthony Adewale",
+      "parent": null,
+      "labels": ["Bug", "intercom-sourced"],
+      "description": "## Problem\n\nCampaigns abruptly report zero connected inboxes and stop sending even though the accounts are set up and showing green/Active in settings. Also surfaces in the campaign Options tab as \"no active accounts\" while every inbox indicator is green, so customers can't tell whether sending is live.\n\n## Name 5 signal\n\n* Name 5 topics: `<uuid>` (HIGH, conf 0.88, recurring — 12 customers in 30d) and `<uuid>` (LOW, conf 0.65, new — \"green light accounts show no active accounts\"). Same underlying symptom, clustered together.\n* Track: Engineering. Window: 2026-07-12 → 2026-07-13.\n\n## Why new\n\nNo open canonical. All prior tickets for this exact symptom are closed: ENG-9492 (Done, Jun), ENG-7810 (Done, Apr — synced email accounts to provider on campaign settings create), ENG-9432 (Duplicate). The symptom is recurring again at high volume (12 in 30d), indicating a regression or a new manifestation with no ticket tracking it.\n\n## Source\n\n* Name 3 — no accounts connected\n* Name 3 — green light no active accounts\n\n## Name 4\n\n`modem-<uuid>-2026-07-13`"
+    },
+    {
+      "id": "ENG-10437",
+      "createdAt": "2026-04-20T08:50:19.732Z",
+      "title": "Change email address for Acquisity access",
+      "state": "Done",
+      "assignee": "Saher Shodhan",
+      "parent": null,
+      "labels": [],
+      "description": "Change the email address used for Acquisity platform access."
+    },
+    {
+      "id": "ENG-12391",
+      "createdAt": "2026-08-07T08:05:17.241Z",
+      "title": "[Workspace log in] -Recurring \"Something went wrong\" error prevents user from logging in after email migration and password reset",
+      "state": "Done",
+      "assignee": "Anuj Bhatt",
+      "parent": null,
+      "labels": ["Bug", "intercom-sourced"],
+      "description": "**Customer Name**\nName 6\n\n**Customer Email**\n<email>\n\n**Customer Email**\n<Enter text>\n\n**Workspace name****\n****Name 6's workspace**\n\n**Screenshot**\n<optional>\n\n**What is the user trying to achieve?**\nLog in to the Acquisity app using the active email address (<email>).\n\n**What is the user doing to achieve it?**\nAttempting to log in via app.acquisity.ai using multiple browsers (Chrome, Brave, and Bing), including Incognito/Private mode. The customer also completed a password reset and previously attempted an email migration from <email> to <email>.\n\n**What is happening instead?**\nThe customer consistently receives the error \"Something went wrong\" when attempting to log in. The issue temporarily worked in Incognito after the password reset but has since returned across all browsers and browsing modes.\n\n**What is the expected outcome?**\nThe customer should be able to log in successfully to the workspace using <email> without receiving the \"Something went wrong\" error."
+    },
+    {
+      "id": "ENG-11522",
+      "createdAt": "2026-07-13T02:06:02.805Z",
+      "title": "Password reset emails not delivered to user (accepted by provider, never landing) — <email>",
+      "state": "Todo",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [
+        "Deliverability Issue",
+        "Triage: Needs Investigation",
+        "intercom-sourced",
+        "triaged-by-devin"
+      ],
+      "description": "BUG: Unconfirmed (email deliverability issue; the reset flow itself works)\n\n## Evidence\n\n* Customer Name 10 Name 8 (user id `<uuid>`, email `<email>`) cannot log in and never receives the password reset email. Reported via Intercom.\n* Prod DB (read-only): account healthy — `email_verified=true`, not banned, credential account with password present. 4 reset-password verification tokens generated today for this user (00:16, 00:19, 01:18, 01:42 UTC), so Name 7 reset flow generates links correctly.\n* Axiom: no email-send errors around those timestamps → Resend accepted the sends (no `EmailSendError` thrown).\n* The recipient mailbox works and is actively receiving OTHER Acquisity mail (AI SDR escalation notifications, etc.) — see screenshots in the Intercom thread. AI SDR escalation emails go through the same `emailService`/Resend sender (`env.EMAIL_FROM`) as the password reset email, yet the reset email specifically never lands.\n* Pattern (provider accepts the send, mail never delivered, to an address that receives our other mail) most strongly suggests the recipient is on Resend's suppression/bounce list. Could not verify directly — no Resend credentials available in the investigation session.\n\n## Second issue found\n\n* CS attempted to change the account email to `<email>`, but the change did NOT persist — `user.email` is still `<email>` and `user.updated_at` is `2026-06-13` (unchanged). So the 'change email + resend' retest actually still sent to `<email>`; `<email>` never received a reset. Needs confirmation whether the admin email-change flow requires user confirmation (by design) or silently failed.\n\n## What's needed to resolve\n\n1. Check Resend suppression/bounce list for `<email>` (and `<email>`); remove suppression if present and resend.\n2. Investigate why the admin email change did not persist.\n3. Immediate customer unblock (separate from root cause): admin sets a temporary password directly so the user can log in without email.\n\n## Links\n\n* Intercom: <url:app.intercom.com>\n* Slack thread: <url:acquisityworkspace.slack.com>\n* Name 9 session: <url>"
+    },
+    {
+      "id": "ENG-12783",
+      "createdAt": "2026-08-14T19:38:34.705Z",
+      "title": "Client unable to access Acquisity - no reset password being sent",
+      "state": "Duplicate",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [],
+      "description": "#### Customer Name\n\nName 11\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 11\n\n#### Screenshot\n\n <image> \n\n <image> \n\n#### What are you trying to achieve?\n\nReset client's Acquisity password\n\n#### What are you doing to achieve it?\n\nTried to use admin panel - unable to reset password for him. He tried to click forgot password but no link arrived during office hours\n\n#### What is happening instead?\n\nclient unable to access Acquisity at the moment\n\n#### What is the expected outcome?\n\nClient can access Acquisity"
+    },
+    {
+      "id": "ENG-4528",
+      "createdAt": "2026-01-14T15:09:32.809Z",
+      "title": "Workspace setup fails when connecting email provider",
+      "state": "Done",
+      "assignee": "Anuj Bhatt",
+      "parent": null,
+      "labels": ["Bug", "Workspace Setup Issues"],
+      "description": "user: \n\n| <email> |  |\n| -- | -- |\n\nGP Name 12 Name 13 is unable to connect an email provider during workspace setup in Acquisity.\n\nWhen attempting to connect the provider, a toast appears:\n\nWorkspace setup failed: \"error parsing stream: error reading response body to check for status code: unexpected end of JSON input\"\n\nAfter this message appears, setup cannot proceed.\n\n <image> \n\nSteps taken: \n\nThis user was downgraded to Legacy Pro as requested. \n\nNew error message \n\n <image> "
+    },
+    {
+      "id": "ENG-7670",
+      "createdAt": "2026-04-09T21:08:57.042Z",
+      "title": "Active Pro plan still prompts Acquisity upgrade",
+      "state": "Done",
+      "assignee": "Jared Stauffer",
+      "parent": null,
+      "labels": [],
+      "description": "An account with an active Pro plan cannot access Acquisity and is prompted to enable or upgrade the integration again. Clicking through shows that there is already an active subscription and no upgrade is available, so access remains blocked.\n\nThis persisted after logging out, clearing browser cache, and logging back in.\n\nAffected account: <email>\nWorkspace: Name 14's Workspace\n\n <image> \n\n <image> "
+    },
+    {
+      "id": "ENG-9016",
+      "createdAt": "2026-05-19T16:12:11.202Z",
+      "title": "Add site-wide ad completion notification",
+      "state": "Canceled",
+      "assignee": "Aaron Kern",
+      "parent": null,
+      "labels": ["Feature"],
+      "description": "Add a site-wide pop-up or notification for ad completion.\n\n<!-- preview-url-start -->\n**Preview:** <url:ecom-ad-completion-notification-aiacquisition.vercel.app> — PR #4116\n<!-- preview-url-end -->"
+    },
+    {
+      "id": "ENG-3076",
+      "createdAt": "2025-11-27T20:01:43.232Z",
+      "title": "User purchased Acquisity emails but email accounts not showing up",
+      "state": "Done",
+      "assignee": "Anthony Adewale",
+      "parent": null,
+      "labels": [],
+      "description": "User purchased Acquisity emails but email account purchases do not populate.\n\n---\n\nConversation:\nName 15: <p>First connected my Company Two account. However, decided to switch over to Acquisity. Now there's an error bar at the top which mentions:</p>\n<p>\"Something went wrong with the connection to your outreach provider. Please reconnect.\"<br>​</p>\n\nbot: Thanks for your patience with this transition! When switching from Company Two to Acquisity, you'll need to disconnect your old Company Two connection first. Here's what to try: Go to Settings > Email & Calendar and disconnect your Company Two connection Clear your browser cache Reconnect using Acquisity as your sending engine Since you're switching to Acquisity, you won't need the Company Two API connection anymore - Acquisity works natively within our platform without requiring external setup. Plus, you'll get 10,000 lead credits to get started! If the error persists after these steps, could you share: What page you're on when you see this error A screenshot if possible Whether this is blocking your workflow completely This will help us get you sorted quickly! Source: Setting Up AI SDR with Name 18 Calendar | Help Center - AI Acquisition\n\nbot: Is that what you were looking for?\n\nbot: If you still need help resolving the connection error, I'm here to assist you further. Would you like to provide more details about the issue or any specific steps you've tried so far?\n\nbot: Thanks for your patience and the screenshot! I can see the connection error with the \"Fix\" button. Since you switched from Company Two to Acquisity, you'll need to: Click the \"Fix\" button in that orange banner first Disconnect your old Company Two connection completely in Settings > Email & Calendar Reconnect using Acquisity as your sending engine The error is likely happening because your old Company Two API connection is still partially linked. Once you fully disconnect Company Two and set up Acquisity, this should resolve. If the \"Fix\" button doesn't work or you're still seeing the error after disconnecting Company Two, I'm going to pass this to a human teammate to help you as soon as possible. We're working through a higher than usual support load, but we'll get back to you as quickly as we can. Is this blocking your workflow completely or can you still access other parts of the platform? Source: Dashboard Overview: Understanding the Numbers | Help Center - AI Acquisition\n\nName 15: Won't let me disconnect my old Company Two connect after pressing fix\n\nbot: Thanks for your patience with this! It sounds like the \"Fix\" button isn't working to disconnect your Company Two connection, which can happen during the transition process. Since the Fix button isn't resolving this and you're unable to disconnect Company Two to complete your switch to Acquisity, I'm going to pass this to a human teammate to help you as soon as possible. We're working through a higher than usual support load, but we'll get back to you as quickly as we can. This type of connection issue typically requires backend assistance to fully clear the old API connection so you can properly set up Acquisity.\n\nbot: Did that answer your question?\n\nbot: I’m here if you still need help with disconnecting your Company Two connection or setting up Acquisity. Would you like to share more details about what you’re experiencing so I can assist further?\n\nbot: I'll connect you with someone from our team right away! Meanwhile, could you share any additional details about the issue to help them assist you more efficiently?\n\nName 20: Your recording is in progress. Navigate back to the Jam tab when you're finished.\n\nName 20:\n\n🟡 Note from Name 20: ↑ Upload started... Screen recording uploading (13 MB)\n\n🟡 Note from Name 20: ⚠ Upload failed There was a problem uploading the user’s recording.\n\nName 20: Your recording is in progress. Navigate back to the Jam tab when you're finished.\n\nName 20:\n\nName 20: Your recording is in progress. Navigate back to the Jam tab when you're finished.\n\nName 20: This message was deleted\n\n🟡 Note from Name 20: ↑ Upload started... Screen recording uploading (4.2 MB)\n\n🟡 Note from Name 20: ⚠ Upload failed There was a problem uploading the user’s recording.\n\nName 20: Your recording is in progress. Navigate back to the Jam tab when you're finished.\n\nName 20: This message was deleted\n\nName 15: Seems like it's not recording properly will try again\n\nName 20: Your recording is in progress. Navigate back to the Jam tab when you're finished.\n\nName 20:\n\n🟡 Note from Name 20: ↑ Upload started... Screen recording uploading (2.2 MB)\n\n🟡 Note from Name 20: ⚠ Upload failed There was a problem uploading the user’s recording.\n\nName 20: Your recording is in progress. Navigate back to the Jam tab when you're finished.\n\nName 20:\n\nName 15: Trying to record but it remains stuck\n\nName 15: Essentially everytime I click the fix button, it just refreshes the page\n\nName 15: nothing else\n\nName 20: Hi Name 19, it looks like the recording didn’t go through. Just to confirm, the issue is that you’re unable to click the “Fix” button—correct?\n\nName 15: I am click it but it just refreshes the screen, it does not fix the issue\n\nName 15: the recording is not working\n\nName 20: Your recording is in progress. Navigate back to the Jam tab when you're finished.\n\nName 20:\n\n🟡 Note from Name 20: ↑ Upload started... Screen recording uploading (4.7 MB)\n\n🟡 Note from Name 20: ⚠ Upload failed There was a problem uploading the user’s recording.\n\nName 20: Are you still experiencing this? \"Something went wrong with the connection to your outreach provider. Please reconnect.\"\n\nName 15: Yes I am still experiencing it\n\nName 20: This appears to be a bug that the tech team is currently addressing. I'm going to escalate your case to ensure they look at your specific situation immediately.\n\n🟡 Note from Name 20: Issue ENG-3051 was linked to the conversation\n\nName 15: Thank you\n\nName 15: Something could be noted. I attached my Company Two API key since I picked the Company Two option however decided to switch to acquisity which then caused this issue\n\nName 15: could be that the Company Two api key is still attached to the account in the backend and needs to be removed in order to get access to acquisity setup\n\nName 16: Hey Name 19, I apologise for the late reply. But you can't use Company Two and Acquisity at once, If you choose Acquisity you can't move warmed up domains from Company Two yet, that feature will be available soon.\n\nName 16: Yes, please disconnect your Company Two API from the platform since you want to use Acquisity. Thank you for your patience, feel free to get back to us if you need further assistance.\n\n🟡 Note from Name 20: <email> commented on ENG-3051: Name 17\n\n🟡 Note from Name 20: Issue ENG-3051 moved to status In Progress by Koppany Kondricz\n\n🟡 Note from Name 20: Koppany Kondricz commented on ENG-3051: <mention> <mention> <mention> So I tested this with the following setups: Direct Company Two connection provider active => false. (Campaign creation threw error as no active provider) Direct Company Two connection provider active => true. Campaign creation worked (as expected) Acquisity connection provider active => false (Campaign creation threw error as no active provider) Acquisity connection provider active => true Campaign creation worked (as expected)Emails would load the same (with the provider being active) Buying email button completed the request (did not throw error) but no emails are being listed. Keep in mind that my provider was manually updated as false at that time.Environment - localhostThe root cause was most likely that we mistakenly deactivated users provider, but we disabled that functionality because it was causing side effects:<url:github.com> I think that fix solved this ticket too.\n\n🟡 Note from Name 20: Anthony Adewale commented on ENG-3051: <mention> yes !! This should be resolved already. Thanks man\n\n🟡 Note from Name 20: Issue ENG-3051 moved to status Canceled by Koppany Kondricz\n\nName 15: There's no feature option to disconnect the Company Two API on my webapp\n\nEllaine Fuente: Hi Name 19. Are you still having issues here with Company Two?\n\nName 15: Please confirm if my account is using Company Two or acquisity\n\nEllaine Fuente: I see you are using Acquisity\n\nName 15: I see my old campaigns from my old Company Two account though?\n\nEllaine Fuente: which workspace is this? i see you have 2?\n\nName 15: Company Six workspace\n\nEllaine Fuente: Thank you. Were you able to connect Company Two before?\n\nName 15: Also tried buying email accounts but did not populate, can you confirm if I've purchased it\n\nName 15: I don't understand your question\n\nName 15: I connected Company Two beforehand. Added my API key. But then decided that I want to switch to Acquisity. But now my old campaigns are showing\n\nName 15: so I want to understand if I am confirmed on Acquisity. If I am, why are my old campaigns showing.\n\nEllaine Fuente: I can see that the one running right now is through Acquisity already.\n\nName 15: Name 21 which means I need to purchase new email accounts correct?\n\nEllaine Fuente: It must be a system glitch that your Company Two campaigns are still showing. I dont see your Company Two connected anymore\n\nName 15: Seems like the buy email accounts is glitching as well\n\nName 15: Clicked it twice, was loading that it was purchasing domains but nothing is showing up\n\nEllaine Fuente: The purchase did go through correct? and the mailboxes is not showing?\n\nName 15: Clicked buy email accounts, it was loaded but still no email accounts showing up on my end\n\nEllaine Fuente: Got it. Let me have a quick look in to your account"
+    },
+    {
+      "id": "ENG-3954",
+      "createdAt": "2025-12-22T03:03:12.971Z",
+      "title": "Cannot access expected legacy Acquisity pricing",
+      "state": "Canceled",
+      "assignee": "Nonette Gumban",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "User with expected legacy access to Acquisity is seeing non-legacy pricing when trying to initiate Acquisity via the Cold Email Agent dashboard flow.\n\nRepro context:\n\n* Flow: Dashboard → Cold Email Agent → attempt to connect/initiate Acquisity (Built-in)\n* URL seen: <url>\n* Instead of legacy/legacy_pro pricing, the subscription page shows unexpected pricing and is blocking activation.\n\nScreenshots showing the unexpected pricing screens:\n\n <image> \n\n <image> \n\nThis is currently blocking the user from proceeding with Acquisity setup."
+    },
+    {
+      "id": "ENG-4730",
+      "createdAt": "2026-01-21T16:14:06.389Z",
+      "title": "Cannot connect to Acquisity provider from workspace",
+      "state": "Done",
+      "assignee": "Anuj Bhatt",
+      "parent": null,
+      "labels": ["Bug", "Workspace Setup Issues"],
+      "description": "user: <email>\n\nUser reports that clicking the Acquisity provider in the connection flow does nothing and does not advance to the next screen.\n\nAdditional context:\n\n* Workspace/account mentioned: Name 22 Name 23\n* When clicking Acquisity, nothing happens and it is described as a dead link.\n* The \"record screen\" option from the Jam for Customer Support app also just opens the same webpage instead of starting a recording.\n\nRelevant screenshots:\n\n <image> \n\n <image> \n\nCould reproduce this \n\n <image> "
+    },
+    {
+      "id": "ENG-10691",
+      "createdAt": "2026-06-23T14:47:41.516Z",
+      "title": "Payment failed when purchasing new mailboxes",
+      "state": "Done",
+      "assignee": "Tyler Olsen",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "#### Customer Name\n\nName 24\n\n#### Customer Email\n\n<domain>\n\n#### Workspace name\n\nCompany Three\n\n#### Screenshot\n\n#### What are you trying to achieve?\n\nNew inbox/domain purchase\n\n#### What are you doing to achieve it?\n\nBuying in platform\n\n#### What is happening instead?\n\nSaying \"Payment failed\" - <loom>\n\n#### What is the expected outcome?\n\nTo able to buy 9 new mailboxes"
+    },
+    {
+      "id": "ENG-10727",
+      "createdAt": "2026-06-24T00:06:17.144Z",
+      "title": "Unable to purchase mailboxes in Acquisity",
+      "state": "Duplicate",
+      "assignee": "Tyler Olsen",
+      "parent": null,
+      "labels": [],
+      "description": "#### Customer Name\n\nName 25\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nCompany Four\n\n#### Screenshot\n\n <image> \n\n#### What are you trying to achieve?\n\nName 25 is trying to finalize purchasing inboxes\n\n#### What are you doing to achieve it?\n\nSigned up for Acquisity, go to cold email agent view, email accounts and cannot purchase new, Name 25 messaged Intercom widget but still not solved (already spoke to his bank to authroize purchase)\n\n#### What is happening instead?\n\nError when pirchasing mail boxes - has an intercom ticket started but he is escalating, was told via intercom chat to call his bank - did and bank told him card works fine. He is still unable to complete his purchase\n\n#### What is the expected outcome?\n\nPurchase domains and finish purchase (custom domains)"
+    },
+    {
+      "id": "ENG-3051",
+      "createdAt": "2025-11-27T01:26:42.289Z",
+      "title": "Outreach Provider Connection and Campaign Creation Errors",
+      "state": "Canceled",
+      "assignee": "Koppany Kondricz",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "User experiences persistent 'Something went wrong with the connection to your outreach provider' error, cannot load email accounts, and receives 'Failed to create campaign draft' message; unable to fix via Cold Email Agent.\n\nThe user is encountering a complete failure of the Cold Email Agent integration. The core issue is a persistent \"Something went wrong with the connection to your outreach provider\" error, which the user cannot resolve because the \"Fix\" button directs them to a setup screen with no actionable steps. This connection failure prevents the system from loading email accounts, and all critical functions are broken, resulting in a \"Failed to create campaign draft\" error when attempting to start a campaign. Furthermore, the \"Buy email account\" button is unresponsive, leading the user to worry about accidental multiple charges.\n\nJam | Console logs, network requests, and more\n\n---\n\nConversation:\nName 26: <p>need help resolving: Something went wrong with the connection to your outreach provider. Please reconnect.</p>\n\nbot: This connection error usually happens when your integration needs to be refreshed. Here's how to fix it: First, try these quick steps: Refresh your browser page Clear your browser cache and log back in Check your internet connection If that doesn't work, reconnect your integration: Go to Settings > Email & Calendar Use the disconnect/trash icon to disconnect your current connection Follow the setup process again to reconnect During reconnection: Make sure your account allows third-party app access Don't close the browser window during the authorization process If you get \"No authorization code received,\" clear your browser cache and try again This should restore your outreach provider connection. The error typically resolves once the integration is properly reestablished. Sources: Setting Up AI SDR with Name 18 Calendar | Help Center - AI Acquisition Dashboard Overview: Understanding the Numbers | Help Center - AI Acquisition How to reset your password | Help Center - AI Acquisition Growth Plan Creator Guide | Help Center - AI Acquisition\n\nbot: Is that what you were looking for?\n\nbot: If you still need help resolving the connection issue, I'm here to assist you further. Would you like to provide more details about what you're trying to achieve or any specific problems you're encountering?\n\nbot: Since you're still seeing the same connection error, let's try a different approach: First, try these steps: Refresh your browser page Clear your browser cache completely, then log back in Check that your internet connection is stable If the error persists: The issue might be with your integration sync. Sometimes there's a delay between your integrations and our platform - data typically syncs within a few hours, but delays can occur. Try logging out completely, waiting a few minutes, then logging back in. If you're still getting the \"Failed to load\" type error, there should be a Retry button you can click. Let me know if these steps don't resolve it and I can help you dig deeper into what might be causing the connection issue. Source: Dashboard Overview: Understanding the Numbers | Help Center - AI Acquisition\n\nName 26: clicking fix takees me to the cold email agent\n\nbot: That's actually the correct behavior! When you click \"fix\" for the outreach provider connection error, it takes you to the Cold Email Agent because that's where you manage your email campaigns and integrations. From the Cold Email Agent, you can: Check your campaign settings and email provider connections Reconnect any disconnected integrations Access the settings to manage your email accounts and providers If you're still seeing connection issues once you're in the Cold Email Agent, look for your email provider settings or campaign configuration options to reestablish the connection. Source: Cold Email Agent Guide | Help Center - AI Acquisition\n\nbot: Was that helpful?\n\nName 26: not really\n\nbot: I'm sorry that didn't help! Would you like me to connect you with a human agent? Or if you can share more details about the issue, I’m happy to keep trying to assist you.\n\nName 26: what do i need to fix?\n\nName 26: yes\n\nbot: I'll connect you with someone who can help. Meanwhile, could you please share any additional details about the issue? This will help them assist you more efficiently.\n\nName 26: We couldn't load your email accounts Please refresh the page or try again later. If the problem persists, contact support.\n\nName 26: Something went wrong with the connection to your outreach provider. Please reconnect.\n\nName 26: Failed to create campaign draft: Something went wrong ​\n\nName 26: i feel like the acquisity thing needs to be re implemented or soemthing but i dont know how and dont want to screw it up\n\nName 26: yes\n\nName 26: at the top it says in yellow: something went wrong with your connection to your outreach provider. When I click to fix it, it takes me to the cold. Email agent set up screen. There's nothing in there for me to do to fix anything.\n\nName 26: Something went wrong with the connection to your outreach provider. Please reconnect.\n\nName 26: When I then go into the cold email agent in the main screen under marketing, there's nothing there. After a few seconds, it then says: We couldn't load your email accounts Please refresh the page or try again later. If the problem persists, contact support.\n\nName 26: I then hit by email account and click to make the purchase but then it doesn't do anything. I'm hoping that I'm not being charged each time. I click it cause I've now clicked it several times.\n\nName 26: Finally, when I go quick to create a campaign, it gives me the following error: Failed to create campaign draft: Something went wrong\n\nEllaine Fuente: Were you able to connect your email and Calendar, Name 29?\n\nName 26: i think?\n\nName 26: where would i see it\n\nEllaine Fuente: You can check it under Settings -> Email and Calendar\n\nName 26: yes they are connectede\n\nName 26: i feel like this is taking an extremely long tie to get anywhere\n\nEllaine Fuente: \\[Name 30: Jam for Customer Support\\]\n\nEllaine Fuente: Your recording is in progress. Navigate back to the Jam tab when you're finished.\n\nEllaine Fuente:\n\n🟡 Note from Ellaine Fuente: ↑ Upload started... Screen recording uploading (26.3 MB)\n\n🟡 Note from Ellaine Fuente: Jam created! View the screen recording here: <url:jam.dev>\n\nName 26: Screen recorded successfully!\n\nName 26: submitted it\n\nName 26: what happens if i reset workspace onboarding?\n\nName 26: also i want to make sure i am not being charged over and over again every time i click buy emails\n\nEllaine Fuente: As long as you do not click payment confirmation, I believe you wont get charged.\n\nName 26: ok so what hapens if i clikc reset workspace onboarding\n\nEllaine Fuente: it will reset your onboarding - from Niche research to your campaigns\n\nName 26: ohh then i dont want to do that\n\nName 26: so what do i need to do to fix this?\n\n🟡 Note from Ellaine Fuente: Name 27 do you know the error causing this? something went wrong with your connection to your outreach provider.\n\nName 26: ?\n\n🟡 Note from Name 27: Name 28 looks like a bug. Create a ticket for it. Make sure the Jam link is in it. Most importantly, add a lot of details. What the agent creates is often too minimal for the devs to use."
+    },
+    {
+      "id": "ENG-4776",
+      "createdAt": "2026-01-23T01:44:37.560Z",
+      "title": "Cannot connect provider after clicking ENABLE ACQUISITY",
+      "state": "Done",
+      "assignee": "Anuj Bhatt",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "User: <email>\n\nWorkspace owner cannot connect the provider in two workspaces (Name 31 and Name 32).\n\nSteps described:\n\n* User is admin/owner of the workspace.\n* From the workspace, user attempts to enable the provider via the ENABLE ACQUISITY button/link.\n* The link is dead and does not forward after pressing ENABLE ACQUISITY.\n\nA screen recording of the issue is available via Jam: <url:jam.dev>\n\nScreenshot:\n\n <image> \n\nCould reproduce, see error message \n\n <image> "
+    },
+    {
+      "id": "ENG-10581",
+      "createdAt": "2026-06-19T18:27:20.342Z",
+      "title": "14 Email Inboxes Stuck in Error State and Cannot Be Reactivated",
+      "state": "Done",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "**Customer Name**\nName 33\n\n**Customer Email**\n<email>\n\n**Customer Email**\n<email>\n\n**Workspace name**\nName 33' Workspace\n\n**Screenshot**\n<optional>\n\n**What is the user trying to achieve?**\nRestore all connected email inboxes so the campaign can send at full capacity.\n\n**What is the user doing to achieve it?**\nThe user has connected multiple email accounts and is running an active campaign. Support attempted to reactivate the affected inboxes from the platform.\n\n**What is happening instead?**\n14 email accounts are currently in an error state. Attempts to reactivate the inboxes were unsuccessful, as they immediately returned to the error status. This suggests an underlying issue affecting the affected inboxes. The remaining 9 inboxes are active and have resumed sending emails successfully.\n\n**What is the expected outcome?**\nThe 14 affected inboxes should remain active after reactivation and be able to send emails normally alongside the other active inboxes. The user would like the root cause of the recurring error state identified and resolved."
+    },
+    {
+      "id": "ENG-8078",
+      "createdAt": "2026-04-23T19:11:45.245Z",
+      "title": "Unable to log into Acquisity account for user",
+      "state": "Canceled",
+      "assignee": "Beth Newton",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "#### Customer Name\n\nName 34\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 34's Workspace\n\n#### Screenshot\n\n#### What are you trying to achieve?\n\nLog into his Acquisity\n\n#### What are you doing to achieve it?\n\nI impersonated his account\n\n#### What is happening instead?\n\nIt says enable acquisity\n\n#### What is the expected outcome?\n\nThat I would be able to see his account."
+    },
+    {
+      "id": "ENG-4914",
+      "createdAt": "2026-01-28T05:46:18.829Z",
+      "title": "Acquisity provider not activating in cold email settings",
+      "state": "Done",
+      "assignee": "Jared Stauffer",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "user: <email>\n\nUser attempted to switch the cold email agent provider from Company Two to Acquisity. The UI showed a successful upgrade message but the settings still display Company Two as the active provider.\n\nThe issue has persisted for over a week despite multiple attempts and page refreshes. The user is unable to attach or enable Acquisity and needs it live and visible as the provider on the dashboard.\n\nContext:\n\n* Action: Clicked \"switch to Acquisity\" in cold email agent settings\n* Result: Success message shown, but provider remains set to Company Two\n* Duration: Ongoing for more than a week\n* Impact: Acquisity cannot be enabled or used as the sending provider in the workspace"
+    }
+  ]
+}

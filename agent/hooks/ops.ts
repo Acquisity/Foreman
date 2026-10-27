@@ -1,5 +1,6 @@
 /**
- * Countable lifecycle logging. Every handler routes through the
+ * Countable lifecycle logging. Every handler but `actions.requested`, which
+ * only binds a critic task to its ticket and logs nothing, routes through the
  * never-throwing `logOpsEvent`, because eve logs and swallows an error a hook
  * raises, so throwing here would only lose the log line. Failure events log
  * the bounded code and message; payloads such as message text, authorization
@@ -15,6 +16,12 @@
  */
 import { defineHook } from "eve/hooks";
 import { logOpsEvent } from "../lib/ops-log.js";
+import {
+  criticTaskIssue,
+  criticTaskIssues,
+  criticVerdictFields,
+  criticVerdictIssue,
+} from "../lib/triage-log.js";
 
 /**
  * Names the connection behind a tool call from the `<connection>__<tool>`
@@ -52,6 +59,24 @@ export default defineHook({
         turnId: event.data.turnId,
       });
     },
+    "actions.requested": (event) => {
+      const bindings: Record<string, string> = {};
+      for (const action of event.data.actions) {
+        if (
+          action.kind !== "subagent-call" ||
+          action.subagentName !== "critic"
+        ) {
+          continue;
+        }
+        const issue = criticTaskIssue(action.input);
+        if (issue) {
+          bindings[action.callId] = issue;
+        }
+      }
+      if (Object.keys(bindings).length > 0) {
+        criticTaskIssues.update((bound) => ({ ...bound, ...bindings }));
+      }
+    },
     "authorization.required": (event, ctx) => {
       logOpsEvent("authorization.required", {
         connection: event.data.name,
@@ -86,6 +111,31 @@ export default defineHook({
         sessionId: ctx.session.id,
         stepIndex: event.data.stepIndex,
         turnId: event.data.turnId,
+      });
+    },
+    // The critic is a subagent task; its reply is the settled task output.
+    "task.settled": (event, ctx) => {
+      const { data } = event;
+      if (!(data.kind === "agent" && data.name === "critic")) {
+        return;
+      }
+      const issue = criticVerdictIssue(criticTaskIssues.get(), data.callId);
+      criticTaskIssues.update((bound) =>
+        Object.fromEntries(
+          Object.entries(bound).filter(([callId]) => callId !== data.callId)
+        )
+      );
+      if (!issue) {
+        return;
+      }
+      logOpsEvent("critic.verdict", {
+        ...criticVerdictFields(
+          data.status,
+          data.status === "completed" ? data.output : undefined
+        ),
+        issue,
+        sessionId: ctx.session.id,
+        turnId: data.turnId,
       });
     },
     "turn.cancelled": (event, ctx) => {

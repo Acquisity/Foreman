@@ -1,0 +1,227 @@
+{
+  "id": "ENG-14754",
+  "provenance": "seeded",
+  "createdAt": "2026-10-05T21:20:27.430Z",
+  "lane": "billing",
+  "stratum": "billing",
+  "ticket": {
+    "title": "Name 27 - Refund last 2 months of payments & Cover the cost of Acquisity and inboxes for 2 months + 20k in lead credits",
+    "description": "#### User Email\n\n<email>\n\n#### Workspace Name\n\nName 27's Workspace\n\n#### Request Type\n\nDiscount code\n\n#### Reason for request\n\nRR save - Refund last 2 months of payments & Cover the cost of Acquisity and inboxes for 2 months + 20k in lead credits",
+    "attachmentKinds": ["slack"]
+  },
+  "repoCommitAtCreate": "f1030734c9b5d44620845538a69fd512466b1d48",
+  "flags": {
+    "descriptionEditedAfterCreate": false,
+    "needsProductionData": true,
+    "alreadyFixedAtTriage": false
+  },
+  "asFiled": {
+    "assignee": "Aaron Fraga",
+    "labels": [],
+    "parent": null,
+    "priority": 0,
+    "project": null
+  },
+  "relatedSnapshot": [
+    {
+      "id": "ENG-11092",
+      "createdAt": "2026-07-02T14:32:33.060Z",
+      "title": "Request for temporary discount for Name 1's Workspace",
+      "state": "Done",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [],
+      "description": "#### User Email\n\n<email>\n\n#### Workspace Name\n\nName 1's Workspace\n\n#### Request Type\n\nDiscount code\n\n#### Reason for request\n\nName 1 is experiencing temporary financial hardship due to significant personal circumstances, including unexpected tax obligations following the sale of his home, while rebuilding his business as a single father. During our Name 2 strategy call, he shared that cash flow has become his primary constraint and he is considering returning to full-time employment if he cannot generate revenue soon.\n\nTo help retain the client and maintain momentum, I'm requesting a temporary Name 3 credit/discount of **1 to 3 months**, with 5,000 lead credits, if approved. Name 1 remains highly engaged, has completed over 30 discovery meetings, and is actively implementing a revised outbound strategy with our team. We are rebuilding his campaign around a more effective interview-based approach and will be providing additional sales coaching to improve conversions.\n\nProviding temporary platform relief will give him the runway needed to execute the new strategy without the immediate financial pressure of his subscription, improving retention and increasing the likelihood of generating client wins. This request is intended as a short-term retention measure while the new campaign is launched and begins producing opportunities."
+    },
+    {
+      "id": "ENG-12371",
+      "createdAt": "2026-08-06T17:44:58.897Z",
+      "title": "Marketing credit",
+      "state": "Done",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [],
+      "description": "#### User Email\n\n<email>\n\n#### Workspace Name\n\nName 4\n\n#### Request Type\n\nLead credit\n\n#### Reason for request\n\nHad a special situation where to get the sale over the line I had to offer 2 months on us for Acquisity and inboxes , I never do this to get a sale over the line but this was a very specific circumstance.\n\nOnboarding for this client will be Monday August 10th."
+    },
+    {
+      "id": "ENG-13368",
+      "createdAt": "2026-09-01T18:50:05.492Z",
+      "title": "requesting 2 additional months of acquisit & 18 inboxes promocode",
+      "state": "Done",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [],
+      "description": "#### User Email\n\n<email>\n\n#### Workspace Name\n\n#### Request Type\n\nDiscount code\n\n#### Reason for request\n\nThis was a refund save client, in order to avoid an escalation to RR we are requesting 2 months of acquisity & 18 inboxes covered by us."
+    },
+    {
+      "id": "ENG-11898",
+      "createdAt": "2026-07-20T18:49:41.608Z",
+      "title": "#### Customer Name",
+      "state": "Canceled",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [],
+      "description": "#### Customer Name\n\nName 5\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 5\n\n#### Screenshot\n\n <image> \n\n <image> \n\n <image> \n\n#### What are you trying to achieve?\n\nMaximize sending to be 25-30 per email account - right now it's capped per camapign?\n\n#### What are you doing to achieve it?\n\nScreenshare and confirm math reflects campaign shows he can only send max 157 per day but is using 18 email accounts\n\n#### What is happening instead?\n\nName 6's email accounts have limit of 157 sends per day (which averages 8-10 sends per email account, instead of expected 25-30 sends per EM acct)\n\n#### What is the expected outcome?\n\nSends per email account should be 25-30 but right now each email acct is <10"
+    },
+    {
+      "id": "ENG-11053",
+      "createdAt": "2026-07-01T18:54:52.124Z",
+      "title": "Request for 20,000 lead credits discount",
+      "state": "Done",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": ["Refund"],
+      "description": "#### User Email\n\n<email>\n\n#### Workspace Name\n\nName 7\n\n#### Request Type\n\nDiscount code\n\n#### Reason for request\n\nRR Save.\n\nCover the costs of acquisity and inboxes for 3 months.\n\nPlease award 20,000 lead credits\n\nShe has legacy pricing ($1/mo for acquisity membership) - she has yet to buy domains and inboxes through our platform however does have an active Acquisity membership"
+    },
+    {
+      "id": "ENG-13150",
+      "createdAt": "2026-08-26T16:14:53.017Z",
+      "title": "2 months of cold email agent plus domain and inboxes",
+      "state": "Done",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": ["Discount"],
+      "description": "#### User Email\n\n<email>\n\n#### Workspace Name\n\nName 8\n\n#### Request Type\n\nDiscount code\n\n#### Reason for request\n\nShe waited 1 week for her onboarding call then her onboarding call was canceled due to changes with OB specialist, she asked for a refund and that was the incentive I gave her to prevent her from refunding."
+    },
+    {
+      "id": "ENG-12029",
+      "createdAt": "2026-07-24T07:15:36.948Z",
+      "title": "Request promo code for client onboarding",
+      "state": "Done",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": ["Discount", "triaged-by-devin"],
+      "description": "#### Customer Name\n\nName 9\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 9's Workspace\n\n#### Screenshot\n\n#### What are you trying to achieve?\n\nI'm requesting a promo code to cover two months of Acquisity Plus, inboxes, and domains for the client.  This was offered to the client by the closer as an incentive to move forward and to ensure a successful onboarding experience while addressing concerns that could have led to a refund request\n\n#### What are you doing to achieve it?\n\nI confirmed with the closer and with Name 10 that this offer was promised to the client.\n\n#### What is happening instead?\n\nI don't have the promo code yet\n\n#### What is the expected outcome?\n\nTo get the promo code valid for 2 months +domains+inboxes"
+    },
+    {
+      "id": "ENG-12045",
+      "createdAt": "2026-07-24T21:01:39.476Z",
+      "title": "Promo credit request for client Name 11",
+      "state": "Todo",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": ["Credits", "triaged-by-devin"],
+      "description": "#### Customer Name\n\nName 11\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 11\n\n#### Screenshot\n\n <image> \n\n#### What are you trying to achieve?\n\nI'm requesting a promo code to deliver 20,000 lead credits, and cover two months of Acquisity Plus, inboxes, and domains for the client.\n\n#### What are you doing to achieve it?\n\nScreenshare and confirm client campaigns - lastest 4 active AIA created campaigns PRR <.2% - this client has already spoken w/ Name 12 and Name 100 and is dissat\n\n#### What is happening instead?\n\nCampaigns perform poorly, low PRR and he's dissat nearly all lead credits gone client becoming risky\n\n#### What is the expected outcome?\n\nPromo credit available for client Name 11 to use for 2 mo Acquisity and domains, inboxes, as well as 20,000 lead credits."
+    },
+    {
+      "id": "ENG-8199",
+      "createdAt": "2026-04-29T22:07:05.775Z",
+      "title": "Request for 2 months free Acquisity and 10,000 lead credits",
+      "state": "Done",
+      "assignee": "Beth Newton",
+      "parent": null,
+      "labels": ["Refund"],
+      "description": "#### Workspace Name\n\nName 13\n\n#### Request Type\n\nDiscount code\n\n#### Reason for request\n\nRefund Save\n\nPlease action 2 Months Acquisity & Inboxes for free\n\n&\n\n10 000 lead credits"
+    },
+    {
+      "id": "ENG-11259",
+      "createdAt": "2026-07-08T15:11:37.411Z",
+      "title": "Request for Acquisity cost coverage and lead credits",
+      "state": "Done",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": ["Refund"],
+      "description": "#### Customer Name\n\nName 14\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 14 Workspace\n\n#### Screenshot\n\n#### What are you trying to achieve?\n\nCover costs of Acquisity and inboxes for 3 months and allocate 20,000 lead credits\n\n#### What are you doing to achieve it?\n\nRR save\n\n#### What is happening instead?\n\nRR save\n\n#### What is the expected outcome?\n\nCover costs of Acquisity and inboxes for 3 months and allocate 20,000 lead credits"
+    },
+    {
+      "id": "ENG-12409",
+      "createdAt": "2026-08-07T17:23:20.800Z",
+      "title": "Name 15 - Cover costs of Acquisity and Inboxes for 4 months & 10k lead credits",
+      "state": "Done",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [],
+      "description": "#### User Email\n\n<email>\n\n#### Workspace Name\n\nName 15\n\n#### Request Type\n\nDiscount code\n\n#### Reason for request\n\nRR Save -  Cover costs of Acquisity and Inboxes for 4 months\n\nPlease award 10,000 lead credits to his account as well"
+    },
+    {
+      "id": "ENG-11189",
+      "createdAt": "2026-07-06T21:11:54.815Z",
+      "title": "Request for 3 months of costs and 10k lead credits",
+      "state": "Done",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [],
+      "description": "#### Customer Name\n\nName 16\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 16 Workspace\n\n#### Screenshot\n\n#### What are you trying to achieve?\n\nCover costs of acquisity and inboxes for 3 months - please allocate 10k lead credits as well\n\n#### What are you doing to achieve it?\n\nRR save\n\n#### What is happening instead?\n\nRR save\n\n#### What is the expected outcome?\n\nCover costs of acquisity and inboxes for 3 months - please allocate 10k lead credits as well"
+    },
+    {
+      "id": "ENG-7889",
+      "createdAt": "2026-04-16T14:32:15.762Z",
+      "title": "Request 10,000 Lead Credits for Acquisity discount code",
+      "state": "Done",
+      "assignee": "Beth Newton",
+      "parent": null,
+      "labels": ["Refund"],
+      "description": "#### Workspace Name\n\nName 17\n\n#### Request Type\n\nDiscount code\n\n#### Reason for request\n\n2 Months Acquisity with Inboxes.\nAccount needs to get 10 000 Lead Credits."
+    },
+    {
+      "id": "ENG-12412",
+      "createdAt": "2026-08-07T21:01:10.958Z",
+      "title": "Name 18 - Cover costs of Acquisity & Inboxes for 4 months & 10k lead credits",
+      "state": "Done",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [],
+      "description": "#### User Email\n\n<email>\n\n#### Workspace Name\n\nName 18\n\n#### Request Type\n\nDiscount code\n\n#### Reason for request\n\nRR Save - Legacy client - Acquisity should be $1 after promo expires\n\nPlease ensure 10,000 lead credits are allocated to the account"
+    },
+    {
+      "id": "ENG-8042",
+      "createdAt": "2026-04-22T20:42:28.755Z",
+      "title": "Apply credits for client: 12 inboxes, domains, 2 months Acquisity",
+      "state": "Done",
+      "assignee": "Beth Newton",
+      "parent": null,
+      "labels": ["Refund"],
+      "description": "#### Workspace Name\n\nName 19's Workspace (email is <email>)\n\n#### Request Type\n\nDiscount code\n\n#### Reason for request\n\nTHIS IS A HIGHLY ESCALATED SITUATION\n\nThis client was misinformed multiple times by our team that he could delete his Company One and ReachOutly accounts and still transfer the warmed custom domains and inboxes over to our platform. Obviously, that’s incorrect since we currently can’t import external email accounts into our workspace. We can only either provide pre-warmed accounts or set up and warm up done-for-you accounts.\n\nHe’s very frustrated because he said he had a gut feeling the info was wrong, but still chose to trust us as the experts. Now he feels burned because he lost time with no real progress, and also wasted money buying domains, accounts, and subscriptions on Company One and ReachOutly that he can’t use with us.\n\nHe vented quite a lot on a call with me just now, and also earlier during office hours. This has definitely escalated. He’s clearly upset and is blaming us for the wasted time and money.\n\nTo calm things down and avoid further escalation, I walked him through how we’ll set things up properly moving forward, and I offered some credits to make up for the situation. I told him we would cover inboxes and domains, plus give him some extra time on the platform since he now has to go through the warm-up process again.\n\nWhat I agreed on the call:\n\n1. 12 DFY inboxes covered for 3 months\n2. Custom domains covered for 1 year\n3. 1 month of Acquisity for free\n\n\nIf possible, I’d like to extend the Acquisity credits to 2 months instead of 1, just to go a bit above what was promised and help smooth things over further. If that’s not possible, no worries, but at least the 1 month should definitely be added.\n\nLet me know if we can get these credits applied asap."
+    },
+    {
+      "id": "ENG-13371",
+      "createdAt": "2026-09-01T19:33:41.869Z",
+      "title": "Name 20 - Cover the cost of Acquisity and inboxes for 1 month, and 2K lead credits",
+      "state": "Done",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [],
+      "description": "#### User Email\n\n<email>\n\n#### Workspace Name\n\nName 22 Name 21's Workspace\n\n#### Request Type\n\nDiscount code\n\n#### Reason for request\n\nRR Save - Cover the cost of Acquisity and inboxes for 1 month, and 2,000 lead credits"
+    },
+    {
+      "id": "ENG-11186",
+      "createdAt": "2026-07-06T19:46:56.128Z",
+      "title": "Request for billing credit and lead credits",
+      "state": "Done",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [],
+      "description": "#### Customer Name\n\nName 23\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 23's Workspace\n\n#### Screenshot\n\n#### What are you trying to achieve?\n\nCover cost of acqusity and inboxes for 3 months & 15k lead credits\n\n#### What are you doing to achieve it?\n\nRR save\n\n#### What is happening instead?\n\nRR save\n\n#### What is the expected outcome?\n\nCover Cost of acquisity and inboxes for 3 months Cover cost of acqusity and inboxes for 3 months & 15k lead credits"
+    },
+    {
+      "id": "ENG-13871",
+      "createdAt": "2026-09-14T21:49:50.466Z",
+      "title": "Name 24 - Cover costs of acquisity and inboxes for 3 months & 15,000 lead credits",
+      "state": "Done",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": ["Credits", "Internal reported"],
+      "description": "#### User Email\n\n<email>\n\n#### Workspace Name\n\nName 24's Workspace\n\n#### Request Type\n\nDiscount code\n\n#### Reason for request\n\nRR save - Cover costs of acquisity and inboxes for 3 months & 15,000 lead credits"
+    },
+    {
+      "id": "ENG-12844",
+      "createdAt": "2026-08-17T21:21:01.224Z",
+      "title": "Name 25 - Cover costs of acquisity and inboxes for 3 months + 10,000 lead credits",
+      "state": "Done",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [],
+      "description": "#### User Email\n\n<email>\n\n#### Workspace Name\n\nCompany Two Workspace\n\n#### Request Type\n\nDiscount code\n\n#### Reason for request\n\nRR Save - Cover costs of acquisity and inboxes for 3 months + 10,000 lead credits"
+    },
+    {
+      "id": "ENG-12215",
+      "createdAt": "2026-07-31T19:53:52.302Z",
+      "title": "4 months of acqusity & domains/inboxes covered by us",
+      "state": "Done",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [],
+      "description": "#### User Email\n\n<email>\n\n#### Workspace Name\n\nName 26\n\n#### Request Type\n\nDiscount code\n\n#### Reason for request\n\nClient is requesting 4 months of all acqusity expenses covered by us as part of AI Auto Agency tier since the original pitch included 4 months of ad spend on us.  We are pivoting to cold email strategy however he is asking for us to adhere to the 4 months of marketing expenses we promised."
+    }
+  ]
+}

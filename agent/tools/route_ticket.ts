@@ -4,6 +4,8 @@ import { executorClient } from "#lib/executor/client.js";
 import { questionsOnlyPolicy } from "#lib/github/approval.js";
 import { LINEAR_ISSUE_ID_PATTERN } from "#lib/investigation-memory/scope.js";
 import { routeTicket } from "#lib/linear-api.js";
+import { logOpsEvent } from "#lib/ops-log.js";
+import { routeDecisionEvent, triageDecisions } from "#lib/triage-log.js";
 
 const identifier = z.string().trim().regex(LINEAR_ISSUE_ID_PATTERN);
 const name = z.string().trim().min(1).max(120);
@@ -22,6 +24,13 @@ export default defineTool({
       const ticket = await routeTicket(input, {
         client: executorClient(ctx),
         signal: ctx.abortSignal,
+      });
+      logOpsEvent("triage.decision", {
+        ...routeDecisionEvent(triageDecisions.get(), {
+          ...input,
+          duplicateOf: ticket.duplicateOf ?? undefined,
+        }),
+        sessionId: ctx.session.id,
       });
       return { routed: true as const, ...ticket };
     } catch (error) {

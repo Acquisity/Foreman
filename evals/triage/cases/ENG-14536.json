@@ -1,0 +1,227 @@
+{
+  "id": "ENG-14536",
+  "provenance": "seeded",
+  "createdAt": "2026-09-30T16:42:06.143Z",
+  "lane": "triage",
+  "stratum": "unproven",
+  "ticket": {
+    "title": "Name 21 - Unsure if AI SDR is sending invites to prospects",
+    "description": "#### Customer Name\n\nName 21\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 21\n\n#### Screenshot\n\n#### What are you trying to achieve?\n\nSDR booking meetings - in Appointments in platform, prospect email address is showing up as intended, but in the actual invite on Name 1 Calendar, the prospect does not appear to be invited.  Please investigate - client had a no-show this morning that is possibly due to the prospect not being invited.\n\n#### What are you doing to achieve it?\n\nSettings all correct, and verified\n\n#### What is happening instead?\n\nUnsure if prospects are receiving invites\n\n#### What is the expected outcome?\n\nBooking as expected",
+    "attachmentKinds": ["slack"]
+  },
+  "repoCommitAtCreate": "6f3c2c01c7b9a4ded78e7172cedbf01378b4b513",
+  "flags": {
+    "descriptionEditedAfterCreate": false,
+    "needsProductionData": true,
+    "alreadyFixedAtTriage": false
+  },
+  "asFiled": {
+    "assignee": "Aaron Fraga",
+    "labels": [],
+    "parent": null,
+    "priority": 1,
+    "project": "Support"
+  },
+  "relatedSnapshot": [
+    {
+      "id": "ENG-12056",
+      "createdAt": "2026-07-26T13:14:09.998Z",
+      "title": "AI SDR confirms meetings but calendar invites are never delivered to prospects (recurring, 6+ customers/30d)",
+      "state": "Done",
+      "assignee": "Koppany Kondricz",
+      "parent": null,
+      "labels": ["Bug", "intercom-sourced", "triaged-by-devin"],
+      "description": "## Name 2 signal (daily triage 2026-07-26)\n\nName 2 clustered this as the day's only **URGENT** item: *AI SDR fails to send meeting invites* — severity urgent, confidence 0.92, **recurring (6+ customers in 30 days)**, 5+ open Intercom threads with no resolution in 30+ days. Track: engineering.\n\nSymptom: prospects reply to the AI SDR confirming a time, the AI SDR acknowledges the booking, but **no calendar invite is ever delivered to the prospect** (Name 1 and Outlook/M365 both reported). Customers only discover the miss when the prospect no-shows or emails asking for the invite.\n\nName 2 topic: <url>\n\n## Why this is a new issue\n\nThe previous canonical ticket **ENG-8214** (\"AI SDR did not send meeting invite after confirmation\") was **Canceled on 2026-07-25** with \"3 months old ticket and could not reproduce. Closing it\" — it was closed as not-reproducible, not fixed. Name 2's cluster kept growing after that closure and escalated to urgent today.\n\nDuplicate search found no open canonical:\n\n* ENG-8214 — Canceled 2026-07-25 (could not reproduce)\n* ENG-5991 \"AI SDR offers unavailable times and fails to send invites\" — Duplicate\n* ENG-1574 \"calendar invite not sending actual conference link\" — Canceled\n* ENG-1770 \"Appointments event doesn't send a calendar invite\" — Done\n* ACQ-3643 \"Calendar invite not received after AI confirmed meeting\" — Canceled\n* ENG-10666 (booking/calendar-sync) — Canceled\n* Related but distinct: ENG-9676 (wrong timezone / ignores buffers), ENG-11505 (out-of-hours slots), ENG-2395 (RSVP status surfacing)\n\nBecause \"could not reproduce\" is now contradicted by a 30-day, multi-customer signal, this needs a fresh reproduction attempt with the affected accounts rather than a reopen of a stale ticket.\n\n## Suggested starting points\n\n* `scheduling_appointment` / booking-service invite send path and whether an event is created but the invite email/attendee notification is never dispatched\n* Name 1 Calendar service hardcodes attendee `responseStatus: 'accepted'` (see ENG-2395) — verify `sendUpdates`/notification flags are set when creating events\n* Outlook/M365 path: events appear in the organizer's calendar but the attendee invite never arrives (consistently reported since May)\n\n## Triage metadata\n\n* Name 3 key: `modem_daily_triage:v1/<uuid>/2026-07-26`\n* Source: Name 2 daily digest, window 2026-07-25 13:01 UTC → 2026-07-26 13:01 UTC\n* Recurrence: recurring, 6+ customers in 30d, 5+ open threads"
+    },
+    {
+      "id": "ENG-8214",
+      "createdAt": "2026-04-30T17:27:34.954Z",
+      "title": "AI SDR did not send meeting invite after confirmation",
+      "state": "Canceled",
+      "assignee": "Arthur Li",
+      "parent": null,
+      "labels": [],
+      "description": "user: <email>\n\nA prospect confirmed a meeting time, but no invite was sent about 14 hours later.\n\nReported details:\n\n* User email: <email>\n* Workspace: Company Three\n* Campaign: Company Four | Name 4 3 | Apr 28 26\n* The email thread in question is from Name 5\n* Email and calendar connection, selected calendar, and related setup were reported as working properly\n* The invite was sent manually as a workaround"
+    },
+    {
+      "id": "ENG-5547",
+      "createdAt": "2026-02-14T21:56:53.410Z",
+      "title": "AI SDR not booking when lead proposes custom time",
+      "state": "Done",
+      "assignee": "Koppany Kondricz",
+      "parent": "ENG-5832",
+      "labels": [],
+      "description": "user: <email>\n\nAI SDR offered times in an initial email, but when the lead replied proposing a custom time (e.g., Tue 1pm ET) instead of selecting an offered slot, it did not book the meeting and instead replied with alternate times.\n\nWorkspace settings show Availability time zone set to New York while Cold Email Agent time zone is Name 6 (both ET). Cold Email Agent does not have a New York option. The proposed time was open on Name 1 Calendar and within availability hours.\n\n <image> \n\n <image> "
+    },
+    {
+      "id": "ENG-5625",
+      "createdAt": "2026-02-17T21:48:40.620Z",
+      "title": "AI SDR fails to book call and send invites",
+      "state": "Duplicate",
+      "assignee": "Koppany Kondricz",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "User: <email>\n\nConversation progressed but no call was successfully booked; calendar invites were never sent; thread ended with a “technical issues” message instead of confirming a meeting. Follow-up happened only after the prospect re-initiated the conversation.\n\nLoom video: <loom>\n\nWorkspace: Company Five \n\nLead example: Name 7 Name 8 "
+    },
+    {
+      "id": "ENG-5991",
+      "createdAt": "2026-02-26T20:51:04.748Z",
+      "title": "AI SDR offers unavailable times and fails to send invites",
+      "state": "Duplicate",
+      "assignee": "Koppany Kondricz",
+      "parent": "ENG-5832",
+      "labels": ["Bug"],
+      "description": "user: <email>\n\nA workspace reports that the AI SDR stopped sending calendar invites after leads show interest and has started offering time slots that are not available.\n\nIn some threads, after agreeing to a specific time, the AI SDR escalates to: “The AI encountered an issue processing this thread. Please review manually.”\n\nSupport noted the calendar connection still appears active, but the campaign shows “No sending accounts available” even though all email accounts are active.\n\nExamples provided (forwarded email threads): Name 11 ↔ <email>; Name 9 (<email>); Name 10."
+    },
+    {
+      "id": "ENG-8264",
+      "createdAt": "2026-05-01T17:44:54.198Z",
+      "title": "AI SDR sending duplicate meeting invites to prospects",
+      "state": "Done",
+      "assignee": "Koppany Kondricz",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "#### Customer Name\n\nName 12\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 12's Workspace\n\n#### Screenshot\n\n <image> \n\n <image> \n\n#### What are you trying to achieve?\n\nRunning AI SDR outreach on his workspace to book pre-podcast calls with prospects.\n\n#### What are you doing to achieve it?\n\nRunning AI SDR outreach on his workspace (Name 12's Workspace) to book pre-podcast calls with prospects.\n\n#### What is happening instead?\n\nThe AI SDR is sending multiple meeting invites to the same prospect (e.g. Name 13 received duplicates). This has happened at least 3 times this week. Additionally, prospects are receiving calendar invites they never accepted or agreed to a day/time for, resulting in no-shows. When the client follows up with no-show prospects, they say they did not accept the meeting request.\n\n#### What is the expected outcome?\n\nEach prospect should receive one meeting invite only, and only after confirming a day/time in the conversation. No duplicate invites, no unsolicited calendar sends."
+    },
+    {
+      "id": "ENG-12142",
+      "createdAt": "2026-07-30T13:32:52.763Z",
+      "title": "Adopt Calendly's calendar event for webhook-fed bookings: stop duplicate invites to prospects, restore the recording-to-appointment link",
+      "state": "Backlog",
+      "assignee": null,
+      "parent": null,
+      "labels": [],
+      "description": "## Note\n\nThe immediately shippable piece (exposing the Calendar Sync field on Create Appointment) is split out as ENG-12143, which blocks this ticket's interim mitigation. This ticket is the durable fix.\n\n## Overview\n\nEvery Calendly booking that reaches the CRM through webhook-fed workflows (the LT org's entire booking flow) still creates a **duplicate Name 1 Calendar event that invites the prospect**, so prospects receive two calendar invites per booking and closers/SDRs see doubled events and notifications (raised by Name 14, sales team hearing it \"frequently\"). ENG-12081 shipped adoption (link Calendly's existing event instead of inserting a second one), but only for bookings from a native trusted Calendly source; webhook-fed payloads are deliberately rejected by the anti-spoofing check and fall through to the old blind insert.\n\nAs interim mitigation, LT will set `createCalendarEvent: false` on its booking workflows (via ENG-12143), which stops the duplicates but leaves appointments with **no calendar-event link at all**. That breaks the platform's native recording-to-appointment joins (`sync-appointment-attendance` joins recording.googleEventId → integration_calendar_event → scheduling_appointment_calendar_entry), which matters as soon as ENG-12090 lands and recordings start attributing to LT.\n\n## Verified current behavior (prod, 2026-07-28 to 07-30)\n\n* 43 bookings processed after the ENG-12081 deploy: zero rows ever in `scheduling_external_booking` for the LT org (adoption never engages), calendar entries still created at the same rate as pre-fix.\n* The insert path still sends `attendees` including the prospect with `sendUpdates: 'all'` (`google-calendar-service.ts` events.insert), so the prospect is invited to the duplicate. This is also how the ENG-12081 false-cancellation emails reached customers.\n\n## Proposed solution\n\nMake webhook-fed Calendly bookings **verifiable rather than trusted**: when a create-appointment input carries Calendly event/invitee URIs, verify them server-side against the Calendly API (fetch the scheduled event, confirm invitee email + start time match the payload). A verified booking then runs the exact adoption path ENG-12081 built: resolve the host's Name 1 account, find Calendly's event, link it (external booking row + calendar entry), insert nothing. Verification failure falls through to current behavior.\n\nKey requirement: **adoption/link must run even when** `createCalendarEvent` **is false.** ENG-12081 already established that false means \"no provider call\" while still tracking idempotently; linking an existing Calendly event is not a provider write, so verified bookings should get their calendar entry regardless of the flag. That lets LT keep the flag off (no duplicates) while appointments regain the event link that recording joins need.\n\nName 15 note: server-side verification needs a Calendly API credential; the org's Calendly connection (or an org-level integration credential) can hold it. If no credential is configured, behavior is unchanged.\n\n## Scope\n\n* Extend the trusted-source resolution in the create-appointment path with API-backed verification of Calendly URIs.\n* Run adoption/link (not insert) for verified bookings, independent of `createCalendarEvent`.\n* Tests: verified webhook booking adopts and links with zero inserts; tampered/mismatched URIs fail closed with no provider write; `createCalendarEvent: false` + verified booking still produces the calendar entry link; unverifiable payloads behave exactly as today.\n\n## Acceptance\n\n* A Calendly booking arriving via an IncomingWebhook workflow in LT results in exactly one Name 1 event (Calendly's), one appointment, and a calendar entry linking them.\n* Prospects receive exactly one calendar invite per booking.\n* `sync-appointment-attendance` can join a completed recording to the appointment via the linked Calendly event.\n* No change for non-Calendly appointments or orgs without a Calendly credential.\n\n## Related\n\n* ENG-12143 (field exposure, blocks the interim mitigation).\n* ENG-12081 (adoption machinery, shipped): this extends its reach.\n* ENG-12090 (recording attribution): the restored link is what its attendance follow-through consumes.\n* Long-term alternative remains migrating booking workflows to the native Calendly connected app; this ticket makes the current webhook architecture safe in the meantime."
+    },
+    {
+      "id": "ENG-13129",
+      "createdAt": "2026-08-25T20:49:49.545Z",
+      "title": "AI SDR re-offers already-booked slots and sends duplicate invites to the same prospect",
+      "state": "Done",
+      "assignee": "Koppany Kondricz",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "## Overview\n\nThe AI SDR occasionally offers a meeting time that the same prospect has already booked, because a just-made booking does not reliably register as \"taken\" in the availability the offer step reads. The prospect then receives conflicting messages (a confirmation plus a \"that time got taken\" / re-offer) and, in this case, declined the calendar invite and required the customer to intervene manually.\n\n## Problem\n\nOn a customer workspace, a prospect confirmed a slot. The AI SDR simultaneously told the same prospect \"that time got taken\" and offered a different time, then later re-offered the original slot as still available. The prospect declined the calendar invite, leaving a \"rejected\" appointment and a confused thread.\n\n## Root cause\n\nThe AI SDR booking flow books from the model-typed `final_slot` and does not re-verify, at booking time, that the slot is not already held by an existing booking in the availability source. Existing bookings are not reliably excluded from the slots the availability/offer step generates, so an already-booked slot is re-offered. Code path: `apps/web/lib/ai-sdr-v2/workflow/steps/booking.ts`, `slot-matchmaking.ts`, and `time-slot-generator.ts`.\n\n## Blast radius\n\nSingle org confirmed for this report. Recurring cluster: related reports ENG-11199, ENG-12517, ENG-13059, ENG-12922.\n\n## Proposed fix\n\nExclude already-booked appointments from offered availability, and re-verify availability immediately before booking, so a booking registers as \"taken\" and is never re-offered or double-booked.\n\n## Done when\n\n* A slot already booked is never offered as available.\n* A confirmed booking reliably excludes that time from subsequent offers.\n\n## Reports\n\n* ENG-13128"
+    },
+    {
+      "id": "ENG-6669",
+      "createdAt": "2026-03-12T17:55:37.529Z",
+      "title": "Member invite emails not delivered to Outlook accounts",
+      "state": "Canceled",
+      "assignee": "Jared Stauffer",
+      "parent": null,
+      "labels": [],
+      "description": "Invite emails sent through the members area are reaching Gmail accounts but not Microsoft/Outlook accounts. The affected addresses provided were <email> and <email>, and the invites are not appearing in inbox or junk.\n\nThe pending invitations are visible in the workspace.\n\n <image> "
+    },
+    {
+      "id": "ENG-5450",
+      "createdAt": "2026-02-11T23:15:32.391Z",
+      "title": "AI SDR says it sent invite but no invite created",
+      "state": "Done",
+      "assignee": "Jared Stauffer",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "AI SDR told a lead it was sending a meeting invite, but no invite was actually sent/created.\n\nAlso, the lead was shown as added to DNC in the AI SDR inbox, but checking the Company One backend showed the lead was not actually on DNC (appears to be an inbox-only DNC status/mislabel).\n\n <image> "
+    },
+    {
+      "id": "ENG-12772",
+      "createdAt": "2026-08-14T18:48:04.458Z",
+      "title": "Cold Email: one email variant sends \"just following up\" as the first (step 1) email instead of the invitation",
+      "state": "Triage",
+      "assignee": "Anthony Adewale",
+      "parent": null,
+      "labels": [],
+      "description": "BUG: Yes\n\nEVIDENCE:\n\n* In \"Influencer outreach\" campaign (id <uuid>), A/B variant 11 sends \"Hey [Name], just following up!\" as the step-1 (is_first: true) email, while the subject line is \"Name 17 [Name], you're invited!\" — a body/subject mismatch.\n* 1,747 such step-1 sends since 2026-05-19, still ongoing (last seen 2026-08-14). Variant-11 leads receive no step-2/step-3 follow-up afterward.\n* Every other variant (8, 10, 4, 5, 13, 9, 7, 2, 6, 12, 3, 1) sends the proper invitation copy (\"Hi [Name], my colleague Name 16 found you on LinkedIn…\").\n* A prospect reply confirms the impact (<email>): \"Thank you for following up. I'm open to reviewing the opportunity, but I don't have the original invitation details in this message.\"\n\nBLAST RADIUS:\n\n* Verified: 1 org (Name 16's Workspace), 1 campaign, 1,747 prospects. Copy generation is a shared path, so other orgs may be affected but were not verifiable from this org's data.\n\nPOTENTIAL FIX:\n\n* Regenerate/repair variant 11's step-1 copy so it carries the invitation, not the follow-up line; trace the variant generator to see why a follow-up message was produced for step 1.\n\nWHATS NEEDED TO RESOLVE:\n\n* Locate the podcast \"5-variant + 2 follow-up\" copy generator and confirm how variant 11 got follow-up copy assigned to step 1; check whether other campaigns/orgs have a variant whose step-1 body is the follow-up line.\n\nCONFIDENCE: High — copy and step/is_first flags read directly from Company One webhook payloads; the unverified item is whether the same broken variant reproduces in other orgs.\n\n---\n\nINTERCOM: <url:app.intercom.com>\nSLACK THREAD: not captured\nORGANIZATION: <uuid>\nFiled by Support from a CS investigation."
+    },
+    {
+      "id": "ENG-3082",
+      "createdAt": "2025-11-28T04:23:46.903Z",
+      "title": "Notification or Meeting Invite for AI SDR Inbox Bookings",
+      "state": "Done",
+      "assignee": "Koppany Kondricz",
+      "parent": null,
+      "labels": [],
+      "description": "Request to add a notification or meeting invite feature to confirm successful meeting bookings made by the AI SDR Inbox in the user's calendar.\n\n---\n\nConversation:\nName 18: <p>I have a feature request</p>\n\nbot: Thank you for helping us improve.\n\nbot: Please describe your feature request. What problem would this feature solve for you? Any examples or use cases?\n\nName 18: I love the AI SDR Inbox that is capable of booking meetings for me and in my calendar, but i'd like a notification to be sent to me or a meeting invite to see if a meeting was successfully booked\n\nbot: Got it — thanks for your feedback! 💬 Our team reviews all requests regularly, and we’ll reach out if we have any updates."
+    },
+    {
+      "id": "ENG-13947",
+      "createdAt": "2026-09-16T22:28:08.907Z",
+      "title": "AI SDR confirms an offered call time but never books the meeting when the prospect's reply also asks a question",
+      "state": "Todo",
+      "assignee": "Koppany Kondricz",
+      "parent": "ENG-13949",
+      "labels": ["Bug", "Customer reported", "intercom-sourced"],
+      "description": "Intercom conversation: <url:app.intercom.com>\n\nBounded context: a customer reports that a podcast prospect asked to book a call on 7 Aug but the call was not booked until 25 Aug, and the prospect is now uncomfortable with the outreach. The customer's own thread transcript (attached to the Intercom conversation) shows the AI SDR confirming the offered time on 7 Aug, again on 10 Aug and again on 17 Aug, each time promising a calendar invite, while no meeting was ever created. The prospect escalated to \"Let me know if you still want to talk.\" on 17 Aug, the thread escalated, and a person booked it by hand on 25 Aug.\n\nTestable claim: When a prospect replies confirming a previously offered slot and also asks an unrelated question in the same message, the AI SDR routes the message to QUESTION, the booking step never runs, and no appointment is created, while the reply copy still confirms the time and promises a calendar invite that is never sent.\n\nThis report owns the customer-specific evidence. The investigation document attached to this issue holds the full readout."
+    },
+    {
+      "id": "ENG-3697",
+      "createdAt": "2025-12-11T22:36:46.530Z",
+      "title": "AI SDR sending multiple calendar invites to leads",
+      "state": "Done",
+      "assignee": "Pieter Venter",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "## Bug Report\n\n**Issue:** AI SDR is sending multiple calendar invites to leads when users have multiple calendar accounts connected.\n\n**Impact:** Leads receive duplicate calendar invitations (one from each connected calendar account), causing confusion and poor user experience.\n\n**Root Cause:** The system was creating calendar events in ALL connected calendar accounts instead of just the active one.\n\n**Fix:** Filter calendars to only use the one with `activeOn` set before creating calendar entries.\n\n**PR:** <url:github.com>\n\n**Status:** Fixed in PR #1859"
+    },
+    {
+      "id": "ENG-1665",
+      "createdAt": "2025-10-07T08:53:01.424Z",
+      "title": "Email not being passed into `runtimeContext` during booking flow",
+      "state": "Done",
+      "assignee": "Declan Lupari",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "**Title:**\nEmail not being passed into `runtimeContext` during booking flow\n\n**Description:**\nWhen attempting to book a meeting, the system returns the error `\"Email address is required for booking\"` even though the user’s email (`<email>`) is provided. Investigation shows that the email value isn’t being passed into the `runtimeContext` during the `bookMeetingAppointment` call.\n\n**Acceptance Criteria:**\n\n* Identify why `email` is not being included in the `runtimeContext` or subsequent booking payload.\n* Ensure the email parameter is properly mapped and passed from the user input into the booking handler.\n* Validate successful booking after fix (no `\"Email address is required for booking\"` error)."
+    },
+    {
+      "id": "ENG-8381",
+      "createdAt": "2026-05-07T14:29:49.333Z",
+      "title": "AI SDR: Send configurable meeting reminders to prospects from primary email",
+      "state": "unknown",
+      "assignee": "Koppany Kondricz",
+      "parent": null,
+      "labels": [],
+      "description": "## User Goal\n\nProspects should receive reminder emails before AI SDR-booked meetings at configurable times, sent from the user's main primary email account via existing OAuth email integrations.\n\n## Current Code Map\n\n* `lib/scheduling/services/booking-service.ts` sends internal booking notifications after booking, but no independent prospect reminder flow was found.\n* `lib/integrations/email/resolve-email-service.ts` resolves Name 1/Outlook OAuth email services.\n* `trpc/routers/integrations/email-calendar.ts` can send email through connected OAuth accounts and lists connected email/calendar accounts.\n* `lib/db/schema/integration.ts` stores connected OAuth accounts.\n* Calendar integrations add calendar event reminders, but those are not the same as prospect email reminders from the primary mailbox.\n\n## Scope\n\n* Add AI SDR reminder settings with configurable offsets, e.g. 24 hours before and/or 1 hour before, including an off state.\n* Resolve the sender to the user's main primary email OAuth account, with clear fallback/error behavior if the account is missing or invalid.\n* Add scheduled reminder jobs, likely through Inngest, created after booking and updated/cancelled on reschedule/cancellation.\n* Add an idempotent reminder send log so retries do not duplicate reminder emails.\n* Build reminder email copy that is short, contextual, and includes meeting time, meeting name, and join/location info.\n* Ensure reminders are not sent after cancellation, completed calls, DNC/unsubscribe, or invalidated OAuth.\n* Surface reminder settings and status in the AI SDR settings/UI revamp.\n\n## Acceptance Criteria\n\n* Users can configure reminder offsets for AI SDR-booked meetings.\n* Reminder jobs are scheduled on booking and re-scheduled on reschedule.\n* Reminder emails are sent from the configured/main primary OAuth email account, not a generic system sender.\n* Cancelled/rescheduled/invalid reminders are not sent.\n* Each reminder offset is sent at most once per appointment.\n\n## Tests / QA\n\n* Unit tests for reminder schedule calculation and idempotency keys.\n* Integration tests for booking -> reminder job creation and reschedule/cancel cleanup.\n* OAuth sender resolution tests for Name 1 and Outlook accounts.\n* Manual QA with a near-future test appointment and verified sent email."
+    },
+    {
+      "id": "ENG-8962",
+      "createdAt": "2026-05-18T16:02:49.052Z",
+      "title": "Already invited flow should resend email and show pending invite",
+      "state": "Duplicate",
+      "assignee": "Jared Stauffer",
+      "parent": null,
+      "labels": [],
+      "description": "Inviting a user who already has a pending workspace invitation shows a blocking \"User is already invited to this workspace\" error, with no way to resend the email. The pending invitation can also disappear from the list because of stale cache after partial failures.\n\nExpected behavior:\n\n* Re-inviting an already invited email resends the invitation email\n* The pending invitation remains visible in the list\n* The UI shows a success message instead of a blocking error"
+    },
+    {
+      "id": "ENG-8148",
+      "createdAt": "2026-04-28T11:39:35.060Z",
+      "title": "Fix call booking issue with missing invite notifications",
+      "state": "Done",
+      "assignee": "Koppany Kondricz",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "#### Customer Name\n\nName 19\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 19\n\n#### Screenshot\n\n#### What are you trying to achieve?\n\nMessage from the client - \"The agent is telling clients that it has booked a call, chosen a time slot that I am not available for, and then not sending any invites. I've had 3 email threads now where people thought I stood them up because they agreed to a call and then never got an invite follow-up.\"\n\n#### What are you doing to achieve it?\n\ncreated this ticket\n\n#### What is happening instead?\n\nissue not resolved\n\n#### What is the expected outcome?\n\nresolve the issue"
+    },
+    {
+      "id": "ENG-7957",
+      "createdAt": "2026-04-20T14:13:59.251Z",
+      "title": "Fix pending invitation issue for <email>",
+      "state": "Done",
+      "assignee": "Jared Stauffer",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "#### Customer Name\n\nName 20\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nCompany Two\n\n#### Screenshot\n\n#### What are you trying to achieve?\n\nClient sent an invite to email to join, and it won't activate. it still shows as pending even though it has been accepted - <email>\n\n#### What are you doing to achieve it?\n\nChecked the settings on the back end to see if it had all been done correctly. Client has received the link\n\n#### What is happening instead?\n\nNot able to move from pending to active status even though he can log in to the platform - <loom>\n\n#### What is the expected outcome?\n\nCan we get this invitation accepted as a member for <email>"
+    },
+    {
+      "id": "ENG-3374",
+      "createdAt": "2025-12-03T18:32:07.781Z",
+      "title": "\"Interested\" \"Not Interested\" and \"Meeting Booked\" buttons are not working",
+      "state": "Canceled",
+      "assignee": "Pieter Venter",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "In the AI SDR, Escalated emails has the \"Interested\" \"Not Interested\" and \"Meeting Booked\" buttons grayed out making it a challenge for clients to categorize the email."
+    }
+  ]
+}

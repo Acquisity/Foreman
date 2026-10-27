@@ -18,6 +18,20 @@ const SIGNED_BINDING_CLAUSE =
   "pass it as the `owner` and `repo` of every `github__` call. `prepare_repository` and `push_branch` check that binding at runtime, but the `github__` tools do not: they act on whatever repository they are handed, so naming another one there is a mistake nothing catches.";
 
 describe("composePrompt", () => {
+  it("lifts the stop rule for missing GitHub tools only in a triage replay", () => {
+    assert.ok(!GENERAL_PROMPT.includes("# Triage replay"));
+    process.env.TRIAGE_REPLAY = "1";
+    try {
+      assert.ok(
+        composePrompt().includes(
+          "the rule to stop repository work when no `github__` tools appear after `prepare_repository` does not apply here"
+        )
+      );
+    } finally {
+      delete process.env.TRIAGE_REPLAY;
+    }
+  });
+
   it("uses the general prompt by default", () => {
     assert.equal(composePrompt(), GENERAL_PROMPT);
   });

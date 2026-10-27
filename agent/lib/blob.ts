@@ -48,6 +48,8 @@ export const MODEL_OVERRIDES_PREFIX = "model-overrides/";
 /** Blob path prefix holding the daily SLA report's last successful dispatch marker. */
 export const SLA_REPORT_PREFIX = "sla-report/";
 
+export const TRIAGE_REPLAY_PREFIX = "triage-replay/";
+
 /**
  * A Blob path prefix that a general-purpose Blob tool must not touch.
  *
@@ -86,6 +88,11 @@ const RESERVED_NAMESPACES: Readonly<Record<string, ReservedNamespace>> = {
     label: "the daily SLA report dispatch marker",
     readTool: "no tool; the sla-report schedule owns this namespace",
     writeTool: "no tool; the sla-report schedule owns this namespace",
+  },
+  [TRIAGE_REPLAY_PREFIX]: {
+    label: "triage replay state and archives",
+    readTool: "no tool; the triage replay owns this namespace",
+    writeTool: "no tool; the triage replay owns this namespace",
   },
   [REPOSITORY_KNOWLEDGE_PREFIX]: {
     label: "repository knowledge",

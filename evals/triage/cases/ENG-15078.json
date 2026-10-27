@@ -1,0 +1,227 @@
+{
+  "id": "ENG-15078",
+  "provenance": "seeded",
+  "createdAt": "2026-10-09T18:21:10.826Z",
+  "lane": "triage",
+  "stratum": "platform_limitation",
+  "ticket": {
+    "title": "feature request ✨",
+    "description": "#### Customer Email\n\n<email>\n\n#### Workspace name\n\nAI Acquisition Sales Team\n\n#### Workspace ID\n\n<uuid>\n\n#### Which lead?\n\nall\n\n#### What's wrong?\n\nis it possible to have the calling pad used whilst we write an email/text/do another task. right now its blurred behind the profile opening, would be great if we had it on the side so we can multitask.\n\nright now i have to copy an email im writing, click off, end call and then paste email again.\n\n#### Screenshot\n\n <image> \n\n#### Video link",
+    "attachmentKinds": ["image", "slack"]
+  },
+  "repoCommitAtCreate": "40543a3bf8c47beee9b42e2d504b3d26db1d116b",
+  "flags": {
+    "descriptionEditedAfterCreate": false,
+    "needsProductionData": false,
+    "alreadyFixedAtTriage": false
+  },
+  "asFiled": {
+    "assignee": "Aaron Fraga",
+    "labels": [],
+    "parent": null,
+    "priority": 3,
+    "project": "CRM"
+  },
+  "relatedSnapshot": [
+    {
+      "id": "ENG-3623",
+      "createdAt": "2025-12-10T13:55:37.007Z",
+      "title": "Feature request: voice-calling AI sales qualification agent",
+      "state": "Canceled",
+      "assignee": "Jared Stauffer",
+      "parent": null,
+      "labels": ["Feature"],
+      "description": "Customer requests a voice-calling AI agent that acts as a sales setter.\n\nThe agent should:\n\n* Call leads by voice\n* Qualify and gather information from the lead\n* Set up the sales closer for success based on collected details\n\nThis is a general feature request; no additional requirements or constraints were provided."
+    },
+    {
+      "id": "ENG-13293",
+      "createdAt": "2026-08-31T14:19:10.367Z",
+      "title": "Feature request: GoHighLevel (Lead Connector) integration and dynamic Name 1 Meet links",
+      "state": "Backlog",
+      "assignee": null,
+      "parent": null,
+      "labels": ["Feature Request"],
+      "description": "Feature request from an Intercom conversation with a customer whose primary CRM is GoHighLevel (GHL) and who runs AI SDR campaigns.\n\nTwo related asks:\n\n1. GoHighLevel (Lead Connector) integration\n   The customer wants leads qualified in Acquisity to sync natively into GHL. Today there is no native GHL sync; the working path is a manual CSV export from the CRM (People, Companies, Deals, and Appointments each export separately) and import into GHL. A public CRM API and a Zapier bridge are on the roadmap but not yet available.\n2. Dynamic Name 1 Meet links\n   The customer wants the AI SDR to use a dynamic Name 1 Meet link (a unique link per booking). Today Conferencing supports only a static meeting link or dynamic Zoom links."
+    },
+    {
+      "id": "ENG-7159",
+      "createdAt": "2026-03-25T06:28:47.195Z",
+      "title": "Feature request: Add manual follow-up timing and scheduled send options",
+      "state": "Canceled",
+      "assignee": "Koppany Kondricz",
+      "parent": null,
+      "labels": ["Feature Request"],
+      "description": "client: Name 2 <email>\n\nRequest to manually adjust the AI SDR follow-up date when the calculated follow-up time is not appropriate, including after out-of-office replies. Also request the ability to schedule a reply to send the following morning.\n\nThis affects workflow daily. The current workaround is to let out-of-office replies stack up and manually review them later."
+    },
+    {
+      "id": "ENG-9232",
+      "createdAt": "2026-05-26T08:07:39.680Z",
+      "title": "Feature request: Add API keys for automation tool integrations",
+      "state": "Canceled",
+      "assignee": "Jared Stauffer",
+      "parent": null,
+      "labels": [],
+      "description": "### Problem\n\nuser: <email>\n\nchallenge in checking metrics as I need to check them individually. I am using other tools and I want all the reporting in one data/tool.\n\nI want to integrate all tools I am using to simplify things.\n\nIf you can create API keys please that we are able to integrate to automation tools for system build purposes."
+    },
+    {
+      "id": "ENG-3235",
+      "createdAt": "2025-12-01T22:40:13.911Z",
+      "title": "Feature Request: Support for Transferring or Reusing Inboxes and Domains",
+      "state": "Duplicate",
+      "assignee": "Anthony Adewale",
+      "parent": null,
+      "labels": ["Feature"],
+      "description": "Request to enable transferring or reusing inboxes and domains purchased through Company One, allowing users to port over inboxes for better management and flexibility.\n\n---\n\nConversation:\nName 3: <p>I have a feature request</p>\n\nbot: Thank you for helping us improve.\n\nbot: Please describe your feature request. What problem would this feature solve for you? Any examples or use cases?\n\nName 3: Support the transferring or reusing inboxes and domains purchased through Company One. The ability to port over inboxes.\n\nbot: Got it — thanks for your feedback! 💬 Our team reviews all requests regularly, and we’ll reach out if we have any updates."
+    },
+    {
+      "id": "ENG-10983",
+      "createdAt": "2026-06-29T13:13:59.640Z",
+      "title": "Feature request: Per-campaign open rate, reply rate, and open-to-reply ratio metrics",
+      "state": "Backlog",
+      "assignee": null,
+      "parent": null,
+      "labels": ["Feature Request"],
+      "description": "## Request\n\nCustomer needs open rate, reply rate, and open-to-reply ratio per campaign to diagnose deliverability vs. copy issues. These metrics are not currently available in the dashboard.\n\n## Context\n\n* Name 7 topic: `<uuid>`\n* Severity: Low | Confidence: 0.72\n* New: first appearance in this triage window\n* Track: Product\n\n## Why New\n\nENG-6092 (campaign analytics cards redesign) shipped some metrics but doesn't cover per-campaign open-to-reply ratio or deliverability diagnosis tooling. No open issue tracks this specific request.\n\n## Source\n\n* Name 5\n\n## Evidence\n\n> Name 4 needs open rate, reply rate, and open-to-reply ratio per campaign to diagnose deliverability vs. copy issues — not currently available in the dashboard.\n\n## Name 6\n\n`modem-<uuid>-2026-06-29`"
+    },
+    {
+      "id": "ENG-6160",
+      "createdAt": "2026-03-03T22:35:23.922Z",
+      "title": "Add campaign open rate metric to CEA analytics",
+      "state": "Backlog",
+      "assignee": "Anthony Adewale",
+      "parent": null,
+      "labels": ["Feature"],
+      "description": "Request to include campaign open rate in CEA analytics so it can be compared to previous Name 8 open rate data and used to monitor subject line success/engagement.\n\nAlso, Name 9. Response Time: \\[Seconds/Minutes\\] — (Proving the \"Instant Response\" market standard)\n\nTop Objections Handled: (e.g., \"Already have a process\" or \"Pricing\")\n\nKnowledge Base Accuracy: \\[%\\] — (Did it correctly use the I-9/ADP facts?)"
+    },
+    {
+      "id": "ENG-3223",
+      "createdAt": "2025-12-01T20:14:06.149Z",
+      "title": "Allow lead scraper preview before spending credits",
+      "state": "Canceled",
+      "assignee": "Anuj Bhatt",
+      "parent": null,
+      "labels": ["Feature", "Feature Request"],
+      "description": "## Feature Request\n\nUser requested a way to spot check lead lists generated by the lead scraper before credits are consumed.\n\nThey reported setting what they believed were the correct filters, but the resulting list did not match the intended target audience. This used 2,500 credits on an unusable list. The request is to be able to review at least an initial subset of leads (e.g. first 100) prior to purchase so incorrect lists do not result in wasted spend.\n\nThis is a feature request, not a bug report."
+    },
+    {
+      "id": "ENG-8217",
+      "createdAt": "2026-04-30T18:21:55.226Z",
+      "title": "Make message status filter support multi-select",
+      "state": "Todo",
+      "assignee": "Koppany Kondricz",
+      "parent": null,
+      "labels": ["Feature Request", "Improvement"],
+      "description": "user: <email>\n\nThe \"filter by\" dropdown at the top of the messages section should support selecting multiple statuses.\n\nCurrent behavior makes it hard to exclude out-of-office replies while still viewing conversations with other statuses, including messages that have no status beyond \"New\". The request is to allow viewing all statuses except out of office.\n\nThis affects workflow every day because out-of-office replies are considered distracting and not relevant.\n\n---\n\n## Problem Statement\n\nThe \"Filter by\" status dropdown at the top of the AI SDR inbox is single-select, so users cannot view conversations across multiple statuses at once. Customers asked for the ability to view all statuses except out-of-office, since OOO replies are noisy.\n\n## Impact Analysis\n\n* **User Impact**: Daily friction for customers who want to triage replies while filtering out OOO. They had to repeatedly switch the status filter or manually scroll past OOO threads.\n* **Development Impact**: None — the existing single-select code paths required minor refactoring to support arrays without changing single-status behavior.\n* **Business Impact**: Improves the inbox triage experience for AI SDR users, reducing time-to-reply on real conversations.\n\n## Root Cause\n\n`statusFilter` was modeled as a single string everywhere — UI dropdown, URL state (`nuqs` `parseAsString`), `useAiSdrEmails` hook, the `outreach.leads.getOrganizationEmailActivities` tRPC input, and the `getStatusCondition` / `getStatusConditionDrizzle` repository helpers — so only one status could ever be active.\n\n## Solution Overview\n\nThreaded `string | string[]` through every layer and converted the dropdown to a checkbox-style multi-select.\n\n* `components/ai-sdr/email-list.tsx`: `DropdownMenuItem` → `DropdownMenuCheckboxItem`. Each option toggles membership in the array; \"Clear filters\" resets it. Trigger label shows \"All Statuses\" when empty, the single label when one is picked, and \"N statuses\" when multiple are picked.\n* `components/ai-sdr/ai-sdr-inbox.tsx`: URL state uses `parseAsArrayOf(parseAsString).withDefault([])` so multi-select selections survive reloads/back-forward. Status array is forwarded to `useAiSdrEmails`, the sample-mode filter, and reset (`[]`) when leaving sample mode.\n* `hooks/use-ai-sdr-emails.tsx`: accepts `StatusFilterValue | StatusFilterValue[] | string | string[]` and forwards the value (or the sidebar `selectedGroup` fallback) to the tRPC query.\n* `trpc/routers/outreach/leads.ts`: introduces `statusFilterValueSchema` (an enum of all known statuses) and accepts `z.union([statusFilterValueSchema, z.array(statusFilterValueSchema).max(15)])` so callers must send a known status and the array length is bounded (addresses Codex's DOS/abuse concern).\n* `lib/outreach/db/campaign.ts`: split each per-status condition out of `getStatusCondition` (raw SQL) and `getStatusConditionDrizzle` (Drizzle, used for the count query) into a `buildSingleStatusCondition*` helper, then `OR` them together when an array is supplied. Single-string callers behave exactly as before. A shared `normalizeStatusFilters` helper coerces input to a clean string array.\n* `components/ai-sdr/sample-data/constants.ts`: `filterSampleSdrEmails` accepts `string | string[]` and matches with `Array.some(matchesGroup)`.\n\n## How to QA\n\n1. Sign in as a user with the AI SDR Inbox enabled and visit `/dashboard/<org>/ai-sdr`.\n2. Click the **Filter by** dropdown at the top of the inbox list. Verify it now shows checkboxes (Interested, Meeting Booked, Not Interested, Out of Office, Do Not Contact) and a \"Clear filters\" item appears once any are checked.\n3. Tick **Interested** and **Meeting Booked**. Confirm:\n   * The trigger label reads \"2 statuses\".\n   * The list updates to threads matching either status (OR semantics), with no out-of-office threads mixed in.\n   * The URL contains `?status=interested,booked` (comma-separated).\n   * Reloading the page restores the same selection.\n4. Untick everything (or click **Clear filters**). Confirm the trigger reads \"All Statuses\" and the unfiltered inbox returns.\n5. Tick only **Out of Office** and verify only OOO threads appear.\n6. Combine with the sidebar groups (e.g. \"Needs Attention\") and the campaign + search filters — they should compose with the multi-select instead of replacing it.\n7. Switch to the sample data demo and repeat steps 2–4 — sample data should respect the same filter semantics.\n8. Verify nothing regressed for single-status callers: a stale URL like `?status=interested` (single value) should still load and behave the same as before.\n\n## Visual changes\n\nE2E walkthrough recorded against the Vercel preview using sample inbox data (8 sample emails).\n\n**Video walkthrough:** multi-select-e2e-edited.mp4\n\n**1. Dropdown renders 5 status options as checkboxes (**`All Statuses`, 8/8 emails):\n\n <image> \n\n**2. Selecting Interested + Meeting Booked → URL** `?status=interested,booked`, label `2 statuses`, 5 emails (OR semantics):\n\n <image> \n\n**3.** Loading `?status=interested,booked,attention` directly → label `3 statuses` (URL hydration verified).\n\n**4.** Single-status URL `?status=booked` → label `Meeting Booked` (backward compatibility verified).\n\n**5. \"Clear filters\" → URL clean, label** `All Statuses`, 8/8 emails restored:\n\n <image> \n\n## Additional Context\n\n* Backwards-compatible: existing `?status=<single>` URLs and any external callers that still pass a single string keep working — the repository helpers detect single vs. array and emit the same SQL as before for the single case.\n* Bot review: Codex's \"constrain unbounded array\" P2 finding was addressed in commit `157ae0c` (`.max(15)` + enum validation). Cubic AI confirmed all six acceptance criteria; Name 10 Review found no bugs.\n\n## Related\n\n* PR: <url:github.com>"
+    },
+    {
+      "id": "ENG-12566",
+      "createdAt": "2026-08-11T20:45:28.901Z",
+      "title": "Allow pausing cold email campaigns by geography",
+      "state": "Triage",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [],
+      "description": "Add the ability in the Cold Email Agent to turn off campaigns for a specific geography, such as country, state, or city, without pausing the entire campaign.\n\nCurrent example: outbound emails to prospects in Name 11 should be paused while the country deals with the aftermath of an earthquake.\n\nCurrent workaround: manually filter the lead list and upload a new one.\n\nThis is described as an active issue and a standard practice previously used for ad spend during disasters or other major regional events."
+    },
+    {
+      "id": "ENG-3233",
+      "createdAt": "2025-12-01T22:18:49.319Z",
+      "title": "Update Intercom Workflow for Feature Requests",
+      "state": "Done",
+      "assignee": "Beth Newton",
+      "parent": null,
+      "labels": ["Improvement"],
+      "description": "Update the Feature Request workflow in Intercom. When a user states they have a Feature Request, ask three questions instead of one.\n\n## Desired Flow\n\n1. **Bot Name 12** - \"Thank you for helping us improve.\"\n2. **Bot Question 1** - \"Please describe your feature request.\"\n3. *\\[*…u*ser answers*…*\\]*\n4. **Bot Question 2** - \"What problem would this solve for you? Please share an example or use case.\"\n5. *\\[*…u*ser answers*…*\\]*\n6. **Bot Question 3** - \"How often does this affect your workflow today? Are you currently using a workaround?\"\n7. *\\[*…u*ser answers*…*\\]*\n8. **Bot Closing** - \"Got it — thanks for your feedback! 💬 Our team reviews all requests regularly, and we’ll reach out if we have any updates.\"\n\nThe bot intro and closing already exist. We should leave those as-is."
+    },
+    {
+      "id": "ENG-10006",
+      "createdAt": "2026-06-11T13:12:07.391Z",
+      "title": "Add native DocuSign equivalent",
+      "state": "Canceled",
+      "assignee": null,
+      "parent": null,
+      "labels": ["Feature Request"],
+      "description": "Request for a native DocuSign equivalent as a future feature."
+    },
+    {
+      "id": "ENG-4808",
+      "createdAt": "2026-01-23T23:17:14.376Z",
+      "title": "Allow attaching files to replies in inbox",
+      "state": "Backlog",
+      "assignee": "Koppany Kondricz",
+      "parent": null,
+      "labels": ["Feature"],
+      "description": "user: <email>\n\nUser requests the ability to attach files directly to replies in the inbox.\n\nExample use case: when a prospect asks for more information about a podcast, the user has a flyer designed and would like to attach it to the reply instead of only sharing a link."
+    },
+    {
+      "id": "ENG-13391",
+      "createdAt": "2026-09-02T16:01:54.398Z",
+      "title": "Feature request: Allow creating custom folders in the AI SDR Inbox",
+      "state": "Backlog",
+      "assignee": "unknown",
+      "parent": null,
+      "labels": ["Customer reported", "Feature Request", "intercom-sourced"],
+      "description": "Customer feature request from an Intercom conversation.\n\n**Source: **<url:app.intercom.com>\n\n**Request:** Allow users to create custom folders in the AI SDR Inbox to organize threads, for example one folder per company they work with.\n\n**Customer's words:** \"My second feature request is to have the ability to create folders in my inbox. I want to make folders for each company I work with. Right now it's just a jumbled mess in my inbox.\"\n\n**Current behavior:** The AI SDR Inbox has a fixed folder structure. Top folders are Inbox, Needs Attention, AI SDR Disabled, and Name 13; collapsible sections are All Campaigns, Responses (Interested / Not Interested / Meeting Booked), and Others (Out of Office / Bounced / Unsubscribed). There is no way to create custom folders.\n\n**Proposed:** Let users create and name their own folders in the inbox and move or tag threads into them for organization."
+    },
+    {
+      "id": "ENG-3228",
+      "createdAt": "2025-12-01T21:35:33.449Z",
+      "title": "Add Overdue Task Notification Feature",
+      "state": "Done",
+      "assignee": "Anuj Bhatt",
+      "parent": null,
+      "labels": ["Feature", "rep-command-center"],
+      "description": "Request to create a notification system for overdue tasks similar to Notion, to help users stay informed about missed deadlines.\n\n---\n\nConversation:\nName 3: <p>I have a feature request</p>\n\nbot: Thank you for helping us improve.\n\nbot: Please describe your feature request. What problem would this feature solve for you? Any examples or use cases?\n\nName 3: Create a notification when a task is overdue, like in notion.\n\nbot: Got it — thanks for your feedback! 💬 Our team reviews all requests regularly, and we’ll reach out if we have any updates."
+    },
+    {
+      "id": "ENG-8328",
+      "createdAt": "2026-05-05T19:58:08.350Z",
+      "title": "Allow prompting the SDR agent to reply on demand",
+      "state": "Backlog",
+      "assignee": "Koppany Kondricz",
+      "parent": null,
+      "labels": ["Feature Request"],
+      "description": "Feature request for a manual way to ask the SDR agent to draft or send a reply based on a prompt after a human has already replied in the thread.\n\nCurrent behavior described is that the SDR agent sometimes does not respond, or escalates the thread, and there is no way to trigger an on-demand AI reply from the same window. The reported workaround is copying the full thread into another AI tool.\n\nThis affects the workflow daily."
+    },
+    {
+      "id": "ENG-5654",
+      "createdAt": "2026-02-18T18:11:48.159Z",
+      "title": "Name 14/Dublin GMT options to timezone picklist",
+      "state": "Canceled",
+      "assignee": "Jared Stauffer",
+      "parent": null,
+      "labels": ["Improvement"],
+      "description": "user: <email>\n\nIn Cold Email Agent default campaign settings, the timezone dropdown does not show the standard (UTC+00:00) Name 15 option with cities like Name 16, Name 17, Name 18, or Name 19. Workaround used: selecting an equivalent UTC+00:00 entry (e.g., Isle of Man), but request is to include main cities in the list rather than obscure locations."
+    },
+    {
+      "id": "ENG-5397",
+      "createdAt": "2026-02-10T17:19:16.290Z",
+      "title": "AI SDR “Booked via AI” text",
+      "state": "Done",
+      "assignee": "Jared Stauffer",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "user: <email>\n\nCalendar event descriptions also include text like “Booked via AI SDR V2…”, which can reveal the use of an AI SDR and should be removable/hidden.\n\nHis feature request is to hide or remove “Booked via AI SDR” line."
+    },
+    {
+      "id": "ENG-6466",
+      "createdAt": "2026-03-09T15:52:29.316Z",
+      "title": "Add UI notifications for new AI SDR inbox emails",
+      "state": "Backlog",
+      "assignee": "Koppany Kondricz",
+      "parent": null,
+      "labels": ["Feature"],
+      "description": "user: <email>\n\nAI SDR inbox currently has no UI notifications/alerts when new emails arrive, so emails can be missed unless the inbox page is manually checked.\n\nRequested: optional UI badge/notification for new inbox messages, and alerts when a conversation requires human attention (especially when multiple campaigns are running).\n\nNOTE: Talk this through with Jared/Blaise before you work on it."
+    },
+    {
+      "id": "ENG-3427",
+      "createdAt": "2025-12-05T02:05:11.336Z",
+      "title": "Allow custom fields and file uploads for Items/Leads",
+      "state": "Canceled",
+      "assignee": "Koppany Kondricz",
+      "parent": null,
+      "labels": ["Feature Request", "Triage: Needs Investigation"],
+      "description": "Customer requested the ability to:\n\n* Add additional fields on Items/Leads (e.g. company, web URL, additional contact details)\n* Have a files tab on Items/Leads where files can be uploaded and stored (e.g. growth plans, discovery call files, etc.)"
+    }
+  ]
+}

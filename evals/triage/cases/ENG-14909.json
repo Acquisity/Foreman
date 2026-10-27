@@ -1,0 +1,227 @@
+{
+  "id": "ENG-14909",
+  "provenance": "seeded",
+  "createdAt": "2026-10-07T19:07:57.941Z",
+  "lane": "triage",
+  "stratum": "unproven",
+  "ticket": {
+    "title": "when i call it keeps saying balance being checked",
+    "description": "#### Customer Email\n\n<email>\n\n#### Workspace name\n\nAI Acquisition Sales Team\n\n#### Workspace ID\n\n<uuid>\n\n#### Which lead?\n\nloads\n\n#### What's wrong?\n\nwhen i give prospects a call on acquisity crm when i click the call buttom a call voice will say your phone balance is being checked (along those lines) but its happened 10+ times today\n\n#### Screenshot\n\n#### Video link\n\n<url:app.acquisity.ai>",
+    "attachmentKinds": ["slack"]
+  },
+  "repoCommitAtCreate": "e4bca2dafd5e1431dca3a1329b6c2fdba87d7269",
+  "flags": {
+    "descriptionEditedAfterCreate": false,
+    "needsProductionData": true,
+    "alreadyFixedAtTriage": false
+  },
+  "asFiled": {
+    "assignee": "Aaron Fraga",
+    "labels": [],
+    "parent": null,
+    "priority": 3,
+    "project": "CRM"
+  },
+  "relatedSnapshot": [
+    {
+      "id": "ENG-14839",
+      "createdAt": "2026-10-06T20:15:08.539Z",
+      "title": "PhoneFundingAccountBusyError: Your phone balance is being checked. Please try again shortly.",
+      "state": "Todo",
+      "assignee": null,
+      "parent": null,
+      "labels": [],
+      "description": ""
+    },
+    {
+      "id": "ENG-14817",
+      "createdAt": "2026-10-06T15:56:37.004Z",
+      "title": "PhoneFundingAccountBusyError: Your phone balance is being checked. Please try again shortly.",
+      "state": "Todo",
+      "assignee": null,
+      "parent": null,
+      "labels": [],
+      "description": ""
+    },
+    {
+      "id": "ENG-12612",
+      "createdAt": "2026-08-12T18:08:00.822Z",
+      "title": "Check funds before starting Twilio calls",
+      "state": "Done",
+      "assignee": "Jil Patel",
+      "parent": "ENG-12603",
+      "labels": [],
+      "description": "## What this does\n\nChecks the Twilio balance before any manual or automated outbound call can connect. Funded calls have a matching provider duration limit so they cannot continue beyond the approved exposure.\n\n## Done when\n\n* Server, browser and automated Twilio calls require reserved funds.\n* Recording, transcription and other paid call features are included in the funding estimate.\n* A browser authorization works once for one destination and cannot be reused.\n* Twilio checks the authorization before connecting the paid outbound leg.\n* An unfunded call does not connect to the destination.\n* A retry for the same call does not reserve money twice.\n* The provider duration limit matches the funded duration and has a safe backup hang-up path.\n* Whop fails clearly before provider usage, with no generic-credit fallback.\n\n## Not included\n\nFinal provider-cost settlement, which remains disabled until verified Twilio charging launches.\n\n## Wait for\n\nRecharge phone funds automatically."
+    },
+    {
+      "id": "ENG-13744",
+      "createdAt": "2026-09-11T21:18:15.400Z",
+      "title": "Check funds before forwarding a call to a rep's phone",
+      "state": "Done",
+      "assignee": "Jil Patel",
+      "parent": "ENG-12603",
+      "labels": [],
+      "description": "## Overview\n\nWhen an incoming call is forwarded to a rep's own phone, Twilio places a paid outbound call. This applies the same balance check as other paid calls, so a workspace with no phone funds does not keep running up forwarded minutes.\n\n## What's included\n\n* The balance check for forwarded calls from Forward incoming calls to a rep's own phone.\n* Making sure forwarded call legs and phone-number verification charges are recorded correctly in Twilio cost tracking.\n\n## Blocked by\n\n* Check funds before starting Twilio calls\n* Ring a rep's own phone for incoming calls\n\n## How it should work\n\n* Before ringing the rep's phone, the forwarded call passes the same balance check as other paid calls. Workspaces billed through Whop count as unfunded.\n* With no funds, the phone is not rung and the caller gets the CRM voicemail. The browser ring is unaffected.\n* The check must finish within a few seconds because the caller is waiting on the line. A timeout or error sends the caller to voicemail.\n* A retried Twilio callback for the same call never counts funds twice.\n\n## Done when\n\n* An unfunded workspace's forwarded calls go to voicemail without ringing the phone; a funded workspace's calls forward normally.\n* A slow or failed balance check sends the caller to voicemail within the time limit.\n* Forwarded call costs and number-verification charges appear in cost tracking and reconcile."
+    },
+    {
+      "id": "ENG-1992",
+      "createdAt": "2025-10-17T03:01:10.562Z",
+      "title": "Corrected user balance discrepancy",
+      "state": "Canceled",
+      "assignee": "Pieter Venter",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": ""
+    },
+    {
+      "id": "ENG-12619",
+      "createdAt": "2026-08-12T18:09:10.596Z",
+      "title": "Show Twilio balances and billing controls",
+      "state": "Done",
+      "assignee": "Jil Patel",
+      "parent": "ENG-12603",
+      "labels": [],
+      "description": "## What this does\n\nGives owners and admins one clear Twilio billing card showing available funds, protected reserve, amount due, recent charges and automatic recharge controls.\n\n## Done when\n\n* Owners/admins can top up and change Twilio automatic-recharge settings.\n* Customers can see the current markup, threshold, recharge amount and monthly limit.\n* Purchase, renewal, low-balance, payment-failed, past-due, suspended and cancellation states have clear actions.\n* Members without billing permission cannot change financial settings; impersonated sessions are rejected.\n* Loading, empty, error, permission and narrow-screen states are covered.\n* “Monthly costs may apply” is replaced with accurate Twilio funding copy.\n* Activation events are added through the repository tracking skill and verified in PostHog.\n\n## Not included\n\nNew charging rules, existing-customer migration tools or Sendblue UI.\n\n## Wait for\n\nENG-12615.\n\n## Parallel work\n\nThis ticket can run in parallel with ENG-12621. Both must finish before ENG-12727 can approve the Twilio rollout."
+    },
+    {
+      "id": "ENG-14405",
+      "createdAt": "2026-09-28T16:43:52.469Z",
+      "title": "Filters say when they cannot apply, and \"today\" moves at midnight",
+      "state": "Done",
+      "assignee": "Jil Patel",
+      "parent": "ENG-14113",
+      "labels": [],
+      "description": "## Overview\n\nA few filter problems give reps a wrong answer without telling them: an export or dial list comes back empty when a filter could not be applied, a \"today\" list keeps yesterday's rows after midnight, and some filters behave differently on demo data than on real data.\n\n## What's included\n\n* An export whose filter could not be applied says so, instead of downloading an empty file.\n* The dialler says a filter could not be applied, instead of showing an empty queue as a finished list.\n* Lists filtered on today, this week or this month move to the new day at the rep's midnight without a reload.\n* On demo data, call filters (call count, last call, last reached) use the demo call history instead of returning nobody.\n* A rule on a deleted custom field gives the same answer on demo data and on the live list.\n\n## Done when\n\n* Exports and the dialler explain when a filter could not be applied.\n* A list filtered on \"today\" shows today's rows after midnight without a reload.\n* Call filters return the expected people on demo data.\n* A rule on a deleted custom field gives the same answer on demo data and on the live list.\n\n## Implementation context\n\nAI context.md"
+    },
+    {
+      "id": "ENG-13222",
+      "createdAt": "2026-08-27T20:54:57.386Z",
+      "title": "find_function_runs keeps the run list when the trace call fails",
+      "state": "Done",
+      "assignee": "Aaron Fraga",
+      "parent": "ENG-13191",
+      "labels": [],
+      "description": "Seen on Aaron's local ENG-13185 run (2026-08-27 20:50). `find_function_runs` listed 20 failed runs of `ai-clients.campaigns.process-add-leads-page`, then Inngest returned HTTP 500 for `GET /runs/{id}/trace?includeOutput=true` on the newest run, and the tool's catch returned `{ error, runs: [], latestTrace: null }`, dropping the list it already had. The model then reached for `inngest__list_function_runs`, `inngest__get_run`, and `inngest__get_run_trace` directly (the MCP trace without output succeeded on the same run), which is the guessed-call pattern the tool replaces.\n\nFix in `agent/lib/inngest-api.ts`: fetch the trace with output; on failure retry once without output; if that fails too, return the runs with `latestTrace: null` and `traceError` naming the failure. `error` is reserved for the run list itself failing. Test both fallbacks."
+    },
+    {
+      "id": "ENG-1353",
+      "createdAt": "2025-09-22T11:09:39.270Z",
+      "title": "Change the label of \"Interview Call Booked\" badge to say \"Name 1 Call Booked\" instead",
+      "state": "Done",
+      "assignee": "Blaise Gulaj",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": " <image> \n\ncheck the other badges/labels make sense for each of the default pipelines that we have - just like this one shouldn't have been in this pipeline etc"
+    },
+    {
+      "id": "ENG-5375",
+      "createdAt": "2026-02-10T10:22:23.692Z",
+      "title": "Create workspace affiliate \"balance\" feature",
+      "state": "Done",
+      "assignee": "Blaise Gulaj",
+      "parent": null,
+      "labels": ["Feature"],
+      "description": "### Problem\n\nAn affiliate might get refunds or chargebacks from their subaffiliates and their sub^n-affiliates and we need to keep track of them by subtracting from the account balance that we need to create for each workspace\n\nIt looks like we already have refund event implemented but still need chargebacks (disputes):\n\n1. How disputes flow\n\n* You receive dispute.created and dispute.updated webhooks.\n* You submit evidence in Dispute fighter before deadline (Whop says typically 7–21 days).\n* Bank/card network decision usually takes 2–3 months.\n\n2. Possible dispute statuses (API)\n\n* warning_needs_response\n* warning_under_review\n* warning_closed\n* needs_response\n* under_review\n* won\n* lost\n* closed\n* other\n\n3. “If someone withdraws a dispute”\n\n* Whop docs do not document a separate withdrawn status.\n* Practical handling: treat it as a dispute.updated status transition and consider terminal outcomes as won, lost, closed, warning_closed, or other (inference from the status\n\n  model).\n\n4. Balance impact timing\n\n* Yes, Whop says disputed funds are taken from balance immediately, plus a $15 dispute fee.\n* If you win, the disputed amount is returned.\n* If you lose, no extra debit is taken for principal because it was already removed.\n\n5. Extra note\n\n* Whop also mentions reserve holds can be applied for high dispute risk (portion held \\~90 days).\n\nSources:\n\n* Name 2 events list: <url:docs.whop.com>\n* Dispute object + statuses: <url:docs.whop.com>\n* Dispute fighter behavior/fees: <url:docs.whop.com>\n* Credit card dispute timing + immediate debit: <url:docs.whop.com>"
+    },
+    {
+      "id": "ENG-13888",
+      "createdAt": "2026-09-15T13:21:01.559Z",
+      "title": "Platform is bugging out and saying leads need to be re verified when they dont",
+      "state": "Todo",
+      "assignee": "Anthony Adewale",
+      "parent": "ENG-13257",
+      "labels": ["Bug", "Customer reported"],
+      "description": "#### Customer Name\n\nMultiple clients - but in this case Company One\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nCompany One\n\n#### Screenshot\n\n <image> \n\n <image> \n\n#### What are you trying to achieve?\n\nTo stop campaigns being blocked from launch because the leads apparently need to be re-verified when they don't (they have been directly scraped from the platform) and it is bugging out every single time I go to launch the campaign after\n\n#### What are you doing to achieve it?\n\n.\n\n#### What is happening instead?\n\n.\n\n#### What is the expected outcome?\n\nTo get this resolved completely (where it's just removed because leads do not need to be re-verified unless they are taken from outside of the platform) or, at the bare minimum, get this resolved to a point where this will only pop up if it is actually and genuinely relevant and needed"
+    },
+    {
+      "id": "ENG-14376",
+      "createdAt": "2026-09-28T12:20:18.117Z",
+      "title": "Keep the ready inbox row current for calls too",
+      "state": "Done",
+      "assignee": "Ebubeker Rexha",
+      "parent": "ENG-14370",
+      "labels": [],
+      "description": "## Overview\n\nExtend the same ready-row update from ENG-14375 to calls, so a person's row reflects their most recent call as well as their texts and emails.\n\n## Problem\n\nENG-14375 keeps a person's row current for texts and emails. Calls are the third and last channel that can make a person's activity go stale, and today's call-saving code does not update anything like it.\n\n## Proposed fix\n\nEvery place a call, a voicemail message, or a standalone call event gets saved calls the same shared row-update function from ENG-14375, covering inbound calls, outbound calls, manual call logging, and calls captured through the meeting recording integration.\n\n## What's included\n\n* Wiring the shared update function into every call, voicemail, and call-event save path.\n* Call-specific tests for the paths that are already fully transactional.\n* A documented, deliberate gap: today's inbound call save is not one single database transaction across all of its steps, so the row update for that path cannot be made fully atomic with the save without a much larger, riskier rewrite of that code. This ticket accepts that gap for inbound calls specifically, and relies on the nightly repair job (a separate ticket) to correct any row that drifts because of it. That gap is called out for the reviewer, not hidden.\n* Not included: rewriting the inbound call save path into one transaction. Not included: the rebuild command and nightly repair job themselves (a separate ticket).\n\n## Blocked by\n\n* ENG-14375: the row and its shared update function must exist first.\n\n## How it should work\n\n* Every call save that is already one transaction updates the person's row inside that same transaction.\n* The inbound call save path updates the row as part of handling the call, but not necessarily atomically with every one of that path's several separate writes; a drifted row from this path is expected to be caught and corrected by the nightly repair job, not guaranteed never to happen.\n* A merged or deleted person's row still reflects calls correctly, using the same merge/delete handling from ENG-14375.\n\n## Who can do what\n\nNot applicable: backend-only change with no new user-facing permission surface.\n\n## What the user sees\n\nNot applicable: nothing on screen changes.\n\n## Done when\n\n- [ ] A new inbound call, outbound call, and manually logged call on a preview each update the right person's row.\n- [ ] A call save that is already one transaction rolls back its row update together with a forced failure.\n- [ ] The documented gap for the inbound call path is written up for the reviewer with the reasoning for accepting it.\n\n## Open questions\n\nNone: all required decisions are settled.\n\n## Expected outcome\n\nA person's ready row reflects their most recent call as reliably as it reflects their texts and emails, with one narrow, documented and monitored exception for the inbound call path.\n\n## Implementation context\n\n* AI context.md: call/voicemail/event write-site inventory, transactional status per site, and the documented inbound-path gap."
+    },
+    {
+      "id": "ENG-11224",
+      "createdAt": "2026-07-07T15:52:10.950Z",
+      "title": "Phase 4 — Keep it clean forever: repo skill, CI check, invariant alerts",
+      "state": "Todo",
+      "assignee": "Mahmut Jomaa",
+      "parent": "ENG-10978",
+      "labels": [],
+      "description": "Part of ENG-10978 (metrics rework). Name 3 4. This is what stops the mess from ever coming back.\n\n## Why this exists\n\nWe've cleaned up metrics before and they drifted again, because nothing stopped the next dashboard, feature, or report from quietly calculating its own version of a number. Per Blaise: add a skill and deterministic checks so we are not introducing any more mess in the future.\n\n## The three guardrails\n\n1. **A repo skill** that forces AI tools (Claude, Codex, Name 4, Warden review) and devs to check, before writing any metric code: does a method for this already exist in `/metrics/*`? Can an existing one be extended? Only then may a new one be added, and only inside `/metrics/*`.\n2. **A deterministic CI check** that fails any PR adding metric calculations outside `/metrics/*`. Not a convention, a hard gate.\n3. **Invariant alerts** from the glossary's family rules, checked automatically: e.g. cold-email booked calls can never exceed total CRM booked calls, and cold-email positive replies can never exceed CRM opportunities. If a rule breaks, we get alerted to a data bug before customers see it.\n\n## Also in this phase\n\n* Consider moving `apps/web/lib/metrics` into `packages/metrics` once stable (cheap after centralization).\n* Reports/automations count too: the weekly AI SDR report's queries must come from the canonical definitions, not hand-written SQL in a prompt.\n\n## Done when\n\nSkill merged and wired into review; CI check proven to catch a planted violation; invariant alerts live."
+    },
+    {
+      "id": "ENG-12738",
+      "createdAt": "2026-08-14T15:22:29.248Z",
+      "title": "Discrepancy in the lead credit balance",
+      "state": "Done",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [],
+      "description": "#### Customer Name\n\nName 5\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 5\n\n#### Screenshot\n\n#### What are you trying to achieve?\n\nScrape leads for creating campaign for outreach\n\n#### What are you doing to achieve it?\n\nClient purchased 20k leads and only used one campaign with 5k leads. Then we created 2 more campaigns and scraped 2.5k leads each for those.\n\n#### What is happening instead?\n\nThe lead credit balance should be more but it's 649 right now\n\n#### What is the expected outcome?\n\nPlease investigate where the remaining lead credit balance went"
+    },
+    {
+      "id": "ENG-14741",
+      "createdAt": "2026-10-05T18:56:10.591Z",
+      "title": "Chat widget: When I asked the new Foreman tool to explain how it was different …",
+      "state": "In Progress",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [],
+      "description": "## Report\n\nReported by: Customer\n\nWhat went wrong: When I asked the new Foreman tool to explain how it was different from the seperate AI tools in the chat AI help section this was the answer no matter how I tried to ask for further clarification so I am still unsure how Foreman is different from the other AI tools and when to use it versuses them.  I hope that makes sense.. see teh pasted coversation that follows.............\"that sounds similar to what you told me you do.  How exactly are you different from those other AI tools?\n4m\nThose are not separate external tools, but different modes of the AI Consultant itself that change how I answer and which extra sources I can pull from. You can pick one from the mode selector at the bottom left of the message box, and switching applies to your next message.\nSources\n\n1. What are the AI Consultant modes?\n   Acquisity Foreman • 4m\n   •\n   Report a problem\n   So you are a seperate external tool while they are not?\n   3m\n   No, I am the AI Consultant, and Name 6 AI, Market Researcher, Name 7 AI, and Tech Wiz are simply different modes of the AI Consultant itself rather than separate external tools.\n   Sources\n2. What are the AI Consultant modes?\n3. AI Consultant\n4. What can the AI Consultant do vs what should I ask support?\n   Acquisity Foreman • 3m\n   •\n   Report a problem\n   So do you encompass all of their abilities into one AI tool than?\n   3m\n   Yes, the AI Consultant encompasses those capabilities across its different modes, and you can switch between them in the mode selector at the bottom left of the message box depending on the specific task you want to tackle.\n   Sources\n5. What are the AI Consultant modes?\n   Acquisity Foreman • 2m\n   •\n   Report a problem\n   So are all of the modes available directly through using you instead of using them seperately?\n   1m\n   The AI Consultant encompasses those capabilities across its different modes. You can switch between them in the mode selector at the bottom left of the message box depending on the specific task you want to tackle.\"\n\n## Conversation\n\nWorkspace: Name 100's Acquisity Workspace (<uuid>)\n\nConversation: <url:app.acquisity.ai>\n\nReported reply: whole conversation\n\nForeman run: <uuid>\n\n### Transcript (oldest first, customer-visible turns only, last 12 turns max)\n\nCustomer: Tell me everything you can do Foreman and how do I best make use of your abilities?\n\nForeman: I am the AI Consultant, a conversational AI for growth strategy, positioning, cold email, offers, and automation questions. I answer using my training knowledge, a built-in library of growth and cold email material, and whatever information you put in the chat. I can provide strategy advice, review things you paste in such as campaign results or email copy, walk you through troubleshooting steps, recommend tools from an AI directory, and do web research in Market Researcher mode. To make the best use of my abilities, be specific with your questions, paste relevant context since I cannot see your campaigns, CRM, or sales calls on my own, list what you have already tried, pick the right mode for your task, iterate by asking for alternatives or pushing back, and ask for my reasoning when a recommendation is unclear.\n\nCustomer: How are you different from Name 6 AI, Marketing research AI, TEch AI and Name 7 AI?\n\nForeman: Name 6 AI is best for general business, sales, growth, and strategy advice using a built-in growth library. Market Researcher mode is for market, trend, competitor, and niche research, and it adds live web search to the built-in library. Name 7 AI focuses on ad copy, campaign angles, and offer messaging using the built-in library plus ads reference material. Tech Wiz provides technical help, automation ideas, and workflow troubleshooting using the built-in library.\n\nCustomer: that sounds similar to what you told me you do.  How exactly are you different from those other AI tools?\n\nForeman: Those are not separate external tools, but different modes of the AI Consultant itself that change how I answer and which extra sources I can pull from. You can pick one from the mode selector at the bottom left of the message box, and switching applies to your next message.\n\nCustomer: So you are a seperate external tool while they are not?\n\nForeman: No, I am the AI Consultant, and Name 6 AI, Market Researcher, Name 7 AI, and Tech Wiz are simply different modes of the AI Consultant itself rather than separate external tools.\n\nCustomer: So do you encompass all of their abilities into one AI tool than?\n\nForeman: Yes, the AI Consultant encompasses those capabilities across its different modes, and you can switch between them in the mode selector at the bottom left of the message box depending on the specific task you want to tackle.\n\nCustomer: So are all of the modes available directly through using you instead of using them seperately?\n\nForeman: The AI Consultant encompasses those capabilities across its different modes. You can switch between them in the mode selector at the bottom left of the message box depending on the specific task you want to tackle.\n\n## Browser\n\nReported at: 2026-10-05T18:56:10.198Z\n\nPage: /dashboard/acquisity-JKDSQ/whats-new\n\nBrowser: Chrome 154.0.0.0, Windows   Screen: 1664x1110   Name 8 version: 20f92dc32112\n\nSentry replay: none\n\nSentry errors: none\n\n### Console errors (last 30, newest last, each line max 300 chars)\n\n(none)\n\n### Failed network calls (last 30, newest last)\n\n```text\n18:35:37 POST /api/client/available 403 402ms\n18:36:08 POST /api/client/available 403 373ms\n18:36:13 POST /api/client/available 403 403ms\n18:36:34 POST /api/client/available 403 360ms\n18:36:58 POST /api/client/available 403 356ms\n18:38:02 POST /api/client/available 403 934ms\n18:38:15 POST /api/client/available 403 339ms\n```\n\n<!-- chat-widget-feedback conversation=<uuid> message=none run=<uuid> replay=none at=2026-10-05T18:56:10.198Z -->"
+    },
+    {
+      "id": "ENG-3342",
+      "createdAt": "2025-12-03T11:45:19.038Z",
+      "title": "CRM not capturing new bookings from AI SDR",
+      "state": "Done",
+      "assignee": "Pieter Venter",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "Name 9's CRM is not capturing new bookings created by the AI SDR. The AI SDR responds to people and generates bookings, but these are not reflected in the CRM.\n\nEmail for the affected CRM account: <email>."
+    },
+    {
+      "id": "ENG-8401",
+      "createdAt": "2026-05-07T17:46:04.731Z",
+      "title": "Make Tasks the default leftmost CRM tab with activity-type inbox views",
+      "state": "Done",
+      "assignee": "Anthony Adewale",
+      "parent": null,
+      "labels": ["Feature"],
+      "description": "This work should make the CRM feel task-first for daily seller usage instead of activity-first.\n\nGoal\n\n* The primary seller operating surface in CRM should be Tasks.\n* Move the Tasks tab to the far left and make it the default tab sellers land on in the CRM.\n* Replace the current scattered activity feel with a single operational workspace centered around what needs action now.\n\nWhat needs to be built\n\n* Move the Tasks tab to the leftmost position in the CRM tab set.\n* Make Tasks the default tab opened when a seller enters CRM.\n* Inside Tasks, create sub-tabs / filtered views for activity types rather than forcing users to switch to separate top-level CRM areas.\n* At minimum, support a catch-all view plus type-specific views for:\n  * Tasks\n  * Emails\n  * Texts\n  * Calls or call-related items if available in the activity model\n* The default view inside Tasks should be the seller's actionable queue.\n* Support personal inbox behavior so each seller sees their own actionable work by default.\n* Add a Todo-focused filtered view so sellers can quickly see tasks requiring attention now.\n* Support a unified inbox style experience where tasks, emails, and texts can be worked from the same operating area.\n\nBehavior expectations\n\n* Tasks should become the main daily workflow entry point for closers and SDRs.\n* Users should be able to stay in one place and switch between activity types using the inner tabs/views.\n* The top-level CRM navigation should emphasize the task-first workflow rather than splitting users across multiple disconnected sections.\n* The default seller experience should feel closer to a personal action queue than a passive activity feed.\n\nName 10 expectations\n\n* Structure the Tasks area so inbound activity can become actionable work items.\n* Automatically create tasks from inbound emails, texts, and other relevant communication where follow-up is needed.\n* This should fit naturally into the task-first inbox model rather than creating isolated items elsewhere.\n\nTeam/shared behavior\n\n* Support team default views so teams can define a standard operating view configuration.\n* Personal default behavior should still exist on top of that so sellers land in their own actionable queue.\n\nDependencies\n\n* Define end-to-end lead/deal/call flows\n* Define stage-based automation rules\n* Some type-specific sub-tabs may depend on the maturity of email, SMS, and call activity models, but the Tasks-first structure should be implemented now."
+    },
+    {
+      "id": "ENG-13819",
+      "createdAt": "2026-09-14T09:33:14.469Z",
+      "title": "Notify people about meeting recordings, AI tools, websites and domains",
+      "state": "Backlog",
+      "assignee": "Elis Bushaj",
+      "parent": "ENG-13430",
+      "labels": ["CRM migration"],
+      "description": "## Overview\n\nHosts hear when the notetaker can't record a call and when a sales call analysis is ready. Long-running AI tools say when they're done or failed, so people can leave the page. Name 13 deploy and website domain problems are flagged before a site goes down.\n\n## Problem\n\nFailed recordings are only noticed after the meeting. Finished analyses aren't announced. Several background tools give no notice when they finish or fail. Name 13 deploy failures and website domain renewal problems are silent.\n\n## What's included\n\n* Recording failed (amber) when the bot can't join or has no permission to record, with what to change. Coordinate with ENG-13509, which owns the recording pipeline.\n* Call analysis ready (good news) with **View analysis**.\n* Finished (good news) and failed (amber) for: brand creator, product ideator, product researcher, Shopify store builder, hero image, ecom angle.\n* Name 13 deploy failed (red alert) with **Open website**, cleared by the next good deploy. Coordinate with ENG-10093.\n* Name 13 domain purchase complete or failed; website domain renewal failed or expiring soon with auto-renew off (red or amber alert). Email-sending domains are covered by ENG-13745.\n* Each event is registered as a notification kind and sent through `notify()`, or `openAlert` / `resolveAlert` for problems that stay open until fixed (ENG-13772). Every event honours Settings › Notifications (ENG-13776), is sent once per recipient, and no alert text names a supplier.\n\n## Design\n\nCurrent design (5 Oct 2026): Notifications kit, clickable. It opens on every card for this ticket. \"Show as pop-up\" under each card fires it the way it arrives.\n\nThe prototype is private until James shares it; the screenshot here shows the same cards.\n\n* Every card for this ticket\n\n**Recording, AI tool, website and domain cards**\n\n <image> \n\n**Drawn:** recording failed (amber, Open meeting), call analysis ready (View analysis), brand creator finished (Open), brand creator failed (amber, Try again), Shopify store builder failed (amber, Try again), Shopify store ready (Open store), Name 11 finished, Product Researcher failed, Hero Image finished, Name 12 finished, website deploy failed (red, Open website), website domain bought and live, website domain purchase failed (red, Try again), website domain expiring with renewal off (amber, Turn on renewal), website domain renewal failed (red, Update card).\n\nFinished and failed cards share one shape per tool: finished uses the tool name as the source with an Open button; failed is amber, says no credits were used, with Try again.\n\n**Changed from the earlier design:** problems that stay open are tagged \"In top bar\" and show in the top bar's alerts control.\n\n**Not drawn, build from the text above:** Name 11 failed, Product Researcher finished, Hero Image failed, Name 12 failed (use the shared shape above).\n\n## Blocked by\n\nENG-13772\n\n## Done when\n\n* A meeting where the bot is refused notifies the host once; a finished analysis notifies the rep once.\n* Each listed tool sends one finished or failed notification to the person who started it.\n* A failed deploy opens one red alert that clears on the next good deploy; a website domain expiring in 7 days with auto-renew off opens one amber alert.\n\nSize: about 1,800 lines.\n\n## Shared roadmap and verification\n\nWhen promoted, add this family’s real-source preview scenarios and verify the master’s flag, access, replay and evidence contract. Keep it parked until then.\n\n## Implementation context\n\nAI context.md contains this ticket’s source seams, scope boundaries and QA handoff. Read the master plan and shared master AI context first. Shared revision: `ENG-13430/2026-09-14-r2`. Use the existing 15-ticket structure and native blockers; do not create or revive tickets automatically."
+    },
+    {
+      "id": "ENG-9213",
+      "createdAt": "2026-05-25T21:04:11.114Z",
+      "title": "Billing upgrade promo codes fail because app passes Stripe/Autumn promo codes to legacy Autumn reward field",
+      "state": "Done",
+      "assignee": "Tyler Olsen",
+      "parent": null,
+      "labels": [],
+      "description": "Issue\n\nUsers attempting to upgrade with a promo code see a generic “Something went wrong” toast during upgrade confirmation. Promo code validation can pass, but the final checkout creation fails.\n\n**Affected example**\n\n* User: Name 14 (`<email>`)\n* Workspace: `Name 14' Workspace`\n* Billing account / Autumn customer id used by app: `<uuid>`\n* Codes investigated: `<promo-code>`, `<promo-code>`\n\n**Root cause**\nThe current `billing.createCheckout` upgrade flow calls legacy Autumn attach and passes the user-entered promo code as `reward`:\n\n`autumn.attach({ customer_id, product_id: targetPlan, reward: promoCode })`\n\nThat legacy `reward` field is not accepting the Stripe/Autumn promo code values we’re creating. Autumn returns `reward_not_found`, and the app converts that backend failure into a generic production tRPC error toast.\n\nCode path: <ref_snippet file=\"/home/ubuntu/repos/ai-clients/apps/web/trpc/routers/billing.ts\" lines=\"1050-1080\" />\n\n**Evidence**\n\n* `<promo-code>` exists in Stripe and is active/unredeemed, but Autumn attach rejects it as `reward_not_found`.\n* `<promo-code>` exists in Stripe as active/unredeemed with coupon metadata containing Autumn reward id `rew_3EESFB4E8k8Gg5BLtI9ae1XlLc8`.\n* Testing the current app payload shape with `<promo-code>` returned `reward_not_found: Reward <promo-code> not found`.\n* Testing the current app payload shape with the metadata reward id also returned `reward_not_found`.\n* Autumn `rewards.redeem` with `<promo-code>` returned `No reward found for code \"<promo-code>\"`.\n* Vercel production runtime logs showed recent `/api/trpc/billing.createCheckout` 500s containing `reward_not_found`.\n* tRPC masks `INTERNAL_SERVER_ERROR` as “Something went wrong” in production. <ref_snippet file=\"/home/ubuntu/repos/ai-clients/apps/web/trpc/init.ts\" lines=\"30-38\" />\n\n**Expected behavior**\nIf a valid promo/reward code is entered during upgrade confirmation, the app should create an Autumn/Stripe checkout session with the discount applied, or show a clear user-facing promo error if the code is invalid.\n\n**Actual behavior**\nCheckout creation fails with Autumn `reward_not_found`; user sees generic “Something went wrong.”\n\n**Suggested fix**\nUpdate the upgrade checkout flow to use Autumn’s current billing attach discount API instead of the legacy `reward` field. Autumn’s documented shape supports:\n\n`discounts: [{ promotion_code: code }]`\n\nor\n\n`discounts: [{ reward_id: rewardId }]`\n\nThis likely means replacing/augmenting the current `autumn.attach(...)` call with the newer Autumn billing attach API and passing discounts through the supported field.\n\n**Possible short-term workaround**\nApply the discount directly to Name 15's Autumn customer in the Autumn dashboard under Customer → Rewards/Add Coupon, then have Name 15 upgrade without entering a promo code. Autumn docs indicate customer-level rewards show when an attach checkout URL is generated or on the next invoice. This should still be verified before sending to the client.\n\n**Not recommended**\nCreating the code only in Stripe is not enough, because the app does not create Stripe Checkout directly. The upgrade confirmation goes through Autumn first, so Stripe-only promo validity does not bypass Autumn’s rejection.\n\n**Acceptance criteria**\n\n* Entering an active Autumn/Stripe promo code in the upgrade dialog successfully creates a checkout URL with the discount applied.\n* Invalid promo/reward codes show a clear promo-specific error, not generic “Something went wrong.”\n* Add coverage for the billing attach payload shape to ensure discounts are sent through Autumn’s supported API field."
+    },
+    {
+      "id": "ENG-14355",
+      "createdAt": "2026-09-28T02:17:51.120Z",
+      "title": "Customer report: Cold Email campaign setup fails with the generic setup error and is left stuck in Draft",
+      "state": "Todo",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": ["Customer reported", "intercom-sourced"],
+      "description": "**Source**: Intercom conversation <url:app.intercom.com>\n\n**Conversation context (bounded)**: Customer (workspace `<workspace-slug>`) reports that setting up a cold email campaign called \"Discovery Calls\" reaches 100% and then shows, in red, \"We could not finish this request. Try again, or contact support if it keeps happening.\" Retries over a day did not help; the campaign stayed in Draft. After switching from Edge to Chrome and rebuilding, the customer reports the same failure during the lead step (\"Finding and Verifying Leads\": Configuring Search Parameters, Initiating Lead Scraping, Collecting Lead Data, Verifying Email Addresses, Processing Lead Results, Uploading to Database) while importing 8,000 of \\~35,441 matching leads. The customer asked whether anything on the account or platform side needs correcting; the conversation is open with a teammate and awaiting a human follow-up.\n\n**Finding**: The 2026-09-20 failure is platform-side. The lead-scrape child failed at the `start-scrape-run` step of `processLeadGenerator` with `Company Two API Client Error (402): Insufficient credits` from the enrichment call, and the campaign creator cascaded the failure to its parent submission (\"Unable to complete your request. Please try again later.\"). The enrichment runs on a system-provisioned Company Two workspace (provider `system_provisioned`, workspace `<workspace-slug>`), so the customer cannot see or fix the exhausted credit pool. This matches the already-tracked Instantly-enrichment-credit failure pattern (ENG-14088 / ENG-14049 / master ENG-14030).\n\n**Current state (2026-09-28)**: The failure is not reproducing. The customer's 2026-09-27 retry dispatched successfully and delivered 7,872 leads to the campaign, and the campaign now holds 7,880 lead rows. However the campaign is still `status=draft` with `wizard_completed_at` null, and the parent campaign_creator submission is still `status=failed` (last touched 2026-09-27), so the setup never finalizes and the customer is blocked/unsure. Platform-wide the cohort peaked on 2026-09-18 (41 orgs on the lead-scrape submission, 31 on the campaign creator) and fell to zero affected organizations from 2026-09-25 onward.\n\n**Human action**: Confirm with the customer what the wizard shows now, help him finish/launch the existing \"Discovery Calls\" draft (its leads are already present), and reply with the outcome. Reopen if the setup error is showing again or the campaign still will not finalize."
+    }
+  ]
+}

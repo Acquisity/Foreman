@@ -1,0 +1,592 @@
+[
+  {
+    "createdAt": "2026-08-27T15:36:18.105Z",
+    "group": "Devin Playbooks",
+    "id": "6ccf50e1-c891-4f61-b412-1bb6e7a3db3f",
+    "name": "!implement"
+  },
+  {
+    "createdAt": "2026-03-12T12:32:27.839Z",
+    "group": "Manus Triggers",
+    "id": "cff28497-0106-49cb-997f-51901cde2bed",
+    "name": "!manus-execute"
+  },
+  {
+    "createdAt": "2026-03-12T12:32:32.815Z",
+    "group": "Manus Triggers",
+    "id": "c5c1b222-ce4b-44d4-a1b6-01baaa2db20c",
+    "name": "!manus-plan"
+  },
+  {
+    "createdAt": "2026-08-27T15:36:17.801Z",
+    "group": "Devin Playbooks",
+    "id": "b868c022-51b6-4f83-90dc-a6b3f5ddd2c1",
+    "name": "!plan"
+  },
+  {
+    "createdAt": "2026-03-06T21:09:20.989Z",
+    "group": "Devin Playbooks",
+    "id": "5ff1e562-b3b0-4532-a6e0-e2146bcc9774",
+    "name": "!review"
+  },
+  {
+    "createdAt": "2026-03-06T21:09:20.847Z",
+    "group": "Devin Playbooks",
+    "id": "825d6f5f-2b59-47d5-9378-3abbe35ea5e0",
+    "name": "!triage"
+  },
+  {
+    "createdAt": "2026-10-14T21:07:21.239Z",
+    "group": "Devin Playbooks",
+    "id": "3719e838-d7c0-4cc5-a7ea-dceaa7df5347",
+    "name": "!triage_and_implement"
+  },
+  {
+    "createdAt": "2026-07-20T09:16:56.937Z",
+    "id": "501569f4-3896-4fb7-8c5b-ad81239d08a5",
+    "name": "Approval Gate"
+  },
+  {
+    "createdAt": "2026-07-20T08:52:52.925Z",
+    "group": "Product Separation",
+    "id": "49844394-bdd8-4602-96b0-4a7a25055b1d",
+    "name": "Architecture"
+  },
+  {
+    "createdAt": "2025-11-26T19:31:08.274Z",
+    "id": "130fac4d-0efd-4cfc-9028-a9fa5f20d5ac",
+    "name": "BTPI"
+  },
+  {
+    "createdAt": "2026-07-20T08:52:54.001Z",
+    "group": "Product Separation",
+    "id": "5d6e32a3-7afd-464c-93bb-5dd1843bafd9",
+    "name": "Billing"
+  },
+  {
+    "createdAt": "2026-01-18T15:41:15.890Z",
+    "group": "Root Cause",
+    "id": "7fe95181-87f3-4ae6-8f8c-46217eb1a521",
+    "name": "Billing Sync"
+  },
+  {
+    "createdAt": "2023-09-15T12:52:00.017Z",
+    "id": "7b21df0f-5ed9-4a54-8ff0-55ae7097c030",
+    "name": "Bug"
+  },
+  {
+    "createdAt": "2026-09-14T10:40:26.029Z",
+    "id": "1f17e18c-51e8-4ee3-bc3b-72db015808d2",
+    "name": "CRM migration"
+  },
+  {
+    "createdAt": "2026-01-18T15:41:29.590Z",
+    "group": "Root Cause",
+    "id": "5d550739-9ff2-4606-b427-abc4b87b40b9",
+    "name": "CSV Import"
+  },
+  {
+    "createdAt": "2026-01-18T16:55:36.158Z",
+    "group": "Root Cause",
+    "id": "b3ee2ac2-c134-452a-bdaf-e4646f5da8f0",
+    "name": "CSV Import Issues"
+  },
+  {
+    "createdAt": "2026-07-06T18:10:01.134Z",
+    "id": "48e85c53-524f-447a-84f6-3aa26d756f14",
+    "name": "Campaign Features"
+  },
+  {
+    "createdAt": "2026-01-18T15:41:23.504Z",
+    "group": "Root Cause",
+    "id": "15741042-ef64-49da-aaa5-d4ce44830ac6",
+    "name": "Campaign State"
+  },
+  {
+    "createdAt": "2026-01-18T16:55:25.848Z",
+    "group": "Root Cause",
+    "id": "cc575f95-dc04-49a0-8c61-7db34aaf4ec3",
+    "name": "Campaign Stops Sending"
+  },
+  {
+    "createdAt": "2025-09-15T05:47:55.983Z",
+    "id": "564b356b-15dd-422a-9a0b-b7b0110cb9c8",
+    "name": "Chore"
+  },
+  {
+    "createdAt": "2026-07-20T08:52:57.971Z",
+    "group": "Product Separation",
+    "id": "ab0576d3-147f-4511-a77c-884beba11b08",
+    "name": "Cleanup"
+  },
+  {
+    "createdAt": "2026-03-09T14:06:28.828Z",
+    "id": "2bb41704-6bdf-40c8-9887-72832530aeb2",
+    "name": "Code Coverage"
+  },
+  {
+    "createdAt": "2026-07-14T08:51:38.597Z",
+    "id": "b8ebb5a7-875c-4197-af9f-393729da37ff",
+    "name": "Compliance"
+  },
+  {
+    "createdAt": "2026-01-18T16:55:23.819Z",
+    "group": "Root Cause",
+    "id": "23d40f93-2a26-4a53-8792-d7f6bc0f599b",
+    "name": "Credit/Billing Mismatch"
+  },
+  {
+    "createdAt": "2026-02-16T15:32:04.807Z",
+    "group": "Refund Request",
+    "id": "c585a011-821b-4c76-b235-a9baabd2c825",
+    "name": "Credits"
+  },
+  {
+    "createdAt": "2026-07-20T09:30:49.134Z",
+    "id": "b7991754-9938-4767-a567-7d399f5fab1e",
+    "name": "Critical Path"
+  },
+  {
+    "createdAt": "2025-11-28T08:51:08.185Z",
+    "id": "ecb2eef5-bf84-4676-bfd6-f9d274b697b2",
+    "name": "Customer reported"
+  },
+  {
+    "createdAt": "2026-07-20T08:52:57.026Z",
+    "group": "Product Separation",
+    "id": "5c71527b-8c74-4cd1-921f-cf736be68ebb",
+    "name": "Cutover"
+  },
+  {
+    "createdAt": "2026-01-18T15:41:21.391Z",
+    "group": "Root Cause",
+    "id": "6ef0e388-b46c-41c7-938d-c0fbee0378cb",
+    "name": "Dashboard Metrics"
+  },
+  {
+    "createdAt": "2026-07-20T08:52:55.045Z",
+    "group": "Product Separation",
+    "id": "f83d3154-8d02-4d59-b8d2-51cf4c69fedf",
+    "name": "Data Migration"
+  },
+  {
+    "createdAt": "2026-01-18T17:06:56.852Z",
+    "group": "Root Cause",
+    "id": "e06e2996-b95c-4537-914a-a097731e8efc",
+    "name": "Data/Config Mismatch"
+  },
+  {
+    "createdAt": "2026-07-20T08:52:51.774Z",
+    "group": "Product Separation",
+    "id": "df779612-2a33-45ee-aa9a-de3317789e2c",
+    "name": "Decision"
+  },
+  {
+    "createdAt": "2026-07-06T18:06:53.009Z",
+    "id": "2e65593e-d64a-43a5-9418-20080ec93a51",
+    "name": "Deliverability & Sending"
+  },
+  {
+    "createdAt": "2026-02-16T04:41:18.912Z",
+    "group": "Root Cause",
+    "id": "0b84a614-cd02-45b1-9bcd-154db62271f6",
+    "name": "Deliverability Issue"
+  },
+  {
+    "createdAt": "2026-03-24T09:22:52.477Z",
+    "id": "25443fa2-9c44-485f-b6f2-186d8342af8a",
+    "name": "Design"
+  },
+  {
+    "createdAt": "2026-03-06T21:09:20.358Z",
+    "id": "c5a2a394-ca09-4725-94ef-4cff713ebe1e",
+    "name": "Devin Playbooks"
+  },
+  {
+    "createdAt": "2026-02-16T15:32:08.847Z",
+    "group": "Refund Request",
+    "id": "2055f69b-076e-4855-8d8b-85459ffc698a",
+    "name": "Discount"
+  },
+  {
+    "createdAt": "2025-07-29T11:08:49.371Z",
+    "id": "79eb52de-e8ca-4e4c-bfa4-ecc19640aec7",
+    "name": "Docs"
+  },
+  {
+    "createdAt": "2026-07-01T14:53:17.870Z",
+    "id": "daa8d9cd-0ce7-453f-8d6b-e8e7943206fa",
+    "name": "Docs Gap"
+  },
+  {
+    "createdAt": "2026-07-20T08:52:49.920Z",
+    "group": "Product Separation",
+    "id": "9a1c33d8-4978-4891-8f31-71112eb73205",
+    "name": "Epic"
+  },
+  {
+    "createdAt": "2023-09-15T12:52:00.017Z",
+    "id": "b9cb46db-656d-499e-89a3-8c1a540729bb",
+    "name": "Feature"
+  },
+  {
+    "createdAt": "2025-10-17T20:14:12.287Z",
+    "id": "7046336d-637d-42fe-99c7-a893e70ead3c",
+    "name": "Feature Request"
+  },
+  {
+    "createdAt": "2025-09-14T12:34:38.332Z",
+    "id": "3e25d1a0-6888-41d0-a9da-173ab895128b",
+    "name": "Featurebase"
+  },
+  {
+    "createdAt": "2026-07-14T08:51:37.547Z",
+    "id": "45ee56df-1ec5-488f-af3f-dc4a59f761d2",
+    "name": "GUSTO"
+  },
+  {
+    "createdAt": "2025-09-15T05:50:19.399Z",
+    "id": "e530e66d-4e35-482b-b851-d73418f44ae0",
+    "name": "Idea"
+  },
+  {
+    "createdAt": "2023-09-15T12:52:00.017Z",
+    "id": "120230fd-c610-4633-b634-78d4fce7cb69",
+    "name": "Improvement"
+  },
+  {
+    "createdAt": "2026-07-06T18:34:49.154Z",
+    "id": "52562fcf-f443-40cb-a999-ce93a4d8a937",
+    "name": "Inbox & CRM"
+  },
+  {
+    "createdAt": "2026-01-18T16:55:20.968Z",
+    "group": "Root Cause",
+    "id": "3a6b0e0b-1ade-420c-96f0-720605cccfd9",
+    "name": "Inbox/Domain Not Created"
+  },
+  {
+    "createdAt": "2026-07-20T08:52:56.064Z",
+    "group": "Product Separation",
+    "id": "eaf8c8e2-2f48-4e0a-9aac-577cefe00c42",
+    "name": "Infrastructure"
+  },
+  {
+    "createdAt": "2026-01-18T15:41:19.006Z",
+    "group": "Root Cause",
+    "id": "d9f831c4-19b3-43a7-aae3-4ff4bcc548bd",
+    "name": "Instantly API"
+  },
+  {
+    "createdAt": "2026-01-18T16:55:27.869Z",
+    "group": "Root Cause",
+    "id": "916654cb-213f-43c8-bbed-5828050c6e59",
+    "name": "Instantly Sync Failure"
+  },
+  {
+    "createdAt": "2025-11-28T08:52:06.414Z",
+    "group": "QA",
+    "id": "5c98c5bc-b176-494b-a9b1-3dc3dabb2993",
+    "name": "Internal reported"
+  },
+  {
+    "createdAt": "2026-07-14T08:51:27.959Z",
+    "id": "919e95b6-bacb-4eee-ad73-55192c6d8c04",
+    "name": "Launch Blocker"
+  },
+  {
+    "createdAt": "2026-01-18T15:41:25.586Z",
+    "group": "Root Cause",
+    "id": "e799fb58-c071-4a12-9fe8-add78d7e59d2",
+    "name": "Lead Scraping"
+  },
+  {
+    "createdAt": "2026-01-18T16:55:31.969Z",
+    "group": "Root Cause",
+    "id": "875236d9-a6ca-4029-bd35-e6afb99d30d5",
+    "name": "Lead Scraping Fails"
+  },
+  {
+    "createdAt": "2026-03-12T12:32:17.008Z",
+    "id": "14bdbf70-8c32-48f8-93ef-8a04d003f2c9",
+    "name": "Manus Triggers"
+  },
+  {
+    "createdAt": "2026-07-14T08:51:41.923Z",
+    "id": "a22c86f2-858f-4983-b499-d7cc097c84cf",
+    "name": "Operations"
+  },
+  {
+    "createdAt": "2026-07-14T08:51:39.608Z",
+    "id": "edd47f39-ed9a-4e1b-b583-9782684a4e4a",
+    "name": "Payments"
+  },
+  {
+    "createdAt": "2025-07-29T11:09:02.791Z",
+    "id": "29ad86ff-df32-47a1-96b5-99c3a770af83",
+    "name": "Performance"
+  },
+  {
+    "createdAt": "2026-03-25T06:32:06.847Z",
+    "id": "35bdf4b3-862f-4af3-86d5-a14b2232245f",
+    "name": "Phase 1"
+  },
+  {
+    "createdAt": "2026-03-25T06:32:07.744Z",
+    "id": "af7cf968-85d5-4f22-b81a-2c1e56eab8f6",
+    "name": "Phase 2"
+  },
+  {
+    "createdAt": "2026-03-25T06:32:08.582Z",
+    "id": "06a1ff86-96b4-45ed-b86b-525247f4bf84",
+    "name": "Phase 3"
+  },
+  {
+    "createdAt": "2025-12-18T17:49:07.733Z",
+    "id": "8a384384-428d-405c-a65e-58e5c1d9266e",
+    "name": "Power User Request"
+  },
+  {
+    "createdAt": "2025-11-09T15:48:24.842Z",
+    "id": "3061d77c-a8b0-43d2-833f-41b2ec06298e",
+    "name": "Prepped"
+  },
+  {
+    "createdAt": "2026-07-20T08:52:49.127Z",
+    "id": "a225244c-3c82-4153-9e36-67b562e0ace8",
+    "name": "Product Separation"
+  },
+  {
+    "createdAt": "2025-10-23T14:33:17.593Z",
+    "id": "511a3532-5d41-4004-9ae1-6aecdc146d89",
+    "name": "Prompt"
+  },
+  {
+    "createdAt": "2026-01-18T15:41:13.735Z",
+    "group": "Root Cause",
+    "id": "d4fb05b3-ce87-45bc-85e2-0bebb0af6331",
+    "name": "Provisioning Pipeline"
+  },
+  {
+    "createdAt": "2025-11-28T08:52:06.114Z",
+    "id": "ea98112a-cc23-4647-8bb3-28d8bab2843a",
+    "name": "QA"
+  },
+  {
+    "createdAt": "2026-10-14T16:36:16.005Z",
+    "id": "fe291d8a-31f4-4256-ae2e-b5fe3ad457d4",
+    "name": "Raindrop"
+  },
+  {
+    "createdAt": "2025-07-29T11:09:14.886Z",
+    "id": "e95e0359-c4b2-4855-9014-753ab022fde5",
+    "name": "Refactor"
+  },
+  {
+    "createdAt": "2026-02-16T15:32:07.032Z",
+    "group": "Refund Request",
+    "id": "9120e30d-e188-4972-940b-20005b7f6d03",
+    "name": "Refund"
+  },
+  {
+    "createdAt": "2026-02-16T15:32:02.317Z",
+    "id": "8c288321-6b42-4a36-9a3d-dc3c539ed10c",
+    "name": "Refund Request"
+  },
+  {
+    "createdAt": "2025-12-15T21:02:26.578Z",
+    "id": "254236c6-c396-4791-88d7-190aae6bed22",
+    "name": "Reporting"
+  },
+  {
+    "createdAt": "2025-10-20T20:53:05.813Z",
+    "id": "23bec1af-99ca-46db-ab31-2d07770d021d",
+    "name": "Research"
+  },
+  {
+    "createdAt": "2026-01-18T15:40:55.415Z",
+    "id": "77459c4a-0d62-4b3b-b788-793b1cd42aea",
+    "name": "Root Cause"
+  },
+  {
+    "createdAt": "2026-07-14T08:51:26.259Z",
+    "id": "7eea8718-3d07-4b98-8265-495dc3ab47e0",
+    "name": "Security"
+  },
+  {
+    "createdAt": "2026-01-18T16:55:34.185Z",
+    "group": "Root Cause",
+    "id": "3e7b4f17-8d29-448c-acdb-9595b754318a",
+    "name": "Sequence/Variant Lost"
+  },
+  {
+    "createdAt": "2026-01-18T17:06:59.375Z",
+    "group": "Root Cause",
+    "id": "7aa6e9f0-f72f-49ba-b51f-18ffb6c6fc6c",
+    "name": "Settings Not Saving"
+  },
+  {
+    "createdAt": "2026-02-16T18:44:27.606Z",
+    "id": "8b0f9b76-8c78-42e0-8c6e-f590d940dca4",
+    "name": "Triage: Blocked/External"
+  },
+  {
+    "createdAt": "2026-02-16T18:44:27.023Z",
+    "id": "4eeab44c-860e-45a4-809d-10bf34f64b49",
+    "name": "Triage: Needs Investigation"
+  },
+  {
+    "createdAt": "2026-02-16T18:44:26.070Z",
+    "id": "b6b21361-e9ea-4490-971f-2f41bc642fe2",
+    "name": "Triage: Quick Win"
+  },
+  {
+    "createdAt": "2026-01-18T15:41:27.553Z",
+    "group": "Root Cause",
+    "id": "53a5a32f-dc43-4a0c-a6e3-1d989b5f2906",
+    "name": "Variant Sync"
+  },
+  {
+    "createdAt": "2026-01-18T15:41:31.506Z",
+    "group": "Root Cause",
+    "id": "384bd377-94c5-42d3-83c2-44cd7779adf3",
+    "name": "Warmup Config"
+  },
+  {
+    "createdAt": "2026-01-18T16:55:38.072Z",
+    "group": "Root Cause",
+    "id": "b0f74310-33cb-4d32-a9a0-53bdf2b18219",
+    "name": "Warmup Not Enabled"
+  },
+  {
+    "createdAt": "2026-01-19T21:32:39.100Z",
+    "id": "17457fc2-519c-46b0-b46c-9016a2abae7b",
+    "name": "Workspace Setup Issues"
+  },
+  {
+    "createdAt": "2026-01-18T16:55:29.767Z",
+    "group": "Root Cause",
+    "id": "b31b698d-e856-4773-b42a-6ceae931fa2d",
+    "name": "Wrong Dashboard Numbers"
+  },
+  {
+    "createdAt": "2026-07-06T18:58:49.165Z",
+    "id": "5a7bfc36-681f-40c3-9b8b-05ea7128ef09",
+    "name": "anal"
+  },
+  {
+    "createdAt": "2026-07-06T18:59:18.385Z",
+    "id": "39250b7f-5969-46ea-83f2-fbdfdc1465b2",
+    "name": "analytics"
+  },
+  {
+    "createdAt": "2026-05-20T12:06:38.427Z",
+    "id": "a67bd486-f9fc-494a-959c-9fb945524c57",
+    "name": "badge"
+  },
+  {
+    "createdAt": "2026-10-12T14:03:23.333Z",
+    "id": "bbf6bd0d-fe02-48c3-bdd5-f9be06ab18f2",
+    "name": "blocked"
+  },
+  {
+    "createdAt": "2026-04-29T08:28:30.630Z",
+    "id": "93c3c9b0-0bec-4def-9cd3-657c6a6cca37",
+    "name": "bugfix"
+  },
+  {
+    "createdAt": "2026-10-12T14:03:21.350Z",
+    "id": "79eff3ef-1e04-4401-bf12-5e3eeb397f1b",
+    "name": "building"
+  },
+  {
+    "createdAt": "2026-07-30T11:12:20.655Z",
+    "id": "d1ed8a4c-f1ef-48a3-8eb8-4d8fe7c2b5c9",
+    "name": "ecom"
+  },
+  {
+    "createdAt": "2026-08-20T11:29:42.446Z",
+    "id": "44a052b5-a3b0-436c-9746-975ed709a777",
+    "name": "fast-lane"
+  },
+  {
+    "createdAt": "2026-10-12T14:03:16.303Z",
+    "id": "2eb65974-b1f4-4f99-88d2-f089a6f41d15",
+    "name": "foreman-improvement"
+  },
+  {
+    "createdAt": "2026-09-17T10:46:06.198Z",
+    "id": "a03623b8-276a-41a1-abff-8ff7915ee258",
+    "name": "intercom-investigation"
+  },
+  {
+    "createdAt": "2026-06-28T11:08:59.270Z",
+    "id": "11afe4dc-3e6c-46c4-b71b-c5ab915602ad",
+    "name": "intercom-sourced"
+  },
+  {
+    "createdAt": "2026-08-20T11:29:39.498Z",
+    "id": "4c65b22a-9d6f-4b8d-b579-a66ee71eff51",
+    "name": "master"
+  },
+  {
+    "createdAt": "2026-10-12T14:03:22.532Z",
+    "id": "06577787-044d-4c45-a4cd-47294519c03d",
+    "name": "not-a-problem"
+  },
+  {
+    "createdAt": "2026-07-06T18:03:52.606Z",
+    "id": "a0ae2d5a-8d4b-4059-a1a5-52eec545e6b4",
+    "name": "par"
+  },
+  {
+    "createdAt": "2026-10-12T14:03:21.829Z",
+    "id": "d5aa6ba4-a8f3-4cc8-991a-d3627121b3e0",
+    "name": "pr-ready"
+  },
+  {
+    "createdAt": "2026-08-05T11:31:08.497Z",
+    "id": "80f12faf-a1ba-4f12-9438-7523f0a34a5d",
+    "name": "ready-for-agent"
+  },
+  {
+    "createdAt": "2026-10-12T14:03:19.814Z",
+    "id": "f2372cbe-64f3-4869-b3ea-ce23872ddcad",
+    "name": "ready-to-build"
+  },
+  {
+    "createdAt": "2026-07-13T10:56:41.767Z",
+    "id": "ea175b25-4308-4f4e-9d9b-a8a1926e8f17",
+    "name": "rep-command-center"
+  },
+  {
+    "createdAt": "2026-06-23T14:44:02.618Z",
+    "id": "2accdfa9-7da1-47fe-81ef-95da43f77135",
+    "name": "sentry-noise"
+  },
+  {
+    "createdAt": "2026-10-12T14:03:17.379Z",
+    "id": "1ed5eda7-debf-4a87-b604-9729dfcd8a66",
+    "name": "triage"
+  },
+  {
+    "createdAt": "2026-06-23T14:43:59.270Z",
+    "id": "a85f832d-c67e-46ff-9e51-46a244f603f0",
+    "name": "triaged-by-devin"
+  },
+  {
+    "createdAt": "2026-09-04T13:10:24.024Z",
+    "id": "172b23ec-b971-48e2-976b-4fbd43374f9d",
+    "name": "uat-requested"
+  },
+  {
+    "createdAt": "2026-07-10T22:03:56.781Z",
+    "id": "4827470c-e6f3-4546-84f7-ea4c76c88848",
+    "name": "weekend-fastlane"
+  },
+  {
+    "createdAt": "2026-10-12T14:03:16.290Z",
+    "id": "32cdd523-f51c-4eaa-91f0-4b48e03a4f07",
+    "name": "widget"
+  }
+]

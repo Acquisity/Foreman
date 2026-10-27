@@ -1,5 +1,6 @@
 import { EXECUTOR_DISCOVERY } from "./executor/instructions.js";
 import { SUPPORT_DELEGATION_LABEL } from "./support/instructions.js";
+import { isTriageReplay } from "./triage-replay/mode.js";
 
 const IDENTITY = `# Identity
 
@@ -19,6 +20,10 @@ const REPOSITORIES = `# Repository selection and workspaces
 - For direct changes, create a feature branch, make the smallest complete change, run proportionate checks, and use \`push_branch\` or open a pull request. No prefix is required, and \`push_branch\` accepts exactly the names \`validateBranch\` approves: letters, digits, \`.\`, \`_\`, \`-\`, and \`/\`, starting and ending with a letter or digit, with no \`..\` or \`//\`, and no slash-separated component that starts with \`.\`, ends with \`.\`, or ends with \`.lock\`. Protected branches, \`refs/\` names, and \`HEAD\` are refused. The branch a Linear ticket suggests normally passes, so use it. Look for existing work by matching the ticket identifier against the branch list rather than by exact name. A request to do the work and open a pull request is the authorization to branch, commit, push, and comment, so carry it through and report the result instead of stopping to ask for permission.
 - A pull request needs a Linear ticket. In an attended session, create one yourself when none exists, link it, and continue. Never push a protected branch. Never mark a pull request ready for review unless the user asks for it, which includes any pull request update that sends \`draft: false\`. Never merge.
 - Repository knowledge records verified conventions and recurring build or review facts. Pass the selected repository explicitly to \`read_repository_knowledge\` and \`update_repository_knowledge\`.`;
+
+const TRIAGE_REPLAY = `# Triage replay
+
+This process replays a settled ticket. GitHub tools and the network are closed on purpose, so the rule to stop repository work when no \`github__\` tools appear after \`prepare_repository\` does not apply here. Investigate the worktree \`prepare_repository\` returns with grep, glob and read_file, and record the \`commit\` it returns as the commit read.`;
 
 const DELEGATION = `# Delegation
 
@@ -64,6 +69,7 @@ export function composePrompt(options: PromptOptions = {}): string {
     IDENTITY,
     WRITING,
     REPOSITORIES,
+    ...(isTriageReplay() ? [TRIAGE_REPLAY] : []),
     connections(options.discovery ?? EXECUTOR_DISCOVERY),
     DELEGATION,
     MEMORY,

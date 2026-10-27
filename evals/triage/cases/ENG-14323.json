@@ -1,0 +1,267 @@
+{
+  "id": "ENG-14323",
+  "provenance": "seeded",
+  "createdAt": "2026-09-26T10:00:18.959Z",
+  "lane": "billing",
+  "stratum": "billing",
+  "ticket": {
+    "title": "GP Name 35",
+    "description": "#### User Email\n\n<email>\n\n#### Workspace Name\n\nName 35's Workspace\n\n#### Request Type\n\nDiscount code\n\n#### Reason for request\n\n3 months workspaces cost covered by us\n3 campaign launches cost covered by us\n10k lead credits\nPut him into the 90 day challenge too",
+    "attachmentKinds": ["slack"]
+  },
+  "repoCommitAtCreate": "9b604624acc813d881fcc65aaa8de1240c0e4a88",
+  "flags": {
+    "descriptionEditedAfterCreate": false,
+    "needsProductionData": true,
+    "alreadyFixedAtTriage": false
+  },
+  "asFiled": {
+    "assignee": "Aaron Fraga",
+    "labels": [],
+    "parent": null,
+    "priority": 0,
+    "project": null
+  },
+  "relatedSnapshot": [
+    {
+      "id": "ENG-14222",
+      "createdAt": "2026-09-24T12:17:41.262Z",
+      "title": "GP Name 1. 2 months acquisity and 18 inboxes covered by us. 3 campaign launches and 10k free lead credits",
+      "state": "Todo",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": ["Credits", "Internal reported"],
+      "description": "#### User Email\n\n<email> or <email>\n\n#### Workspace Name\n\nCompany Three' Workspace and Name 2's Workspace\n\n#### Request Type\n\nDiscount code\n\n#### Reason for request\n\nGP - Name 1\n\nWe will launch 3 campaigns for him and wear costs including leads\nWe cover costs, run campaigns, if he closes at 5% and isn't happy in 60 days, we refund everything\n\nContext: DFY failed with 5200 upgrade, lacked support, no results. He is a very reasonable high level guy. Said \"I do not want to work with \"Name 100\", he is happy with Name 3."
+    },
+    {
+      "id": "ENG-3542",
+      "createdAt": "2025-12-08T13:54:40.498Z",
+      "title": "AI SDR sends EST slots to Name 4 GP",
+      "state": "Duplicate",
+      "assignee": "Pieter Venter",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "Australian-based GP Name 5 is trying to book meetings in AEST, but the AI SDR is sending EST time slots instead, even though Name 6's availability does not reflect EST. Investigate why the AI SDR is using the wrong timezone for leads in Name 7 and ensure correct timezone handling for scheduling."
+    },
+    {
+      "id": "ENG-12576",
+      "createdAt": "2026-08-12T01:31:03.617Z",
+      "title": "GP was also promised 20k leads in the sales call but was only issued 10k",
+      "state": "Todo",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [],
+      "description": "#### User Email\n\n<email>\n\n#### Workspace Name\n\nName 8's Workspace\n\n#### Request Type\n\nLead credit\n\n#### Reason for request\n\nPlease issue 10k leads as a part of a refund save strategy"
+    },
+    {
+      "id": "ENG-3642",
+      "createdAt": "2025-12-10T23:09:05.008Z",
+      "title": "Domain and email configuration issues for GP Name 9",
+      "state": "Done",
+      "assignee": "Jared Stauffer",
+      "parent": "ENG-3684",
+      "labels": ["Bug"],
+      "description": "Customer GP (Name 9) reports configuration issues:\n\n* GP has bought 4 domains but only 1 domain is active and it is under the wrong name.\n* Email accounts are configured for Name 10 instead of GP’s actual name."
+    },
+    {
+      "id": "ENG-3888",
+      "createdAt": "2025-12-18T13:34:14.615Z",
+      "title": "GP purchase of domains and inboxes not fulfilled",
+      "state": "Done",
+      "assignee": "Tyler Olsen",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "A GP (Name 11 Power) purchased domains and inboxes about a week ago but has still not received them.\n\nPlease investigate the order status and ensure the domains and inboxes are provisioned or refunded as appropriate."
+    },
+    {
+      "id": "ENG-12575",
+      "createdAt": "2026-08-12T01:29:54.492Z",
+      "title": "GP was promised 20k leads in the sales call - only got 10k",
+      "state": "Done",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [],
+      "description": "#### User Email\n\n<email>\n\n#### Workspace Name\n\nName 12's Workspace\n\n#### Request Type\n\nLead credit\n\n#### Reason for request\n\nPlease issue 10k leads as a part of a refund save strategy"
+    },
+    {
+      "id": "ENG-2347",
+      "createdAt": "2025-10-27T10:58:24.918Z",
+      "title": "Should be able to select what currency the prospect works in/what currency you want your plan in",
+      "state": "Canceled",
+      "assignee": "Declan Lupari",
+      "parent": null,
+      "labels": ["Improvement"],
+      "description": "\nWhen filling out the GP Creator fields it only gives USD amounts but the prospect may work and track in a different currency. \n\nAdd a way to select the currency you are working in.\n\nThe GP Creator should then give you the plan in that currency.\n\n <image> \n\n <image> "
+    },
+    {
+      "id": "ENG-4235",
+      "createdAt": "2026-01-06T22:53:27.700Z",
+      "title": "AI SDR v1 escalates Company One replies as campaign inactive",
+      "state": "Canceled",
+      "assignee": "Koppany Kondricz",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "GP Name 13 Name 14’s Company One campaign is active and connected via API, but the AI SDR in Acquisity is escalating replies as if the campaign is not active / is paused. The “Disable AI SDR” setting is not selected. The GP is seeing replies both in Company One and in the AI SDR inbox but has to respond manually because the AI SDR escalates them instead of handling them.\n\n <image> "
+    },
+    {
+      "id": "ENG-13549",
+      "createdAt": "2026-09-07T19:16:32.530Z",
+      "title": "Name 15 - HIGHLY FRUSTRATED GP - NEED 10K LEAD CREDITS",
+      "state": "Done",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [],
+      "description": "#### User Email\n\n<email>\n\n#### Workspace Name\n\nName 15 & Name 16's Workspace\n\n#### Request Type\n\nLead credit\n\n#### Reason for request\n\nGP has had us run 6 campaigns for her - delivered 0 results. The cold email team had launched a podcast campaign and used her lead credits without permission which has only increased her frustration. She is on the verge of asking for a refund and to opt out of the program. Please approve and provide 10k lead credits as a goodwill gesture on PRIORITY."
+    },
+    {
+      "id": "ENG-12574",
+      "createdAt": "2026-08-12T00:31:27.061Z",
+      "title": "s GP is asking to put this charge in his current charges, he's under LTO now.",
+      "state": "Todo",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [],
+      "description": "#### User Email\n\n<email>\n\n#### Workspace Name\n\nName 17 Name 18\n\n#### Request Type\n\nRefund\n\n#### Reason for request\n\nHis sales person is no longer with the company and he is requesting that the 1k payment that he paid will be credited to his current payments."
+    },
+    {
+      "id": "ENG-4774",
+      "createdAt": "2026-01-23T00:35:24.094Z",
+      "title": "Status update on new inboxes and domains for GP",
+      "state": "Done",
+      "assignee": "Tyler Olsen",
+      "parent": null,
+      "labels": ["Inbox/Domain Not Created"],
+      "description": "#### Customer Name\n\nName 19 (Name 20) Name 21\n\n#### Customer Email\n\n<email>\n\n#### Screenshot\n\n <image> \n\n <image> \n\n#### Clear description of what the problem is\n\nGP ordered more inboxes and domains on the 20th but is still yet to see them active in his account, any status updates on when these are coming?\n\nThis verified, 15 inboxes bought on the 14th/01 visible in account. \n\n15 inboxes bought on 21st/01 not visible in account \n\n <image> \n\n <image> "
+    },
+    {
+      "id": "ENG-13487",
+      "createdAt": "2026-09-04T14:50:02.975Z",
+      "title": "3 Months Acquisity , Domains and Inboxes",
+      "state": "Done",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [],
+      "description": "#### User Email\n\n<email>\n\n#### Workspace Name\n\nName 103\n\n#### Request Type\n\nDiscount code\n\n#### Reason for request\n\nRefund Save.\n\nGP needs 3 Months Acquisity , Domains & Inboxes \nAND 10 000 Lead Credits"
+    },
+    {
+      "id": "ENG-5486",
+      "createdAt": "2026-02-12T20:28:37.658Z",
+      "title": "GP Name 102 (<email>)",
+      "state": "Canceled",
+      "assignee": "Beth Newton",
+      "parent": null,
+      "labels": [],
+      "description": "The GP is needing clarity on the benefits of his extension with us. He was looking to get onto Acquisity but as he was about to purchase his workspace he mentioned it should be free for him. Says he has yet to get the 4 workspaces as promised. Need someone to reach out and clarify things for him.\n\nAttached is his proof of extension\n\nAI Name 22 Terms of Business_11 September 2025.docx (3) (1).pdf"
+    },
+    {
+      "id": "ENG-11669",
+      "createdAt": "2026-07-15T20:14:52.153Z",
+      "title": "Request for account credit and campaign support",
+      "state": "Triage",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [],
+      "description": "#### Customer Name\n\nName 23\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nCompany Two\n\n#### Screenshot\n\n#### What are you trying to achieve?\n\nGP is extremely frustrated - he had accidentally deleted his entire workspace as he was onboarding a new client of his. He has been stalled because he paid for the inboxes and domains and has been going back and forth with us to recover those for him. To save him, im proposing we provide a credit for 1 month acquisity + domains as well as credit for 6 domains in addition to our team building out a new campaign for him  (separate request but dependent on this credit) pls review and approve\n\n#### What are you doing to achieve it?\n\n* \n\n#### What is happening instead?\n\n* \n\n#### What is the expected outcome?\n\n* "
+    },
+    {
+      "id": "ENG-1867",
+      "createdAt": "2025-10-14T08:36:10.538Z",
+      "title": "Adjust Growth Plan Creator prompts to prioritize core growth solutions",
+      "state": "Done",
+      "assignee": "Declan Lupari",
+      "parent": null,
+      "labels": ["Improvement"],
+      "description": "## Context\n\nGrowth Partner (GP) email: <email>\n\n## Issue\n\nThe Growth Plan Creator is generating solutions that don't adequately address the biggest client issues.\n\n**Example:**\n\n* **Client Need:** More orders with better average order value\n* **Current Output:** Dashboard, custom Shopify, email campaigns as top 3 pillars\n* **Expected Output:** Advertising should be the #1 solution\n\n## Impact\n\nGPs are finding it difficult to present growth plans without significant manual changes and remodeling, reducing the tool's effectiveness.\n\n## Request\n\nThe GP tried adding notes to focus on certain things, but it didn't have an impact on the output.\n\n## Action Needed\n\nAdjust the prompts to:\n\n1. Better identify and prioritize solutions that directly address the client's primary growth needs\n2. Take into account GP notes/inputs when generating plans\n3. Ensure core growth drivers (like advertising for revenue/order growth) are appropriately weighted"
+    },
+    {
+      "id": "ENG-12424",
+      "createdAt": "2026-08-08T01:14:08.461Z",
+      "title": "GP was charged for Acquisity + inboxes when he cancelled subs in June",
+      "state": "Done",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [],
+      "description": "#### User Email\n\n<email>\n\n#### Workspace Name\n\nName 24's Workspace\n\n#### Request Type\n\nRefund\n\n#### Reason for request\n\nClient cancelled and closed out 4 workspaces on June 15th but was incorrectly still charged for them in August. Total $546. Please issue refund immediately\n\n\n <image> "
+    },
+    {
+      "id": "ENG-5519",
+      "createdAt": "2026-02-13T15:38:38.333Z",
+      "title": "Domains Replaced",
+      "state": "Done",
+      "assignee": "Beth Newton",
+      "parent": null,
+      "labels": [],
+      "description": "GP Name 25 has a handful of domains that are broken and needs them replaced via Acquisity.\n\n <image> "
+    },
+    {
+      "id": "ENG-14185",
+      "createdAt": "2026-09-23T20:36:12.882Z",
+      "title": "The client purchased additional domains, but they are not appearing in Acquisity. They also have 4 previously purchased domains and 12 inboxes that are still missing or inactive. They are requesting that the missing domains/inboxes be checked, provisioned, and activated, and to confirm if any action is needed from their side.",
+      "state": "Todo",
+      "assignee": "Anthony Adewale",
+      "parent": "ENG-14187",
+      "labels": ["Bug", "Customer reported", "fast-lane"],
+      "description": "#### Customer Name\n\nName 26\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 26\n\n#### Screenshot\n\n <image> \n\n#### What are you trying to achieve?\n\nThe client wants to have all of their purchased domains and inboxes properly provisioned and visible in Acquisity so they can use them for outreach.\n\n#### What are you doing to achieve it?\n\nThey purchased six additional domains and previously purchased six pre-warmed domains with three inboxes per domain (18 inboxes total).\n\n#### What is happening instead?\n\nThe payment for the six new domains went through, but the domains are not showing in Acquisity. From the previous purchase, only two of the six domains appeared successfully with three active inboxes each. The remaining four domains and 12 inboxes are still missing or inactive.\n\n#### What is the expected outcome?\n\nThe missing domains and inboxes should be properly provisioned, authenticated, and appear under Email Accounts in Acquisity. The client would also like confirmation if any action is required from their side."
+    },
+    {
+      "id": "ENG-8167",
+      "createdAt": "2026-04-28T21:15:01.211Z",
+      "title": "Approve additional lead credits for high-risk GP",
+      "state": "Done",
+      "assignee": "Beth Newton",
+      "parent": null,
+      "labels": ["Refund"],
+      "description": "#### Workspace Name\n\nName 27 Name 28\n\n#### Request Type\n\nLead credit\n\n#### Reason for request\n\nGP is high risk and has previously complained about our quality of leads. She is now using Clay to scrape leads and has asked for us to cover the cost. As an alternative, offering to top up her lead credits an additional 6271. Kindly approve to avoid further escalation"
+    },
+    {
+      "id": "ENG-4684",
+      "createdAt": "2026-01-20T12:42:29.974Z",
+      "title": "Downgrade GP to Legacy for AIA usage as approved by Name 29",
+      "state": "Done",
+      "assignee": "Beth Newton",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "#### Customer Name\n\nName 30\n\n#### Customer Email\n\n<email>\n\n#### Screenshot\n\n#### Clear description of what the problem is\n\nCan we downgrade this GP to the Legacy? he wants to use his Company One inside AIA. this was approved by <mention>"
+    },
+    {
+      "id": "ENG-13550",
+      "createdAt": "2026-09-07T20:08:57.487Z",
+      "title": "3 Months Acquisity , Inboxes & Domains + 10 000 Lead Credits",
+      "state": "Done",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [],
+      "description": "#### User Email\n\n<email>\n\n#### Workspace Name\n\n#Name 101\n\n#### Request Type\n\nDiscount code\n\n#### Reason for request\n\nRefund save with the 90 Day Challenge\n\n3 Months Acquisity , Inboxes & Domains + 10 000 Lead Credits"
+    },
+    {
+      "id": "ENG-13571",
+      "createdAt": "2026-09-08T17:06:38.921Z",
+      "title": "3 Months Acquisity , Domains & Inboxes + 10 000 Lead Credits",
+      "state": "Done",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [],
+      "description": "#### User Email\n\n<email>\n\n#### Workspace Name\n\nName 31\n\n#### Request Type\n\nDiscount code\n\n#### Reason for request\n\nRefund Save\nStarting the 90 Day Challenge with Name 32\nNeeds 3 Months Acquisity , Domains & Inboxes\n\n* 10 000 Lead Credits"
+    },
+    {
+      "id": "ENG-13675",
+      "createdAt": "2026-09-10T20:57:27.308Z",
+      "title": "3 Months Acquisity , Inboxes and Domains + 10 000 Lead Credits",
+      "state": "Todo",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": ["Billing", "Credits", "Internal reported"],
+      "description": "#### User Email\n\n<email>\n\n#### Workspace Name\n\n#a customer contact\n\n#### Request Type\n\nDiscount code\n\n#### Reason for request\n\n3 Months Acquisity , Inboxes and Domains + 10 000 Lead Credits\nName 12 will join the 90DC with Name 32\nShe is a $25,000 ticket save"
+    },
+    {
+      "id": "ENG-13844",
+      "createdAt": "2026-09-14T14:35:29.212Z",
+      "title": "3 Months Acquisity , Inboxes & Domains + 10 000 Lead Credits",
+      "state": "Todo",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": ["Credits", "Internal reported"],
+      "description": "#### User Email\n\n<email>\n\n#### Workspace Name\n\nName 33\n\n#### Request Type\n\nDiscount code\n\n#### Reason for request\n\nRefund Save \nHe will be joing Name 34 90 Day Challenge Cohort \nHe needs Free 3 Months Acquisity , Inboxes & Domains + 10 000 Lead Credits"
+    }
+  ]
+}

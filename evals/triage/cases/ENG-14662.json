@@ -1,0 +1,237 @@
+{
+  "id": "ENG-14662",
+  "provenance": "seeded",
+  "createdAt": "2026-10-02T18:31:35.125Z",
+  "lane": "triage",
+  "stratum": "bug_master",
+  "ticket": {
+    "title": "Domains not being provisioned",
+    "description": "#### Customer Name\n\nName 10\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nCompany Three\n\n#### Screenshot\n\n <image> \n\n#### What are you trying to achieve?\n\nTo get all his domains provisioned in his account\n\n#### What are you doing to achieve it?\n\ncollected proof of error\n\n#### What is happening instead?\n\nonly 3 domains and 9 inboxes are active in his account but he bought 6 domains and 18 inboxes\n\n#### What is the expected outcome?\n\nTo get the 18 inboxes in his account",
+    "attachmentKinds": ["image", "slack"]
+  },
+  "repoCommitAtCreate": "6459bb388948cb5ac47cab72d4a8a7fe723f9320",
+  "flags": {
+    "descriptionEditedAfterCreate": false,
+    "needsProductionData": true,
+    "alreadyFixedAtTriage": false
+  },
+  "asFiled": {
+    "assignee": "Aaron Fraga",
+    "labels": [],
+    "parent": null,
+    "priority": 2,
+    "project": "Support"
+  },
+  "relatedSnapshot": [
+    {
+      "id": "ENG-7183",
+      "createdAt": "2026-03-25T17:26:22.036Z",
+      "title": "Domain Order Refund on failed provisioning",
+      "state": "Done",
+      "assignee": "Tyler Olsen",
+      "parent": null,
+      "labels": [],
+      "description": "Domain orders can fail provisioning the selected domains because those domains may no longer be available (we cannot \"lock\" domains with Zapmail - something James is going to push to get changed)\n\nThe system was designed to handle this by detecting it, and refunding the user (balance credit) for the domains that couldn't be provisioned.\n\nThere was an issue with the code hitting rate limits with large orders, this needs to be fixed by adhering to Autumn’s “1 billing operation at a time per customer” requirement."
+    },
+    {
+      "id": "ENG-9087",
+      "createdAt": "2026-05-21T15:05:11.820Z",
+      "title": "One purchased domain remains stuck provisioning for weeks",
+      "state": "Done",
+      "assignee": "Tyler Olsen",
+      "parent": null,
+      "labels": [],
+      "description": "In Name 101 Workspace, 4 of 5 purchased prewarmed domains have been provisioned, while 1 domain remains stuck with a banner saying provisioning requires attention and the order is taking longer than expected.\n\nThis has reportedly been unresolved for many weeks.\n\nUser details:\n\n* Name 1\n* <email>\n* Name 1's Workspace\n\n <image> \n\n\nAnother user encounters the same issue. It's been provisioning for 4 hours now.\n**User**: Company One\n**Email**: <email>\nJames Partner workspace\n\n <image> \n\nAnother user encounters the same issue.\n**User**: Name 2\n**Email**: <email>\nName 2's Workspace\n\n <image> \n\n\n\n"
+    },
+    {
+      "id": "ENG-8257",
+      "createdAt": "2026-05-01T14:07:03.286Z",
+      "title": "Name 3 domains show stuck in provisioning despite being added",
+      "state": "Todo",
+      "assignee": "Anthony Adewale",
+      "parent": "ENG-7790",
+      "labels": ["Bug"],
+      "description": "Inboxes appear to be added but provisioning never progresses and Inbox loading bar never appears or confirms the inboxes are added. (The pre warmed tagged inboxes are the ones that were purchased in screenshot below)\n\n <image> "
+    },
+    {
+      "id": "ENG-12128",
+      "createdAt": "2026-07-29T15:32:57.171Z",
+      "title": "Outreach inboxes and domains provisioning failed",
+      "state": "In Progress",
+      "assignee": "Tyler Olsen",
+      "parent": null,
+      "labels": ["Bug", "Provisioning Pipeline", "triaged-by-devin"],
+      "description": "#### Customer Name\n\nName 4\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 4\n\n#### Screenshot\n\n <image> \n\n <image> \n\n <image> \n\n#### What are you trying to achieve?\n\nPurchase outreach inboxes and domains\n\n#### What are you doing to achieve it?\n\nPurchase outreach inboxes and domains\n\n#### What is happening instead?\n\nprovisioning failed\n\n#### What is the expected outcome?\n\nPlease investigate and resolve the issue so that campaign can be built"
+    },
+    {
+      "id": "ENG-4253",
+      "createdAt": "2026-01-07T14:32:10.308Z",
+      "title": "Email domains not provisioning after purchase",
+      "state": "Done",
+      "assignee": "Tyler Olsen",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "A customer purchased 3 domains and 9 email addresses and was charged in full, but the domains and inboxes have not appeared in the Email Accounts section after 2 days.\n\nDomains are expected to provision within 15–30 minutes, so this suggests a provisioning or post-purchase processing issue for this account."
+    },
+    {
+      "id": "ENG-13677",
+      "createdAt": "2026-09-10T23:35:40.551Z",
+      "title": "Paid DFY order for 6 domains stuck at \"Provisioning domains (0/6)\" after 4 chosen names were already claimed by other organizations",
+      "state": "Todo",
+      "assignee": "Anthony Adewale",
+      "parent": "ENG-13213",
+      "labels": ["Bug", "Customer reported", "intercom-sourced"],
+      "description": "**Intercom source**: <url:app.intercom.com>\n\n**Conversation context**: The customer opened with \"I found a bug\" and asked how long domain provisioning takes, attaching a Cold Email Agent -> Email Accounts (\"All Inboxes\") screenshot showing the banner \"Provisioning domains (0/6)... This may take a few minutes. You can leave this page.\" He said it had been stuck like that for almost two hours. He later asked a separate question about a campaign that had been paused for bounces.\n\n**Testable claim**: A paid Done-For-You order for six email domains in the reported workspace sat at \"Provisioning domains (0/6)\" with zero domains and zero inboxes created, because four of the six chosen domain names were already held in mail_domain by other organizations, so the order's domain-claim step threw and the order was left in the provisioning state with a null error and no retry path.\n\n**Observed vs expected**: The customer expected the six purchased domains with three inboxes each to appear shortly after payment. Observed a stuck 0/6 provisioning banner for hours with payment already taken, no error message, and no recovery.\n\nEvidence, root cause, the exact failing function, and the blast-radius counts are on the Triage investigation document attached to this issue.\n\nForeman support operation: <id>\nIntercom source: <url:app.intercom.com>"
+    },
+    {
+      "id": "ENG-7362",
+      "createdAt": "2026-03-30T21:03:42.118Z",
+      "title": "Investigate failed inbox provisioning for January domain order",
+      "state": "Done",
+      "assignee": "Tyler Olsen",
+      "parent": null,
+      "labels": [],
+      "description": "user: <email>\n\nA customer reported that domains and inboxes purchased in January were not provisioned.\n\nOrder details shown in the thread list user `<email>` under Company Five with status `Failed`, `0 / 3 provisioned` domains, and the error `Failed to connect 8 inbox(es) after max retry attempts`.\n\nUnclear whether this is a provisioning issue or related to billing."
+    },
+    {
+      "id": "ENG-4190",
+      "createdAt": "2026-01-06T04:31:57.852Z",
+      "title": "Provisioning purchased domains and email accounts fails with error",
+      "state": "Done",
+      "assignee": "Tyler Olsen",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "Customer reports that after purchasing domains and email accounts, the provisioning step consistently fails with an error.\n\nThey also mention that the in-app message confirming the domain purchase is no longer visible.\n\nA screen recording of the issue is available via Jam: <url:jam.dev>\n\nRelevant screenshot from the conversation:"
+    },
+    {
+      "id": "ENG-4184",
+      "createdAt": "2026-01-05T23:38:28.172Z",
+      "title": "Domain provisioning fails when buying 6 domains",
+      "state": "Duplicate",
+      "assignee": "Tyler Olsen",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "Customer reports repeated \"Provisioning failed\" errors when purchasing 6 domains.\n\nObserved behavior:\n\n* All prerequisites are met (Pro plan active, connected email provider, valid payment method)\n* Spinner shows for around 10 minutes\n* Provisioning then fails with a \"Provisioning failed\" message\n\nScreenshots:\n\n <image> \n\n <image> \n\nScreen recording: Jam recording"
+    },
+    {
+      "id": "ENG-11251",
+      "createdAt": "2026-07-08T06:50:39.789Z",
+      "title": "Domain and Inboxes order failed",
+      "state": "Done",
+      "assignee": "Tyler Olsen",
+      "parent": null,
+      "labels": ["Bug", "intercom-sourced", "triaged-by-devin"],
+      "description": "**Customer Name**\nName 5\n\n**Customer Email**\n<email>\n\n**Customer Email**\n<Enter text>\n\n**Workspace name**\nName 5's Workspace\n\n**Screenshot**\n\n**What is the user trying to achieve?**\n3 Domains and inboxes\n\n**What is the user doing to achieve it?**\nordered 3 domains and inboxes\n\n**What is happening instead?**\nOrder failed and domain and inboxes not showing\n\n**What is the expected outcome?**\nSuccessfully have domains and inboxes"
+    },
+    {
+      "id": "ENG-11254",
+      "createdAt": "2026-07-08T13:17:45.280Z",
+      "title": "Paid domains/pre-warmed inboxes never provision after a successful charge",
+      "state": "Duplicate",
+      "assignee": "Tyler Olsen",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "## Problem\n\nCustomers are charged for pre-warmed domains and inboxes, but the purchased items never appear in their workspace — provisioning is stuck after a successful charge (distinct from checkout failing). Name 5 paid for domains + inboxes that are not showing up.\n\n## Name 8 signal\n\n* Name 8 topic: `<uuid>`\n* Severity: High | Confidence: 0.85 | Track: Engineering\n* 2nd customer this week (3 in 30d).\n\n## Why new\n\nAll prior provision-after-charge tickets are closed: ENG-8024 (marked Duplicate), ENG-7601 (Done), ENG-3964 (Done), ENG-4903 (Done), ENG-8098 (Done, refund). The symptom is recurring again with no open canonical ticket to track it. Separate from the checkout \"payment failed\" error tracked in ENG-10691.\n\n## Source\n\n* Name 6\n* Reporter: Name 5 (charge succeeded, domains/inboxes absent from workspace).\n\n## Name 7\n\n`modem-<uuid>-2026-07-08`"
+    },
+    {
+      "id": "ENG-11975",
+      "createdAt": "2026-07-22T13:09:53.784Z",
+      "title": "Domain/inbox provisioning repeatedly stalls partway (\"X/Y provisioned, taking longer than expected\") across customers — no open canonical",
+      "state": "Todo",
+      "assignee": "unknown",
+      "parent": null,
+      "labels": ["Bug", "Provisioning Pipeline", "triaged-by-devin"],
+      "description": "## Problem\n\nDomain/inbox provisioning stalls partway through and never completes: customers see \"2/3 domains provisioned, taking longer than expected,\" can't add new email accounts/domains, and campaign setup is blocked with no active sending accounts. The provisioning pipeline is inconsistent across customers and requires manual backend pushes to recover.\n\n## Name 8 signal\n\n* Severity: Medium | Confidence: 0.80 | Track: engineering | Recurrence: recurring (multiple customers in 30d)\n* Name 8 topic: <uuid>\n* Name 10 Foreman — \"2/3 domains provisioned, taking longer than expected\"\n* Name 9 — unable to add new email accounts/domains\n* Name 100 — email-accounts bug\n\n## Why new\n\nThe symptom recurs continuously but every prior ticket is closed, leaving no open canonical to track the pipeline defect: ENG-11145 (Done 07-15, Company One), ENG-8453 (Done, Company Six), ACQ-3510 (Done), ENG-7816 (provisioning requires attention). Each is resolved as a one-off manual push rather than a durable fix, so new customers keep hitting it. Filing a persistent issue to track the recurring provisioning-pipeline inconsistency.\n\n## Source\n\n* Name 8 topic: <url>\n\n## Name 7\n\nmodem-<uuid>-2026-07-22"
+    },
+    {
+      "id": "ENG-6837",
+      "createdAt": "2026-03-18T21:44:06.558Z",
+      "title": "New email and domain provisioning delayed 48 hours",
+      "state": "Done",
+      "assignee": "Tyler Olsen",
+      "parent": null,
+      "labels": [],
+      "description": "A user has been waiting 48 hours for new email and domain provisioning to complete.\n\nUser: Name 11 Name 12\nEmail: <email>\nWorkspace: Name 11's workspace\n\nThe order is still in provisioning status, with 0/6 domains provisioned and 0/0 inboxes provisioned.\n\n <image> "
+    },
+    {
+      "id": "ENG-13308",
+      "createdAt": "2026-08-31T17:10:00.889Z",
+      "title": "Domain orders stuck in \"provisioning\" (pre-warmed and DFY) block inbox creation and are never recovered",
+      "state": "Todo",
+      "assignee": "unknown",
+      "parent": null,
+      "labels": ["Bug", "fast-lane", "master"],
+      "description": "## Root cause\n\nA pre-warmed domain purchase order can get stuck in `provisioning` status when one of its domains only partially provisions (some inboxes fail OAuth and never connect). The order never transitions to a terminal state (`completed` / `requires_attention` / `failed`), and `reconcile-domain-orders-cron.ts` has no path to recover a stuck `provisioning` order. Because `getActiveOrder` returns any non-dismissed `provisioning` order and the \"Add New Inboxes\" button is hidden while an active order exists, the customer is permanently blocked from creating new inboxes with no self-service way to dismiss the stuck order.\n\n## Evidence\n\n* `apps/web/lib/inngest/functions/billing/process-domain-purchase-order.ts` `processDomainPurchaseOrder`: a domain is marked `partial` when fewer inboxes than expected connect (line \\~1304), and the final order status becomes `requires_attention` when any domain is partial (line \\~1448). An order that stops before this finalization (or ran under older code without it) is left `provisioning` forever.\n* `apps/web/lib/inngest/functions/billing/reconcile-domain-orders-cron.ts`: recovers only `paid` orders with no `provisioningStartedAt`, `failed` orders within 24h, and `requires_attention` orders. No path handles a stuck `provisioning` order.\n* `apps/web/trpc/routers/billing.ts` `getActiveOrder`: returns non-dismissed orders in `provisioning` as the active order.\n* `apps/web/components/campaigns/email-accounts/email-accounts-table.tsx`: hides the \"Add New Inboxes\" button while `hasActiveOrder` is true.\n\n## Blast radius (recounted 2026-09-17)\n\n13 `domain_purchase_order` rows in `provisioning` status across 13 distinct organizations; 10 stuck more than 24 hours, spanning Jan-Sep 2026, with 6 starting in September 2026. Both `dfy` and `pre_warmed` order types are represented. Counted 2026-09-17 with `select count(*), count(distinct organization_id) from domain_purchase_order where status='provisioning'` and the same predicate plus `and provisioning_started_at < now() - interval '24 hours'`.\n\n## Fix direction\n\nAdd a reconcile path that recovers stuck `provisioning` orders (mark terminal and retry failed inboxes after a timeout), and/or let the customer dismiss a stuck order so inbox creation is unblocked."
+    },
+    {
+      "id": "ENG-6568",
+      "createdAt": "2026-03-11T00:00:36.405Z",
+      "title": "Ordered domain and inboxes stucked on provisioning",
+      "state": "Done",
+      "assignee": "Tyler Olsen",
+      "parent": null,
+      "labels": [],
+      "description": "A customer reported ordering 1 domain and 3 inboxes. After about 8 hours, the order still showed as provisioning, then stopped appearing as provisioning altogether.\n\nSupport saw this error: `Partial failure after 0/1 domains: No domains available - all candidates failed during order verification`.\n\nThe customer's credit card shows the charge as pending.\n\n <image> "
+    },
+    {
+      "id": "ENG-7816",
+      "createdAt": "2026-04-14T19:56:58.764Z",
+      "title": "Purchased domains not fully available in campaigns",
+      "state": "Done",
+      "assignee": "Tyler Olsen",
+      "parent": null,
+      "labels": [],
+      "description": "User: <email>\nIn the Name 13 workspace, not all purchased domains are showing as available in campaigns.\n\nA support review indicated the last 3 inboxes encountered provisioning errors. The UI shows: \"Provisioning requires attention\" and \"6/9 domains provisioned, but your order is taking longer than expected. We'll keep trying, please be patient!\"\n\nThe issue has been present since yesterday.\nError: Provisioning stopped after partial success. Remaining capacity requires manual review.\n\n <image> \n\n <image> "
+    },
+    {
+      "id": "ENG-14226",
+      "createdAt": "2026-09-24T13:22:37.473Z",
+      "title": "Name 14 - Outreach inboxe purchase failed",
+      "state": "Todo",
+      "assignee": "Anthony Adewale",
+      "parent": "ENG-14227",
+      "labels": ["Bug", "Customer reported", "fast-lane"],
+      "description": "#### Customer Name\n\nName 14\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nCompany Two\n\n#### Screenshot\n\n <image> \n\n <image> \n\n <image> \n\n#### What are you trying to achieve?\n\nClient was trying to purchase more outreach inboxes\n\n#### What are you doing to achieve it?\n\nmade the payment, see attached receipts\n\n#### What is happening instead?\n\nThe payment went through but the emails did not show up. There was a cancel order button which he pressed assuming that it would reset. But all the existing emails also dropped from the account.\n\n#### What is the expected outcome?\n\nPlease investigate. Client would like to get the existing emails back as well as the ones he purchased just now"
+    },
+    {
+      "id": "ENG-14185",
+      "createdAt": "2026-09-23T20:36:12.882Z",
+      "title": "The client purchased additional domains, but they are not appearing in Acquisity. They also have 4 previously purchased domains and 12 inboxes that are still missing or inactive. They are requesting that the missing domains/inboxes be checked, provisioned, and activated, and to confirm if any action is needed from their side.",
+      "state": "Todo",
+      "assignee": "Anthony Adewale",
+      "parent": "ENG-14187",
+      "labels": ["Bug", "Customer reported", "fast-lane"],
+      "description": "#### Customer Name\n\nName 15\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 15\n\n#### Screenshot\n\n <image> \n\n#### What are you trying to achieve?\n\nThe client wants to have all of their purchased domains and inboxes properly provisioned and visible in Acquisity so they can use them for outreach.\n\n#### What are you doing to achieve it?\n\nThey purchased six additional domains and previously purchased six pre-warmed domains with three inboxes per domain (18 inboxes total).\n\n#### What is happening instead?\n\nThe payment for the six new domains went through, but the domains are not showing in Acquisity. From the previous purchase, only two of the six domains appeared successfully with three active inboxes each. The remaining four domains and 12 inboxes are still missing or inactive.\n\n#### What is the expected outcome?\n\nThe missing domains and inboxes should be properly provisioned, authenticated, and appear under Email Accounts in Acquisity. The client would also like confirmation if any action is required from their side."
+    },
+    {
+      "id": "ENG-8041",
+      "createdAt": "2026-04-22T20:26:03.944Z",
+      "title": "Domain purchase provisioning error blocks email access",
+      "state": "Done",
+      "assignee": "Tyler Olsen",
+      "parent": null,
+      "labels": [],
+      "description": "user: <email>\n\nA newly purchased domain with 3 warmed emails is still not accessible about 5 hours after purchase. The charge is pending on the card, but the emails are not showing in the product. A provisioning error appeared, and retry was attempted multiple times before exiting and re-entering the platform. The email names are not available."
+    },
+    {
+      "id": "ENG-7253",
+      "createdAt": "2026-03-26T18:25:23.197Z",
+      "title": "Domain purchase stuck provisioning in Company Four workspace",
+      "state": "Done",
+      "assignee": "Tyler Olsen",
+      "parent": null,
+      "labels": [],
+      "description": "user; <email>\n\nA domain purchase for the Company Four workspace has remained in provisioning for over a day and a half. The domains appear in the Purchased section but do not appear in the Email Accounts table after multiple refreshes.\n\nThe same user reported that adding domains in the main Name 16 workspace worked without issue. They also believe the domains and three inboxes each have been paid for."
+    },
+    {
+      "id": "ENG-14187",
+      "createdAt": "2026-09-23T21:05:22.215Z",
+      "title": "Pre-warmed mailbox connect conflicts are retried to exhaustion and the unconnected seats stay billed after finalization",
+      "state": "Todo",
+      "assignee": "Anthony Adewale",
+      "parent": null,
+      "labels": ["Bug", "fast-lane"],
+      "description": "## Overview\n\nPre-warmed Done-For-You mailboxes that the mail provider already reports as owned by another workspace can never be connected, and the seats are billed anyway. Operators pay for inboxes that have never worked, and the orders they belong to are closed out without releasing the charge.\n\n## Problem\n\nAn operator buys pre-warmed domains with three inboxes each. Some of the mailboxes in the assignment cannot be connected to the buyer's workspace, so those domains are left half-built: the domain is provisioned, its inboxes sit in an error state, and the order is eventually closed out with the seats still granted and still billed. There is no customer-side reconnect for a managed inbox in this state, and nothing in the finalization path releases the charge.\n\n## Root cause\n\nA permanent provider conflict is treated as a transient connect failure, and finalization releases no seats on Autumn accounts.\n\n* `apps/web/lib/inngest/functions/billing/process-domain-purchase-order.ts`, `processDomainPurchaseOrder`: invokes `processConnectOAuth` per mailbox; on a failure result it logs and pushes `{success:false, error}` and continues, and the domain is later written as `partial` when any inbox did not connect.\n* `apps/web/lib/inngest/functions/campaign/workspaces/process-connect-oauth.ts`, `processConnectOAuth`: surfaces the provider's failure text (\"OAuth connection failed: account_exists - Account already exists in another workspace\") and consumes retry budget.\n* `apps/web/lib/mail/db/mail-repository.ts`: `MAX_INBOX_RETRY_ATTEMPTS = 24`, and `isEligibleForRetry: row.retryCount < MAX_INBOX_RETRY_ATTEMPTS`.\n* `apps/web/lib/inngest/functions/billing/reconcile-domain-orders-cron.ts`, `reconcileDomainOrdersCron`: the `find-orders-requiring-attention` loop re-invokes the connect for every still-eligible failed inbox each cycle, so a conflict that can never succeed burns \\~24 cycles over several weeks; once `eligibleForRetry.length === 0 && failedInboxes.length > 0` it calls `finalizeUnfulfillableOrderAfterRetries`.\n* `apps/web/lib/billing/order-finalization.ts`, `finalizeUnfulfillableOrderAfterRetries`: for an order with provisioned items it writes `status: 'requires_attention'`, `completedAt` and `errorDetails.retriesExhausted = true`, and calls `applyManagedDomainCancellationAdjustment` only inside `if (billingProvider === 'whop' ...)`. On Autumn billing accounts no seats are released or refunded, so the never-connected inboxes stay granted and billed after the order terminalizes.\n\nThe upstream contributing cause is that the pipeline assigns mailboxes to a paying order without checking that they are free at the provider.\n\n## Blast radius\n\n122 inboxes across 11 organizations on 15 orders share the `account_exists` connect signature (max retry_count 25, earliest inbox row 2026-03-05, most recent 2026-08-27). 81 of those inboxes sit on 8 orders still in `requires_attention` with `completed_at` null; 41 sit on 7 orders already `completed` (3 organizations), where the seats remain billed after finalization; 20 are at or above the 24-attempt cap. Query: `SELECT count(*), count(DISTINCT organization_id), max(retry_count), min(created_at), max(created_at) FROM mail_inbox WHERE status='error' AND connection_error LIKE '%account_exists%'`, counted 2026-09-23. Confirmed affected: 11 organizations. Not settled: the population that traversed the path without confirmed failure (every pre-warmed order that assigned a mailbox already claimed at the provider), because no query separates it.\n\n## Proposed fix\n\nA mailbox that the provider reports as already owned elsewhere is a permanent conflict: detect it at connect time, stop retrying it, and surface it as a terminal, operator-visible failure instead of burning the retry budget. When an order is finalized with unconnected inboxes, release or refund those seats for every billing provider, not only Whop. Prevent the conflict upstream by not assigning a mailbox that is already claimed at the provider.\n\n## What's included\n\nDetecting the permanent conflict as non-retryable, terminal finalization that releases unconnected seats on Autumn, and a provider-availability check before assignment. Not included: reclaiming a mailbox from the workspace that already holds it, and the general billing reconciliation between supplier inventory and customer entitlements, which belongs to the existing billing-drift master.\n\n## Regression seam\n\nEntry: a pre-warmed order whose mailbox the provider reports as already owned by another workspace. Observable red-before behavior: the reconcile loop keeps re-invoking the connect until `MAX_INBOX_RETRY_ATTEMPTS` is exhausted, then finalizes with the seats still granted. Green-after: the permanent conflict is classified immediately and the unconnected seats are released or refunded at finalization for an Autumn account. A test at `finalizeUnfulfillableOrderAfterRetries` and one at the connect-result handling in the provider-agnostic path prove it.\n\n## Done when\n\n* A provider-reported `account_exists` conflict stops being retried rather than consuming the 24-attempt budget.\n* Finalizing an order with unconnected inboxes releases or refunds those seats on an Autumn billing account, and the granted-seat count on the billing account matches the number of connected inboxes.\n* A regression test proves the causal mechanism at the named seam.\n\n## Reports\n\n* ENG-14185"
+    }
+  ]
+}

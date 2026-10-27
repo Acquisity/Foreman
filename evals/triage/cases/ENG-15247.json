@@ -1,0 +1,248 @@
+{
+  "id": "ENG-15247",
+  "provenance": "seeded",
+  "createdAt": "2026-10-13T07:39:02.854Z",
+  "lane": "triage",
+  "stratum": "bug_master",
+  "ticket": {
+    "title": "3 of 18 Purchased Email Inboxes Missing – Provisioning Retry Exhausted",
+    "description": "#### Customer Name\n\nName 16\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nCompany Six\n\n#### Screenshot\n\n#### What are you trying to achieve?\n\nEnsure Name 16 receives all 18 purchased email inboxes and that the remaining 3 inboxes are successfully provisioned and available for use.\n\n#### What are you doing to achieve it?\n\nReviewed the client's screenshot and confirmed that only 15 of 18 purchased inboxes have been delivered. Identified provisioning errors indicating that automatic retry attempts have been exhausted.\n\n#### What is happening instead?\n\nThree inboxes remain missing approximately three weeks after purchase. The platform displays \"3 mailboxes could not be retried – Retry budget exhausted\" and \"Provisioning requires attention,\" despite all 6 domains being provisioned.\n\n#### What is the expected outcome?\n\nThe technical team should investigate and restart the failed provisioning processes, successfully deliver the 3 missing inboxes, and ensure the client receives all 18 inboxes purchased without additional charges.",
+    "attachmentKinds": ["slack"]
+  },
+  "repoCommitAtCreate": "0b271c859bb199cb0e2016bc79ec46c5110170ec",
+  "flags": {
+    "descriptionEditedAfterCreate": false,
+    "needsProductionData": true,
+    "alreadyFixedAtTriage": false
+  },
+  "asFiled": {
+    "assignee": "Aaron Fraga",
+    "labels": [],
+    "parent": null,
+    "priority": 2,
+    "project": "Support"
+  },
+  "relatedSnapshot": [
+    {
+      "id": "ENG-14249",
+      "createdAt": "2026-09-24T23:32:22.275Z",
+      "title": "Failed pre-warmed mailbox connects count as in-flight OAuth sessions for 48h, so retries stall and orders sit in requires_attention",
+      "state": "Todo",
+      "assignee": "Anthony Adewale",
+      "parent": "ENG-14251",
+      "labels": ["Bug", "Customer reported", "fast-lane", "intercom-sourced"],
+      "description": "## Intercom source\n\n<url:app.intercom.com>\n\n## Bounded conversation context\n\nCustomer-initiated chat from Name 1 (<email>), workspace <workspace-slug> (organization <uuid>), 2026-09-24 \\~22:54 UTC. Opened with \"i need help with the cold email agent\", said \"setup inboxes\", asked how long provisioning takes, then sent a screenshot of the Cold Email Agent Email Accounts area and said \"i have this screen showing\" / \"trying to launch the campaigns tonight\". Fin answered from help-centre articles (provisioning takes 15-30 min, up to \\~1 hour) and escalated to a human. Agent Ellaine Fuente replied \"I see your inboxes are still having issues. I will look into this\".\n\n## Testable claim\n\nA pre-warmed inbox order whose mailbox OAuth connect fails with the mail provider's rate-limit response is never retried again: recordConnectionFailure marks the newest OAuth session 'failed', and the reconcile-domain-orders retry loop skips a mailbox whenever its newest session status is neither 'expired' nor 'completed', so the mailboxes stay disconnected and the order stays in requires_attention indefinitely. For this order: 6 pre-warmed domains and 18 mailbox rows were created, 0 of 18 connected, and no connect attempt has run since 2026-09-24T15:20:24Z.\n\n## Known signature\n\nmail_inbox.status='error', connected=false, connection_error \"Mailbox OAuth connection threw an exception: Rate limit exceeded, please try again later.\" Started: 2026-09-24T12:04:25Z.\n\n## Impact for this customer\n\nPaid order <uuid> (6 domains x 3 pre-warmed inboxes) is unusable and the UI shows an endless \"Provisioning in progress\"; the customer cannot launch campaigns."
+    },
+    {
+      "id": "ENG-10932",
+      "createdAt": "2026-06-26T18:16:59.755Z",
+      "title": "Cold Email Agent inboxes stuck provisioning after purchase",
+      "state": "Todo",
+      "assignee": "Koppany Kondricz",
+      "parent": null,
+      "labels": ["intercom-sourced"],
+      "description": "## Problem\\nAfter purchasing domains and pre-warmed inboxes, they do not appear in the Cold Email Agent or stay stuck in a provisioning state indefinitely. Users cannot begin sending.\\n\\n## Context\\n- Reported from March 2026 through June 22, 2026\\n- Lifecycle state: <stripe-id>\\n- Affects new customers who can't start using the platform after payment\\n\\n## What users are saying\\n> \"Users report purchased domains and pre-warmed inboxes not appearing or stuck while provisioning after payment.\"\\n\\n## Acceptance Criteria\\n- [ ] Inbox provisioning completes within expected timeframe after purchase\\n- [ ] Users see clear status/progress during provisioning\\n- [ ] If provisioning fails, error is surfaced and recovery path provided\\n\\n## Resources\\n- Name 2\\n\\n## Name 3 Used\\n- \"cold email inboxes stuck provisioning warmup error\"\\n- Note: ENG-8323 (Done), ENG-9834 (Done), ENG-7733 (Backlog - billing investigation). ENG-10707 (In Progress - help article). No current active bug tracking ticket."
+    },
+    {
+      "id": "ENG-11455",
+      "createdAt": "2026-07-10T16:45:24.543Z",
+      "title": "Email inboxes failing to provision after purchase",
+      "state": "Duplicate",
+      "assignee": "Koppany Kondricz",
+      "parent": null,
+      "labels": [],
+      "description": "#### Customer Name\n\nName 4\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 4's Workspace\n\n#### Screenshot\n\n <image> \n\n <image> \n\n#### What are you trying to achieve?\n\nFix email inboxes that are not provisioning into account\n\n#### What are you doing to achieve it?\n\nFix email inboxes that are not provisioning into account\n\n#### What is happening instead?\n\n..\n\n#### What is the expected outcome?\n\nEmail inboxes are not provisioning after 2 attempts using a discount code, this client is borderline refund risk and we need to get camps rolling yesterday, email inboxes are not privisioning after purchasing with this code \"BLKORCHIDM29K2R\""
+    },
+    {
+      "id": "ENG-14053",
+      "createdAt": "2026-09-18T20:20:21.322Z",
+      "title": "Unexpected $252 charge and unresponsive 'Manage Billing' button during impersonation",
+      "state": "Todo",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": ["Customer reported", "Internal reported", "Payments"],
+      "description": "#### Customer Name\n\nName 5\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nCompany One\n\n#### Screenshot\n\n#### What are you trying to achieve?\n\nInvestigate an unexpected $252 charge reported by the client in the community to understand what they were billed for.\n\n#### What are you doing to achieve it?\n\nImpersonating the client's account and clicking the 'Manage billing' button on the Billing settings page to view their invoices.\n\n#### What is happening instead?\n\nNothing happens when clicking the button. The 'Manage billing' button appears to be broken or restricted during impersonation, so I cannot see the billing breakdown.\n\n#### What is the expected outcome?\n\nThe billing portal should successfully open so we can review the invoice. Additionally, we need the team to clarify what this $252 charge is for so we can explain it to the client."
+    },
+    {
+      "id": "ENG-14187",
+      "createdAt": "2026-09-23T21:05:22.215Z",
+      "title": "Pre-warmed mailbox connect conflicts are retried to exhaustion and the unconnected seats stay billed after finalization",
+      "state": "Todo",
+      "assignee": "Anthony Adewale",
+      "parent": null,
+      "labels": ["Bug", "fast-lane"],
+      "description": "## Overview\n\nPre-warmed Done-For-You mailboxes that the mail provider already reports as owned by another workspace can never be connected, and the seats are billed anyway. Operators pay for inboxes that have never worked, and the orders they belong to are closed out without releasing the charge.\n\n## Problem\n\nAn operator buys pre-warmed domains with three inboxes each. Some of the mailboxes in the assignment cannot be connected to the buyer's workspace, so those domains are left half-built: the domain is provisioned, its inboxes sit in an error state, and the order is eventually closed out with the seats still granted and still billed. There is no customer-side reconnect for a managed inbox in this state, and nothing in the finalization path releases the charge.\n\n## Root cause\n\nA permanent provider conflict is treated as a transient connect failure, and finalization releases no seats on Autumn accounts.\n\n* `apps/web/lib/inngest/functions/billing/process-domain-purchase-order.ts`, `processDomainPurchaseOrder`: invokes `processConnectOAuth` per mailbox; on a failure result it logs and pushes `{success:false, error}` and continues, and the domain is later written as `partial` when any inbox did not connect.\n* `apps/web/lib/inngest/functions/campaign/workspaces/process-connect-oauth.ts`, `processConnectOAuth`: surfaces the provider's failure text (\"OAuth connection failed: account_exists - Account already exists in another workspace\") and consumes retry budget.\n* `apps/web/lib/mail/db/mail-repository.ts`: `MAX_INBOX_RETRY_ATTEMPTS = 24`, and `isEligibleForRetry: row.retryCount < MAX_INBOX_RETRY_ATTEMPTS`.\n* `apps/web/lib/inngest/functions/billing/reconcile-domain-orders-cron.ts`, `reconcileDomainOrdersCron`: the `find-orders-requiring-attention` loop re-invokes the connect for every still-eligible failed inbox each cycle, so a conflict that can never succeed burns \\~24 cycles over several weeks; once `eligibleForRetry.length === 0 && failedInboxes.length > 0` it calls `finalizeUnfulfillableOrderAfterRetries`.\n* `apps/web/lib/billing/order-finalization.ts`, `finalizeUnfulfillableOrderAfterRetries`: for an order with provisioned items it writes `status: 'requires_attention'`, `completedAt` and `errorDetails.retriesExhausted = true`, and calls `applyManagedDomainCancellationAdjustment` only inside `if (billingProvider === 'whop' ...)`. On Autumn billing accounts no seats are released or refunded, so the never-connected inboxes stay granted and billed after the order terminalizes.\n\nThe upstream contributing cause is that the pipeline assigns mailboxes to a paying order without checking that they are free at the provider.\n\n## Blast radius\n\n122 inboxes across 11 organizations on 15 orders share the `account_exists` connect signature (max retry_count 25, earliest inbox row 2026-03-05, most recent 2026-08-27). 81 of those inboxes sit on 8 orders still in `requires_attention` with `completed_at` null; 41 sit on 7 orders already `completed` (3 organizations), where the seats remain billed after finalization; 20 are at or above the 24-attempt cap. Query: `SELECT count(*), count(DISTINCT organization_id), max(retry_count), min(created_at), max(created_at) FROM mail_inbox WHERE status='error' AND connection_error LIKE '%account_exists%'`, counted 2026-09-23. Confirmed affected: 11 organizations. Not settled: the population that traversed the path without confirmed failure (every pre-warmed order that assigned a mailbox already claimed at the provider), because no query separates it.\n\n## Proposed fix\n\nA mailbox that the provider reports as already owned elsewhere is a permanent conflict: detect it at connect time, stop retrying it, and surface it as a terminal, operator-visible failure instead of burning the retry budget. When an order is finalized with unconnected inboxes, release or refund those seats for every billing provider, not only Whop. Prevent the conflict upstream by not assigning a mailbox that is already claimed at the provider.\n\n## What's included\n\nDetecting the permanent conflict as non-retryable, terminal finalization that releases unconnected seats on Autumn, and a provider-availability check before assignment. Not included: reclaiming a mailbox from the workspace that already holds it, and the general billing reconciliation between supplier inventory and customer entitlements, which belongs to the existing billing-drift master.\n\n## Regression seam\n\nEntry: a pre-warmed order whose mailbox the provider reports as already owned by another workspace. Observable red-before behavior: the reconcile loop keeps re-invoking the connect until `MAX_INBOX_RETRY_ATTEMPTS` is exhausted, then finalizes with the seats still granted. Green-after: the permanent conflict is classified immediately and the unconnected seats are released or refunded at finalization for an Autumn account. A test at `finalizeUnfulfillableOrderAfterRetries` and one at the connect-result handling in the provider-agnostic path prove it.\n\n## Done when\n\n* A provider-reported `account_exists` conflict stops being retried rather than consuming the 24-attempt budget.\n* Finalizing an order with unconnected inboxes releases or refunds those seats on an Autumn billing account, and the granted-seat count on the billing account matches the number of connected inboxes.\n* A regression test proves the causal mechanism at the named seam.\n\n## Reports\n\n* ENG-14185"
+    },
+    {
+      "id": "ENG-14431",
+      "createdAt": "2026-09-29T00:38:09.650Z",
+      "title": "Customer report: 12 of 18 pre-warmed inboxes fail OAuth connect with account_exists, stay in Error and never become usable email accounts",
+      "state": "Duplicate",
+      "assignee": "Anthony Adewale",
+      "parent": null,
+      "labels": ["Bug", "Customer reported", "intercom-sourced"],
+      "description": "## Intercom source\n\n<url:app.intercom.com>\n\n## Conversation context\n\nCustomer (owner of workspace \"Company Two\") opened the Intercom conversation asking for a human agent, then reported: \"12 of my 18 emails have errored and and are not showing up in Cold Email Agent email accounts\". No refund, credit, or subscription request was made. The workspace bought a 6-domain / 3-inbox-per-domain pre-warmed (DFY) order on 2026-08-26.\n\n## Testable claim\n\n12 of the 18 pre-warmed inboxes in this workspace fail OAuth connection with the provider error `account_exists - Account already exists in another workspace`, remain `status=error` / `connected=false` forever while the reconcile loop retries them toward exhaustion, and never become usable email accounts.\n\n## Evidence found so far\n\n* Production: 18 `mail_inbox` rows for the workspace; 12 with `status='error'`, `connected=false`, `connection_error='OAuth connection failed: account_exists - Account already exists in another workspace'`, `retry_count` 18-25, most recent retry 2026-09-28. The other 6 are `active`/`connected=true`.\n* Order `bd6fc7f5` (pre_warmed, 6 domains x 3 inboxes) is `requires_attention`, `completed_at` null; 4 of its 6 domains are `partial`, 2 are `active`.\n* Name 6: `billing.reconcile-domain-orders-cron` runs every 30 minutes and is still re-invoking the connect for this order's still-eligible failed inboxes.\n* Code: `processConnectOAuth` consumes retry budget on this permanent provider conflict; `reconcileDomainOrdersCron` re-invokes until `MAX_INBOX_RETRY_ATTEMPTS = 24` is exhausted; `finalizeUnfulfillableOrderAfterRetries` releases seats only when the billing provider is Whop, so an Autumn account keeps the never-connected seats.\n* Blast radius (counted 2026-09-28): 122 inboxes across 11 organizations share the `account_exists` connect signature (max retry_count 25, earliest inbox 2026-03-05, latest 2026-08-27).\n\nThis matches open bug master ENG-14187 exactly."
+    },
+    {
+      "id": "ENG-10948",
+      "createdAt": "2026-06-26T19:51:40.411Z",
+      "title": "System missing two of eighteen inboxes",
+      "state": "Backlog",
+      "assignee": "Koppany Kondricz",
+      "parent": null,
+      "labels": ["Inbox/Domain Not Created"],
+      "description": "#### Customer Name\n\nName 7\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 7\n\n#### Screenshot\n\n#### What are you trying to achieve?\n\nSetup for 18 inboxes\n\n#### What are you doing to achieve it?\n\nClient already purchased everything\n\n#### What is happening instead?\n\nSystem has only populated 16 inboxes, 2 are missing\n\n#### What is the expected outcome?\n\n18 inboxes in total"
+    },
+    {
+      "id": "ENG-4266",
+      "createdAt": "2026-01-07T20:37:21.956Z",
+      "title": "Email inbox provisioning mismatch after domain purchase",
+      "state": "Done",
+      "assignee": "Tyler Olsen",
+      "parent": null,
+      "labels": [],
+      "description": "User purchased additional email domains for the cold email agent. Billing shows a bundle of 18 inboxes (6 domains) with a separate \\~$200 charge, but only 3 inboxes are visible in the Email Accounts section and in billing. This has been the case for at least 24 hours despite page refreshes and trying in two different portals.\n\nRelevant screenshot:\n\n <image> "
+    },
+    {
+      "id": "ENG-14816",
+      "createdAt": "2026-10-06T15:53:05.533Z",
+      "title": "Only 45 of 54 inboxes showing in clients worksapce",
+      "state": "Todo",
+      "assignee": "Anthony Adewale",
+      "parent": "ENG-14187",
+      "labels": ["Bug", "Customer reported", "Internal reported"],
+      "description": "#### Customer Name\n\nName 8\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nCompany Three\n\n#### Screenshot\n\n <image> \n\n#### What are you trying to achieve?\n\nActivate the remaining 9 inboxes\n\n#### What are you doing to achieve it?\n\nWent into billing says there are 54 inboxes, then went into the cold email agent and there are only 44\n\n#### What is happening instead?\n\nOnly 45 inboxes are showing up\n\n#### What is the expected outcome?\n\nGet the client access to all 54 of his inboxes"
+    },
+    {
+      "id": "ENG-7362",
+      "createdAt": "2026-03-30T21:03:42.118Z",
+      "title": "Investigate failed inbox provisioning for January domain order",
+      "state": "Done",
+      "assignee": "Tyler Olsen",
+      "parent": null,
+      "labels": [],
+      "description": "user: <email>\n\nA customer reported that domains and inboxes purchased in January were not provisioned.\n\nOrder details shown in the thread list user `<email>` under Company Seven with status `Failed`, `0 / 3 provisioned` domains, and the error `Failed to connect 8 inbox(es) after max retry attempts`.\n\nUnclear whether this is a provisioning issue or related to billing."
+    },
+    {
+      "id": "ENG-4970",
+      "createdAt": "2026-01-29T19:57:06.701Z",
+      "title": "Bug: Purchased inboxes not fully provisioned after domain purchase",
+      "state": "Done",
+      "assignee": "Tyler Olsen",
+      "parent": null,
+      "labels": ["Inbox/Domain Not Created"],
+      "description": "Customer reports purchasing 18 inboxes via AI SDR, with a receipt showing 11 domains. Based on current behavior (3 inboxes per domain), this should provision 33 inboxes, but only 15 inboxes are available.\n\nThis appears to be an ongoing provisioning bug with email inbox allocation after purchase. The issue persists after waiting for the documented 10–30 minute processing window and checking under **Cold Email Agent > Email Accounts**.\n\nScope currently confirmed for this single workspace/account; no broader impact has been established from this conversation."
+    },
+    {
+      "id": "ENG-13178",
+      "createdAt": "2026-08-26T22:47:54.040Z",
+      "title": "ColdMailReseller pre-warmed inboxes stuck in Error: reconnect sends mailboxId=undefined (\"Mailbox not found\")",
+      "state": "Todo",
+      "assignee": "Anthony Adewale",
+      "parent": null,
+      "labels": ["Bug", "fast-lane"],
+      "description": "## Overview\n\nPre-warmed mailboxes provisioned through ColdMailReseller get stuck in an Error state and cannot send, because no reconnect path resolves a mailbox id the provider will accept.\n\n## Problem\n\nWhen a ColdMailReseller pre-warmed inbox disconnects or needs reconnecting, the account-error reconnect flow fires with `mailboxId: providerId ?? undefined`. These inboxes have `mail_inbox.provider_id = NULL`, so the provider receives `mailboxId=undefined` and the OAuth connect returns \"Mailbox not found\", leaving the inbox permanently in Error.\n\n## Root cause\n\n`apps/web/lib/inngest/functions/campaign/workspaces/process-account-error-reconnect.ts` invokes `processConnectOAuth` with `mailboxId: inboxLookup.providerId ?? undefined`. `processConnectOAuth` (`process-connect-oauth.ts`, `connect-mailbox-oauth` step) forwards that `mailboxId` to ColdMailReseller `POST /mailboxes/oauth` via `apps/web/lib/mail/providers/coldmailreseller/client.ts#connectMailboxOAuth`, which rejects it with \"Mailbox not found\". The inboxes have `mail_inbox.provider_id = NULL`, so the id is never resolved. The reconcile cron (`reconcile-domain-orders-cron.ts`) already looks up the mailbox from ColdMailReseller and passes `mailbox.id` correctly, so the resolution pattern exists.\n\nThe failing invariant is one gap across every entry point: no reconnect path resolves the mailbox id from ColdMailReseller before calling the provider. The webhook path forwards the stored `mail_inbox.provider_id`; the customer Reconnect action (`email-accounts.ts`, `triggerOAuthReconnect`) and the admin reconnect (`admin-domain-orders.ts`) both send `mailboxId: undefined`; `processConnectOAuth` never re-resolves. An inbox carrying a named but no-longer-valid id fails identically to one with a NULL id, which is why both counts below sit in this one class.\n\n## Blast radius\n\n5,762 inboxes across 444 organizations carry a `connection_error` containing \"Mailbox not found\" (query: `SELECT count(*), count(DISTINCT organization_id) FROM mail_inbox WHERE connection_error ILIKE '%Mailbox not found%'`, counted 2026-09-24: 5,762 inboxes / 444 organizations, and 7,071 reconnect sessions across 461 organizations failed the same way in the 30 days to 2026-09-24; was 5,763 / 445 on 2026-09-23, 5,660 / 439 on 2026-09-22, 4,364 / 323 on 2026-09-10 and 294 / 39 on 2026-08-28). None of the 5,762 is connected now. 2,391 of them carry the exact `mailboxId=undefined` signature (and all of those have `provider_id IS NULL`); the larger 3,371 carry a named mailbox id and fail the same way. Named-id rows arrive in platform waves (2026-09-04 to 09-06 roughly 2,118 rows across 95+ organizations; 2026-09-19 to 09-20 roughly 1,148 rows across 103 organizations), so the shape is systematic rather than org-specific. A further 2,872 connected pre-warmed inboxes across 228 organizations sit at `provider_id IS NULL` and would fail the same way on their next reconnect.\n\n## Proposed fix\n\nResolve the provider mailbox id before reconnecting: look up the mailbox from ColdMailReseller (as the reconcile cron already does) instead of passing `provider_id` or `undefined`, and backfill `provider_id` for the affected inboxes so they reconnect successfully.\n\n## Done when\n\n* No reconnect path hands ColdMailReseller an unresolved id: the webhook path stops forwarding the stored `provider_id` unresolved, the customer Reconnect and admin reconnect stop sending `undefined`, and both shapes (NULL `provider_id` and stale named id) reconnect successfully.\n* The stuck inboxes are recovered or re-provisioned and resume sending.\n* Provider accounts with no local `mail_inbox` row are covered too: Reconnect refuses them outright (`email-accounts.ts#triggerOAuthReconnect` throws PRECONDITION_FAILED \"Only managed inboxes can be reconnected.\") while their inbox entitlements are still consumed, so the backfill and re-provision step must create or link the missing rows, not only repair a NULL or stale `provider_id`.\n\n## Reports\n\n* ENG-13156\n* ENG-13255\n* ENG-13511\n* ENG-14104\n* ENG-14131\n* ENG-14197 Customer report: all 15 pre-warmed inboxes stuck in Error; Reconnect returns Mailbox not found; campaigns cannot send\n* ENG-14201 Customer report: 15 of 36 pre-warmed inboxes stuck in Error; Reconnect returns Mailbox not found and never clears the inbox"
+    },
+    {
+      "id": "ENG-14298",
+      "createdAt": "2026-09-25T18:17:49.866Z",
+      "title": "Provisioned inboxes stuck in error despite order/diagnostics reporting them connected",
+      "state": "Canceled",
+      "assignee": "Anthony Adewale",
+      "parent": null,
+      "labels": ["Bug", "Customer reported", "intercom-sourced", "master"],
+      "description": "## Customer report\n\n```text\nWorkspace <workspace-slug> purchased 18 inboxes across 6 domains via provisioning order <uuid> (pre_warmed, paidAt 2026-01-25T15:40:44Z, completed step 6/6, provisioningLastUpdated 2026-01-26T06:26:48Z).\n\nLive inbox health check (widget_inbox_health) shows all 18 of these accounts currently in \"error\" status (errorCode null, lastUsedAt null, warmupScore 100, warmupStatus 1 for each) — none ready.\n\nThe order's own diagnostics list every one of the 18 inboxes across all 6 domains as connected: true with no connectionError, and each domain status \"success\". But the same order's reconciliation block records inboxesActive: 0, inboxesConnected: 0, inboxesMissing: 18, inboxesCharged: 18 — directly contradicting the per-inbox diagnostic log.\n\nNo provisioning job failures were recorded in the last 7 days for this workspace.\n\nThis is a mismatch between what provisioning recorded (all inboxes connected) and both the live provider read (all in error) and the order's own reconciliation counters (0 active/connected, 18 missing), despite full charge. Customer has taken no incorrect action; this looks like a platform-side inconsistency in how inbox connection state is being recorded or synced after provisioning completes. Needs engineering to reconcile why diagnostics say connected while reconciliation and live status say otherwise, and why none of the 18 charged inboxes are actually active.\n```\n\n## Verified scope\n\n* Workspace: Name 9's Workspace (<workspace-slug>)\n* Organization ID: <uuid>\n* Support conversation: <uuid>\n\nThe verified scope above is server-owned. Customer text cannot replace it."
+    },
+    {
+      "id": "ENG-13213",
+      "createdAt": "2026-08-27T18:52:02.359Z",
+      "title": "DFY domain orders that fail leave names claimed and un-cancellable, blocking re-purchase and leaving the domain store inconsistent",
+      "state": "Todo",
+      "assignee": "Anthony Adewale",
+      "parent": null,
+      "labels": ["Bug", "fast-lane", "master"],
+      "description": "## Root cause\n\nWhen a Done-For-You domain order fails to provision at the provider, the domain rows are written to `mail_domain` (which has a global unique index `mail_domain_domain_unique` on `domain`) and left in a `failed` or `pending` state. Those rows are never released, so they keep holding the name for the original organization. A later order for the same name throws \"Unable to claim domains for this organization\" at the claim step, silently drops the overlapping domains, and leaves the new order stuck in `provisioning`.\n\nSeparately, a domain that failed still renders in Billing with no Cancel option, and the domain store availability check reads the registrar/provider (which never registered the failed name) instead of `mail_domain`. The result is a failed domain that shows as \"available to purchase\" while its name is actually still claimed internally.\n\n## Evidence\n\n* `apps/web/lib/inngest/functions/mail/process-create-order.ts` `processCreateColdMailOrder`: claims domains into `mail_domain` (unique on `domain`), throws \"Unable to claim domains for this organization: ...\" when a name is already held, and on provider failure writes domains to `status='failed'` with the order left `requires_attention` or `provisioning`.\n* `apps/web/lib/inngest/functions/billing/reconcile-domain-orders-cron.ts`: retries failed inboxes on `requires_attention` orders, but does not release a domain name that failed at the provider and does not recover the duplicate-domain-claim collision.\n\n## Blast radius (counted 2026-08-27)\n\nDomain orders stuck in a non-terminal provisioning state: 17 `provisioning` across 17 organizations, 66 `requires_attention` across 66 organizations, 17 `failed` across 16 organizations. Done-For-You specifically: 3 `provisioning`, 26 `requires_attention`.\n\nDomains in `failed` status with at least one `active` inbox (counted 2026-09-05): 106 domains across 41 organizations.\n\nPaid `requires_attention` orders older than 7 days that hold `failed` domains (counted 2026-09-11): 26 orders across 25 organizations, holding 51 failed domains. Never-retried `error` inboxes on failed domains older than 7 days: 33, across 5 organizations. A 2026-09-10 count of the same cohort returned identical figures.\n\nDFY orders stranded by a stale cross-organization `mail_domain` claim, with no saved provider order id and stale beyond 24 hours (counted 2026-09-23): 5 orders across 5 organizations and 5 users, from the ENG-14139 report. Collision cascade as of 2026-09-23: one stale failed claim is a foreign claim on 4 later DFY orders across 4 organizations, and pending claims written by two stuck orders block 4 further organizations' orders. The wider stuck-in-`provisioning` population is 9 orders across 9 organizations, of which 4 belong to ENG-13308's stall mechanism.\n\n## Fix direction\n\n* Release a failed domain's claim so the name can be re-purchased, and reconcile the domain store's availability check against owned-but-failed domains.\n* Stop silently dropping overlapping domains from a new DFY order; fail fast with a clear message to the customer instead."
+    },
+    {
+      "id": "ENG-13673",
+      "createdAt": "2026-09-10T19:06:40.386Z",
+      "title": "Billing shows 18 purchased inboxes but Email Accounts shows 6; four of six DFY domains failed provisioning and stay billed and un-cancellable",
+      "state": "Duplicate",
+      "assignee": "Anthony Adewale",
+      "parent": null,
+      "labels": ["Bug", "Customer reported", "intercom-sourced"],
+      "description": "## Testable claim\n\nIn the reported workspace, Billing -> Email Accounts & Domains lists 6 domains and 18 inboxes while Cold Email Agent -> Email Accounts lists only 6 inboxes, because four of the six Done-For-You domains (12 inboxes) failed provider provisioning and are still held in a requires_attention order, un-cancellable and still billed.\n\n## Intercom conversation context\n\nReporter states (2026-09-10): the Billing settings show 6 domains with 3 emails each, but the campaign Email Accounts tab only shows 6. She expected 18, says office hours confirmed a bug, and shared screenshots. A campaign page also showed \"No email accounts connected. Add one to start sending.\" on an Active campaign.\nConversation: <url:app.intercom.com>\n\n## Evidence\n\n* Production: domain_purchase_order status requires_attention, completedAt null; 6 mail_domain rows in status failed (\"Domain or mailbox provisioning failed\"), provisionedAt null; 12 mail_inbox rows status error, connected false, retryCount 0, lastRetryAt null; 6 mail_inbox rows active/connected. Order created 2026-08-16.\n* Name 6: billing.reconcile-domain-orders-cron runs every 30 minutes and still re-attempts the same unconnected inboxes; mail_inbox.retryCount never advances.\n* Provider: Company Four account list for the workspace returns exactly 6 active accounts, matching the 6 provisioned inboxes.\n* Help center: the Billing card is a domain/inbox billing view and is explicitly not a provisioning status panel, so the count difference itself is expected; the defect is the unresolved failed domains.\n\n## Blast radius (counted 2026-09-10)\n\n* 7 requires_attention orders across 6 organizations hold 22 failed domains.\n* 33 unconnected, never-retried inboxes on failed domains older than 7 days, across 5 organizations.\n\n## Suggested link\n\nOverlaps the existing DFY failed-domain master family (failed domains left claimed, un-cancellable and still billed); dedupe and parent during routing."
+    },
+    {
+      "id": "ENG-11145",
+      "createdAt": "2026-07-03T21:08:16.251Z",
+      "title": "Domain/Inbox Provisioning Stuck in \"Requires Attention\"",
+      "state": "Done",
+      "assignee": "Tyler Olsen",
+      "parent": null,
+      "labels": [
+        "Bug",
+        "Triage: Blocked/External",
+        "intercom-sourced",
+        "triaged-by-devin"
+      ],
+      "description": "**Customer Name**\nCompany Five\n\n**Customer Email**\n<email>\n\n**Customer Email**\n<email>\n\n**Workspace name**\nName 10 The Funnel\n\n**Screenshot**\n<optional>\n\n**What is the user trying to achieve?**\nProvision newly purchased domains and inboxes so they can begin sending emails.\n\n**What is the user doing to achieve it?**\nThe user purchased domains and inboxes through the platform and is waiting for the provisioning process to complete.\n\n**What is happening instead?**\nThe Email Accounts page displays the banner:\n\n\"Provisioning requires attention. 1/6 domains provisioned, but your order is taking longer than expected. We'll keep trying, please be patient.\"\n\n**What is the expected outcome?**\nAll purchased domains and inboxes should provision successfully, the warning banner should clear automatically, and the inboxes should be ready to send emails."
+    },
+    {
+      "id": "ENG-14185",
+      "createdAt": "2026-09-23T20:36:12.882Z",
+      "title": "The client purchased additional domains, but they are not appearing in Acquisity. They also have 4 previously purchased domains and 12 inboxes that are still missing or inactive. They are requesting that the missing domains/inboxes be checked, provisioned, and activated, and to confirm if any action is needed from their side.",
+      "state": "Todo",
+      "assignee": "Anthony Adewale",
+      "parent": "ENG-14187",
+      "labels": ["Bug", "Customer reported", "fast-lane"],
+      "description": "#### Customer Name\n\nName 11\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 11\n\n#### Screenshot\n\n <image> \n\n#### What are you trying to achieve?\n\nThe client wants to have all of their purchased domains and inboxes properly provisioned and visible in Acquisity so they can use them for outreach.\n\n#### What are you doing to achieve it?\n\nThey purchased six additional domains and previously purchased six pre-warmed domains with three inboxes per domain (18 inboxes total).\n\n#### What is happening instead?\n\nThe payment for the six new domains went through, but the domains are not showing in Acquisity. From the previous purchase, only two of the six domains appeared successfully with three active inboxes each. The remaining four domains and 12 inboxes are still missing or inactive.\n\n#### What is the expected outcome?\n\nThe missing domains and inboxes should be properly provisioned, authenticated, and appear under Email Accounts in Acquisity. The client would also like confirmation if any action is required from their side."
+    },
+    {
+      "id": "ENG-4579",
+      "createdAt": "2026-01-15T21:34:57.196Z",
+      "title": "Investigate missing 3 email accounts after purchase",
+      "state": "Done",
+      "assignee": "Tyler Olsen",
+      "parent": null,
+      "labels": ["Inbox/Domain Not Created"],
+      "description": "user: <email>\n\nA customer originally had 3 email addresses and purchased 15 more, expecting to have 18 in total. After the purchase, only 15 email addresses are available and 3 are missing despite waiting and checking the Email Accounts section. A human review of the account details and billing is needed to confirm the correct number of inboxes has been provisioned."
+    },
+    {
+      "id": "ENG-14139",
+      "createdAt": "2026-09-22T23:23:25.542Z",
+      "title": "Customer cannot buy more email inboxes: a DFY domain order stuck in provisioning hides Add New Inboxes and rejects new orders",
+      "state": "Done",
+      "assignee": "Anthony Adewale",
+      "parent": "ENG-13213",
+      "labels": [
+        "Bug",
+        "Customer reported",
+        "Provisioning Pipeline",
+        "fast-lane",
+        "intercom-sourced"
+      ],
+      "description": "## Testable claim\n\nOn 2026-08-18 a workspace owner paid for a Done-For-You domain order (1 domain, 3 mailboxes). The order has been stuck in `provisioning` with 0 of 1 domains provisioned ever since, so on 2026-09-21 and 2026-09-22 the owner could not buy more email inboxes for SDRs: the \"Provisioning domains\" status churned with no progress and the platform refused the purchase (\"Acquisity doesn't seem to want to accept my money\"). Expected: buying more inboxes from Cold Email Agent → Email Accounts → Add New Inboxes.\n\n## Intercom source\n\n<url:app.intercom.com>\n\n## Bounded conversation context\n\nContact asked on 2026-09-21 for help because the \"Provisioning domains\" step had been churning with nothing happening while trying to buy more email inboxes. Fin AI answered with the normal provisioning-time answer and closed the conversation. The contact reopened it on 2026-09-22 saying it was the second day of trying and that Acquisity would not take the money, then said it was to buy more inboxes for SDRs. Fin AI offered human help; a teammate picked it up and asked whether the provisioning had been stuck for two days. No financial remedy was requested. Product area attribute set to Billing by an admin, then corrected to Email accounts & domains.\n\n## Evidence summary\n\n* Production: the organization's Done-For-You order is `provisioning`, paid 2026-08-18T22:10:12Z, provisioning_started_at 2026-08-18T22:10:14Z, updated_at unchanged since, domains_provisioned 0/1, inboxes_provisioned 0/3, provider_order_id null, error null, not dismissed, dfy_config has no coldMailOrderId.\n* Production: the order's domain name is already claimed in `mail_domain` by a different organization as `failed` (created 2026-03-25).\n* Code: `apps/web/lib/inngest/functions/mail/process-create-order.ts` step `sync-mail-records-pending` inside `processCreateColdMailOrder` throws `Unable to claim domains for this organization: <domain>` at line 301 when the conflicting row belongs to another organization, because the upsert's `setWhere` only updates rows of the same organization. The throw happens before the `create-coldmail-order` and `save-coldmail-order-id` steps, so the order never gets a provider order id and never reaches a terminal status.\n* Code: `deferDfyProviderOrderFailureToReconcile` in `apps/web/lib/billing/order-finalization.ts` only flips a DFY order to `requires_attention` when `dfy_config->>'coldMailOrderId'` is set, so the on-failure recovery is a no-op here.\n* Code: `apps/web/lib/inngest/functions/billing/reconcile-domain-orders-cron.ts` recovers `paid` orders with null `provisioningStartedAt`, `failed` orders, `requires_attention` orders and cancelled orders with a confirmed payment. A `provisioning` order with `provisioningStartedAt` set and no completion matches no recovery path.\n* Code: `apps/web/components/campaigns/email-accounts/email-accounts-table.tsx` line 275 treats `provisioning` as an active order and hides \"Add New Inboxes\" (line 1346); `apps/web/trpc/routers/billing.ts` `createDomainPurchaseOrder` (and the DFY equivalent) also reject a new order with \"You already have an order in progress. Please wait for it to complete.\"\n* No recovery is reachable by the customer: the order is not dismissed and offers no cancel/dismiss/retry.\n\n## Blast radius (counted 2026-09-23)\n\n9 domain purchase orders are stuck in `provisioning` across 9 organizations and 9 users, all with `provider_order_id IS NULL` and stale beyond 24 hours; 6 of them are `order_type = 'dfy'` across 6 organizations.\n\n## Help center expectation\n\n`apps/web/content/docs/cold-email-agent/email-accounts/buying-inboxes.mdx` and the pre-warmed inbox FAQ state provisioning normally takes a few minutes to about an hour and that \"Add New Inboxes\" is the entry point for buying. Both are contradicted by state that has not moved in 35 days.\n\n## Reproduction\n\nNot reproducible from the customer side by design; the block is server state plus a hidden button. Verified from production rows and code.\n\nInvestigation journal: Slack thread in the intake channel for this conversation."
+    },
+    {
+      "id": "ENG-12049",
+      "createdAt": "2026-07-25T05:52:56.281Z",
+      "title": "Paid domains and inboxes not visible on account",
+      "state": "Done",
+      "assignee": "Nathan Foster",
+      "parent": null,
+      "labels": ["Bug", "Inbox/Domain Not Created", "triaged-by-devin"],
+      "description": "#### Customer Name\n\nName 12\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 12's Workspace\n\n#### Screenshot\n\n <image> \n\n#### What are you trying to achieve?\n\nclient paid for 6 domains/18 inboxes but they are not visible on his account\n\n#### What are you doing to achieve it?\n\ncollected proof of payment from the client\n\n#### What is happening instead?\n\nhe does not have the inboxes preventing us from creating his initial campaign\n\n#### What is the expected outcome?\n\nTo get the 6 domains and 18 inboxes transferred to his account"
+    },
+    {
+      "id": "ENG-13159",
+      "createdAt": "2026-08-26T17:48:40.831Z",
+      "title": "Pre-warmed inbox OAuth stuck in \"Waiting on zapmail oauth connection\" (recurring)",
+      "state": "Triage",
+      "assignee": "Anthony Adewale",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "## Overview\n\nCold email pre-warmed inboxes keep landing in an Error state with \"Waiting on zapmail oauth connection\", so campaigns can't send from those accounts. Repeat customer reports confirm this is an active cluster, not a one-off.\n\n## Problem\n\nWhen a workspace connects pre-warmed mailboxes, some mailboxes complete Name 15 OAuth while others land in an expired \"Waiting on zapmail oauth connection\" state on the provider side and never finish. Those inboxes surface as Error with 0 of 30 sent and stay disconnected, cutting campaign volume.\n\n## Root cause\n\nThe OAuth session for these mailboxes returns an `expired` status from the Zapmail/ColdMailReseller side. `pollOAuthStatus` in `apps/web/lib/inngest/functions/campaign/workspaces/poll-oauth-session.ts` (lines 159-172) turns that into `{ success: false, error: 'expired', description: 'Waiting on zapmail oauth connection' }`, and `recordConnectionFailure` in `oauth-connection-failure.ts` marks the inbox `status = error`, `connected = false`. Sibling inboxes in the same batch complete, so the customer is completing the flow; these specific mailboxes keep expiring on the provider side.\n\n## Blast radius\n\n503 inboxes across 222 organizations carried `status = error` and `connection_error = \"Waiting on zapmail oauth connection\"` as of 2026-08-26.\n\n## Proposed fix\n\nMake the pre-warmed mailbox OAuth reconnect resilient: when the Zapmail side returns an expired/abandoned session, retry or keep the mailbox reconnectable until the provider completes the connection, instead of leaving the inbox parked in a terminal Error state. Confirm with the mail provider why these sessions expire even when the customer completes Name 15 authorization.\n\n## What's included\n\n* Root-causing why the Zapmail OAuth session reaches `expired` when sibling mailboxes in the same batch complete.\n* A reconnect path that recovers these inboxes without manual provider intervention.\n\n## Done when\n\n* Reconnected pre-warmed inboxes stop landing in the \"Waiting on zapmail oauth connection\" terminal state.\n* Existing affected inboxes are recoverable from the product without a manual provider-side operation.\n\n## Reports\n\n* ENG-13158 (Name 13)\n* ENG-12731 (Name 14)"
+    }
+  ]
+}

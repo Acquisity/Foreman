@@ -147,3 +147,12 @@ Widget progress writes use the same private-DB transport with a 1.5-second deadl
 | `scripts/widget-live.ts` production run lookup | Thirty-second private Postgres client | SELECT-only reader; separate from the live server's file store. |
 | `scripts/widget-run-stream.ts` Workflow CLI stream inspection | Three-minute child-process timeout | Shared existing CLI reader; stream decryption may hang. |
 | `widget-live-store.ts` local filesystem operations | Local filesystem exemption; lock acquisition bounded to five seconds | Runs only without VERCEL_ENV and stores atomic JSON snapshots under `.eve/widget-live/`. No remote storage adapter or database URL is used. Node directory/rename APIs offer no cancellable operation; a crashed lock fails closed and requires local recovery. |
+
+## Triage replay (ENG-16049)
+
+| Call | Bound | Notes |
+| --- | --- | --- |
+| `scripts/triage-replay-archives.ts` `git fetch`, `git archive` and Blob upload | 120s for the fetch; 300s per archive and per upload | Operator-only, against a local Acquisity checkout. Private objects, one upload at a time. |
+| `scripts/triage-replay.ts` replay start and result poll | 30s per request; polling stops at `--timeout-s` (default 1800s) per case | Calls only the replay server named by `--url`, with the diagnostics secret. |
+| `agent/lib/triage-replay/archive.ts` private archive read | 60s | The replay server reads the case's archive and writes it into the sandbox. |
+| `agent/lib/triage-replay/backend.ts` replay state | 20s per Blob read or write | Private objects; `TRIAGE_REPLAY_STATE=memory` keeps them in the process instead. |

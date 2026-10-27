@@ -1,0 +1,89 @@
+[
+  {
+    "createdAt": "2026-05-18T18:21:47.818Z",
+    "email": "aaron.fraga@acquisity.ai",
+    "id": "7525cd17-5535-4a97-8316-f960a070bd7d",
+    "name": "Aaron Fraga"
+  },
+  {
+    "createdAt": "2025-08-11T05:32:17.179Z",
+    "email": "anthony.adewale@acquisity.ai",
+    "id": "7e89af41-050e-425c-95eb-6a0dcf472944",
+    "name": "Anthony Adewale"
+  },
+  {
+    "createdAt": "2025-06-27T14:04:05.007Z",
+    "email": "anuj.bhatt@acquisity.ai",
+    "id": "90a2e2a6-1690-4d06-ae0e-a31c7877db6d",
+    "name": "Anuj Bhatt"
+  },
+  {
+    "createdAt": "2023-09-15T12:52:00.017Z",
+    "id": "4284920e-4fa9-469f-a0bf-2afc7e0aca6f",
+    "name": "Blaise Gulaj"
+  },
+  {
+    "createdAt": "2025-09-15T17:12:03.395Z",
+    "id": "745f0181-b558-4281-a04f-ceb448e84931",
+    "name": "Bot"
+  },
+  {
+    "createdAt": "2026-10-19T10:51:13.930Z",
+    "id": "115f3456-bea8-4671-bcf3-3970ecda00ce",
+    "name": "Dhruval Golakiya"
+  },
+  {
+    "createdAt": "2026-06-23T15:05:09.735Z",
+    "email": "ebubeker.rexha@acquisity.ai",
+    "id": "9795691b-1e29-4007-8415-c0b0849b2ac0",
+    "name": "Ebubeker Rexha"
+  },
+  {
+    "createdAt": "2026-07-03T15:35:39.002Z",
+    "id": "18f92b57-deef-4f6e-be1b-70173e0c8a93",
+    "name": "Elis Bushaj"
+  },
+  {
+    "createdAt": "2025-09-28T11:54:47.863Z",
+    "id": "d69d0d5b-50c4-4ae1-8edc-c08e3843a5b7",
+    "name": "Ellaine Dela Fuente"
+  },
+  {
+    "createdAt": "2025-11-25T11:45:27.751Z",
+    "email": "james.keeble@aiacquisition.com",
+    "id": "a4bf50f4-be15-4ca7-86bf-a8bcaf3ad501",
+    "name": "James Keeble"
+  },
+  {
+    "createdAt": "2026-05-28T18:13:10.840Z",
+    "email": "jil.patel@acquisity.ai",
+    "id": "648185a3-1a13-4eb6-b2e5-a48efb54cf22",
+    "name": "Jil Patel"
+  },
+  {
+    "createdAt": "2025-09-22T05:54:23.766Z",
+    "email": "koppany.kondricz@acquisity.ai",
+    "id": "6793dc7e-daa7-4821-8b47-2ebcd897881e",
+    "name": "Koppany Kondricz"
+  },
+  {
+    "createdAt": "2025-01-27T22:48:13.019Z",
+    "id": "ae3ba782-740b-44da-9412-7d97027ccedd",
+    "name": "Mahmut Jomaa"
+  },
+  {
+    "createdAt": "2026-10-19T10:51:12.785Z",
+    "id": "41a1c663-da1c-476d-8e92-bc2768bd02ae",
+    "name": "Matthew Meszaros"
+  },
+  {
+    "createdAt": "2024-05-02T10:39:09.948Z",
+    "id": "151c8239-4c88-4121-b721-839133b0ebac",
+    "name": "Rose Pilarek"
+  },
+  {
+    "createdAt": "2026-10-19T10:51:13.525Z",
+    "id": "a73f100a-7e58-4f96-ad24-924e002d8ec1",
+    "name": "medhansh.malhotra@acquisity.ai"
+  }
+]

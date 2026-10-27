@@ -24,6 +24,7 @@
     "roster:check": "tsx scripts/render-roster.ts --check",
     "start": "eve start",
     "test": "tsx --test \"agent/**/*.test.ts\"",
+    "triage:score": "tsx scripts/triage-score.ts",
     "typecheck": "tsc",
     "validate": "tsx scripts/executor-linear-specs.ts --check && pnpm run roster:check && pnpm run check && pnpm run typecheck && eve info && pnpm run test",
     "verify:built-github": "tsx scripts/verify-built-github.mjs",

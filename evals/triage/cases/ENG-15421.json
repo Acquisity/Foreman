@@ -1,0 +1,227 @@
+{
+  "id": "ENG-15421",
+  "provenance": "seeded",
+  "createdAt": "2026-10-14T20:30:18.870Z",
+  "lane": "billing",
+  "stratum": "billing",
+  "ticket": {
+    "title": "Name 1 refund save",
+    "description": "#### User Email\n\n<email>\n\n#### Workspace Name\n\nName 1\n\n#### Request Type\n\nDiscount code\n\n#### Reason for request\n\n3 months acquisity and domains. 20,000 lead credits",
+    "attachmentKinds": ["slack"]
+  },
+  "repoCommitAtCreate": "fd64963aa8464c0592a2779b063095e77d931939",
+  "flags": {
+    "descriptionEditedAfterCreate": false,
+    "needsProductionData": true,
+    "alreadyFixedAtTriage": false
+  },
+  "asFiled": {
+    "assignee": "Aaron Fraga",
+    "labels": [],
+    "parent": null,
+    "priority": 0,
+    "project": null
+  },
+  "relatedSnapshot": [
+    {
+      "id": "ENG-6052",
+      "createdAt": "2026-03-01T14:36:56.732Z",
+      "title": "Request 2500 credit for Name 1's workspace",
+      "state": "Done",
+      "assignee": "Beth Newton",
+      "parent": null,
+      "labels": ["Refund"],
+      "description": "#### Workspace Name\n\nName 1's Workspace\n\n#### Request Type\n\nLead credit\n\n#### Reason for request\n\nNeeds a 2500 credit for her workspace"
+    },
+    {
+      "id": "ENG-11360",
+      "createdAt": "2026-07-09T18:13:16.200Z",
+      "title": "Reimburse 3904 lead credits to client workspace",
+      "state": "Done",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [],
+      "description": "#### Customer Name\n\nName 1\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nCompany One\n\n#### Screenshot\n\n#### What are you trying to achieve?\n\nReinbursement of 3904 lead credits to clients workspace\n\n#### What are you doing to achieve it?\n\nReaching out to you - client is pushy and NEEDS a client quick (This is her full time hustle)\n\n#### What is happening instead?\n\nClient is pushing\n\n#### What is the expected outcome?\n\nReinburs the client's 3904 lead credits that she \"did not want to be used without her permission\" by us, so i can create a new email camp targeting her desired niche etc and get the ball rolling"
+    },
+    {
+      "id": "ENG-6237",
+      "createdAt": "2026-03-05T15:05:22.758Z",
+      "title": "AI SDR not following up as expected",
+      "state": "Done",
+      "assignee": "Koppany Kondricz",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "#### Customer Name\n\nName 1\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 1's Workspace\n\n#### Issue - \n\nThe AI SDR is not following up on emails automatically. "
+    },
+    {
+      "id": "ENG-7402",
+      "createdAt": "2026-03-31T17:32:23.507Z",
+      "title": "Process refund for charges after February 22nd 2026",
+      "state": "Done",
+      "assignee": "Beth Newton",
+      "parent": null,
+      "labels": ["Refund"],
+      "description": "#### Workspace Name\n\nName 2 (<email>)\n\n#### Request Type\n\nRefund\n\n#### Reason for request\n\nPrevious RR Save.\n\nHe is now being partially refunded and offboarded.\n\nApart of our initial RR save - he was not suppose to be charged for acquisity for 90 days.\n\nPlease refund all charges after February 22nd 2026."
+    },
+    {
+      "id": "ENG-13931",
+      "createdAt": "2026-09-16T16:43:48.508Z",
+      "title": "Name 3 - campaigns sending half volume",
+      "state": "Done",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [],
+      "description": "#### Customer Name\n\nName 1\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nCompany Two (Company Three)\n\n#### Screenshot\n\n#### What are you trying to achieve?\n\nClient has 3 active campaigns, but only sending 300 emails/day - should be sending 540\n\n#### What are you doing to achieve it?\n\nall settings correct\n\n#### What is happening instead?\n\n300 emails/day sending\n\n#### What is the expected outcome?\n\n540 emails/day"
+    },
+    {
+      "id": "ENG-7392",
+      "createdAt": "2026-03-31T14:39:52.094Z",
+      "title": "Process refund for Name 4 and cancel subscription",
+      "state": "Done",
+      "assignee": "Beth Newton",
+      "parent": null,
+      "labels": ["Refund"],
+      "description": "#### Workspace Name\n\n#### Request Type\n\nRefund\n\n#### Reason for request\n\nName 4 - I can't find a user under in this email in Whop or live billing matching this in Acquisity. He has been charged the old tech stack for Acquisity and is requesting a refund for these charges charged in Name 7, Feb and Mar. He didn't use them.\n\nHe is a refund save and on AI Name 6 currently. Can we refund this to him and cancel this sub? <url:fegrowthpartner.slack.com>\n\n<mention> 5 already advised we should refund him"
+    },
+    {
+      "id": "ENG-14753",
+      "createdAt": "2026-10-05T20:38:49.950Z",
+      "title": "Name 8 refund save",
+      "state": "Todo",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": ["Customer reported", "Discount", "Internal reported"],
+      "description": "#### User Email\n\n<email>\n\n#### Workspace Name\n\nName 100's Workspace\n\n#### Request Type\n\nDiscount code\n\n#### Reason for request\n\n2 months acquisity and up to 18 inboxes we cover\n2 campaign launches\n10k lead credits\n2 onboarding calls (had none)\n2 months contract extension\n\nContext:\n\nHas been left in the dark for a month... no onboarding after upsell - nothing - absolute drop of the ball from our side.\nRefund save - accelerator BNPL - in klarna - 7k save. She is not very financial and quite worried about future expenses"
+    },
+    {
+      "id": "ENG-5238",
+      "createdAt": "2026-02-06T19:01:00.907Z",
+      "title": "Add “Refund Saved” toggle in Name 9",
+      "state": "Done",
+      "assignee": "Savinder Singh",
+      "parent": null,
+      "labels": [],
+      "description": "Add a “Refund Saved” toggle in Name 9 that works the same way as the existing refund request toggle."
+    },
+    {
+      "id": "ENG-14079",
+      "createdAt": "2026-09-21T12:47:37.181Z",
+      "title": "Name 10 5k Leads as part of refund save",
+      "state": "Todo",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": ["Credits", "Customer reported", "Internal reported"],
+      "description": "#### User Email\n\n<email>\n\n#### Workspace Name\n\n#### Request Type\n\nLead credit\n\n#### Reason for request\n\nPart of refund save with Name 11"
+    },
+    {
+      "id": "ENG-11952",
+      "createdAt": "2026-07-22T01:58:28.304Z",
+      "title": "Client requesting 10k leads as part of refund save",
+      "state": "Todo",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": ["triaged-by-devin"],
+      "description": "#### Customer Name\n\nName 12\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 12\n\n#### Screenshot\n\n#### What are you trying to achieve?\n\nAs part of refund save, we offered 10k leads over 3 months - client is asking for 10k leads\n\n#### What are you doing to achieve it?\n\nasking for 10k leads - part of reufnd save\n\n#### What is happening instead?\n\nn/a\n\n#### What is the expected outcome?\n\nn/a"
+    },
+    {
+      "id": "ENG-7190",
+      "createdAt": "2026-03-25T20:20:04.777Z",
+      "title": "Update AI consultant to provide current AIA recommendations",
+      "state": "Canceled",
+      "assignee": "Beth Newton",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "#### Customer Name\n\nName 1\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 1\n\n#### Screenshot\n\n <image> \n\n <image> \n\n <image> \n\n#### What are you trying to achieve?\n\nThe AI consultant needs to be updated because it gave client Name 1 recommendations for using Name 13 (old vehicle) and made suggestions that are already part of AIA workspace + platform\n\n#### What are you doing to achieve it?\n\nSubmit ticket, screenshots\n\n#### What is happening instead?\n\nAI consultant suggesting info that is outdated\n\n#### What is the expected outcome?\n\nAI consultant recommend solutions that are current and only AIA in house deliverables or resources"
+    },
+    {
+      "id": "ENG-12685",
+      "createdAt": "2026-08-13T14:41:11.940Z",
+      "title": "Name 12 - promised lead refresh in refund save call",
+      "state": "Done",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [],
+      "description": "#### User Email\n\n<email>\n\n#### Workspace Name\n\nName 12\n\n#### Request Type\n\nLead credit\n\n#### Reason for request\n\nHe has been a 2x refund save.  Has been waiting on a closer for 3 months, and a perennial risk client.  I have him in a decent spot, but he brought up the lead credit refresh that was promised by Name 11 M in his refund save call"
+    },
+    {
+      "id": "ENG-12920",
+      "createdAt": "2026-08-19T13:04:30.872Z",
+      "title": "Acquisity email sending issue - Refund save client.",
+      "state": "Todo",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [],
+      "description": "#### Customer Name\n\nName 14\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 14's Workspace\n\n#### Screenshot\n\n <image> \n\n#### What are you trying to achieve?\n\nHe is constantly having email sending issues. This is probably the 3rd time he is complaining about the issue. He is a refund save to speed is important here.\n\n#### What are you doing to achieve it?\n\nI have stopped the campaign and restarting helped but it looks like\n\n#### What is happening instead?\n\nCampaigns constantly stalling when new campaigns are created.\n\n#### What is the expected outcome?\n\nFixing the account wide issue of stalled campaigns stopped sending emails randomly and understanding the core issue with the account."
+    },
+    {
+      "id": "ENG-6534",
+      "createdAt": "2026-03-10T12:08:17.371Z",
+      "title": "Stop unrelated emails from appearing in interested inbox",
+      "state": "Done",
+      "assignee": "Jared Stauffer",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "#### Customer Name\n\nName 1\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 1\n\n#### Screenshot\n\n#### What are you trying to achieve?\n\nThe “interested” inbox has emails in there where people have not even replied to the first email.\n\n#### What are you doing to achieve it?\n\nThe “interested” inbox has emails in there where people have not even replied to the first email.\n\n#### What is happening instead?\n\nThe “interested” inbox has emails in there where people have not even replied to the first email. <loom>\n\n#### What is the expected outcome?\n\nTo stop the emails appearing in the \"interested\" section whne they are not actually \"interested\""
+    },
+    {
+      "id": "ENG-14357",
+      "createdAt": "2026-09-28T07:33:37.964Z",
+      "title": "Name 15 - refund save, requesting 1 month of free Acquisity, inboxes, domains and lead credits",
+      "state": "Done",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": ["Discount", "Internal reported"],
+      "description": "#### User Email\n\n<email>\n\n#### Workspace Name\n\nCompany Four\n\n#### Request Type\n\nDiscount code\n\n#### Reason for request\n\nName 15 - refund save, requesting 1 month of free Acquisity, inboxes, domains and lead credits. Name 15 was a churn risk that I saved from refund without filing RR. He cited a lot of  bad experiences during the onboarding including setting of incorrect expectations. I got him back on track and he has agreed to continue with us but we need to compensate him for the time lost by giving him at least one month of free Acquisity, inboxes, domains, lead credits."
+    },
+    {
+      "id": "ENG-7133",
+      "createdAt": "2026-03-25T05:42:45.068Z",
+      "title": "Build advanced order saved views",
+      "state": "Canceled",
+      "assignee": null,
+      "parent": null,
+      "labels": ["Feature", "Phase 2"],
+      "description": "## Context\n\nSave frequently-used filter combinations as named views in the orders dashboard. This lets team members quickly switch between common order views (e.g., \"Unfulfilled orders this week\", \"High-value refunds\") without re-applying filters each time.\n\n## Acceptance Criteria\n\n- [ ] `orderView` table: `name`, `filters` (JSONB), `isDefault` (boolean), `userId` (personal views), `organizationId`\n- [ ] Default system views: All Orders, Unfulfilled, Unpaid, Refunded, Disputed\n- [ ] Custom views: user applies filters → clicks \"Save as View\" → names it\n- [ ] View tabs displayed above the orders table\n- [ ] Rename, reorder, delete custom views\n- [ ] Personal (per user) — not shared across team members\n\n## Codebase Reference\n\n* Schema: `lib/db/schema/commerce.ts` — create `orderView` table\n* tRPC: `trpc/routers/commerce/` for view CRUD procedures\n* Admin pages: `Page`/`PageHeader`/`PageBody`, `DataTable`\n* URL state: `nuqs` for filter params synced with view selection\n\n## Implementation Steps\n\n1. Create `orderView` table in `lib/db/schema/commerce.ts` with name, filters (JSONB), isDefault, userId, organizationId\n2. Seed default system views on first access (All Orders, Unfulfilled, Unpaid, Refunded, Disputed)\n3. Add view tabs UI above the orders `DataTable`\n4. \"Save View\" button: capture current filter state from URL params → save as new named view\n5. View management: rename and delete via dropdown menu on each tab"
+    },
+    {
+      "id": "ENG-6902",
+      "createdAt": "2026-03-20T11:56:43.452Z",
+      "title": "AISDR marks available times as unavailable",
+      "state": "Canceled",
+      "assignee": "Koppany Kondricz",
+      "parent": "ENG-6737",
+      "labels": [],
+      "description": "Client: **Name 1** <email>\n\nAISDR is advising prospects that availability is blocked when there are open times on the calendar.\n\nThis has happened more than once. One reported example is from Name 16, who booked Wednesday at 10:00 AM being treated as unavailable even though there was only one meeting an hour earlier, so buffer time should not have blocked that slot.\n\nClient manually created the meeting you now see at 10MDT on the 25th. This is an Urgent issue and would appreciate a speedy fix and an update early next week.\n\nA screen recording was shared in Jam.\n\n <image> "
+    },
+    {
+      "id": "ENG-4346",
+      "createdAt": "2026-01-09T16:38:42.249Z",
+      "title": "Templates not saving and error shown when saving",
+      "state": "Duplicate",
+      "assignee": "Jared Stauffer",
+      "parent": null,
+      "labels": [],
+      "description": "Customer reports that none of their templates are being saved and an error is shown when attempting to save.\n\nScreenshot of the error:\n\n <image> "
+    },
+    {
+      "id": "ENG-12916",
+      "createdAt": "2026-08-19T11:41:36.058Z",
+      "title": "Name 17 - WL refund",
+      "state": "Done",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [],
+      "description": "#### User Email\n\n<email>\n\n#### Workspace Name\n\nName 17\n\n#### Request Type\n\nRefund\n\n#### Reason for request\n\nShe's an active refund request for the $99 white-label payment she made, despite not using it whatsoever. This was a promise made to her during the last save attempt"
+    },
+    {
+      "id": "ENG-6040",
+      "createdAt": "2026-02-28T16:38:39.599Z",
+      "title": "6. Saved Searches Modal & Auto-Save Backend",
+      "state": "Done",
+      "assignee": "Blaise Gulaj",
+      "parent": "ENG-6027",
+      "labels": ["Feature", "Improvement"],
+      "description": "## Overview\n\nBuild the saved searches system including: the saved searches modal UI, auto-save behavior for every search, rename/delete functionality, and the backend data model to persist searches.\n\n## Saved Searches Modal\n\nTriggered by clicking the \"Saved Searches\" button in the results table top bar.\n\n### Modal Layout\n\n* **Header**: \"Search...\" title with close (X) button\n* **Search/Rename Input**: Text input at top for searching through saved searches or renaming the currently selected search. Has checkmark (save) and X (cancel) action buttons.\n* **Saved Searches List**: Scrollable list of all saved searches, each showing:\n  * Search name/description text (auto-generated from filter values, e.g. \"United States, Software & Name 19, CEO, owner, business...\")\n  * Lead count with people icon (e.g. \"244k\")\n  * If search is currently being scraped/imported: status badge showing progress (e.g. \"5k/20k imported\" in yellow/amber badge with refresh icon)\n* **Hover State**: On hover, each list item reveals:\n  * Edit (pencil) icon — enters rename mode for that search\n  * Delete (trash) icon — deletes the saved search (with confirmation)\n* **Click Behavior**: Clicking a saved search item loads its filters into the sidebar, transitions to results table, and fetches updated lead count\n\n## Auto-Save Behavior\n\n* Every search (AI or manual filter application) is automatically saved\n* Auto-generated name based on applied filters (e.g. comma-separated summary of key filters)\n* Users can rename saved searches via the modal\n* Saved searches persist across sessions (stored in database)\n\n## \"Save Search\" Button (in top bar)\n\n* Clicking \"Save Search\" in the results table top bar saves the current filter state\n* If the current search already exists (was loaded from saved searches), it updates the existing saved search\n* Shows a brief success toast/notification\n\n## Backend Data Model\n\nNew database table/model needed:\n\n```\nsaved_lead_searches:\n  - id (UUID, primary key)\n  - organization_id (FK to organizations)\n  - user_id (FK to users, who created it)\n  - name (string — auto-generated or user-renamed)\n  - filters (JSONB — stores the complete filter state: job titles, locations, industries, keywords, employee sizes, advanced filters, etc.)\n  - ai_prompt (string, nullable — the original AI search prompt if applicable)\n  - lead_count (integer, nullable — cached lead count at time of save)\n  - import_status (enum: null | 'importing' | 'partial' | 'complete')\n  - imported_count (integer, default 0)\n  - total_to_import (integer, nullable)\n  - created_at (timestamp)\n  - updated_at (timestamp)\n```\n\n## tRPC Name 18\n\n* `savedSearches.list` — list all saved searches for the current organization\n* `savedSearches.create` — create a new saved search\n* `savedSearches.update` — update name or filters of a saved search\n* `savedSearches.delete` — delete a saved search\n* `savedSearches.getById` — load a specific saved search with its filters\n\n## Technical Notes\n\n* Use Drizzle ORM for the database schema (follow repo conventions)\n* Generate migrations with `bun db:generate` (never hand-write migrations)\n* The saved searches list in the AI Search initial state panel (ENG-6030) should use the same `savedSearches.list` endpoint\n* Consider optimistic updates for rename/delete operations\n* Use `ds-*` design system variables for modal styling\n\n## Dependencies\n\n* Blocked by: ENG-6031 (Lead Results Data Table — the modal is triggered from the table's top bar)\n* Also connects to: ENG-6030 (AI Search Panel uses the same saved searches list)\n\n## Priority\n\nP2 — Important for user workflow but the core search/filter/table flow can work without saved searches initially."
+    }
+  ]
+}

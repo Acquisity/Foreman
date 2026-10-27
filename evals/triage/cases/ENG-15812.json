@@ -1,0 +1,267 @@
+{
+  "id": "ENG-15812",
+  "provenance": "seeded",
+  "createdAt": "2026-10-20T16:35:21.379Z",
+  "lane": "triage",
+  "stratum": "unproven",
+  "ticket": {
+    "title": "Lead history popping up and down when scrolling on Acquisity",
+    "description": "#### Customer Email\n\n<email>\n\n#### Workspace name\n\nAI Acquisition Sales Team\n\n#### Workspace ID\n\n<uuid>\n\n#### Which lead?\n\nNone\n\n#### What's wrong?\n\nWhen clicking on different tabs like emails, calls and texts on a lead's profile in Acquisity, the screen doesn't stay stable and always jumps up and down, making scrolling and navigation quite jumpy and difficult\n\n#### Screenshot\n\n <image> \n\n#### Video link",
+    "attachmentKinds": ["image", "slack"]
+  },
+  "repoCommitAtCreate": "048eb83a821baf4c42e8e3e7e785ef867159c934",
+  "flags": {
+    "descriptionEditedAfterCreate": false,
+    "needsProductionData": false,
+    "alreadyFixedAtTriage": false
+  },
+  "asFiled": {
+    "assignee": "James Keeble",
+    "labels": [],
+    "parent": null,
+    "priority": 3,
+    "project": "CRM"
+  },
+  "relatedSnapshot": [
+    {
+      "id": "ENG-3519",
+      "createdAt": "2025-12-07T23:19:18.063Z",
+      "title": "Cannot scroll leads or view full emails on small window",
+      "state": "Done",
+      "assignee": "Anuj Bhatt",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "Customer reports UI issues when the app window is not full-sized:\n\n* Unable to scroll down to see leads unless the window is full size.\n* Unable to see full email messages and there is no way to pop out the email, which makes it challenging to respond within the app.\n\nScreen recording of the issue: Jam recording."
+    },
+    {
+      "id": "ENG-4431",
+      "createdAt": "2026-01-12T04:46:04.177Z",
+      "title": "Campaign stops after contacting 22 of 2000 scraped leads",
+      "state": "Done",
+      "assignee": "Anthony Adewale",
+      "parent": null,
+      "labels": ["Campaign Stops Sending"],
+      "description": "Customer reports that after using the AI lead scraper in Acquisity to add \\~2000 leads to a campaign, only 22 leads were actually contacted and the campaign shows as completed.\n\nDetails shared so far:\n\n* All \\~2000 leads appear in the campaign in Acquisity.\n* Only 22 of the leads were contacted.\n* The campaign is marked as completed after sending to just those 22 leads.\n* Leads were expected to transfer to / be contacted via Company One, but remained in Acquisity instead.\n* A screen recording of the behaviour is available in this Jam: <url:jam.dev>"
+    },
+    {
+      "id": "ENG-15303",
+      "createdAt": "2026-10-13T15:21:17.615Z",
+      "title": "Slow loading time when dialing leads on Acquisity",
+      "state": "Triage",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [],
+      "description": "#### Customer Name\n\nN/A\n\n#### Customer Email\n\nN/A\n\n#### Workspace name\n\nAI Acquisition Sales Team\n\n#### Screenshot\n\n#### What are you trying to achieve?\n\nWhen a lead is opened on Acquisity for dialling, there's always a lag time of 20-60 seconds before dialling starts, which is a significant amount of time wasted when dialling a huge list\n\n#### What are you doing to achieve it?\n\nClicking on the call button to dial a lead\n\n#### What is happening instead?\n\nExperiencing a lag time before the lead is dialled\n\n#### What is the expected outcome?\n\nFaster/ near instantaneous loading time when dialling a lead"
+    },
+    {
+      "id": "ENG-3326",
+      "createdAt": "2025-12-03T00:47:55.723Z",
+      "title": "Account flagged for bug preventing campaign pause and email provider verification",
+      "state": "Done",
+      "assignee": "Savinder Singh",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "Customer reports inability to pause active campaign.\n\nAlso want to verify that Company One isn't linked up since he wants that his campaign will be transferred over to acquisity.\n\n---\n\nConversation:\nName 1: <p>how can I find leads that I purchased through acquisity but havent used yet</p>\n\nbot: You can check your unused lead credits by going to Settings > Cold Email Agent in your platform. This will show your current credit balance and how many credits you have remaining. To access your leads and manage them, click the CRM icon in your sidebar to open the CRM area. The CRM helps you organize contacts and track your entire sales process, so you can see which leads you've sourced but haven't contacted yet. Your credit balance updates automatically when you purchase credits and when you use them to source new leads for campaigns. Sources: How Lead Scraping Credits Work | Help Center - AI Acquisition CRM Overview | Help Center - AI Acquisition\n\nbot: Is that what you were looking for?\n\nName 1: how do I find all leads within CRM\n\nbot: To find all your leads in the CRM, go to the People tab at the top of your CRM area. This is your centralized contact database where you can see all individual contacts with their details like name, email, phone, company, and tags. The People tab has a searchable table format, so you can easily browse through all your contacts or search for specific ones. You'll also see their complete interaction history including any linked deals, tasks, and notes right from this view. Source: CRM Overview | Help Center - AI Acquisition\n\nbot: Did that answer your question?\n\nName 1: Im trying to locate the leads that are uncontacted so I can add to campaigns\n\nbot: The CRM doesn't have a specific filter for \"uncontacted\" leads, but you can work with your contacts in the People tab to identify leads for campaigns. For new campaigns, you have two main options: generate fresh AI leads or upload a CSV of contacts. If you want to use existing CRM contacts, you'd need to export them as a CSV and then upload that to your new campaign. The People tab shows all your contacts with their interaction history, so you can manually review which ones haven't been contacted yet. Sources: CRM Overview | Help Center - AI Acquisition How to Create a New Cold Email Campaign | Help Center - AI Acquisition\n\nbot: Was this helpful?\n\nName 1: no.\n\nbot: Sorry it didn't work! Could you tell me more about what you see in your CRM? Maybe we can find another way to spot those uncontacted leads together.\n\nName 1: I need to find all uncontacted leads within the platform so I can add them to a new campaign\n\nbot: I understand you want to use existing uncontacted leads for a new campaign. Unfortunately, our platform doesn't have a built-in filter to identify uncontacted leads specifically. For new campaigns, you have two main options: generate fresh AI leads or upload a CSV of contacts. If you want to use existing contacts from your CRM, you'd need to export them as a CSV first, then upload that to your new campaign. The workaround would be manually reviewing your contacts in the People tab to identify which ones haven't been contacted, export those as CSV, then upload to your campaign. Source: How to Create a New Cold Email Campaign | Help Center - AI Acquisition\n\nbot: Is that what you were looking for?\n\nName 1: I've deleted 2 campaigns that was never launched but had purchased 2500 leads per campaign. I need to find those uncontacted leads to utilize for a new campaign. Name 3 used 5000 credits towards these leads\n\nbot: I understand your frustration about losing those leads after deleting the campaigns. Unfortunately, when campaigns are deleted, the leads that were generated for those specific campaigns are also removed from the platform. Since you've already used the credits to generate those leads, you'll need to create a new campaign and generate fresh leads, which will require additional credits. The platform doesn't store previously generated leads separately from their campaigns once deleted. For your new campaign, you can generate AI leads again using your targeting criteria. Each AI lead generation requires 2,500 credits and takes 5-15 minutes to complete. To avoid this in the future, consider pausing campaigns instead of deleting them if you want to preserve the leads for later use. Sources: How to Create a New Cold Email Campaign | Help Center - AI Acquisition How Lead Scraping Credits Work | Help Center - AI Acquisition\n\nbot: Did that answer your question?\n\nName 1: so there isn't a complete lead list of purchased leads?\n\nbot: No, there isn't a master list of all purchased leads stored separately. Leads are tied to specific campaigns - you can see your complete prospect list in each campaign's Leads tab. When you delete a campaign, those leads are removed with it. The platform doesn't maintain a separate database of all leads you've ever purchased across campaigns. Your credits get used when generating leads for campaigns, but the leads themselves live within those individual campaigns rather than in a central lead repository. Sources: Cold Email Agent Overview | Help Center - AI Acquisition How to Create a New Cold Email Campaign | Help Center - AI Acquisition\n\nbot: Was that helpful?\n\nName 1: So l lost all 5000 leads/credits?\n\nbot: Yes, unfortunately when you delete campaigns, the leads generated for those campaigns are removed from the platform. The credits were used to generate those leads, but since the campaigns were deleted, those specific leads are no longer accessible. For future campaigns, you'll need to generate fresh leads using additional credits. Each AI lead generation requires 2,500 credits. To avoid this happening again, consider pausing campaigns instead of deleting them if you want to preserve the leads for later use. Sources: How Lead Scraping Credits Work | Help Center - AI Acquisition How to Create a New Cold Email Campaign | Help Center - AI Acquisition\n\nbot: Is that what you were looking for?\n\nName 1: can this be flagged to a human. Its a bit frustrating to be wasting valuable credits from experimenting on the platform without any training provided\n\nbot: I'll connect you with someone from our team right away. Meanwhile, could you share any additional details or concerns you have? This will help them assist you more effectively.\n\nName 1: <email>\n\nEllaine Fuente: Thanks. I have pulled up your account.\n\nEllaine Fuente: Go to Cold Email Agent. Click your campaign and go to Leads Tab\n\nEllaine Fuente:\n\nName 1: im there\n\nEllaine Fuente: These are all your leads list\n\nName 1: this campaign is fine. I had created 2 other campaigns trying to get to this point. within the other 2 campaigns I had to purchase 2500 leads each. the campaigns were brutal so I deleted them. I want to access those 5000 uncontacted leads I purchased to add to this campaign\n\nName 1: The 2 intial campaigns I created was AI generated and were pulling information about healthcare and hairsalons into the copy.\n\nName 1: with no training I was experimenting on the platform and during that it sounds like it caused me to burn up 5000 credits? for campaigns that made zero sense.\n\nEllaine Fuente: Let me check this one out, Name 100.\n\nEllaine Fuente: When was the purchase made?\n\nName 1: used from the startup 10k credits. 11/26\n\nEllaine Fuente: Unfortunately, we could not retrieve the leads at the moment.\n\nName 1: Ok. What would the next step be\n\nName 1:\n\nName 1:\n\nName 1: why is it telling me I dont have any leads?\n\nEllaine Fuente: Hi Name 100. Sorry for the late response. Are you still getting this error?\n\nEllaine Fuente: If you only had 1 campaign to run what would that be?\n\nName 1: Yes. Name 4 offer 1 is the one I am trying to start. The other 2 I pulled over from Company One.\n\nEllaine Fuente: I see you have 3 campaigns running. I see you only have around 5k credits which may be the reason why the campaigns wont run. Can we pause the other 2 campaigns to test if this will work?\n\nName 1: Yes. Im away from my computer right now and only phone access. Also ive evidently wasted 5k of credits trying to start Name 4 offer 1 campaign. I deleted the first two attempts because the copy was so off. Combining healthcare and hair salon messaging?? Is it possible to get those 5k credits back?\n\nName 1: Or just retrieve the 5k of uncontacted leads?\n\nName 1: I paused the 2 other campaigns\n\nName 1: actually it wont let me pause those campaigns. I think something is setup wrong. something has to be off because nothing seems to working\n\nName 5: Hi Name 100 do you have a recording for the campaign that won't pause? For the credits I'll check with the team if it can be refunded.\n\nName 1:\n\nName 1: this continues without pausing it. I tried the bulk action for pausing as well. neither would pause it\n\nName 1: can we check to verify Company One isn't effecting this process. I started with Company One set up and then wanted to switch to acquisty fully because my domains got wiped out on Company One.\n\nName 1:\n\nName 1: here is a better recording\n\nName 5: Does the campaign still not pausing\n\nName 1: status is still active\n\nName 5: This can be a bug since you manually pause it in the platform but it seems not to work. I'll have this reported to the team.\n\nName 1: thank you! excited to get this moving in the right direction! its been a rough start on the new platform lol\n\nName 5: Thank you! I really appreciate your patience with the new platform — it’s definitely been a bit of a rough start. I’m glad we’re getting things on track now.\n\nName 1: one more quick question. how do I verify I dont have Company One linked up still? I want to be completely transfered over to acquisity\n\nName 5: You can try this steps.\n\nName 5: This message was deleted\n\nName 1: ?\n\nName 5: Sorry this one\n\nName 5: Step 1: Verify Acquisity is Active Log in to the Acquisity platform. Navigate to the Cold Email Agent section (or the equivalent area where you manage email providers). Confirm that Acquisity is selected and showing as the Active email sending provider. If you see an option to \"Connect Company One\" or a field for an Company One API key, proceed to Step 2. Step 2: Disconnect Company One on the Acquisity Platform If any Company One credentials (like an API key) are still visible in the Cold Email Agent settings, delete or clear that information from the fields. Save the settings to ensure the platform registers the removal. Step 3: Revoke Access within Company One (Crucial Security Step) Log in to your client's Company One.ai account. Go to the Settings or API Key section (often found under Profile or Integrations). Locate the specific API key that was used to link Company One to the previous platform. Revoke or Delete that API Key. This immediately cuts off all communication between Company One and the old integration, guaranteeing the transfer is complete. Step 4: Check for Active Company One Campaigns (Deliverability Caution) While still in Company One, check the Campaigns section. If there are any campaigns currently running, pause or stop them. You cannot transfer a running campaign to Acquisity. Wait for all scheduled emails to finish sending before you consider canceling the Company One subscription.\n\nName 1: sorry but you expand on Step 1\n\nName 1: can you\\*\n\nName 5: Here is the expanded detail for Step 1: Step 1: Verify Acquisity is Active This step involves navigating the platform to the control panel for your email marketing tools and visually confirming the status of the sending engine. A. Locate the Email Agent Settings: Action: Log into the platform and look for the navigation link labeled \"Cold Email Agent,\" \"Email Marketing,\" or \"Campaign Settings.\" This is the section where you manage the backend provider for your outreach. B. Check the Active Provider Status: Action: Once in the settings, look for a status indicator or a selection box that specifies which provider is currently in use. Verification: You should see a clear indication that Acquisity is the selected and active provider. This might be a green checkmark, a radio button selected next to \"Acquisity,\" or a status message like \"Active Provider: Acquisity.\" C. Look for Company One Artifacts: Action: While in the settings, look specifically for any remaining signs of the Company One integration. Verification: If the platform is fully transitioned, you should not see: A prominent button that says \"Connect Company One.\" An input field that still contains an Company One API key. A status message indicating that Company One is still \"Connected\" or \"Active.\" D. Confirmation: If you see Acquisity clearly marked as active and no Company One credentials are present, you have successfully completed the first step of the transition. You can proceed to Step 2 to ensure the connection is revoked at the source.\n\nName 1: I dont see anywhere stating either or is selected\n\nName 1: do you have a screen shot of this page\n\nName 2: Hello Name 100 Do you still need help with that?\n\nName 1: yes\n\nName 1: Has my account been flagged to the team? would love to get this figured out asap! thanks"
+    },
+    {
+      "id": "ENG-15809",
+      "createdAt": "2026-10-20T16:26:44.370Z",
+      "title": "No lead history or profile shown when power dialling",
+      "state": "Triage",
+      "assignee": "James Keeble",
+      "parent": null,
+      "labels": [],
+      "description": "#### Customer Email\n\n<email>\n\n#### Workspace name\n\nAI Acquisition Sales Team\n\n#### Workspace ID\n\n<uuid>\n\n#### Which lead?\n\nNone\n\n#### What's wrong?\n\nWhen power dialling, it doesn't show the history of the lead I'm dialling.\n\nThat leads to dialling someone else's lead or a lead who has already bought\n\nAnd even when I exclude existing clients on my smart views, I still find myself calling leads I've closed previously.\n\nIt would be helpful to be able to fully exclude already existing clients and also see each lead's history when power dialling\n\n#### Screenshot\n\n <image> \n\n#### Video link"
+    },
+    {
+      "id": "ENG-4232",
+      "createdAt": "2026-01-06T21:27:50.635Z",
+      "title": "Client portal shows campaign data before any campaigns run",
+      "state": "Done",
+      "assignee": "Anuj Bhatt",
+      "parent": null,
+      "labels": ["Wrong Dashboard Numbers"],
+      "description": "Client reports that a newly created client workspace shows existing campaign metrics in the client portal even though no campaigns have been started for that client yet.\n\nWhen logging into the client’s portal account, the dashboard displays stats such as emails sent, opens, and replies as if there were active or historical campaigns. Support checked the main account and did not see an obvious configuration issue, but the client continues to see this data from their side.\n\nThis appears to be a data mismatch or leakage between workspaces/client portals.\n\nScreen recording: <url:jam.dev>\n\nScreenshot from client portal:\n\n <image> "
+    },
+    {
+      "id": "ENG-4833",
+      "createdAt": "2026-01-26T05:46:40.663Z",
+      "title": "Cold Email Agent lead tools leave customer outreach blocked",
+      "state": "Duplicate",
+      "assignee": "Anthony Adewale",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "Customer’s outreach remains effectively frozen due to limitations and unresolved behavior in the Cold Email Agent lead workflow, even after previous issues (ENG-3326, ENG-3838, ENG-4232, ENG-4639) were marked resolved.\n\nKey points from the conversation:\n\n* Customer cannot practically proceed with campaigns because there is no way to efficiently clean and segment a 4,560-lead healthcare list where only \\~40–42% of leads match their ICP.\n* Existing guidance to \"upload leads and create different campaigns\" does not address the underlying need to filter, segment, and export leads at scale from a single campaign.\n* Customer reports that their outreach has been \"frozen\" for weeks and they are unable to move forward with both their own and client campaigns as a result.\n* Customer explicitly asks what can be done to fix this and whether this is what they should expect going forward.\n\nThis ticket is to reassess the current behavior and previous resolutions for this account and ensure there is a workable, reliable path for the customer to run campaigns using large lead lists without being blocked by tooling gaps or edge-case behavior."
+    },
+    {
+      "id": "ENG-4639",
+      "createdAt": "2026-01-18T22:36:53.894Z",
+      "title": "Add lead export, filtering, and segments to Cold Email Agent",
+      "state": "Done",
+      "assignee": "Anthony Adewale",
+      "parent": null,
+      "labels": ["Campaign State", "Feature"],
+      "description": "### Problem\n\nLead management inside the Cold Email Agent is too limited for larger campaigns. In a recent healthcare campaign with 4,560 imported leads (\\~50.7K available in pool), the user had to manually review all leads and found that only \\~40–42% matched their ICP, but there was no way to efficiently clean or organize the list inside the product. There is no CSV export, filtering is too basic for complex criteria, and there is no way to segment leads or tag them by quality.\n\n### User Story\n\nAs an agency user running multi-thousand-lead campaigns, I want robust lead export, filtering, and segmentation tools so that I can clean, organize, and target my lists efficiently without spending 15–25 hours per campaign on manual cleanup or having to move data to other platforms.\n\n### Functional Requirements\n\n- [ ] Allow exporting campaign leads to CSV (all leads or filtered subset), including core fields like name, email, company, title, location, LinkedIn, and status.\n- [ ] Add an advanced filter builder that supports multiple conditions with AND/OR logic, bulk keyword input (e.g. exclude many company keywords at once), and combining filters across fields (e.g. company + industry + title).\n- [ ] Enable saving and reusing filter configurations (saved views) within a campaign.\n- [ ] Support lead segments or lists within a campaign (e.g. \"Strong ICP\", \"Borderline\", \"Non-ICP\") that can be populated via filters or bulk actions.\n- [ ] Add basic tagging for leads (e.g. \"Strong Match\", \"Needs Review\") that can be used in filters and bulk actions.\n\n### Acceptance Criteria\n\n- [ ] User can export the full lead list or a filtered subset from the Leads tab to CSV and open it in a spreadsheet tool.\n- [ ] User can define complex filters (including multiple \"does not contain\" keywords at once) and apply them without losing them on page reload.\n- [ ] User can save a filter configuration, reapply it later in the same or another session, and switch quickly between saved views.\n- [ ] User can create named lead segments and move leads into them using filters or selection; metrics and sending can target only a chosen segment.\n- [ ] User can add and remove tags on individual or bulk-selected leads and filter by those tags when preparing a campaign.\n\n### Out of Scope\n\n* Changes to lead scraping logic or data sources.\n* Changes to billing/credit usage; this request focuses on managing leads after they are in the platform."
+    },
+    {
+      "id": "ENG-3838",
+      "createdAt": "2025-12-17T00:42:27.374Z",
+      "title": "AI SDR suggests meeting dates before prospect availability",
+      "state": "Canceled",
+      "assignee": "Pieter Venter",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "Customer reports that the AI SDR proposed meeting dates that conflict with the prospect’s stated availability.\n\nObserved behavior:\n\n* Prospect replied along the lines of being available **only after Friday this week**.\n* AI SDR responded with three suggested dates, **two of which were before Friday**.\n\nThere is a screen recording of the conversation showing the incorrect SDR reply and context: Jam recording."
+    },
+    {
+      "id": "ENG-14620",
+      "createdAt": "2026-10-02T09:27:16.388Z",
+      "title": "when lead magnet is being shared it shows full URL with acquisity and vercel",
+      "state": "unknown",
+      "assignee": "unknown",
+      "parent": "unknown",
+      "labels": "unknown",
+      "description": "#### Customer Name\n\nName 6\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 6's Workspace - (Company Two)\n\n#### Screenshot\n\n <image> \n\n#### What are you trying to achieve?\n\nHaving the lead magnet be sent as a hyperlink\n\n#### What are you doing to achieve it?\n\nSelected campaign type lead magnet and added the lead magnet in the right way\n\n#### What is happening instead?\n\nIt's showing the entire URL with acquisity and vercel + it just doesn't look nice\n\n#### What is the expected outcome?\n\nhaving it as a hyperlink behind the lead magnet title we need to add"
+    },
+    {
+      "id": "ENG-5946",
+      "createdAt": "2026-02-25T20:56:01.197Z",
+      "title": "Cold Email Agent campaign creation fails with \"Something went wrong\"",
+      "state": "Done",
+      "assignee": "Anthony Adewale",
+      "parent": null,
+      "labels": ["Bug", "Campaign State"],
+      "description": "user: <email>\n<email>\n<email>\n<email>\n\nA customer is unable to create a Cold Email Agent campaign; clicking New Campaign results in a \"Something went wrong\" error.\n\n <image> \n\n <image> "
+    },
+    {
+      "id": "ENG-3051",
+      "createdAt": "2025-11-27T01:26:42.289Z",
+      "title": "Outreach Provider Connection and Campaign Creation Errors",
+      "state": "Canceled",
+      "assignee": "Koppany Kondricz",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "User experiences persistent 'Something went wrong with the connection to your outreach provider' error, cannot load email accounts, and receives 'Failed to create campaign draft' message; unable to fix via Cold Email Agent.\n\nThe user is encountering a complete failure of the Cold Email Agent integration. The core issue is a persistent \"Something went wrong with the connection to your outreach provider\" error, which the user cannot resolve because the \"Fix\" button directs them to a setup screen with no actionable steps. This connection failure prevents the system from loading email accounts, and all critical functions are broken, resulting in a \"Failed to create campaign draft\" error when attempting to start a campaign. Furthermore, the \"Buy email account\" button is unresponsive, leading the user to worry about accidental multiple charges.\n\nJam | Console logs, network requests, and more\n\n---\n\nConversation:\nName 7: <p>need help resolving: Something went wrong with the connection to your outreach provider. Please reconnect.</p>\n\nbot: This connection error usually happens when your integration needs to be refreshed. Here's how to fix it: First, try these quick steps: Refresh your browser page Clear your browser cache and log back in Check your internet connection If that doesn't work, reconnect your integration: Go to Settings > Email & Calendar Use the disconnect/trash icon to disconnect your current connection Follow the setup process again to reconnect During reconnection: Make sure your account allows third-party app access Don't close the browser window during the authorization process If you get \"No authorization code received,\" clear your browser cache and try again This should restore your outreach provider connection. The error typically resolves once the integration is properly reestablished. Sources: Setting Up AI SDR with Name 10 Calendar | Help Center - AI Acquisition Dashboard Overview: Understanding the Numbers | Help Center - AI Acquisition How to reset your password | Help Center - AI Acquisition Growth Plan Creator Guide | Help Center - AI Acquisition\n\nbot: Is that what you were looking for?\n\nbot: If you still need help resolving the connection issue, I'm here to assist you further. Would you like to provide more details about what you're trying to achieve or any specific problems you're encountering?\n\nbot: Since you're still seeing the same connection error, let's try a different approach: First, try these steps: Refresh your browser page Clear your browser cache completely, then log back in Check that your internet connection is stable If the error persists: The issue might be with your integration sync. Sometimes there's a delay between your integrations and our platform - data typically syncs within a few hours, but delays can occur. Try logging out completely, waiting a few minutes, then logging back in. If you're still getting the \"Failed to load\" type error, there should be a Retry button you can click. Let me know if these steps don't resolve it and I can help you dig deeper into what might be causing the connection issue. Source: Dashboard Overview: Understanding the Numbers | Help Center - AI Acquisition\n\nName 7: clicking fix takees me to the cold email agent\n\nbot: That's actually the correct behavior! When you click \"fix\" for the outreach provider connection error, it takes you to the Cold Email Agent because that's where you manage your email campaigns and integrations. From the Cold Email Agent, you can: Check your campaign settings and email provider connections Reconnect any disconnected integrations Access the settings to manage your email accounts and providers If you're still seeing connection issues once you're in the Cold Email Agent, look for your email provider settings or campaign configuration options to reestablish the connection. Source: Cold Email Agent Guide | Help Center - AI Acquisition\n\nbot: Was that helpful?\n\nName 7: not really\n\nbot: I'm sorry that didn't help! Would you like me to connect you with a human agent? Or if you can share more details about the issue, I’m happy to keep trying to assist you.\n\nName 7: what do i need to fix?\n\nName 7: yes\n\nbot: I'll connect you with someone who can help. Meanwhile, could you please share any additional details about the issue? This will help them assist you more efficiently.\n\nName 7: We couldn't load your email accounts Please refresh the page or try again later. If the problem persists, contact support.\n\nName 7: Something went wrong with the connection to your outreach provider. Please reconnect.\n\nName 7: Failed to create campaign draft: Something went wrong ​\n\nName 7: i feel like the acquisity thing needs to be re implemented or soemthing but i dont know how and dont want to screw it up\n\nName 7: yes\n\nName 7: at the top it says in yellow: something went wrong with your connection to your outreach provider. When I click to fix it, it takes me to the cold. Email agent set up screen. There's nothing in there for me to do to fix anything.\n\nName 7: Something went wrong with the connection to your outreach provider. Please reconnect.\n\nName 7: When I then go into the cold email agent in the main screen under marketing, there's nothing there. After a few seconds, it then says: We couldn't load your email accounts Please refresh the page or try again later. If the problem persists, contact support.\n\nName 7: I then hit by email account and click to make the purchase but then it doesn't do anything. I'm hoping that I'm not being charged each time. I click it cause I've now clicked it several times.\n\nName 7: Finally, when I go quick to create a campaign, it gives me the following error: Failed to create campaign draft: Something went wrong\n\nEllaine Fuente: Were you able to connect your email and Calendar, Name 11?\n\nName 7: i think?\n\nName 7: where would i see it\n\nEllaine Fuente: You can check it under Settings -> Email and Calendar\n\nName 7: yes they are connectede\n\nName 7: i feel like this is taking an extremely long tie to get anywhere\n\nEllaine Fuente: \\[Name 12: Jam for Customer Support\\]\n\nEllaine Fuente: Your recording is in progress. Navigate back to the Jam tab when you're finished.\n\nEllaine Fuente:\n\n🟡 Note from Ellaine Fuente: ↑ Upload started... Screen recording uploading (26.3 MB)\n\n🟡 Note from Ellaine Fuente: Jam created! View the screen recording here: <url:jam.dev>\n\nName 7: Screen recorded successfully!\n\nName 7: submitted it\n\nName 7: what happens if i reset workspace onboarding?\n\nName 7: also i want to make sure i am not being charged over and over again every time i click buy emails\n\nEllaine Fuente: As long as you do not click payment confirmation, I believe you wont get charged.\n\nName 7: ok so what hapens if i clikc reset workspace onboarding\n\nEllaine Fuente: it will reset your onboarding - from Niche research to your campaigns\n\nName 7: ohh then i dont want to do that\n\nName 7: so what do i need to do to fix this?\n\n🟡 Note from Ellaine Fuente: Name 8 do you know the error causing this? something went wrong with your connection to your outreach provider.\n\nName 7: ?\n\n🟡 Note from Name 8: Name 9 looks like a bug. Create a ticket for it. Make sure the Jam link is in it. Most importantly, add a lot of details. What the agent creates is often too minimal for the devs to use."
+    },
+    {
+      "id": "ENG-7889",
+      "createdAt": "2026-04-16T14:32:15.762Z",
+      "title": "Request 10,000 Lead Credits for Acquisity discount code",
+      "state": "Done",
+      "assignee": "Beth Newton",
+      "parent": null,
+      "labels": ["Refund"],
+      "description": "#### Workspace Name\n\nName 13\n\n#### Request Type\n\nDiscount code\n\n#### Reason for request\n\n2 Months Acquisity with Inboxes.\nAccount needs to get 10 000 Lead Credits."
+    },
+    {
+      "id": "ENG-11186",
+      "createdAt": "2026-07-06T19:46:56.128Z",
+      "title": "Request for billing credit and lead credits",
+      "state": "Done",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [],
+      "description": "#### Customer Name\n\nName 14\n\n#### Customer Email\n\n<email>\n\n#### Workspace name\n\nName 14's Workspace\n\n#### Screenshot\n\n#### What are you trying to achieve?\n\nCover cost of acqusity and inboxes for 3 months & 15k lead credits\n\n#### What are you doing to achieve it?\n\nRR save\n\n#### What is happening instead?\n\nRR save\n\n#### What is the expected outcome?\n\nCover Cost of acquisity and inboxes for 3 months Cover cost of acqusity and inboxes for 3 months & 15k lead credits"
+    },
+    {
+      "id": "ENG-7013",
+      "createdAt": "2026-03-24T21:39:32.301Z",
+      "title": "Cold email agent still prompts for enable and billing page fails to load",
+      "state": "Done",
+      "assignee": "Tyler Olsen",
+      "parent": null,
+      "labels": [],
+      "description": "Users:\n<email>\n<email>\n<email>\n<email>\n<email>\n<email>\n<email>\n<email>\n<email>\n<email>\n\nThe platform still asks to enable Cold Email Agent and AI SDR even though it has already been enabled.\n\nThe billing page also does not load and shows \"Unable to load billing information. Please try again later.\" The workspace was charged for domains and emails this week.\n\n <image> \n\n <image> "
+    },
+    {
+      "id": "ENG-8199",
+      "createdAt": "2026-04-29T22:07:05.775Z",
+      "title": "Request for 2 months free Acquisity and 10,000 lead credits",
+      "state": "Done",
+      "assignee": "Beth Newton",
+      "parent": null,
+      "labels": ["Refund"],
+      "description": "#### Workspace Name\n\nName 15\n\n#### Request Type\n\nDiscount code\n\n#### Reason for request\n\nRefund Save\n\nPlease action 2 Months Acquisity & Inboxes for free\n\n&\n\n10 000 lead credits"
+    },
+    {
+      "id": "ENG-3514",
+      "createdAt": "2025-12-07T12:50:22.634Z",
+      "title": "Delayed Resolution for Grandfathered Pricing Issue on Stripe Checkout",
+      "state": "Done",
+      "assignee": "Tyler Olsen",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "User grandfathered at $1/month sees $297/month upgrade prompt when creating personal workspace.\n\nCustomer reports repeated delays over 5 days in resolving the grandfathered $1/month Pro plan pricing not applying on Stripe checkout, still seeing full $297/month charge.\n\n---\n\nConversation:\nName 16: <p>hi, when I am at checkout It says acquisity is $297 a  month </p>\n\nbot: The pricing you're seeing depends on when you created your account. If you joined before November 24th, 2025, you should be grandfathered in and only pay the nominal fee. However, if your account was created on or after November 24th, you'll see the regular pricing since you joined after our platform launch. Even existing subscribers may see a payment page when first accessing the Cold Email Agent or AI SDR - this is part of the standard setup process to activate your account and unlock the full feature set. Could you let me know when you first created your account? That'll help clarify which pricing should apply to you.\n\nName 16: I purchased the A.I incubator on the 20th of November 2025\n\nbot: Perfect! Since you purchased on November 20th, you're grandfathered in and should only pay the nominal fee, not the regular pricing. The payment page you're seeing is normal - existing subscribers still see this when first accessing the Cold Email Agent or AI SDR. It's part of the setup process to activate your account and unlock the full feature set. You should be able to proceed with just the nominal fee since you joined before November 24th.\n\nName 16: so should I just continue with the payment and ignore the $297 a month payment?\n\nbot: Yes, you can proceed with the payment! Since you purchased on November 20th (before the November 24th cutoff), you're grandfathered in and should only pay the nominal fee. The payment page is part of the standard setup process that all existing subscribers see when first accessing the Cold Email Agent or AI SDR - it activates your account and unlocks the full feature set. You won't actually be charged the regular pricing amount since you're grandfathered in. Go ahead and complete the payment to get your tools activated!\n\nbot: Did that answer your question?\n\nName 16: so your saying even if I complete the transaction on stripe that says it is $297 dollars I will not be charged?\n\nbot: I understand your concern about the amount showing on Stripe. Since you purchased before November 24th, you should only pay the nominal fee (not the regular pricing amount). The payment page is part of our standard setup process that all existing subscribers see when accessing the Cold Email Agent or AI SDR - it activates your account and unlocks the full feature set. However, I want to make sure you're charged correctly. Could you share what page you're on when you see this amount? If possible, a screenshot would help us verify you're seeing the right pricing for your grandfathered status.\n\nName 16: I can take a screenshot, 2 minutes\n\nbot: Perfect! A screenshot will help us verify you're seeing the correct pricing for your grandfathered status. While you're getting that ready, I want to clarify - I can't confirm specific amounts you might see on the payment page, but I can help explain what type of charge it should be based on when you joined. Go ahead and share that screenshot when you have it!\n\nbot: Did that answer your question?\n\nName 16:\n\nbot: Thanks for sharing that screenshot! I can see you're on the Stripe checkout page showing the Pro plan pricing. Since you purchased on November 20th (before the November 24th cutoff), this doesn't look right for your grandfathered status. Don't complete this payment - it appears you may be seeing the regular pricing instead of the grandfathered rate you should qualify for. Thanks for your patience as we work through this. I'm going to pass this to a human teammate who can verify your account status and ensure you get the correct pricing. We're working through higher than usual support volume, but we'll get back to you as quickly as we can.\n\nName 16: no problem\n\nbot: Thanks for your patience! If you have any more questions or need further assistance, just let me know. I'm here to help! 😊\n\nbot: Thanks for your patience! I can see from our previous conversation that you purchased on November 20th, which means you should be grandfathered in and only pay the nominal fee, not the regular pricing. Since you're seeing the full pricing on Stripe instead of the grandfathered rate, this appears to be a billing setup issue that needs human review. Your account should be configured for the nominal fee since you joined before November 24th. We're still working through higher than usual support volume from our recent platform update, but our team will get back to you as quickly as possible to resolve the pricing discrepancy.\n\nName 16: No problem\n\nbot: Thanks for your patience! If you have any other questions or need further help, just let me know. I'm here to assist you! 😊\n\nbot: Thanks for your patience—this is definitely confusing, especially since you joined before the November 24th cutoff and should be grandfathered in for the nominal fee. If you’re seeing the full Pro plan price instead of the $1/month activation fee, it’s likely a setup or account status issue that needs to be reviewed by a human teammate. Here’s what’s supposed to happen: If you joined before November 24th, you should only pay a nominal fee (not the regular Pro rate) to activate the Cold Email Agent or AI SDR. The payment page you see is part of the standard setup, but the amount should reflect your grandfathered status, not the full Pro price . Since you’re being shown the regular rate, this isn’t expected behavior. I’m going to pass this to a human teammate so they can verify your account and make sure you’re charged the correct amount. We’re working through higher support volume right now, but you’ll get a reply as soon as possible.\n\nbot: Was that helpful?\n\nbot: I’m here to help if you still need assistance with the pricing issue you’re experiencing, and I apologize again for the confusion. Would you like to share any more details or questions about what you’re trying to resolve?\n\nbot: Thanks for your patience—this is definitely confusing, especially since you joined before the November 24th cutoff and should be grandfathered in for the nominal fee. If you’re seeing the full Pro plan price instead of the $1/month activation fee, it’s likely a setup or account status issue that needs to be reviewed by a human teammate. Here’s what’s supposed to happen: If you joined before November 24th, you should only pay a nominal fee (not the regular Pro rate) to activate the Cold Email Agent or AI SDR. The payment page you see is part of the standard setup, but the amount should reflect your grandfathered status, not the full Pro price. Since you’re being shown the regular rate, this isn’t expected behavior. I’m going to pass this to a human teammate so they can verify your account and make sure you’re charged the correct amount. We’re working through higher support volume right now, but you’ll get a reply as soon as possible.\n\nName 16: Ok, when will I know that it has been viewed by a human?\n\nbot: Thanks for your patience—this is definitely confusing, especially since you joined before the November 24th cutoff and should be grandfathered in for the nominal fee. If you’re seeing the full Pro plan price instead of the $1/month activation fee, it’s likely a setup or account status issue that needs to be reviewed by a human teammate. You’ll know a human has reviewed your issue when you get a reply in this chat. We’re working through higher support volume right now, but you’ll get a response as soon as possible. If you need to check your subscription or billing details, you can also review your agreement or billing page for exact charges.\n\nName 16: Ok I will keep checking this chat and wait for a human to respond\n\nbot: Thanks for your patience! I'll keep an eye out for any updates from our team and let you know if anything changes. Meanwhile, feel free to reach out if you have any other questions or need assistance! 😊\n\nbot: If you still need help with your billing issue, I’m here to assist you. Would you like to share any more details or questions about what you’re trying to resolve?\n\nbot: Thanks for your patience—this is definitely confusing, especially since you joined before November 24th, 2025, and should be grandfathered in for the nominal fee, not the full Pro plan price. If you’re seeing the $297/month charge, it’s likely a setup or account status issue that needs human review. Here’s what’s supposed to happen: If you joined before November 24th, you should only pay a nominal fee (not the regular Pro rate) to activate the Cold Email Agent or AI SDR. The payment page you see is part of the standard setup, but the amount should reflect your grandfathered status, not the full Pro price. Since you’re being shown the regular rate, this isn’t expected behavior. I’m going to pass this to a human teammate so they can verify your account and make sure you’re charged the correct amount. We’re working through higher support volume right now, but you’ll get a reply as soon as possible.\n\nName 16: You have said this the last 3 times it’s been 5 days"
+    },
+    {
+      "id": "ENG-10945",
+      "createdAt": "2026-06-26T18:47:05.158Z",
+      "title": "Request for discount code and lead credits",
+      "state": "Done",
+      "assignee": "Aaron Fraga",
+      "parent": null,
+      "labels": [],
+      "description": "#### User Email\n\n<email>\n\n#### Workspace Name\n\nName 17\n\n#### Request Type\n\nDiscount code\n\n#### Reason for request\n\nRR Save.\n\nCover the costs of Acquisity and inboxes for 3 months.\n\nPlease award 10,000 lead credits as well"
+    },
+    {
+      "id": "ENG-2385",
+      "createdAt": "2025-10-28T12:30:20.694Z",
+      "title": "Can't scroll down/see previous messages when replying manually to an email",
+      "state": "Duplicate",
+      "assignee": "Ben Ford",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "When replying manually to an email in the inbox, you hit Reply but then you just see this screen (screenshot). You can write here, but you cannot scroll down to see the message history. This is needed to craft a good response.\n\n <image> "
+    },
+    {
+      "id": "ENG-789",
+      "createdAt": "2025-08-14T08:05:35.003Z",
+      "title": "Fix the rectangle coming up when scrolling to the bottom",
+      "state": "Done",
+      "assignee": "Darshit Prajapati",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "Right now the \"scroll down\" effect aligns nicely with the text field:\n\n <image> \n\nBut when the user scrolls down, it goes even lower, with the rectangle coming up covering the latest message:\n\nScreen Recording 2025-08-14 at 12.02.37.mov"
+    },
+    {
+      "id": "ENG-2501",
+      "createdAt": "2025-10-31T08:56:05.158Z",
+      "title": "Prevent shifts in campaigns table during sorting load",
+      "state": "Done",
+      "assignee": "Mahmut Jomaa",
+      "parent": null,
+      "labels": ["Bug"],
+      "description": "When sorting the Campaigns table, there are large layout/content shifts during loading.\n\nProposed fix per prior tables:\n\n* Use placeholder data (React Query) during sort/loading.\n* Do not show skeleton while pending; only show skeleton on initial load.\n\n <image> "
+    },
+    {
+      "id": "ENG-11027",
+      "createdAt": "2026-06-30T19:58:24.929Z",
+      "title": "Add `scrollbar-gutter: stable` across the app",
+      "state": "Todo",
+      "assignee": "Jeet Nirnejak",
+      "parent": null,
+      "labels": [],
+      "description": "Apply `scrollbar-gutter: stable` across the app to prevent layout shifts when the scrollbar disappears.\n\nReference: post on X"
+    },
+    {
+      "id": "ENG-14371",
+      "createdAt": "2026-09-28T11:44:21.323Z",
+      "title": "Opening a person in Conversations stays fast with years of history",
+      "state": "Done",
+      "assignee": "Ebubeker Rexha",
+      "parent": "ENG-14368",
+      "labels": [],
+      "description": "## Overview\n\nOpening a person in Conversations, and the record Activity tab, stay under half a second even for people with hundreds of imported calls, texts and emails. The newest items load first and older ones load as you scroll.\n\n## Problem\n\nOpening one person reads their history, which is cheap today (20 to 60 ms after ENG-14300). But the timeline may still build workspace-wide call tables and match texts through a rule that can't use an index, so it could slow down as 1.4M imported texts land. It also loads a person's whole history at once.\n\n## User experience\n\nA rep opens a person with two years of Close history: the latest 50 items appear straight away and older ones load as they scroll. The record Activity tab behaves the same.\n\n## What's included\n\n* Measure the timeline and Activity tab at full Close volume: after the 10k-call test slice, then after the full load.\n* Narrow every part of the timeline query to the one person or record before joining, and add any missing index.\n* Load the timeline in pages, newest first.\n* Not included: the inbox list (separate tickets under ENG-14368).\n\n## Blocked by\n\nNone: can start immediately. Measurements are most useful after the 10k-call test slice lands.\n\n## Done when\n\n- [ ] Opening the person with the most imported history in the AI Acquisition Sales Team workspace takes under 500 ms on production.\n- [ ] The timeline shows the newest 50 items first and loads older ones on scroll.\n- [ ] Query plans show no workspace-wide scan for a single person or record.\n\n## Implementation context\n\n* AI context.md: timeline query paths, what ENG-14300 already fixed and what to measure first."
+    },
+    {
+      "id": "ENG-14516",
+      "createdAt": "2026-09-30T11:46:09.015Z",
+      "title": "Conversations stays fast as imported texts grow",
+      "state": "Done",
+      "assignee": "James Keeble",
+      "parent": "ENG-14368",
+      "labels": [],
+      "description": "## Overview\n\nKeep Conversations fast for the AI Acquisition Sales Team as the Close text history loads. The list, opening a person and the thread pane should cost about the same however many texts the workspace holds.\n\n## Problem\n\nENG-14492 made calls scale with the rows on screen. Texts still do not. After about 250k imported texts (40,586 text threads, up from 1,864), production Conversations went from about 1 s to 3 to 4 s for Everyone and about 8 s for Mine on 30 Sep. The list's text side works through every text thread in the workspace, and the thread pane reads every text message. About 190k more texts, then about 900k more in phase 2, are paused until this is fixed.\n\n## What's included\n\n* The list and opening a person read only the text threads of the people on screen: threads whose own contact is one of them, plus threads where a sent text is attributed to one of them.\n* Opening a row with no person reads only that thread.\n* The thread pane for a person reads only that person's texts.\n* One small index for texts attributed to a person when sent from the app (under 1,000 rows today).\n* Not included: search (tracked in ENG-14495), and the deal record page's text timeline.\n\n## Done when\n\n* On production, the Sales Team list, opening a person and the thread pane return in about the same time before and after the next texts batch, and their plans no longer loop once per workspace text thread.\n* Results are identical before and after: old-versus-new comparison on the replica, and the ready inbox parity check reports the same mismatches for old and new code."
+    }
+  ]
+}
