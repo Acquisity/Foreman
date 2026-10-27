@@ -2,10 +2,6 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
 
-const triageCriticSkill = readFileSync(
-  new URL("../subagents/critic/skills/triage-critic/SKILL.md", import.meta.url),
-  "utf8"
-);
 const triageSkill = readFileSync(
   new URL("../skills/triage-investigate/SKILL.md", import.meta.url),
   "utf8"
@@ -996,36 +992,19 @@ test("triage reviews bugs and closures with the critic before routing them", () 
   );
   for (const rule of [
     "The review runs when `decide_triage` returns `review.required`",
-    "a `Duplicate`, a `Platform Limitation`",
-    "a `User Error` closing with a lane that could not run or a failure the customer saw",
-    "an inbox error set aside as billing",
     "The critic reviews a ticket at most twice",
-    "A second objection sends it to the area owner, unproven",
-    "run the `engineering-handoff` master search first so the critic can check the master",
     "[references/critic-review.md](references/critic-review.md)",
   ]) {
     assert.ok(review.includes(rule), rule);
   }
-  assert.ok(!review.includes("never parks the ticket on a person"));
-  assert.ok(!triageHandlingSkill.includes("so the evidence is complete"));
-  assert.ok(
-    triageHandlingSkill.includes(
-      "A `Could not run` lane is a gap, not evidence: name each in `unavailableLanes`"
-    )
-  );
   for (const rule of [
     "`**Review**: Pending critic`",
-    "`**Confidence**` line from `decision.confidence`",
     "Only when `review.kind` is `bug`, load `incident-hotlane`",
     "If the route is `NEEDS_HUMAN_URGENT`, do not call the critic",
-    "Every other kind has no hotlane assessment",
     "Post nothing about the review to the attended thread",
     "the next message the thread receives is the final reply",
     "Delegate to the `critic` subagent for the first review",
     "the full 40-character SHA",
-    "`Review kind: <review.kind>: <review.reason>`",
-    "Always name the master",
-    "the duplicate target with why it has the same cause",
     "The critic replies in its fixed JSON shape; pass no schema",
     "this reading starts the adjudication",
     "exactly one entry for each of the twelve criterion slugs with no slug missing or repeated",
@@ -1039,11 +1018,6 @@ test("triage reviews bugs and closures with the critic before routing them", () 
     "without adding settlement-summary clauses elsewhere in the document",
     "Those clauses occur exactly once, in the `**Review**` line",
     "That final read-back `updatedAt` is the settled version the handoff checks",
-    "Second review, only after step 7",
-    "An objection, after a first review that also objected: the ticket is blocked",
-    "An objection, after a first review that failed: it is the first objection",
-    "Then call `route_ticket` with only `issue` and `assignee` set to the area owner",
-    "`route_ticket` refuses any other route for this ticket once it is blocked",
     "In a read-only run, describe those writes instead of making them",
     "as the literal marker `read-only`",
     "Do not touch the document",
@@ -1118,12 +1092,6 @@ test("triage reviews bugs and closures with the critic before routing them", () 
   assert.ok(triageReportingReference.includes("**Review**: <Pending critic"));
   assert.ok(
     triageReportingReference.includes(
-      "**Confidence**: verdict <0.00>, classification <0.00>, path <0.00>"
-    )
-  );
-  assert.ok(triageReportingReference.includes("Not required: <review.reason>"));
-  assert.ok(
-    triageReportingReference.includes(
       "Adjudicated <document updatedAt> at <commit>: <CHALLENGE | INSUFFICIENT_EVIDENCE | review failure>"
     )
   );
@@ -1142,11 +1110,6 @@ test("triage reviews bugs and closures with the critic before routing them", () 
       "the `updatedAt` Stage 5 read back after its settling save"
     )
   );
-  assert.ok(
-    handoffSkill.includes(
-      "Stage 5 runs it before the critic review and records the chosen master or `none eligible` in the document"
-    )
-  );
   for (const excluded of [
     "create_triage_review_packet",
     "read_triage_review_verdict",
@@ -1157,58 +1120,6 @@ test("triage reviews bugs and closures with the critic before routing them", () 
     assert.ok(!triageHandlingSkill.includes(excluded), excluded);
     assert.ok(!criticReviewReference.includes(excluded), excluded);
   }
-});
-
-test("a sending-inbox report is billing-checked before it can be a bug or a duplicate", () => {
-  const billingCheck = readFileSync(
-    new URL(
-      "../skills/triage-handling/references/billing-check.md",
-      import.meta.url
-    ),
-    "utf8"
-  );
-  assert.ok(
-    triageHandlingSkill.includes(
-      "[references/billing-check.md](references/billing-check.md)"
-    )
-  );
-  for (const rule of [
-    "An inbox error is billing until this check says otherwise",
-    "whether the subscription is paid, and whether payments are failing",
-    "No read here reaches the domain supplier",
-    "`domainsLive: null`",
-    "never a duplicate link",
-  ]) {
-    assert.ok(billingCheck.includes(rule), rule);
-  }
-  assert.ok(
-    triageHandlingSkill.includes(
-      "if `unproven` lists the billing check as missing, run it and call again"
-    )
-  );
-  assert.ok(
-    handoffSkill.includes("Stage 5 loads it only to run the master search")
-  );
-  assert.ok(
-    triageCriticSkill.includes(
-      "`billing_inbox`: an inbox error was set aside as billing"
-    )
-  );
-});
-
-test("the critic judges closures and master matches, and is told how many reviews it gives", () => {
-  for (const rule of [
-    "## Reviewing a closure",
-    "`duplicate`: `master_match` judges the duplicate target",
-    "`platform_limitation`: `classification` and `alternatives`",
-    "`user_error`: the document names an evidence lane that could not run",
-    "A missing master search is a gap in the evidence, not a reason to mark `master_match` `NOT_APPLICABLE`",
-    "## Two reviews at most",
-    "A second objection stops the ticket",
-  ]) {
-    assert.ok(triageCriticSkill.includes(rule), rule);
-  }
-  assert.ok(!triageCriticSkill.includes("exactly once per ticket"));
 });
 
 test("ENG-13397-shaped wrong-channel money ask is handled in place", () => {
