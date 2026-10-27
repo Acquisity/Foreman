@@ -8,7 +8,11 @@ import {
 } from "./jev.js";
 import { SUPPORT_OWNER } from "./owner-map.js";
 import type { RegressionOutcome } from "./regression-record.js";
-import { fixedRouting, REGRESSION_GAP } from "./regression-routing.js";
+import {
+  fixedRouting,
+  pathAfterFix,
+  REGRESSION_GAP,
+} from "./regression-routing.js";
 import { BARS } from "./triage-bars.js";
 import {
   HOTLANE_IMPACTS,
@@ -629,11 +633,8 @@ export function resolveTriage(
 
   const settled = billed ? "Platform Limitation" : classification;
   const match = billed ? undefined : duplicate;
-  const fixed = fixedRouting(input, settled, match !== undefined);
-  if (fixed) {
-    notes.push(`${fixed.note} Fixing commit: ${input.regression?.commit}.`);
-  }
-  const path = fixed?.path ?? routedPath(billed, match, pathPick.choice);
+  const fixed = fixedRouting(input, settled, match !== undefined, notes);
+  const path = routedPath(billed, match, pathAfterFix(fixed, pathPick.choice));
   const project = choiceOf(answers.project);
   const projectSettled =
     project.choice !== UNDETERMINED && project.confidence >= BARS.project;

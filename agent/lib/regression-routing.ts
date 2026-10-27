@@ -39,11 +39,23 @@ const FIXED_PATHS: Partial<Record<RegressionKind, FixedRouting>> = {
 export const fixedRouting = (
   input: TriageInput,
   classification: TriageClassification,
-  duplicate: boolean
-): FixedRouting | undefined =>
-  classification === "Bug" && !duplicate && input.regression
-    ? FIXED_PATHS[input.regression.kind]
-    : undefined;
+  duplicate: boolean,
+  notes: string[]
+): FixedRouting | undefined => {
+  const fixed =
+    classification === "Bug" && !duplicate && input.regression
+      ? FIXED_PATHS[input.regression.kind]
+      : undefined;
+  if (fixed) {
+    notes.push(`${fixed.note} Fixing commit: ${input.regression?.commit}.`);
+  }
+  return fixed;
+};
+
+export const pathAfterFix = (
+  fixed: FixedRouting | undefined,
+  choice: string
+): string => fixed?.path ?? choice;
 
 /**
  * The one gap Foreman closes itself: it is never a reason to take the
