@@ -183,7 +183,14 @@ describe("verdictFacts", () => {
 
   it("a duplicate bills the same item for the same period, not the same amount", async () => {
     const line = (price: string) => ({
-      lines: { data: [{ period: { end: 2, start: 1 }, price: { id: price } }] },
+      lines: {
+        data: [
+          {
+            period: { end: CHARGE + 30 * 86_400, start: CHARGE },
+            price: { id: price },
+          },
+        ],
+      },
       subscription: price === "price_domains" ? "sub_domains" : "sub_inboxes",
     });
     const other = {

@@ -319,3 +319,62 @@ it("a covering truncated page can disprove stopped delivery", async () => {
   assert.equal(facts(result, "stripe").invoices?.truncated, true);
   assert.equal(result.verdict.deliveryStoppedBeforeCharge.value, false);
 });
+
+describe("duplicate candidates from live charge histories", () => {
+  const period = { end: CHARGE + 30 * 86_400, start: CHARGE };
+  const billed = (id: string, extra: Record<string, unknown> = {}) => ({
+    id,
+    lines: { data: [{ period, subscription: "sub_1" }] },
+    subscription: "sub_1",
+    ...extra,
+  });
+  const unrefunded = (id: string, created: number, amount = 18_500) => ({
+    amount,
+    amount_refunded: 0,
+    created,
+    id,
+    status: "succeeded",
+  });
+
+  it("a charge with no invoice in a complete page billed no subscription item", async () => {
+    const { result } = await gather({
+      charges: [unrefunded("ch_oneoff", CHARGE - 3600, 14_400)],
+      invoices: [billed("in_1")],
+    });
+    assert.equal(result.verdict.duplicate.value, false);
+  });
+
+  it("ignores charges older than the lookback before the billed period", async () => {
+    const stub = fake({
+      charges: [unrefunded("ch_april", CHARGE - 180 * 86_400)],
+    });
+    const { read } = stub.deps;
+    const result = await gatherDisputeEvidence("du_1", {
+      ...stub.deps,
+      read: (request, options) =>
+        request.operation === "stripe.invoices.list"
+          ? json({ data: [billed("in_1"), OLD_INVOICE], has_more: true })
+          : read(request, options),
+    });
+    assert.equal(result.verdict.duplicate.value, false);
+  });
+
+  it("stays unknown when a candidate charge matches several invoices", async () => {
+    const paid = { amount_paid: 18_500, status: "paid" };
+    const { result } = await gather({
+      charges: [unrefunded("ch_2", CHARGE - 3600)],
+      invoices: [
+        billed("in_1"),
+        billed("in_a", {
+          ...paid,
+          status_transitions: { paid_at: CHARGE - 3590 },
+        }),
+        billed("in_b", {
+          ...paid,
+          status_transitions: { paid_at: CHARGE - 3610 },
+        }),
+      ],
+    });
+    assert.equal(result.verdict.duplicate.value, null);
+  });
+});

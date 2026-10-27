@@ -229,7 +229,7 @@ export const matchChargeInvoice = <
   },
   invoices: T[],
   complete = true
-): { invoice: T | null; reason: string | null } => {
+): { invoice: T | null; reason: string | null; uninvoiced?: boolean } => {
   const linked = invoices.filter(
     (invoice) =>
       (charge.invoice && invoice.id === charge.invoice) ||
@@ -254,12 +254,14 @@ export const matchChargeInvoice = <
         "The invoice inventory is incomplete, so a unique payment-time match cannot be established.",
     };
   }
-  return candidates.length === 1
-    ? { invoice: candidates[0], reason: null }
-    : {
-        invoice: null,
-        reason: candidates.length
-          ? "Several paid invoices match this charge; its invoice and subscription are unknown."
-          : "No unique paid invoice matches the charge amount within 120 seconds of its creation.",
-      };
+  if (candidates.length === 1) {
+    return { invoice: candidates[0], reason: null };
+  }
+  return {
+    invoice: null,
+    reason: candidates.length
+      ? "Several paid invoices match this charge; its invoice and subscription are unknown."
+      : "No paid invoice matches the charge amount within 120 seconds of its creation.",
+    uninvoiced: candidates.length === 0,
+  };
 };

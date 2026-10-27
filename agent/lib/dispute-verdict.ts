@@ -13,7 +13,11 @@ import {
   str,
   UUID,
 } from "./dispute-evidence-shared.js";
-import { matchChargeInvoice, pageCoversCharge } from "./stripe-dispute-read.js";
+import {
+  INVOICE_LOOKBACK_MS,
+  matchChargeInvoice,
+  pageCoversCharge,
+} from "./stripe-dispute-read.js";
 
 const ERRORING = /error|fail/iu;
 const WITHDRAWN = /cancel|reject/iu;
@@ -88,25 +92,44 @@ const duplicate = (stripe: StripeFacts): Flag => {
       "The disputed invoice has no known subscription item and complete billed period."
     );
   }
+  // Only a charge made between a lookback before the billed period and its end
+  // can bill that period again; older and later charges are not candidates.
+  const periods = disputed.lines.flatMap((line) =>
+    line.periodStart && line.periodEnd
+      ? [[Date.parse(line.periodStart), Date.parse(line.periodEnd)]]
+      : []
+  );
+  const from = Math.min(...periods.map(([start]) => start));
+  const to = Math.max(...periods.map(([, end]) => end));
+  const earliest = new Date(from).toISOString();
   let missing =
-    charges.truncated || invoices.truncated || disputed.linesTruncated;
+    disputed.linesTruncated ||
+    !pageCoversCharge(charges.rows, charges.truncated, earliest);
   const because: Fact[] = [];
   for (const other of charges.rows) {
+    const at = ms(other.created);
     if (
       other.id === stripe.charge.id ||
       other.status !== "succeeded" ||
       other.amount === null ||
-      other.amountRefunded >= other.amount
+      other.amountRefunded >= other.amount ||
+      (at !== null && (at < from - INVOICE_LOOKBACK_MS || at > to))
     ) {
       continue;
     }
-    const { invoice } = matchChargeInvoice(
+    const covered = pageCoversCharge(
+      invoices.rows,
+      invoices.truncated,
+      other.created
+    );
+    const { invoice, uninvoiced } = matchChargeInvoice(
       other,
       invoices.rows,
-      pageCoversCharge(invoices.rows, invoices.truncated, other.created)
+      covered
     );
     if (!invoice) {
-      missing = true;
+      // A charge with no invoice in a complete page billed no subscription item.
+      missing ||= !uninvoiced;
       continue;
     }
     if (invoice.id === disputed.id) {
