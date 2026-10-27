@@ -9,7 +9,7 @@ import {
   type FollowUpOutcome,
   RELAY_HEADER,
   SLACK_PROMPT,
-} from "./jev-decisions.js";
+} from "./follow-up-decisions.js";
 import { askFromName, isTriageIntakeAsk } from "./linear-context.js";
 import { withoutReporterUpdates } from "./reporter-updates/copy.js";
 import { WIDGET_FEEDBACK_PROJECT_ID } from "./widget-feedback.js";

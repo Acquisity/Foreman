@@ -7,6 +7,7 @@ import {
   probabilityOf,
 } from "./jev.js";
 import { SUPPORT_OWNER } from "./owner-map.js";
+import { BARS } from "./triage-bars.js";
 import {
   HOTLANE_IMPACTS,
   HOTLANE_ROUTES,
@@ -19,6 +20,15 @@ import {
   ownershipRoute,
   resolveOwnership,
 } from "./triage-ownership.js";
+import {
+  type BillingCheck,
+  type BillingFacts,
+  gateInboxError,
+  type ReviewDecision,
+  reviewOf,
+  type TriageConfidence,
+  UNPROVEN_REVIEW,
+} from "./triage-review.js";
 
 /**
  * Every triage and billing decision Foreman used to make in prose, as Jev
@@ -32,38 +42,6 @@ import {
  * The bars scale with what an answer changes: a label is cheap to get wrong,
  * closing a ticket as a duplicate is not.
  */
-export const BARS = {
-  /** Below this, money versus product is unclear and the model follows the leaning. */
-  askKind: 0.7,
-  classification: 0.6,
-  /** Below this, an existing investigation is not reused. */
-  continuation: 0.6,
-  /** A billing verdict below this is left to a person. */
-  discretion: 0.7,
-  /** A done claim without near-certain evidence is flagged. */
-  doneClaim: 0.8,
-  /** A duplicate closes the ticket, so it needs a near-certain match. */
-  duplicate: 0.8,
-  /** Below this, staying quiet on a requester follow-up is not trusted. */
-  followUp: 0.6,
-  /** Below this, a claim the reply makes is flagged as not shown. */
-  grounded: 0.5,
-  /** Below this, a hotlane call goes to a person instead of the fast lane. */
-  incident: 0.6,
-  path: 0.6,
-  /** Below this, the priority band takes the higher neighbour. */
-  priorityBand: 0.6,
-  /** Below this, the project is left unset and the area decides the owner. */
-  project: 0.6,
-  /** A root cause label is only added when the match is clear. */
-  rootCauseLabel: 0.6,
-  /** Yes/no signals that only add a label or raise a floor. */
-  signal: 0.5,
-  /** Below this, a follow-up is not trusted to be only a status move. */
-  statusOnly: 0.7,
-  /** Below this, the claim is treated as unproven. */
-  verdict: 0.6,
-} as const;
 
 export const UNDETERMINED = "undetermined";
 const NO_LABEL = "none";
@@ -208,15 +186,6 @@ const LOW_PATHS = new Set<HandlingPath>([
   "Resolved by triage",
 ]);
 
-export interface BillingFacts {
-  checkedAt: string;
-  domainsLive: boolean | null;
-  organizationId: string;
-  paymentsFailing: boolean | null;
-  source: string;
-  subscriptionPaid: boolean | null;
-}
-
 export interface TriageInput {
   billingFacts?: BillingFacts;
   blastRadius?: {
@@ -241,32 +210,6 @@ export interface TriageInput {
   sourceLabels: string[];
   ticketLabels?: string[];
   unavailableLanes?: string[];
-}
-
-export const REVIEW_KINDS = [
-  "bug",
-  "duplicate",
-  "platform_limitation",
-  "user_error",
-  "billing_inbox",
-] as const;
-export type ReviewKind = (typeof REVIEW_KINDS)[number];
-
-export interface ReviewDecision {
-  kind: ReviewKind | null;
-  reason: string;
-  required: boolean;
-}
-
-export interface TriageConfidence {
-  classification: number;
-  path: number;
-  verdict: number;
-}
-
-export interface BillingCheck {
-  failures: string[];
-  outcome: "failed" | "passed";
 }
 
 export interface TriageRoute {
@@ -521,6 +464,7 @@ const resolvePriority = (
     ? Math.min(priority, PRIORITY.high)
     : priority;
 };
+export type DuplicateMatch = ReturnType<typeof findDuplicate>;
 
 const resolveLabels = (
   input: TriageInput,
@@ -543,63 +487,6 @@ const resolveLabels = (
     }
   }
   return [...new Set(labels)];
-};
-
-const BILLING_FACTS_MAX_AGE_MS = 24 * 60 * 60 * 1000;
-const BILLING_FACTS_CLOCK_SKEW_MS = 5 * 60 * 1000;
-const COULD_NOT_RUN = /could not run/iu;
-
-const BILLING_GAP =
-  "A billing check for the inbox error: the subscription is paid, payments are not failing, and the domains are live at the supplier, read now for this workspace.";
-
-const inspectBillingFacts = (
-  input: TriageInput,
-  now: Date
-): { gaps: string[] } | BillingCheck => {
-  const facts = input.billingFacts;
-  if (!facts) {
-    return { gaps: [BILLING_GAP] };
-  }
-  const readAt = Date.parse(facts.checkedAt);
-  const age = now.getTime() - readAt;
-  if (
-    Number.isNaN(readAt) ||
-    age > BILLING_FACTS_MAX_AGE_MS ||
-    age < -BILLING_FACTS_CLOCK_SKEW_MS
-  ) {
-    return { gaps: [`${BILLING_GAP} The facts given are stale or undated.`] };
-  }
-  if (!input.organizationId || facts.organizationId !== input.organizationId) {
-    return {
-      gaps: [`${BILLING_GAP} The facts are not tied to the pinned workspace.`],
-    };
-  }
-  const failures = [
-    ...(facts.subscriptionPaid === false
-      ? ["The subscription is not paid."]
-      : []),
-    ...(facts.paymentsFailing === true ? ["Payments are failing."] : []),
-    ...(facts.domainsLive === false
-      ? ["The domains are not live at the supplier."]
-      : []),
-  ];
-  if (failures.length > 0) {
-    return { failures, outcome: "failed" };
-  }
-  const unknown = [
-    facts.subscriptionPaid === null ? "whether the subscription is paid" : null,
-    facts.paymentsFailing === null ? "whether payments are failing" : null,
-    facts.domainsLive === null ? "whether the domains are live" : null,
-  ].filter((gap): gap is string => gap !== null);
-  return unknown.length > 0
-    ? { gaps: [`${BILLING_GAP} Not known: ${unknown.join(", ")}.`] }
-    : { failures: [], outcome: "passed" };
-};
-
-const UNPROVEN_REVIEW: ReviewDecision = {
-  kind: null,
-  reason: "the ticket stays open as unproven",
-  required: false,
 };
 
 interface BarContext {
@@ -633,147 +520,6 @@ const barGap = (
     }
   }
   return null;
-};
-
-interface InboxGateContext {
-  answers: Answers;
-  classification: TriageClassification;
-  confidence: TriageConfidence;
-  duplicate: ReturnType<typeof findDuplicate>;
-  input: TriageInput;
-  notes: string[];
-  now: Date;
-  verdict: { confidence: number; value: string };
-}
-
-const gateInboxError = (
-  context: InboxGateContext
-): { billingCheck: BillingCheck } | { decision: TriageDecision } | null => {
-  const { answers, classification, confidence, duplicate, input, notes } =
-    context;
-  if (
-    probabilityOf(answers.inbox_error) < BARS.signal ||
-    !(classification === "Bug" || duplicate)
-  ) {
-    return null;
-  }
-  const inspected = inspectBillingFacts(input, context.now);
-  if ("gaps" in inspected) {
-    notes.push(
-      "An inbox error cannot be called a bug or linked to a master before the billing check."
-    );
-    return {
-      decision: {
-        confidence,
-        missing: inspected.gaps,
-        notes,
-        outcome: "unproven",
-        review: UNPROVEN_REVIEW,
-        verdict: context.verdict,
-      },
-    };
-  }
-  if (inspected.outcome === "passed") {
-    notes.push("The billing check passed: paid, not failing, domains live.");
-    return { billingCheck: inspected };
-  }
-  notes.push(
-    `The inbox error is billing, not a code bug: ${inspected.failures.join(" ")}`
-  );
-  if (duplicate) {
-    notes.push(
-      `The match with ${duplicate.candidate.identifier} was set aside.`
-    );
-  }
-  const path: HandlingPath = "Support/Financial";
-  return {
-    decision: {
-      assignee: "Aaron Fraga",
-      billingCheck: inspected,
-      classification: "Platform Limitation",
-      confidence,
-      needsCriticReview: true,
-      notes,
-      outcome: "route",
-      path,
-      review: {
-        kind: "billing_inbox",
-        reason: "an inbox error was set aside as billing, not code",
-        required: true,
-      },
-      route: {
-        addLabels: [...new Set(input.sourceLabels)],
-        assignee: "Aaron Fraga",
-        priority: resolvePriority(path, undefined, answers, notes),
-        project: "Support",
-        state: PATH_STATE[path],
-      },
-      verdict: context.verdict,
-    },
-  };
-};
-
-const reviewOf = (
-  input: TriageInput,
-  answers: Answers,
-  settled: {
-    classification: TriageClassification;
-    duplicate: boolean;
-    path: HandlingPath;
-  }
-): ReviewDecision => {
-  const { classification, duplicate, path } = settled;
-  if (duplicate) {
-    return {
-      kind: "duplicate",
-      reason: "a duplicate closes this ticket on another ticket's cause",
-      required: true,
-    };
-  }
-  if (classification === "Bug") {
-    return {
-      kind: "bug",
-      reason: "a Bug is routed to engineering",
-      required: true,
-    };
-  }
-  if (
-    classification === "Platform Limitation" ||
-    path === "Platform Limitation"
-  ) {
-    return {
-      kind: "platform_limitation",
-      reason: "a platform limitation closes the ticket as expected behaviour",
-      required: true,
-    };
-  }
-  const closes = PATH_STATE[path] === "Done";
-  const laneGap =
-    (input.unavailableLanes?.length ?? 0) > 0 ||
-    COULD_NOT_RUN.test(input.evidence);
-  if (closes && laneGap) {
-    return {
-      kind: "user_error",
-      reason:
-        "an evidence lane could not run, so the user error rests on missing evidence",
-      required: true,
-    };
-  }
-  if (closes && probabilityOf(answers.customer_saw_failure) >= BARS.signal) {
-    return {
-      kind: "user_error",
-      reason: "the customer saw a failure that the user error explains away",
-      required: true,
-    };
-  }
-  let reason =
-    "every evidence lane ran and the report names no failure the customer saw";
-  if (path === "Resolved by triage") {
-    reason = "the already-fixed check for this path ships separately";
-  } else if (!closes) {
-    reason = "the ticket stays open for a person";
-  }
-  return { kind: null, reason, required: false };
 };
 
 /** Turns Jev's answers into the triage decision. Pure, so it is tested alone. */
@@ -824,6 +570,11 @@ export function resolveTriage(
     input,
     notes,
     now,
+    signal: BARS.signal,
+    supportRoute: (supportPath) => ({
+      priority: resolvePriority(supportPath, undefined, answers, notes),
+      state: PATH_STATE[supportPath],
+    }),
     verdict,
   });
   if (gate && "decision" in gate) {
@@ -875,8 +626,10 @@ export function resolveTriage(
   );
   const review = reviewOf(input, answers, {
     classification,
+    closes: PATH_STATE[ownership.path] === "Done",
     duplicate: Boolean(duplicate),
     path: ownership.path,
+    signal: BARS.signal,
   });
 
   return {
@@ -1183,120 +936,4 @@ export async function decideBilling(
   };
   const answers = await askJev(billingQuestions(), state, opts);
   return resolveBilling(input, answers);
-}
-
-// ---------------------------------------------------------------- follow-up
-
-export const FOLLOW_UP_OUTCOMES = {
-  respond:
-    "speaks to Foreman: asks Foreman something, gives a new fact or evidence about the issue, including the fact lastReply said would reopen it, approves or withdraws the ask, doubts it (for example, says they may have made a mistake), or changes the outcome they want",
-  skip: "anything else: people in the thread talking to each other (a question to a teammate, a hand-off), context that adds nothing new about the issue, an acknowledgement, thanks, or noise",
-} as const;
-/** status: the only ask is a ticket status move, so nothing is re-checked. */
-export type FollowUpOutcome = keyof typeof FOLLOW_UP_OUTCOMES | "status";
-
-export interface FollowUpInput {
-  /** Replies since lastReply that Foreman already handled; context only. */
-  earlier?: string[];
-  /** Foreman's last message in the requester thread. */
-  lastReply: string;
-  /** Everything said in the thread since, oldest first, as relayed. */
-  replies: string[];
-}
-
-export const followUpQuestions = (): Record<string, JevQuestion> => ({
-  follow_up: {
-    criteria: { ...FOLLOW_UP_OUTCOMES },
-    instructions:
-      "Foreman posted lastReply in a thread shared by several people (a Slack thread, or a support team's notes on a customer conversation). Each reply is 'Name: text'. @Foreman is Foreman; @teammate is a person, never Foreman. Taking the replies since then together, do they need a message from Foreman? A question addressed to a teammate is for that teammate; a question addressed to no one is for Foreman. earlier, when present, holds replies Foreman already handled: read them as context, and judge only replies.",
-    type: "choice",
-  },
-  status_only: {
-    instructions:
-      "Is the only thing the replies ask of Foreman to move the ticket to a status (done, complete, closed, cancelled), with no question for Foreman and no request to check, verify, or change anything else?",
-    type: "boolean",
-  },
-});
-
-/**
- * Staying quiet needs a clear call; when unsure, the requester is answered.
- * A clear status-only ask is answered without re-checking the work.
- */
-export function resolveFollowUp(answers: Answers): FollowUpOutcome {
-  const { choice, confidence } = choiceOf(answers.follow_up);
-  if (choice === "skip" && confidence >= BARS.followUp) {
-    return "skip";
-  }
-  return answers.status_only &&
-    probabilityOf(answers.status_only) >= BARS.statusOnly
-    ? "status"
-    : "respond";
-}
-
-/**
- * The prompt into a ticket's Foreman session: one line naming who replied in
- * Slack (the Asks receiver) or added a note in the Acquisity support inbox.
- * The reply itself is under the requester thread's anchor comment.
- */
-export const SLACK_PROMPT =
-  /^\*\*([^*\n]{1,100})\*\* (?:replied in Slack|added a note in the support inbox)\.$/u;
-
-/** Foreman's bot user in the intake Slack workspace, as the receiver mentions it. */
-const FOREMAN_MENTION = /<@U0BQ5QMHM7D(?:\|[^>]*)?>/gu;
-const SLACK_MENTION = /<@[A-Za-z0-9]+(?:\|[^>]*)?>/gu;
-// The Asks receiver heads each relayed reply with "<link> **Name** replied in
-// Slack:", and the support inbox each note with "**Name** added a note in the
-// support inbox:". The link always names Foreman, so it says nothing about
-// who a reply is for.
-export const RELAY_HEADER =
-  /^[^\n]{0,300}?(?:\*\*([^*\n]{1,100})\*\* )?(?:replied in Slack|added a note in the support inbox):/u;
-
-/**
- * Rewrites a relayed reply as "Name: text" with a mention of Foreman as
- * @Foreman and every other Slack mention as @teammate, since Jev cannot
- * resolve Slack ids. The receiver relays a reply that mentions the bot like
- * any other, so "@Foreman move this to done" must not read as a hand-off.
- */
-export const followUpText = (reply: string): string => {
-  const name = RELAY_HEADER.exec(reply)?.[1] ?? "Someone";
-  const text = reply
-    .replace(RELAY_HEADER, "")
-    .replace(FOREMAN_MENTION, "@Foreman")
-    .replace(SLACK_MENTION, "@teammate")
-    .trim();
-  return `${name}: ${text}`;
-};
-
-/**
- * A reply that is only a mention is what wakes Foreman, not something said,
- * so code skips it without asking Jev.
- */
-export async function decideFollowUp(
-  input: FollowUpInput,
-  opts?: JevOptions
-): Promise<FollowUpOutcome> {
-  const said = (list: string[] = []) =>
-    list
-      .filter(
-        (reply) =>
-          reply.replace(RELAY_HEADER, "").replace(SLACK_MENTION, "").trim() !==
-          ""
-      )
-      .map(followUpText);
-  const replies = said(input.replies);
-  if (replies.length === 0) {
-    return "skip";
-  }
-  const earlier = said(input.earlier);
-  return resolveFollowUp(
-    await askJev(
-      followUpQuestions(),
-      {
-        lastReply: input.lastReply,
-        replies,
-        ...(earlier.length > 0 ? { earlier } : {}),
-      },
-      opts
-    )
-  );
 }

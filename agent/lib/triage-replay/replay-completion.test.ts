@@ -202,7 +202,7 @@ describe("replay result", () => {
       { client }
     );
     await routeTicket(
-      { addLabels: ["Bug"], assignee: "James Keeble", issue: "ENG-100" },
+      { addLabels: ["Bug"], assignee: "Anthony Adewale", issue: "ENG-100" },
       { client }
     );
     await endTurn();
@@ -210,7 +210,7 @@ describe("replay result", () => {
     assert.equal(result.status, "completed");
     assert.equal(result.final?.outcome, "unproven");
     assert.equal(result.final?.path, null);
-    assert.equal(result.final?.assignee, "James Keeble");
+    assert.equal(result.final?.assignee, "Anthony Adewale");
     assert.equal(result.final?.master, null);
   });
 

@@ -57,9 +57,11 @@ const input = (over: Partial<TriageInput> = {}): TriageInput => ({
 const answers = (over: Record<string, JevAnswer> = {}) => ({
   area: pick("undetermined"),
   classification: pick("bug"),
+  customer_saw_failure: no(),
   data_loss_or_security: no(),
   direct_evidence: yes(),
   impact: { probabilities: { "1": 0.9 }, score: 1, type: "score" } as JevAnswer,
+  inbox_error: no(),
   incident: pick("standard"),
   incident_impact: pick("MATERIALLY_IMPAIRED"),
   money_blocker: no(),

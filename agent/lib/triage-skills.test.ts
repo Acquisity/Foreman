@@ -1342,7 +1342,8 @@ test("Stage 5 hands decide_triage the ticket's own labels so an approved request
     new URL("../tools/decide_triage.ts", import.meta.url),
     "utf8"
   );
-  const field = tool.slice(tool.indexOf("ticketLabels: z"));
+  const start = tool.indexOf("ticketLabels: z");
+  const field = tool.slice(start, tool.indexOf("\n      ),\n", start));
   assert.equal(field.includes(".optional()"), false);
 });
 

@@ -5,7 +5,7 @@ import {
   type JevQuestion,
   probabilityOf,
 } from "./jev.js";
-import { BARS } from "./jev-decisions.js";
+import { BARS } from "./triage-bars.js";
 
 const MAX_CLAIMS = 40;
 const CLAIM_BREAK = /(?<=[.!?])\s+|\n+/u;

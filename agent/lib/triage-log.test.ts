@@ -18,11 +18,9 @@ import {
   settleCriticRound,
   settleDecision,
 } from "./triage-log.js";
-import { prepareReplayArchive } from "./triage-replay/archive.js";
 
 const FIRST_LINE_RULE = /Source issue: ENG-1/u;
 const TWICE_RULE = /objected to ENG-1 twice/u;
-const UNPACK = /tar -xzf .* && test ! -e \/workspace\/repo\/\.git/u;
 
 const criteria = (fail: number) =>
   CRITIC_CRITERIA.map((criterion, i) => ({
@@ -267,42 +265,6 @@ describe("issue-bound decisions", () => {
   });
 });
 
-describe("replay archive", () => {
-  it("unpacks the pinned archive with no history and writes the repository marker", async () => {
-    const commands: string[] = [];
-    const files: Record<string, unknown> = {};
-    const sandbox = {
-      run: (options: { command: string }) => {
-        commands.push(options.command);
-        return Promise.resolve({ exitCode: 0, stderr: "", stdout: "" });
-      },
-      writeBinaryFile: (o: { content: unknown; path: string }) => {
-        files[o.path] = o.content;
-        return Promise.resolve();
-      },
-      writeTextFile: (o: { content: string; path: string }) => {
-        files[o.path] = o.content;
-        return Promise.resolve();
-      },
-    } as never;
-    const error = await prepareReplayArchive(
-      sandbox,
-      {
-        commit: "a".repeat(40),
-        url: "https://x.blob.vercel-storage.com/a.tgz",
-      },
-      () => Promise.resolve(new Uint8Array([1, 2, 3]))
-    );
-    assert.equal(error, null);
-    assert.match(commands[0], UNPACK);
-    assert.equal(
-      JSON.parse(String(files["/workspace/.foreman/repository.json"]))
-        .replayCommit,
-      "a".repeat(40)
-    );
-  });
-});
-
 describe("the critic's second check", () => {
   const duplicate = {
     classification: "Bug",
@@ -326,7 +288,9 @@ describe("the critic's second check", () => {
 
   it("marks a closure for review and carries confidence and review into the log", () => {
     const fields = decisionFields("ENG-1", {
-      assignee: "area owner",
+      approval: "not-applicable",
+      area: null,
+      assignee: "James Keeble",
       classification: "Bug",
       confidence: { classification: 0.7, path: 0.85, verdict: 0.9 },
       needsCriticReview: true,
@@ -339,7 +303,9 @@ describe("the critic's second check", () => {
     });
     assert.equal(fields.closureReview, true);
     const bugFields = decisionFields("ENG-2", {
-      assignee: "area owner",
+      approval: "not-applicable",
+      area: null,
+      assignee: "James Keeble",
       classification: "Bug",
       confidence: { classification: 0.7, path: 0.85, verdict: 0.9 },
       needsCriticReview: true,

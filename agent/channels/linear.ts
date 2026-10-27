@@ -12,7 +12,7 @@ import {
   linearContinuationToken,
   parseLinearWebhookEvent,
 } from "eve/channels/linear";
-import type { FollowUpOutcome } from "../lib/jev-decisions.js";
+import type { FollowUpOutcome } from "../lib/follow-up-decisions.js";
 import { buildLinearContext } from "../lib/linear-context.js";
 import { extractRepositoryUrls, stampRepository } from "../lib/repository.js";
 import { readAskFrom, relayedFollowUpOutcome } from "../lib/requester-reply.js";

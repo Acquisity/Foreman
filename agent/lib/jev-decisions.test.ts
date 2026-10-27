@@ -1,15 +1,17 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import {
+  decideFollowUp,
+  followUpText,
+  resolveFollowUp,
+} from "./follow-up-decisions.js";
 import { askJev, type JevAnswer } from "./jev.js";
 import {
   type BillingInput,
   billingQuestions,
   decideAskKind,
-  decideFollowUp,
   decidePriorWork,
-  followUpText,
   resolveBilling,
-  resolveFollowUp,
   resolvePriorWork,
   resolveTriage,
   type TriageInput,
