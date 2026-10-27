@@ -379,8 +379,9 @@ export const runReporterUpdates = async (
   }
   const todo = await deps.store.nextPending(PENDING_BATCH);
   let posts = 0;
-  await todo.reduce(async (previous, identifier) => {
+  await todo.reduce(async (previous, pending) => {
     await previous;
+    const identifier = pending.issue;
     if (
       posts >= deps.config.maxPosts ||
       clock() - nowMs >= deps.config.runDeadlineMs
@@ -390,7 +391,7 @@ export const runReporterUpdates = async (
     const result = await settle(identifier, deps, liveSha);
     if (result.error) {
       report.errors.push(`${result.identifier}: ${result.error}`);
-      await deps.store.failPending(identifier);
+      await deps.store.failPending(pending);
       return;
     }
     if (!result.outcome) {
@@ -402,15 +403,15 @@ export const runReporterUpdates = async (
       result.outcome.kind === "skipped" &&
       result.outcome.retryAfter !== undefined
     ) {
-      await deps.store.deferPending(identifier, result.outcome.retryAfter);
+      await deps.store.deferPending(pending, result.outcome.retryAfter);
     } else if (
       result.outcome.kind === "skipped" &&
       KEEP_PENDING.has(result.outcome.why)
     ) {
-      await deps.store.failPending(identifier);
+      await deps.store.failPending(pending);
     } else {
       await settleWaiting(identifier, result.outcome, deps, liveSha);
-      await deps.store.resolvePending(identifier);
+      await deps.store.resolvePending(pending);
     }
   }, Promise.resolve());
   return report;

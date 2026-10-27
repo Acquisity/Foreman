@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { ThreadIncompleteError } from "../requester-reply.js";
-import { fixedText } from "./copy.js";
+import { fixedText, receivedText } from "./copy.js";
 import {
   MERGE_SHA,
   merged,
@@ -365,5 +365,68 @@ describe("discovery", () => {
       s.linear.posts.map((p) => p.identifier),
       ["ENG-1"]
     );
+  });
+
+  it("keeps a newer version queued when an older run finishes the ticket after discovery has moved on", async () => {
+    const t = old(1);
+    const s = setup([t], {
+      ancestors: { [`${MERGE_SHA}>${NEW_SHA}`]: true },
+      liveSha: NEW_SHA,
+      pulls: { [pullKey(7)]: merged() },
+    });
+    let release: () => void = () => undefined;
+    s.linear.state.holdNextPost = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const first = run(s);
+    const inFlight = async (tries: number): Promise<void> => {
+      if (s.linear.state.holdNextPost && tries > 0) {
+        await new Promise((resolve) => setImmediate(resolve));
+        await inFlight(tries - 1);
+      }
+    };
+    await inFlight(100);
+    assert.equal(
+      s.linear.state.holdNextPost,
+      null,
+      "the received post is in flight"
+    );
+
+    Object.assign(t.facts, { pullUrls: [PR_URL], stateType: "completed" });
+    t.updatedAt = new Date(NOW + 30_000).toISOString();
+    const later = NOW + 15 * 60_000;
+    await runReporterUpdates(
+      { ...s.deps, config: { ...s.deps.config, runDeadlineMs: 0 } },
+      later,
+      () => later
+    );
+    assert.equal(
+      s.memory.pending.get("ENG-1")?.version,
+      Date.parse(t.updatedAt)
+    );
+
+    release();
+    await first;
+    assert.deepEqual(
+      s.linear.posts.map((p) => p.body),
+      [receivedText("Sam")]
+    );
+    assert.equal(
+      s.memory.pending.get("ENG-1")?.version,
+      Date.parse(t.updatedAt),
+      "the older run does not acknowledge the newer version"
+    );
+
+    await run(s, NOW + 3_600_000);
+    assert.ok(
+      Date.parse(s.linear.state.discoveries.at(-1)?.updatedSince ?? "") >
+        Date.parse(t.updatedAt),
+      "the last sweep is past the overlap, so it cannot rediscover the change"
+    );
+    assert.deepEqual(
+      s.linear.posts.map((p) => p.body),
+      [receivedText("Sam"), fixedText()]
+    );
+    assert.equal(s.memory.pending.size, 0);
   });
 });

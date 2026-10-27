@@ -3,7 +3,10 @@ import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import pg from "pg";
 import { disposableDatabaseUrl } from "../agent/lib/reporter-updates/disposable-database.js";
-import { createReporterStore } from "../agent/lib/reporter-updates/store.js";
+import {
+  createReporterStore,
+  type PendingTicket,
+} from "../agent/lib/reporter-updates/store.js";
 
 const url = disposableDatabaseUrl(process.env.REPORTER_STORE_TEST_URL);
 
@@ -20,6 +23,21 @@ await pool.query(
   "DROP TABLE IF EXISTS reporter_updates, reporter_pending, reporter_cursor"
 );
 await pool.query(migration);
+
+const queued = async (issue: string): Promise<PendingTicket> => {
+  const [row] = await pool
+    .query(
+      "SELECT seen_version::text AS version FROM reporter_pending WHERE issue = $1",
+      [issue]
+    )
+    .then((result) => result.rows);
+  return {
+    issue,
+    version: typeof row?.version === "string" ? Number(row.version) : null,
+  };
+};
+const due = async (issue: string) =>
+  (await store.nextPending(10)).some((ticket) => ticket.issue === issue);
 
 const claims = await Promise.all(
   Array.from({ length: 8 }, () =>
@@ -214,13 +232,13 @@ assert.ok(
   Number(stored?.seconds) > 590 && Number(stored?.seconds) <= 600,
   "the winner's failure sets the second backoff"
 );
-await store.deferPending("ENG-7", loser.retryAfter);
+await store.deferPending(await queued("ENG-7"), loser.retryAfter);
 assert.equal(
-  (await store.nextPending(10)).includes("ENG-7"),
+  await due("ENG-7"),
   false,
   "the loser's deferral does not make the ticket due early"
 );
-await store.deferPending("ENG-7", Date.now() + 60_000);
+await store.deferPending(await queued("ENG-7"), Date.now() + 60_000);
 const [pendingWait] = await pool
   .query(
     "SELECT extract(epoch FROM retry_after - now()) AS seconds FROM reporter_pending WHERE issue = 'ENG-7'"
@@ -230,7 +248,7 @@ assert.ok(
   Number(pendingWait?.seconds) > 500,
   "an earlier deadline never replaces a later one"
 );
-await store.failPending("ENG-7");
+await store.failPending(await queued("ENG-7"));
 const [afterFail] = await pool
   .query(
     "SELECT extract(epoch FROM retry_after - now()) AS seconds FROM reporter_pending WHERE issue = 'ENG-7'"
@@ -265,13 +283,13 @@ await store.markWaiting("ENG-10", "old-sha");
 await store.stampWaiting("ENG-10", "new-sha");
 await store.queueWaiting("new-sha");
 assert.equal(
-  (await store.nextPending(10)).includes("ENG-10"),
+  await due("ENG-10"),
   false,
   "a row stamped with the live commit is not requeued until the next deploy"
 );
 await store.queueWaiting("newer-sha");
 assert.equal(
-  (await store.nextPending(10)).includes("ENG-10"),
+  await due("ENG-10"),
   true,
   "and is requeued once the next deploy lands"
 );
@@ -279,7 +297,7 @@ await store.markWaiting("ENG-9", "old-sha");
 await store.dropWaiting("ENG-9");
 await store.queueWaiting("new-sha");
 assert.equal(
-  (await store.nextPending(10)).includes("ENG-9"),
+  await due("ENG-9"),
   false,
   "a dropped waiting row is never requeued"
 );
@@ -299,8 +317,11 @@ await store.markWaiting("ENG-2001", "older-sha");
 assert.equal(await store.anyWaiting(), true);
 await store.queueWaiting("live-sha");
 assert.deepEqual(
-  (await store.nextPending(10)).sort((a, b) => a.localeCompare(b)),
-  ["ENG-2000", "ENG-2001"],
+  (await store.nextPending(10)).sort((a, b) => a.issue.localeCompare(b.issue)),
+  [
+    { issue: "ENG-2000", version: null },
+    { issue: "ENG-2001", version: null },
+  ],
   "rows already checked against the live commit never crowd out the others"
 );
 
@@ -309,17 +330,17 @@ await store.enqueue([
   { issue: "ENG-5", version: 100 },
   { issue: "ENG-5", version: 90 },
 ]);
-await store.failPending("ENG-2000");
+await store.failPending(await queued("ENG-2000"));
 assert.equal(
-  (await store.nextPending(10)).includes("ENG-2000"),
+  await due("ENG-2000"),
   false,
   "a ticket that just failed waits out its backoff"
 );
-await store.resolvePending("ENG-5");
-assert.equal((await store.nextPending(10)).includes("ENG-5"), false);
+await store.resolvePending(await queued("ENG-5"));
+assert.equal(await due("ENG-5"), false);
 await Array.from({ length: 25 }, (_, i) => i).reduce(async (previous) => {
   await previous;
-  await store.failPending("ENG-2001");
+  await store.failPending(await queued("ENG-2001"));
 }, Promise.resolve());
 const [pendingRow] = await pool
   .query(
@@ -335,30 +356,59 @@ await pool.query(
   "UPDATE reporter_pending SET retry_after = now() - interval '1 second' WHERE issue = 'ENG-2001'"
 );
 assert.equal(
-  (await store.nextPending(10)).includes("ENG-2001"),
+  await due("ENG-2001"),
   true,
   "a failing ticket is tried again once its backoff has passed"
 );
-await store.failPending("ENG-2001");
+await store.failPending(await queued("ENG-2001"));
 await store.enqueue([{ issue: "ENG-2001", version: 100 }]);
 assert.equal(
-  (await store.nextPending(10)).includes("ENG-2001"),
+  await due("ENG-2001"),
   true,
   "new ticket activity brings it back at once"
 );
 
-await store.failPending("ENG-2001");
+await store.failPending(await queued("ENG-2001"));
 await store.enqueue([{ issue: "ENG-2001", version: 100 }]);
 assert.equal(
-  (await store.nextPending(10)).includes("ENG-2001"),
+  await due("ENG-2001"),
   false,
   "rediscovering the same version keeps the backoff"
 );
 await store.enqueue([{ issue: "ENG-2001", version: 101 }]);
+assert.equal(await due("ENG-2001"), true, "a newer version clears it");
+
+await pool.query("TRUNCATE reporter_updates, reporter_pending");
+await store.enqueue([{ issue: "ENG-11", version: 100 }]);
+const [olderRun] = await store.nextPending(10);
+assert.deepEqual(olderRun, { issue: "ENG-11", version: 100 });
+await store.enqueue([{ issue: "ENG-11", version: 200 }]);
+await store.failPending(olderRun);
+await store.deferPending(olderRun, Date.now() + 3_600_000);
 assert.equal(
-  (await store.nextPending(10)).includes("ENG-2001"),
+  await due("ENG-11"),
   true,
-  "a newer version clears it"
+  "an older run's failure or deferral does not back off a newer version"
+);
+await store.resolvePending(olderRun);
+assert.deepEqual(
+  await store.nextPending(10),
+  [{ issue: "ENG-11", version: 200 }],
+  "an older run's acknowledgement does not delete a newer version"
+);
+await store.resolvePending({ issue: "ENG-11", version: 200 });
+assert.equal(await due("ENG-11"), false, "the current version is acknowledged");
+
+await store.markWaiting("ENG-12", "old-sha");
+await store.queueWaiting("new-sha");
+const [waitingRun] = await store.nextPending(10);
+assert.deepEqual(waitingRun, { issue: "ENG-12", version: null });
+await store.enqueue([{ issue: "ENG-12", version: 300 }]);
+await store.resolvePending(waitingRun);
+assert.deepEqual(
+  await store.nextPending(10),
+  [{ issue: "ENG-12", version: 300 }],
+  "a deploy recheck's acknowledgement does not delete a version discovery queued meanwhile"
 );
 
 assert.deepEqual(await store.readCursor(), { since: null, sweep: null });

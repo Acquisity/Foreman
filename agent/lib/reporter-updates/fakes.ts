@@ -3,7 +3,12 @@ import type { DeployProbe } from "./deploy.js";
 import type { LinearPort, TicketView } from "./linear.js";
 import { DEPLOY_REPOSITORY, type PullFacts, type TicketFacts } from "./plan.js";
 import { type Deps, type RunConfig, reconcileTicket } from "./run.js";
-import { backoffMs, type LedgerRow, type ReporterStore } from "./store.js";
+import {
+  backoffMs,
+  type LedgerRow,
+  type PendingTicket,
+  type ReporterStore,
+} from "./store.js";
 
 export const SANDBOX = "C0AAAAAAAAA";
 export const FOREMAN = "foreman-user";
@@ -62,9 +67,13 @@ export const memoryStore = () => {
       attempts: number;
       lastTry: number;
       retryAfter: number;
-      version: number;
+      version: number | null;
     }
   >();
+  const current = ({ issue, version }: PendingTicket) => {
+    const entry = pending.get(issue);
+    return entry?.version === version ? entry : undefined;
+  };
   const state: {
     cursor: number | null;
     cursorWrites: number[];
@@ -170,11 +179,11 @@ export const memoryStore = () => {
       await markSent(issue, covers, message, channel, commentId);
       return true;
     },
-    deferPending(issue, untilMs) {
-      const entry = pending.get(issue);
+    deferPending(item, untilMs) {
+      const entry = current(item);
       if (entry) {
         state.tokens += 1;
-        pending.set(issue, {
+        pending.set(item.issue, {
           ...entry,
           lastTry: state.tokens,
           retryAfter: Math.max(entry.retryAfter, untilMs),
@@ -196,7 +205,11 @@ export const memoryStore = () => {
       }
       for (const { issue, version } of tickets) {
         const existing = pending.get(issue);
-        if (existing && version <= existing.version) {
+        if (
+          existing &&
+          existing.version !== null &&
+          version <= existing.version
+        ) {
           continue;
         }
         pending.set(issue, {
@@ -213,11 +226,11 @@ export const memoryStore = () => {
       }
       return Promise.resolve();
     },
-    failPending(issue) {
-      const entry = pending.get(issue);
+    failPending(item) {
+      const entry = current(item);
       if (entry) {
         state.tokens += 1;
-        pending.set(issue, {
+        pending.set(item.issue, {
           attempts: entry.attempts + 1,
           lastTry: state.tokens,
           retryAfter: Math.max(
@@ -247,7 +260,7 @@ export const memoryStore = () => {
           .filter(([, entry]) => entry.retryAfter <= state.now)
           .sort((a, b) => a[1].lastTry - b[1].lastTry)
           .slice(0, limit)
-          .map(([issue]) => issue)
+          .map(([issue, entry]) => ({ issue, version: entry.version }))
       );
     },
     queueWaiting(liveSha) {
@@ -262,7 +275,7 @@ export const memoryStore = () => {
             attempts: 0,
             lastTry: 0,
             retryAfter: 0,
-            version: 0,
+            version: null,
           });
         }
       }
@@ -286,8 +299,10 @@ export const memoryStore = () => {
       }
       return Promise.resolve();
     },
-    resolvePending(issue) {
-      pending.delete(issue);
+    resolvePending(item) {
+      if (current(item)) {
+        pending.delete(item.issue);
+      }
       return Promise.resolve();
     },
     rows(issue) {

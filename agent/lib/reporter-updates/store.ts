@@ -24,6 +24,11 @@ export interface DiscoveredTicket {
   version: number;
 }
 
+export interface PendingTicket {
+  issue: string;
+  version: number | null;
+}
+
 export interface Sweep {
   after: string;
   since: number;
@@ -52,10 +57,10 @@ export interface ReporterStore {
     commentId: string,
     token: string
   ) => Promise<boolean>;
-  deferPending: (issue: string, untilMs: number) => Promise<void>;
+  deferPending: (ticket: PendingTicket, untilMs: number) => Promise<void>;
   dropWaiting: (issue: string) => Promise<void>;
   enqueue: (tickets: DiscoveredTicket[]) => Promise<void>;
-  failPending: (issue: string) => Promise<void>;
+  failPending: (ticket: PendingTicket) => Promise<void>;
   markSent: (
     issue: string,
     stages: Stage[],
@@ -64,11 +69,11 @@ export interface ReporterStore {
     commentId: string
   ) => Promise<void>;
   markWaiting: (issue: string, checkedSha: string | null) => Promise<void>;
-  nextPending: (limit: number) => Promise<string[]>;
+  nextPending: (limit: number) => Promise<PendingTicket[]>;
   queueWaiting: (liveSha: string) => Promise<void>;
   readCursor: () => Promise<DiscoveryCursor>;
   release: (issue: string, stage: Stage, token: string) => Promise<void>;
-  resolvePending: (issue: string) => Promise<void>;
+  resolvePending: (ticket: PendingTicket) => Promise<void>;
   rows: (issue: string) => Promise<LedgerRow[]>;
   saveCursor: (ms: number) => Promise<void>;
   saveSweep: (sweep: Sweep) => Promise<void>;
@@ -82,7 +87,11 @@ const rowSchema = z.object({
   stage: ROW_STAGE,
   status: z.enum(["claimed", "sent", "waiting"]),
 });
-const issueSchema = z.object({ issue: z.string() });
+const pendingSchema = z.object({
+  issue: z.string(),
+  version: z.coerce.number().nullable(),
+});
+const SAME_VERSION = "seen_version IS NOT DISTINCT FROM $2::bigint";
 const cursorSchema = z.object({
   after: z.string().nullable(),
   since: z.coerce.number().nullable(),
@@ -167,14 +176,14 @@ export const createReporterStore = (query: Query): ReporterStore => {
       }
       return true;
     },
-    async deferPending(issue, untilMs) {
+    async deferPending(ticket, untilMs) {
       await query(
         `UPDATE reporter_pending
          SET last_try = now(),
-             retry_after = GREATEST(COALESCE(retry_after, to_timestamp($2::double precision / 1000)),
-                                    to_timestamp($2::double precision / 1000))
-         WHERE issue = $1`,
-        [issue, untilMs]
+             retry_after = GREATEST(COALESCE(retry_after, to_timestamp($3::double precision / 1000)),
+                                    to_timestamp($3::double precision / 1000))
+         WHERE issue = $1 AND ${SAME_VERSION}`,
+        [ticket.issue, ticket.version, untilMs]
       );
     },
     async dropWaiting(issue) {
@@ -206,13 +215,13 @@ export const createReporterStore = (query: Query): ReporterStore => {
         [[...latest.keys()], [...latest.values()]]
       );
     },
-    async failPending(issue) {
+    async failPending(ticket) {
       await query(
         `UPDATE reporter_pending
          SET attempts = attempts + 1, last_try = now(),
              retry_after = GREATEST(COALESCE(retry_after, now() + ${BACKOFF("attempts")}), now() + ${BACKOFF("attempts")})
-         WHERE issue = $1`,
-        [issue]
+         WHERE issue = $1 AND ${SAME_VERSION}`,
+        [ticket.issue, ticket.version]
       );
     },
     async markSent(issue, stages, message, channel, commentId) {
@@ -237,12 +246,12 @@ export const createReporterStore = (query: Query): ReporterStore => {
     },
     async nextPending(limit) {
       const rows = await query(
-        `SELECT issue FROM reporter_pending
+        `SELECT issue, seen_version::text AS version FROM reporter_pending
          WHERE retry_after IS NULL OR retry_after <= now()
          ORDER BY last_try NULLS FIRST, added_at LIMIT $1`,
         [limit]
       );
-      return rows.map((row) => issueSchema.parse(row).issue);
+      return rows.map((row) => pendingSchema.parse(row));
     },
     async queueWaiting(liveSha) {
       await query(
@@ -288,8 +297,11 @@ export const createReporterStore = (query: Query): ReporterStore => {
         [issue, stage, token]
       );
     },
-    async resolvePending(issue) {
-      await query("DELETE FROM reporter_pending WHERE issue = $1", [issue]);
+    async resolvePending(ticket) {
+      await query(
+        `DELETE FROM reporter_pending WHERE issue = $1 AND ${SAME_VERSION}`,
+        [ticket.issue, ticket.version]
+      );
     },
     async rows(issue) {
       const rows = await query(
