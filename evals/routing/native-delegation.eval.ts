@@ -55,7 +55,7 @@ export default defineEval({
       // both receipts, both settled tasks, and the final reply.
       const launch = await observe(
         session.send(
-          `Use the native agent tool twice for two independent tasks, in this order. Give each child all its context and copy its command verbatim. First agent call: run exactly this one read-only bash command computing 17 + 25: ${COMPUTATIONS[0].command}. Second agent call: run exactly this one read-only bash command reversing raven using Bash built-ins: ${COMPUTATIONS[1].command}. Each child must return only its exact printed result line. Do not use critic or vision, create files, access providers, or delegate further. A working receipt is not a result. Let native background delivery bring both results back; do not poll or repeat the tasks. Only after both children finish, put their actual results on separate lines in your final reply.`,
+          `Use the native agent tool twice for two independent tasks, in this order. Give each child all its context and copy its command verbatim. First agent call: run exactly this one read-only bash command computing 17 + 25: ${COMPUTATIONS[0].command}. Second agent call: run exactly this one read-only bash command reversing raven using Bash built-ins: ${COMPUTATIONS[1].command}. Each child must return only its exact printed result line. Do not use critic, create files, access providers, or delegate further. A working receipt is not a result. Let native background delivery bring both results back; do not poll or repeat the tasks. Only after both children finish, put their actual results on separate lines in your final reply.`,
           { signal }
         )
       );

@@ -1,9 +1,18 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-const { gatewayRouting, modelFor, parseModelOverrides } = await import(
+const { gatewayRouting, MODELS, modelFor, parseModelOverrides } = await import(
   "./models.js"
 );
+
+describe("MODELS", () => {
+  it("runs the general root on Claude and no root slot on DeepSeek", () => {
+    assert.ok(MODELS.orchestrator.startsWith("anthropic/"));
+    for (const slot of ["orchestrator", "triage", "widget"] as const) {
+      assert.ok(!MODELS[slot].startsWith("deepseek/"), slot);
+    }
+  });
+});
 
 describe("gatewayRouting", () => {
   it("orders a deepseek id onto the providers that accept a mixed history", () => {
