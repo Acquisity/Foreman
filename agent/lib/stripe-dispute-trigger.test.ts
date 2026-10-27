@@ -185,12 +185,19 @@ describe("stripe dispute trigger", () => {
     assert.equal(stripeDisputeIdOf(auth), "du_1AbCdEf");
   });
 
-  it("reads only a plain approve as an approval", () => {
+  it("reads a clear go-ahead as an approval, and nothing conditional", () => {
     for (const text of [
       "approve",
       "<@U0BQ5QMHM7D> approve",
       "<@U0BQ5QMHM7D|foreman> Approve!",
       "  APPROVE. ",
+      "<@U0BQ5QMHM7D> approve to submit",
+      "Foreman approve <@U0BQ5QMHM7D>",
+      "Acquisity Foreman approved",
+      "approved",
+      "yes approve",
+      "go ahead and submit",
+      "submit it",
     ]) {
       assert.ok(isStripeDisputeApprovalText(text), text);
     }
@@ -198,7 +205,12 @@ describe("stripe dispute trigger", () => {
       "<@U0BQ5QMHM7D> should we approve?",
       "approve but drop the receipt",
       "don't approve",
-      "approved",
+      "do not submit",
+      "wait, don't submit yet",
+      "approve if the refund is in there",
+      "change the summary then approve",
+      "what's in the evidence",
+      "<@U0BQ5QMHM7D>",
       "",
     ]) {
       assert.equal(isStripeDisputeApprovalText(text), false, text);

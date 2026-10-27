@@ -176,17 +176,24 @@ export const stripeDisputeSessionMessage = (alert: string): string =>
   ].join("\n");
 
 const MENTION = /<@[A-Z0-9]+(?:\|[^>]*)?>/gu;
-const CLOSING_PUNCTUATION = /[.!]+$/u;
+
+const APPROVE_WORD =
+  /\b(?:approve[ds]?|submit(?: it)?|go ahead|ship it|lgtm)\b/u;
+const HOLD_WORD =
+  /\b(?:not|no|don'?t|do not|never|wait|hold|but|except|unless|instead|change|drop|remove|edit|cancel|stop|if)\b/u;
 
 /**
- * Whether a person's thread reply is a literal approval: "approve" with only
- * mentions, case and closing punctuation around it. Anything else, a question
- * or "approve but change X", is not.
+ * Whether a person's thread reply approves the submit: it names approving or
+ * submitting ("approve", "approved", "approve to submit", "go ahead and
+ * submit"), and is not a question, a refusal or a conditional ("should we
+ * approve?", "don't approve", "approve but drop the receipt").
  */
-export const isStripeDisputeApprovalText = (text: string): boolean =>
-  text.length <= 200 &&
-  text
-    .replace(MENTION, "")
-    .trim()
-    .replace(CLOSING_PUNCTUATION, "")
-    .toLowerCase() === "approve";
+export const isStripeDisputeApprovalText = (text: string): boolean => {
+  if (text.length > 200) {
+    return false;
+  }
+  const said = text.replace(MENTION, "").trim().toLowerCase();
+  return (
+    APPROVE_WORD.test(said) && !said.includes("?") && !HOLD_WORD.test(said)
+  );
+};

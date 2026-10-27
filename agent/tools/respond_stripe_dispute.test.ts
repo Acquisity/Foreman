@@ -584,7 +584,7 @@ describe("respond_stripe_dispute submit", () => {
     assert.notEqual(await submitKey("41 logins."), first);
   });
 
-  it("refuses a person's turn that is not a literal approve, with no write", async () => {
+  it("refuses a person's turn that is not a go-ahead, with no write", async () => {
     const { fingerprint, stripe } = await staged();
     const writes = stripe.writes.length;
     const { stripeDisputeApproved: _approved, ...asked } = person().attributes;
@@ -593,7 +593,7 @@ describe("respond_stripe_dispute submit", () => {
       fingerprint,
     });
     assert.equal(result.ok, false);
-    assert.ok(reasonMatches(result.reason, "@Foreman approve"), result.reason);
+    assert.ok(reasonMatches(result.reason, "say approve"), result.reason);
     assert.equal(stripe.writes.length, writes);
   });
 
