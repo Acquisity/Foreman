@@ -446,3 +446,20 @@ test("a low-confidence inbox decision is unproven even when the billing facts fa
   assert.ok(confident.outcome === "route");
   assert.equal(confident.path, "Support/Financial");
 });
+
+test("a billed inbox error with a set-aside duplicate still needs a confident path", () => {
+  const decision = resolveTriage(
+    inboxInput({ billingFacts: billingFacts({ paymentsFailing: true }) }),
+    inboxAnswers({ path: pick("Engineering Todo", 0.4) }),
+    NOW
+  );
+  assert.equal(decision.outcome, "unproven");
+  const confident = resolveTriage(
+    inboxInput({ billingFacts: billingFacts({ paymentsFailing: true }) }),
+    inboxAnswers({ path: pick("Engineering Todo", 0.7) }),
+    NOW
+  );
+  assert.ok(confident.outcome === "route");
+  assert.equal(confident.path, "Support/Financial");
+  assert.equal(confident.confidence.path, 0.7);
+});

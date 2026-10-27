@@ -605,12 +605,15 @@ export function resolveTriage(
     return unproven(gate.missing);
   }
   const billed = gate?.kind === "billing";
+  if (billed) {
+    confidence.path = pathPick.confidence;
+  }
   const gap = barGap({
     answers,
     billed,
     classification,
     classificationConfidence: classificationPick.confidence,
-    duplicate,
+    duplicate: billed ? undefined : duplicate,
     input,
     pathConfidence: pathPick.confidence,
   });
