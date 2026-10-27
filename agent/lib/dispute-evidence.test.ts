@@ -471,16 +471,14 @@ describe("dispute review regressions", () => {
     assert.equal(calls.includes("slack.aia.history"), false);
   });
 
-  it("finding 4: drops ticket bodies without exact customer ownership", async () => {
+  it("returns a found ticket that names none of the customer's identifiers, with an empty matchedOn", async () => {
     const { result } = await gather({
       linearDescription:
         "A different customer's refund request. other@elsewhere.io",
     });
-    assert.equal(facts(result, "linear").tickets.rows.length, 0);
-    assert.equal(
-      (facts(result, "linear") as { droppedCandidates?: number })
-        .droppedCandidates,
-      1
+    assert.deepEqual(
+      facts(result, "linear").tickets.rows.map((row) => row.matchedOn),
+      [[]]
     );
   });
 
@@ -718,15 +716,22 @@ describe("dispute attribution boundaries", () => {
     assert.equal(stub.calls.includes("slack.aia.history"), false);
   });
 
-  it("exact Linear ownership rejects email substrings and marks limited text", async () => {
+  it("matches identifiers exactly, not as substrings, and marks limited text", async () => {
     const wrong = await gather({
       linearDescription: "Another customer: owner@acme.io.evil",
     });
-    assert.equal(facts(wrong.result, "linear").tickets.rows.length, 0);
+    assert.deepEqual(
+      facts(wrong.result, "linear").tickets.rows[0]?.matchedOn,
+      []
+    );
     const exact = await gather({
       linearDescription: `Workspace ${ORG_A}. ${"text ".repeat(1000)}`,
     });
-    assert.equal(facts(exact.result, "linear").tickets.rows.length, 1);
+    assert.ok(
+      facts(exact.result, "linear").tickets.rows[0]?.matchedOn.includes(
+        "organizationId"
+      )
+    );
     assert.equal(facts(exact.result, "linear").tickets.truncated, true);
   });
 });

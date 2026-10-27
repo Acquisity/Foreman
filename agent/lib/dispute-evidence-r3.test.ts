@@ -14,7 +14,7 @@ import type { OperationRequest } from "./executor/operations.js";
 import { ExecutorError } from "./executor/transport.js";
 import { WORKSPACE_ID } from "./instantly-fixtures.js";
 
-const UNREQUESTED = /only unrequested issues \(1\)/u;
+const UNREQUESTED = /none of the 1 tickets the search found \(1 unrequested\)/u;
 const DISPUTED_INVOICE = {
   amount_paid: 25_200,
   created: CHARGE - 3600,
@@ -79,7 +79,7 @@ describe("Linear live replay regressions", () => {
     assert.match(result.sources.linear.error, UNREQUESTED);
   });
 
-  it("drops and counts mixed unrequested issues before ownership matching", async () => {
+  it("drops and counts unrequested issues Linear returns", async () => {
     const stub = fake();
     const { linear } = stub.deps;
     const result = await gatherDisputeEvidence("du_1", {
@@ -104,7 +104,6 @@ describe("Linear live replay regressions", () => {
       ["CSP-12"]
     );
     assert.equal(source.droppedUnrequested, 1);
-    assert.equal(source.droppedCandidates, 1);
   });
 
   it("accepts a different-email ticket naming the exact full workspace", async () => {
@@ -130,7 +129,7 @@ describe("Linear live replay regressions", () => {
     ]);
   });
 
-  it("rejects a single-word Growth workspace and partial workspace or person names", async () => {
+  it("does not count a single-word workspace or a partial name as a match", async () => {
     const cases = [
       {
         name: "Growth",
@@ -145,13 +144,17 @@ describe("Linear live replay regressions", () => {
       { name: "Acme", person: "Mira Patel", text: "Mira requested a refund" },
     ];
     for (const sample of cases) {
-      // biome-ignore lint/performance/noAwaitInLoops: isolate the three ownership counterexamples.
+      // biome-ignore lint/performance/noAwaitInLoops: isolate the three near-miss names.
       const { result } = await gather({
         charge: { billing_details: { name: sample.person } },
         linearDescription: sample.text,
         tables: { organization: [{ id: ORG_A, name: sample.name }] },
       });
-      assert.equal(facts(result, "linear").tickets.rows.length, 0, sample.text);
+      assert.deepEqual(
+        facts(result, "linear").tickets.rows[0]?.matchedOn,
+        [],
+        sample.text
+      );
     }
   });
 
@@ -394,4 +397,22 @@ it("a failed author name lookup leaves the Slack source checked", async () => {
   assert.ok(read.messages.rows.length > 0);
   assert.ok(read.messages.rows.every((message) => message.author === null));
   assert.ok(read.unresolvedAuthors > 0);
+});
+
+it("fails Linear when the body read returns none of the found tickets", async () => {
+  const stub = fake();
+  const { linear } = stub.deps;
+  const result = await gatherDisputeEvidence("du_1", {
+    ...stub.deps,
+    linear: async (request, options) => {
+      const response = await linear(request, options);
+      if (request.operation === "linear.IssueBodies") {
+        (
+          response.data as { data: { issues: { nodes: unknown[] } } }
+        ).data.issues.nodes = [];
+      }
+      return response;
+    },
+  });
+  assert.equal(result.sources.linear.checked, false);
 });

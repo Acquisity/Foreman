@@ -23,7 +23,7 @@ const phraseIn = (text: string, value: string) => {
   ).test(text);
 };
 
-/** Keep the accepting rule visible: a name match is weaker than an exact email or id. */
+/** Which customer identifiers a ticket names; empty when it names none of them. */
 const ownershipRules = (
   stripe: Source<StripeFacts>,
   database: Source<DatabaseFacts>
@@ -96,9 +96,9 @@ export const readLinear = async (
     requested.has(body.identifier)
   );
   const droppedUnrequested = bodies.length - requestedBodies.length;
-  if (bodies.length && !requestedBodies.length) {
+  if (identifiers.length && !requestedBodies.length) {
     throw new Error(
-      `IssueBodies returned only unrequested issues (${droppedUnrequested}); the requested tickets were not verified.`
+      `Linear returned none of the ${identifiers.length} tickets the search found (${droppedUnrequested} unrequested); their text was not read.`
     );
   }
   const rules = ownershipRules(stripe, database);
@@ -117,9 +117,6 @@ export const readLinear = async (
           .map(({ rule }) => rule)
       ),
     ];
-    if (!matchedOn.length) {
-      return [];
-    }
     const comments = body.comments.nodes
       .map((comment) => ({
         author: comment.user?.name ?? null,
@@ -146,7 +143,6 @@ export const readLinear = async (
     ];
   });
   return {
-    droppedCandidates: found.length - tickets.length + droppedUnrequested,
     droppedUnrequested,
     phrases,
     tickets: rowList(
