@@ -9,6 +9,8 @@ import replyTool from "../../tools/reply_to_requester.js";
 import { executorClient } from "../executor/client.js";
 import { executorTransport } from "../executor/transport.js";
 import { routeTicket, saveInvestigationDocument } from "../linear-api.js";
+import { SUPPORT_OWNER } from "../owner-map.js";
+import { routeRefusal, settleCriticRound } from "../triage-log.js";
 import { withReplayState } from "./backend.js";
 import {
   auth,
@@ -25,6 +27,8 @@ import { NEW_MASTER } from "./schema.js";
 import { appliedRoute } from "./views.js";
 
 const TOKEN_REFRESH = /token refresh/u;
+const SUPPORT_OWNER_RULE = /assignee set to Aaron Fraga/u;
+const DEVELOPER_RULE = /is a developer/u;
 const ONLY_CASE_DOCUMENTS = /documents only on ENG-100/u;
 
 const rootCtx = {
@@ -230,16 +234,36 @@ describe("replay result", () => {
       { content: "Blocked.", issue: "ENG-100", lane: "triage" },
       { client }
     );
-    await routeTicket(
-      { addLabels: ["Bug"], assignee: "Anthony Adewale", issue: "ENG-100" },
-      { client }
+    const blocked = settleCriticRound(
+      settleCriticRound({}, "ENG-100", "objection"),
+      "ENG-100",
+      "objection"
     );
+    const guardedRoute = (input: { assignee: string; issue: string }) => {
+      const refusal = routeRefusal({}, blocked, input);
+      return refusal
+        ? Promise.reject(new Error(refusal))
+        : routeTicket(input, { client });
+    };
+    await assert.rejects(
+      guardedRoute({ assignee: "Anthony Adewale", issue: "ENG-100" }),
+      SUPPORT_OWNER_RULE
+    );
+    await assert.rejects(
+      routeTicket(
+        { assignee: "Anthony Adewale", issue: "ENG-100" },
+        { client }
+      ),
+      DEVELOPER_RULE
+    );
+    await guardedRoute({ assignee: SUPPORT_OWNER, issue: "ENG-100" });
     await endTurn();
     const result = buildReplayResult(await state(), RUN);
     assert.equal(result.status, "completed");
     assert.equal(result.final?.outcome, "unproven");
     assert.equal(result.final?.path, null);
-    assert.equal(result.final?.assignee, "Anthony Adewale");
+    assert.deepEqual((await state()).issue.labels, []);
+    assert.equal(result.final?.assignee, SUPPORT_OWNER);
     assert.equal(result.final?.master, null);
   });
 

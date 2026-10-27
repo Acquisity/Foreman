@@ -79,7 +79,7 @@ Apply the fewest labels that place the ticket, as `addLabels` in Stage 6; never 
 
 ### Review before routing
 
-The review runs when `decide_triage` returns `review.required`: a `Bug` that is not a `Duplicate`, a `Duplicate`, a `Platform Limitation`, a `User Error` closing with a lane that could not run or a failure the customer saw, and an inbox error set aside as billing. The critic reviews a ticket at most twice: once, and again after Foreman's one adjudication. A second objection sends it to the area owner, unproven. For a `Bug`, run the `engineering-handoff` master search first so the critic can check the master. Follow [references/critic-review.md](references/critic-review.md) before Stage 6.
+The review runs when `decide_triage` returns `review.required`: a `Bug` that is not a `Duplicate`, a `Duplicate`, a `Platform Limitation`, a `User Error` closing with a lane that could not run or a failure the customer saw, and an inbox error set aside as billing. The critic reviews a ticket at most twice: once, and again after Foreman's one adjudication. A second objection sends it to Aaron Fraga, unproven. For a `Bug`, run the `engineering-handoff` master search first so the critic can check the master. Follow [references/critic-review.md](references/critic-review.md) before Stage 6.
 
 Completion: the unproven branch has stopped before classification with the unblock, missing confirmation and reopen condition documented; or the decision is recorded and, if `review.required`, a review has settled the document or a person has the ticket.
 

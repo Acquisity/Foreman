@@ -25,7 +25,7 @@ test("the review covers closures, records confidence, and reviews twice at most"
     "a `Duplicate`, a `Platform Limitation`",
     "a `User Error` closing with a lane that could not run or a failure the customer saw",
     "an inbox error set aside as billing",
-    "A second objection sends it to the area owner, unproven",
+    "A second objection sends it to Aaron Fraga, unproven",
     "run the `engineering-handoff` master search first so the critic can check the master",
   ]) {
     assert.ok(reviewSection.includes(rule), rule);
@@ -46,7 +46,8 @@ test("the review covers closures, records confidence, and reviews twice at most"
     "Second review, only after step 7",
     "An objection, after a first review that also objected: the ticket is blocked",
     "An objection, after a first review that failed: it is the first objection",
-    "Then call `route_ticket` with only `issue` and `assignee` set to the area owner",
+    'Then call `route_ticket` with only `issue` and `assignee: "Aaron Fraga"`',
+    "a developer may not hold one that is not labelled `Bug`",
     "`route_ticket` refuses any other route for this ticket once it is blocked",
   ]) {
     assert.ok(criticReviewReference.includes(rule), rule);

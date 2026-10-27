@@ -2,6 +2,7 @@ import { defineState } from "eve/context";
 import { z } from "zod";
 import { CRITIC_CRITERIA, CRITIC_VERDICTS } from "../subagents/critic/agent.js";
 import type { TriageDecision } from "./jev-decisions.js";
+import { SUPPORT_OWNER } from "./owner-map.js";
 
 export interface LatestTriageDecision {
   classification: string | null;
@@ -90,16 +91,22 @@ const ownerOnly = (input: RouteInput & Record<string, unknown>): boolean =>
       key === "issue" || key === "assignee" || value === undefined
   );
 
+const supportOwnerOnly = (input: RouteInput & Record<string, unknown>) =>
+  ownerOnly(input) &&
+  input.assignee?.trim().toLowerCase() === SUPPORT_OWNER.toLowerCase();
+
 export function routeRefusal(
   decisions: Readonly<Record<string, LatestTriageDecision>>,
   rounds: Readonly<Record<string, CriticRounds>>,
   input: RouteInput & Record<string, unknown>
 ): string | null {
+  if (criticBlocked(rounds, input.issue)) {
+    return supportOwnerOnly(input)
+      ? null
+      : `The critic objected to ${input.issue} twice, so it is not routed. Leave its state, priority, labels and project as they are, record the objections in the investigation document, and call route_ticket with only issue and assignee set to ${SUPPORT_OWNER}, who takes it without a label change.`;
+  }
   if (ownerOnly(input)) {
     return null;
-  }
-  if (criticBlocked(rounds, input.issue)) {
-    return `The critic objected to ${input.issue} twice, so it is not routed. Leave its state, priority, labels and project as they are, record the objections in the investigation document, and call route_ticket with only issue and assignee set to the area owner.`;
   }
   if (decisions[input.issue]?.closureReview && !rounds[input.issue]?.ran) {
     return `${input.issue} is a closure or duplicate that needs the critic's second check first. Delegate to the critic with a first line of exactly "Source issue: ${input.issue}", then route once it settles.`;

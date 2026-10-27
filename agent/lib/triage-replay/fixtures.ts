@@ -170,6 +170,13 @@ export const lists = {
   users: [
     {
       createdAt: LISTED,
+      displayName: "aaron",
+      email: "aaron@example.test",
+      id: "u-aaron",
+      name: "Aaron Fraga",
+    },
+    {
+      createdAt: LISTED,
       displayName: "anthony",
       email: "anthony@example.test",
       id: "u-anthony",

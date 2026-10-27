@@ -362,7 +362,7 @@ describe("the critic's second check", () => {
     );
   });
 
-  it("blocks routing after a second objection and still allows the owner assignment", () => {
+  it("blocks routing after a second objection and still allows the support owner assignment", () => {
     const decisions = { "ENG-1": duplicate };
     const first = settleCriticRound({}, "ENG-1", "objection");
     assert.equal(criticBlocked(first, "ENG-1"), false);
@@ -374,13 +374,14 @@ describe("the critic's second check", () => {
       routeRefusal({}, second, { issue: "ENG-1", labels: ["Bug"] }) ?? "",
       TWICE_RULE
     );
-    assert.equal(
-      routeRefusal(decisions, second, { assignee: "Ada", issue: "ENG-1" }),
-      null
+    assert.match(
+      routeRefusal(decisions, second, { assignee: "Ada", issue: "ENG-1" }) ??
+        "",
+      TWICE_RULE
     );
     assert.equal(
       routeRefusal(decisions, second, {
-        assignee: "Ada",
+        assignee: "aaron fraga",
         issue: "ENG-1",
         state: undefined,
       }),
