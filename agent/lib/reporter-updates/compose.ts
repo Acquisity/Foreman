@@ -54,7 +54,7 @@ export const composeReceived = async (
 
 /**
  * A duplicate gets its fixed line. Any other close reads the closing comments,
- * Foreman's and people's: the writer gives a one-line reason, and for a close
+ * Foreman's and staff's: the writer gives a one-line reason, and for a close
  * with no User Error or Platform Limitation label it also judges whether the
  * product works as designed (not a bug) or will not be changed (closed). A
  * failed call, or no comments, posts closed without a reason, unless the label
@@ -70,7 +70,7 @@ export const composeNotFixed = async (
     stage: "not_fixed",
     text,
   });
-  const comments = commentsOf(facts, ["foreman", "person"]);
+  const comments = commentsOf(facts, ["foreman", "staff"]);
   if (reason === "duplicate" || comments.length === 0) {
     return planned(notFixedText(reason));
   }
@@ -123,12 +123,12 @@ export const composeChange = async (
   };
 };
 
-/** Null when no closing comment from a person describes a change: post nothing. */
+/** Null when no closing comment from staff describes a change: post nothing. */
 export const composeDone = async (
   facts: TicketFacts,
   write: ReporterWriter
 ): Promise<Planned | null> => {
-  const comments = commentsOf(facts, ["person"]);
+  const comments = commentsOf(facts, ["staff"]);
   if (comments.length === 0) {
     return null;
   }

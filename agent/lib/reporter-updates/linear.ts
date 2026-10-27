@@ -1,6 +1,7 @@
 import { callLinearGraphQL } from "eve/channels/linear";
 import { z } from "zod";
 import { ENGINEERING_TEAM_ID } from "../linear-api.js";
+import { mappedOwner } from "../owner-map.js";
 import {
   assertThreadComplete,
   createThreadComment,
@@ -28,52 +29,44 @@ interface CommentNode {
   createdAt: string;
   id: string;
   parent: { id: string } | null;
-  user: { id: string } | null;
+  user: { id: string; name: string } | null;
 }
 
 /**
- * The comments the writer reads to judge a close: the newest people's
- * comments and, separately, the newest of Foreman's, each capped, anywhere on
- * the ticket including the Slack thread. Authors decide the group, never the
- * position. Left out: the thread anchors, comments by an anchor's author other
- * than Foreman (the receiver mirroring Slack), and Foreman's reporter updates.
+ * The comments the writer reads to judge a close, from anywhere on the ticket
+ * including the Slack thread: the newest staff comments (authors in the owner
+ * map) and, separately, the newest of Foreman's own, each group capped. Only
+ * staff count as evidence of a change; bots, external users, reporters and
+ * anyone else outside the owner map never do. Foreman's reporter updates are
+ * left out.
  */
 export const closingCommentsOf = (
   comments: readonly CommentNode[],
-  anchors: readonly CommentNode[],
   viewerId: string,
   identifier: string
 ): ClosingComment[] => {
-  const anchorIds = new Set(anchors.map((anchor) => anchor.id));
-  const mirrors = new Set(
-    anchors.flatMap((anchor) =>
-      anchor.user && anchor.user.id !== viewerId ? [anchor.user.id] : []
-    )
+  const sorted = [...comments].sort((a, b) =>
+    a.createdAt.localeCompare(b.createdAt)
   );
-  const sorted = comments
-    .filter(
-      (comment) =>
-        comment.user !== null &&
-        !anchorIds.has(comment.id) &&
-        !mirrors.has(comment.user.id)
-    )
-    .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
   const foreman = sorted
     .filter(
       (comment) =>
         comment.user?.id === viewerId && !isReporterUpdate(identifier, comment)
     )
-    .slice(-CLOSING_COMMENTS);
-  const people = sorted
-    .filter((comment) => comment.user?.id !== viewerId)
-    .slice(-CLOSING_COMMENTS);
-  return [...people, ...foreman]
+    .slice(-CLOSING_COMMENTS)
+    .map((comment) => ({ ...comment, author: "foreman" as const }));
+  const staff = sorted
+    .filter(
+      (comment) =>
+        comment.user !== null &&
+        comment.user.id !== viewerId &&
+        mappedOwner(comment.user.name) !== null
+    )
+    .slice(-CLOSING_COMMENTS)
+    .map((comment) => ({ ...comment, author: "staff" as const }));
+  return [...staff, ...foreman]
     .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
-    .map((comment) => ({
-      author: comment.user?.id === viewerId ? "foreman" : "person",
-      body: comment.body,
-      createdAt: comment.createdAt,
-    }));
+    .map(({ author, body, createdAt }) => ({ author, body, createdAt }));
 };
 
 export interface LinearPort {
@@ -126,7 +119,7 @@ const TICKET_QUERY = `query ReporterTicket($id: String!) {
     relations(first: 50) { nodes { type relatedIssue { identifier } } }
     comments(first: 100) {
       pageInfo { hasNextPage }
-      nodes { id body createdAt parent { id } user { id } }
+      nodes { id body createdAt parent { id } user { id name } }
     }
   }
 }`;
@@ -181,7 +174,7 @@ const ticketSchema = z.object({
             createdAt: z.string(),
             id: z.string(),
             parent: z.object({ id: z.string() }).nullable(),
-            user: z.object({ id: z.string() }).nullable(),
+            user: z.object({ id: z.string(), name: z.string() }).nullable(),
           })
         ),
         pageInfo: z.object({ hasNextPage: z.boolean() }),
@@ -454,7 +447,6 @@ export const linearPort = (
         .filter((url) => parsePullUrl(url) !== null);
       const closingComments = closingCommentsOf(
         comments,
-        anchors,
         data.viewer.id,
         issue.identifier
       );

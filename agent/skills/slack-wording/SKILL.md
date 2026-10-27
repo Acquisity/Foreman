@@ -45,7 +45,7 @@ The scheduled reporter-updates job, not a session turn, posts these messages: re
 - About 40 words at most; a message that runs over drops its optional part or uses its fallback line.
 - Never name an owner or developer. Reporters don't know them.
 - When something new ships, say how to use it and where to find it on screen, naming the button, page or menu.
-- Never say a change was made unless one was. A Done ticket with no linked change posts "Done" only when a person's closing comment describes the change; otherwise nothing is posted.
+- Never say a change was made unless one was. A Done ticket with no linked change posts "Done" only when a staff member's closing comment describes the change; otherwise nothing is posted.
 - No filler such as "Nothing for you to do", "Good news" or "as soon as there's news". A test checks every message.
 - Never use file paths, PR numbers, CI, ticket states or IDs, model names, "root cause", "deploy", "merge" or raw error codes.
 - A fixed or live message is sent only after the change is live for users, never when the ticket merely moves to Done.

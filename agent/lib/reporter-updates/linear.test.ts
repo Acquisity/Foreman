@@ -11,6 +11,12 @@ const PR = "https://github.com/Acquisity/Acquisity/pull/7";
 const ok = (data: unknown) =>
   new Response(JSON.stringify({ data }), { status: 200 });
 
+const NAMES: Record<string, string> = {
+  aaron: "Aaron Fraga",
+  james: "James Keeble",
+  viewer: "Acquisity Foreman",
+};
+
 const comment = (
   id: string,
   body: string,
@@ -19,14 +25,16 @@ const comment = (
     user?: string | null;
     createdAt?: string;
   } = {}
-) => ({
-  body,
-  createdAt: over.createdAt ?? "2026-10-10T10:00:00Z",
-  id,
-  parent: over.parent ? { id: over.parent } : null,
-  user:
-    over.user === undefined ? { id: "bot" } : over.user && { id: over.user },
-});
+) => {
+  const user = over.user === undefined ? "bot" : over.user;
+  return {
+    body,
+    createdAt: over.createdAt ?? "2026-10-10T10:00:00Z",
+    id,
+    parent: over.parent ? { id: over.parent } : null,
+    user: user && { id: user, name: NAMES[user] ?? `User ${user}` },
+  };
+};
 
 const issue = (over: Record<string, unknown> = {}) => ({
   assignee: { name: "Sam Jones" },
@@ -117,11 +125,6 @@ describe("readTicket", () => {
       channel: SANDBOX,
       closingComments: [
         {
-          author: "person",
-          body: "my own reply",
-          createdAt: "2026-10-10T10:00:00Z",
-        },
-        {
           author: "foreman",
           body: "We've received your report",
           createdAt: "2026-10-10T10:00:00Z",
@@ -137,7 +140,7 @@ describe("readTicket", () => {
           createdAt: "2026-10-10T10:00:00Z",
         },
         {
-          author: "person",
+          author: "staff",
           body: "Removed the wrong number from their contact.",
           createdAt: "2026-10-12T10:00:00Z",
         },
@@ -468,10 +471,10 @@ describe("readTicket", () => {
 });
 
 describe("closing comments", () => {
-  const ANCHOR = comment(
+  const BOT_ANCHOR = comment(
     "c-anchor",
     `Slack thread connected in [#sandbox](https://x.slack.com/archives/${SANDBOX}/p1700000000000001)`,
-    { user: "asks-bot" }
+    { user: null }
   );
   const at = (minute: number) =>
     `2026-10-12T10:${String(minute).padStart(2, "0")}:00Z`;
@@ -480,7 +483,7 @@ describe("closing comments", () => {
       ok({
         issue: issue({
           comments: {
-            nodes: [ANCHOR, ...nodes],
+            nodes: [BOT_ANCHOR, ...nodes],
             pageInfo: { hasNextPage: false },
           },
         }),
@@ -490,41 +493,61 @@ describe("closing comments", () => {
     return (await port.readTicket("ENG-1"))?.facts.closingComments ?? [];
   };
 
-  it("includes replies in the Slack thread and tells people from Foreman by author", async () => {
+  it("counts staff replies in the Linear-bot Slack thread and in a staff-started thread, and nobody else's", async () => {
     const found = await read([
-      comment("p-1", "Removed the duplicate number for you.", {
+      comment("a-1", "Looking at this now.", {
         createdAt: at(1),
         parent: "c-anchor",
-        user: "james",
+        user: "aaron",
       }),
       comment("f-1", "This works as designed.", {
         createdAt: at(2),
         parent: "c-anchor",
         user: "viewer",
       }),
-      comment("m-1", "Mirrored from Slack by the receiver", {
+      comment("r-1", "It is still wrong for me.", {
         createdAt: at(3),
         parent: "c-anchor",
-        user: "asks-bot",
+        user: "reporter",
       }),
       comment(commentIdFor("ENG-1", "received"), "Thanks, got it.", {
         createdAt: at(4),
         parent: "c-anchor",
         user: "viewer",
       }),
+      comment("t-1", "Removing the wrong number.", {
+        createdAt: at(5),
+        user: "aaron",
+      }),
+      comment("t-2", "Removed it from the CRM.", {
+        createdAt: at(6),
+        parent: "t-1",
+        user: "aaron",
+      }),
+      comment("t-3", "Thanks.", {
+        createdAt: at(7),
+        parent: "t-1",
+        user: "outsider",
+      }),
+      comment("b-1", "Synced by an integration.", {
+        createdAt: at(8),
+        user: null,
+      }),
     ]);
     assert.deepEqual(
       found.map((c) => [c.author, c.body]),
       [
-        ["person", "Removed the duplicate number for you."],
+        ["staff", "Looking at this now."],
         ["foreman", "This works as designed."],
+        ["staff", "Removing the wrong number."],
+        ["staff", "Removed it from the CRM."],
       ]
     );
   });
 
-  it("keeps a person's comment even when many Foreman notes follow it, and caps each group", async () => {
+  it("keeps a staff comment even when many Foreman notes follow it, and caps each group", async () => {
     const found = await read([
-      comment("p-1", "Fixed their data.", { createdAt: at(1), user: "james" }),
+      comment("a-1", "Fixed their data.", { createdAt: at(1), user: "aaron" }),
       ...Array.from({ length: 7 }, (_, i) =>
         comment(`f-${i}`, `Foreman note ${i}`, {
           createdAt: at(10 + i),
@@ -533,7 +556,7 @@ describe("closing comments", () => {
       ),
     ]);
     assert.deepEqual(
-      found.filter((c) => c.author === "person").map((c) => c.body),
+      found.filter((c) => c.author === "staff").map((c) => c.body),
       ["Fixed their data."]
     );
     assert.deepEqual(

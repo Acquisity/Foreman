@@ -194,7 +194,7 @@ describe("received fallback", () => {
 
 describe("done without a pull request", () => {
   const closing = (body: string) => ({
-    author: "person" as const,
+    author: "staff" as const,
     body,
     createdAt: "2026-10-12T10:00:00Z",
   });
@@ -265,7 +265,7 @@ describe("not a bug and closed reasons", () => {
     const t = ticket({
       closingComments: [
         {
-          author: "person",
+          author: "staff",
           body: "Exports only cover 12 months.",
           createdAt: "2026-10-12T10:00:00Z",
         },
