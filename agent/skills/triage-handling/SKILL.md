@@ -30,7 +30,7 @@ The unblock never replaces the root cause or the master ticket.
 
 ### Jev decides, Foreman acts
 
-Then call `decide_triage` once with the evidence record and that unblock, the Stage 3 duplicate candidates, the team's active projects and Root Cause labels read from Linear now, and `classify_ask`'s `sourceLabels`. Its decision is the verdict, classification, path, state, priority, labels, and project; record its notes and never hand-edit them. Call it again whenever the evidence changes: after adjudication, or a correction. A `NEEDS_HUMAN_URGENT` hotlane stop suspends its route. `unproven` takes the unproven branch with its `missing` list:
+Then call `decide_triage` once with the evidence record and that unblock, the Stage 3 duplicate candidates, `classify_ask`'s `sourceLabels`, and, read from Linear now, the team's active projects and Root Cause labels and the ticket's own labels as `ticketLabels`. Its decision is the verdict, classification, path, state, priority, labels, and project; record its notes and never hand-edit them. Call it again whenever evidence changes, as after adjudication or a correction. A `NEEDS_HUMAN_URGENT` hotlane stop suspends its route. `unproven` takes the unproven branch with its `missing` list:
 
 When the deciding confirmation is still missing, take the unproven branch and stop before classification. Before stopping, record any safe unblock supported by the completed evidence: the action, owner, current status, and confirmation that it costs the customer neither data nor money, or `None found: <reason>`. Preserve the source ticket's current state, priority, and labels, even an empty priority; read the unproven reporting exception in [references/reporting.md](references/reporting.md); attach or update the investigation document with the known facts, missing confirmation, and reopen condition; and give the requester that same reopen condition in the short comment or attended reply. Do not create or attach a master, route engineering work, or record investigation memory.
 
@@ -52,7 +52,7 @@ Set the state that matches the handling path: `Engineering Todo` is `Todo` (the 
 
 #### Set Linear priority
 
-Priority comes from impact, never from the reporter's requested priority or how loudly the complaint was phrased. Never leave a ticket at No priority. Weigh in order:
+Priority comes from impact, never from the reporter's requested priority or tone. Never leave a ticket at No priority. Weigh in order:
 
 1. Data loss or security. Any data corruption, loss, or security exposure is automatic `Urgent`, no matter how few accounts are affected.
 2. Blast radius, quantified from primary data in Stage 4, not estimated. A core workflow broken for many orgs outweighs one broken for a single org.
@@ -100,25 +100,27 @@ When Stage 5 review ran, the document already exists at the settled version: do 
 
 ### Comment on the ticket
 
-Write the report comment from [references/reporting.md](references/reporting.md): the root cause and next step, four blocks maximum. Evidence stays in the document. For the unproven branch, save only this document and comment, then stop: do not choose or change the project, read the roster, call `route_ticket`, or load `engineering-handoff`; preserve state, priority, labels, project, parent, and assignee.
+Write the report comment from [references/reporting.md](references/reporting.md): the root cause and next step, four blocks maximum. For the unproven branch, save only this document and comment, then stop: do not choose or change the project, read the roster, call `route_ticket`, or load `engineering-handoff`; preserve state, priority, labels, project, parent, and assignee.
 
 ### Choose the product project from completed evidence
 
-`decide_triage` chose it from the confirmed root cause and owning code path. A memory analogy, symptom, title, repository name, incoming `null`, or incoming `Support` project cannot make this decision. Pass the evidence-backed project to the ticket's one `route_ticket` call as `route.project`, unchanged; its returned `projectId` is what memory recording uses. When `route` has no project, it already assigns Aaron Fraga: say in the document which evidence is still missing. Missing or unmapped intake metadata by itself is never that evidence gap and never triggers Aaron routing. On `decided: false`, choose the project the same way.
+`decide_triage` chose it from the confirmed root cause and owning code path. A memory analogy, symptom, title, repository name, incoming `null`, or incoming `Support` project cannot make this decision. Pass the evidence-backed project to the ticket's one `route_ticket` call as `route.project`, unchanged; its returned `projectId` is what memory recording uses. When `route` has no project, the area alone chose the owner: name the missing evidence in the document. Missing or unmapped intake metadata by itself is never that gap. On `decided: false`, choose the project the same way.
 
 When Aaron explicitly requests read-only validation during an attended manual test, still search memory and complete the evidence work normally. Recommend the evidence-backed project in the result, but apply no Linear mutation and do not record investigation memory. This is an operator instruction for that test, not a runtime authorization mode. Do not require or invent a session marker for it.
 
 ### Area-routing roster
 
-Take the product area from the evidence-backed project, never from the incoming project, title, symptom, repository name, or memory. Read the roster in [references/roster.md](references/roster.md) and use the emails verbatim; the routing map accepts only allowlisted assignees.
+Take the product area from the evidence, never from the incoming project, title, symptom, repository name, or memory. `route` carries the `Area:` label and `assignee` from the owner map in [references/roster.md](references/roster.md); pass it unchanged.
 
-The roster exists on the production ENG team only; SAN sandbox tickets always route to Aaron Fraga. If the area is ambiguous, the project has no lead set, or the roster is unavailable, assign Aaron Fraga and say why in the report. Never route to retired or legacy projects.
+A developer gets only a confirmed Bug or a feature request labelled `Approved`; an unapproved one waits in Backlog with `Needs approval` and James. Questions, user errors, platform limits, billing and support get none.
+
+SAN sandbox tickets route to Aaron Fraga. No fitting area means James Keeble; repeat the reason in the report. Never route to retired or legacy projects.
 
 ### When the ticket is not engineering actionable
 
-`User Error`, `Platform Limitation`, `Resolved by triage`, `Duplicate`, `Backlog/low-impact`, and the `Support/` paths end here: call `route_ticket` once with the decision's `route` unchanged. Add no assignee: the ticket keeps its current one. The ticket carries the explanation and moves to the Stage 5 state; nothing goes to engineering. `User Error`, `Platform Limitation`, and `Resolved by triage` close as `Done`; the `Support/` paths stay `Todo` for a person.
+`User Error`, `Platform Limitation`, `Resolved by triage`, `Duplicate`, `Backlog/low-impact`, and the `Support/` paths end here: call `route_ticket` once with the decision's `route` unchanged. `route` names Aaron Fraga for an open follow-up, no one for a closed outcome. The ticket carries the explanation and moves to the Stage 5 state; nothing goes to engineering. `User Error`, `Platform Limitation` (unless a lift is wanted), and `Resolved by triage` close as `Done`; the `Support/` paths stay `Todo` for a person.
 
-A `Duplicate` still inherits: `route` already carries `duplicateOf` and `inheritAssigneeFrom`. Add only `assignee`, the area owner from the roster, when `route` names none, so the root cause's owner owns its reports. The tool inherits the parent's assignee when it has one and uses the fallback otherwise; say in the document when the parent was unassigned. That fallback is ownership of record, not a work assignment.
+A `Duplicate` still inherits: `route` already carries `duplicateOf` and `inheritAssigneeFrom`. Add only `assignee`, the area owner from the roster, when `route` names none (a confirmed Bug only), so the root cause's owner owns its reports. The tool inherits the parent's assignee when it is in the roster and uses the fallback otherwise.
 
 ### When the root cause warrants action
 

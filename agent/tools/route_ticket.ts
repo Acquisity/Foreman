@@ -12,8 +12,8 @@ export default defineTool({
   approval: questionsOnlyPolicy,
   description:
     "Apply final routing decisions to a Linear ticket in one write: state, priority, labels to add, project, assignee, parent, and duplicate relation, then read it back. " +
-    "Labels are added to the ones already on the ticket, never replaced; an unknown label name fails before any write and lists the valid names. " +
-    "Names are resolved for you: state by name within the ticket's team, project by name, assignee by name or email. " +
+    "Labels are added to the ones already on the ticket, never replaced, and removeLabels takes named ones off; an unknown label name to add fails before any write and lists the valid names. " +
+    "Names are resolved for you: state by name within the ticket's team and project by name. The assignee must be a person in the owner map, given by name; any other name fails before any write. A developer takes a ticket only when it is labelled Bug, or Feature Request and Approved, counting the labels being added; the one exception is James holding a Feature Request with Needs approval while he decides it; support owners are not gated. A label change that would leave the current developer holder outside that rule fails before any write unless it also names a new assignee or passes releaseDeveloper. " +
     "For a duplicate pass duplicateOf and inheritAssigneeFrom with the same master; when that master has an assignee it is inherited, otherwise assignee (the area owner) is used as the fallback. " +
     "links attach urls as resources on the ticket. Use the returned projectId for memory recording. " +
     "routed true with warnings means the ticket was updated but a relation or link after it failed; read the warning before retrying only that part.",
@@ -43,7 +43,7 @@ export default defineTool({
     assignee: name
       .optional()
       .describe(
-        "User name or email; with inheritAssigneeFrom, the fallback for an unassigned source."
+        "An owner-map person by name; with inheritAssigneeFrom, the fallback for an unassigned source or one held by someone outside the map."
       ),
     duplicateOf: identifier
       .optional()
@@ -67,6 +67,17 @@ export default defineTool({
       .optional()
       .describe("1 Urgent, 2 High, 3 Medium, 4 Low, 0 none."),
     project: name.optional().describe("Project name."),
+    releaseDeveloper: z
+      .boolean()
+      .optional()
+      .describe(
+        "Unassign the ticket when a developer holds it and nobody new is assigned; James and support owners are kept."
+      ),
+    removeLabels: z
+      .array(name)
+      .max(10)
+      .optional()
+      .describe("Label names to take off; a name the ticket lacks is ignored."),
     state: name
       .optional()
       .describe("Workflow state name in the ticket's team."),

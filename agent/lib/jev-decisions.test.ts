@@ -82,9 +82,15 @@ test("a supported Bug with the full bar routes to the project and asks for revie
   assert.ok(decision.outcome === "route");
   assert.equal(decision.classification, "Bug");
   assert.equal(decision.needsCriticReview, true);
-  assert.equal(decision.assignee, "area owner");
+  assert.equal(decision.assignee, "James Keeble");
+  assert.deepEqual(decision.area, {
+    key: "ai_sdr",
+    label: "Area: AI SDR",
+    matched: true,
+  });
   assert.deepEqual(decision.route, {
-    addLabels: ["Customer reported", "Bug"],
+    addLabels: ["Customer reported", "Bug", "Area: AI SDR"],
+    assignee: "James Keeble",
     priority: 3,
     project: "AI SDR Core",
     state: "Todo",
@@ -169,15 +175,18 @@ test("between adjacent bands the higher one wins and is flagged", () => {
   assert.equal(decision.notes.length, 1);
 });
 
-test("an unsettled project leaves it unset and routes to Aaron", () => {
+test("an unsettled project and area leave the project unset and route to James", () => {
   const decision = resolveTriage(
     triageInput(),
-    bugAnswers({ project: pick("undetermined") })
+    bugAnswers({ area: pick("undetermined"), project: pick("undetermined") })
   );
   assert.ok(decision.outcome === "route");
-  assert.equal(decision.assignee, "Aaron Fraga");
+  assert.equal(decision.assignee, "James Keeble");
+  assert.equal(decision.area?.key, "other");
+  assert.equal(decision.area?.matched, false);
   assert.equal(decision.route.project, undefined);
-  assert.equal(decision.route.assignee, "Aaron Fraga");
+  assert.equal(decision.route.assignee, "James Keeble");
+  assert.ok(decision.route.addLabels.includes("Area: Other"));
 });
 
 test("a sandbox ticket always routes to Aaron", () => {
@@ -187,7 +196,12 @@ test("a sandbox ticket always routes to Aaron", () => {
   );
   assert.ok(decision.outcome === "route");
   assert.equal(decision.route.assignee, "Aaron Fraga");
+  assert.equal(decision.area, null);
   assert.equal(decision.route.project, "AI SDR Core");
+  assert.equal(
+    decision.route.addLabels.some((label) => label.startsWith("Area:")),
+    false
+  );
 });
 
 test("a platform limitation the customer wants lifted is a Low feature request", () => {
@@ -205,9 +219,14 @@ test("a platform limitation the customer wants lifted is a Low feature request",
     "Customer reported",
     "Feature Request",
     "Provider limit",
+    "Needs approval",
   ]);
+  assert.equal(decision.assignee, "James Keeble");
+  assert.equal(decision.approval, "needed");
+  assert.equal(decision.route.assignee, "James Keeble");
   assert.equal(decision.route.priority, 4);
-  assert.equal(decision.route.state, "Done");
+  assert.equal(decision.route.state, "Backlog");
+  assert.equal(decision.path, "Backlog/low-impact");
 });
 
 test("triage asks every question, including one per duplicate candidate", () => {
@@ -768,4 +787,336 @@ test("a reply at the claim limit is still checked in full", async () => {
     result.reply,
     `${"Confirmed.\n".repeat(39)}Everything is deployed (unconfirmed).`
   );
+});
+
+test("a confirmed Bug that needs no developer still carries its Area label", () => {
+  for (const path of ["Backlog/low-impact", "Resolved by triage"]) {
+    const decision = resolveTriage(
+      triageInput(),
+      bugAnswers({ area: pick("ai_sdr"), path: pick(path) })
+    );
+    assert.ok(decision.outcome === "route");
+    assert.equal(decision.classification, "Bug", path);
+    assert.equal(decision.area?.key, "ai_sdr", path);
+    assert.ok(decision.route.addLabels.includes("Area: AI SDR"), path);
+    assert.equal(decision.assignee, null, path);
+    assert.equal(decision.route.assignee, undefined, path);
+  }
+});
+
+test("a shared CRM file does not override a CRM sub-area the model settled", () => {
+  const shared = {
+    commit: "a".repeat(40),
+    file: "apps/web/components/crm-v2/shared.tsx",
+    function: "Shell",
+  };
+  const settled = resolveTriage(
+    triageInput({ codePath: shared }),
+    bugAnswers({ area: pick("crm_conversations"), project: pick("CRM") })
+  );
+  assert.ok(settled.outcome === "route");
+  assert.equal(settled.area?.key, "crm_conversations");
+  assert.equal(settled.assignee, "Elis Bushaj");
+  const specific = resolveTriage(
+    triageInput({
+      codePath: { ...shared, file: "apps/web/lib/dialer/session.ts" },
+    }),
+    bugAnswers({ area: pick("crm_conversations"), project: pick("CRM") })
+  );
+  assert.ok(specific.outcome === "route");
+  assert.equal(specific.area?.key, "crm_phone");
+  assert.equal(specific.assignee, "Ebubeker Rexha");
+});
+
+test("an approved feature request that duplicates another stays a Duplicate", () => {
+  const decision = resolveTriage(
+    triageInput({
+      duplicateCandidates: [
+        { identifier: "ENG-9", priority: 3, summary: "same", title: "t" },
+      ],
+      ticketLabels: ["Approved", "Feature Request"],
+    }),
+    bugAnswers({
+      area: pick("ai_sdr"),
+      classification: pick("platform_limitation"),
+      duplicate_0: pick("same_outcome", 0.9),
+      path: pick("Platform Limitation"),
+      wants_limit_lifted: yes(),
+    })
+  );
+  assert.ok(decision.outcome === "route");
+  assert.equal(decision.path, "Duplicate");
+  assert.equal(decision.route.state, "Duplicate");
+  assert.equal(decision.route.duplicateOf, "ENG-9");
+  assert.equal(decision.route.assignee, undefined);
+});
+
+test("an approved feature request takes the engineering path so the hand-off can build it", () => {
+  const decision = resolveTriage(
+    triageInput({ ticketLabels: ["Approved", "Feature Request"] }),
+    bugAnswers({
+      area: pick("ai_sdr"),
+      classification: pick("platform_limitation"),
+      path: pick("Platform Limitation"),
+      wants_limit_lifted: yes(),
+    })
+  );
+  assert.ok(decision.outcome === "route");
+  assert.equal(decision.classification, "Platform Limitation");
+  assert.equal(decision.path, "Engineering Todo");
+  assert.equal(decision.route.state, "Todo");
+  assert.equal(decision.route.assignee, "James Keeble");
+  assert.ok(decision.route.addLabels.includes("Area: AI SDR"));
+});
+
+test("an approved feature request on a path that closes or delegates it keeps that path", () => {
+  for (const path of ["Resolved by triage", "Support/Product follow-up"]) {
+    const decision = resolveTriage(
+      triageInput({ ticketLabels: ["Approved", "Feature Request"] }),
+      bugAnswers({
+        area: pick("ai_sdr"),
+        classification: pick("platform_limitation"),
+        path: pick(path),
+        wants_limit_lifted: yes(),
+      })
+    );
+    assert.ok(decision.outcome === "route");
+    assert.equal(decision.path, path);
+    assert.equal(
+      decision.route.state,
+      path === "Resolved by triage" ? "Done" : "Todo"
+    );
+    assert.equal(
+      decision.route.assignee,
+      path === "Resolved by triage" ? undefined : "Aaron Fraga",
+      path
+    );
+  }
+});
+
+test("an approved feature request drops the label that held it for approval", () => {
+  const approved = resolveTriage(
+    triageInput({
+      ticketLabels: ["Approved", "Feature Request", "Needs approval"],
+    }),
+    bugAnswers({
+      area: pick("ai_sdr"),
+      classification: pick("platform_limitation"),
+      path: pick("Platform Limitation"),
+      wants_limit_lifted: yes(),
+    })
+  );
+  assert.ok(approved.outcome === "route");
+  assert.deepEqual(approved.route.removeLabels, ["Needs approval"]);
+  assert.equal(approved.route.addLabels.includes("Needs approval"), false);
+  const bug = resolveTriage(triageInput(), bugAnswers());
+  assert.ok(bug.outcome === "route");
+  assert.equal(bug.route.removeLabels, undefined);
+});
+
+test("an outcome that is not for a developer releases the one holding the ticket", () => {
+  const userError = resolveTriage(
+    triageInput(),
+    bugAnswers({
+      classification: pick("user_error"),
+      path: pick("User Error"),
+    })
+  );
+  assert.ok(userError.outcome === "route");
+  assert.equal(userError.route.releaseDeveloper, true);
+  assert.equal(userError.route.assignee, undefined);
+  const unapproved = resolveTriage(
+    triageInput(),
+    bugAnswers({
+      classification: pick("platform_limitation"),
+      path: pick("Platform Limitation"),
+      wants_limit_lifted: yes(),
+    })
+  );
+  assert.ok(unapproved.outcome === "route");
+  assert.equal(unapproved.route.releaseDeveloper, undefined);
+  assert.equal(unapproved.route.assignee, "James Keeble");
+  for (const kept of [
+    bugAnswers(),
+    bugAnswers({ path: pick("Backlog/low-impact") }),
+  ]) {
+    const bug = resolveTriage(triageInput(), kept);
+    assert.ok(bug.outcome === "route");
+    assert.equal(bug.route.releaseDeveloper, undefined);
+  }
+});
+
+test("an approved feature request that Jev already put on the engineering path gets its owner and Area label", () => {
+  const decision = resolveTriage(
+    triageInput({ ticketLabels: ["Approved", "Feature Request"] }),
+    bugAnswers({
+      area: pick("ai_sdr"),
+      classification: pick("platform_limitation"),
+      path: pick("Engineering Todo"),
+      wants_limit_lifted: yes(),
+    })
+  );
+  assert.ok(decision.outcome === "route");
+  assert.equal(decision.path, "Engineering Todo");
+  assert.equal(decision.route.state, "Todo");
+  assert.equal(decision.assignee, "James Keeble");
+  assert.equal(decision.route.assignee, "James Keeble");
+  assert.ok(decision.route.addLabels.includes("Area: AI SDR"));
+});
+
+test("an open follow-up a person owes goes to Aaron instead of being left with no owner", () => {
+  const cases: [string, Record<string, JevAnswer>][] = [
+    [
+      "Support/Product follow-up",
+      {
+        classification: pick("user_error"),
+        path: pick("Support/Product follow-up"),
+      },
+    ],
+    [
+      "Support/Financial",
+      { classification: pick("user_error"), path: pick("Support/Financial") },
+    ],
+    [
+      "Backlog/low-impact",
+      {
+        classification: pick("platform_limitation"),
+        path: pick("Backlog/low-impact"),
+      },
+    ],
+    [
+      "unapproved request on the engineering path",
+      {
+        classification: pick("platform_limitation"),
+        path: pick("Engineering Todo"),
+        wants_limit_lifted: yes(),
+      },
+    ],
+  ];
+  for (const [name, over] of cases) {
+    const decision = resolveTriage(triageInput(), bugAnswers(over));
+    assert.ok(decision.outcome === "route", name);
+    assert.equal(
+      decision.route.assignee,
+      name.startsWith("unapproved") ? "James Keeble" : "Aaron Fraga",
+      name
+    );
+    assert.equal(decision.route.releaseDeveloper, undefined, name);
+  }
+  const closed = resolveTriage(
+    triageInput(),
+    bugAnswers({
+      classification: pick("user_error"),
+      path: pick("User Error"),
+    })
+  );
+  assert.ok(closed.outcome === "route");
+  assert.equal(closed.route.assignee, undefined);
+  assert.equal(closed.route.releaseDeveloper, true);
+});
+
+test("a Bug on a Support path is an open follow-up and goes to Aaron, keeping its Area label", () => {
+  for (const path of ["Support/Product follow-up", "Support/Financial"]) {
+    const decision = resolveTriage(
+      triageInput(),
+      bugAnswers({ area: pick("ai_sdr"), path: pick(path) })
+    );
+    assert.ok(decision.outcome === "route", path);
+    assert.equal(decision.classification, "Bug", path);
+    assert.equal(decision.route.state, "Todo", path);
+    assert.equal(decision.route.assignee, "Aaron Fraga", path);
+    assert.equal(decision.route.releaseDeveloper, undefined, path);
+    assert.ok(decision.route.addLabels.includes("Area: AI SDR"), path);
+  }
+});
+
+test("an unapproved feature request never keeps an engineering path", () => {
+  for (const path of [
+    "Engineering Todo",
+    "Platform Limitation",
+    "Backlog/low-impact",
+  ]) {
+    const decision = resolveTriage(
+      triageInput(),
+      bugAnswers({
+        area: pick("ai_sdr"),
+        classification: pick("platform_limitation"),
+        path: pick(path),
+        wants_limit_lifted: yes(),
+      })
+    );
+    assert.ok(decision.outcome === "route", path);
+    assert.equal(decision.approval, "needed", path);
+    assert.equal(decision.path, "Backlog/low-impact", path);
+    assert.equal(decision.route.state, "Backlog", path);
+    assert.equal(decision.route.assignee, "James Keeble", path);
+    assert.ok(decision.route.addLabels.includes("Needs approval"), path);
+    assert.equal(
+      decision.route.addLabels.some((label) => label.startsWith("Area:")),
+      false,
+      path
+    );
+  }
+});
+
+test("a request parked in Backlog gets the Backlog priority, not the engineering one", () => {
+  const decision = resolveTriage(
+    triageInput(),
+    bugAnswers({
+      area: pick("ai_sdr"),
+      classification: pick("platform_limitation"),
+      impact: band({ "0": 0.02, "1": 0.02, "2": 0.9, "3": 0.06 }),
+      path: pick("Engineering Todo"),
+      wants_limit_lifted: yes(),
+    })
+  );
+  assert.ok(decision.outcome === "route");
+  assert.equal(decision.path, "Backlog/low-impact");
+  assert.equal(decision.route.priority, 4);
+  const withMoney = resolveTriage(
+    triageInput(),
+    bugAnswers({
+      classification: pick("platform_limitation"),
+      impact: band({ "0": 0.02, "1": 0.02, "2": 0.9, "3": 0.06 }),
+      money_blocker: yes(),
+      path: pick("Engineering Todo"),
+      wants_limit_lifted: yes(),
+    })
+  );
+  assert.ok(withMoney.outcome === "route");
+  assert.equal(withMoney.route.priority, 2);
+  const engineering = resolveTriage(
+    triageInput(),
+    bugAnswers({ impact: band({ "0": 0.02, "1": 0.02, "2": 0.9, "3": 0.06 }) })
+  );
+  assert.ok(engineering.outcome === "route");
+  assert.equal(engineering.route.priority, 2);
+});
+
+test("James owns an unapproved feature request waiting in Backlog, and Aaron keeps open support follow-ups", () => {
+  const request = resolveTriage(
+    triageInput(),
+    bugAnswers({
+      classification: pick("platform_limitation"),
+      path: pick("Engineering Todo"),
+      wants_limit_lifted: yes(),
+    })
+  );
+  assert.ok(request.outcome === "route");
+  assert.equal(request.assignee, "James Keeble");
+  assert.equal(request.route.assignee, "James Keeble");
+  assert.equal(request.route.state, "Backlog");
+  assert.ok(request.route.addLabels.includes("Needs approval"));
+  for (const path of ["Support/Product follow-up", "Support/Financial"]) {
+    const followUp = resolveTriage(
+      triageInput(),
+      bugAnswers({
+        classification: pick("platform_limitation"),
+        path: pick(path),
+        wants_limit_lifted: yes(),
+      })
+    );
+    assert.ok(followUp.outcome === "route", path);
+    assert.equal(followUp.route.assignee, "Aaron Fraga", path);
+  }
 });

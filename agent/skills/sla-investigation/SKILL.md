@@ -70,7 +70,6 @@ Tag the assignee in their bug's block. Slack only renders a real mention from a 
 | Koppany Kondricz | `<@U0BA7JPMD39>` |
 | Mahmut Jomaa | `<@U0BAKLZ3JTF>` |
 | Paolo de Guzman | `<@U0BAHDX5SS3>` |
-| Pieter Venter | `<@U0BAM0YRHML>` |
 | Rose Pilarek | `<@U0BAP4RNVDG>` |
 | Tasnim Abbas | `<@U0BASM8SB9S>` |
 

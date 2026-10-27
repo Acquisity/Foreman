@@ -2,6 +2,7 @@ import { getToken as getConnectToken } from "@vercel/connect";
 import type { ToolContext } from "eve/tools";
 import { z } from "zod";
 import { PRODUCTION_READ_QUERY_ARGS } from "../lookup-customer.js";
+import { SUPPORT_OWNER } from "../owner-map.js";
 import { supportOperationPolicy } from "../support/policy.js";
 import { widgetOperationPolicy } from "../widget-policy.js";
 import {
@@ -38,7 +39,7 @@ export const REFUND_TICKET = {
 
 /** Every widget ticket is Aaron's, with the work delegated to the Foreman Linear agent. */
 export const WIDGET_TICKET_OWNER = {
-  assignee: "Aaron Fraga",
+  assignee: SUPPORT_OWNER,
   delegate: "d5325c6f-fbc8-451e-9fed-358667e58ad3",
 } as const;
 

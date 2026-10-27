@@ -1,5 +1,11 @@
 import { z } from "zod";
 import type { ProviderContext } from "../executor/dispatch.js";
+import {
+  areaLabels,
+  FALLBACK_OWNER,
+  NEEDS_APPROVAL_LABEL,
+  SUPPORT_OWNER,
+} from "../owner-map.js";
 import { SupportRefusal } from "./errors.js";
 import {
   readLinkedIssue,
@@ -8,6 +14,9 @@ import {
 } from "./linear-followup.js";
 import { writtenIssueId } from "./linear-state.js";
 import type { supportOperations } from "./store.js";
+
+const CLOSED_STATES = ["Done", "Duplicate", "Canceled"];
+const UNASSIGNED_BUG_STATES = ["Backlog", ...CLOSED_STATES];
 
 const documentSchema = z.object({
   content: z.string().min(1),
@@ -23,9 +32,96 @@ const issueSchema = z.object({
   status: z.string(),
 });
 const CLASSIFICATION = /^\*\*Classification\*\*:\s*([^\r\n]+)/m;
+const HANDLING_PATH = /^\*\*Handling path\*\*:\s*([^\r\n]+)/m;
 const REVIEW = /^\*\*Review\*\*:\s*([^\r\n]+)/m;
 const SETTLED_REVIEW =
   /^(?:Approved \S+ at [a-f0-9]{40}|Adjudicated \S+ at [a-f0-9]{40}: (?:CHALLENGE|INSUFFICIENT_EVIDENCE|review failure)[;:,]?[ \t]+\S.*)$/;
+
+const ENGINEERING_PATH = "Engineering Todo";
+
+const isEngineering = (
+  classification: string | undefined,
+  handlingPath: string | undefined
+): boolean => classification === "Bug" || handlingPath === ENGINEERING_PATH;
+
+const isSupportFollowUp = (
+  issue: z.infer<typeof issueSchema>,
+  handlingPath: string | undefined
+): boolean =>
+  issue.assignee === SUPPORT_OWNER &&
+  Boolean(handlingPath?.startsWith("Support/"));
+
+const isWaitingForApproval = (issue: z.infer<typeof issueSchema>): boolean =>
+  issue.labels.includes("Feature Request") &&
+  issue.labels.includes(NEEDS_APPROVAL_LABEL) &&
+  !issue.labels.includes("Approved");
+
+const ownerRecordMissing = (
+  issue: z.infer<typeof issueSchema>,
+  classification: string | undefined,
+  handlingPath: string | undefined
+): boolean => {
+  if (!isEngineering(classification, handlingPath)) {
+    if (
+      isWaitingForApproval(issue) &&
+      !isSupportFollowUp(issue, handlingPath) &&
+      !CLOSED_STATES.includes(issue.status)
+    ) {
+      return issue.assignee !== FALLBACK_OWNER;
+    }
+    return !(issue.assignee || CLOSED_STATES.includes(issue.status));
+  }
+  const hasArea = issue.labels.some((label) => areaLabels().includes(label));
+  if (classification !== "Bug" && !hasArea) {
+    return true;
+  }
+  if (!issue.assignee) {
+    return !(hasArea && UNASSIGNED_BUG_STATES.includes(issue.status));
+  }
+  return !(
+    issue.project ||
+    hasArea ||
+    issue.assignee === SUPPORT_OWNER ||
+    issue.assignee === FALLBACK_OWNER
+  );
+};
+
+const needsMaster = (
+  issue: z.infer<typeof issueSchema>,
+  classification: string | undefined,
+  handlingPath: string | undefined
+): boolean => {
+  if (issue.status !== "Todo" || issue.parentId) {
+    return false;
+  }
+  if (handlingPath === ENGINEERING_PATH) {
+    return true;
+  }
+  return classification === "Bug" && !isSupportFollowUp(issue, handlingPath);
+};
+
+const missesTypeLabels = (
+  issue: z.infer<typeof issueSchema>,
+  classification: string | undefined,
+  handlingPath: string | undefined
+): boolean => {
+  if (classification === "Bug") {
+    return !issue.labels.includes("Bug");
+  }
+  if (
+    issue.labels.includes("Feature Request") &&
+    !issue.labels.includes("Approved") &&
+    !issue.labels.includes(NEEDS_APPROVAL_LABEL)
+  ) {
+    return true;
+  }
+  return (
+    handlingPath === ENGINEERING_PATH &&
+    !["Feature Request", "Approved"].every((label) =>
+      issue.labels.includes(label)
+    )
+  );
+};
 
 /** Check durable outputs, not whether a model says it loaded the workflow. */
 export function assertTriageOutputs(
@@ -36,6 +132,7 @@ export function assertTriageOutputs(
   const issue = issueSchema.parse(rawIssue);
   const document = documentSchema.parse(rawDocument);
   const classification = CLASSIFICATION.exec(document.content)?.[1].trim();
+  const handlingPath = HANDLING_PATH.exec(document.content)?.[1].trim();
   const review = REVIEW.exec(document.content)?.[1].trim() ?? "";
   const urgent = review.startsWith("Stopped: NEEDS_HUMAN_URGENT");
   const reported = comments.some((comment) => {
@@ -52,7 +149,7 @@ export function assertTriageOutputs(
       "Complete the required minimal Linear comment before finishing triage."
     );
   }
-  if (urgent && issue.assignee === "Aaron Fraga") {
+  if (urgent && issue.assignee === SUPPORT_OWNER) {
     return;
   }
   if (classification === "Not settled" && review === "Not required") {
@@ -77,11 +174,8 @@ export function assertTriageOutputs(
     );
   }
   if (
-    !(
-      issue.assignee &&
-      (issue.project || issue.assignee === "Aaron Fraga") &&
-      issue.priority
-    ) ||
+    !issue.priority ||
+    ownerRecordMissing(issue, classification, handlingPath) ||
     issue.priority.value < 1 ||
     issue.priority.value > 4 ||
     !issue.status.trim() ||
@@ -89,12 +183,12 @@ export function assertTriageOutputs(
     !["intercom-sourced", "Customer reported"].every((label) =>
       issue.labels.includes(label)
     ) ||
-    (classification === "Bug" && !issue.labels.includes("Bug")) ||
-    (classification === "Bug" && issue.status === "Todo" && !issue.parentId) ||
+    missesTypeLabels(issue, classification, handlingPath) ||
+    needsMaster(issue, classification, handlingPath) ||
     (duplicate && !issue.relations?.duplicateOf)
   ) {
     throw new SupportRefusal(
-      "Complete and read back the report's state, priority, labels, project, assignment and applicable master/duplicate relation. Tracking an issue is not Linear routing. Aaron is only the documented ownership fallback."
+      "Complete and read back the report's state, priority, labels, project, assignment and applicable master/duplicate relation. Tracking an issue is not Linear routing. James is the documented ownership fallback."
     );
   }
 }
@@ -126,7 +220,7 @@ export async function requireCompletedSupportTriage(
   if (
     matches.length === 0 &&
     issue.project === "Support" &&
-    issue.assignee === "Aaron Fraga" &&
+    issue.assignee === SUPPORT_OWNER &&
     issue.status === "Todo" &&
     Array.isArray(issue.labels) &&
     !issue.labels.includes("Bug") &&

@@ -1,6 +1,16 @@
 import { type ProviderClient, requiredClient } from "./executor/operations.js";
 import type { LinearOperation } from "./linear-operations.js";
 import { parseLinearResponse } from "./linear-response.js";
+import {
+  APPROVED_LABEL,
+  BUG_LABEL,
+  FALLBACK_OWNER,
+  FEATURE_REQUEST_LABEL,
+  mappedOwner,
+  mayHoldTicket,
+  NEEDS_APPROVAL_LABEL,
+  ownerNames,
+} from "./owner-map.js";
 
 /** Fixed Linear GraphQL operations. The injected Executor transport supplies provider authentication; this module retains routing and document semantics. */
 
@@ -326,6 +336,8 @@ export interface RouteTicketInput {
   parent?: string;
   priority?: number;
   project?: string;
+  releaseDeveloper?: boolean;
+  removeLabels?: string[];
   state?: string;
 }
 
@@ -401,12 +413,17 @@ const toResult = (
   warnings,
 });
 
-/** Unions the labels to add with the ticket's current labels; unknown names throw before any write. */
-async function resolveLabelIds(
+interface FinalLabels {
+  changed: boolean;
+  ids: string[];
+  names: string[];
+}
+
+async function teamLabelsNamed(
   gql: Gql,
   issue: RouteIssue,
-  addLabels: string[]
-): Promise<string[]> {
+  names: string[]
+): Promise<Named[]> {
   const labels: Named[] = [];
   let after: string | null = null;
   for (let page = 0; page < MAX_LABEL_PAGES; page += 1) {
@@ -423,9 +440,9 @@ async function resolveLabelIds(
     }
   }
   const byName = new Map(
-    labels.map((label) => [label.name.toLowerCase(), label.id])
+    labels.map((label) => [label.name.toLowerCase(), label])
   );
-  const unknown = addLabels.filter((name) => !byName.has(name.toLowerCase()));
+  const unknown = names.filter((name) => !byName.has(name.toLowerCase()));
   if (unknown.length > 0) {
     throw new Error(
       `Unknown label${unknown.length > 1 ? "s" : ""} ${unknown.map((name) => `"${name}"`).join(", ")}. Valid labels: ${labels
@@ -434,36 +451,107 @@ async function resolveLabelIds(
         .join(", ")}.`
     );
   }
-  return [
-    ...new Set([
-      ...issue.labels.nodes.map((label) => label.id),
-      ...addLabels.map((name) => byName.get(name.toLowerCase()) ?? ""),
-    ]),
-  ].filter(Boolean);
+  return names.flatMap((name) => byName.get(name.toLowerCase()) ?? []);
 }
 
-/**
- * The assignee id: the source issue's assignee when `inheritAssigneeFrom` is
- * given and that issue has one; otherwise `assignee` by name or email, which
- * therefore acts as the fallback for an unassigned master.
- */
-async function resolveAssigneeId(
+/** The ticket's labels after the call: its current labels minus the ones to remove, then the ones to add; unknown names throw before any write. */
+async function resolveLabels(
   gql: Gql,
+  issue: RouteIssue,
   input: RouteTicketInput
-): Promise<string | undefined> {
+): Promise<FinalLabels> {
+  const removed = new Set(
+    (input.removeLabels ?? []).map((name) => name.toLowerCase())
+  );
+  const kept = issue.labels.nodes.filter(
+    (label) => !removed.has(label.name.toLowerCase())
+  );
+  const added = input.addLabels?.length
+    ? await teamLabelsNamed(gql, issue, input.addLabels)
+    : [];
+  const final = [
+    ...new Map(
+      [...kept, ...added].map((label) => [label.id, label] as const)
+    ).values(),
+  ];
+  return {
+    changed: added.length > 0 || kept.length < issue.labels.nodes.length,
+    ids: final.map((label) => label.id),
+    names: final.map((label) => label.name),
+  };
+}
+
+async function chooseAssignee(
+  gql: Gql,
+  input: RouteTicketInput,
+  labels: string[]
+): Promise<{ id?: string; warnings: string[] }> {
+  const warnings: string[] = [];
   if (input.inheritAssigneeFrom !== undefined) {
     const source = await requireIssue(gql, input.inheritAssigneeFrom);
-    if (source.assignee) {
-      return source.assignee.id;
+    const holder = source.assignee ? mappedOwner(source.assignee.name) : null;
+    if (source.assignee && holder && mayHoldTicket(holder, labels)) {
+      return { id: source.assignee.id, warnings };
+    }
+    if (source.assignee && !holder) {
+      if (input.parent === input.inheritAssigneeFrom) {
+        throw new Error(
+          `${input.inheritAssigneeFrom} is held by ${source.assignee.name}, who is not in the owner map, so nothing was written. Move that master to its area owner first, so the report and its master keep one owner.`
+        );
+      }
+      warnings.push(
+        `${input.inheritAssigneeFrom} is held by ${source.assignee.name}, who is not in the owner map, so the assignee was not inherited.`
+      );
+    } else if (source.assignee) {
+      warnings.push(
+        `${input.inheritAssigneeFrom} is held by ${source.assignee.name}, a developer, and this ticket is neither a ${BUG_LABEL}, an approved ${FEATURE_REQUEST_LABEL} nor one waiting for approval, so the assignee was not inherited.`
+      );
     }
   }
-  if (input.assignee !== undefined) {
-    const { users } = await gql<{ users: { nodes: Named[] } }>("Users", {
-      name: input.assignee,
-    });
-    return exactlyOne("user", input.assignee, users.nodes);
+  if (input.assignee === undefined) {
+    return { warnings };
   }
-  return undefined;
+  const owner = mappedOwner(input.assignee);
+  if (!owner) {
+    throw new Error(
+      `"${input.assignee}" is not in the owner map, so nothing was assigned. Use one of: ${ownerNames().join(", ")}.`
+    );
+  }
+  if (!mayHoldTicket(owner, labels)) {
+    throw new Error(
+      `${owner.name} is a developer. A ticket goes to a developer only when it is labelled ${BUG_LABEL}, or ${FEATURE_REQUEST_LABEL} and ${APPROVED_LABEL}; only ${FALLBACK_OWNER} may hold a ${FEATURE_REQUEST_LABEL} marked ${NEEDS_APPROVAL_LABEL}. Add the label or leave the assignee unchanged.`
+    );
+  }
+  const { users } = await gql<{ users: { nodes: Named[] } }>("Users", {
+    name: owner.name,
+  });
+  return { id: exactlyOne("user", owner.name, users.nodes), warnings };
+}
+
+async function resolveAssigneeId(
+  gql: Gql,
+  issue: RouteIssue,
+  input: RouteTicketInput,
+  labels: FinalLabels
+): Promise<{ id?: string | null; warnings: string[] }> {
+  const chosen = await chooseAssignee(gql, input, labels.names);
+  if (chosen.id !== undefined) {
+    return chosen;
+  }
+  const holder = issue.assignee ? mappedOwner(issue.assignee.name) : null;
+  if (
+    input.releaseDeveloper &&
+    holder?.lane === "developer" &&
+    holder.name !== FALLBACK_OWNER
+  ) {
+    return { id: null, warnings: chosen.warnings };
+  }
+  if (labels.changed && holder && !mayHoldTicket(holder, labels.names)) {
+    throw new Error(
+      `${issue.identifier} is held by ${holder.name}, a developer, and this label change would leave it labelled ${labels.names.length > 0 ? labels.names.join(", ") : "nothing"}, so nothing was written. A developer holds a ticket only when it is labelled ${BUG_LABEL}, or ${FEATURE_REQUEST_LABEL} and ${APPROVED_LABEL}; only ${FALLBACK_OWNER} may hold a ${FEATURE_REQUEST_LABEL} marked ${NEEDS_APPROVAL_LABEL}. Keep the label, assign someone who may hold it, or pass releaseDeveloper.`
+    );
+  }
+  return chosen;
 }
 
 /** Builds the single issueUpdate input from the decisions given. */
@@ -471,10 +559,11 @@ async function buildUpdate(
   gql: Gql,
   issue: RouteIssue,
   input: RouteTicketInput
-): Promise<Record<string, unknown>> {
+): Promise<{ update: Record<string, unknown>; warnings: string[] }> {
   const update: Record<string, unknown> = {};
-  if (input.addLabels?.length) {
-    update.labelIds = await resolveLabelIds(gql, issue, input.addLabels);
+  const labels = await resolveLabels(gql, issue, input);
+  if (labels.changed) {
+    update.labelIds = labels.ids;
   }
   if (input.state !== undefined) {
     const { workflowStates } = await gql<{
@@ -496,14 +585,14 @@ async function buildUpdate(
       projects.nodes
     );
   }
-  const assigneeId = await resolveAssigneeId(gql, input);
-  if (assigneeId !== undefined) {
-    update.assigneeId = assigneeId;
+  const assignee = await resolveAssigneeId(gql, issue, input, labels);
+  if (assignee.id !== undefined) {
+    update.assigneeId = assignee.id;
   }
   if (input.parent !== undefined) {
     update.parentId = (await requireIssue(gql, input.parent)).id;
   }
-  return update;
+  return { update, warnings: assignee.warnings };
 }
 
 /**
@@ -524,7 +613,7 @@ export async function routeTicket(
 
   const issue = await requireIssue(gql, input.issue);
 
-  const update = await buildUpdate(gql, issue, input);
+  const { update, warnings } = await buildUpdate(gql, issue, input);
   // Resolve the duplicate target before the first write, so a bad identifier
   // fails the whole call rather than leaving a routed ticket with no relation.
   const master =
@@ -546,7 +635,6 @@ export async function routeTicket(
 
   // The update above is the write. Anything after it that fails is reported
   // as a warning on a routed result, never as an unrouted ticket.
-  const warnings: string[] = [];
   const reason = (error: unknown) =>
     error instanceof Error ? error.message : String(error);
   // Caller cancellation is never a warning; the tool rethrows it.
