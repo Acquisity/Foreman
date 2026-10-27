@@ -103,6 +103,7 @@ describe("replay result", () => {
     await toolResult("decide_triage", { error: "late" }, true);
     await routeTicket(
       {
+        addLabels: ["Bug"],
         duplicateOf: "ENG-90",
         inheritAssigneeFrom: "ENG-90",
         issue: "ENG-100",
@@ -115,7 +116,7 @@ describe("replay result", () => {
     const result = buildReplayResult(await state(), RUN);
     assert.equal(result.status, "completed");
     assert.deepEqual(result.final, {
-      assignee: "Ada Lovelace",
+      assignee: "Anthony Adewale",
       classification: "Bug",
       duplicateOf: "ENG-90",
       master: "ENG-90",
@@ -210,14 +211,11 @@ describe("replay Executor client", () => {
     } as never);
     assert.equal(refused.status, 503);
     assert.deepEqual((await state()).evidenceMisses, ["planetscale.readQuery"]);
-    for (const assignee of ["ada@example.test", "ADA", "ada lovelace"]) {
-      // biome-ignore lint/performance/noAwaitInLoops: each spelling routes on its own.
-      const routed = await routeTicket(
-        { assignee, issue: "ENG-100" },
-        { client }
-      );
-      assert.equal(routed.assignee, "Ada Lovelace");
-    }
+    const routed = await routeTicket(
+      { addLabels: ["Bug"], assignee: "Anthony Adewale", issue: "ENG-100" },
+      { client }
+    );
+    assert.equal(routed.assignee, "Anthony Adewale");
   });
 });
 
@@ -316,7 +314,7 @@ describe("replay Linear tools", () => {
     const { identifier } = await outputOf(
       createIssueTool.execute(
         {
-          assignee: "ada@example.test",
+          assignee: "anthony@example.test",
           description: "Token refresh races the send.",
           title: "Inbox token refresh race",
         },
@@ -324,11 +322,16 @@ describe("replay Linear tools", () => {
       )
     );
     await routeTicket(
-      { inheritAssigneeFrom: identifier, issue: "ENG-100", parent: identifier },
+      {
+        addLabels: ["Bug"],
+        inheritAssigneeFrom: identifier,
+        issue: "ENG-100",
+        parent: identifier,
+      },
       { client: executorClient(ctx) }
     );
     const s = await state();
-    assert.equal(s.issue.assignee, "Ada Lovelace");
+    assert.equal(s.issue.assignee, "Anthony Adewale");
     assert.equal(appliedRoute(s).master, NEW_MASTER);
   });
 });

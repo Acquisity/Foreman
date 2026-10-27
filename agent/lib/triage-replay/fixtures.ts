@@ -110,7 +110,7 @@ export const triageCase: TriageCase = {
   provenance: "seeded",
   relatedSnapshot: [
     {
-      assignee: "Ada Lovelace",
+      assignee: "Anthony Adewale",
       createdAt: "2026-09-20T00:00:00.000Z",
       description: "Inbox reconnect fails after the token expires",
       id: "ENG-90",
@@ -165,10 +165,10 @@ export const lists = {
   users: [
     {
       createdAt: LISTED,
-      displayName: "ada",
-      email: "ada@example.test",
-      id: "u-ada",
-      name: "Ada Lovelace",
+      displayName: "anthony",
+      email: "anthony@example.test",
+      id: "u-anthony",
+      name: "Anthony Adewale",
     },
   ],
 };
