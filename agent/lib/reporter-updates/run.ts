@@ -409,9 +409,8 @@ export const runReporterUpdates = async (
       KEEP_PENDING.has(result.outcome.why)
     ) {
       await deps.store.failPending(pending);
-    } else {
+    } else if (await deps.store.resolvePending(pending)) {
       await settleWaiting(identifier, result.outcome, deps, liveSha);
-      await deps.store.resolvePending(pending);
     }
   }, Promise.resolve());
   return report;

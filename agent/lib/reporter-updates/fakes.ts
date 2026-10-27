@@ -300,10 +300,9 @@ export const memoryStore = () => {
       return Promise.resolve();
     },
     resolvePending(item) {
-      if (current(item)) {
-        pending.delete(item.issue);
-      }
-      return Promise.resolve();
+      return Promise.resolve(
+        current(item) !== undefined && pending.delete(item.issue)
+      );
     },
     rows(issue) {
       return Promise.resolve(

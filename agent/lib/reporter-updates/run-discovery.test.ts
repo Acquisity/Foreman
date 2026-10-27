@@ -12,6 +12,7 @@ import {
   pullKey,
   setup,
   ticket,
+  waitingIssues,
 } from "./fakes.js";
 import { runReporterUpdates } from "./run.js";
 
@@ -428,5 +429,54 @@ describe("discovery", () => {
       [receivedText("Sam"), fixedText()]
     );
     assert.equal(s.memory.pending.size, 0);
+  });
+
+  it("keeps the deploy wait a newer run recorded when an older run finishes the ticket afterwards", async () => {
+    const t = old(1);
+    const s = setup([t], {
+      ancestors: { [`${MERGE_SHA}>${OLD_SHA}`]: false },
+      liveSha: OLD_SHA,
+      pulls: { [pullKey(7)]: merged() },
+    });
+    let release: () => void = () => undefined;
+    s.linear.state.holdNextPost = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const first = run(s);
+    const inFlight = async (tries: number): Promise<void> => {
+      if (s.linear.state.holdNextPost && tries > 0) {
+        await new Promise((resolve) => setImmediate(resolve));
+        await inFlight(tries - 1);
+      }
+    };
+    await inFlight(100);
+    assert.equal(
+      s.linear.state.holdNextPost,
+      null,
+      "the received post is in flight"
+    );
+
+    Object.assign(t.facts, { pullUrls: [PR_URL], stateType: "completed" });
+    t.updatedAt = new Date(NOW + 30_000).toISOString();
+    const report = await run(s, NOW + 15 * 60_000);
+    assert.deepEqual(
+      report.outcomes.map((o) => o.outcome),
+      [{ kind: "waiting" }]
+    );
+    assert.equal(s.memory.pending.size, 0);
+
+    release();
+    await first;
+    assert.deepEqual(waitingIssues(s.memory), [
+      { checkedSha: OLD_SHA, issue: "ENG-1" },
+    ]);
+
+    s.probe.state.liveSha = NEW_SHA;
+    s.probe.state.ancestors[`${MERGE_SHA}>${NEW_SHA}`] = true;
+    await run(s, NOW + 3_600_000);
+    assert.deepEqual(
+      s.linear.posts.map((p) => p.body),
+      [receivedText("Sam"), fixedText()]
+    );
   });
 });

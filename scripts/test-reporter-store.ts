@@ -336,7 +336,7 @@ assert.equal(
   false,
   "a ticket that just failed waits out its backoff"
 );
-await store.resolvePending(await queued("ENG-5"));
+assert.equal(await store.resolvePending(await queued("ENG-5")), true);
 assert.equal(await due("ENG-5"), false);
 await Array.from({ length: 25 }, (_, i) => i).reduce(async (previous) => {
   await previous;
@@ -381,6 +381,7 @@ assert.equal(await due("ENG-2001"), true, "a newer version clears it");
 await pool.query("TRUNCATE reporter_updates, reporter_pending");
 await store.enqueue([{ issue: "ENG-11", version: 100 }]);
 const [olderRun] = await store.nextPending(10);
+assert.ok(olderRun);
 assert.deepEqual(olderRun, { issue: "ENG-11", version: 100 });
 await store.enqueue([{ issue: "ENG-11", version: 200 }]);
 await store.failPending(olderRun);
@@ -390,21 +391,34 @@ assert.equal(
   true,
   "an older run's failure or deferral does not back off a newer version"
 );
-await store.resolvePending(olderRun);
+assert.equal(
+  await store.resolvePending(olderRun),
+  false,
+  "an older run is told its version was not the one acknowledged"
+);
 assert.deepEqual(
   await store.nextPending(10),
   [{ issue: "ENG-11", version: 200 }],
   "an older run's acknowledgement does not delete a newer version"
 );
-await store.resolvePending({ issue: "ENG-11", version: 200 });
+assert.equal(
+  await store.resolvePending({ issue: "ENG-11", version: 200 }),
+  true
+);
+assert.equal(
+  await store.resolvePending({ issue: "ENG-11", version: 200 }),
+  false,
+  "acknowledging a row that is already gone reports nothing removed"
+);
 assert.equal(await due("ENG-11"), false, "the current version is acknowledged");
 
 await store.markWaiting("ENG-12", "old-sha");
 await store.queueWaiting("new-sha");
 const [waitingRun] = await store.nextPending(10);
+assert.ok(waitingRun);
 assert.deepEqual(waitingRun, { issue: "ENG-12", version: null });
 await store.enqueue([{ issue: "ENG-12", version: 300 }]);
-await store.resolvePending(waitingRun);
+assert.equal(await store.resolvePending(waitingRun), false);
 assert.deepEqual(
   await store.nextPending(10),
   [{ issue: "ENG-12", version: 300 }],

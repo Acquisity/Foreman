@@ -73,7 +73,7 @@ export interface ReporterStore {
   queueWaiting: (liveSha: string) => Promise<void>;
   readCursor: () => Promise<DiscoveryCursor>;
   release: (issue: string, stage: Stage, token: string) => Promise<void>;
-  resolvePending: (ticket: PendingTicket) => Promise<void>;
+  resolvePending: (ticket: PendingTicket) => Promise<boolean>;
   rows: (issue: string) => Promise<LedgerRow[]>;
   saveCursor: (ms: number) => Promise<void>;
   saveSweep: (sweep: Sweep) => Promise<void>;
@@ -298,10 +298,11 @@ export const createReporterStore = (query: Query): ReporterStore => {
       );
     },
     async resolvePending(ticket) {
-      await query(
-        `DELETE FROM reporter_pending WHERE issue = $1 AND ${SAME_VERSION}`,
+      const deleted = await query(
+        `DELETE FROM reporter_pending WHERE issue = $1 AND ${SAME_VERSION} RETURNING issue`,
         [ticket.issue, ticket.version]
       );
+      return deleted.length === 1;
     },
     async rows(issue) {
       const rows = await query(
