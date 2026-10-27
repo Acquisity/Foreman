@@ -734,7 +734,7 @@ describe("dispute write dispatch", () => {
       abortSignal: new AbortController().signal,
       getToken: () => Promise.resolve({ token: "synthetic-executor-token" }),
     };
-    const path = `${DISPUTE_WRITE_CONNECTION}org.foremanStripeDisputeWrite.disputes.updateDisputeEvidence`;
+    const path = `${DISPUTE_WRITE_CONNECTION}org.workspaceForemanStripeDisputeWrite.disputes.updateDisputeEvidence`;
     const input = {
       dispute_id: ID,
       "Idempotency-Key": `foreman-dispute-submit-${ID}-abc`,

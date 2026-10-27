@@ -470,7 +470,12 @@ test("the Stripe dispute write lives only in the foreman-disputes toolkit", () =
   const writes = Object.keys(disputeOperationInputs).map(
     (operation) => bindings[operation]?.path
   );
-  assert.deepEqual([...writes].sort(), [...disputes.toolkit.paths].sort());
+  // Production binds the live writes; Preview binds the same two operations
+  // on the sandbox connection, which is also mounted here.
+  for (const path of writes) {
+    assert.ok(disputes.toolkit.paths.includes(path), path);
+  }
+  assert.equal(disputes.toolkit.paths.length, writes.length * 2);
   for (const path of disputes.toolkit.paths) {
     assert.ok(path.startsWith(DISPUTE_WRITE_CONNECTION), path);
   }
