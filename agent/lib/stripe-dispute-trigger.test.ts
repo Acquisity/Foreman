@@ -3,6 +3,7 @@ import { describe, it } from "node:test";
 import {
   isStripeDisputeAlert,
   renderStripeDisputeAlert,
+  STRIPE_DISPUTE_ALERTS_APP,
   STRIPE_DISPUTES_CHANNEL,
   stripeDisputeSessionAuth,
 } from "./stripe-dispute-trigger.js";
@@ -16,11 +17,9 @@ import {
   stripeDisputeIdOf,
 } from "./trust.js";
 
-const APP = "A0BQA371MBQ";
-
-/** The shape Acquisity's alert arrives in, as observed in production. */
+/** The shape Acquisity's alert arrives in, posted as Dispute Alerts with a Foreman tag. */
 const alertEvent = (): Record<string, unknown> => ({
-  app_id: APP,
+  app_id: STRIPE_DISPUTE_ALERTS_APP,
   blocks: [
     {
       text: {
@@ -50,54 +49,63 @@ const alertEvent = (): Record<string, unknown> => ({
   bot_id: "B0BQA35JD62",
   channel: STRIPE_DISPUTES_CHANNEL,
   subtype: "bot_message",
-  text: "Dispute opened by Eric Mead. Nothing has been cancelled automatically; review the checklist.",
+  text: "<@U0BQ5QMHM7D> Dispute opened by Eric Mead. Nothing has been cancelled automatically; review the checklist.",
   ts: "1761400000.000100",
   type: "message",
   user: "U0BQ5QMHM7D",
 });
 
 describe("stripe dispute trigger", () => {
-  it("accepts a top-level alert from this app in the disputes channel", () => {
-    assert.ok(isStripeDisputeAlert(STRIPE_DISPUTES_CHANNEL, alertEvent(), APP));
+  it("accepts a top-level Dispute Alerts post, as a message or its mention", () => {
+    assert.ok(isStripeDisputeAlert(STRIPE_DISPUTES_CHANNEL, alertEvent()));
     const { subtype: _subtype, ...plain } = alertEvent();
-    assert.ok(isStripeDisputeAlert(STRIPE_DISPUTES_CHANNEL, plain, APP));
+    assert.ok(isStripeDisputeAlert(STRIPE_DISPUTES_CHANNEL, plain));
     assert.ok(
-      isStripeDisputeAlert(
-        STRIPE_DISPUTES_CHANNEL,
-        { ...alertEvent(), thread_ts: "1761400000.000100" },
-        APP
-      )
+      isStripeDisputeAlert(STRIPE_DISPUTES_CHANNEL, {
+        ...plain,
+        type: "app_mention",
+      })
+    );
+    assert.ok(
+      isStripeDisputeAlert(STRIPE_DISPUTES_CHANNEL, {
+        ...alertEvent(),
+        thread_ts: "1761400000.000100",
+      })
     );
   });
 
   it("rejects thread replies, other channels, other apps, and edits", () => {
-    const cases: [string, unknown, Record<string, unknown>, unknown][] = [
+    const cases: [string, unknown, Record<string, unknown>][] = [
       [
         "thread reply",
         STRIPE_DISPUTES_CHANNEL,
         { ...alertEvent(), thread_ts: "1761300000.000100" },
-        APP,
       ],
-      ["other channel", "C0DEV", alertEvent(), APP],
-      ["other app", STRIPE_DISPUTES_CHANNEL, alertEvent(), "A0OTHER"],
-      ["missing app id", STRIPE_DISPUTES_CHANNEL, alertEvent(), undefined],
+      ["other channel", "C0DEV", alertEvent()],
+      [
+        "Foreman's own app",
+        STRIPE_DISPUTES_CHANNEL,
+        { ...alertEvent(), app_id: "A0BQA371MBQ" },
+      ],
+      [
+        "missing app id",
+        STRIPE_DISPUTES_CHANNEL,
+        { ...alertEvent(), app_id: undefined },
+      ],
       [
         "message_changed",
         STRIPE_DISPUTES_CHANNEL,
         { ...alertEvent(), subtype: "message_changed" },
-        APP,
       ],
       [
         "message_deleted",
         STRIPE_DISPUTES_CHANNEL,
         { ...alertEvent(), subtype: "message_deleted" },
-        APP,
       ],
       [
         "reaction",
         STRIPE_DISPUTES_CHANNEL,
         { ...alertEvent(), type: "reaction_added" },
-        APP,
       ],
       [
         "non-alert post",
@@ -112,17 +120,15 @@ describe("stripe dispute trigger", () => {
           ],
           text: "Evidence staged for du_1AbCdEf",
         },
-        APP,
       ],
       [
         "plain text only",
         STRIPE_DISPUTES_CHANNEL,
         { ...alertEvent(), blocks: undefined },
-        APP,
       ],
     ];
-    for (const [name, channel, message, appId] of cases) {
-      assert.equal(isStripeDisputeAlert(channel, message, appId), false, name);
+    for (const [name, channel, message] of cases) {
+      assert.equal(isStripeDisputeAlert(channel, message), false, name);
     }
   });
 
@@ -134,7 +140,7 @@ describe("stripe dispute trigger", () => {
         return Reflect.get(target, key);
       },
     });
-    assert.equal(isStripeDisputeAlert("C0DEV", watched, APP), false);
+    assert.equal(isStripeDisputeAlert("C0DEV", watched), false);
     assert.deepEqual(touched, []);
   });
 

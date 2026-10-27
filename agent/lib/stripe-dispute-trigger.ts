@@ -10,12 +10,19 @@ import {
  * The Acquisity Slack channel where Stripe dispute alerts land (ENG-16255).
  *
  * @remarks
- * Acquisity's dispute pipeline posts each alert through the same Slack app as
- * Foreman, so eve drops it from the mention, DM and message hooks as
- * self-authored. Foreman's `onEvent` picks it up instead, and
- * {@link isStripeDisputeAlert} decides which of those events starts a session.
+ * Acquisity's dispute pipeline posts each alert as the Dispute Alerts Slack
+ * app and tags Foreman in it. Only a mention reaches Foreman: Slack and
+ * Vercel Connect deliver no untagged message from this private channel, and
+ * no message an app posts reaches that same app. Foreman's mention dispatch
+ * hands the alert to {@link isStripeDisputeAlert}.
  */
 export const STRIPE_DISPUTES_CHANNEL = "C0CAEACAGPJ";
+
+/**
+ * The Dispute Alerts Slack app (`slack/dispute-alerts` in Vercel Connect).
+ * Production and Preview Foreman both trust alerts from this one app.
+ */
+export const STRIPE_DISPUTE_ALERTS_APP = "A0CCMSPF3AQ";
 
 const ALERT_HEADER = "Stripe dispute opened";
 const DISPUTE_ID = /du_[A-Za-z0-9]{1,64}/u;
@@ -40,25 +47,21 @@ const blocksOf = (
   Array.isArray(message.blocks) ? message.blocks.filter(isRecord) : [];
 
 /**
- * Whether one Slack message is a new dispute alert from this Slack app.
+ * Whether one Slack message is a new dispute alert from the Dispute Alerts app.
  *
  * @param channelId - The channel the message is in. Checked first, so every
- * event from every other channel returns at once.
- * @param message - The raw Slack message event, or a `conversations.replies`
- * message.
- * @param appId - This Slack app's id, from the signed envelope's
- * `api_app_id`. Comparing against it works for both the production and
- * Preview apps.
+ * message from every other channel returns at once.
+ * @param message - The raw Slack message, from a mention or from
+ * `conversations.replies`.
  */
 export const isStripeDisputeAlert = (
   channelId: unknown,
-  message: Record<string, unknown>,
-  appId: unknown
+  message: Record<string, unknown>
 ): boolean => {
   if (channelId !== STRIPE_DISPUTES_CHANNEL) {
     return false;
   }
-  if (message.type !== "message") {
+  if (message.type !== "message" && message.type !== "app_mention") {
     return false;
   }
   if (message.subtype !== undefined && message.subtype !== "bot_message") {
@@ -67,7 +70,7 @@ export const isStripeDisputeAlert = (
   if (message.thread_ts !== undefined && message.thread_ts !== message.ts) {
     return false;
   }
-  if (typeof appId !== "string" || appId === "" || message.app_id !== appId) {
+  if (message.app_id !== STRIPE_DISPUTE_ALERTS_APP) {
     return false;
   }
   return blocksOf(message).some(
