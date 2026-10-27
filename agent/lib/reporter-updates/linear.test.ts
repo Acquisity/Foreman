@@ -49,6 +49,7 @@ const issue = (over: Record<string, unknown> = {}) => ({
       { title: "Notes", url: "https://example.com/notes" },
     ],
   },
+  canceledAt: null,
   comments: {
     nodes: [
       comment(
@@ -70,6 +71,7 @@ const issue = (over: Record<string, unknown> = {}) => ({
     ],
     pageInfo: { hasNextPage: false },
   },
+  completedAt: "2026-10-12T11:00:00Z",
   createdAt: "2026-10-10T09:00:00Z",
   description: "Exports stop at 500 rows.",
   id: "uuid-1",
@@ -123,6 +125,7 @@ describe("readTicket", () => {
     assert.deepEqual(view?.facts, {
       assignee: "Sam Jones",
       channel: SANDBOX,
+      closedAt: "2026-10-12T11:00:00Z",
       closingComments: [
         {
           author: "foreman",
@@ -573,31 +576,43 @@ describe("closing comments", () => {
 });
 
 describe("readOriginal", () => {
-  it("reads state, labels and linked pull requests without loading comments, so a long thread cannot block it", async () => {
+  const original = (comments: ReturnType<typeof comment>[]) => ({
+    issue: {
+      assignee: null,
+      attachments: { nodes: [{ title: "Fix", url: PR }] },
+      comments: { nodes: comments },
+      description: null,
+      identifier: "ENG-9",
+      labels: { nodes: [{ name: "Feature Request" }] },
+      parent: null,
+      state: { name: "Done", type: "completed" },
+      title: "Email from the dialler",
+    },
+    viewer: { id: "viewer" },
+  });
+
+  it("reads state, labels, linked pull requests and the newest staff comments, with no full-thread guard to block it", async () => {
     const { port, requests } = portWith(() =>
-      ok({
-        issue: {
-          assignee: null,
-          attachments: { nodes: [{ title: "Fix", url: PR }] },
-          description: null,
-          identifier: "ENG-9",
-          labels: { nodes: [{ name: "Feature Request" }] },
-          parent: null,
-          state: { name: "Done", type: "completed" },
-          title: "Email from the dialler",
-        },
-      })
+      ok(
+        original([
+          comment("a-1", "Removed the number.", { user: "aaron" }),
+          comment("r-1", "Thanks!", { user: "reporter" }),
+        ])
+      )
     );
     const facts = await port.readOriginal("ENG-9");
-    assert.ok(!requests[0]?.query.includes("comments"));
+    assert.ok(requests[0]?.query.includes("comments(last: 100)"));
+    assert.ok(!requests[0]?.query.includes("hasNextPage"));
     assert.deepEqual(
       facts && {
+        closingComments: facts.closingComments.map((c) => [c.author, c.body]),
         labels: facts.labels,
         pullUrls: facts.pullUrls,
         stateType: facts.stateType,
         title: facts.title,
       },
       {
+        closingComments: [["staff", "Removed the number."]],
         labels: ["Feature Request"],
         pullUrls: [PR],
         stateType: "completed",
@@ -607,7 +622,9 @@ describe("readOriginal", () => {
   });
 
   it("returns null for a missing original", async () => {
-    const { port } = portWith(() => ok({ issue: null }));
+    const { port } = portWith(() =>
+      ok({ issue: null, viewer: { id: "viewer" } })
+    );
     assert.equal(await port.readOriginal("ENG-9"), null);
   });
 });

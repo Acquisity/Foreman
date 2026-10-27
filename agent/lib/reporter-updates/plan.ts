@@ -11,6 +11,7 @@ export interface ClosingComment {
 export interface TicketFacts {
   assignee: string | null;
   channel: string | null;
+  closedAt: string | null;
   closingComments: ClosingComment[];
   createdAt: string;
   description: string;

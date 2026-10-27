@@ -68,6 +68,7 @@ export const config = (over: Partial<RunConfig> = {}): RunConfig => ({
 export const facts = (over: Partial<TicketFacts> = {}): TicketFacts => ({
   assignee: "Sam Jones",
   channel: SANDBOX,
+  closedAt: null,
   closingComments: [],
   createdAt: "2026-10-10T10:00:00.000Z",
   description: "Exports stop at 500 rows.",

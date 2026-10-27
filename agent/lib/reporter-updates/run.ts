@@ -42,6 +42,7 @@ export interface Deps {
   deploy: DeployProbe;
   linear: LinearPort;
   log?: (event: string, fields: OpsFields) => void;
+  now?: () => number;
   store: ReporterStore;
   write: ReporterWriter;
 }
@@ -304,10 +305,40 @@ const duplicateFollowUp = async (
   if (closure.kind === "needs_deploy") {
     return changePlan(view, original, closure.pullUrls, deps, liveSha);
   }
-  if (closure.kind === "open") {
-    await deps.store.markWaiting(identifier, await liveSha());
-    return { kind: "waiting" };
+  if (closure.kind === "not_fixed") {
+    return dropDuplicate(
+      identifier,
+      original.stateType === "canceled"
+        ? "original_canceled"
+        : "original_not_fixed",
+      deps
+    );
   }
+  if (closure.kind === "done_without_pull") {
+    const done = await composeDone(original, deps.write);
+    if (done) {
+      return done;
+    }
+    const closedAt = Date.parse(view.facts.closedAt ?? "");
+    if (
+      !Number.isNaN(closedAt) &&
+      (deps.now ?? Date.now)() - closedAt > DUPLICATE_WAIT_MS
+    ) {
+      return dropDuplicate(identifier, "expired", deps);
+    }
+  }
+  await deps.store.markWaiting(identifier, await liveSha());
+  return { kind: "waiting" };
+};
+
+const DUPLICATE_WAIT_MS = 30 * 86_400_000;
+
+const dropDuplicate = (identifier: string, code: string, deps: Deps): null => {
+  (deps.log ?? logOpsEvent)("reporter.update.duplicate_dropped", {
+    code,
+    issue: identifier,
+    outcome: "skipped",
+  });
   return null;
 };
 

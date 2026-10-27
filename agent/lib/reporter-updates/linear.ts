@@ -107,6 +107,8 @@ const TICKET_QUERY = `query ReporterTicket($id: String!) {
     title
     description
     createdAt
+    canceledAt
+    completedAt
     state { name type }
     assignee { name }
     labels(first: 50) { nodes { name } }
@@ -124,7 +126,9 @@ const TICKET_QUERY = `query ReporterTicket($id: String!) {
   }
 }`;
 
+const ORIGINAL_COMMENTS = 100;
 const ORIGINAL_QUERY = `query ReporterOriginal($id: String!) {
+  viewer { id }
   issue(id: $id) {
     identifier
     title
@@ -134,6 +138,9 @@ const ORIGINAL_QUERY = `query ReporterOriginal($id: String!) {
     labels(first: 50) { nodes { name } }
     attachments(first: 50) { nodes { title url } }
     parent { identifier state { type } attachments(first: 50) { nodes { title url } } }
+    comments(last: ${ORIGINAL_COMMENTS}) {
+      nodes { id body createdAt parent { id } user { id name } }
+    }
   }
 }`;
 
@@ -167,6 +174,7 @@ const ticketSchema = z.object({
     .object({
       assignee: z.object({ name: z.string() }).nullable(),
       attachments,
+      canceledAt: z.string().nullable(),
       comments: z.object({
         nodes: z.array(
           z.object({
@@ -179,6 +187,7 @@ const ticketSchema = z.object({
         ),
         pageInfo: z.object({ hasNextPage: z.boolean() }),
       }),
+      completedAt: z.string().nullable(),
       createdAt: z.string(),
       description: z.string().nullable(),
       id: z.string(),
@@ -208,11 +217,23 @@ const ticketSchema = z.object({
 const linkNodes = z.object({
   nodes: z.array(z.object({ title: z.string(), url: z.string() })),
 });
+const commentNodes = z.object({
+  nodes: z.array(
+    z.object({
+      body: z.string(),
+      createdAt: z.string(),
+      id: z.string(),
+      parent: z.object({ id: z.string() }).nullable(),
+      user: z.object({ id: z.string(), name: z.string() }).nullable(),
+    })
+  ),
+});
 const originalSchema = z.object({
   issue: z
     .object({
       assignee: z.object({ name: z.string() }).nullable(),
       attachments: linkNodes,
+      comments: commentNodes,
       description: z.string().nullable(),
       identifier: z.string(),
       labels: z.object({ nodes: z.array(z.object({ name: z.string() })) }),
@@ -227,6 +248,7 @@ const originalSchema = z.object({
       title: z.string(),
     })
     .nullable(),
+  viewer: z.object({ id: z.string() }),
 });
 
 const pullUrlsOf = (nodes: readonly { url: string }[]): string[] => [
@@ -392,14 +414,19 @@ export const linearPort = (
       return created.id;
     },
     async readOriginal(identifier) {
-      const { issue } = originalSchema.parse(
+      const { issue, viewer } = originalSchema.parse(
         await call(ORIGINAL_QUERY, "ReporterOriginal", { id: identifier })
       );
       return issue
         ? {
             assignee: issue.assignee?.name ?? null,
             channel: null,
-            closingComments: [],
+            closedAt: null,
+            closingComments: closingCommentsOf(
+              issue.comments.nodes,
+              viewer.id,
+              issue.identifier
+            ),
             createdAt: "",
             description: issue.description ?? "",
             duplicateOf: null,
@@ -455,6 +482,7 @@ export const linearPort = (
         facts: {
           assignee: issue.assignee?.name ?? null,
           channel: delivery.channel,
+          closedAt: issue.canceledAt ?? issue.completedAt,
           closingComments,
           createdAt: issue.createdAt,
           description: issue.description ?? "",
