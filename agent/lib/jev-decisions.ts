@@ -173,11 +173,11 @@ const PATH_STATE: Record<HandlingPath, string> = {
   "Backlog/low-impact": "Backlog",
   Duplicate: "Duplicate",
   "Engineering Todo": "Todo",
-  "Platform Limitation": "Done",
+  "Platform Limitation": "Canceled",
   "Resolved by triage": "Done",
   "Support/Financial": "Todo",
   "Support/Product follow-up": "Todo",
-  "User Error": "Done",
+  "User Error": "Canceled",
 };
 
 const SUPPORT_PROJECT = "Support";
@@ -630,7 +630,7 @@ export function resolveTriage(
     bar: BARS.project,
     billing: billed,
     classification: settled,
-    closed: ["Done", "Duplicate"].includes(PATH_STATE[path]),
+    closed: ["Canceled", "Done", "Duplicate"].includes(PATH_STATE[path]),
     duplicate: match !== undefined,
     input,
     notes,
@@ -650,7 +650,7 @@ export function resolveTriage(
     ? BILLING_INBOX_REVIEW
     : reviewOf(input, answers, {
         classification,
-        closes: PATH_STATE[ownership.path] === "Done",
+        closes: ["Canceled", "Done"].includes(PATH_STATE[ownership.path]),
         duplicate: Boolean(match),
         path: ownership.path,
         signal: BARS.signal,

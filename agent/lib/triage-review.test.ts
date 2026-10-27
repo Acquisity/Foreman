@@ -69,7 +69,7 @@ test("a User Error with a lane that could not run goes to the second check", () 
   ]) {
     const decision = resolveTriage(input, userErrorAnswers());
     assert.ok(decision.outcome === "route");
-    assert.equal(decision.route.state, "Done");
+    assert.equal(decision.route.state, "Canceled");
     assert.equal(decision.needsCriticReview, true);
     assert.equal(decision.review.required, true);
     assert.equal(decision.review.kind, "user_error");
@@ -386,4 +386,31 @@ test("a billed inbox error stays a support follow-up even when a lifted limit is
   assert.equal(decision.approval, "not-applicable");
   assert.equal(decision.route.assignee, SUPPORT_OWNER);
   assert.ok(!decision.route.addLabels.includes("Needs approval"));
+});
+
+test("a close where nothing changed is Canceled, so Done always means a change was made", () => {
+  const userError = resolveTriage(
+    triageInput(),
+    bugAnswers({ classification: pick("user_error"), path: pick("User Error") })
+  );
+  assert.ok(userError.outcome === "route");
+  assert.equal(userError.route.state, "Canceled");
+  const limit = resolveTriage(
+    triageInput(),
+    bugAnswers({
+      classification: pick("platform_limitation"),
+      path: pick("Platform Limitation"),
+    })
+  );
+  assert.ok(limit.outcome === "route");
+  assert.equal(limit.route.state, "Canceled");
+  const resolved = resolveTriage(
+    triageInput(),
+    bugAnswers({
+      classification: pick("user_error"),
+      path: pick("Resolved by triage"),
+    })
+  );
+  assert.ok(resolved.outcome === "route");
+  assert.equal(resolved.route.state, "Done");
 });
