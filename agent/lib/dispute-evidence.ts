@@ -63,6 +63,7 @@ const DAY_MS = 86_400_000;
 const USE_WINDOW_DAYS = 30;
 const STRIPE_LIMIT = 50;
 const TEXT_CHARS = 1500;
+const SLACK_PAGE_BYTES = 1024 * 1024;
 export interface EvidenceDeps {
   readonly abortSignal?: AbortSignal;
   /** Linear GraphQL reads. */
@@ -599,17 +600,47 @@ interface EvidenceResult {
   verdict: ReturnType<typeof verdictFacts>;
 }
 
-/** Measure the real tool envelope; an oversized result fails explicitly. */
+/** Every row list inside the sources, found by shape. */
+const rowLists = (value: unknown, found: RowList<unknown>[] = []) => {
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      rowLists(item, found);
+    }
+  } else if (value && typeof value === "object") {
+    const list = value as Partial<RowList<unknown>>;
+    if (Array.isArray(list.rows) && typeof list.truncated === "boolean") {
+      found.push(list as RowList<unknown>);
+    }
+    for (const child of Object.values(value)) {
+      rowLists(child, found);
+    }
+  }
+  return found;
+};
+
+/** Measure the real tool envelope; oversized lists are halved before anything fails. */
 export const fitResponse = (
   result: EvidenceResult,
   cap: number = READ_BYTES
 ): EvidenceResult => {
   const bounded = boundedText(result);
   const fitted = { ...bounded.value, textTruncated: bounded.clipped };
-  if (
-    Buffer.byteLength(JSON.stringify({ ok: true, result: fitted }), "utf8") <
-    cap
-  ) {
+  const size = () =>
+    Buffer.byteLength(JSON.stringify({ ok: true, result: fitted }), "utf8");
+  // Halve the largest row list until it fits, so one big source never costs
+  // the whole result; the verdict facts and source statuses stay intact.
+  const lists = rowLists(fitted.sources);
+  while (size() >= cap) {
+    const [largest] = lists
+      .filter((list) => list.rows.length)
+      .sort((a, b) => JSON.stringify(b).length - JSON.stringify(a).length);
+    if (!largest) {
+      break;
+    }
+    largest.rows = largest.rows.slice(0, Math.floor(largest.rows.length / 2));
+    largest.truncated = true;
+  }
+  if (size() < cap) {
     return fitted;
   }
   const error =
@@ -683,12 +714,15 @@ export const evidenceDeps = (ctx: ProviderContext): EvidenceDeps => {
   const client = executorClient(ctx);
   const capped: ProviderClient = (request, options) =>
     client(request, { maxBytes: READ_BYTES, ...options });
+  // A 200-message history page can pass 256 KiB; the response is trimmed later.
+  const slack: ProviderClient = (request, options) =>
+    client(request, { maxBytes: SLACK_PAGE_BYTES, ...options });
   return {
     abortSignal: ctx.abortSignal,
     linear: client,
     now: Date.now,
     read: capped,
-    slack: capped,
+    slack,
     sql: (query, signal) =>
       callPlanetscaleReadQuery(
         {

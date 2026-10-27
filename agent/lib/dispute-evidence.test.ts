@@ -320,7 +320,12 @@ describe("client channel", () => {
   it("matches by workspace name or company email domain", async () => {
     const byName = await gather({
       email: "owner@gmail.com",
-      slackChannels: [{ id: "G0ACME", name: "client-acme" }],
+      slackChannels: [{ id: "G0ACME", name: "client-acme-labs" }],
+      tables: {
+        organization: [
+          { billing_account_id: BA, id: ORG_A, name: "Acme Labs" },
+        ],
+      },
     });
     assert.equal(facts(byName.result, "slack").channel?.id, "G0ACME");
     const byDomain = await gather({
@@ -332,12 +337,29 @@ describe("client channel", () => {
     assert.equal(facts(byDomain.result, "slack").channel?.id, "G0ACMEIO");
   });
 
+  it("a one-word workspace name does not pick a client channel", async () => {
+    const { calls, result } = await gather({
+      email: "owner@gmail.com",
+      slackChannels: [{ id: "G0GROWTH", name: "growth-client" }],
+      tables: {
+        organization: [{ billing_account_id: BA, id: ORG_A, name: "Growth" }],
+      },
+    });
+    assert.equal(result.sources.slack.checked, false);
+    assert.equal(calls.includes("slack.aia.history"), false);
+  });
+
   it("reads no channel when several clients match", async () => {
     const { calls, result } = await gather({
       slackChannels: [
-        { id: "G0ONE", name: "acme-one" },
-        { id: "G0TWO", name: "acme-two" },
+        { id: "G0ONE", name: "acme-labs-one" },
+        { id: "G0TWO", name: "acme-labs-two" },
       ],
+      tables: {
+        organization: [
+          { billing_account_id: BA, id: ORG_A, name: "Acme Labs" },
+        ],
+      },
     });
     assert.equal(result.sources.slack.checked, false);
     assert.equal(calls.includes("slack.aia.history"), false);
@@ -375,6 +397,19 @@ describe("bounds", () => {
     assert.ok(messages.rows.length < 400);
     assert.ok(
       messages.rows.every((message) => (message.text?.length ?? 0) <= 1503)
+    );
+  });
+
+  it("fitResponse halves the largest list before failing, keeping every verdict fact", async () => {
+    const { result } = await gather({ charge: { amount_refunded: 25_200 } });
+    const full = Buffer.byteLength(JSON.stringify({ ok: true, result }));
+    const fitted = fitResponse(result, full - 200);
+    assert.equal(fitted.error, undefined);
+    assert.ok(Object.values(fitted.sources).every((source) => source.checked));
+    assert.equal(fitted.verdict.refundedInFull.value, true);
+    assert.ok(
+      JSON.stringify(fitted.sources).includes('"truncated":true'),
+      "a trimmed list is marked truncated"
     );
   });
 
@@ -671,9 +706,14 @@ describe("dispute attribution boundaries", () => {
     const cases: World[] = [
       {
         slackChannels: [
-          { id: "G0NAME", name: "acme-client" },
+          { id: "G0NAME", name: "acme-labs-client" },
           { id: "G0DOMAIN", name: "acme-io-client" },
         ],
+        tables: {
+          organization: [
+            { billing_account_id: BA, id: ORG_A, name: "Acme Labs" },
+          ],
+        },
       },
       {
         email: "owner@gmail.com",

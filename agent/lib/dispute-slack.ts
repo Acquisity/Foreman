@@ -75,7 +75,8 @@ export const channelTerms = (
   const name = workspaceName
     ? slug(workspaceName.replace(WORKSPACE_SUFFIX, ""))
     : "";
-  if (name.length >= 3) {
+  // One word ("growth", "test") names too many channels to identify a client.
+  if (name.includes("-")) {
     terms.add(name);
   }
   for (const person of names) {

@@ -142,6 +142,14 @@ export const readLinear = async (
       },
     ];
   });
+  // Tickets that name the customer first, so the size cap trims unrelated ones.
+  tickets.sort(
+    (a, b) => Number(!a.matchedOn.length) - Number(!b.matchedOn.length)
+  );
+  const unread = identifiers.filter(
+    (identifier) =>
+      !requestedBodies.some((body) => body.identifier === identifier)
+  );
   return {
     droppedUnrequested,
     phrases,
@@ -150,7 +158,9 @@ export const readLinear = async (
       MAX_TICKETS,
       related.truncated ||
         related.issues.length > MAX_TICKETS ||
+        unread.length > 0 ||
         tickets.some((ticket) => ticket.truncated)
     ),
+    unread,
   };
 };
