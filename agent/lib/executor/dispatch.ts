@@ -11,7 +11,11 @@ import {
 } from "../widget-scope.js";
 import { executorAuth } from "./auth.js";
 import { operationPath } from "./bindings.js";
-import { WIDGET_TOOLKIT } from "./endpoint.js";
+import {
+  DISPUTES_TOOLKIT,
+  type ExecutorToolkit,
+  WIDGET_TOOLKIT,
+} from "./endpoint.js";
 import { ExecutorError, executorTransport } from "./transport.js";
 
 export type ProviderContext = Pick<ToolContext, "abortSignal" | "getToken"> &
@@ -55,6 +59,9 @@ const widgetLinearTicketInput = z.union([
   }),
 ]);
 
+/** Every path the foreman-disputes toolkit binds starts with its connection. */
+export const DISPUTE_WRITE_CONNECTION = "foreman_stripe_dispute_write.";
+
 type OperationPolicy =
   | ReturnType<typeof supportOperationPolicy>
   | ReturnType<typeof widgetOperationPolicy>;
@@ -62,6 +69,18 @@ type OperationPolicy =
 /** Lanes with their own toolkit select it here; every other session uses the shared toolkit. */
 const operationPolicy = (ctx: ProviderContext): OperationPolicy =>
   supportOperationPolicy(ctx) ?? widgetOperationPolicy(ctx);
+
+/**
+ * The toolkit a call runs in. A lane policy wins, so a support or widget
+ * session asking for a dispute path is refused by its own allowlist; the
+ * dispute write paths otherwise run only in the foreman-disputes toolkit.
+ */
+const toolkitFor = (
+  policy: OperationPolicy,
+  path: string
+): ExecutorToolkit | undefined =>
+  policy?.toolkit ??
+  (path.startsWith(DISPUTE_WRITE_CONNECTION) ? DISPUTES_TOOLKIT : undefined);
 
 /** The widget egress gate runs outside any eve session: one fixed read under the app principal. */
 export async function readWidgetOwnership(
@@ -96,12 +115,16 @@ export async function readWidgetOwnership(
   return result.data;
 }
 
-async function connection(ctx: ProviderContext, policy: OperationPolicy) {
+async function connection(
+  ctx: ProviderContext,
+  policy: OperationPolicy,
+  path: string
+) {
   const { token } = await ctx.getToken(executorAuth());
   const authorization = policy ? { version: await policy.authorize() } : null;
   return {
     authorization,
-    wire: { signal: ctx.abortSignal, token, toolkit: policy?.toolkit },
+    wire: { signal: ctx.abortSignal, token, toolkit: toolkitFor(policy, path) },
   };
 }
 
@@ -144,7 +167,7 @@ export async function invokeProvider(
   assertLaneOperation(ctx, path, input);
   const policy = operationPolicy(ctx);
   policy?.assert(path, input);
-  const { wire, authorization } = await connection(ctx, policy);
+  const { wire, authorization } = await connection(ctx, policy, path);
   const key =
     policy && authorization
       ? policy.writeKey(path, input, authorization.version, operationKey)
@@ -192,7 +215,7 @@ export async function describeProvider(ctx: ProviderContext, path: string) {
   const policy = operationPolicy(ctx);
   // Describing a dispatcher is permitted; operation arguments are checked only when called.
   policy?.describe(path);
-  const { wire } = await connection(ctx, policy);
+  const { wire } = await connection(ctx, policy, path);
   return executorTransport.describe(wire, path);
 }
 

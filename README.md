@@ -19,7 +19,7 @@ Foreman reaches company services through Executor, using shared company accounts
 
 ## Skills
 
-Skills under `agent/skills/` are load-on-demand procedures the model pulls in when a task calls for them. They include triage and billing investigation, GitHub and code-quality review, GitHub-Linear bridging, SLA investigation, and writing and Slack wording guardrails. Loading a skill adds instructions only; it never adds tools.
+Skills under `agent/skills/` are load-on-demand procedures the model pulls in when a task calls for them. They include triage and billing investigation, Stripe dispute response, GitHub and code-quality review, GitHub-Linear bridging, SLA investigation, and writing and Slack wording guardrails. Loading a skill adds instructions only; it never adds tools.
 
 ## Execution
 
