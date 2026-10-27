@@ -51,7 +51,7 @@ export const AREAS: Readonly<Record<AreaKey, Area>> = {
       "the AI SDR: replies, escalation, classification, scheduling and its inbox",
     label: "Area: AI SDR",
     lane: "developer",
-    owner: "Koppany Kondricz",
+    owner: "James Keeble",
     paths: [],
     projects: [
       "AI SDR Core",

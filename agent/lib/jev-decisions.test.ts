@@ -82,7 +82,7 @@ test("a supported Bug with the full bar routes to the project and asks for revie
   assert.ok(decision.outcome === "route");
   assert.equal(decision.classification, "Bug");
   assert.equal(decision.needsCriticReview, true);
-  assert.equal(decision.assignee, "Koppany Kondricz");
+  assert.equal(decision.assignee, "James Keeble");
   assert.deepEqual(decision.area, {
     key: "ai_sdr",
     label: "Area: AI SDR",
@@ -90,7 +90,7 @@ test("a supported Bug with the full bar routes to the project and asks for revie
   });
   assert.deepEqual(decision.route, {
     addLabels: ["Customer reported", "Bug", "Area: AI SDR"],
-    assignee: "Koppany Kondricz",
+    assignee: "James Keeble",
     priority: 3,
     project: "AI SDR Core",
     state: "Todo",
@@ -865,7 +865,7 @@ test("an approved feature request takes the engineering path so the hand-off can
   assert.equal(decision.classification, "Platform Limitation");
   assert.equal(decision.path, "Engineering Todo");
   assert.equal(decision.route.state, "Todo");
-  assert.equal(decision.route.assignee, "Koppany Kondricz");
+  assert.equal(decision.route.assignee, "James Keeble");
   assert.ok(decision.route.addLabels.includes("Area: AI SDR"));
 });
 
@@ -959,8 +959,8 @@ test("an approved feature request that Jev already put on the engineering path g
   assert.ok(decision.outcome === "route");
   assert.equal(decision.path, "Engineering Todo");
   assert.equal(decision.route.state, "Todo");
-  assert.equal(decision.assignee, "Koppany Kondricz");
-  assert.equal(decision.route.assignee, "Koppany Kondricz");
+  assert.equal(decision.assignee, "James Keeble");
+  assert.equal(decision.route.assignee, "James Keeble");
   assert.ok(decision.route.addLabels.includes("Area: AI SDR"));
 });
 

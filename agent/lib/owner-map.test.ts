@@ -79,7 +79,7 @@ describe("the owner map", () => {
   it("names each owner James set on 22 and 23 Oct 2026", () => {
     const expected: Record<AreaKey, string> = {
       acquisity_agent: "James Keeble",
-      ai_sdr: "Koppany Kondricz",
+      ai_sdr: "James Keeble",
       billing: "Anthony Adewale",
       cold_email: "Anthony Adewale",
       core_platform: "Anuj Bhatt",
@@ -104,7 +104,6 @@ describe("the owner map", () => {
       "Ebubeker Rexha",
       "Elis Bushaj",
       "James Keeble",
-      "Koppany Kondricz",
     ]);
   });
 
@@ -199,7 +198,7 @@ describe("the owner map", () => {
 
 describe("routing a sample of each area", () => {
   const samples: [string, AreaKey, string][] = [
-    ["AI SDR Core", "ai_sdr", "Koppany Kondricz"],
+    ["AI SDR Core", "ai_sdr", "James Keeble"],
     ["Cold Email Leads", "cold_email", "Anthony Adewale"],
     ["Billing", "billing", "Anthony Adewale"],
     ["Domains & Inboxes", "inboxes_domains", "Anthony Adewale"],
@@ -297,7 +296,7 @@ describe("who may be assigned to a developer", () => {
       )
     );
     assert.equal(decision.approval, "approved");
-    assert.equal(decision.assignee, "Koppany Kondricz");
+    assert.equal(decision.assignee, "James Keeble");
     assert.equal(decision.route.state, "Todo");
     assert.ok(decision.route.addLabels.includes("Feature Request"));
     assert.equal(decision.route.addLabels.includes("Needs approval"), false);

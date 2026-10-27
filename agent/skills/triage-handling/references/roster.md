@@ -2,7 +2,7 @@
 
 Do not load this reference unless `STAGE 4 COMPLETE: evidence record ready` existed before this file was opened and Stage 6 reached area routing before its duplicate or engineering-handoff branch. If either gate is absent, stop reading and return to the unfinished stage. This is the owner map Stage 6 routing and the `engineering-handoff` master assignee follow, and the same map lives in code, so `decide_triage` and `route_ticket` agree with it. Give names exactly as written: the routing tool refuses any assignee who is not on this list. An area that fits nothing goes to James Keeble. A support owner is never a developer: tickets for Aaron Fraga are refunds, concessions and the support widget.
 
-- The AI SDR: replies, escalation, classification, scheduling and its inbox (`ai_sdr`, label `Area: AI SDR`): Koppany Kondricz
+- The AI SDR: replies, escalation, classification, scheduling and its inbox (`ai_sdr`, label `Area: AI SDR`): James Keeble
 - Cold email campaigns, the cold email agent, leads, sending and sending infrastructure (`cold_email`, label `Area: Cold Email`): Anthony Adewale
 - Subscriptions, credits, checkout and billing providers (a bug in billing code, not a refund request) (`billing`, label `Area: Billing`): Anthony Adewale
 - Buying, provisioning and managing sending domains and inboxes (`inboxes_domains`, label `Area: Inboxes and Domains`): Anthony Adewale
