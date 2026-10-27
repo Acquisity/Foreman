@@ -447,7 +447,7 @@ describe("slack channel", () => {
     assert.deepEqual(posts, []);
   });
 
-  it("stamps the receiver's mention in the two triage intake channels and the Intercom intake channels only", async () => {
+  it("stamps the receiver's mention in the two triage intake channels only", async () => {
     const fromReceiver = (channelId: string): SlackMessage => ({
       ...message("New ask", channelId),
       author: {
@@ -461,9 +461,6 @@ describe("slack channel", () => {
     const cases = [
       ["C0BBPVC3N2X", true],
       ["C0BC011NAQL", true],
-      ["C0BCV1WBR42", true],
-      ["C0BNCL031AQ", true],
-      ["C0C8XP8HAFL", false],
       ["C0BLFDUN6Q7", false],
       ["C0INTAKEONLY", false],
       ["C0DEV", false],

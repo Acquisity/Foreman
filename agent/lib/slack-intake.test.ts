@@ -13,6 +13,7 @@ import {
   parseIntakeOnlyChannels,
   resolveSlackIntakeWorkflow,
   slackIntakeContext,
+  TRIAGE_INTAKE_CHANNELS,
 } from "./slack-intake.js";
 import { isIntakeOnly, stampIntakeOnly, stampTrusted } from "./trust.js";
 import { SLACK_SIGN_IN_REASON, slackSignInDenial } from "./user-connect.js";
@@ -221,4 +222,20 @@ it("the receiver intake channels answer only the receiver's mention", () => {
   assert.equal(admitsSlackMention("C0BC011NAQL", receiver), true);
   assert.equal(admitsSlackMention("C0BCV1WBR42", person), true);
   assert.equal(admitsSlackMention("D123", person), true);
+});
+
+describe("triage intake channels", () => {
+  it("are the two receiver channels and the Intercom intake channels only", () => {
+    for (const [channelId, stamped] of [
+      ["C0BBPVC3N2X", true],
+      ["C0BC011NAQL", true],
+      ["C0BCV1WBR42", true],
+      ["C0BNCL031AQ", true],
+      ["C0C8XP8HAFL", false],
+      ["C0BLFDUN6Q7", false],
+      ["C0DEV", false],
+    ] as const) {
+      assert.equal(TRIAGE_INTAKE_CHANNELS.has(channelId), stamped, channelId);
+    }
+  });
 });
