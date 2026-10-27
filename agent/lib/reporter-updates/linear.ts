@@ -6,7 +6,8 @@ import {
   createThreadComment,
   SLACK_ANCHOR_PATTERN,
 } from "../requester-reply.js";
-import { parsePullUrl, type TicketFacts } from "./plan.js";
+import { isReporterUpdate } from "./copy.js";
+import { type ClosingComment, parsePullUrl, type TicketFacts } from "./plan.js";
 import type { DiscoveredTicket } from "./store.js";
 
 export interface ThreadComment {
@@ -22,6 +23,59 @@ export interface TicketView {
   undeliverable: string[] | null;
 }
 
+interface CommentNode {
+  body: string;
+  createdAt: string;
+  id: string;
+  parent: { id: string } | null;
+  user: { id: string } | null;
+}
+
+/**
+ * The comments the writer reads to judge a close: the newest people's
+ * comments and, separately, the newest of Foreman's, each capped, anywhere on
+ * the ticket including the Slack thread. Authors decide the group, never the
+ * position. Left out: the thread anchors, comments by an anchor's author other
+ * than Foreman (the receiver mirroring Slack), and Foreman's reporter updates.
+ */
+export const closingCommentsOf = (
+  comments: readonly CommentNode[],
+  anchors: readonly CommentNode[],
+  viewerId: string,
+  identifier: string
+): ClosingComment[] => {
+  const anchorIds = new Set(anchors.map((anchor) => anchor.id));
+  const mirrors = new Set(
+    anchors.flatMap((anchor) =>
+      anchor.user && anchor.user.id !== viewerId ? [anchor.user.id] : []
+    )
+  );
+  const sorted = comments
+    .filter(
+      (comment) =>
+        comment.user !== null &&
+        !anchorIds.has(comment.id) &&
+        !mirrors.has(comment.user.id)
+    )
+    .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+  const foreman = sorted
+    .filter(
+      (comment) =>
+        comment.user?.id === viewerId && !isReporterUpdate(identifier, comment)
+    )
+    .slice(-CLOSING_COMMENTS);
+  const people = sorted
+    .filter((comment) => comment.user?.id !== viewerId)
+    .slice(-CLOSING_COMMENTS);
+  return [...people, ...foreman]
+    .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
+    .map((comment) => ({
+      author: comment.user?.id === viewerId ? "foreman" : "person",
+      body: comment.body,
+      createdAt: comment.createdAt,
+    }));
+};
+
 export interface LinearPort {
   discover: (
     updatedSince: string,
@@ -35,6 +89,7 @@ export interface LinearPort {
     body: string,
     id: string
   ) => Promise<string>;
+  readOriginal: (identifier: string) => Promise<TicketFacts | null>;
   readTicket: (identifier: string) => Promise<TicketView | null>;
 }
 
@@ -73,6 +128,19 @@ const TICKET_QUERY = `query ReporterTicket($id: String!) {
       pageInfo { hasNextPage }
       nodes { id body createdAt parent { id } user { id } }
     }
+  }
+}`;
+
+const ORIGINAL_QUERY = `query ReporterOriginal($id: String!) {
+  issue(id: $id) {
+    identifier
+    title
+    description
+    state { name type }
+    assignee { name }
+    labels(first: 50) { nodes { name } }
+    attachments(first: 50) { nodes { title url } }
+    parent { identifier state { type } attachments(first: 50) { nodes { title url } } }
   }
 }`;
 
@@ -144,6 +212,38 @@ const ticketSchema = z.object({
     .nullable(),
   viewer: z.object({ id: z.string() }),
 });
+const linkNodes = z.object({
+  nodes: z.array(z.object({ title: z.string(), url: z.string() })),
+});
+const originalSchema = z.object({
+  issue: z
+    .object({
+      assignee: z.object({ name: z.string() }).nullable(),
+      attachments: linkNodes,
+      description: z.string().nullable(),
+      identifier: z.string(),
+      labels: z.object({ nodes: z.array(z.object({ name: z.string() })) }),
+      parent: z
+        .object({
+          attachments: linkNodes,
+          identifier: z.string(),
+          state: z.object({ type: z.string() }),
+        })
+        .nullable(),
+      state: z.object({ name: z.string(), type: z.string() }),
+      title: z.string(),
+    })
+    .nullable(),
+});
+
+const pullUrlsOf = (nodes: readonly { url: string }[]): string[] => [
+  ...new Set(
+    nodes
+      .map((node) => node.url.trim())
+      .filter((url) => parsePullUrl(url) !== null)
+  ),
+];
+
 const commentSchema = z.object({
   comment: z
     .object({ id: z.string(), parent: z.object({ id: z.string() }).nullable() })
@@ -298,6 +398,36 @@ export const linearPort = (
       });
       return created.id;
     },
+    async readOriginal(identifier) {
+      const { issue } = originalSchema.parse(
+        await call(ORIGINAL_QUERY, "ReporterOriginal", { id: identifier })
+      );
+      return issue
+        ? {
+            assignee: issue.assignee?.name ?? null,
+            channel: null,
+            closingComments: [],
+            createdAt: "",
+            description: issue.description ?? "",
+            duplicateOf: null,
+            identifier: issue.identifier,
+            labels: issue.labels.nodes.map((label) => label.name),
+            parent: issue.parent
+              ? {
+                  identifier: issue.parent.identifier,
+                  stateType: issue.parent.state.type,
+                }
+              : null,
+            pullUrls: pullUrlsOf([
+              ...issue.attachments.nodes,
+              ...(issue.parent?.attachments.nodes ?? []),
+            ]),
+            stateName: issue.state.name,
+            stateType: issue.state.type,
+            title: issue.title,
+          }
+        : null;
+    },
     async readTicket(identifier) {
       const data = ticketSchema.parse(
         await call(TICKET_QUERY, "ReporterTicket", { id: identifier })
@@ -322,24 +452,12 @@ export const linearPort = (
       ]
         .map((node) => node.url.trim())
         .filter((url) => parsePullUrl(url) !== null);
-      const anchorIds = new Set(anchors.map((candidate) => candidate.id));
-      const closingComments = comments
-        .filter(
-          (comment) =>
-            comment.user !== null &&
-            !anchorIds.has(comment.id) &&
-            !(comment.parent && anchorIds.has(comment.parent.id))
-        )
-        .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
-        .slice(-CLOSING_COMMENTS)
-        .map((comment) => ({
-          author:
-            comment.user?.id === data.viewer.id
-              ? ("foreman" as const)
-              : ("person" as const),
-          body: comment.body,
-          createdAt: comment.createdAt,
-        }));
+      const closingComments = closingCommentsOf(
+        comments,
+        anchors,
+        data.viewer.id,
+        issue.identifier
+      );
       return {
         anchorId: anchor ? delivery.anchorId : null,
         facts: {

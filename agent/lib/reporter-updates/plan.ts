@@ -139,7 +139,7 @@ const FENCE = /```[\s\S]*?```/gu;
 const HTML_COMMENT = /<!--[\s\S]*?-->/gu;
 const HTML_TAG = /<[^>]+>/gu;
 const PULL_SECTIONS = new Set(["solution", "how it works"]);
-export const MAX_PULL_CONTEXT_CHARS = 4000;
+export const MAX_PULL_CONTEXT_CHARS = 3000;
 
 /** The Solution and How it works sections of a pull request description, with code, diagrams and markup removed. */
 export const pullContext = (body: string): string => {

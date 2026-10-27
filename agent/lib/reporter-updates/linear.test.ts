@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
+import { commentIdFor } from "./comment-id.js";
 import { linearPort } from "./linear.js";
 
 const SANDBOX = "C0AAAAAAAAA";
@@ -115,6 +116,16 @@ describe("readTicket", () => {
       assignee: "Sam Jones",
       channel: SANDBOX,
       closingComments: [
+        {
+          author: "person",
+          body: "my own reply",
+          createdAt: "2026-10-10T10:00:00Z",
+        },
+        {
+          author: "foreman",
+          body: "We've received your report",
+          createdAt: "2026-10-10T10:00:00Z",
+        },
         {
           author: "foreman",
           body: "elsewhere",
@@ -453,6 +464,128 @@ describe("readTicket", () => {
     await assert.rejects(long.port.readTicket("ENG-1"), {
       name: "ThreadIncompleteError",
     });
+  });
+});
+
+describe("closing comments", () => {
+  const ANCHOR = comment(
+    "c-anchor",
+    `Slack thread connected in [#sandbox](https://x.slack.com/archives/${SANDBOX}/p1700000000000001)`,
+    { user: "asks-bot" }
+  );
+  const at = (minute: number) =>
+    `2026-10-12T10:${String(minute).padStart(2, "0")}:00Z`;
+  const read = async (nodes: ReturnType<typeof comment>[]) => {
+    const { port } = portWith(() =>
+      ok({
+        issue: issue({
+          comments: {
+            nodes: [ANCHOR, ...nodes],
+            pageInfo: { hasNextPage: false },
+          },
+        }),
+        viewer: { id: "viewer" },
+      })
+    );
+    return (await port.readTicket("ENG-1"))?.facts.closingComments ?? [];
+  };
+
+  it("includes replies in the Slack thread and tells people from Foreman by author", async () => {
+    const found = await read([
+      comment("p-1", "Removed the duplicate number for you.", {
+        createdAt: at(1),
+        parent: "c-anchor",
+        user: "james",
+      }),
+      comment("f-1", "This works as designed.", {
+        createdAt: at(2),
+        parent: "c-anchor",
+        user: "viewer",
+      }),
+      comment("m-1", "Mirrored from Slack by the receiver", {
+        createdAt: at(3),
+        parent: "c-anchor",
+        user: "asks-bot",
+      }),
+      comment(commentIdFor("ENG-1", "received"), "Thanks, got it.", {
+        createdAt: at(4),
+        parent: "c-anchor",
+        user: "viewer",
+      }),
+    ]);
+    assert.deepEqual(
+      found.map((c) => [c.author, c.body]),
+      [
+        ["person", "Removed the duplicate number for you."],
+        ["foreman", "This works as designed."],
+      ]
+    );
+  });
+
+  it("keeps a person's comment even when many Foreman notes follow it, and caps each group", async () => {
+    const found = await read([
+      comment("p-1", "Fixed their data.", { createdAt: at(1), user: "james" }),
+      ...Array.from({ length: 7 }, (_, i) =>
+        comment(`f-${i}`, `Foreman note ${i}`, {
+          createdAt: at(10 + i),
+          user: "viewer",
+        })
+      ),
+    ]);
+    assert.deepEqual(
+      found.filter((c) => c.author === "person").map((c) => c.body),
+      ["Fixed their data."]
+    );
+    assert.deepEqual(
+      found.filter((c) => c.author === "foreman").map((c) => c.body),
+      [
+        "Foreman note 2",
+        "Foreman note 3",
+        "Foreman note 4",
+        "Foreman note 5",
+        "Foreman note 6",
+      ]
+    );
+  });
+});
+
+describe("readOriginal", () => {
+  it("reads state, labels and linked pull requests without loading comments, so a long thread cannot block it", async () => {
+    const { port, requests } = portWith(() =>
+      ok({
+        issue: {
+          assignee: null,
+          attachments: { nodes: [{ title: "Fix", url: PR }] },
+          description: null,
+          identifier: "ENG-9",
+          labels: { nodes: [{ name: "Feature Request" }] },
+          parent: null,
+          state: { name: "Done", type: "completed" },
+          title: "Email from the dialler",
+        },
+      })
+    );
+    const facts = await port.readOriginal("ENG-9");
+    assert.ok(!requests[0]?.query.includes("comments"));
+    assert.deepEqual(
+      facts && {
+        labels: facts.labels,
+        pullUrls: facts.pullUrls,
+        stateType: facts.stateType,
+        title: facts.title,
+      },
+      {
+        labels: ["Feature Request"],
+        pullUrls: [PR],
+        stateType: "completed",
+        title: "Email from the dialler",
+      }
+    );
+  });
+
+  it("returns null for a missing original", async () => {
+    const { port } = portWith(() => ok({ issue: null }));
+    assert.equal(await port.readOriginal("ENG-9"), null);
   });
 });
 

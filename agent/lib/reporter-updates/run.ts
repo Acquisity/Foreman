@@ -295,14 +295,14 @@ const duplicateFollowUp = async (
 ): Promise<Planned | Outcome | null> => {
   const { duplicateOf, identifier } = view.facts;
   const original = duplicateOf
-    ? await deps.linear.readTicket(duplicateOf)
+    ? await deps.linear.readOriginal(duplicateOf)
     : null;
   if (!original) {
     return null;
   }
-  const closure = closureOf(original.facts);
+  const closure = closureOf(original);
   if (closure.kind === "needs_deploy") {
-    return changePlan(view, original.facts, closure.pullUrls, deps, liveSha);
+    return changePlan(view, original, closure.pullUrls, deps, liveSha);
   }
   if (closure.kind === "open") {
     await deps.store.markWaiting(identifier, await liveSha());

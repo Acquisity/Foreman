@@ -401,6 +401,8 @@ export const fakeLinear = (tickets: FakeTicket[]) => {
     failAfterCreate: boolean;
     failNextPost: boolean;
     holdNextPost: Promise<void> | null;
+    longThreads: Set<string>;
+    originalReads: number;
     reads: number;
   } = {
     discoverFails: false,
@@ -409,6 +411,8 @@ export const fakeLinear = (tickets: FakeTicket[]) => {
     failAfterCreate: false,
     failNextPost: false,
     holdNextPost: null,
+    longThreads: new Set<string>(),
+    originalReads: 0,
     reads: 0,
   };
   const created = new Map<string, { anchorId: string }>();
@@ -473,8 +477,18 @@ export const fakeLinear = (tickets: FakeTicket[]) => {
       }
       return id;
     },
+    readOriginal(identifier) {
+      state.originalReads += 1;
+      const found = tickets.find(
+        (entry) => entry.facts.identifier === identifier
+      );
+      return Promise.resolve(found ? { ...found.facts } : null);
+    },
     readTicket(identifier) {
       state.reads += 1;
+      if (state.longThreads.has(identifier)) {
+        return Promise.reject(new Error(`${identifier} thread is incomplete`));
+      }
       const found = tickets.find(
         (entry) => entry.facts.identifier === identifier
       );

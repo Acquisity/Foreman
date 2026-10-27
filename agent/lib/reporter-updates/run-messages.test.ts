@@ -399,6 +399,20 @@ describe("duplicate follow-up", () => {
     });
   });
 
+  it("follows up even when the original's thread is too long to read in full", async () => {
+    const original = ticket({
+      identifier: "ENG-9",
+      labels: ["Bug"],
+      pullUrls: [PR_URL],
+      stateType: "completed",
+    });
+    const s = setup([duplicate(), original], LIVE_DEPLOY);
+    s.linear.state.longThreads.add("ENG-9");
+    await reconcile(s);
+    assert.deepEqual(await reconcile(s), { kind: "posted", stage: "fixed" });
+    assert.equal(s.linear.state.originalReads, 1);
+  });
+
   it("waits while the original is open, and follows up on a later run once it ships", async () => {
     const original = ticket({
       identifier: "ENG-9",
