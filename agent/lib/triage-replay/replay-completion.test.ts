@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
+import { CRITIC_CRITERIA } from "../../subagents/critic/agent.js";
 import { tool as commentTool } from "../../tools/comment_triage_replay_issue.js";
 import { tool as createIssueTool } from "../../tools/create_triage_replay_issue.js";
 import { tool as catalogTool } from "../../tools/list_triage_replay_catalog.js";
@@ -8,6 +9,9 @@ import replyTool from "../../tools/reply_to_requester.js";
 import { executorClient } from "../executor/client.js";
 import { executorTransport } from "../executor/transport.js";
 import { routeTicket, saveInvestigationDocument } from "../linear-api.js";
+import { SUPPORT_OWNER } from "../owner-map.js";
+import { CRITIC_FINDING } from "../triage-fixtures.js";
+import { routeRefusal, settleCriticRound } from "../triage-log.js";
 import { withReplayState } from "./backend.js";
 import {
   auth,
@@ -24,6 +28,8 @@ import { NEW_MASTER } from "./schema.js";
 import { appliedRoute } from "./views.js";
 
 const TOKEN_REFRESH = /token refresh/u;
+const SUPPORT_OWNER_RULE = /assignee set to Aaron Fraga/u;
+const DEVELOPER_RULE = /is a developer/u;
 const ONLY_CASE_DOCUMENTS = /documents only on ENG-100/u;
 
 const rootCtx = {
@@ -70,6 +76,76 @@ const noTransport = (t: Parameters<typeof replayProcess>[0]) =>
   });
 
 const endTurn = () => replayHandler("turn.completed")({ data: {} }, rootCtx);
+
+const criticReply = (verdict: string, over: Record<string, unknown> = {}) => ({
+  advisory_notes: [],
+  blocking_findings: verdict === "APPROVE" ? [] : [CRITIC_FINDING],
+  criteria_results: CRITIC_CRITERIA.map((criterion) => ({
+    criterion,
+    evidence: "read",
+    rationale: "checked",
+    result: verdict === "APPROVE" ? "PASS" : "FAIL",
+  })),
+  reviewed: {
+    commit: "c".repeat(40),
+    document_id: "doc-1",
+    document_updated_at: "2026-10-27T10:00:00.000Z",
+    issue_id: "ENG-100",
+  },
+  summary: "s",
+  verdict,
+  ...over,
+});
+const objection = criticReply("CHALLENGE");
+const skillLoadFailure = criticReply("INSUFFICIENT_EVIDENCE", {
+  blocking_findings: [],
+  criteria_results: [],
+  reviewed: {
+    commit: "unpinned",
+    document_id: "doc-1",
+    document_updated_at: "2026-10-27T10:00:00.000Z",
+    issue_id: "ENG-100",
+  },
+});
+const PACKET_MESSAGE = [
+  "Source issue: ENG-100",
+  "Document: doc-1",
+  "Document updatedAt: 2026-10-27T10:00:00.000Z",
+  `Commit: ${"c".repeat(40)}`,
+].join("\n");
+const criticDispatched = (callId: string, message = PACKET_MESSAGE) =>
+  replayHandler("actions.requested")(
+    {
+      data: {
+        actions: [
+          {
+            callId,
+            input: { message },
+            kind: "subagent-call",
+            subagentName: "critic",
+          },
+        ],
+      },
+    },
+    rootCtx
+  );
+const criticSettles = async (callId: string, output: unknown) => {
+  await criticDispatched(callId);
+  await criticSettled(callId, output);
+};
+const criticSettled = (callId: string, output: unknown) =>
+  replayHandler("task.settled")(
+    {
+      data: {
+        callId,
+        kind: "agent",
+        name: "critic",
+        output,
+        status: "completed",
+      },
+    },
+    rootCtx
+  );
 
 describe("replay result", () => {
   it("settles only when the root turn ends, and fails a route that never applied", async (t) => {
@@ -126,6 +202,193 @@ describe("replay result", () => {
     });
   });
 
+  it("does not complete a routed duplicate until the critic has a result", async (t) => {
+    await replayProcess(t);
+    noTransport(t);
+    await toolResult(
+      "decide_triage",
+      routeDecision({
+        needsCriticReview: true,
+        review: { kind: "duplicate", reason: "r", required: true },
+      })
+    );
+    await routeTicket(
+      {
+        addLabels: ["Bug"],
+        duplicateOf: "ENG-90",
+        inheritAssigneeFrom: "ENG-90",
+        issue: "ENG-100",
+        project: "Cold Email Core",
+        state: "Duplicate",
+      },
+      { client: executorClient(ctx) }
+    );
+    await endTurn();
+    assert.equal(buildReplayResult(await state(), RUN).status, "failed");
+    await replayHandler("task.settled")(
+      {
+        data: {
+          callId: "critic-1",
+          kind: "agent",
+          name: "critic",
+          output: {
+            blocking_findings: [],
+            criteria_results: [],
+            verdict: "APPROVE",
+          },
+          status: "completed",
+        },
+      },
+      rootCtx
+    );
+    assert.equal(buildReplayResult(await state(), RUN).status, "completed");
+  });
+
+  it("scores a ticket the critic objected to twice as unproven with its owner assigned, not as routed", async (t) => {
+    await replayProcess(t);
+    noTransport(t);
+    const client = executorClient(ctx);
+    await toolResult(
+      "decide_triage",
+      routeDecision({
+        needsCriticReview: true,
+        review: { kind: "duplicate", reason: "r", required: true },
+      })
+    );
+    await criticSettles("critic-1", objection);
+    await criticSettles("critic-2", objection);
+    await saveInvestigationDocument(
+      { content: "Blocked.", issue: "ENG-100", lane: "triage" },
+      { client }
+    );
+    const blocked = settleCriticRound(
+      settleCriticRound({}, "ENG-100", "objection"),
+      "ENG-100",
+      "objection"
+    );
+    const guardedRoute = (input: { assignee: string; issue: string }) => {
+      const refusal = routeRefusal({}, blocked, input);
+      return refusal
+        ? Promise.reject(new Error(refusal))
+        : routeTicket(input, { client });
+    };
+    await assert.rejects(
+      guardedRoute({ assignee: "Anthony Adewale", issue: "ENG-100" }),
+      SUPPORT_OWNER_RULE
+    );
+    await assert.rejects(
+      routeTicket(
+        { assignee: "Anthony Adewale", issue: "ENG-100" },
+        { client }
+      ),
+      DEVELOPER_RULE
+    );
+    await guardedRoute({ assignee: SUPPORT_OWNER, issue: "ENG-100" });
+    await endTurn();
+    const result = buildReplayResult(await state(), RUN);
+    assert.equal(result.status, "completed");
+    assert.equal(result.final?.outcome, "unproven");
+    assert.equal(result.final?.path, null);
+    assert.deepEqual((await state()).issue.labels, []);
+    assert.equal(result.final?.assignee, SUPPORT_OWNER);
+    assert.equal(result.final?.master, null);
+  });
+
+  it("does not count two reviews that could not start as objections", async (t) => {
+    await replayProcess(t);
+    noTransport(t);
+    await toolResult(
+      "decide_triage",
+      routeDecision({
+        needsCriticReview: true,
+        review: { kind: "duplicate", reason: "r", required: true },
+      })
+    );
+    await criticSettles("critic-1", skillLoadFailure);
+    await criticSettles("critic-2", skillLoadFailure);
+    const settled = await state();
+    assert.equal(settled.criticObjections ?? 0, 0);
+    assert.equal(settled.critic?.counted, "failed");
+    assert.equal(settled.critic?.verdict, "INSUFFICIENT_EVIDENCE");
+  });
+
+  it("counts a republished critic settlement once", async (t) => {
+    await replayProcess(t);
+    noTransport(t);
+    await criticSettles("critic-1", objection);
+    await criticSettles("critic-1", objection);
+    assert.equal((await state()).criticObjections, 1);
+    await criticSettles("critic-2", objection);
+    assert.equal((await state()).criticObjections, 2);
+  });
+
+  it("does not count an objection to a packet the critic was not sent", async (t) => {
+    await replayProcess(t);
+    noTransport(t);
+    await criticDispatched(
+      "critic-1",
+      PACKET_MESSAGE.replace("doc-1", "doc-2")
+    );
+    await criticSettled("critic-1", objection);
+    await criticDispatched("critic-2", "Source issue: ENG-100\nPlease review.");
+    await criticSettled("critic-2", objection);
+    const settled = await state();
+    assert.equal(settled.criticObjections ?? 0, 0);
+    assert.equal(settled.critic?.counted, "failed");
+  });
+
+  it("ignores a critic result dispatched for an earlier decision", async (t) => {
+    await replayProcess(t);
+    noTransport(t);
+    const closure = routeDecision({
+      needsCriticReview: true,
+      review: { kind: "duplicate", reason: "r", required: true },
+    });
+    await toolResult("decide_triage", closure);
+    await criticDispatched("critic-a");
+    await toolResult("decide_triage", closure);
+    await criticSettled("critic-a", objection);
+    const stale = await state();
+    assert.equal(stale.critic, null);
+    assert.equal(stale.criticObjections ?? 0, 0);
+    await criticSettles("critic-b", objection);
+    assert.equal((await state()).criticObjections, 1);
+  });
+
+  it("discards a review dispatched before a decide_triage retry failed, as live does", async (t) => {
+    await replayProcess(t);
+    noTransport(t);
+    await toolResult(
+      "decide_triage",
+      routeDecision({
+        needsCriticReview: true,
+        review: { kind: "duplicate", reason: "r", required: true },
+      })
+    );
+    await criticDispatched("critic-1");
+    await toolResult("decide_triage", { decided: false, error: "Jev failed." });
+    await criticSettled("critic-1", objection);
+    const stale = await state();
+    assert.equal(stale.critic, null);
+    assert.equal(stale.criticObjections ?? 0, 0);
+    await criticSettles("critic-2", objection);
+    const settled = await state();
+    assert.equal(settled.critic?.counted, "objection");
+    assert.equal(settled.criticObjections, 1);
+  });
+
+  it("does not advance the cycle on a failed decide_billing, which live does not record", async (t) => {
+    await replayProcess(t);
+    noTransport(t);
+    await criticDispatched("critic-1");
+    await toolResult("decide_billing", {
+      decided: false,
+      error: "Jev failed.",
+    });
+    await criticSettled("critic-1", objection);
+    assert.equal((await state()).criticObjections, 1);
+  });
+
   it("waits for the critic when the decision needs review", async (t) => {
     await replayProcess(t);
     noTransport(t);
@@ -176,6 +439,66 @@ describe("replay result", () => {
     assert.equal(result.status, "completed");
     assert.equal(result.final?.path, "Support/Financial");
     assert.equal(result.final?.classification, null);
+  });
+
+  it("scores a billing decision made after a blocked review as the billing route", async (t) => {
+    await replayProcess(t);
+    noTransport(t);
+    const closure = routeDecision({
+      needsCriticReview: true,
+      review: { kind: "duplicate", reason: "r", required: true },
+    });
+    await toolResult("decide_triage", closure);
+    await criticSettles("critic-1", objection);
+    await toolResult("decide_triage", closure);
+    await criticSettles("critic-2", objection);
+    assert.equal((await state()).criticObjections, 2);
+    await toolResult("decide_billing", {
+      decided: true,
+      decision: {
+        discretion: "needs-human",
+        notes: [],
+        route: { assignee: "Aaron Fraga", project: "Support" },
+        unconfirmed: [],
+      },
+    });
+    assert.equal((await state()).criticObjections, 0);
+    await routeTicket(
+      { issue: "ENG-100", priority: 3, state: "Todo" },
+      { client: executorClient(ctx) }
+    );
+    await endTurn();
+    const result = buildReplayResult(await state(), RUN);
+    assert.equal(result.status, "completed");
+    assert.equal(result.final?.outcome, "route");
+    assert.equal(result.final?.path, "Support/Financial");
+  });
+
+  it("does not let an earlier approval complete a new closure decision", async (t) => {
+    await replayProcess(t);
+    noTransport(t);
+    const closure = routeDecision({
+      needsCriticReview: true,
+      review: { kind: "duplicate", reason: "r", required: true },
+    });
+    await toolResult("decide_triage", closure);
+    await criticSettles("critic-1", criticReply("APPROVE"));
+    await toolResult("decide_triage", closure);
+    await routeTicket(
+      {
+        addLabels: ["Bug"],
+        duplicateOf: "ENG-90",
+        inheritAssigneeFrom: "ENG-90",
+        issue: "ENG-100",
+        project: "Cold Email Core",
+        state: "Duplicate",
+      },
+      { client: executorClient(ctx) }
+    );
+    await endTurn();
+    assert.equal(buildReplayResult(await state(), RUN).status, "failed");
+    await criticSettles("critic-2", criticReply("APPROVE"));
+    assert.equal(buildReplayResult(await state(), RUN).status, "completed");
   });
 
   it("completes an unproven stop once its document is saved", async (t) => {

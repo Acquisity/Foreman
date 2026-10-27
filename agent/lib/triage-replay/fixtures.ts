@@ -67,7 +67,12 @@ export const makeResult = (
   overrides: Partial<TriageResult> = {}
 ): TriageResult => ({
   caseId,
-  critic: { blockingFindings: 0, failedCriteria: 0, verdict: "APPROVE" },
+  critic: {
+    blockingFindings: 0,
+    counted: "approve",
+    failedCriteria: 0,
+    verdict: "APPROVE",
+  },
   diagnosis: "renderPanel in apps/web/src/panel.ts clears the layout.",
   document: {
     text: "## Root cause\nrenderPanel in apps/web/src/panel.ts clears the layout.",
@@ -163,6 +168,13 @@ export const lists = {
     { createdAt: LISTED, id: "s-dup", name: "Duplicate" },
   ],
   users: [
+    {
+      createdAt: LISTED,
+      displayName: "aaron",
+      email: "aaron@example.test",
+      id: "u-aaron",
+      name: "Aaron Fraga",
+    },
     {
       createdAt: LISTED,
       displayName: "anthony",

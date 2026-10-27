@@ -123,6 +123,7 @@ const bugAssignee = (
 export function resolveOwnership(context: {
   answers: Answers;
   bar: number;
+  billing?: boolean;
   classification: TriageClassification;
   closed: boolean;
   duplicate: boolean;
@@ -141,7 +142,7 @@ export function resolveOwnership(context: {
     path,
     releaseDeveloper: classification !== "Bug" && followUp === null,
   };
-  if (input.identifier.toUpperCase().startsWith("SAN-")) {
+  if (context.billing || input.identifier.toUpperCase().startsWith("SAN-")) {
     return { ...none, assignee: SUPPORT_OWNER, releaseDeveloper: false };
   }
   const place = () => {

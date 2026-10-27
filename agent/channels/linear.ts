@@ -12,12 +12,14 @@ import {
   linearContinuationToken,
   parseLinearWebhookEvent,
 } from "eve/channels/linear";
-import type { FollowUpOutcome } from "../lib/jev-decisions.js";
+import type { SessionAuthContext } from "eve/context";
+import type { FollowUpOutcome } from "../lib/follow-up-decisions.js";
 import { buildLinearContext } from "../lib/linear-context.js";
 import { extractRepositoryUrls, stampRepository } from "../lib/repository.js";
 import { readAskFrom, relayedFollowUpOutcome } from "../lib/requester-reply.js";
 import {
   stampInvestigationMemory,
+  stampStatusFollowUp,
   stampTriageIntake,
   stampTrusted,
 } from "../lib/trust.js";
@@ -49,6 +51,24 @@ export const withFollowUpOutcome = (
     : context;
 
 /**
+ * The dispatch for a judged follow-up: the turn that gets the status-only
+ * instruction is the turn stamped as a status request, so route_ticket lets
+ * exactly that state move through a critic block.
+ */
+export const followUpDispatch = (
+  auth: SessionAuthContext,
+  context: string[],
+  outcome: FollowUpOutcome | null,
+  widgetFeedback: boolean
+): { auth: SessionAuthContext; context: string[] } => {
+  const instructed = withFollowUpOutcome(context, outcome, widgetFeedback);
+  return {
+    auth: instructed === context ? auth : stampStatusFollowUp(auth),
+    context: instructed,
+  };
+};
+
+/**
  * Runs a pre-model read inside Linear's response window. Any failure or a
  * slow answer yields null, so the session dispatches as usual: a throw here
  * would drop it.
@@ -72,7 +92,8 @@ const issueOf = (event: LinearAgentSessionEvent): string | undefined =>
 
 /**
  * Judges a follow-up before the model runs: a relayed Slack reply on any
- * ticket, or a comment written to Foreman on a chat widget ticket.
+ * ticket, or a comment written to Foreman (any outcome on a chat widget
+ * ticket, only a status move on any other).
  */
 const followUpOutcome = (
   event: LinearAgentSessionEvent
@@ -179,10 +200,7 @@ export const onAgentSession = async (
       : auth;
   const context =
     buildLinearContext(event, ask?.requester ?? null, route ?? undefined) ?? [];
-  return {
-    auth: withRepository,
-    context: withFollowUpOutcome(context, outcome, Boolean(route)),
-  };
+  return followUpDispatch(withRepository, context, outcome, Boolean(route));
 };
 
 /** Whether a Linear event is the session's Stop button (ENG-14608). */

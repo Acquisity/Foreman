@@ -17,10 +17,15 @@
 import { defineHook } from "eve/hooks";
 import { logOpsEvent } from "../lib/ops-log.js";
 import {
-  criticTaskIssue,
-  criticTaskIssues,
+  applyCriticSettlement,
+  type CriticPacket,
+  criticRounds,
+  criticTaskPacket,
+  criticTaskPackets,
   criticVerdictFields,
   criticVerdictIssue,
+  stampCriticPacket,
+  triageDecisions,
 } from "../lib/triage-log.js";
 
 /**
@@ -60,7 +65,7 @@ export default defineHook({
       });
     },
     "actions.requested": (event) => {
-      const bindings: Record<string, string> = {};
+      const bindings: Record<string, CriticPacket> = {};
       for (const action of event.data.actions) {
         if (
           action.kind !== "subagent-call" ||
@@ -68,13 +73,16 @@ export default defineHook({
         ) {
           continue;
         }
-        const issue = criticTaskIssue(action.input);
-        if (issue) {
-          bindings[action.callId] = issue;
+        const packet = criticTaskPacket(action.input);
+        if (packet) {
+          bindings[action.callId] = stampCriticPacket(
+            criticRounds.get(),
+            packet
+          );
         }
       }
       if (Object.keys(bindings).length > 0) {
-        criticTaskIssues.update((bound) => ({ ...bound, ...bindings }));
+        criticTaskPackets.update((bound) => ({ ...bound, ...bindings }));
       }
     },
     "authorization.required": (event, ctx) => {
@@ -119,20 +127,34 @@ export default defineHook({
       if (!(data.kind === "agent" && data.name === "critic")) {
         return;
       }
-      const issue = criticVerdictIssue(criticTaskIssues.get(), data.callId);
-      criticTaskIssues.update((bound) =>
+      const packet = criticVerdictIssue(criticTaskPackets.get(), data.callId);
+      criticTaskPackets.update((bound) =>
         Object.fromEntries(
           Object.entries(bound).filter(([callId]) => callId !== data.callId)
         )
       );
-      if (!issue) {
+      if (!packet) {
         return;
       }
+      const { issue } = packet;
+      const verdict = criticVerdictFields(
+        data.status,
+        data.status === "completed" ? data.output : undefined,
+        packet
+      );
+      const { decisions, rounds, stale } = applyCriticSettlement(
+        triageDecisions.get(),
+        criticRounds.get(),
+        packet,
+        verdict.counted
+      );
+      if (!stale) {
+        criticRounds.update(() => rounds);
+        triageDecisions.update(() => decisions);
+      }
       logOpsEvent("critic.verdict", {
-        ...criticVerdictFields(
-          data.status,
-          data.status === "completed" ? data.output : undefined
-        ),
+        ...verdict,
+        code: stale ? "stale" : null,
         issue,
         sessionId: ctx.session.id,
         turnId: data.turnId,

@@ -1,7 +1,11 @@
 import { z } from "zod";
 import { ENGINEERING_TEAM_ID } from "../linear-api.js";
 import { ticketUrl } from "../ticket-links.js";
-import type { CriticVerdictFields } from "../triage-log.js";
+import type {
+  CriticPacket,
+  CriticRounds,
+  CriticVerdictFields,
+} from "../triage-log.js";
 import type { TriageCase } from "./schema.js";
 
 const named = z.strictObject({
@@ -59,6 +63,10 @@ export interface ReplayState {
   comments: { body: string; issue: string }[];
   created: CreatedIssue[];
   critic: CriticVerdictFields | null;
+  criticCalls?: string[];
+  criticObjections?: number;
+  criticPackets?: Record<string, CriticPacket>;
+  criticRounds?: Record<string, CriticRounds>;
   decisions: { kind: "billing" | "triage"; output: unknown }[];
   documents: StoredDocument[];
   evidenceMisses: string[];

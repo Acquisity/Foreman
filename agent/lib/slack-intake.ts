@@ -93,6 +93,17 @@ export const RECEIVER_ONLY_CHANNELS: ReadonlySet<string> = new Set([
   "C0BC011NAQL",
 ]);
 
+export const INTERCOM_INTAKE_CHANNELS: ReadonlySet<string> = new Set(
+  Object.entries(SLACK_INTAKE_WORKFLOWS)
+    .filter(([, workflow]) => workflow === INTERCOM_INTAKE_WORKFLOW)
+    .map(([channelId]) => channelId)
+);
+
+export const TRIAGE_INTAKE_CHANNELS: ReadonlySet<string> = new Set([
+  ...RECEIVER_ONLY_CHANNELS,
+  ...INTERCOM_INTAKE_CHANNELS,
+]);
+
 /** Whether a Slack mention in this channel may start a Foreman turn. */
 export function admitsSlackMention(
   channelId: string,

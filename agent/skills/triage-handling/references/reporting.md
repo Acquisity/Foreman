@@ -78,7 +78,8 @@ Nothing in the bad comment is wrong; it is all in the wrong place, and the one s
 **Classification**: <User Error | Platform Limitation | Bug>
 **Handling path**: <the Stage 5 path, such as Engineering Todo or Support/Product follow-up>
 **Organization**: <organization_id> (<org name>)
-**Review**: <Pending critic | Approved <document updatedAt> at <commit> | Adjudicated <document updatedAt> at <commit>: <CHALLENGE | INSUFFICIENT_EVIDENCE | review failure> | Stopped: NEEDS_HUMAN_URGENT | Not required>
+**Confidence**: verdict <0.00>, classification <0.00>, path <0.00>
+**Review**: <Pending critic | Approved <document updatedAt> at <commit> | Adjudicated <document updatedAt> at <commit>: <CHALLENGE | INSUFFICIENT_EVIDENCE | review failure> | Blocked <document updatedAt> at <commit>: <CHALLENGE | INSUFFICIENT_EVIDENCE> twice | Stopped: NEEDS_HUMAN_URGENT | Not required: <review.reason>>
 
 ## Claim
 The one testable sentence from Stage 1.
@@ -108,7 +109,9 @@ What was checked and eliminated, so the next agent does not redo it.
 What action the root cause warrants.
 ```
 
-An `Adjudicated` review names each blocking finding or the failure reason in the `**Review**` line itself, one short clause per finding with what settled it, so the next person starts from the findings rather than from nothing.
+The `**Confidence**` numbers are `decision.confidence` copied as returned. A decision that fell back to the skill because Jev failed writes `**Confidence**: Not available: Jev did not answer`. The `**Review**` line is never blank: a reviewed ticket shows the critic's result, and an unreviewed one shows `Not required:` with the decision's reason.
+
+An `Adjudicated` review names each blocking finding or the failure reason in the `**Review**` line itself, one short clause per finding with what settled it, so the next person starts from the findings rather than from nothing. A `Blocked` review names each finding still open after the second review.
 
 ## Master ticket template
 
@@ -118,4 +121,4 @@ The master ticket template and the rules for filling it live in the `engineering
 
 When Stage 5 takes the unproven terminal branch, do not force the ordinary templates to claim a classification or root cause. Keep the `## Triage investigation` title and document link in the short comment, lead with the unblock or `None found: <reason>`, then state the known facts, the missing confirmation and who can supply it, and the condition that will reopen the investigation. Do not present a classification, root cause, or blast radius as settled.
 
-Keep the full evidence record in the investigation document. Set `**Classification**: Not settled` and `**Review**: Not required` and write `Not settled: <missing confirmation and who can supply it>` under Root cause. Preserve Evidence, Prior cases, Blast radius, Code path, Unblock, and Ruled out with the ordinary `Not applicable` and `Not settled` rules, and put the reopen condition under Next steps. Never load `engineering-handoff` or create or attach a master for this branch.
+Keep the full evidence record in the investigation document. Set `**Classification**: Not settled`, `**Confidence**` from the decision (the verdict confidence is always known), and `**Review**: Not required: the ticket stays open as unproven`, and write `Not settled: <missing confirmation and who can supply it>` under Root cause. Preserve Evidence, Prior cases, Blast radius, Code path, Unblock, and Ruled out with the ordinary `Not applicable` and `Not settled` rules, and put the reopen condition under Next steps. Never load `engineering-handoff` or create or attach a master for this branch.

@@ -1,5 +1,5 @@
 ---
-description: "Turn a settled, engineering-actionable triage investigation into exactly one causal Linear master with the customer report parented to it: search, match by cause, reuse or create, apply the approved priority and fast-lane state, and read every write back. Load from triage Stage 6 only for that branch."
+description: "Turn a settled, engineering-actionable triage investigation into exactly one causal Linear master with the customer report parented to it: search, match by cause, reuse or create, apply the approved priority and fast-lane state, and read every write back. Load from triage Stage 6 only for that branch; Stage 5 loads it only to run the master search before the critic review."
 ---
 
 # Engineering handoff
@@ -14,9 +14,9 @@ All of these hold before anything is written:
 
 - Stage 5 settled the classification as `Bug` and the handling path as `Engineering Todo`, or settled a feature request labelled `Approved` as a `Platform Limitation` on the `Engineering Todo` path; its master takes the `Feature Request` type label instead of `Bug`.
 - The `Triage investigation` document is attached to the customer ticket and current.
-- When the workflow ran the critic, the review settled this exact document version: on an approval the document id and `updatedAt` the critic echoed in `reviewed`, and on an adjudication the `updatedAt` Stage 5 read back after its settling save, still match what Linear returns now. The critic reviews a ticket once and Foreman adjudicates once. A later change records its reason on the `**Review**` line and proceeds on the settled version; it never triggers a second review or a second adjudication.
+- When the workflow ran the critic, the review settled this exact document version: on an approval the document id and `updatedAt` the critic echoed in `reviewed`, and on an adjudication the `updatedAt` Stage 5 read back after its settling save, still match what Linear returns now. A ticket the critic blocked (two objections in a row) never reaches this skill. The critic reviews a ticket at most twice and Foreman adjudicates once. A later change records its reason on the `**Review**` line and proceeds on the settled version; it never triggers a second review or a second adjudication.
 - When the workflow ran `incident-hotlane`, its route is `HOTLANE` or `STANDARD_ENGINEERING`; `NEEDS_HUMAN_URGENT` never reaches this skill. When the workflow did not run it, treat the route as `STANDARD_ENGINEERING`: proceed normally and apply no `fast-lane` label.
-- The master search below has been run in this pass, not carried over from an earlier one.
+- The master search below has been run in this pass, not carried over from an earlier one. Stage 5 runs it before the critic review and records the chosen master or `none eligible` in the document; that run counts while the cause and code path are unchanged, and it is repeated when adjudication changed either. The critic reviewed that master, so a different one needs a new search recorded on the `**Review**` line, never a silent switch.
 
 If any precondition fails, write nothing structural. Record the blocker in the investigation document and leave the report where Stage 5 put it.
 
@@ -32,6 +32,8 @@ Parent the report to an existing master only when all of these match:
 A shared symptom, error string, component, provider, or customer outcome is not enough. Two tickets reporting the same visible failure with different causes need two masters. Two tickets with different symptoms and one cause share a master. When uncertain, add a `related` link and say so in the document; never parent speculatively.
 
 ## Search for the current master
+
+Stage 5 runs this search before the critic review so the critic can check the master. When adjudication moves the decision to `Engineering Todo` or changes its cause or code path, Stage 5 runs it again and records the new master before the second review; Stage 6 reuses the latest result.
 
 Search on four axes: the cause, the Stage 4 code path, the provider failure, and the symptom. The code path is the strongest of the four, because two reports running through the same function are almost certainly one bug.
 

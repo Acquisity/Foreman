@@ -4,6 +4,7 @@ import { z } from "zod";
 import { stampTriageIntake, stampUnattended } from "./trust.js";
 
 const CARD_OR_BANK = /card or bank/u;
+const CONFIDENCE_NEEDED = /`\*\*Confidence\*\*: verdict/u;
 
 process.env.LINEAR_CONNECTOR ??= "linear/test";
 
@@ -90,6 +91,29 @@ describe("save_investigation_document tool", () => {
       assert.equal(result.saved, false);
       assert.match(result.error ?? "", CARD_OR_BANK);
     }
+    assert.equal(requested, false);
+  });
+
+  it("refuses a triage document without its confidence and review lines before any write", async () => {
+    let requested = false;
+    const context = {
+      abortSignal: new AbortController().signal,
+      getToken: () => {
+        requested = true;
+        throw new Error("no");
+      },
+      session: { auth: { current: null, initiator: null } },
+    } as unknown as Context;
+    const result = (await tool.execute(
+      {
+        content: "# Triage investigation\n\n**Review**: Pending critic",
+        issue: "ENG-1",
+        lane: "triage",
+      },
+      context
+    )) as { error?: string; saved: boolean };
+    assert.equal(result.saved, false);
+    assert.match(result.error ?? "", CONFIDENCE_NEEDED);
     assert.equal(requested, false);
   });
 

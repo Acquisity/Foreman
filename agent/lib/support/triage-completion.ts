@@ -37,6 +37,10 @@ const REVIEW = /^\*\*Review\*\*:\s*([^\r\n]+)/m;
 const SETTLED_REVIEW =
   /^(?:Approved \S+ at [a-f0-9]{40}|Adjudicated \S+ at [a-f0-9]{40}: (?:CHALLENGE|INSUFFICIENT_EVIDENCE|review failure)[;:,]?[ \t]+\S.*)$/;
 
+const NOT_REQUIRED = /^Not required(?::[ \t]+\S.*)?$/;
+const BLOCKED_REVIEW =
+  /^Blocked \S+ at [a-f0-9]{40}: (?:CHALLENGE|INSUFFICIENT_EVIDENCE) twice\b.*$/;
+
 const ENGINEERING_PATH = "Engineering Todo";
 
 const isEngineering = (
@@ -134,12 +138,14 @@ export function assertTriageOutputs(
   const classification = CLASSIFICATION.exec(document.content)?.[1].trim();
   const handlingPath = HANDLING_PATH.exec(document.content)?.[1].trim();
   const review = REVIEW.exec(document.content)?.[1].trim() ?? "";
-  const urgent = review.startsWith("Stopped: NEEDS_HUMAN_URGENT");
+  const handedToPerson =
+    review.startsWith("Stopped: NEEDS_HUMAN_URGENT") ||
+    BLOCKED_REVIEW.test(review);
   const reported = comments.some((comment) => {
     const parsed = z.object({ body: z.string() }).safeParse(comment);
     return (
       parsed.success &&
-      (urgent
+      (handedToPerson
         ? parsed.data.body.trim().length > 0
         : parsed.data.body.includes(document.url))
     );
@@ -149,10 +155,14 @@ export function assertTriageOutputs(
       "Complete the required minimal Linear comment before finishing triage."
     );
   }
-  if (urgent && issue.assignee === SUPPORT_OWNER) {
+  if (handedToPerson && issue.assignee === SUPPORT_OWNER) {
     return;
   }
-  if (classification === "Not settled" && review === "Not required") {
+  if (
+    classification === "Not settled" &&
+    (NOT_REQUIRED.test(review) ||
+      (review.startsWith("Adjudicated ") && SETTLED_REVIEW.test(review)))
+  ) {
     return;
   }
   if (
@@ -168,7 +178,7 @@ export function assertTriageOutputs(
       "Complete the one critic review and adjudication, then save the final Review line before finishing triage."
     );
   }
-  if (review !== "Not required" && !SETTLED_REVIEW.test(review)) {
+  if (!(NOT_REQUIRED.test(review) || SETTLED_REVIEW.test(review))) {
     throw new SupportRefusal(
       "Save the settled review before finishing triage, including after reclassification."
     );

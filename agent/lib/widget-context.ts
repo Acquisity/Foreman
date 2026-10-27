@@ -8,6 +8,8 @@ import {
   replayContext,
 } from "./widget-replay.js";
 import {
+  ORGANIZATION_NAME_MAX,
+  ORGANIZATION_SLUG,
   officeHoursSchema,
   type WidgetContext,
   widgetContextSchema,
@@ -18,8 +20,8 @@ const appContextSchema = z.looseObject({
   // Any problem with it reads as absent: support counts as open, as before.
   officeHours: officeHoursSchema.optional().catch(undefined),
   organizationId: z.uuid(),
-  organizationName: z.string().min(1).max(500),
-  organizationSlug: z.string().regex(/^[A-Za-z0-9][A-Za-z0-9_-]{0,199}$/),
+  organizationName: z.string().min(1).max(ORGANIZATION_NAME_MAX),
+  organizationSlug: z.string().regex(ORGANIZATION_SLUG),
   partnerId: z.literal(DEFAULT_PARTNER_ID),
   role: z.enum(["owner", "admin", "member", "client"]),
   userId: z.uuid(),

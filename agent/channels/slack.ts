@@ -16,9 +16,9 @@ import {
   admitsSlackMention,
   FINAL_SLACK_POST_RULE,
   QUESTIONS_ONLY_CHANNELS,
-  RECEIVER_ONLY_CHANNELS,
   slackAttachmentContext,
   slackIntakeContext,
+  TRIAGE_INTAKE_CHANNELS,
 } from "../lib/slack-intake.js";
 import { stableSlackClientMessageId } from "../lib/slack-message-id.js";
 import { postSlackReply } from "../lib/slack-post.js";
@@ -254,9 +254,10 @@ export const dispatch = async (
     repository:
       repositories.length === 1 && repository ? repository.slug : undefined,
   });
-  // The receiver's mention in a triage intake channel runs on the triage
-  // models (ENG-15226); admitsSlackMention already kept everyone else out.
-  const stamped = RECEIVER_ONLY_CHANNELS.has(message.channelId)
+  // A session in a triage intake channel (the receiver's mention, or an
+  // Intercom intake channel) runs on the triage models (ENG-15226, ENG-16055);
+  // admitsSlackMention already kept everyone else out of the receiver's.
+  const stamped = TRIAGE_INTAKE_CHANNELS.has(message.channelId)
     ? stampTriageIntake(sessionAuth)
     : sessionAuth;
   // One line naming any attached files, because eve stages them in the

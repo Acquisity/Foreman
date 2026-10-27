@@ -1,5 +1,12 @@
 import { defineHook } from "eve/hooks";
-import { criticVerdictFields } from "../triage-log.js";
+import {
+  type CriticRounds,
+  criticTaskPacket,
+  criticVerdictFields,
+  reviewCycleAfterDecision,
+  settleCriticPacket,
+  stampCriticPacket,
+} from "../triage-log.js";
 import { withReplayState } from "./backend.js";
 import { replaySessionOf } from "./mode.js";
 import type { ReplayState } from "./store.js";
@@ -7,6 +14,27 @@ import type { ReplayState } from "./store.js";
 const DECISIONS: Record<string, ReplayState["decisions"][number]["kind"]> = {
   decide_billing: "billing",
   decide_triage: "triage",
+};
+
+/**
+ * Whether live records this decision tool result: decide_triage always does,
+ * a failed call as the fallback decision, and decide_billing only when Jev
+ * answered.
+ */
+const recordedLive = (
+  kind: ReplayState["decisions"][number]["kind"],
+  output: unknown
+): boolean =>
+  kind === "triage" ||
+  (output as { decided?: unknown } | null)?.decided === true;
+
+/** Keeps the replay's objection count in step with the live rounds. */
+const withRounds = (
+  state: ReplayState,
+  rounds: Record<string, CriticRounds>
+) => {
+  state.criticRounds = rounds;
+  state.criticObjections = rounds[state.case.id]?.objections ?? 0;
 };
 
 const endRootTurn =
@@ -43,6 +71,45 @@ export const triageReplayHook = defineHook({
       }
       await withReplayState(session.runId, session.caseKey, (state) => {
         state.decisions.push({ kind, output: result.output });
+        if (recordedLive(kind, result.output)) {
+          withRounds(
+            state,
+            reviewCycleAfterDecision(state.criticRounds ?? {}, state.case.id)
+          );
+        }
+      });
+    },
+    "actions.requested": async (event, ctx) => {
+      const session = replaySessionOf(ctx.session.auth.initiator);
+      if (!session) {
+        return;
+      }
+      const packets = event.data.actions.flatMap((action) => {
+        const packet =
+          action.kind === "subagent-call" && action.subagentName === "critic"
+            ? criticTaskPacket(action.input)
+            : null;
+        return packet ? [[action.callId, packet] as const] : [];
+      });
+      if (packets.length === 0) {
+        return;
+      }
+      await withReplayState(session.runId, session.caseKey, (state) => {
+        const { generation } = stampCriticPacket(state.criticRounds ?? {}, {
+          commit: null,
+          documentId: null,
+          issue: state.case.id,
+          updatedAt: null,
+        });
+        state.criticPackets = {
+          ...state.criticPackets,
+          ...Object.fromEntries(
+            packets.map(([callId, packet]) => [
+              callId,
+              { ...packet, generation },
+            ])
+          ),
+        };
       });
     },
     "task.settled": async (event, ctx) => {
@@ -51,12 +118,35 @@ export const triageReplayHook = defineHook({
       if (!(session && data.kind === "agent" && data.name === "critic")) {
         return;
       }
-      const critic = criticVerdictFields(
-        data.status,
-        data.status === "completed" ? data.output : undefined
-      );
       await withReplayState(session.runId, session.caseKey, (state) => {
+        if (state.criticCalls?.includes(data.callId)) {
+          return;
+        }
+        state.criticCalls = [...(state.criticCalls ?? []), data.callId];
+        const packet = state.criticPackets?.[data.callId] ?? null;
+        const critic = criticVerdictFields(
+          data.status,
+          data.status === "completed" ? data.output : undefined,
+          packet
+        );
+        const rounds = state.criticRounds ?? {};
+        const settled = settleCriticPacket(
+          rounds,
+          packet
+            ? { ...packet, issue: state.case.id }
+            : stampCriticPacket(rounds, {
+                commit: null,
+                documentId: null,
+                issue: state.case.id,
+                updatedAt: null,
+              }),
+          critic.counted
+        );
+        if (settled.stale) {
+          return;
+        }
         state.critic = critic;
+        withRounds(state, settled.rounds);
       });
     },
     "turn.cancelled": endRootTurn("cancelled"),

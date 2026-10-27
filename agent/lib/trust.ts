@@ -152,6 +152,34 @@ export function isTriageIntake(auth: SessionAuthContext | null): boolean {
 }
 
 /**
+ * Auth attribute marking a Linear follow-up that Jev read as only asking to
+ * move the ticket to a status a person already decided (ENG-14387).
+ *
+ * @remarks
+ * Stamped by the Linear channel on the turn it judged, so `route_ticket` can
+ * let that one state move through a critic block (ENG-16055). It grants no
+ * other route.
+ */
+export const STATUS_FOLLOW_UP_ATTRIBUTE = "statusFollowUp";
+
+/** Returns a copy of `auth` carrying the {@link STATUS_FOLLOW_UP_ATTRIBUTE} stamp. */
+export function stampStatusFollowUp(
+  auth: SessionAuthContext
+): SessionAuthContext {
+  return {
+    ...auth,
+    attributes: { ...auth.attributes, [STATUS_FOLLOW_UP_ATTRIBUTE]: "true" },
+  };
+}
+
+/** Whether the channel judged this turn a status-only follow-up. */
+export function isStatusFollowUp(
+  auth: SessionAuthContext | null | undefined
+): boolean {
+  return auth?.attributes[STATUS_FOLLOW_UP_ATTRIBUTE] === "true";
+}
+
+/**
  * Auth attribute marking a Slack session from a questions-only channel.
  *
  * @remarks

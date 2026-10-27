@@ -144,7 +144,7 @@ test("handling stays behind the explicit Stage 4 checkpoint", () => {
 test("Stage 5 names the Linear state for every handling path", () => {
   assert.ok(
     triageHandlingSkill.includes(
-      "`Engineering Todo` is `Todo` (the master owns the work; the report stays open under it), `Duplicate` is `Duplicate`, `Backlog/low-impact` is `Backlog`, `Support/Financial` and `Support/Product follow-up` are `Todo` (a person still acts), and `Resolved by triage`, `User Error`, and `Platform Limitation` are `Done`."
+      "`Engineering Todo` is `Todo` (the master owns the work; the report stays open under it), `Duplicate` is `Duplicate`, `Backlog/low-impact` is `Backlog`, `Support/Financial` and `Support/Product follow-up` are `Todo` (a person still acts), `Resolved by triage` is `Done`, and `User Error` and `Platform Limitation` are `Canceled`: nothing changed."
     )
   );
 });
@@ -733,7 +733,7 @@ test("shared triage stops unproven claims before classification or routing", () 
   );
   assert.ok(
     triageHandlingSkill.includes(
-      "either the unproven branch has made the unblock explicit"
+      "the unproven branch has stopped before classification with the unblock"
     )
   );
   assert.ok(triageReportingReference.includes("## Unproven branch reporting"));
@@ -836,7 +836,7 @@ test("Intercom Bug path creates the report, then hands off to the shared stages"
     ),
     "title rule precedes every issue-creation call"
   );
-  assert.ok(bugHandoff.includes("exactly one critic pass"));
+  assert.ok(bugHandoff.includes("the shared critic review"));
   assert.ok(bugHandoff.includes("`engineering-handoff`"));
   assert.equal(intercomTriageSkill.split(STAGE_4_CHECKPOINT).length, 2);
   assert.equal(
@@ -984,37 +984,33 @@ test("incident-hotlane assesses and never writes", () => {
   );
 });
 
-test("triage reviews a Bug with the critic before routing it", () => {
+test("triage reviews bugs and closures with the critic before routing them", () => {
   const review = extractInstruction(
     triageHandlingSkill,
-    "### Review a Bug before routing it",
+    "### Review before routing",
     "## Stage 6: Persist and route"
   );
   for (const rule of [
-    "This review runs only when the classification is `Bug` and the handling path is not `Duplicate`",
-    "a duplicate routes nothing new to engineering",
-    "The critic runs exactly once per ticket",
-    "Foreman delegates once and adjudicates the result once",
-    "never parks the ticket on a person",
-    "Foreman settles the findings against the Stage 4 evidence record and continues routing",
+    "The review runs when `decide_triage` returns `review.required`",
+    "The critic reviews a ticket at most twice",
     "[references/critic-review.md](references/critic-review.md)",
   ]) {
     assert.ok(review.includes(rule), rule);
   }
   for (const rule of [
     "`**Review**: Pending critic`",
-    "Load `incident-hotlane`",
+    "Only when `review.kind` is `bug`, load `incident-hotlane`",
     "If the route is `NEEDS_HUMAN_URGENT`, do not call the critic",
     "Post nothing about the review to the attended thread",
     "the next message the thread receives is the final reply",
-    "Delegate to the `critic` subagent exactly once",
+    "Delegate to the `critic` subagent for the first review",
     "the full 40-character SHA",
     "The critic replies in its fixed JSON shape; pass no schema",
-    "this reading is the one adjudication",
+    "this reading starts the adjudication",
     "exactly one entry for each of the twelve criterion slugs with no slug missing or repeated",
     "An `APPROVE` with any `FAIL` criterion, a missing or repeated slug, or a non-empty `blocking_findings` is handled as a `CHALLENGE`",
     "A result with an empty `criteria_results` is a review that could not start",
-    "None of these is a reason for a second delegation",
+    "A failed review is not an objection",
     "On `CHALLENGE`, on `INSUFFICIENT_EVIDENCE`, or on a failed review: adjudicate once against the Stage 4 evidence record",
     "take every field it returns, including a changed classification, handling path",
     "read back its adjudicated-evidence `updatedAt`",
@@ -1034,30 +1030,14 @@ test("triage reviews a Bug with the critic before routing it", () => {
     false,
     "the review posts no progress line to the thread"
   );
-  const retryWording = [
+  for (const excluded of [
     "attempt 1",
     "attempt 2",
     "attempt 3",
-    "re-delegate",
-    "delegate again",
-    "second `CHALLENGE`",
     "fresh reviewer",
-    "new critic review",
-  ];
-  for (const excluded of retryWording) {
+  ]) {
     assert.ok(!review.includes(excluded), excluded);
     assert.ok(!criticReviewReference.includes(excluded), excluded);
-  }
-  for (const surface of [
-    triageSkill,
-    triageHandlingSkill,
-    triageReportingReference,
-    criticReviewReference,
-    handoffSkill,
-  ]) {
-    for (const excluded of retryWording) {
-      assert.ok(!surface.includes(excluded), excluded);
-    }
   }
   assert.ok(
     triageHandlingSkill.includes(
@@ -1071,10 +1051,14 @@ test("triage reviews a Bug with the critic before routing it", () => {
   );
   assert.ok(
     triageHandlingSkill.includes(
-      "A document created here for an unreviewed outcome is written once with `**Review**: Not required`"
+      "A document created here for an unreviewed outcome is written once with `**Review**: Not required: <review.reason>`"
     )
   );
-  assert.ok(triageHandlingSkill.includes("are applied in Stage 6 without one"));
+  assert.ok(
+    triageHandlingSkill.includes(
+      "A decision with `review.required` false is applied in Stage 6 without one"
+    )
+  );
   assert.ok(
     triageHandlingSkill.includes(
       "Every decision above is provisional until the review below has settled the document"
@@ -1087,7 +1071,7 @@ test("triage reviews a Bug with the critic before routing it", () => {
   );
   assert.ok(
     triageHandlingSkill.includes(
-      "A reviewed `Bug` is final once its review has settled, approved or adjudicated; a hotlane-stopped review records nothing. A `Duplicate` is final once its master link is saved"
+      "A reviewed `Bug` is final once its review has settled, approved or adjudicated; a hotlane-stopped or blocked review records nothing. A `Duplicate` is final once its master link is saved"
     )
   );
   assert.ok(
@@ -1118,7 +1102,7 @@ test("triage reviews a Bug with the critic before routing it", () => {
   );
   assert.ok(
     handoffSkill.includes(
-      "The critic reviews a ticket once and Foreman adjudicates once"
+      "The critic reviews a ticket at most twice and Foreman adjudicates once"
     )
   );
   assert.ok(
@@ -1194,7 +1178,7 @@ test("ENG-13397-shaped wrong-channel money ask is handled in place", () => {
   const labelRules = extractInstruction(
     triageHandlingSkill,
     "### Label the ticket",
-    "### Review a Bug before routing it"
+    "### Review before routing"
   );
   assert.ok(labelRules.includes("One type label from the verdict"));
   assert.ok(!labelRules.includes("channel"));
@@ -1269,7 +1253,8 @@ test("Stage 5 hands decide_triage the ticket's own labels so an approved request
     new URL("../tools/decide_triage.ts", import.meta.url),
     "utf8"
   );
-  const field = tool.slice(tool.indexOf("ticketLabels: z"));
+  const start = tool.indexOf("ticketLabels: z");
+  const field = tool.slice(start, tool.indexOf("\n      ),\n", start));
   assert.equal(field.includes(".optional()"), false);
 });
 

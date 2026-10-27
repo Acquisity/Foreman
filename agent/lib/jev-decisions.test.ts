@@ -1,18 +1,19 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import {
+  decideFollowUp,
+  followUpText,
+  resolveFollowUp,
+} from "./follow-up-decisions.js";
 import { askJev, type JevAnswer } from "./jev.js";
 import {
   type BillingInput,
   billingQuestions,
   decideAskKind,
-  decideFollowUp,
   decidePriorWork,
-  followUpText,
   resolveBilling,
-  resolveFollowUp,
   resolvePriorWork,
   resolveTriage,
-  type TriageInput,
   triageQuestions,
 } from "./jev-decisions.js";
 import {
@@ -20,61 +21,14 @@ import {
   resolveGrounding,
   splitClaims,
 } from "./jev-grounding.js";
-
-const yes = (probability = 0.9): JevAnswer => ({
-  probability,
-  type: "boolean",
-});
-const no = (): JevAnswer => ({ probability: 0.1, type: "boolean" });
-const pick = (choice: string, confidence = 0.9): JevAnswer => ({
-  choice,
-  probabilities: { [choice]: confidence },
-  type: "choice",
-});
-const band = (probabilities: Record<string, number>): JevAnswer => ({
-  probabilities,
-  score: 0,
-  type: "score",
-});
-
-const triageInput = (over: Partial<TriageInput> = {}): TriageInput => ({
-  blastRadius: {
-    countedAt: "2026-09-25",
-    orgs: 3,
-    query: "select count(*)",
-    users: 4,
-  },
-  claim: "Replies stopped arriving.",
-  codePath: {
-    commit: "a".repeat(40),
-    file: "webhook.ts",
-    function: "handleReply",
-  },
-  duplicateCandidates: [],
-  evidence: "Inngest run failed at step parse.",
-  identifier: "ENG-1",
-  projects: [{ name: "AI SDR Core" }],
-  rootCauseLabels: [],
-  sourceLabels: ["Customer reported"],
-  ...over,
-});
-
-const bugAnswers = (
-  over: Record<string, JevAnswer> = {}
-): Record<string, JevAnswer> => ({
-  classification: pick("bug"),
-  data_loss_or_security: no(),
-  direct_evidence: yes(),
-  impact: band({ "0": 0.05, "1": 0.8, "2": 0.1, "3": 0.05 }),
-  incident: pick("standard"),
-  incident_impact: pick("MATERIALLY_IMPAIRED"),
-  money_blocker: no(),
-  path: pick("Engineering Todo"),
-  project: pick("AI SDR Core"),
-  verdict: pick("supported"),
-  wants_limit_lifted: no(),
-  ...over,
-});
+import {
+  band,
+  bugAnswers,
+  no,
+  pick,
+  triageInput,
+  yes,
+} from "./triage-fixtures.js";
 
 test("a supported Bug with the full bar routes to the project and asks for review", () => {
   const decision = resolveTriage(triageInput(), bugAnswers());
@@ -125,7 +79,8 @@ test("a near-certain same-outcome candidate makes it a duplicate that inherits",
   );
   assert.ok(decision.outcome === "route");
   assert.equal(decision.path, "Duplicate");
-  assert.equal(decision.needsCriticReview, false);
+  assert.equal(decision.needsCriticReview, true);
+  assert.equal(decision.review.kind, "duplicate");
   assert.equal(decision.route.state, "Duplicate");
   assert.equal(decision.route.priority, 2);
   assert.equal(decision.route.duplicateOf, "ENG-9");
