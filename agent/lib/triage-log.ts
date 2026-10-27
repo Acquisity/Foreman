@@ -243,7 +243,10 @@ export const criticVerdictSchema = z.strictObject({
 });
 export type CriticVerdictFields = z.infer<typeof criticVerdictSchema>;
 
-const PINNED_COMMIT = /^[0-9a-f]{40}$/u;
+const PINNED_COMMIT = /^[0-9a-f]{40}$/iu;
+
+const echoed = (value: string): string =>
+  value.replaceAll("`", "").trim().toUpperCase();
 
 const completeApproval = (reply: CriticReply): boolean => {
   const slugs = new Set(reply.criteria_results.map((entry) => entry.criterion));
@@ -267,8 +270,8 @@ export function countCriticReply(
   if (
     reply.criteria_results.length === 0 ||
     !reply.reviewed ||
-    !PINNED_COMMIT.test(reply.reviewed.commit) ||
-    (issue !== null && reply.reviewed.issue_id !== issue)
+    !PINNED_COMMIT.test(echoed(reply.reviewed.commit)) ||
+    (issue !== null && echoed(reply.reviewed.issue_id) !== echoed(issue))
   ) {
     return "failed";
   }

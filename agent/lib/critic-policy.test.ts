@@ -104,6 +104,29 @@ describe("the critic policy", () => {
     );
   });
 
+  it("reads an echo that differs only in case, spacing or code marks as the same ticket and commit", () => {
+    const challenge = (echo: Record<string, string>) =>
+      reply({
+        blocking_findings: [{ claim: "c" }],
+        criteria_results: criteria(1),
+        reviewed: reviewed(echo),
+        verdict: "CHALLENGE",
+      });
+    for (const echo of <Record<string, string>[]>[
+      { issue_id: "eng-1" },
+      { issue_id: " ENG-1 " },
+      { issue_id: "`ENG-1`" },
+      { commit: COMMIT.toUpperCase() },
+      { commit: ` ${COMMIT} ` },
+    ]) {
+      assert.equal(
+        criticVerdictFields("completed", challenge(echo), "ENG-1").counted,
+        "objection",
+        JSON.stringify(echo)
+      );
+    }
+  });
+
   it("treats an approval with failed criteria, blocking findings or missing slugs as an objection", () => {
     for (const output of [
       reply({ criteria_results: criteria(CRITIC_CRITERIA.length) }),
