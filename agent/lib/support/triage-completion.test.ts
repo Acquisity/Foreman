@@ -774,6 +774,21 @@ test("a report whose recorded path is Engineering Todo needs its master whatever
       ),
     SupportRefusal
   );
+  assert.throws(
+    () =>
+      assertTriageOutputs(
+        {
+          ...approvedRequest,
+          labels: approvedRequest.labels.filter(
+            (label) => label !== "Area: AI SDR"
+          ),
+          parentId: "ENG-13136",
+        },
+        requestDocument,
+        comments
+      ),
+    SupportRefusal
+  );
 });
 
 test("completion accepts James as the owner of a request waiting in Backlog for approval", () => {
@@ -796,6 +811,18 @@ test("completion accepts James as the owner of a request waiting in Backlog for 
       "# Triage investigation\n**Classification**: Platform Limitation\n**Handling path**: Backlog/low-impact\n**Review**: Not required",
   };
   assert.doesNotThrow(() => assertTriageOutputs(parked, content, comments));
+  assert.throws(
+    () =>
+      assertTriageOutputs(
+        {
+          ...parked,
+          labels: parked.labels.filter((label) => label !== "Needs approval"),
+        },
+        content,
+        comments
+      ),
+    SupportRefusal
+  );
   assert.throws(
     () => assertTriageOutputs({ ...parked, assignee: null }, content, comments),
     SupportRefusal

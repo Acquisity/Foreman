@@ -1248,7 +1248,14 @@ test("a master built for an approved feature request carries Feature Request and
     "## Reuse an existing master",
     "## Create one master"
   );
-  assert.ok(reuse.includes("add `Feature Request` and `Approved` too"));
+  assert.ok(
+    reuse.includes(
+      "`Feature Request` and `Approved` for an approved feature request"
+    )
+  );
+  assert.ok(
+    reuse.includes("`fast-lane` only when the approved route is `HOTLANE`")
+  );
 });
 
 test("Stage 5 hands decide_triage the ticket's own labels so an approved request is seen", () => {

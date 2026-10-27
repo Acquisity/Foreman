@@ -1,6 +1,11 @@
 import { z } from "zod";
 import type { ProviderContext } from "../executor/dispatch.js";
-import { areaLabels, FALLBACK_OWNER, SUPPORT_OWNER } from "../owner-map.js";
+import {
+  areaLabels,
+  FALLBACK_OWNER,
+  NEEDS_APPROVAL_LABEL,
+  SUPPORT_OWNER,
+} from "../owner-map.js";
 import { SupportRefusal } from "./errors.js";
 import {
   readLinkedIssue,
@@ -48,6 +53,9 @@ const ownerRecordMissing = (
     return !(issue.assignee || CLOSED_STATES.includes(issue.status));
   }
   const hasArea = issue.labels.some((label) => areaLabels().includes(label));
+  if (classification !== "Bug" && !hasArea) {
+    return true;
+  }
   if (!issue.assignee) {
     return !(hasArea && UNASSIGNED_BUG_STATES.includes(issue.status));
   }
@@ -87,6 +95,13 @@ const missesTypeLabels = (
 ): boolean => {
   if (classification === "Bug") {
     return !issue.labels.includes("Bug");
+  }
+  if (
+    issue.labels.includes("Feature Request") &&
+    !issue.labels.includes("Approved") &&
+    !issue.labels.includes(NEEDS_APPROVAL_LABEL)
+  ) {
+    return true;
   }
   return (
     handlingPath === ENGINEERING_PATH &&
