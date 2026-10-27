@@ -50,13 +50,23 @@ export const withFollowUpOutcome = (
     ? [...context, STATUS_ONLY_FOLLOW_UP]
     : context;
 
-/** Stamps the turn a status-only triage follow-up opened, as above. */
-export const withStatusFollowUp = (
+/**
+ * The dispatch for a judged follow-up: the turn that gets the status-only
+ * instruction is the turn stamped as a status request, so route_ticket lets
+ * exactly that state move through a critic block.
+ */
+export const followUpDispatch = (
   auth: SessionAuthContext,
+  context: string[],
   outcome: FollowUpOutcome | null,
   widgetFeedback: boolean
-): SessionAuthContext =>
-  outcome === "status" && !widgetFeedback ? stampStatusFollowUp(auth) : auth;
+): { auth: SessionAuthContext; context: string[] } => {
+  const instructed = withFollowUpOutcome(context, outcome, widgetFeedback);
+  return {
+    auth: instructed === context ? auth : stampStatusFollowUp(auth),
+    context: instructed,
+  };
+};
 
 /**
  * Runs a pre-model read inside Linear's response window. Any failure or a
@@ -189,10 +199,7 @@ export const onAgentSession = async (
       : auth;
   const context =
     buildLinearContext(event, ask?.requester ?? null, route ?? undefined) ?? [];
-  return {
-    auth: withStatusFollowUp(withRepository, outcome, Boolean(route)),
-    context: withFollowUpOutcome(context, outcome, Boolean(route)),
-  };
+  return followUpDispatch(withRepository, context, outcome, Boolean(route));
 };
 
 /** Whether a Linear event is the session's Stop button (ENG-14608). */

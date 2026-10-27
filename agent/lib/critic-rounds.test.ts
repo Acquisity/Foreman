@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { SessionAuthContext } from "eve/context";
-import { withStatusFollowUp } from "../channels/linear.js";
+import { followUpDispatch, STATUS_ONLY_FOLLOW_UP } from "../channels/linear.js";
 import {
   type CriticCount,
   type CriticRounds,
@@ -103,25 +103,27 @@ describe("the review cycle", () => {
     );
   });
 
-  it("stamps only a triage status-only follow-up as a status request", () => {
+  it("stamps exactly the turn that gets the status-only instruction", () => {
     const auth: SessionAuthContext = {
       attributes: {},
       authenticator: "test",
       principalId: "user:1",
       principalType: "user",
     };
-    assert.equal(
-      isStatusFollowUp(withStatusFollowUp(auth, "status", false)),
-      true
-    );
-    assert.equal(
-      isStatusFollowUp(withStatusFollowUp(auth, "status", true)),
-      false
-    );
-    assert.equal(
-      isStatusFollowUp(withStatusFollowUp(auth, null, false)),
-      false
-    );
+    for (const [outcome, widget, stamped] of [
+      ["status", false, true],
+      ["status", true, false],
+      ["respond", false, false],
+      [null, false, false],
+    ] as const) {
+      const dispatched = followUpDispatch(auth, ["ticket"], outcome, widget);
+      assert.equal(isStatusFollowUp(dispatched.auth), stamped, `${outcome}`);
+      assert.equal(
+        dispatched.context.includes(STATUS_ONLY_FOLLOW_UP),
+        stamped,
+        `${outcome}`
+      );
+    }
     assert.equal(isStatusFollowUp(auth), false);
     assert.equal(isStatusFollowUp(null), false);
   });
