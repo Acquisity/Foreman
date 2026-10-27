@@ -198,6 +198,9 @@ describe("stripe dispute trigger", () => {
       "yes approve",
       "go ahead and submit",
       "submit it",
+      "no changes, approve to submit",
+      "lgtm, ship it",
+      "go ahead",
     ]) {
       assert.ok(isStripeDisputeApprovalText(text), text);
     }
@@ -212,6 +215,13 @@ describe("stripe dispute trigger", () => {
       "what's in the evidence",
       "<@U0BQ5QMHM7D>",
       "",
+      "I cannot approve",
+      "approve only after finance confirms",
+      "submit only after Alice approves",
+      "don\u2019t submit yet",
+      "go ahead and update the evidence",
+      "no submit",
+      "approve the other one",
     ]) {
       assert.equal(isStripeDisputeApprovalText(text), false, text);
     }
