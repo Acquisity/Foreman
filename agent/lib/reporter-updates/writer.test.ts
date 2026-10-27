@@ -111,10 +111,11 @@ describe("writerPrompt", () => {
     assert.ok(prompt.includes("naming the button, page or menu"));
   });
 
-  it("asks the done task to say null unless a person describes a change", () => {
+  it("asks the done task to say null unless staff describe a change", () => {
     const prompt = writerPrompt({
-      comments: ["Could not reproduce."],
+      foreman: [],
       kind: "done",
+      staff: ["Could not reproduce."],
       title: "Notes not saving",
     });
     assert.ok(prompt.includes("- Could not reproduce."));
@@ -123,11 +124,32 @@ describe("writerPrompt", () => {
 
   it("asks the reason task to judge whether the product works as designed", () => {
     const prompt = writerPrompt({
-      comments: ["Expected behaviour."],
+      foreman: [],
       kind: "reason",
+      staff: ["Expected behaviour."],
       title: "Export stops at a year",
     });
     assert.ok(prompt.includes("Set asDesigned to true when"));
+  });
+
+  it("keeps a staff explanation in the prompt however many Foreman notes follow it", () => {
+    const prompt = writerPrompt({
+      foreman: Array.from({ length: 7 }, (_, i) => `Foreman status note ${i}`),
+      kind: "reason",
+      staff: ["This is how exports are meant to work: they cover 12 months."],
+      title: "Export stops at a year",
+    });
+    assert.ok(
+      prompt.includes(
+        "- This is how exports are meant to work: they cover 12 months."
+      )
+    );
+    assert.ok(
+      prompt.indexOf("Comments from our staff") <
+        prompt.indexOf("Comments from Foreman")
+    );
+    assert.ok(!prompt.includes("Foreman status note 1"));
+    assert.ok(prompt.includes("Foreman status note 6"));
   });
 
   it("never asks for owners, developers or engineering words", () => {

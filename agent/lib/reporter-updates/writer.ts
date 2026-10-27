@@ -15,7 +15,12 @@ export type WriterTask =
       pull: string;
       title: string;
     }
-  | { comments: string[]; kind: "done" | "reason"; title: string };
+  | {
+      foreman: string[];
+      kind: "done" | "reason";
+      staff: string[];
+      title: string;
+    };
 
 export interface WriterReply {
   asDesigned?: boolean | null;
@@ -47,8 +52,8 @@ const RULES = [
 
 const TASKS: Record<WriterTask["kind"], string> = {
   done: [
-    "The report was closed with no code change. Read the closing comments from our team.",
-    "If a person clearly says they made a change for this customer, such as fixing their data, removing a record or changing a setting, set what to a phrase of at most 15 words saying what was done, as it fits after 'Done: ', for example: that number's been removed from the CRM.",
+    "The report was closed with no code change. Read the comments from our staff.",
+    "If a staff member clearly says they made a change for this customer, such as fixing their data, removing a record or changing a setting, set what to a phrase of at most 15 words saying what was done, as it fits after 'Done: ', for example: that number's been removed from the CRM.",
     "If no comment clearly describes a change that was made, set what to null. When in doubt, use null.",
     "Set steps to null.",
   ].join("\n"),
@@ -63,7 +68,7 @@ const TASKS: Record<WriterTask["kind"], string> = {
     "Set steps to one or two short sentences, at most 25 words, telling the customer how to use it and where to find it on screen, naming the button, page or menu, for example: After a call, click Email in the wrap-up panel, next to Task, Text and Book meeting.",
   ].join("\n"),
   reason: [
-    "The report was closed without a change. Read the closing comments from our team.",
+    "The report was closed without a change. Read the comments from our staff, then Foreman's. When they disagree, trust our staff.",
     "Set asDesigned to true when they found the product works the way it is meant to: the customer's expectation differs from how it works, a user mistake, or a current limitation of the product. Set it to false when they decided not to change it for any other reason, such as not planned, out of scope or could not reproduce. Use null when the comments do not say.",
     "If they give a reason a customer would understand, set what to that reason in at most 10 words, as it fits after a colon at the end of a sentence, for example: exports only include the last 12 months.",
     "Otherwise set what to null. Set steps to null.",
@@ -77,15 +82,22 @@ const TASKS: Record<WriterTask["kind"], string> = {
 
 const clip = (text: string): string => text.slice(0, MAX_INPUT_CHARS);
 
+const commentBlock = (label: string, comments: readonly string[]): string => {
+  const kept = comments.slice(-MAX_COMMENTS).map(clip);
+  return kept.length > 0
+    ? `${label}:\n${kept.map((comment) => `- ${comment}`).join("\n")}`
+    : `${label}: none`;
+};
+
 const contextOf = (task: WriterTask): string => {
   const parts = [`Report title: ${clip(task.title)}`];
-  if ("comments" in task) {
-    const comments = task.comments.slice(-MAX_COMMENTS).map(clip);
-    parts.push(
-      comments.length > 0
-        ? `Closing comments from our team:\n${comments.map((comment) => `- ${comment}`).join("\n")}`
-        : "Closing comments from our team: none"
-    );
+  if ("staff" in task) {
+    parts.push(commentBlock("Comments from our staff", task.staff));
+    if (task.foreman.length > 0) {
+      parts.push(
+        commentBlock("Comments from Foreman, our assistant", task.foreman)
+      );
+    }
     return parts.join("\n\n");
   }
   parts.push(`Report description:\n${clip(task.description)}`);

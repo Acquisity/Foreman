@@ -26,7 +26,12 @@ import {
   waitingIssues,
 } from "./fakes.js";
 import { runReporterUpdates } from "./run.js";
-import { NO_REPLY, type WriterReply, type WriterTask } from "./writer.js";
+import {
+  NO_REPLY,
+  type WriterReply,
+  type WriterTask,
+  writerPrompt,
+} from "./writer.js";
 
 const PR_7638: { body: string; title: string } = JSON.parse(
   readFileSync(new URL("./fixtures/pr-7638.json", import.meta.url), "utf8")
@@ -215,9 +220,10 @@ describe("done without a pull request", () => {
       "Done: that number's been removed from the CRM. Reply here if anything still looks off."
     );
     const [task] = writer.tasks;
-    assert.deepEqual(task && "comments" in task ? task.comments : [], [
+    assert.deepEqual(task && "staff" in task ? task.staff : [], [
       "Removed the wrong number from the CRM.",
     ]);
+    assert.deepEqual(task && "foreman" in task ? task.foreman : null, []);
   });
 
   const skipCases: [string, ReturnType<typeof ticket>, WriterReply][] = [
@@ -321,9 +327,33 @@ describe("not a bug and closed reasons", () => {
       "We checked, and this is working the way it's meant to right now: exports only include the last 12 months. If that's not what you saw, reply here with a screenshot and we'll take another look."
     );
     const [task] = writer.tasks;
-    assert.deepEqual(task && "comments" in task ? task.comments : [], [
+    assert.deepEqual(task && "foreman" in task ? task.foreman : [], [
       "Closing: this is expected behaviour, exports cover 12 months.",
     ]);
+  });
+
+  it("passes a staff explanation to the writer prompt even when five Foreman notes follow it", async () => {
+    const t = foremanClose();
+    t.facts.closingComments = [
+      {
+        author: "staff",
+        body: "Exports are meant to cover 12 months.",
+        createdAt: "2026-10-12T09:00:00Z",
+      },
+      ...Array.from({ length: 5 }, (_, i) => ({
+        author: "foreman" as const,
+        body: `Foreman status note ${i}`,
+        createdAt: `2026-10-12T10:0${i}:00Z`,
+      })),
+    ];
+    const s = setup([t]);
+    const writer = withWriter(s, {});
+    await reconcile(s);
+    const [task] = writer.tasks;
+    assert.ok(task);
+    assert.ok(
+      writerPrompt(task).includes("- Exports are meant to cover 12 months.")
+    );
   });
 
   it("posts closed with the reason when the writer says it won't be changed", async () => {

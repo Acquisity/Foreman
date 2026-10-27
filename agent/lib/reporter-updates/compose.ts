@@ -23,12 +23,12 @@ import {
 } from "./plan.js";
 import type { ReporterWriter } from "./writer.js";
 
-const commentsOf = (
+const commentsBy = (
   facts: TicketFacts,
-  authors: readonly ClosingComment["author"][]
+  author: ClosingComment["author"]
 ): string[] =>
   facts.closingComments
-    .filter((comment) => authors.includes(comment.author))
+    .filter((comment) => comment.author === author)
     .map((comment) => comment.body);
 
 export const composeReceived = async (
@@ -70,11 +70,17 @@ export const composeNotFixed = async (
     stage: "not_fixed",
     text,
   });
-  const comments = commentsOf(facts, ["foreman", "staff"]);
-  if (reason === "duplicate" || comments.length === 0) {
+  const staff = commentsBy(facts, "staff");
+  const foreman = commentsBy(facts, "foreman");
+  if (reason === "duplicate" || staff.length + foreman.length === 0) {
     return planned(notFixedText(reason));
   }
-  const reply = await write({ comments, kind: "reason", title: facts.title });
+  const reply = await write({
+    foreman,
+    kind: "reason",
+    staff,
+    title: facts.title,
+  });
   const why = cleanPhrase(
     reply.what,
     MAX_REASON_WORDS,
@@ -128,11 +134,16 @@ export const composeDone = async (
   facts: TicketFacts,
   write: ReporterWriter
 ): Promise<Planned | null> => {
-  const comments = commentsOf(facts, ["staff"]);
-  if (comments.length === 0) {
+  const staff = commentsBy(facts, "staff");
+  if (staff.length === 0) {
     return null;
   }
-  const reply = await write({ comments, kind: "done", title: facts.title });
+  const reply = await write({
+    foreman: [],
+    kind: "done",
+    staff,
+    title: facts.title,
+  });
   const text = doneText(
     cleanPhrase(reply.what, MAX_PHRASE_WORDS, firstName(facts.assignee))
   );
