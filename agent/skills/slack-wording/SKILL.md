@@ -37,3 +37,14 @@ If missing evidence materially limits the answer, name the product fact that rem
 - **Bug**: identified a bug and passed it to the team; keep it short. Say the team is already working on this, or working on a fix, only when a matching engineering issue covering the same problem is In Progress or current explicit evidence shows active engineering work; this holds when the requester's own ticket is new or a Duplicate. Finding a duplicate, or creating or routing a Todo ticket, does not show active work. Never imply a delivery date or a deployed fix.
 - **Duplicate**: say it is already reported and with the team.
 - **Backlog/low-impact**: say it is logged as low impact, without promising a next action.
+
+## Automatic reporter updates
+
+Four messages are posted by the scheduled reporter-updates job, not by a model turn: received, owner assigned, fixed, and not fixed. Their wording is fixed in `agent/lib/reporter-updates/copy.ts`; change it there, keep the old text in `PAST_TEXTS` so earlier messages are still recognised, and keep these rules:
+
+- Under 50 words each, and longer only when explaining something.
+- The first sentence says whether the report is handled.
+- Name one owner by first name, only in the received and owner messages. This is the one exception to the rule above against naming assignees; it applies only when `REPORTER_UPDATES_NAME_OWNER=true`, which is off by default.
+- Give at most one action, or say "Nothing for you to do".
+- Never use file paths, PR numbers, CI, ticket states or IDs, model names, "root cause", "deploy", "merge" or raw error codes. A test checks every message against this list.
+- A fixed message is sent only after the fix is live for users, never when the ticket merely moves to Done.

@@ -680,7 +680,7 @@ test("ENG-13108-shaped Support intake neither gates memory nor triggers fallback
   );
   assert.ok(
     triageHandlingSkill.includes(
-      "Missing or unmapped intake metadata by itself is never that evidence gap and never triggers Aaron routing"
+      "Missing or unmapped intake metadata by itself is never that gap"
     )
   );
   assert.ok(
@@ -1198,4 +1198,236 @@ test("ENG-13397-shaped wrong-channel money ask is handled in place", () => {
   );
   assert.ok(labelRules.includes("One type label from the verdict"));
   assert.ok(!labelRules.includes("channel"));
+});
+
+test("the engineering hand-off admits an approved feature request", () => {
+  const preconditions = extractInstruction(
+    handoffSkill,
+    "## Preconditions",
+    "## Match by cause, not symptom"
+  );
+  assert.ok(preconditions.includes("feature request labelled `Approved`"));
+  assert.ok(preconditions.includes("`Engineering Todo` path"));
+  assert.ok(preconditions.includes("`Feature Request` type label"));
+});
+
+test("the engineering hand-off stops when the master's owner is outside the roster", () => {
+  assert.ok(
+    handoffSkill.includes(
+      "When the tool refuses because the master's owner is not in the roster, write nothing else"
+    )
+  );
+});
+
+test("a new engineering master carries the Area label and the read-back checks it", () => {
+  const create = extractInstruction(
+    handoffSkill,
+    "## Create one master",
+    "## Read back before finishing"
+  );
+  assert.ok(
+    create.includes("the `Area:` label that `route.addLabels` carries")
+  );
+  const readBack = extractInstruction(
+    handoffSkill,
+    "## Read back before finishing",
+    "Hand back the master id"
+  );
+  assert.ok(readBack.includes("including the `Area:` label"));
+});
+
+test("a master built for an approved feature request carries Feature Request and Approved", () => {
+  const create = extractInstruction(
+    handoffSkill,
+    "## Create one master",
+    "## Read back before finishing"
+  );
+  assert.ok(create.includes("`Feature Request` and `Approved` together"));
+  const reuse = extractInstruction(
+    handoffSkill,
+    "## Reuse an existing master",
+    "## Create one master"
+  );
+  assert.ok(
+    reuse.includes(
+      "`Feature Request` and `Approved` for an approved feature request"
+    )
+  );
+  assert.ok(
+    reuse.includes("`fast-lane` only when the approved route is `HOTLANE`")
+  );
+});
+
+test("Stage 5 hands decide_triage the ticket's own labels so an approved request is seen", () => {
+  const stage = extractInstruction(
+    triageHandlingSkill,
+    "### Jev decides, Foreman acts",
+    "### Fallback: only when `decided: false`"
+  );
+  assert.ok(stage.includes("the ticket's own labels as `ticketLabels`"));
+  const tool = readFileSync(
+    new URL("../tools/decide_triage.ts", import.meta.url),
+    "utf8"
+  );
+  const field = tool.slice(tool.indexOf("ticketLabels: z"));
+  assert.equal(field.includes(".optional()"), false);
+});
+
+test("the not-engineering branch covers an unapproved feature request waiting in Backlog", () => {
+  const roster = extractInstruction(
+    triageHandlingSkill,
+    "### Area-routing roster",
+    "### When the ticket is not engineering actionable"
+  );
+  assert.ok(
+    roster.includes("waits in Backlog with `Needs approval` and James")
+  );
+  const branch = extractInstruction(
+    triageHandlingSkill,
+    "### When the ticket is not engineering actionable",
+    "### When the root cause warrants action"
+  );
+  assert.ok(branch.includes("`Backlog/low-impact`"));
+  assert.ok(branch.includes("unless a lift is wanted"));
+});
+
+test("the unblock never replaces the root cause or the master ticket", () => {
+  const unblock = extractInstruction(
+    triageHandlingSkill,
+    "### Find the unblock",
+    "### Jev decides, Foreman acts"
+  );
+  assert.ok(
+    unblock.includes(
+      "The unblock never replaces the root cause or the master ticket."
+    )
+  );
+});
+
+test("the investigation document template records the handling path completion reads", () => {
+  assert.ok(triageReportingReference.includes("**Handling path**:"));
+});
+
+test("the Intercom skill sends a feature request through the report and hand-off branch", () => {
+  const opening = intercomTriageSkill.slice(
+    intercomTriageSkill.indexOf("Only a confirmed `Bug`"),
+    intercomTriageSkill.indexOf("## Boundaries")
+  );
+  assert.ok(
+    opening.includes(
+      "Only a confirmed `Bug` or a feature request leaves this skill"
+    )
+  );
+  const handoff = extractInstruction(
+    intercomTriageSkill,
+    "### A confirmed Bug: create the report, then hand off",
+    "## Step 7:"
+  );
+  assert.ok(
+    handoff.includes(
+      "a Bug or an approved feature request (`Feature Request` plus `Approved`) then gets documentation, routing and `engineering-handoff`"
+    )
+  );
+  assert.ok(
+    handoff.includes(
+      "an unapproved one stops at `triage-handling`'s Backlog with `Needs approval` for James"
+    )
+  );
+  const followUp = extractInstruction(
+    intercomTriageSkill,
+    "## Step 7:",
+    "## Step 8:"
+  );
+  assert.ok(followUp.includes("a Platform Limitation nobody wants lifted"));
+  const record = extractInstruction(
+    intercomTriageSkill,
+    "## Step 8:",
+    "Store only the sanitized pattern"
+  );
+  assert.ok(
+    record.includes(
+      "A Bug or feature request is recorded by `triage-handling` Stage 7"
+    )
+  );
+});
+
+test("the Intercom skill keeps historical counts from being reported as today's impact", () => {
+  const memory = extractInstruction(
+    intercomTriageSkill,
+    "## Step 3A: Search investigation memory",
+    "## Step 4:"
+  );
+  assert.ok(
+    memory.includes(
+      "Historical affected counts are dated figures, never the current blast radius."
+    )
+  );
+});
+
+test("the Intercom skill agrees with triage-handling on the document and the description", () => {
+  const documentRule = intercomTriageSkill.slice(
+    intercomTriageSkill.indexOf("## Triage investigation document")
+  );
+  assert.ok(
+    documentRule.includes(
+      "A Bug's or feature request's document is written by `triage-handling`"
+    )
+  );
+  assert.ok(documentRule.includes("Other outcomes write none."));
+  const description = intercomTriageSkill.match(DESCRIPTION_PATTERN)?.[1] ?? "";
+  assert.ok(description.includes("confirmed bug or feature request"));
+});
+
+test("a correction to a feature request supersedes its case because both use the ticket identifier", () => {
+  const record = extractInstruction(
+    intercomTriageSkill,
+    "## Step 8:",
+    "Store only the sanitized pattern"
+  );
+  assert.ok(
+    record.includes(
+      "A Bug or feature request is recorded by `triage-handling` Stage 7 under its ticket identifier"
+    )
+  );
+  assert.ok(
+    record.includes(
+      "For a User Error, a Platform Limitation nobody wants lifted, or an unproven verdict"
+    )
+  );
+  const correction = extractInstruction(
+    intercomTriageSkill,
+    "### Corrections from the thread",
+    "## Step 9:"
+  );
+  assert.ok(
+    correction.includes(
+      "the ticket identifier for a Bug or feature request, `intercom:<conversation id>` otherwise"
+    )
+  );
+  const tools = readFileSync(
+    new URL(
+      "../skills/intercom-triage-investigate/references/tools.md",
+      import.meta.url
+    ),
+    "utf8"
+  );
+  assert.ok(
+    tools.includes(
+      "For a Bug or feature request, `triage-handling` Stage 7 owns the write under the report's ticket identifier"
+    )
+  );
+  assert.ok(
+    tools.includes(
+      "Step 8 records a User Error, a Platform Limitation nobody wants lifted, or an unproven claim"
+    )
+  );
+});
+
+test("the Intercom skill never asks the requester for a Linear identifier", () => {
+  const boundaries = extractInstruction(
+    intercomTriageSkill,
+    "## Boundaries",
+    "## Step 1:"
+  );
+  assert.ok(boundaries.includes("Never ask for a Linear identifier."));
 });
