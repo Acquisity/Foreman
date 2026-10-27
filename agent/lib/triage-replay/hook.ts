@@ -13,6 +13,12 @@ const DECISIONS: Record<string, ReplayState["decisions"][number]["kind"]> = {
   decide_triage: "triage",
 };
 
+/** The live rule: only a decision that was made advances the generation. */
+const decisionGeneration = (state: ReplayState): number =>
+  state.decisions.filter(
+    (entry) => (entry.output as { decided?: unknown } | null)?.decided === true
+  ).length;
+
 const endRootTurn =
   (status: NonNullable<ReplayState["rootTurn"]>) =>
   async (
@@ -65,7 +71,7 @@ export const triageReplayHook = defineHook({
         return;
       }
       await withReplayState(session.runId, session.caseKey, (state) => {
-        const generation = state.decisions.length;
+        const generation = decisionGeneration(state);
         state.criticPackets = {
           ...state.criticPackets,
           ...Object.fromEntries(
@@ -89,7 +95,7 @@ export const triageReplayHook = defineHook({
         }
         state.criticCalls = [...(state.criticCalls ?? []), data.callId];
         const packet = state.criticPackets?.[data.callId] ?? null;
-        if (packet && packet.generation !== state.decisions.length) {
+        if (packet && packet.generation !== decisionGeneration(state)) {
           return;
         }
         const critic = criticVerdictFields(

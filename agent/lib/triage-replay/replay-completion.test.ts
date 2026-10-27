@@ -354,6 +354,24 @@ describe("replay result", () => {
     assert.equal((await state()).criticObjections, 1);
   });
 
+  it("keeps a review when a decide_triage retry failed while it ran", async (t) => {
+    await replayProcess(t);
+    noTransport(t);
+    await toolResult(
+      "decide_triage",
+      routeDecision({
+        needsCriticReview: true,
+        review: { kind: "duplicate", reason: "r", required: true },
+      })
+    );
+    await criticDispatched("critic-1");
+    await toolResult("decide_triage", { decided: false, error: "Jev failed." });
+    await criticSettled("critic-1", objection);
+    const settled = await state();
+    assert.equal(settled.critic?.counted, "objection");
+    assert.equal(settled.criticObjections, 1);
+  });
+
   it("waits for the critic when the decision needs review", async (t) => {
     await replayProcess(t);
     noTransport(t);
