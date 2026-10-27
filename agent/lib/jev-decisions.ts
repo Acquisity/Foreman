@@ -494,6 +494,8 @@ const resolveLabels = (
 
 interface BarContext {
   answers: Answers;
+  /** An inbox error set aside as billing: no Bug bar, the same confidence bars. */
+  billed: boolean;
   classification: TriageClassification;
   classificationConfidence: number;
   duplicate: ReturnType<typeof findDuplicate>;
@@ -516,7 +518,11 @@ const barGap = (
       note: "The handling path was not clear enough to act on.",
     };
   }
-  if (context.classification === "Bug" && !context.duplicate) {
+  if (
+    context.classification === "Bug" &&
+    !context.duplicate &&
+    !context.billed
+  ) {
     const missing = bugBarGaps(context.input, context.answers);
     if (missing.length > 0) {
       return { missing, note: "Not a Bug yet: the Bug bar is not met." };
@@ -599,16 +605,15 @@ export function resolveTriage(
     return unproven(gate.missing);
   }
   const billed = gate?.kind === "billing";
-  const gap = billed
-    ? null
-    : barGap({
-        answers,
-        classification,
-        classificationConfidence: classificationPick.confidence,
-        duplicate,
-        input,
-        pathConfidence: pathPick.confidence,
-      });
+  const gap = barGap({
+    answers,
+    billed,
+    classification,
+    classificationConfidence: classificationPick.confidence,
+    duplicate,
+    input,
+    pathConfidence: pathPick.confidence,
+  });
   if (gap) {
     notes.push(gap.note);
     return unproven(gap.missing);

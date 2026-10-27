@@ -414,3 +414,35 @@ test("a close where nothing changed is Canceled, so Done always means a change w
   assert.ok(resolved.outcome === "route");
   assert.equal(resolved.route.state, "Done");
 });
+
+test("a low-confidence inbox decision is unproven even when the billing facts fail", () => {
+  const decision = resolveTriage(
+    inboxInput({ billingFacts: billingFacts({ paymentsFailing: true }) }),
+    inboxAnswers({
+      classification: pick("bug", 0.4),
+      duplicate_0: pick("not_relevant"),
+      path: pick("Engineering Todo", 0.4),
+    }),
+    NOW
+  );
+  assert.equal(decision.outcome, "unproven");
+  const pathOnly = resolveTriage(
+    inboxInput({ billingFacts: billingFacts({ paymentsFailing: true }) }),
+    inboxAnswers({
+      duplicate_0: pick("not_relevant"),
+      path: pick("Engineering Todo", 0.4),
+    }),
+    NOW
+  );
+  assert.equal(pathOnly.outcome, "unproven");
+  const confident = resolveTriage(
+    inboxInput({
+      billingFacts: billingFacts({ paymentsFailing: true }),
+      codePath: undefined,
+    }),
+    inboxAnswers({ duplicate_0: pick("not_relevant") }),
+    NOW
+  );
+  assert.ok(confident.outcome === "route");
+  assert.equal(confident.path, "Support/Financial");
+});
