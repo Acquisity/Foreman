@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { execFile, execFileSync } from "node:child_process";
+import { execFile, execFileSync, spawnSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -7,7 +7,7 @@ import type {
   CheckDeps,
   CheckInput,
   CheckResult,
-  Deployment,
+  DeployReads,
   Shell,
 } from "./regression-lane.js";
 
@@ -154,8 +154,27 @@ export const history = (origin: Origin) => {
   return { base };
 };
 
-export const deps = (worktree: string, origin: Origin): CheckDeps => ({
+/** Production reads answered from the origin's full history, as GitHub would. */
+export const productionAt = (
+  origin: Origin,
+  live: string | null
+): DeployReads => ({
+  isAncestor: (base, head) =>
+    Promise.resolve(
+      spawnSync("git", ["merge-base", "--is-ancestor", base, head], {
+        cwd: origin.path,
+      }).status === 0
+    ),
+  liveSha: () => Promise.resolve(live),
+});
+
+export const deps = (
+  worktree: string,
+  origin: Origin,
+  live: string | null = null
+): CheckDeps => ({
   closeNetwork: () => Promise.resolve(),
+  deploy: productionAt(origin, live),
   now: () => NOW,
   openNetwork: () => Promise.resolve(),
   remote: origin.url,
@@ -163,16 +182,10 @@ export const deps = (worktree: string, origin: Origin): CheckDeps => ({
   worktree,
 });
 
-export const deployment = (commit: string, daysAgo: number): Deployment => ({
-  commit,
-  readyAt: at(daysAgo),
-});
-
 export const input = (
   over: Partial<CheckInput> & Pick<CheckInput, "readCommit">
 ) =>
   ({
-    deployments: { current: null, timeline: [] },
     failureAt: at(8),
     failureAtSource: "claim",
     file: FILE,

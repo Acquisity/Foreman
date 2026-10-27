@@ -122,3 +122,40 @@ describe("the regression lane in the triage skills", () => {
     assert.ok(handoff.includes("`introduced by <commit>`"));
   });
 });
+
+describe("the regression lane reads only what it can prove", () => {
+  it("reads production's commit from GitHub, never Vercel READY times, and takes only a line range", () => {
+    const regressionLines = (text: string) =>
+      text
+        .split("\n")
+        .filter((line) => line.includes("check_regression"))
+        .join("\n");
+    for (const surface of [
+      reference,
+      regressionLines(rootTools),
+      regressionLines(criticTools),
+      regressionLines(criticSkill),
+      regressionLines(reporting),
+    ]) {
+      assert.ok(!surface.includes("foreman_vercel_api"), "no Vercel read");
+      assert.ok(!surface.includes("timeline"), "no deployment timeline");
+      assert.ok(!surface.includes("readyAt"), "no READY timestamps");
+    }
+    assert.ok(!reference.includes("needle"));
+    assert.ok(
+      reference.includes(
+        "`check_regression` reads the commit production serves from Acquisity/Acquisity's GitHub production deployments itself"
+      )
+    );
+    assert.ok(
+      reference.includes(
+        "a fix that was on main before the failure time is `unchecked`"
+      )
+    );
+    assert.ok(
+      reference.includes(
+        "The record answers only for the file and commit read you passed"
+      )
+    );
+  });
+});

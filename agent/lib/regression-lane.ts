@@ -9,7 +9,8 @@ import type { RegressionKind, RegressionRecord } from "./regression-record.js";
 export const HISTORY_DAYS = 30;
 export const MAX_CANDIDATES = 25;
 const MAX_PATCH_CHARS = 3000;
-const MAX_TIMELINE = 50;
+const DEEPEN_ROUNDS = 3;
+const DEEPEN_BY = 200;
 const SHA_PATTERN = /^[0-9a-f]{40}$/u;
 const DAY_MS = 86_400_000;
 const FIELD_SEPARATOR = "\u001f";
@@ -35,27 +36,17 @@ export interface Label {
   sha: string;
 }
 
-export interface Deployment {
-  commit: string;
-  readyAt: string;
-}
-
-/**
- * `current` is the deployment production serves right now, so a rollback shows
- * as an older commit. `timeline` is only used to tell what ran at the failure
- * time, newest first.
- */
-export interface DeploymentEvidence {
-  current: Deployment | null;
-  timeline: Deployment[];
+/** Production's deployed commit and ancestry, read from GitHub (the reporter-updates probe). */
+export interface DeployReads {
+  isAncestor: (base: string, head: string) => Promise<boolean>;
+  liveSha: () => Promise<string | null>;
 }
 
 export type FailureTimeSource = "claim" | "ticket-created";
 
 export interface Blame {
   file: string;
-  lines?: { end: number; start: number };
-  needle?: string;
+  lines: { end: number; start: number };
 }
 
 export interface Failure {
@@ -76,7 +67,7 @@ export const isSha = (value: string) => SHA_PATTERN.test(value);
 
 const FORBIDDEN_TEXT = /[\0\n\r]/u;
 
-/** Why a blamed file or string can't be put on a command line, or null. */
+/** Why a blamed file or range can't be put on a command line, or null. */
 export const blameProblem = (blame: Blame): string | null => {
   if (
     !blame.file ||
@@ -88,17 +79,7 @@ export const blameProblem = (blame: Blame): string | null => {
   ) {
     return "The file must be a repository-relative path.";
   }
-  if (Boolean(blame.lines) === Boolean(blame.needle)) {
-    return "Pass either the blamed line range or a distinctive string, not both and not neither.";
-  }
   if (
-    blame.needle &&
-    (FORBIDDEN_TEXT.test(blame.needle) || blame.needle.length > 200)
-  ) {
-    return "The string must be one line of at most 200 characters.";
-  }
-  if (
-    blame.lines &&
     !(
       Number.isInteger(blame.lines.start) &&
       Number.isInteger(blame.lines.end) &&
@@ -128,31 +109,56 @@ const failure = (what: string, result: ShellResult): Failure => ({
     .slice(0, 300)}`,
 });
 
-const hasCommit = async (shell: Shell, worktree: string, sha: string) =>
-  (await shell(git(worktree, `cat-file -e ${sha}^{commit}`))).exitCode === 0;
+/**
+ * The in-window commits reachable from the commit read that are shallow
+ * boundaries: their parents are missing, so `git log -L` would treat each as
+ * the root that added every blamed line.
+ */
+const windowBoundaries = async (
+  shell: Shell,
+  worktree: string,
+  readCommit: string,
+  since: string
+): Promise<string[] | Failure> => {
+  const path = await shell(git(worktree, "rev-parse --git-path shallow"));
+  if (path.exitCode !== 0) {
+    return failure("Could not find the clone's shallow list", path);
+  }
+  const listed = await shell(
+    `cat ${quote(`${worktree}/${trimmed(path)}`)} 2>/dev/null || true`
+  );
+  const boundaries = new Set(trimmed(listed).split("\n").filter(Boolean));
+  if (boundaries.size === 0) {
+    return [];
+  }
+  const inWindow = await shell(
+    git(worktree, `rev-list --since=${quote(since)} ${readCommit}`)
+  );
+  if (inWindow.exitCode !== 0) {
+    return failure("Could not list the window's commits", inWindow);
+  }
+  return trimmed(inWindow)
+    .split("\n")
+    .filter((sha) => boundaries.has(sha));
+};
 
 /**
- * Makes sure every commit dated inside the window and reachable from the
- * commit read is present, deepening a shallow clone. A repo that is not
- * shallow already has it. Complete means the fetch exited 0 and the commit
- * resolves; anything else is a failure, so a thin clone can never read as
- * "nothing changed".
- *
- * Deployment commits missing locally are fetched too (window first, then the
- * single commit). A commit that still isn't there is not a commit of this
- * repository, and the caller treats it as unknown.
+ * Makes the history of the commit read complete for the window, and proves
+ * it: no commit dated inside the window may be a shallow boundary. A shallow
+ * clone is fetched back past the window, then deepened a bounded number of
+ * times; anything still unproven is a failure, so a thin clone can never
+ * invent an introducing commit or read as "nothing changed".
  */
 export async function ensureHistory(
   shell: Shell,
   options: {
-    deploymentCommits: string[];
     readCommit: string;
     remote: string;
     since: string;
     worktree: string;
   }
 ): Promise<{ ok: true } | Failure> {
-  const { worktree } = options;
+  const { readCommit, remote, since, worktree } = options;
   const inside = await shell(
     `test "$(${git(worktree, "rev-parse --show-toplevel")})" = "$(cd ${quote(worktree)} && pwd -P)"`
   );
@@ -162,70 +168,60 @@ export async function ensureHistory(
       reason: "This workspace holds no git history to check.",
     };
   }
+  const margin = new Date(Date.parse(since) - DAY_MS).toISOString();
+  const fetched = await shell(
+    git(
+      worktree,
+      `fetch --quiet --shallow-since=${quote(margin)} ${quote(remote)} ${readCommit}`
+    )
+  );
   const shallow = await shell(
     git(worktree, "rev-parse --is-shallow-repository")
   );
   if (shallow.exitCode !== 0) {
     return failure("Could not tell whether the clone is shallow", shallow);
   }
-  const isShallow = trimmed(shallow) === "true";
-  const fetchSince = (sha: string) =>
-    shell(
+  if (trimmed(shallow) === "true" && fetched.exitCode !== 0) {
+    return failure(
+      "Could not fetch 30 days of history for the commit read",
+      fetched
+    );
+  }
+  for (let round = 0; round <= DEEPEN_ROUNDS; round += 1) {
+    // biome-ignore lint/performance/noAwaitInLoops: each round depends on what the last fetch left.
+    const open = await windowBoundaries(shell, worktree, readCommit, since);
+    if (!Array.isArray(open)) {
+      return open;
+    }
+    if (open.length === 0) {
+      return { ok: true };
+    }
+    if (round === DEEPEN_ROUNDS) {
+      break;
+    }
+    const deepened = await shell(
       git(
         worktree,
-        `fetch --quiet --shallow-since=${quote(options.since)} ${quote(options.remote)} ${sha}`
+        `fetch --quiet --deepen=${DEEPEN_BY} ${quote(remote)} ${readCommit}`
       )
     );
-  if (isShallow) {
-    const fetched = await fetchSince(options.readCommit);
-    if (fetched.exitCode !== 0) {
-      return failure(
-        "Could not fetch 30 days of history for the commit read",
-        fetched
-      );
+    if (deepened.exitCode !== 0) {
+      return failure("Could not deepen the history to cover 30 days", deepened);
     }
   }
-  if (!(await hasCommit(shell, worktree, options.readCommit))) {
-    return {
-      ok: false,
-      reason: "The commit read is not in this checkout's history.",
-    };
-  }
-  for (const commit of options.deploymentCommits) {
-    // biome-ignore lint/performance/noAwaitInLoops: fetches in one repository take its shallow lock, so they run one at a time.
-    if (await hasCommit(shell, worktree, commit)) {
-      continue;
-    }
-    const windowed = await fetchSince(commit);
-    if (windowed.exitCode !== 0) {
-      await shell(
-        git(
-          worktree,
-          `fetch --quiet --depth=1 ${quote(options.remote)} ${commit}`
-        )
-      );
-    }
-  }
-  return { ok: true };
+  return {
+    ok: false,
+    reason:
+      "Could not prove the last 30 days of history are complete in this clone.",
+  };
 }
 
-const parseCandidates = (stdout: string) =>
-  stdout
-    .split(RECORD_SEPARATOR)
-    .map((entry) => entry.trim())
-    .filter(Boolean)
-    .map((entry) => {
-      const [sha = "", date = "", ...subject] = entry.split(FIELD_SEPARATOR);
-      return { date, sha, subject: subject.join(FIELD_SEPARATOR).trim() };
-    })
-    .filter((candidate) => isSha(candidate.sha));
-
 /**
- * The commits from the window that touched the blamed lines (an explicit
- * range, because `-L :name:file` latches onto an `import { name }` line in
- * TypeScript) or the blamed string, newest first by topology, each with a
- * bounded patch. More than {@link MAX_CANDIDATES} is refused: every candidate
- * has to be labelled, so a range that busy needs narrowing.
+ * The commits from the window that touched the blamed lines, newest first by
+ * topology, each with its patch. `git log -L` tracks the range back through
+ * every revision itself, so each patch shows the lines as they were in that
+ * commit. More than {@link MAX_CANDIDATES} is refused: every candidate has to
+ * be labelled, so a range that busy needs narrowing.
  */
 export async function listCandidates(
   shell: Shell,
@@ -233,55 +229,41 @@ export async function listCandidates(
 ): Promise<{ candidates: Candidate[]; ok: true } | Failure> {
   const { worktree, readCommit, since } = options;
   const format = `--format=${RECORD_SEPARATOR}%H${FIELD_SEPARATOR}%cI${FIELD_SEPARATOR}%s`;
-  const base = `log --topo-order --since=${quote(since)} ${format}`;
-  const file = quote(options.file);
-  const selector = options.lines
-    ? `-L${options.lines.start},${options.lines.end}:${file} -s ${readCommit}`
-    : `-S${quote(options.needle ?? "")} ${readCommit} -- ${file}`;
-  const listed = await shell(git(worktree, `${base} ${selector}`));
+  const range = `-L${options.lines.start},${options.lines.end}:${quote(options.file)}`;
+  const listed = await shell(
+    git(
+      worktree,
+      `log --topo-order --no-color --since=${quote(since)} ${format} ${range} ${readCommit}`
+    )
+  );
   if (listed.exitCode !== 0) {
     return failure("Could not read the history of the blamed code", listed);
   }
-  const found = parseCandidates(String(listed.stdout));
-  if (found.length > MAX_CANDIDATES) {
-    return {
-      ok: false,
-      reason: `More than ${MAX_CANDIDATES} commits touched it in 30 days; narrow the line range or the string.`,
-    };
-  }
-  const candidates = await Promise.all(
-    found.map(async (entry): Promise<Candidate> => {
-      const patchCommand = options.lines
-        ? `log -L${options.lines.start},${options.lines.end}:${file} -n1 --format= ${entry.sha}`
-        : `show --format= ${entry.sha} -- ${file}`;
-      const patch = await shell(git(worktree, patchCommand));
+  const candidates = String(listed.stdout)
+    .split(RECORD_SEPARATOR)
+    .filter((entry) => entry.trim())
+    .map((entry) => {
+      const newline = entry.indexOf("\n");
+      const header = newline === -1 ? entry : entry.slice(0, newline);
+      const [sha = "", date = "", ...subject] = header.split(FIELD_SEPARATOR);
       return {
-        ...entry,
-        patch:
-          patch.exitCode === 0
-            ? String(patch.stdout).trim().slice(0, MAX_PATCH_CHARS)
-            : "(patch unavailable)",
+        date,
+        patch: (newline === -1 ? "" : entry.slice(newline + 1))
+          .trim()
+          .slice(0, MAX_PATCH_CHARS),
+        sha: sha.trim(),
+        subject: subject.join(FIELD_SEPARATOR).trim(),
       };
     })
-  );
+    .filter((candidate) => isSha(candidate.sha));
+  if (candidates.length > MAX_CANDIDATES) {
+    return {
+      ok: false,
+      reason: `More than ${MAX_CANDIDATES} commits touched it in 30 days; narrow the line range.`,
+    };
+  }
   return { candidates, ok: true };
 }
-
-/** true or false from git, null when git could not answer. */
-const contains = async (
-  shell: Shell,
-  worktree: string,
-  ancestor: string,
-  descendant: string
-): Promise<boolean | null> => {
-  const result = await shell(
-    git(worktree, `merge-base --is-ancestor ${ancestor} ${descendant}`)
-  );
-  if (result.exitCode === 0) {
-    return true;
-  }
-  return result.exitCode === 1 ? false : null;
-};
 
 export const lineFor = (
   kind: RegressionKind,
@@ -340,30 +322,30 @@ export const labelProblem = (
     : "Each commit takes exactly one label.";
 };
 
-const byReadyAtDescending = (a: Deployment, b: Deployment) =>
-  Date.parse(b.readyAt) - Date.parse(a.readyAt);
+const ancestry = (reads: DeployReads, base: string, head: string) =>
+  reads.isAncestor(base, head).then(
+    (contained) => contained,
+    () => null
+  );
 
 /**
  * Turns labels into the result. The latest labelled commit that isn't
  * `neither` decides, so a fix followed by a revert is `introduced`.
  *
- * Production state comes from `current` alone, so a fix that shipped and was
- * rolled back reads as not deployed. The timeline only answers what ran at the
- * failure time: a fix that was already live then did not fix this failure, and
- * a timeline that doesn't reach back to it can't say.
+ * Production state is only what production serves now. Whether a fix was
+ * already live when the customer hit the failure is out of scope, so a fix
+ * committed on or before the failure time is unchecked: it can't be shown to
+ * have fixed this failure.
  */
-export async function resolveRegression(
-  shell: Shell,
-  options: {
-    candidates: Candidate[];
-    deployments: DeploymentEvidence;
-    failureAt: string;
-    failureAtSource: FailureTimeSource;
-    labels: Label[];
-    worktree: string;
-  }
-): Promise<Resolution> {
-  const { candidates, worktree, deployments } = options;
+export async function resolveRegression(options: {
+  candidates: Candidate[];
+  failureAt: string;
+  failureAtSource: FailureTimeSource;
+  labels: Label[];
+  live: string | null;
+  reads: DeployReads;
+}): Promise<Resolution> {
+  const { candidates, live, reads } = options;
   const decisive = candidates
     .map((candidate) => ({
       candidate,
@@ -373,57 +355,35 @@ export async function resolveRegression(
   if (!decisive) {
     return resolution("none");
   }
-  const { sha } = decisive.candidate;
-  const { current } = deployments;
+  const { date, sha } = decisive.candidate;
   if (decisive.role === "introduced") {
-    if (
-      current &&
-      (await contains(shell, worktree, sha, current.commit)) === false
-    ) {
+    if (live && (await ancestry(reads, sha, live)) === false) {
       return unchecked(
         "the introducing commit is not in the commit production serves, so production cannot show a bug from it"
       );
     }
     return resolution("introduced", sha);
   }
-  if (!current) {
-    return resolution("fixed_deploy_unknown", sha);
-  }
-  const live = await contains(shell, worktree, sha, current.commit);
-  if (live === null) {
-    return unchecked("git could not compare the fix with production's commit");
+  if (Date.parse(date) <= Date.parse(options.failureAt)) {
+    const when =
+      options.failureAtSource === "claim"
+        ? "the failure time"
+        : "the ticket's creation (the failure time is not known)";
+    return unchecked(
+      `the fix was on main before ${when}, so it cannot be shown to fix this failure`
+    );
   }
   if (!live) {
-    return resolution("fixed_not_deployed", sha);
+    return resolution("fixed_deploy_unknown", sha);
   }
-  const failureAt = Date.parse(options.failureAt);
-  const unknownTime =
-    options.failureAtSource === "claim"
-      ? ""
-      : "; the failure time is not known, only that the ticket was created at that point";
-  const liveThen = [...deployments.timeline]
-    .sort(byReadyAtDescending)
-    .find((deployment) => Date.parse(deployment.readyAt) <= failureAt);
-  if (!liveThen) {
-    return unchecked(
-      `the deployment history does not reach back to the failure time${unknownTime}`
-    );
+  const contained = await ancestry(reads, sha, live);
+  if (contained === null) {
+    return resolution("fixed_deploy_unknown", sha);
   }
-  const alreadyLive = await contains(shell, worktree, sha, liveThen.commit);
-  if (alreadyLive === null) {
-    return unchecked(
-      `git could not compare the fix with the deployment live at the failure time${unknownTime}`
-    );
-  }
-  return alreadyLive
-    ? unchecked(
-        `the fix was already live at the failure time${unknownTime}, so it does not explain this failure`
-      )
-    : resolution("fixed_live", sha);
+  return resolution(contained ? "fixed_live" : "fixed_not_deployed", sha);
 }
 
 export interface CheckInput extends Blame {
-  deployments: DeploymentEvidence;
   failureAt: string;
   failureAtSource: FailureTimeSource;
   issue: string;
@@ -433,6 +393,7 @@ export interface CheckInput extends Blame {
 
 export interface CheckDeps {
   closeNetwork: () => Promise<void>;
+  deploy: DeployReads;
   now: () => Date;
   openNetwork: () => Promise<void>;
   remote: string;
@@ -447,26 +408,8 @@ export type CheckResult =
 
 /** What is wrong with the input before any command runs, or null. */
 export const inputProblem = (input: CheckInput): string | null => {
-  const deployments = [
-    ...(input.deployments.current ? [input.deployments.current] : []),
-    ...input.deployments.timeline,
-  ];
   if (!isSha(input.readCommit)) {
     return "readCommit must be a full 40-character commit.";
-  }
-  if (
-    deployments.some(
-      (deployment) =>
-        !(
-          isSha(deployment.commit) &&
-          Number.isFinite(Date.parse(deployment.readyAt))
-        )
-    )
-  ) {
-    return "Every deployment needs a 40-character commit and an ISO readyAt time.";
-  }
-  if (input.deployments.timeline.length > MAX_TIMELINE) {
-    return `Pass at most ${MAX_TIMELINE} timeline deployments.`;
   }
   if (!Number.isFinite(Date.parse(input.failureAt))) {
     return "failureAt must be an ISO time.";
@@ -474,11 +417,95 @@ export const inputProblem = (input: CheckInput): string | null => {
   return blameProblem(input);
 };
 
+const recordOf = (
+  input: CheckInput,
+  outcome: Resolution,
+  deployed: string | null
+): RegressionRecord => ({
+  ...outcome,
+  commitRead: input.readCommit,
+  deployedCommit: deployed,
+  file: input.file,
+  issue: input.issue,
+  lines: input.lines,
+  windowDays: HISTORY_DAYS,
+});
+
+const deepenHistory = async (
+  deps: CheckDeps,
+  input: CheckInput,
+  since: string
+): Promise<{ ok: true } | Failure> => {
+  let opened = false;
+  try {
+    await deps.openNetwork();
+    opened = true;
+    return await ensureHistory(deps.shell, {
+      readCommit: input.readCommit,
+      remote: deps.remote,
+      since,
+      worktree: deps.worktree,
+    });
+  } finally {
+    if (opened) {
+      await deps.closeNetwork();
+    }
+  }
+};
+
+const check = async (
+  deps: CheckDeps,
+  input: CheckInput
+): Promise<CheckResult> => {
+  const since = sinceIso(deps.now());
+  const unusable = (reason: string): CheckResult => ({
+    candidates: [],
+    record: recordOf(input, unchecked(reason), null),
+    status: "recorded",
+  });
+  const ensured = await deepenHistory(deps, input, since);
+  if (!ensured.ok) {
+    return unusable(ensured.reason);
+  }
+  const listed = await listCandidates(deps.shell, {
+    ...input,
+    since,
+    worktree: deps.worktree,
+  });
+  if (!listed.ok) {
+    return unusable(listed.reason);
+  }
+  if (listed.candidates.length > 0 && !input.labels) {
+    return { candidates: listed.candidates, status: "labels_needed" };
+  }
+  const bad = labelProblem(listed.candidates, input.labels ?? []);
+  if (bad) {
+    return { error: bad, status: "error" };
+  }
+  const live = await deps.deploy.liveSha().then(
+    (sha) => (sha && isSha(sha) ? sha : null),
+    () => null
+  );
+  const resolved = await resolveRegression({
+    candidates: listed.candidates,
+    failureAt: input.failureAt,
+    failureAtSource: input.failureAtSource,
+    labels: input.labels ?? [],
+    live,
+    reads: deps.deploy,
+  });
+  return {
+    candidates: listed.candidates,
+    record: recordOf(input, resolved, live),
+    status: "recorded",
+  };
+};
+
 /**
- * One check: deepen the history, list what touched the blamed code, and, once
- * the caller has labelled every candidate, resolve the result. Anything the
- * environment gets wrong (no git, a failed fetch, an unreadable log) is an
- * `unchecked` record, never `none`.
+ * One check: complete the history, list what touched the blamed lines, and,
+ * once the caller has labelled every candidate, resolve the result. Anything
+ * the environment gets wrong, a thrown error included, is an `unchecked`
+ * record, never `none`.
  */
 export async function runCheckRegression(
   deps: CheckDeps,
@@ -488,113 +515,36 @@ export async function runCheckRegression(
   if (problem) {
     return { error: problem, status: "error" };
   }
-  const since = sinceIso(deps.now());
-  const recordOf = (
-    outcome: Resolution,
-    deployed: string | null
-  ): RegressionRecord => ({
-    ...outcome,
-    commitRead: input.readCommit,
-    deployedCommit: deployed,
-    issue: input.issue,
-    windowDays: HISTORY_DAYS,
-  });
-  const unusable = (reason: string): CheckResult => ({
-    candidates: [],
-    record: recordOf(unchecked(reason), null),
-    status: "recorded",
-  });
-
-  const asked = [
-    ...(input.deployments.current ? [input.deployments.current] : []),
-    ...input.deployments.timeline,
-  ].map((deployment) => deployment.commit);
-  let ensured: { ok: true } | Failure;
-  await deps.openNetwork();
   try {
-    ensured = await ensureHistory(deps.shell, {
-      deploymentCommits: [...new Set(asked)],
-      readCommit: input.readCommit,
-      remote: deps.remote,
-      since,
-      worktree: deps.worktree,
-    });
-  } finally {
-    await deps.closeNetwork();
-  }
-  if (!ensured.ok) {
-    return unusable(ensured.reason);
-  }
-
-  const listed = await listCandidates(deps.shell, {
-    ...input,
-    since,
-    worktree: deps.worktree,
-  });
-  if (!listed.ok) {
-    return unusable(listed.reason);
-  }
-
-  const present = async (deployment: Deployment | null) =>
-    deployment &&
-    (await hasCommit(deps.shell, deps.worktree, deployment.commit))
-      ? deployment
-      : null;
-  const current = await present(input.deployments.current);
-  const checked = await Promise.all(
-    input.deployments.timeline.map((deployment) => present(deployment))
-  );
-  const timeline = checked.filter(
-    (deployment): deployment is Deployment => deployment !== null
-  );
-  const timelineComplete = timeline.length === checked.length;
-  // A timeline with a deployment that isn't a commit of this repository can't
-  // say what ran at the failure time: dropping the entry would pick an older
-  // deployment as the one that was live.
-  const evidence: DeploymentEvidence = {
-    current,
-    timeline: timelineComplete ? timeline : [],
-  };
-  const deployedCommit = current?.commit ?? null;
-
-  if (listed.candidates.length === 0) {
+    return await check(deps, input);
+  } catch (error) {
     return {
       candidates: [],
-      record: recordOf(resolution("none"), deployedCommit),
+      record: recordOf(
+        input,
+        unchecked(
+          `the check failed: ${error instanceof Error ? error.message : String(error)}`.slice(
+            0,
+            300
+          )
+        ),
+        null
+      ),
       status: "recorded",
     };
   }
-  if (!input.labels) {
-    return { candidates: listed.candidates, status: "labels_needed" };
-  }
-  const bad = labelProblem(listed.candidates, input.labels);
-  if (bad) {
-    return { error: bad, status: "error" };
-  }
-  const resolved = await resolveRegression(deps.shell, {
-    candidates: listed.candidates,
-    deployments: evidence,
-    failureAt: input.failureAt,
-    failureAtSource: input.failureAtSource,
-    labels: input.labels,
-    worktree: deps.worktree,
-  });
-  return {
-    candidates: listed.candidates,
-    record: recordOf(resolved, deployedCommit),
-    status: "recorded",
-  };
 }
 
 /** A record for a workspace that cannot be checked at all (a replay archive). */
 export const uncheckedRecord = (
-  issue: string,
-  readCommit: string,
+  input: Pick<CheckInput, "file" | "issue" | "lines" | "readCommit">,
   reason: string
 ): RegressionRecord => ({
   ...unchecked(reason),
-  commitRead: readCommit,
+  commitRead: input.readCommit,
   deployedCommit: null,
-  issue,
+  file: input.file,
+  issue: input.issue,
+  lines: input.lines,
   windowDays: HISTORY_DAYS,
 });

@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { resolveTriage } from "./jev-decisions.js";
+import { recordFor } from "./regression-record.js";
 import { REGRESSION_GAP } from "./regression-routing.js";
 import { bugAnswers, pick, triageInput } from "./triage-fixtures.js";
 
@@ -101,4 +102,42 @@ test("the regression result changes nothing for a duplicate or a non-Bug", () =>
   );
   assert.ok(userError.outcome === "route");
   assert.equal(userError.path, "User Error");
+});
+
+test("a record from another file or commit read is stale evidence, so the Bug needs a new check", () => {
+  const read = "a".repeat(40);
+  const record = {
+    commit: FIX,
+    commitRead: read,
+    deployedCommit: read,
+    file: "webhook.ts",
+    issue: "ENG-1",
+    kind: "fixed_live" as const,
+    line: `fixed on main and live, by ${FIX}`,
+    lines: { end: 7, start: 5 },
+    windowDays: 30,
+  };
+  const codePath = {
+    commit: read,
+    file: "webhook.ts",
+    function: "handleReply",
+  };
+  assert.equal(recordFor(record, codePath), record);
+  for (const corrected of [
+    { ...codePath, file: "inbox.ts" },
+    { ...codePath, commit: "c".repeat(40) },
+    undefined,
+  ]) {
+    const kept = recordFor(record, corrected);
+    assert.equal(kept, undefined);
+    const decision = resolveTriage(
+      triageInput({
+        ...(corrected ? { codePath: corrected } : {}),
+        regression: kept,
+      }),
+      bugAnswers()
+    );
+    assert.ok(decision.outcome === "unproven");
+    assert.deepEqual(decision.missing, [REGRESSION_GAP]);
+  }
 });

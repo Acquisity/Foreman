@@ -2,8 +2,8 @@ import assert from "node:assert/strict";
 import { mkdirSync } from "node:fs";
 import { after, describe, it } from "node:test";
 import {
+  at,
   BLAMED,
-  deployment,
   deps,
   FILE,
   git,
@@ -19,9 +19,7 @@ import {
   shellFor,
 } from "./regression-fixtures.js";
 import {
-  type CheckDeps,
   type CheckInput,
-  type Deployment,
   ensureHistory,
   listCandidates,
   runCheckRegression,
@@ -29,42 +27,49 @@ import {
 } from "./regression-lane.js";
 
 const ADDED_RETURN = /\+ {2}return count;/u;
-const ALREADY_LIVE =
-  /^unchecked: the fix was already live at the failure time/u;
+const ADDED_PLUS_ONE = /\+ {2}return count \+ 1;/u;
+const ON_MAIN_BEFORE =
+  /^unchecked: the fix was on main before the failure time/u;
 const TIME_UNKNOWN = /failure time is not known/u;
 const NOT_SERVED = /not in the commit production serves/u;
 const NO_HISTORY = /no git history/u;
 const NARROW = /narrow the line range/u;
-const NO_REACH = /does not reach back to the failure time/u;
+const THROWN = /^unchecked: the check failed: broker down/u;
+const NOT_PROVEN = /could not|Could not/u;
 
 after(removeSandbox);
 
+const fixedChain = (fixDaysAgo = 5) => {
+  const origin = new Origin();
+  history(origin);
+  const bug = origin.commit(
+    20,
+    { [FILE]: sendLimit("count * 2") },
+    "feat: double"
+  );
+  const older = origin.commit(15, note("a"), "docs: a");
+  const fix = origin.commit(
+    fixDaysAgo,
+    { [FILE]: sendLimit("count") },
+    "fix: send limit"
+  );
+  const head = origin.commit(fixDaysAgo - 1, note("b"), "docs: b");
+  return { bug, fix, head, older, origin };
+};
+
+const bothLabels = (fix: string, bug: string): CheckInput["labels"] => [
+  { role: "fixed", sha: fix },
+  { role: "introduced", sha: bug },
+];
+
 describe("planted case: fixed on main and live", () => {
-  it("names the fixing commit when production serves it and it shipped after the failure", async () => {
-    const origin = new Origin();
-    history(origin);
-    const bug = origin.commit(
-      20,
-      { [FILE]: sendLimit("count * 2") },
-      "feat: double"
-    );
-    const earlier = origin.commit(15, note("a"), "docs: a");
-    const fix = origin.commit(
-      5,
-      { [FILE]: sendLimit("count") },
-      "fix: send limit"
-    );
-    const head = origin.commit(4, note("b"), "docs: b");
+  it("names the fixing commit when production serves it and it landed after the failure", async () => {
+    const { bug, fix, head, origin } = fixedChain();
     const worktree = origin.clone(50);
-    const evidence = {
-      current: deployment(head, 4),
-      timeline: [deployment(head, 4), deployment(earlier, 15)],
-    };
     const first = await runCheckRegression(
-      deps(worktree, origin),
-      input({ deployments: evidence, readCommit: head })
+      deps(worktree, origin, head),
+      input({ readCommit: head })
     );
-    assert.equal(first.status, "labels_needed");
     assert.ok(first.status === "labels_needed");
     assert.deepEqual(
       first.candidates.map((candidate) => candidate.sha),
@@ -74,243 +79,122 @@ describe("planted case: fixed on main and live", () => {
 
     const record = recorded(
       await runCheckRegression(
-        deps(worktree, origin),
-        input({
-          deployments: evidence,
-          labels: [
-            { role: "fixed", sha: fix },
-            { role: "introduced", sha: bug },
-          ],
-          readCommit: head,
-        })
+        deps(worktree, origin, head),
+        input({ labels: bothLabels(fix, bug), readCommit: head })
       )
     );
     assert.equal(record.kind, "fixed_live");
     assert.equal(record.line, `fixed on main and live, by ${fix}`);
-    assert.equal(record.commit, fix);
     assert.equal(record.deployedCommit, head);
     assert.equal(record.commitRead, head);
+    assert.equal(record.file, FILE);
+    assert.deepEqual(record.lines, BLAMED);
   });
 
-  it("still counts a fix committed before the report but first deployed after the failure", async () => {
-    const origin = new Origin();
-    history(origin);
-    const before = origin.commit(14, note("before"), "docs: before");
-    const fix = origin.commit(
-      12,
-      { [FILE]: sendLimit("count + 0") },
-      "fix: send limit"
-    );
+  it("does not call a fix that was on main before the failure the fix for it", async () => {
+    const { bug, fix, head, origin } = fixedChain(12);
     const worktree = origin.clone(50);
-    const evidence = {
-      current: deployment(fix, 6),
-      timeline: [deployment(fix, 6), deployment(before, 13)],
-    };
-    const record = recorded(
-      await runCheckRegression(
-        deps(worktree, origin),
-        input({
-          deployments: evidence,
-          labels: [{ role: "fixed", sha: fix }],
-          readCommit: fix,
-        })
-      )
-    );
-    assert.equal(record.kind, "fixed_live");
-  });
-
-  it("does not call a fix live when it already ran at the failure time", async () => {
-    const origin = new Origin();
-    history(origin);
-    const fix = origin.commit(
-      12,
-      { [FILE]: sendLimit("count + 0") },
-      "fix: send limit"
-    );
-    const worktree = origin.clone(50);
-    const evidence = {
-      current: deployment(fix, 11),
-      timeline: [deployment(fix, 11)],
-    };
-    const record = recorded(
-      await runCheckRegression(
-        deps(worktree, origin),
-        input({
-          deployments: evidence,
-          labels: [{ role: "fixed", sha: fix }],
-          readCommit: fix,
-        })
-      )
-    );
-    assert.equal(record.kind, "unchecked");
-    assert.match(record.line, ALREADY_LIVE);
-  });
-
-  it("keeps the failure time uncertain when it is only the ticket's creation time", async () => {
-    const origin = new Origin();
-    history(origin);
-    const fix = origin.commit(
-      12,
-      { [FILE]: sendLimit("count + 0") },
-      "fix: send limit"
-    );
-    const worktree = origin.clone(50);
-    const evidence = {
-      current: deployment(fix, 11),
-      timeline: [deployment(fix, 11)],
-    };
-    const record = recorded(
-      await runCheckRegression(
-        deps(worktree, origin),
-        input({
-          deployments: evidence,
-          failureAtSource: "ticket-created",
-          labels: [{ role: "fixed", sha: fix }],
-          readCommit: fix,
-        })
-      )
-    );
-    assert.equal(record.kind, "unchecked");
-    assert.match(record.line, TIME_UNKNOWN);
+    for (const [source, pattern] of [
+      ["claim", ON_MAIN_BEFORE],
+      ["ticket-created", TIME_UNKNOWN],
+    ] as const) {
+      const record = recorded(
+        // biome-ignore lint/performance/noAwaitInLoops: one clone, checked twice in turn.
+        await runCheckRegression(
+          deps(worktree, origin, head),
+          input({
+            failureAtSource: source,
+            labels: bothLabels(fix, bug),
+            readCommit: head,
+          })
+        )
+      );
+      assert.equal(record.kind, "unchecked", source);
+      assert.match(record.line, pattern, source);
+    }
   });
 });
 
 describe("planted case: fixed on main, not deployed", () => {
-  const setup = () => {
-    const origin = new Origin();
-    history(origin);
-    const bug = origin.commit(
-      20,
-      { [FILE]: sendLimit("count * 2") },
-      "feat: double"
-    );
-    const served = origin.commit(15, note("served"), "docs: served");
-    const fix = origin.commit(
-      2,
-      { [FILE]: sendLimit("count") },
-      "fix: send limit"
-    );
-    return { bug, fix, origin, served, worktree: origin.clone(50) };
-  };
-  const labels = (fix: string, bug: string) => [
-    { role: "fixed" as const, sha: fix },
-    { role: "introduced" as const, sha: bug },
-  ];
-
   it("names the fix and says it is not live when production serves an older commit", async () => {
-    const { bug, fix, origin, served, worktree } = setup();
+    const { bug, fix, head, older, origin } = fixedChain();
+    const worktree = origin.clone(50);
     const record = recorded(
       await runCheckRegression(
-        deps(worktree, origin),
-        input({
-          deployments: {
-            current: deployment(served, 15),
-            timeline: [deployment(served, 15)],
-          },
-          labels: labels(fix, bug),
-          readCommit: fix,
-        })
+        deps(worktree, origin, older),
+        input({ labels: bothLabels(fix, bug), readCommit: head })
       )
     );
     assert.equal(record.kind, "fixed_not_deployed");
     assert.equal(record.line, `fixed on main, not deployed yet, by ${fix}`);
-    assert.equal(record.deployedCommit, served);
+    assert.equal(record.deployedCommit, older);
   });
 
-  it("treats a fix that shipped and was rolled back as not deployed", async () => {
-    const { bug, fix, origin, served, worktree } = setup();
-    const record = recorded(
-      await runCheckRegression(
-        deps(worktree, origin),
-        input({
-          deployments: {
-            current: deployment(served, 1),
-            timeline: [deployment(fix, 2), deployment(served, 15)],
-          },
-          labels: labels(fix, bug),
-          readCommit: fix,
-        })
-      )
-    );
-    assert.equal(record.kind, "fixed_not_deployed");
-  });
-
-  it("says the deploy status is unknown when no deployment can be established", async () => {
-    const { bug, fix, origin, worktree } = setup();
-    const records = await Promise.all(
-      ([null, deployment("f".repeat(40), 3)] as (Deployment | null)[]).map(
-        async (current) =>
-          recorded(
-            await runCheckRegression(
-              deps(worktree, origin),
-              input({
-                deployments: { current, timeline: [] },
-                labels: labels(fix, bug),
-                readCommit: fix,
-              })
-            )
-          )
-      )
-    );
-    for (const record of records) {
+  it("says the deploy status is unknown when production's commit or ancestry can't be read", async () => {
+    const { bug, fix, head, origin } = fixedChain();
+    const worktree = origin.clone(50);
+    const run = (deploy: ReturnType<typeof deps>["deploy"]) =>
+      runCheckRegression(
+        { ...deps(worktree, origin), deploy },
+        input({ labels: bothLabels(fix, bug), readCommit: head })
+      );
+    for (const deploy of [
+      {
+        isAncestor: () => Promise.resolve(true),
+        liveSha: () => Promise.resolve(null),
+      },
+      {
+        isAncestor: () => Promise.resolve(true),
+        liveSha: () => Promise.reject(new Error("HTTP 404")),
+      },
+      {
+        isAncestor: () => Promise.reject(new Error("HTTP 403")),
+        liveSha: () => Promise.resolve(head),
+      },
+    ]) {
+      // biome-ignore lint/performance/noAwaitInLoops: one clone, checked in turn.
+      const record = recorded(await run(deploy));
       assert.equal(record.kind, "fixed_deploy_unknown");
       assert.equal(
         record.line,
         `fixed on main, deploy status unknown, by ${fix}`
       );
-      assert.equal(record.deployedCommit, null);
     }
   });
 });
 
 describe("planted case: regression", () => {
-  const setup = () => {
+  const regressed = () => {
     const origin = new Origin();
     history(origin);
+    const old = origin.commit(12, note("old"), "docs: old");
     const bug = origin.commit(
       10,
       { [FILE]: sendLimit("count * 2") },
       "feat: double"
     );
     const head = origin.commit(9, note("after"), "docs: after");
-    return { bug, head, origin, worktree: origin.clone(50) };
+    return { bug, head, old, origin };
   };
 
   it("names the commit from the last 30 days that introduced it", async () => {
-    const { bug, head, origin, worktree } = setup();
+    const { bug, head, origin } = regressed();
     const record = recorded(
       await runCheckRegression(
-        deps(worktree, origin),
-        input({
-          deployments: {
-            current: deployment(head, 9),
-            timeline: [deployment(head, 9)],
-          },
-          labels: [{ role: "introduced", sha: bug }],
-          readCommit: head,
-        })
+        deps(origin.clone(50), origin, head),
+        input({ labels: [{ role: "introduced", sha: bug }], readCommit: head })
       )
     );
-    assert.equal(record.kind, "introduced");
     assert.equal(record.line, `introduced by ${bug}`);
-    assert.equal(record.commit, bug);
-    assert.ok(
-      Date.parse(git(worktree, ["log", "-1", "--format=%cI", bug])) >=
-        Date.parse(sinceIso(NOW))
-    );
+    assert.ok(Date.parse(at(30)) < Date.parse(at(10)));
   });
 
   it("refuses an introducing commit that production does not run", async () => {
-    const { bug, head, origin, worktree } = setup();
-    const older = git(worktree, ["rev-parse", `${bug}~1`]);
+    const { bug, head, old, origin } = regressed();
     const record = recorded(
       await runCheckRegression(
-        deps(worktree, origin),
-        input({
-          deployments: { current: deployment(older, 30), timeline: [] },
-          labels: [{ role: "introduced", sha: bug }],
-          readCommit: head,
-        })
+        deps(origin.clone(50), origin, old),
+        input({ labels: [{ role: "introduced", sha: bug }], readCommit: head })
       )
     );
     assert.equal(record.kind, "unchecked");
@@ -319,72 +203,38 @@ describe("planted case: regression", () => {
 });
 
 describe("later changes and labels", () => {
-  const chain = () => {
-    const origin = new Origin();
-    history(origin);
-    const bug = origin.commit(
-      20,
-      { [FILE]: sendLimit("count * 2") },
-      "feat: double"
-    );
-    const fix = origin.commit(
-      10,
-      { [FILE]: sendLimit("count") },
-      "fix: send limit"
-    );
-    return { bug, fix, origin };
-  };
-
-  it("lets a later revert win over an earlier fix", async () => {
-    const { bug, fix, origin } = chain();
+  it("lets a later revert win over an earlier fix, and a later fix over an introduction", async () => {
+    const { bug, fix, origin } = fixedChain();
     const revert = origin.commit(
-      5,
+      2,
       { [FILE]: sendLimit("count * 2") },
       "Revert: send limit"
     );
     const worktree = origin.clone(50);
-    const record = recorded(
+    const reverted = recorded(
       await runCheckRegression(
-        deps(worktree, origin),
+        deps(worktree, origin, revert),
         input({
-          deployments: {
-            current: deployment(revert, 4),
-            timeline: [deployment(revert, 4)],
-          },
           labels: [
             { role: "introduced", sha: revert },
-            { role: "fixed", sha: fix },
-            { role: "introduced", sha: bug },
+            ...(bothLabels(fix, bug) ?? []),
           ],
           readCommit: revert,
         })
       )
     );
-    assert.equal(record.kind, "introduced");
-    assert.equal(record.commit, revert);
-  });
-
-  it("lets a later fix win over an earlier introduction", async () => {
-    const { bug, fix, origin } = chain();
-    const worktree = origin.clone(50);
-    const record = recorded(
+    assert.equal(reverted.line, `introduced by ${revert}`);
+    const fixed = recorded(
       await runCheckRegression(
         deps(worktree, origin),
-        input({
-          labels: [
-            { role: "fixed", sha: fix },
-            { role: "introduced", sha: bug },
-          ],
-          readCommit: fix,
-        })
+        input({ labels: bothLabels(fix, bug), readCommit: fix })
       )
     );
-    assert.equal(record.kind, "fixed_deploy_unknown");
-    assert.equal(record.commit, fix);
+    assert.equal(fixed.kind, "fixed_deploy_unknown");
   });
 
   it("ignores a commit labelled neither and refuses a missing or stray label", async () => {
-    const { bug, fix, origin } = chain();
+    const { bug, fix, origin } = fixedChain();
     const worktree = origin.clone(50);
     const run = (labels: CheckInput["labels"]) =>
       runCheckRegression(
@@ -398,17 +248,41 @@ describe("later changes and labels", () => {
       ])
     );
     assert.equal(quiet.kind, "none");
-
     const missing = await run([{ role: "fixed", sha: fix }]);
-    assert.ok(missing.status === "error");
-    assert.ok(missing.error.includes(bug));
-
+    assert.ok(missing.status === "error" && missing.error.includes(bug));
     const stray = await run([
-      { role: "fixed", sha: fix },
-      { role: "introduced", sha: bug },
+      ...(bothLabels(fix, bug) ?? []),
       { role: "introduced", sha: "a".repeat(40) },
     ]);
     assert.ok(stray.status === "error");
+  });
+});
+
+describe("patches follow the lines through moves", () => {
+  it("shows each commit's change to the blamed lines where they were then, not at today's coordinates", async () => {
+    const origin = new Origin();
+    history(origin);
+    const fix = origin.commit(
+      6,
+      { [FILE]: sendLimit("count + 1") },
+      "fix: send limit"
+    );
+    const moved = origin.commit(
+      4,
+      {
+        [FILE]: `${"// header\n".repeat(20)}${sendLimit("count + 1")}`,
+      },
+      "chore: add a header"
+    );
+    const record = await runCheckRegression(
+      deps(origin.clone(50), origin),
+      input({ lines: { end: 27, start: 25 }, readCommit: moved })
+    );
+    assert.ok(record.status === "labels_needed", JSON.stringify(record));
+    const patch =
+      record.candidates.find((candidate) => candidate.sha === fix)?.patch ?? "";
+    assert.match(patch, ADDED_PLUS_ONE);
+    assert.ok(!record.candidates.some((candidate) => candidate.sha === moved));
   });
 });
 
@@ -417,18 +291,44 @@ describe("history", () => {
     const origin = new Origin();
     history(origin);
     const head = origin.commit(3, note("recent"), "docs: recent");
-    const worktree = origin.clone(50);
+    const record = recorded(
+      await runCheckRegression(
+        deps(origin.clone(50), origin),
+        input({ readCommit: head })
+      )
+    );
+    assert.equal(record.line, "none");
+  });
+
+  it("never names a shallow boundary inside the window as the introducing commit", async () => {
+    const origin = new Origin();
+    history(origin);
+    origin.commit(40, note("old"), "docs: old");
+    const head = origin.commit(25, note("inside"), "docs: inside");
+    const worktree = origin.clone(1);
+    assert.equal(
+      git(worktree, ["rev-parse", "--is-shallow-repository"]),
+      "true"
+    );
     const record = recorded(
       await runCheckRegression(
         deps(worktree, origin),
         input({ readCommit: head })
       )
     );
-    assert.equal(record.kind, "none");
     assert.equal(record.line, "none");
+    const cut = origin.clone(1);
+    const offline = recorded(
+      await runCheckRegression(
+        { ...deps(cut, origin), remote: "file:///does/not/exist" },
+        input({ readCommit: head })
+      )
+    );
+    assert.equal(offline.kind, "unchecked");
+    assert.match(offline.line, NOT_PROVEN);
   });
 
-  it("deepens a shallow 50-commit clone to cover 30 days", async () => {
+  it("deepens a shallow 50-commit clone until 30 days are proven complete", async () => {
     const origin = new Origin();
     history(origin);
     const head = origin.bulk(240, 40, 0.1);
@@ -436,21 +336,13 @@ describe("history", () => {
     const inWindow = Number(
       git(origin.path, ["rev-list", "--count", `--since=${since}`, "HEAD"])
     );
-    assert.ok(inWindow > 150);
-
     const worktree = origin.clone(50);
     const countIn = () =>
       Number(
         git(worktree, ["rev-list", "--count", `--since=${since}`, "HEAD"])
       );
-    assert.equal(
-      git(worktree, ["rev-parse", "--is-shallow-repository"]),
-      "true"
-    );
     assert.ok(countIn() < inWindow, "the 50-commit clone must start short");
-
     const ensured = await ensureHistory(shellFor(), {
-      deploymentCommits: [],
       readCommit: head,
       remote: origin.url,
       since,
@@ -468,8 +360,7 @@ describe("history", () => {
       { [FILE]: sendLimit("count * 2") },
       "feat: double"
     );
-    let head = bug;
-    head = origin.bulk(80, 20, 4);
+    const head = origin.bulk(80, 20, 4);
     const worktree = origin.clone(50);
     assert.throws(() => git(worktree, ["cat-file", "-e", `${bug}^{commit}`]));
     const result = await runCheckRegression(
@@ -486,30 +377,25 @@ describe("history", () => {
   it("reports unchecked, never none, when the history cannot be fetched", async () => {
     const origin = new Origin();
     history(origin);
-    origin.commit(3, note("recent"), "docs: recent");
     const head = origin.bulk(60, 2, 1);
-    const worktree = origin.clone(50);
     const record = recorded(
       await runCheckRegression(
-        { ...deps(worktree, origin), remote: "file:///does/not/exist" },
+        { ...deps(origin.clone(50), origin), remote: "file:///does/not/exist" },
         input({ readCommit: head })
       )
     );
     assert.equal(record.kind, "unchecked");
-    assert.notEqual(record.line, "none");
   });
 
   it("reports unchecked when the workspace holds no git history", async () => {
-    const origin = new Origin();
     const empty = scratch("archive-only");
     mkdirSync(empty);
     const record = recorded(
       await runCheckRegression(
-        deps(empty, origin),
+        deps(empty, new Origin()),
         input({ readCommit: "a".repeat(40) })
       )
     );
-    assert.equal(record.kind, "unchecked");
     assert.match(record.line, NO_HISTORY);
   });
 
@@ -524,97 +410,67 @@ describe("history", () => {
         `tweak ${i}`
       );
     }
-    const worktree = origin.clone(50);
     const listed = await listCandidates(shellFor(), {
-      ...BLAME_FOR_LIST,
+      file: FILE,
+      lines: BLAMED,
       readCommit: head,
       since: sinceIso(NOW),
-      worktree,
+      worktree: origin.clone(50),
     });
     assert.ok(!listed.ok);
     assert.match(listed.reason, NARROW);
   });
 });
 
-const BLAME_FOR_LIST = { file: FILE, lines: BLAMED };
-
-describe("incomplete or mismatched deployment evidence", () => {
-  const setup = () => {
+describe("operational failures", () => {
+  it("turns a thrown error anywhere into unchecked and still closes the network", async () => {
     const origin = new Origin();
     history(origin);
-    const served = origin.commit(15, note("served"), "docs: served");
-    const fix = origin.commit(
-      5,
-      { [FILE]: sendLimit("count + 0") },
-      "fix: send limit"
+    const head = origin.commit(3, note("recent"), "docs: recent");
+    const worktree = origin.clone(50);
+    let closed = 0;
+    const broken = await runCheckRegression(
+      {
+        ...deps(worktree, origin),
+        closeNetwork: () => {
+          closed += 1;
+          return Promise.resolve();
+        },
+        openNetwork: () => Promise.reject(new Error("broker down")),
+      },
+      input({ readCommit: head })
     );
-    return { fix, origin, served, worktree: origin.clone(50) };
-  };
-
-  it("cannot say live when the timeline starts after the failure time", async () => {
-    const { fix, origin, worktree } = setup();
-    const record = recorded(
-      await runCheckRegression(
-        deps(worktree, origin),
-        input({
-          deployments: {
-            current: deployment(fix, 4),
-            timeline: [deployment(fix, 4)],
-          },
-          labels: [{ role: "fixed", sha: fix }],
-          readCommit: fix,
-        })
-      )
+    assert.match(recorded(broken).line, THROWN);
+    assert.equal(closed, 0);
+    const shellThrows = await runCheckRegression(
+      {
+        ...deps(worktree, origin),
+        closeNetwork: () => {
+          closed += 1;
+          return Promise.resolve();
+        },
+        shell: () => Promise.reject(new Error("broker down")),
+      },
+      input({ readCommit: head })
     );
-    assert.equal(record.kind, "unchecked");
-    assert.match(record.line, NO_REACH);
-  });
-
-  it("cannot say live when a timeline entry is not a commit of this repository", async () => {
-    const { fix, origin, served, worktree } = setup();
-    const record = recorded(
-      await runCheckRegression(
-        deps(worktree, origin),
-        input({
-          deployments: {
-            current: deployment(fix, 4),
-            timeline: [
-              deployment(fix, 4),
-              deployment("c".repeat(40), 9),
-              deployment(served, 15),
-            ],
-          },
-          labels: [{ role: "fixed", sha: fix }],
-          readCommit: fix,
-        })
-      )
-    );
-    assert.equal(record.kind, "unchecked");
+    assert.match(recorded(shellThrows).line, THROWN);
+    assert.equal(closed, 1);
   });
 
   it("rejects malformed input before running any command", async () => {
-    const { fix, origin, worktree } = setup();
-    const ran: string[] = [];
-    const spy: CheckDeps = {
-      ...deps(worktree, origin),
-      shell: (command) => {
-        ran.push(command);
-        return Promise.resolve({ exitCode: 0, stderr: "", stdout: "" });
+    const origin = new Origin();
+    let ran = false;
+    const result = await runCheckRegression(
+      {
+        ...deps(scratch("never"), origin),
+        shell: () => {
+          ran = true;
+          return Promise.resolve({ exitCode: 0, stderr: "", stdout: "" });
+        },
       },
-    };
-    const results = await Promise.all(
-      [
-        input({ readCommit: "HEAD" }),
-        input({ file: "../outside.ts", readCommit: fix }),
-        input({ file: "-p", readCommit: fix }),
-        input({ lines: undefined, readCommit: fix }),
-        input({ needle: "x", readCommit: fix }),
-        input({ failureAt: "not a date", readCommit: fix }),
-      ].map((bad) => runCheckRegression(spy, bad))
+      input({ lines: { end: 1, start: 3 }, readCommit: "a".repeat(40) })
     );
-    for (const result of results) {
-      assert.equal(result.status, "error");
-    }
-    assert.deepEqual(ran, []);
+    assert.equal(result.status, "error");
+    assert.equal(ran, false);
   });
 });

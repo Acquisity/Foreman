@@ -38,4 +38,4 @@ Both authored helpers validate the complete accepted membership set before retur
 
 ## Regression check
 
-`check_regression` (root, bare) is the one tool for git history and production's commit: it deepens the checkout to 30 days, lists the commits that touched a line range and, once each is labelled, returns the result line. Load [regression-check.md](regression-check.md) for how to call it, and read the production deployments through `foreman_vercel_api`.
+`check_regression` (root, bare) is the one tool for git history and production's commit: it deepens the checkout to 30 days, lists the commits that touched a line range and, once each is labelled, returns the result line. It reads production's commit from GitHub itself. Load [regression-check.md](regression-check.md) for how to call it.

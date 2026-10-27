@@ -21,13 +21,31 @@ export interface RegressionRecord {
   commitRead: string;
   /** The commit production serves, or null when it could not be established. */
   deployedCommit: string | null;
+  /** The blamed file and line range at the commit read: the record answers only for that code. */
+  file: string;
   issue: string;
   kind: RegressionKind;
   /** The one result line the investigation document must repeat. */
   line: string;
+  lines: { end: number; start: number };
   reason?: string;
   windowDays: number;
 }
+
+/**
+ * The record for the code a decision blames, or none: a record from another
+ * file or another commit read is stale evidence for a corrected investigation.
+ */
+export const recordFor = (
+  record: RegressionRecord | undefined,
+  codePath: { commit: string; file: string } | undefined
+): RegressionRecord | undefined =>
+  record &&
+  codePath &&
+  record.commitRead === codePath.commit &&
+  record.file === codePath.file
+    ? record
+    : undefined;
 
 /** The part of a record the routing decision needs. */
 export type RegressionOutcome = Pick<

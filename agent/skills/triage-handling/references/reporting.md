@@ -114,7 +114,7 @@ What was checked and eliminated, so the next agent does not redo it.
 What action the root cause warrants.
 ```
 
-The three regression lines are copied from the `check_regression` record, and the save refuses a Bug document whose lines differ from it. Under them note what the critic needs to rerun it: the file and line range, the failure time and its source, the Vercel project, the deployments passed (`current` and the timeline, each with its commit and time), and the fixing or introducing commit's subject; for a fix not yet live, add the deploy note.
+The three regression lines are copied from the `check_regression` record, and the save refuses a Bug document whose lines differ from it. Under them note what the critic needs to rerun it: the file and line range, the failure time and its source, and the fixing or introducing commit's subject; for a fix not yet live, add the deploy note.
 
 The `**Confidence**` numbers are `decision.confidence` copied as returned. A decision that fell back to the skill because Jev failed writes `**Confidence**: Not available: Jev did not answer`. The `**Review**` line is never blank: a reviewed ticket shows the critic's result, and an unreviewed one shows `Not required:` with the decision's reason.
 
