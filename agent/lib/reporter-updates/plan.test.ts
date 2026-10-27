@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
-import { facts, MERGE_SHA, merged as pull, NEW_SHA } from "./fakes.js";
+import { facts, MERGE_SHA, NEW_SHA, merged as pull } from "./fakes.js";
 import {
   changeKindOf,
   closureOf,
@@ -80,7 +80,11 @@ describe("closureOf", () => {
     for (const label of ["User Error", "Platform Limitation"]) {
       assert.deepEqual(
         closureOf(
-          facts({ labels: [label], stateName: "Canceled", stateType: "canceled" })
+          facts({
+            labels: [label],
+            stateName: "Canceled",
+            stateType: "canceled",
+          })
         ),
         { kind: "not_fixed", reason: "not_a_bug" }
       );
@@ -160,8 +164,17 @@ describe("pullContext", () => {
     const context = pullContext(PR_7638.body);
     assert.ok(context.startsWith("## Solution"));
     assert.ok(context.includes("Add Email to the existing next-step controls"));
-    assert.ok(context.includes("### Power Dialer wrap-up and completed-call dock"));
-    for (const dropped of ["## Problem", "## Verification", "mermaid", "codesmith", "Blast radius", "Closes ENG-15846"]) {
+    assert.ok(
+      context.includes("### Power Dialer wrap-up and completed-call dock")
+    );
+    for (const dropped of [
+      "## Problem",
+      "## Verification",
+      "mermaid",
+      "codesmith",
+      "Blast radius",
+      "Closes ENG-15846",
+    ]) {
       assert.ok(!context.includes(dropped), dropped);
     }
   });

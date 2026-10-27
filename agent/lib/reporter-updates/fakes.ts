@@ -547,7 +547,13 @@ export const setup = (
   const probe = fakeDeploy(deploy);
   const memory = memoryStore();
   const writer = fakeWriter();
-  const deps = depsOf(linear.port, probe.probe, memory.store, over, writer.write);
+  const deps = depsOf(
+    linear.port,
+    probe.probe,
+    memory.store,
+    over,
+    writer.write
+  );
   return { deps, linear, memory, probe, writer };
 };
 

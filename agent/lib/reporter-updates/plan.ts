@@ -3,6 +3,7 @@ import type { NotFixedReason, Stage } from "./copy.js";
 export const DEPLOY_REPOSITORY = "Acquisity/Acquisity";
 
 export interface ClosingComment {
+  author: "foreman" | "person";
   body: string;
   createdAt: string;
 }

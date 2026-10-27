@@ -57,9 +57,10 @@ export const bannedWordsIn = (text: string): string[] =>
 
 const mentions = (text: string, name: string | null): boolean =>
   name !== null &&
-  new RegExp(`(?:^|[^\\p{L}])${name.replace(REGEXP_SPECIALS, "\\$&")}(?:$|[^\\p{L}])`, "iu").test(
-    text
-  );
+  new RegExp(
+    `(?:^|[^\\p{L}])${name.replace(REGEXP_SPECIALS, "\\$&")}(?:$|[^\\p{L}])`,
+    "iu"
+  ).test(text);
 
 const usable = (
   text: string,
@@ -226,8 +227,7 @@ export const stageOfCommentId = (
   identifier: string,
   id: string
 ): LedgerStage | null =>
-  LEDGER_STAGES.find((stage) => commentIdFor(identifier, stage) === id) ??
-  null;
+  LEDGER_STAGES.find((stage) => commentIdFor(identifier, stage) === id) ?? null;
 
 export const isReporterUpdate = (
   identifier: string,

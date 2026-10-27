@@ -1,4 +1,5 @@
 import { logOpsEvent, type OpsFields } from "../ops-log.js";
+import { commentIdFor } from "./comment-id.js";
 import {
   composeChange,
   composeDone,
@@ -11,7 +12,6 @@ import {
   type Stage,
   stageOfCommentId,
 } from "./copy.js";
-import { commentIdFor } from "./comment-id.js";
 import type { DeployProbe } from "./deploy.js";
 import type { LinearPort, TicketView } from "./linear.js";
 import {

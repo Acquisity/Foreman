@@ -4,11 +4,11 @@ import { notFixedText } from "./copy.js";
 import { githubDeployProbe } from "./deploy.js";
 import {
   depsOf,
+  FIXED,
   fakeDeploy,
   fakeLinear,
-  FIXED,
-  memoryStore,
   MERGE_SHA,
+  memoryStore,
   merged,
   NEW_SHA,
   NOW,
@@ -388,10 +388,9 @@ describe("a slow deployment scan", () => {
       linear.posts
         .map((p) => `${p.identifier} ${p.body}`)
         .sort((a, b) => a.localeCompare(b)),
-      [
-        `ENG-2 ${RECEIVED}`,
-        `ENG-3 ${notFixedText("closed")}`,
-      ].sort((a, b) => a.localeCompare(b))
+      [`ENG-2 ${RECEIVED}`, `ENG-3 ${notFixedText("closed")}`].sort((a, b) =>
+        a.localeCompare(b)
+      )
     );
     assert.equal(
       waitingIssues(memory).length,

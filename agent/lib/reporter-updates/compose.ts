@@ -13,6 +13,7 @@ import {
   receivedText,
 } from "./copy.js";
 import {
+  type ClosingComment,
   changeKindOf,
   DEPLOY_REPOSITORY,
   type Planned,
@@ -22,8 +23,13 @@ import {
 } from "./plan.js";
 import type { ReporterWriter } from "./writer.js";
 
-const commentsOf = (facts: TicketFacts): string[] =>
-  facts.closingComments.map((comment) => comment.body);
+const commentsOf = (
+  facts: TicketFacts,
+  authors: readonly ClosingComment["author"][]
+): string[] =>
+  facts.closingComments
+    .filter((comment) => authors.includes(comment.author))
+    .map((comment) => comment.body);
 
 export const composeReceived = async (
   facts: TicketFacts,
@@ -46,22 +52,39 @@ export const composeReceived = async (
   };
 };
 
+/**
+ * A duplicate gets its fixed line. Any other close reads the closing comments,
+ * Foreman's and people's: the writer gives a one-line reason, and for a close
+ * with no User Error or Platform Limitation label it also judges whether the
+ * product works as designed (not a bug) or will not be changed (closed). A
+ * failed call, or no comments, posts closed without a reason, unless the label
+ * already said not a bug.
+ */
 export const composeNotFixed = async (
   facts: TicketFacts,
   reason: NotFixedReason,
   write: ReporterWriter
 ): Promise<Planned> => {
-  const comments = commentsOf(facts);
-  let why: string | null = null;
-  if (reason !== "duplicate" && comments.length > 0) {
-    const reply = await write({ comments, kind: "reason", title: facts.title });
-    why = cleanPhrase(reply.what, MAX_REASON_WORDS, firstName(facts.assignee));
-  }
-  return {
+  const planned = (text: string): Planned => ({
     covers: ["not_fixed"],
     stage: "not_fixed",
-    text: notFixedText(reason, why),
-  };
+    text,
+  });
+  const comments = commentsOf(facts, ["foreman", "person"]);
+  if (reason === "duplicate" || comments.length === 0) {
+    return planned(notFixedText(reason));
+  }
+  const reply = await write({ comments, kind: "reason", title: facts.title });
+  const why = cleanPhrase(
+    reply.what,
+    MAX_REASON_WORDS,
+    firstName(facts.assignee)
+  );
+  const settled =
+    reason === "not_a_bug" || reply.asDesigned === true
+      ? "not_a_bug"
+      : "closed";
+  return planned(notFixedText(settled, why));
 };
 
 /**
@@ -105,7 +128,7 @@ export const composeDone = async (
   facts: TicketFacts,
   write: ReporterWriter
 ): Promise<Planned | null> => {
-  const comments = commentsOf(facts);
+  const comments = commentsOf(facts, ["person"]);
   if (comments.length === 0) {
     return null;
   }

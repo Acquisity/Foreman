@@ -18,15 +18,21 @@ export type WriterTask =
   | { comments: string[]; kind: "done" | "reason"; title: string };
 
 export interface WriterReply {
+  asDesigned?: boolean | null;
   steps: string | null;
   what: string | null;
 }
 
 export type ReporterWriter = (task: WriterTask) => Promise<WriterReply>;
 
-export const NO_REPLY: WriterReply = { steps: null, what: null };
+export const NO_REPLY: WriterReply = {
+  asDesigned: null,
+  steps: null,
+  what: null,
+};
 
 const replySchema = z.object({
+  asDesigned: z.boolean().nullable(),
   steps: z.string().max(400).nullable(),
   what: z.string().max(300).nullable(),
 });
@@ -36,7 +42,7 @@ const RULES = [
   "Write in plain, friendly words a customer uses. Never mention developers, owners, names of staff, tickets, pull requests, code, merges, deploys, file paths, error codes or AI models.",
   "No markdown, no quotes, no links, no emoji and no em dashes.",
   "Say only what the text below supports. Never invent a change, a button or a page.",
-  "Return JSON with two fields, what and steps. Use null for a field you cannot write from the text.",
+  "Return JSON with three fields, what, steps and asDesigned. Use null for a field you cannot write from the text, and for asDesigned unless the task asks for it.",
 ].join("\n");
 
 const TASKS: Record<WriterTask["kind"], string> = {
@@ -58,6 +64,7 @@ const TASKS: Record<WriterTask["kind"], string> = {
   ].join("\n"),
   reason: [
     "The report was closed without a change. Read the closing comments from our team.",
+    "Set asDesigned to true when they found the product works the way it is meant to: the customer's expectation differs from how it works, a user mistake, or a current limitation of the product. Set it to false when they decided not to change it for any other reason, such as not planned, out of scope or could not reproduce. Use null when the comments do not say.",
     "If they give a reason a customer would understand, set what to that reason in at most 10 words, as it fits after a colon at the end of a sentence, for example: exports only include the last 12 months.",
     "Otherwise set what to null. Set steps to null.",
   ].join("\n"),

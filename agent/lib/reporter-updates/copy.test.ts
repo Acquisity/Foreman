@@ -38,7 +38,10 @@ const allTexts = () => [
   fixedText(null, null),
   fixedText("the Resume session card no longer blocks your search bar", null),
   liveText(null, null),
-  liveText("you can now send an email without leaving the power dialler", STEPS),
+  liveText(
+    "you can now send an email without leaving the power dialler",
+    STEPS
+  ),
   doneText("that number's been removed from the CRM") ?? "",
   ...REASONS.map((reason) => notFixedText(reason)),
   ...REASONS.map((reason) => notFixedText(reason, "exports only cover a year")),
@@ -84,12 +87,18 @@ describe("reporter update wording", () => {
 
   it("writes fixed, live and done messages from the spec", () => {
     assert.equal(
-      fixedText("the Resume session card no longer blocks your search bar", null),
+      fixedText(
+        "the Resume session card no longer blocks your search bar",
+        null
+      ),
       "Fixed: the Resume session card no longer blocks your search bar. Give it a go, and reply here if it's still not right."
     );
     assert.equal(fixedText(null, null), FIXED_FALLBACK);
     assert.equal(
-      liveText("you can now send an email without leaving the power dialler", STEPS),
+      liveText(
+        "you can now send an email without leaving the power dialler",
+        STEPS
+      ),
       `This is live: you can now send an email without leaving the power dialler. ${STEPS}`
     );
     assert.equal(liveText("you can now do X", null), LIVE_FALLBACK);
@@ -122,8 +131,14 @@ describe("reporter update wording", () => {
 
 describe("cleanPhrase and cleanSteps", () => {
   it("accepts a short plain phrase and drops its closing stop", () => {
-    assert.equal(cleanPhrase(" why your threads won't load. ", 15), "why your threads won't load");
-    assert.equal(cleanSteps("Click Email in the wrap-up panel", 25), "Click Email in the wrap-up panel.");
+    assert.equal(
+      cleanPhrase(" why your threads won't load. ", 15),
+      "why your threads won't load"
+    );
+    assert.equal(
+      cleanSteps("Click Email in the wrap-up panel", 25),
+      "Click Email in the wrap-up panel."
+    );
   });
 
   it("refuses an empty, over-long, marked-up, banned or owner-naming phrase", () => {
@@ -137,7 +152,10 @@ describe("cleanPhrase and cleanSteps", () => {
     assert.equal(cleanPhrase("see https://example.com", 15), null);
     assert.equal(cleanPhrase("the deploy went out", 15), null);
     assert.equal(cleanPhrase("Sam fixed the export", 15, "Sam"), null);
-    assert.equal(cleanPhrase("the sample export", 15, "Sam"), "the sample export");
+    assert.equal(
+      cleanPhrase("the sample export", 15, "Sam"),
+      "the sample export"
+    );
   });
 });
 
@@ -165,10 +183,19 @@ describe("recognising messages already in the thread", () => {
 
   it("recognises a v2 message by its comment id, whatever the model wrote", () => {
     for (const stage of STAGES) {
-      assert.equal(stageOfCommentId("ENG-1", commentIdFor("ENG-1", stage)), stage);
-      assert.equal(stageOfCommentId("ENG-2", commentIdFor("ENG-1", stage)), null);
+      assert.equal(
+        stageOfCommentId("ENG-1", commentIdFor("ENG-1", stage)),
+        stage
+      );
+      assert.equal(
+        stageOfCommentId("ENG-2", commentIdFor("ENG-1", stage)),
+        null
+      );
     }
-    assert.equal(stageOfCommentId("ENG-1", commentIdFor("ENG-1", "owner")), "owner");
+    assert.equal(
+      stageOfCommentId("ENG-1", commentIdFor("ENG-1", "owner")),
+      "owner"
+    );
     assert.equal(
       isReporterUpdate("ENG-1", {
         body: "Fixed: anything at all.",
@@ -219,7 +246,12 @@ describe("reporter updates and the requester thread", () => {
       comment(receivedId, FOREMAN, receivedText(WHAT), "2026-10-01T10:01:00Z"),
       comment("b", FOREMAN, "A real answer.", "2026-10-01T10:02:00Z"),
       comment("c", "someone", receivedText(null), "2026-10-01T10:03:00Z"),
-      comment("d", FOREMAN, PAST_TEXTS.received[0] ?? "", "2026-10-01T10:04:00Z"),
+      comment(
+        "d",
+        FOREMAN,
+        PAST_TEXTS.received[0] ?? "",
+        "2026-10-01T10:04:00Z"
+      ),
     ];
     assert.deepEqual(
       withoutReporterUpdates(comments, FOREMAN, "ENG-1").map((c) => c.id),

@@ -116,6 +116,17 @@ describe("readTicket", () => {
       channel: SANDBOX,
       closingComments: [
         {
+          author: "foreman",
+          body: "elsewhere",
+          createdAt: "2026-10-10T10:00:00Z",
+        },
+        {
+          author: "foreman",
+          body: "Triage notes from Foreman",
+          createdAt: "2026-10-10T10:00:00Z",
+        },
+        {
+          author: "person",
           body: "Removed the wrong number from their contact.",
           createdAt: "2026-10-12T10:00:00Z",
         },

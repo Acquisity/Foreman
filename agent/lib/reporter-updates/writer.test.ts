@@ -41,9 +41,16 @@ const recorder = () => {
 describe("reporterWriter", () => {
   it("returns the phrase from a reply that matches the schema", async () => {
     const write = reporterWriter(
-      answer(JSON.stringify({ steps: null, what: "why your email threads won't load" }))
+      answer(
+        JSON.stringify({
+          asDesigned: null,
+          steps: null,
+          what: "why your email threads won't load",
+        })
+      )
     );
     assert.deepEqual(await write(TASK), {
+      asDesigned: null,
       steps: null,
       what: "why your email threads won't load",
     });
@@ -112,6 +119,15 @@ describe("writerPrompt", () => {
     });
     assert.ok(prompt.includes("- Could not reproduce."));
     assert.ok(prompt.includes("When in doubt, use null."));
+  });
+
+  it("asks the reason task to judge whether the product works as designed", () => {
+    const prompt = writerPrompt({
+      comments: ["Expected behaviour."],
+      kind: "reason",
+      title: "Export stops at a year",
+    });
+    assert.ok(prompt.includes("Set asDesigned to true when"));
   });
 
   it("never asks for owners, developers or engineering words", () => {

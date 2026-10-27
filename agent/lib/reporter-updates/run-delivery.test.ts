@@ -660,7 +660,11 @@ describe("run over several tickets", () => {
       }),
       ticket({
         closingComments: [
-          { body: "Removed the number.", createdAt: "2026-10-12T10:00:00Z" },
+          {
+            author: "person",
+            body: "Removed the number.",
+            createdAt: "2026-10-12T10:00:00Z",
+          },
         ],
         identifier: "ENG-4",
         stateType: "completed",

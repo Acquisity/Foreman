@@ -327,13 +327,16 @@ export const linearPort = (
         .filter(
           (comment) =>
             comment.user !== null &&
-            comment.user.id !== data.viewer.id &&
             !anchorIds.has(comment.id) &&
             !(comment.parent && anchorIds.has(comment.parent.id))
         )
         .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
         .slice(-CLOSING_COMMENTS)
         .map((comment) => ({
+          author:
+            comment.user?.id === data.viewer.id
+              ? ("foreman" as const)
+              : ("person" as const),
           body: comment.body,
           createdAt: comment.createdAt,
         }));

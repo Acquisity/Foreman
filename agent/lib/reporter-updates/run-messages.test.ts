@@ -31,7 +31,8 @@ import { NO_REPLY, type WriterReply, type WriterTask } from "./writer.js";
 const PR_7638: { body: string; title: string } = JSON.parse(
   readFileSync(new URL("./fixtures/pr-7638.json", import.meta.url), "utf8")
 );
-const LIVE_PHRASE = "you can now send an email without leaving the power dialler";
+const LIVE_PHRASE =
+  "you can now send an email without leaving the power dialler";
 const LIVE_STEPS =
   "After a call, click Email in the wrap-up panel, next to Task, Text and Book meeting";
 const LIVE_DEPLOY = {
@@ -99,8 +100,8 @@ describe("live message for a feature", () => {
     assert.equal(writer.tasks[0]?.kind, "live");
   });
 
-  it("posts the live fallback when the steps are missing or the model fails", async () => {
-    for (const reply of [{ steps: null, what: LIVE_PHRASE }, NO_REPLY]) {
+  for (const reply of [{ steps: null, what: LIVE_PHRASE }, NO_REPLY]) {
+    it(`posts the live fallback when the model returns ${JSON.stringify(reply)}`, async () => {
       const s = setup(
         [
           ticket({
@@ -114,8 +115,8 @@ describe("live message for a feature", () => {
       withWriter(s, { live: reply });
       await reconcile(s);
       assert.equal(s.linear.posts[0]?.body, LIVE_FALLBACK);
-    }
-  });
+    });
+  }
 });
 
 describe("fixed message for a bug", () => {
@@ -144,25 +145,31 @@ describe("fixed message for a bug", () => {
     );
   });
 
-  it("falls back on a model failure, a banned word or an over-long phrase", async () => {
-    const replies: WriterReply[] = [
-      NO_REPLY,
-      { steps: null, what: "the deploy fixed your export" },
-      {
-        steps: null,
-        what: "the export that used to stop at five hundred rows now includes every single row again",
-      },
-    ];
-    for (const reply of replies) {
+  const fallbackReplies: WriterReply[] = [
+    NO_REPLY,
+    { steps: null, what: "the deploy fixed your export" },
+    {
+      steps: null,
+      what: "the export that used to stop at five hundred rows now includes every single row again",
+    },
+  ];
+  for (const reply of fallbackReplies) {
+    it(`falls back to the fixed line when the model returns ${JSON.stringify(reply.what)}`, async () => {
       const s = setup(
-        [ticket({ labels: ["Bug"], pullUrls: [PR_URL], stateType: "completed" })],
+        [
+          ticket({
+            labels: ["Bug"],
+            pullUrls: [PR_URL],
+            stateType: "completed",
+          }),
+        ],
         LIVE_DEPLOY
       );
       withWriter(s, { fixed: reply });
       await reconcile(s);
-      assert.equal(s.linear.posts[0]?.body, FIXED_FALLBACK, reply.what ?? "");
-    }
-  });
+      assert.equal(s.linear.posts[0]?.body, FIXED_FALLBACK);
+    });
+  }
 
   it("keeps the steps only while the whole message stays within the word limit", () => {
     const what = "the Resume session card no longer blocks your search bar";
@@ -190,6 +197,7 @@ describe("received fallback", () => {
 
 describe("done without a pull request", () => {
   const closing = (body: string) => ({
+    author: "person" as const,
     body,
     createdAt: "2026-10-12T10:00:00Z",
   });
@@ -215,19 +223,19 @@ describe("done without a pull request", () => {
     ]);
   });
 
-  it("posts nothing and logs why when no comment describes a change, or the model fails", async () => {
-    const cases: [string, ReturnType<typeof ticket>, WriterReply][] = [
-      ["no comments", ticket({ stateType: "completed" }), NO_REPLY],
-      [
-        "comments with no change",
-        ticket({
-          closingComments: [closing("Could not reproduce.")],
-          stateType: "completed",
-        }),
-        NO_REPLY,
-      ],
-    ];
-    for (const [name, t, reply] of cases) {
+  const skipCases: [string, ReturnType<typeof ticket>, WriterReply][] = [
+    ["no comments", ticket({ stateType: "completed" }), NO_REPLY],
+    [
+      "comments with no change",
+      ticket({
+        closingComments: [closing("Could not reproduce.")],
+        stateType: "completed",
+      }),
+      NO_REPLY,
+    ],
+  ];
+  for (const [name, t, reply] of skipCases) {
+    it(`posts nothing and logs why when there are ${name}`, async () => {
       const s = setup([t]);
       const events = logged(s);
       withWriter(s, { done: reply });
@@ -251,15 +259,19 @@ describe("done without a pull request", () => {
         ],
         name
       );
-    }
-  });
+    });
+  }
 });
 
 describe("not a bug and closed reasons", () => {
   it("adds a short reason from the closing comments, and leaves it out when there is none", async () => {
     const t = ticket({
       closingComments: [
-        { body: "Exports only cover 12 months.", createdAt: "2026-10-12T10:00:00Z" },
+        {
+          author: "person",
+          body: "Exports only cover 12 months.",
+          createdAt: "2026-10-12T10:00:00Z",
+        },
       ],
       labels: ["User Error"],
       stateName: "Canceled",
@@ -280,6 +292,75 @@ describe("not a bug and closed reasons", () => {
     const writer = withWriter(bare, {});
     await reconcile(bare);
     assert.equal(bare.linear.posts[0]?.body, notFixedText("closed"));
+    assert.equal(writer.tasks.length, 0);
+  });
+
+  const foremanClose = () =>
+    ticket({
+      closingComments: [
+        {
+          author: "foreman",
+          body: "Closing: this is expected behaviour, exports cover 12 months.",
+          createdAt: "2026-10-12T10:00:00Z",
+        },
+      ],
+      labels: ["Feature Request"],
+      stateName: "Canceled",
+      stateType: "canceled",
+    });
+
+  it("lets the writer call an unlabelled Canceled close not a bug, from Foreman's closing comment", async () => {
+    const s = setup([foremanClose()]);
+    const writer = withWriter(s, {
+      reason: {
+        asDesigned: true,
+        steps: null,
+        what: "exports only include the last 12 months",
+      },
+    });
+    await reconcile(s);
+    assert.equal(
+      s.linear.posts[0]?.body,
+      "We checked, and this is working the way it's meant to right now: exports only include the last 12 months. If that's not what you saw, reply here with a screenshot and we'll take another look."
+    );
+    const [task] = writer.tasks;
+    assert.deepEqual(task && "comments" in task ? task.comments : [], [
+      "Closing: this is expected behaviour, exports cover 12 months.",
+    ]);
+  });
+
+  it("posts closed with the reason when the writer says it won't be changed", async () => {
+    const s = setup([foremanClose()]);
+    withWriter(s, {
+      reason: {
+        asDesigned: false,
+        steps: null,
+        what: "it's not something we plan to add",
+      },
+    });
+    await reconcile(s);
+    assert.equal(
+      s.linear.posts[0]?.body,
+      notFixedText("closed", "it's not something we plan to add")
+    );
+  });
+
+  it("posts closed without a reason when the writer fails", async () => {
+    const s = setup([foremanClose()]);
+    withWriter(s, { reason: NO_REPLY });
+    await reconcile(s);
+    assert.equal(s.linear.posts[0]?.body, notFixedText("closed"));
+  });
+
+  it("never treats Foreman's own comment as evidence that a person made a change", async () => {
+    const t = foremanClose();
+    Object.assign(t.facts, { stateName: "Done", stateType: "completed" });
+    const s = setup([t]);
+    const writer = withWriter(s, {});
+    assert.deepEqual(await reconcile(s), {
+      kind: "skipped",
+      why: "no_evidence_of_change",
+    });
     assert.equal(writer.tasks.length, 0);
   });
 });
@@ -322,7 +403,10 @@ describe("duplicate follow-up", () => {
   });
 
   it("waits while the original is open, and follows up on a later run once it ships", async () => {
-    const original = ticket({ identifier: "ENG-9", labels: ["Feature Request"] });
+    const original = ticket({
+      identifier: "ENG-9",
+      labels: ["Feature Request"],
+    });
     original.anchorId = null;
     const dup = duplicate();
     dup.updatedAt = "2026-10-11T10:00:00.000Z";
