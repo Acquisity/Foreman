@@ -212,6 +212,18 @@ export const gatewayRouting = (modelId: string) =>
       }
     : undefined;
 
+// The root's Anthropic effort on the orchestrator and triage slots: Aaron's decision
+// (ENG-16434). A gateway model ignores the anthropic option, so an override to a
+// non-Claude id stays safe. Native delegates inherit it with the root's model.
+export const ROOT_EFFORT = "medium";
+
+export const rootCallOptions = (modelId: string) => ({
+  providerOptions: {
+    ...gatewayRouting(modelId)?.providerOptions,
+    anthropic: { effort: ROOT_EFFORT },
+  },
+});
+
 // For calls that reformat or summarise text they were handed rather than reason
 // about it. Measured on the support widget: on its defaults the fast model spends
 // about 90% of its output on hidden reasoning (8 to 12s a call); with reasoning

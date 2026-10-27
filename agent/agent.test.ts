@@ -109,15 +109,73 @@ it("accepts the wrapped root model under Eve's documented live-step contract", a
   assert.equal(resolved.model, selection.model);
   assert.equal(typeof resolved.model.doStream, "function");
   // The compiled Sonnet default carries no gateway order. The routing for a
-  // DeepSeek override rides on the selection and eve forwards it as
-  // providerOptions. The order itself is pinned in models.test.ts; this only
-  // checks the forwarding.
+  // DeepSeek override rides on the selection with the root's medium effort, and
+  // eve forwards both as providerOptions. The order itself is pinned in
+  // models.test.ts; this only checks the forwarding.
   const { gatewayRouting, MODELS } = await import("./lib/models.js");
   assert.equal(gatewayRouting(MODELS.orchestrator), undefined);
   const expected = gatewayRouting(OVERRIDE_ID);
   assert.ok(expected);
-  assert.deepEqual(
-    resolved.reference.providerOptions,
-    expected.providerOptions
-  );
+  assert.deepEqual(resolved.reference.providerOptions, {
+    ...expected.providerOptions,
+    anthropic: { effort: "medium" },
+  });
+});
+
+describe("root effort", () => {
+  const effortOf = (selection: {
+    modelOptions?: { providerOptions?: { anthropic?: { effort?: string } } };
+  }) => selection.modelOptions?.providerOptions?.anthropic?.effort;
+
+  it("runs the orchestrator and triage roots at medium effort and leaves the widget alone", async (t) => {
+    t.mock.method(globalThis, "fetch", () =>
+      Promise.reject(new Error("No network in this test"))
+    );
+    // Claude ids build a CLI Proxy provider; nothing is called.
+    const env = { ...process.env };
+    t.after(() => {
+      process.env = env;
+    });
+    process.env.CLIPROXY_BASE_URL = "https://proxy.invalid/v1";
+    process.env.CLIPROXY_API_KEY = "test";
+    const [{ MODELS, rootCallOptions }, { stampTriageIntake }, scope] =
+      await Promise.all([
+        import("./lib/models.js"),
+        import("./lib/trust.js"),
+        import("./lib/widget-scope.js"),
+      ]);
+    const [resolve] = Object.values(rootAgent.model.events);
+    const select = (initiator: unknown) =>
+      Reflect.apply(resolve, undefined, [
+        {},
+        { session: { auth: { current: initiator, initiator }, id: "s1" } },
+      ]);
+    const auth = {
+      attributes: {},
+      authenticator: "slack",
+      issuer: "slack",
+      principalId: "U123",
+      principalType: "user",
+    } as unknown as Parameters<typeof rootModelSlot>[0] & object;
+
+    // The orchestrator slot carries the saved DeepSeek override here, so its
+    // selection must keep the gateway order alongside the effort.
+    const orchestrator = await select(auth);
+    assert.equal(effortOf(orchestrator), "medium");
+    assert.deepEqual(
+      orchestrator.modelOptions.providerOptions,
+      rootCallOptions(OVERRIDE_ID).providerOptions
+    );
+    assert.ok(orchestrator.modelOptions.providerOptions.gateway?.order);
+    // The compiled Sonnet default gets the effort and no gateway order.
+    assert.deepEqual(rootCallOptions(MODELS.orchestrator).providerOptions, {
+      anthropic: { effort: "medium" },
+    });
+
+    assert.equal(effortOf(await select(stampTriageIntake(auth))), "medium");
+    assert.equal(
+      effortOf(await select({ ...auth, issuer: scope.WIDGET_SUPPORT_ISSUER })),
+      undefined
+    );
+  });
 });

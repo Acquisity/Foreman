@@ -2,8 +2,8 @@ import { defineAgent, defineDynamic } from "eve";
 import {
   type AgentModelSlot,
   fastCallOptions,
-  gatewayRouting,
   resolveModel,
+  rootCallOptions,
 } from "./lib/models.js";
 import { ticketLinkedModel } from "./lib/ticket-link-model.js";
 import { isTriageIntake } from "./lib/trust.js";
@@ -46,7 +46,8 @@ export const rootModelSlot = (
 //
 // Wrapped model instances resolve at step start: Eve cannot serialize provider
 // objects into durable session/turn selections. resolveModel retains live overrides.
-// The selection also carries the gateway routing for a DeepSeek override (see gatewayRouting).
+// The selection also carries the root's medium effort and the gateway routing for a
+// DeepSeek override (see rootCallOptions).
 export default defineAgent({
   compaction: { thresholdPercent: 0.75 },
   limits: { sessionUsage: () => false },
@@ -66,7 +67,7 @@ export default defineAgent({
           ),
           // Jev decides each widget step, so the widget model only acts: on its
           // default reasoning each step ran past the 15s model-call timeout.
-          modelOptions: widget ? fastCallOptions(id) : gatewayRouting(id),
+          modelOptions: widget ? fastCallOptions(id) : rootCallOptions(id),
         };
       },
     },
