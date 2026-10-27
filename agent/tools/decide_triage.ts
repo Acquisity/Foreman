@@ -7,6 +7,7 @@ import {
   confidenceFields,
   criticRounds,
   decisionFields,
+  fallbackDecisionFields,
   recordDecision,
   triageDecisions,
 } from "#lib/triage-log.js";
@@ -26,7 +27,7 @@ export default defineTool({
     "For a Bug that is not a Duplicate, hotlane carries the incident-hotlane route, impact, and proposed label. " +
     "outcome route carries the exact state, priority, addLabels (including the Area label), project, assignee, and duplicate fields for route_ticket; pass them unchanged. decision.assignee is the mapped owner of the area it chose, James Keeble when no area fits, and null when the ticket may not go to a developer (not a confirmed Bug, or a feature request nobody approved); decision.area names the Area label the route already carries. approval needed means a feature request waits for James to approve it. " +
     "Put every note in the Triage investigation document. " +
-    "decided false means Jev could not answer: decide by the skill's rules and say so in the document.",
+    "decided false means Jev could not answer: decide by the skill's rules and say so in the document; route_ticket then holds any route but the owner assignment until the critic has reviewed the fallback decision.",
   async execute(input, ctx) {
     try {
       const decision = await decideTriage(input, { signal: ctx.abortSignal });
@@ -55,6 +56,13 @@ export default defineTool({
       if (ctx.abortSignal.aborted) {
         throw error;
       }
+      const fallback = recordDecision(
+        triageDecisions.get(),
+        criticRounds.get(),
+        fallbackDecisionFields(input.identifier)
+      );
+      triageDecisions.update(() => fallback.decisions);
+      criticRounds.update(() => fallback.rounds);
       return {
         decided: false as const,
         error: error instanceof Error ? error.message : "Jev failed.",

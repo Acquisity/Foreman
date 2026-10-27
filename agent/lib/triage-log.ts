@@ -7,6 +7,7 @@ import { SUPPORT_OWNER } from "./owner-map.js";
 export interface LatestTriageDecision {
   classification: string | null;
   closureReview?: boolean;
+  fallback?: boolean;
   issue: string;
   outcome: "route" | "unproven";
   path: string | null;
@@ -283,6 +284,22 @@ export function applyCriticSettlement(
   };
 }
 
+/**
+ * The record a failed decide_triage leaves: the skill's fallback decides the
+ * route without Jev's confidence, so any route but the owner assignment waits
+ * for the critic's review of it.
+ */
+export const fallbackDecisionFields = (
+  issue: string
+): LatestTriageDecision => ({
+  classification: null,
+  closureReview: true,
+  fallback: true,
+  issue,
+  outcome: "unproven",
+  path: null,
+});
+
 export function billingDecisionFields(
   issue: string,
   route: BillingRoute
@@ -482,7 +499,8 @@ export function routeDecisionEvent(
   input: RouteInput
 ) {
   const decision = decisions[input.issue];
-  const triage = decision && !decision.route ? decision : undefined;
+  const triage =
+    decision && !(decision.route || decision.fallback) ? decision : undefined;
   const billing = decision?.route;
   const billed =
     !triage &&

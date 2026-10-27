@@ -124,13 +124,16 @@ test("a Bug the fallback decides after Jev failed still gets the review and the 
   );
   for (const rule of [
     "`decide_triage` returned `review.required: true`",
-    "or returned `decided: false` and the fallback decided a `Bug`, a `Duplicate`, a `Platform Limitation`, or a `User Error` closing with a lane that could not run or a failure the customer saw",
-    "take `review.kind` from that classification and path",
+    "or returned `decided: false` and the fallback decided anything but the unproven stop",
+    "`duplicate` for a `Duplicate`, `billing_inbox` for an inbox error set aside as billing",
+    "otherwise `bug`, `platform_limitation` or `user_error` by classification",
   ]) {
     assert.ok(gate.includes(rule), rule);
   }
   assert.ok(
-    reviewSection.includes("or the fallback decides one of these"),
+    reviewSection.includes(
+      "or the fallback decides anything but the unproven stop"
+    ),
     "Stage 5 sends a fallback decision to review"
   );
   assert.ok(
@@ -155,4 +158,28 @@ test("the critic is sent the packet its echo is checked against", () => {
   ]) {
     assert.ok(criticReviewReference.includes(rule), rule);
   }
+});
+
+test("the final Review line is saved after routing on every path, not only after the handoff", () => {
+  assert.ok(
+    triageHandlingSkill.includes(
+      "After routing reads back on any path, save it once more with its final `**Review**` line"
+    )
+  );
+  assert.ok(
+    !triageHandlingSkill.includes("After the handoff reads its writes back")
+  );
+});
+
+test("a changed cause gets its master search before the second review", () => {
+  assert.ok(
+    handoffSkill.includes(
+      "When adjudication changes the cause or code path, Stage 5 runs it again and records the new master before the second review; Stage 6 reuses the latest result."
+    )
+  );
+  assert.ok(
+    criticReviewReference.includes(
+      "If the corrected cause or code path changed, run the `engineering-handoff` master search again and record its master"
+    )
+  );
 });

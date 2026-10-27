@@ -9,8 +9,10 @@ import {
   type CriticCount,
   type CriticRounds,
   criticBlocked,
+  fallbackDecisionFields,
   recordDecision,
   reviewCycleAfterDecision,
+  routeDecisionEvent,
   routeRefusal,
   settleCriticPacket,
   settleCriticRound,
@@ -165,6 +167,45 @@ describe("the review cycle", () => {
         issue: "ENG-1",
         project: "Support",
         state: "Todo",
+      }),
+      null
+    );
+  });
+
+  it("holds a route the fallback decided after Jev failed until the critic settles", () => {
+    const failed = recordDecision({}, {}, fallbackDecisionFields("ENG-1"));
+    const billing = {
+      assignee: "Aaron Fraga",
+      issue: "ENG-1",
+      project: "Support",
+      state: "Todo",
+    };
+    assert.match(
+      routeRefusal(failed.decisions, failed.rounds, billing) ?? "",
+      FIRST_LINE_RULE
+    );
+    assert.equal(
+      routeDecisionEvent(failed.decisions, billing).code,
+      "skill_fallback"
+    );
+    const reviewed = settleCriticPacket(
+      failed.rounds,
+      stampCriticPacket(failed.rounds, {
+        commit: null,
+        documentId: null,
+        issue: "ENG-1",
+        updatedAt: null,
+      }),
+      "approve"
+    );
+    assert.equal(
+      routeRefusal(failed.decisions, reviewed.rounds, billing),
+      null
+    );
+    assert.equal(
+      routeRefusal(failed.decisions, failed.rounds, {
+        assignee: "Aaron Fraga",
+        issue: "ENG-1",
       }),
       null
     );

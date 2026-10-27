@@ -33,7 +33,7 @@ A shared symptom, error string, component, provider, or customer outcome is not 
 
 ## Search for the current master
 
-Stage 5 runs this search before the critic review so the critic can check the master; Stage 6 reuses its result unless adjudication changed the cause or code path.
+Stage 5 runs this search before the critic review so the critic can check the master. When adjudication changes the cause or code path, Stage 5 runs it again and records the new master before the second review; Stage 6 reuses the latest result.
 
 Search on four axes: the cause, the Stage 4 code path, the provider failure, and the symptom. The code path is the strongest of the four, because two reports running through the same function are almost certainly one bug.
 
