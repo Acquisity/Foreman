@@ -171,15 +171,20 @@ test("the final Review line is saved after routing on every path, not only after
   );
 });
 
-test("a changed cause gets its master search before the second review", () => {
+test("every Engineering Todo decision gets its master search before the review that checks it", () => {
+  assert.ok(
+    reviewSection.includes(
+      "For an `Engineering Todo` path, run the `engineering-handoff` master search first so the critic can check the master"
+    )
+  );
   assert.ok(
     handoffSkill.includes(
-      "When adjudication changes the cause or code path, Stage 5 runs it again and records the new master before the second review; Stage 6 reuses the latest result."
+      "When adjudication moves the decision to `Engineering Todo` or changes its cause or code path, Stage 5 runs it again and records the new master before the second review; Stage 6 reuses the latest result."
     )
   );
   assert.ok(
     criticReviewReference.includes(
-      "If the corrected cause or code path changed, run the `engineering-handoff` master search again and record its master"
+      "If the corrected decision takes the `Engineering Todo` path and no master search has run for its cause and code path, run the `engineering-handoff` master search and record its master"
     )
   );
 });
