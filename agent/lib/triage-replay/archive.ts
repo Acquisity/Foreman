@@ -79,12 +79,16 @@ export async function prepareReplayWorkspace(
         error:
           "A replay process prepares repositories only for replay sessions.",
       },
+      success: false as const,
     };
   }
   const { archive } = await readReplayState(session.runId, session.caseKey);
   const error = await prepareReplayArchive(await getSandbox(), archive);
   if (error) {
-    return { refusal: { code: "replay_archive_unavailable", error } };
+    return {
+      refusal: { code: "replay_archive_unavailable", error },
+      success: false as const,
+    };
   }
   return {
     commit: archive.commit,
