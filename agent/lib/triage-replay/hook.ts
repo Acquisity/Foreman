@@ -51,15 +51,16 @@ export const triageReplayHook = defineHook({
       if (!(session && data.kind === "agent" && data.name === "critic")) {
         return;
       }
-      const critic = criticVerdictFields(
-        data.status,
-        data.status === "completed" ? data.output : undefined
-      );
       await withReplayState(session.runId, session.caseKey, (state) => {
+        const critic = criticVerdictFields(
+          data.status,
+          data.status === "completed" ? data.output : undefined,
+          state.case.id
+        );
         state.critic = critic;
         state.criticObjections = nextObjections(
           state.criticObjections ?? 0,
-          critic.verdict
+          critic.counted
         );
       });
     },

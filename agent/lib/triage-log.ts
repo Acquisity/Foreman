@@ -40,25 +40,22 @@ export const criticRounds = defineState<Record<string, CriticRounds>>(
 
 export const CRITIC_OBJECTION_LIMIT = 2;
 
-export function nextObjections(
-  before: number,
-  verdict: CriticVerdictFields["verdict"]
-): number {
-  if (verdict === "APPROVE") {
+export function nextObjections(before: number, counted: CriticCount): number {
+  if (counted === "approve") {
     return 0;
   }
-  return verdict === "failed" ? before : before + 1;
+  return counted === "failed" ? before : before + 1;
 }
 
 export function settleCriticRound(
   rounds: Readonly<Record<string, CriticRounds>>,
   issue: string,
-  verdict: CriticVerdictFields["verdict"]
+  counted: CriticCount
 ): Record<string, CriticRounds> {
   return {
     ...rounds,
     [issue]: {
-      objections: nextObjections(rounds[issue]?.objections ?? 0, verdict),
+      objections: nextObjections(rounds[issue]?.objections ?? 0, counted),
       ran: true,
     },
   };
@@ -175,22 +172,64 @@ const criticReply = z.object({
   criteria_results: z.array(
     z.object({ criterion: z.enum(CRITIC_CRITERIA), result: z.string() })
   ),
+  reviewed: z.object({ commit: z.string(), issue_id: z.string() }).optional(),
   verdict: z.enum(CRITIC_VERDICTS),
 });
+type CriticReply = z.infer<typeof criticReply>;
+
+export const CRITIC_COUNTS = ["approve", "objection", "failed"] as const;
+export type CriticCount = (typeof CRITIC_COUNTS)[number];
 
 export const criticVerdictSchema = z.strictObject({
   blockingFindings: z.int().nonnegative().nullable(),
+  counted: z.enum(CRITIC_COUNTS),
   failedCriteria: z.int().nonnegative().nullable(),
   verdict: z.enum([...CRITIC_VERDICTS, "failed"]),
 });
 export type CriticVerdictFields = z.infer<typeof criticVerdictSchema>;
 
+const PINNED_COMMIT = /^[0-9a-f]{40}$/u;
+
+const completeApproval = (reply: CriticReply): boolean => {
+  const slugs = new Set(reply.criteria_results.map((entry) => entry.criterion));
+  return (
+    reply.blocking_findings.length === 0 &&
+    reply.criteria_results.length === CRITIC_CRITERIA.length &&
+    slugs.size === CRITIC_CRITERIA.length &&
+    reply.criteria_results.every((entry) => entry.result !== "FAIL")
+  );
+};
+
+/**
+ * What a critic result counts as under critic-review.md step 5: an approval
+ * only when it is complete, a failure when the review could not start, ran
+ * unpinned or reviewed another ticket, and an objection otherwise.
+ */
+export function countCriticReply(
+  reply: CriticReply,
+  issue: string | null
+): CriticCount {
+  if (
+    reply.criteria_results.length === 0 ||
+    !reply.reviewed ||
+    !PINNED_COMMIT.test(reply.reviewed.commit) ||
+    (issue !== null && reply.reviewed.issue_id !== issue)
+  ) {
+    return "failed";
+  }
+  return reply.verdict === "APPROVE" && completeApproval(reply)
+    ? "approve"
+    : "objection";
+}
+
 export function criticVerdictFields(
   status: string,
-  output: unknown
+  output: unknown,
+  issue: string | null = null
 ): CriticVerdictFields {
   const failed = {
     blockingFindings: null,
+    counted: "failed",
     failedCriteria: null,
     verdict: "failed",
   } as const;
@@ -211,6 +250,7 @@ export function criticVerdictFields(
   }
   return {
     blockingFindings: parsed.data.blocking_findings.length,
+    counted: countCriticReply(parsed.data, issue),
     failedCriteria: parsed.data.criteria_results.filter(
       (entry) => entry.result === "FAIL"
     ).length,

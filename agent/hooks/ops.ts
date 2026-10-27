@@ -134,12 +134,13 @@ export default defineHook({
       }
       const verdict = criticVerdictFields(
         data.status,
-        data.status === "completed" ? data.output : undefined
+        data.status === "completed" ? data.output : undefined,
+        issue
       );
       const rounds = settleCriticRound(
         criticRounds.get(),
         issue,
-        verdict.verdict
+        verdict.counted
       );
       criticRounds.update(() => rounds);
       triageDecisions.update((decisions) =>

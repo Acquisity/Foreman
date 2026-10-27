@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
+import { CRITIC_CRITERIA } from "../../subagents/critic/agent.js";
 import { tool as commentTool } from "../../tools/comment_triage_replay_issue.js";
 import { tool as createIssueTool } from "../../tools/create_triage_replay_issue.js";
 import { tool as catalogTool } from "../../tools/list_triage_replay_catalog.js";
@@ -70,6 +71,50 @@ const noTransport = (t: Parameters<typeof replayProcess>[0]) =>
   });
 
 const endTurn = () => replayHandler("turn.completed")({ data: {} }, rootCtx);
+
+const criticReply = (verdict: string, over: Record<string, unknown> = {}) => ({
+  advisory_notes: [],
+  blocking_findings: verdict === "APPROVE" ? [] : [{ claim: "c" }],
+  criteria_results: CRITIC_CRITERIA.map((criterion) => ({
+    criterion,
+    evidence: "read",
+    rationale: "checked",
+    result: verdict === "APPROVE" ? "PASS" : "FAIL",
+  })),
+  reviewed: {
+    commit: "c".repeat(40),
+    document_id: "doc-1",
+    document_updated_at: "2026-10-27T10:00:00.000Z",
+    issue_id: "ENG-100",
+  },
+  summary: "s",
+  verdict,
+  ...over,
+});
+const objection = criticReply("CHALLENGE");
+const skillLoadFailure = criticReply("INSUFFICIENT_EVIDENCE", {
+  blocking_findings: [],
+  criteria_results: [],
+  reviewed: {
+    commit: "unpinned",
+    document_id: "doc-1",
+    document_updated_at: "2026-10-27T10:00:00.000Z",
+    issue_id: "ENG-100",
+  },
+});
+const criticSettles = (callId: string, output: unknown) =>
+  replayHandler("task.settled")(
+    {
+      data: {
+        callId,
+        kind: "agent",
+        name: "critic",
+        output,
+        status: "completed",
+      },
+    },
+    rootCtx
+  );
 
 describe("replay result", () => {
   it("settles only when the root turn ends, and fails a route that never applied", async (t) => {
@@ -179,24 +224,8 @@ describe("replay result", () => {
         review: { kind: "duplicate", reason: "r", required: true },
       })
     );
-    const objection = () =>
-      replayHandler("task.settled")(
-        {
-          data: {
-            kind: "agent",
-            name: "critic",
-            output: {
-              blocking_findings: [{ claim: "c" }],
-              criteria_results: [],
-              verdict: "CHALLENGE",
-            },
-            status: "completed",
-          },
-        },
-        rootCtx
-      );
-    await objection();
-    await objection();
+    await criticSettles("critic-1", objection);
+    await criticSettles("critic-2", objection);
     await saveInvestigationDocument(
       { content: "Blocked.", issue: "ENG-100", lane: "triage" },
       { client }
@@ -212,6 +241,24 @@ describe("replay result", () => {
     assert.equal(result.final?.path, null);
     assert.equal(result.final?.assignee, "Anthony Adewale");
     assert.equal(result.final?.master, null);
+  });
+
+  it("does not count two reviews that could not start as objections", async (t) => {
+    await replayProcess(t);
+    noTransport(t);
+    await toolResult(
+      "decide_triage",
+      routeDecision({
+        needsCriticReview: true,
+        review: { kind: "duplicate", reason: "r", required: true },
+      })
+    );
+    await criticSettles("critic-1", skillLoadFailure);
+    await criticSettles("critic-2", skillLoadFailure);
+    const settled = await state();
+    assert.equal(settled.criticObjections ?? 0, 0);
+    assert.equal(settled.critic?.counted, "failed");
+    assert.equal(settled.critic?.verdict, "INSUFFICIENT_EVIDENCE");
   });
 
   it("waits for the critic when the decision needs review", async (t) => {
