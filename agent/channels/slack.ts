@@ -39,6 +39,7 @@ import {
 import {
   alertDisputeId,
   isStripeDisputeAlert,
+  isStripeDisputeApprovalText,
   renderStripeDisputeAlert,
   STRIPE_DISPUTES_CHANNEL,
   stripeDisputeSessionAuth,
@@ -46,6 +47,7 @@ import {
 } from "../lib/stripe-dispute-trigger.js";
 import {
   isIntakeOnly,
+  stampStripeDisputeApproval,
   stampStripeDisputeId,
   stampTriageIntake,
 } from "../lib/trust.js";
@@ -276,10 +278,16 @@ export const dispatch = async (
     ...(history ? [history] : []),
   ];
   // The only dispute this turn may write is the one its thread's alert names.
+  const bound = disputeAlert?.disputeId
+    ? stampStripeDisputeId(stamped, disputeAlert.disputeId)
+    : stamped;
+  // Only a person's literal "approve" in the alert thread may submit, so a
+  // question in the thread can never carry the model to a submit.
   return {
-    auth: disputeAlert?.disputeId
-      ? stampStripeDisputeId(stamped, disputeAlert.disputeId)
-      : stamped,
+    auth:
+      disputeAlert?.disputeId && isStripeDisputeApprovalText(message.text)
+        ? stampStripeDisputeApproval(bound)
+        : bound,
     context,
   };
 };

@@ -174,3 +174,18 @@ export const stripeDisputeSessionMessage = (alert: string): string =>
     "",
     alert,
   ].join("\n");
+
+const MENTION = /<@[A-Z0-9]+(?:\|[^>]*)?>/gu;
+
+/**
+ * Whether a person's thread reply is a literal approval: "approve" with only
+ * mentions, case and closing punctuation around it. Anything else, a question
+ * or "approve but change X", is not.
+ */
+export const isStripeDisputeApprovalText = (text: string): boolean =>
+  text.length <= 200 &&
+  text
+    .replace(MENTION, "")
+    .trim()
+    .replace(/[.!]+$/u, "")
+    .toLowerCase() === "approve";

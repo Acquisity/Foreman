@@ -234,6 +234,32 @@ export function stripeDisputeIdOf(
   return typeof id === "string" && id.length > 0 ? id : undefined;
 }
 
+/**
+ * Auth attribute marking a Slack turn whose own message is a person's literal
+ * "approve" in a dispute alert thread. Only that turn may submit.
+ */
+export const STRIPE_DISPUTE_APPROVAL_ATTRIBUTE = "stripeDisputeApproved";
+
+/** Returns a copy of `auth` carrying a person's approval for this turn. */
+export function stampStripeDisputeApproval(
+  auth: SessionAuthContext
+): SessionAuthContext {
+  return {
+    ...auth,
+    attributes: {
+      ...auth.attributes,
+      [STRIPE_DISPUTE_APPROVAL_ATTRIBUTE]: "true",
+    },
+  };
+}
+
+/** Whether this turn's message was a person's literal "approve". */
+export function isStripeDisputeApproval(
+  auth: SessionAuthContext | null | undefined
+): boolean {
+  return auth?.attributes[STRIPE_DISPUTE_APPROVAL_ATTRIBUTE] === "true";
+}
+
 /** Whether this is the automatic Stripe dispute session. */
 export function isStripeDisputeSession(
   auth: SessionAuthContext | null | undefined

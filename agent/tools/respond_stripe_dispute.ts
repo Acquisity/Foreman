@@ -23,6 +23,7 @@ import { STRIPE_DISPUTES_CHANNEL } from "#lib/stripe-dispute-trigger.js";
 import {
   isIntakeOnly,
   isQuestionsOnly,
+  isStripeDisputeApproval,
   isStripeDisputeSession,
   isUnattended,
   stripeDisputeIdOf,
@@ -173,6 +174,8 @@ const DELEGATED_REASON =
   "A delegated task cannot work a Stripe dispute. Return what you found to the root.";
 const SUBMIT_REASON =
   "A person approves every submit. Post the ready message and end the turn; a person replies in the thread to approve.";
+const APPROVAL_REASON =
+  'Submit runs only on a turn whose message is a person\'s plain "@Foreman approve" in this thread. Ask them to reply that if they want it submitted.';
 
 /** The refusal for this caller and action, or null when it may proceed. */
 export const disputeAccessRefusal = (
@@ -196,7 +199,10 @@ export const disputeAccessRefusal = (
     return DELEGATED_REASON;
   }
   if (action === "submit") {
-    return isDisputeChannelPerson(auth.current) ? null : SUBMIT_REASON;
+    if (!isDisputeChannelPerson(auth.current)) {
+      return SUBMIT_REASON;
+    }
+    return isStripeDisputeApproval(auth.current) ? null : APPROVAL_REASON;
   }
   return isStripeDisputeSession(auth.current) ||
     isDisputeChannelPerson(auth.current)

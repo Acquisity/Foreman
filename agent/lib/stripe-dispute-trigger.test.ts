@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
   isStripeDisputeAlert,
+  isStripeDisputeApprovalText,
   renderStripeDisputeAlert,
   STRIPE_DISPUTE_ALERTS_APP,
   STRIPE_DISPUTES_CHANNEL,
@@ -182,5 +183,25 @@ describe("stripe dispute trigger", () => {
     assert.notEqual(auth.principalType, "user");
     assert.equal(auth.attributes.channel_id, STRIPE_DISPUTES_CHANNEL);
     assert.equal(stripeDisputeIdOf(auth), "du_1AbCdEf");
+  });
+
+  it("reads only a plain approve as an approval", () => {
+    for (const text of [
+      "approve",
+      "<@U0BQ5QMHM7D> approve",
+      "<@U0BQ5QMHM7D|foreman> Approve!",
+      "  APPROVE. ",
+    ]) {
+      assert.ok(isStripeDisputeApprovalText(text), text);
+    }
+    for (const text of [
+      "<@U0BQ5QMHM7D> should we approve?",
+      "approve but drop the receipt",
+      "don't approve",
+      "approved",
+      "",
+    ]) {
+      assert.equal(isStripeDisputeApprovalText(text), false, text);
+    }
   });
 });

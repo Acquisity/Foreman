@@ -22,6 +22,7 @@ import {
   STRIPE_DISPUTES_CHANNEL,
 } from "./stripe-dispute-trigger.js";
 import {
+  isStripeDisputeApproval,
   isStripeDisputeSession,
   isTriageIntake,
   stripeDisputeIdOf,
@@ -1628,6 +1629,24 @@ describe("slack channel stripe disputes", () => {
     assert.ok(line.includes("stripe-disputes skill"));
     assert.equal(isStripeDisputeSession(result?.auth ?? null), false);
     assert.equal(stripeDisputeIdOf(result?.auth ?? null), "du_1AbCdEf");
+  });
+
+  it("stamps an approval only for a plain approve in an alert thread", async () => {
+    const approve = await dispatch(threadContext({ raw: alert() }), {
+      ...inThread(STRIPE_DISPUTES_CHANNEL),
+      text: "<@U0BQ5QMHM7D> approve",
+    });
+    assert.ok(isStripeDisputeApproval(approve?.auth ?? null));
+    const asked = await dispatch(
+      threadContext({ raw: alert() }),
+      inThread(STRIPE_DISPUTES_CHANNEL)
+    );
+    assert.equal(isStripeDisputeApproval(asked?.auth ?? null), false);
+    const elsewhere = await dispatch(threadContext({ raw: alert() }), {
+      ...inThread("C0DEV"),
+      text: "<@U0BQ5QMHM7D> approve",
+    });
+    assert.equal(isStripeDisputeApproval(elsewhere?.auth ?? null), false);
   });
 
   it("adds nothing in any other channel, at the top level, or for a root not posted by Dispute Alerts", async () => {

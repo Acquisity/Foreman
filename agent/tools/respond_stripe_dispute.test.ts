@@ -45,6 +45,7 @@ const person = (channelId = STRIPE_DISPUTES_CHANNEL): SessionAuthContext => ({
   attributes: {
     author_type: "user",
     channel_id: channelId,
+    stripeDisputeApproved: "true",
     stripeDisputeId: ID,
     team_id: "T123",
     thread_ts: "1761400000.000100",
@@ -581,6 +582,19 @@ describe("respond_stripe_dispute submit", () => {
     assert.ok(typeof first === "string" && first.includes(ID));
     assert.equal(await submitKey("40 logins."), first);
     assert.notEqual(await submitKey("41 logins."), first);
+  });
+
+  it("refuses a person's turn that is not a literal approve, with no write", async () => {
+    const { fingerprint, stripe } = await staged();
+    const writes = stripe.writes.length;
+    const { stripeDisputeApproved: _approved, ...asked } = person().attributes;
+    const result = await run(stripe.deps({ ...person(), attributes: asked }), {
+      action: "submit",
+      fingerprint,
+    });
+    assert.equal(result.ok, false);
+    assert.ok(reasonMatches(result.reason, "@Foreman approve"), result.reason);
+    assert.equal(stripe.writes.length, writes);
   });
 
   it("refuses when the evidence changed after the ready message", async () => {
