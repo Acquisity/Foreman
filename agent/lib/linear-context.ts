@@ -35,6 +35,9 @@ const TRIAGE_ASK_CHANNELS: ReadonlySet<string> = new Set([
   "C0BQM9V6P47",
 ]);
 
+export const slackChannelOf = (url: string): string | null =>
+  url.length <= 2048 ? (SLACK_ARCHIVE.exec(url)?.[1] ?? null) : null;
+
 /**
  * Whether an 'Ask from' attachment links a thread in a triage ask channel,
  * which puts the session on the triage models (ENG-15226).
