@@ -152,7 +152,7 @@
     "fixCommit": null,
     "fixPr": null,
     "labelSource": ["human_state"],
-    "insufficient": false,
+    "insufficient": true,
     "notes": "Staff closed it Done when the master was closed; a later thread pointed at a meeting-link setting, so the Bug call is only weakly confirmed.",
     "outcomeAt": "2026-10-01T21:27:32.019Z"
   },
@@ -186,7 +186,7 @@
     "fixCommit": null,
     "fixPr": null,
     "labelSource": ["human_state"],
-    "insufficient": false,
+    "insufficient": true,
     "notes": "Staff closed it with no comment; the ENG-13178 cluster mixes reconnect and non-payment cases.",
     "outcomeAt": "2026-10-02T17:25:28.503Z"
   },
