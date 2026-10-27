@@ -68,8 +68,9 @@ export const makeResult = (
 ): TriageResult => ({
   caseId,
   critic: { blockingFindings: 0, failedCriteria: 0, verdict: "APPROVE" },
+  diagnosis: "renderPanel in apps/web/src/panel.ts clears the layout.",
   document: {
-    text: "Root cause: renderPanel in apps/web/src/panel.ts clears the layout.",
+    text: "## Root cause\nrenderPanel in apps/web/src/panel.ts clears the layout.",
     updatedAt: "2026-09-01T10:05:00.000Z",
   },
   evidenceMisses: [],

@@ -184,14 +184,18 @@ describe("replay result", () => {
       decision: { missing: [], notes: [], outcome: "unproven" },
     });
     await saveInvestigationDocument(
-      { content: "Unproven.", issue: "ENG-100", lane: "triage" },
+      {
+        content: "## Root cause\nUnproven.\n## Ruled out\nThe token.",
+        issue: "ENG-100",
+        lane: "triage",
+      },
       { client: executorClient(ctx) }
     );
     await endTurn();
     const result = buildReplayResult(await state(), RUN);
     assert.equal(result.status, "completed");
     assert.equal(result.final?.outcome, "unproven");
-    assert.equal(result.document?.text, "Unproven.");
+    assert.equal(result.diagnosis, "Unproven.");
   });
 });
 

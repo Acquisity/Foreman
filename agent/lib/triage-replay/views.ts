@@ -182,3 +182,23 @@ export function createReplayIssue(
   tick(state);
   return identifier;
 }
+
+const DIAGNOSIS_SECTIONS = new Set(["## root cause", "## code path"]);
+
+export function diagnosisOf(document: string | null): string | null {
+  if (document === null) {
+    return null;
+  }
+  const kept: string[] = [];
+  let keep = false;
+  for (const line of document.split("\n")) {
+    if (line.startsWith("## ")) {
+      keep = DIAGNOSIS_SECTIONS.has(line.trim().toLowerCase());
+      continue;
+    }
+    if (keep) {
+      kept.push(line);
+    }
+  }
+  return kept.length > 0 ? kept.join("\n") : null;
+}

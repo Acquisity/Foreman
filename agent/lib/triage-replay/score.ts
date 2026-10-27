@@ -46,7 +46,7 @@ export interface GroupScore {
   evidenceMisses: { reads: number; rows: number };
   fields: Record<Field, Tally>;
   insufficient: number;
-  rootCause: Tally & { notScored: number };
+  rootCause: Tally & { noDiagnosis: number; notScored: number };
   rows: number;
 }
 
@@ -153,7 +153,7 @@ const emptyGroup = (): GroupScore => ({
     FIELDS.map((field) => [field, { correct: 0, total: 0 }])
   ) as Record<Field, Tally>,
   insufficient: 0,
-  rootCause: { correct: 0, notScored: 0, total: 0 },
+  rootCause: { correct: 0, noDiagnosis: 0, notScored: 0, total: 0 },
   rows: 0,
 });
 
@@ -174,12 +174,12 @@ export const rootCauseScored = (label: TriageLabel) =>
 
 export function rootCauseMatches(
   label: TriageLabel,
-  document: string | null
+  diagnosis: string | null
 ): boolean {
-  if (!(label.rootCause && document)) {
+  if (!(label.rootCause && diagnosis)) {
     return false;
   }
-  const text = document.toLowerCase();
+  const text = diagnosis.toLowerCase();
   const { files, functions } = label.rootCause;
   const file =
     files.length === 0 ||
@@ -311,8 +311,11 @@ function addRow(
     return;
   }
   group.rootCause.total += 1;
+  if (scorable && result?.diagnosis === null) {
+    group.rootCause.noDiagnosis += 1;
+  }
   group.rootCause.correct +=
-    scorable && rootCauseMatches(label, result?.document?.text ?? null) ? 1 : 0;
+    scorable && rootCauseMatches(label, result?.diagnosis ?? null) ? 1 : 0;
 }
 
 export function scoreReplay(input: ScoreInput): ScoreReport {
@@ -358,7 +361,7 @@ function groupLines(name: string, group: GroupScore): string[] {
   const { completion, evidenceMisses, fields, rootCause } = group;
   return [
     `| ${name} | ${group.rows} | ${FIELDS.map((field) => pct(fields[field])).join(" | ")} | ${pct(rootCause)} |`,
-    `| | completion: ${COMPLETION.map((key) => `${key} ${completion[key]}`).join(", ")}; evidence misses ${evidenceMisses.rows} rows / ${evidenceMisses.reads} reads; insufficient ${group.insufficient} (excluded); root cause not scored ${rootCause.notScored} (no labelled fix files or functions) |${" |".repeat(FIELDS.length + 1)}`,
+    `| | completion: ${COMPLETION.map((key) => `${key} ${completion[key]}`).join(", ")}; evidence misses ${evidenceMisses.rows} rows / ${evidenceMisses.reads} reads; insufficient ${group.insufficient} (excluded); root cause not scored ${rootCause.notScored} (no labelled fix files or functions); no Root cause or Code path section ${rootCause.noDiagnosis} (scored wrong) |${" |".repeat(FIELDS.length + 1)}`,
   ];
 }
 
@@ -385,7 +388,7 @@ export function renderScorecard(report: ScoreReport): string {
     `Run ${report.runId ?? "none"}, ${report.runs} run(s) per case, Foreman commit ${report.foremanCommit ?? "none"}.`,
     "",
     ...sections,
-    "Every case counts once per run. A missing, failed or cancelled row scores wrong on every field. Text fields match trimmed and case-folded, and a field the label leaves null is unscored. Duplicates match as sets of issue ids, where null means not a duplicate. Master compares the label's master with the parent the run set; a master filed after the case means the run should have created a new one. Root cause is scored only for labels with known fix files or functions: the run's investigation document must name at least one labelled file by its file name (any path ending in it counts) and, when the label lists functions, at least one labelled function as a whole word, both case-insensitive. Every other label shows as not scored.",
+    "Every case counts once per run. A missing, failed or cancelled row scores wrong on every field. Text fields match trimmed and case-folded, and a field the label leaves null is unscored. Duplicates match as sets of issue ids, where null means not a duplicate. Master compares the label's master with the parent the run set; a master filed after the case means the run should have created a new one. Root cause is scored only for labels with known fix files or functions: the Root cause and Code path sections of the run's investigation document must name at least one labelled file by its file name (any path ending in it counts) and, when the label lists functions, at least one labelled function as a whole word, both case-insensitive. Ruled out, Prior cases and every other section are ignored, and a document with neither section scores wrong. Every other label shows as not scored.",
     "",
   ].join("\n");
 }

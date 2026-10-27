@@ -12,12 +12,14 @@ import {
   sameDuplicates,
   scoreReplay,
 } from "./score.js";
+import { diagnosisOf } from "./views.js";
 
 const NO_LABEL = /no label: ENG-4/;
 const TWO_RUN_IDS = /more than one run id/;
 const REPEATED = /same case and run: ENG-1#1/;
 const OUTSIDE = /outside the cohort: ENG-99/;
 const ROOT_CAUSE_COLUMN = /\| root cause \|/;
+const NO_DIAGNOSIS = /no Root cause or Code path section 4 /;
 const NOT_SCORED = /root cause not scored 1 /;
 const MIXED_COMMITS = /more than one Foreman commit: /;
 const UNKNOWN_COMMIT = /unknown Foreman commit.*: ENG-1#1/;
@@ -323,23 +325,34 @@ const withDocument = (text: string) =>
   base({
     results: base().results.map((result) => ({
       ...result,
+      diagnosis: diagnosisOf(text),
       document: { text, updatedAt: "2026-09-01T10:05:00.000Z" },
     })),
   });
 
 test("root cause scores the labelled file and function in the document", () => {
   const { train } = scoreReplay(base()).splits;
-  assert.deepEqual(train.all.rootCause, { correct: 4, notScored: 0, total: 4 });
+  assert.deepEqual(train.all.rootCause, {
+    correct: 4,
+    noDiagnosis: 0,
+    notScored: 0,
+    total: 4,
+  });
   assert.match(renderScorecard(scoreReplay(base())), ROOT_CAUSE_COLUMN);
 });
 
 test("a wrong diagnosis with identical routing lowers the root-cause score", () => {
   const right = scoreReplay(base()).splits.train.all;
   const wrong = scoreReplay(
-    withDocument("Root cause: renderPanel in services/billing/ledger.ts.")
+    withDocument("## Root cause\nrenderPanel in services/billing/ledger.ts.")
   ).splits.train.all;
   assert.deepEqual(wrong.fields, right.fields);
-  assert.deepEqual(wrong.rootCause, { correct: 0, notScored: 0, total: 4 });
+  assert.deepEqual(wrong.rootCause, {
+    correct: 0,
+    noDiagnosis: 0,
+    notScored: 0,
+    total: 4,
+  });
 });
 
 test("a label with functions needs a function too, so a file alone is wrong", () => {
@@ -366,6 +379,69 @@ test("a text-only cause shows as not scored, never pass or fail", () => {
   );
   input.results = input.results.filter(({ caseId }) => caseId !== "ENG-3");
   const { all } = scoreReplay(input).splits.train;
-  assert.deepEqual(all.rootCause, { correct: 2, notScored: 1, total: 3 });
+  assert.deepEqual(all.rootCause, {
+    correct: 2,
+    noDiagnosis: 0,
+    notScored: 1,
+    total: 3,
+  });
   assert.match(renderScorecard(scoreReplay(input)), NOT_SCORED);
+});
+
+const RULED_OUT_ONLY = `## Root cause
+A billing ledger error in services/billing/ledger.ts: updateLedger.
+
+## Code path
+services/billing/ledger.ts: updateLedger
+
+## Ruled out
+We checked src/panel.ts and renderPanel.
+Both are healthy and do not cause this issue.`;
+
+test("a labelled file and function named only under Ruled out score wrong", () => {
+  const one = (text: string) =>
+    base({
+      cases: [makeCase("ENG-1"), makeCase("ENG-5")],
+      heldoutLabels: [makeLabel("ENG-5")],
+      results: [
+        {
+          ...makeResult("ENG-1"),
+          diagnosis: diagnosisOf(text),
+          document: { text, updatedAt: "2026-09-01T10:05:00.000Z" },
+        },
+        makeResult("ENG-5"),
+      ],
+      split: { groups: {}, heldout: ["ENG-5"], train: ["ENG-1"] },
+      trainLabels: [makeLabel("ENG-1")],
+    });
+  const right = scoreReplay(one(String(makeResult("ENG-1").document?.text)))
+    .splits.train.all;
+  const ruledOut = scoreReplay(one(RULED_OUT_ONLY)).splits.train.all;
+  assert.deepEqual(right.rootCause.correct, 1);
+  assert.deepEqual(ruledOut.fields, right.fields);
+  assert.deepEqual(ruledOut.rootCause, {
+    correct: 0,
+    noDiagnosis: 0,
+    notScored: 0,
+    total: 1,
+  });
+});
+
+test("a document with neither diagnosis section scores wrong and is counted", () => {
+  const input = withDocument("## Ruled out\nsrc/panel.ts and renderPanel.");
+  const { all } = scoreReplay(input).splits.train;
+  assert.equal(all.rootCause.correct, 0);
+  assert.equal(all.rootCause.noDiagnosis, 4);
+  assert.match(renderScorecard(scoreReplay(input)), NO_DIAGNOSIS);
+});
+
+test("the diagnosis keeps only the Root cause and Code path sections", () => {
+  assert.equal(
+    diagnosisOf(
+      "# Triage investigation\n## Claim\nx\n## Root cause\nA\n### Detail\nB\n## Prior cases\nC\n## Code path\nD\n## Ruled out\nE"
+    ),
+    "A\n### Detail\nB\nD"
+  );
+  assert.equal(diagnosisOf("## Ruled out\nE"), null);
+  assert.equal(diagnosisOf(null), null);
 });

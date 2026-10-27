@@ -96,6 +96,7 @@ export const RESULT_STATUSES = ["completed", "failed", "cancelled"] as const;
 export const triageResultSchema = z.strictObject({
   caseId: z.string().regex(/^ENG-\d+$/),
   critic: criticVerdictSchema.nullable(),
+  diagnosis: z.string().nullable(),
   document: z
     .strictObject({ text: z.string(), updatedAt: z.string() })
     .nullable(),

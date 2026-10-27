@@ -19,7 +19,7 @@ import {
   type ReplayState,
   seedReplayState,
 } from "./store.js";
-import { appliedRoute } from "./views.js";
+import { appliedRoute, diagnosisOf } from "./views.js";
 
 export const REPLAY_SECRET_HEADER = "x-foreman-diagnostics-secret";
 
@@ -252,6 +252,7 @@ export function buildReplayResult(
   return {
     caseId: state.case.id,
     critic: state.critic,
+    diagnosis: diagnosisOf(document?.content ?? null),
     document: document
       ? { text: document.content, updatedAt: document.updatedAt }
       : null,
