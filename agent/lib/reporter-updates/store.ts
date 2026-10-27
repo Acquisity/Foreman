@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { privateDatabase } from "../private-postgres.js";
-import { STAGES, type Stage } from "./copy.js";
+import { LEDGER_STAGES, type LedgerStage, type Stage } from "./copy.js";
 
 export type Query = (
   text: string,
@@ -11,7 +11,7 @@ export type Query = (
 export interface LedgerRow {
   checkedSha: string | null;
   commentId: string | null;
-  stage: Stage;
+  stage: LedgerStage;
   status: "claimed" | "sent" | "waiting";
 }
 
@@ -67,7 +67,7 @@ export interface ReporterStore {
   failPending: (ticket: PendingTicket) => Promise<void>;
   markSent: (
     issue: string,
-    stages: Stage[],
+    stages: LedgerStage[],
     message: string,
     channel: string | null,
     commentId: string
@@ -86,7 +86,7 @@ export interface ReporterStore {
   saveSweep: (sweep: Sweep) => Promise<void>;
 }
 
-const ROW_STAGE = z.enum(STAGES as [Stage, ...Stage[]]);
+const ROW_STAGE = z.enum(LEDGER_STAGES as [LedgerStage, ...LedgerStage[]]);
 const rowSchema = z.object({
   checked_sha: z.string().nullable(),
   comment_id: z.string().nullable(),

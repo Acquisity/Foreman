@@ -1,4 +1,4 @@
-import type { Stage } from "./copy.js";
+import { fixedText, type LedgerStage, receivedText } from "./copy.js";
 import type { DeployProbe } from "./deploy.js";
 import type { LinearPort, TicketView } from "./linear.js";
 import { DEPLOY_REPOSITORY, type PullFacts, type TicketFacts } from "./plan.js";
@@ -9,6 +9,7 @@ import {
   type PendingTicket,
   type ReporterStore,
 } from "./store.js";
+import type { ReporterWriter, WriterReply, WriterTask } from "./writer.js";
 
 export const SANDBOX = "C0AAAAAAAAA";
 export const FOREMAN = "foreman-user";
@@ -19,19 +20,46 @@ export const PR_URL = `https://github.com/${DEPLOY_REPOSITORY}/pull/7`;
 export const NOW = Date.parse("2026-10-20T12:00:00Z");
 
 export const merged = (over: Partial<PullFacts> = {}): PullFacts => ({
+  body: "## Solution\nThe export now includes every row.",
   mergeSha: MERGE_SHA,
   number: 7,
   repo: DEPLOY_REPOSITORY,
   state: "merged",
+  title: "fix(crm): export every row",
   ...over,
 });
+
+export const STUB: Record<WriterTask["kind"], WriterReply> = {
+  done: { steps: null, what: "that number's been removed from the CRM" },
+  fixed: { steps: null, what: "the export now includes every row" },
+  live: {
+    steps: "Open People and click Export.",
+    what: "you can now export every row",
+  },
+  reason: { steps: null, what: null },
+  received: { steps: null, what: "why your export is missing rows" },
+};
+
+export const RECEIVED = receivedText(STUB.received.what);
+export const FIXED = fixedText(STUB.fixed.what, null);
+
+/** A stub `writer` that answers each task kind from `replies`, and records the tasks. */
+export const fakeWriter = (
+  replies: Partial<Record<WriterTask["kind"], WriterReply>> = {}
+) => {
+  const tasks: WriterTask[] = [];
+  const write: ReporterWriter = (task) => {
+    tasks.push(task);
+    return Promise.resolve(replies[task.kind] ?? STUB[task.kind]);
+  };
+  return { tasks, write };
+};
 
 export const pullKey = (number: number) => `${DEPLOY_REPOSITORY}#${number}`;
 
 export const config = (over: Partial<RunConfig> = {}): RunConfig => ({
   channels: new Set([SANDBOX]),
   maxPosts: 20,
-  nameOwner: true,
   runDeadlineMs: 240_000,
   since: "2026-10-01T00:00:00.000Z",
   ...over,
@@ -40,13 +68,17 @@ export const config = (over: Partial<RunConfig> = {}): RunConfig => ({
 export const facts = (over: Partial<TicketFacts> = {}): TicketFacts => ({
   assignee: "Sam Jones",
   channel: SANDBOX,
+  closingComments: [],
   createdAt: "2026-10-10T10:00:00.000Z",
+  description: "Exports stop at 500 rows.",
+  duplicateOf: null,
   identifier: "ENG-1",
   labels: [],
   parent: null,
   pullUrls: [],
   stateName: "Todo",
   stateType: "unstarted",
+  title: "Export is missing rows",
   ...over,
 });
 
@@ -60,7 +92,7 @@ interface StoredRow extends LedgerRow {
 
 export const memoryStore = () => {
   const table = new Map<string, StoredRow>();
-  const key = (issue: string, stage: Stage) => `${issue}|${stage}`;
+  const key = (issue: string, stage: LedgerStage) => `${issue}|${stage}`;
   const pending = new Map<
     string,
     {
@@ -93,7 +125,7 @@ export const memoryStore = () => {
     sweep: null,
     tokens: 0,
   };
-  const blank = (stage: Stage): StoredRow => ({
+  const blank = (stage: LedgerStage): StoredRow => ({
     attempts: 0,
     checkedSha: null,
     claimedAt: 0,
@@ -494,8 +526,9 @@ export const depsOf = (
   linear: LinearPort,
   deploy: DeployProbe,
   store: ReporterStore,
-  over: Partial<RunConfig> = {}
-): Deps => ({ config: config(over), deploy, linear, store });
+  over: Partial<RunConfig> = {},
+  write: ReporterWriter = fakeWriter().write
+): Deps => ({ config: config(over), deploy, linear, store, write });
 
 export const waitingIssues = (memory: ReturnType<typeof memoryStore>) =>
   [...memory.table.entries()]
@@ -513,8 +546,9 @@ export const setup = (
   const linear = fakeLinear(tickets);
   const probe = fakeDeploy(deploy);
   const memory = memoryStore();
-  const deps = depsOf(linear.port, probe.probe, memory.store, over);
-  return { deps, linear, memory, probe };
+  const writer = fakeWriter();
+  const deps = depsOf(linear.port, probe.probe, memory.store, over, writer.write);
+  return { deps, linear, memory, probe, writer };
 };
 
 export const reconcile = (s: ReturnType<typeof setup>, identifier = "ENG-1") =>

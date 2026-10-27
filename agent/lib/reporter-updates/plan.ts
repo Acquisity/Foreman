@@ -1,41 +1,46 @@
-import {
-  firstName,
-  fixedText,
-  type NotFixedReason,
-  notFixedText,
-  ownerText,
-  receivedText,
-  type Stage,
-} from "./copy.js";
+import type { NotFixedReason, Stage } from "./copy.js";
 
 export const DEPLOY_REPOSITORY = "Acquisity/Acquisity";
+
+export interface ClosingComment {
+  body: string;
+  createdAt: string;
+}
 
 export interface TicketFacts {
   assignee: string | null;
   channel: string | null;
+  closingComments: ClosingComment[];
   createdAt: string;
+  description: string;
+  duplicateOf: string | null;
   identifier: string;
   labels: string[];
   parent: { identifier: string; stateType: string } | null;
   pullUrls: string[];
   stateName: string;
   stateType: string;
+  title: string;
 }
 
 export type Closure =
   | { kind: "open" }
   | { kind: "not_fixed"; reason: NotFixedReason }
   | { kind: "needs_deploy"; pullUrls: string[] }
-  | { kind: "held"; why: "no_linked_pull" };
+  | { kind: "done_without_pull" };
 
 export interface PullFacts {
+  body: string;
   mergeSha: string | null;
   number: number;
   repo: string;
   state: "closed" | "merged" | "open";
+  title: string;
 }
 
 export type DeployVerdict = "held" | "live" | "unsupported" | "waiting";
+
+export type ChangeKind = "bug" | "feature";
 
 export interface Planned {
   covers: Stage[];
@@ -44,6 +49,9 @@ export interface Planned {
 }
 
 const NO_CODE_LABELS = new Set(["User Error", "Platform Limitation"]);
+const FEATURE_LABEL = "Feature Request";
+const BUG_LABEL = "Bug";
+const FEATURE_TITLE = /^feat\b/iu;
 
 const PULL_URL = /^https:\/\/github\.com\/([\w.-]+\/[\w.-]+)\/pull\/(\d+)$/u;
 
@@ -59,17 +67,17 @@ export const parsePullUrl = (
 export const isTerminal = (stateType: string): boolean =>
   stateType === "completed" || stateType === "canceled";
 
-const noCodeReason = (facts: TicketFacts): NotFixedReason =>
-  facts.labels.some((label) => NO_CODE_LABELS.has(label))
-    ? "not_a_bug"
-    : "closed";
+const hasNoCodeLabel = (facts: TicketFacts): boolean =>
+  facts.labels.some((label) => NO_CODE_LABELS.has(label));
 
 export const closureOf = (facts: TicketFacts): Closure => {
   if (facts.stateType === "canceled") {
+    if (facts.stateName === "Duplicate") {
+      return { kind: "not_fixed", reason: "duplicate" };
+    }
     return {
       kind: "not_fixed",
-      reason:
-        facts.stateName === "Duplicate" ? "duplicate" : noCodeReason(facts),
+      reason: hasNoCodeLabel(facts) ? "not_a_bug" : "closed",
     };
   }
   const done =
@@ -80,13 +88,27 @@ export const closureOf = (facts: TicketFacts): Closure => {
   if (facts.pullUrls.length > 0) {
     return { kind: "needs_deploy", pullUrls: facts.pullUrls };
   }
-  if (facts.labels.some((label) => NO_CODE_LABELS.has(label))) {
+  if (hasNoCodeLabel(facts)) {
     return { kind: "not_fixed", reason: "not_a_bug" };
   }
-  if (facts.labels.includes("Bug") || facts.parent) {
-    return { kind: "held", why: "no_linked_pull" };
+  return { kind: "done_without_pull" };
+};
+
+export const changeKindOf = (
+  labels: readonly string[],
+  pulls: readonly PullFacts[]
+): ChangeKind => {
+  if (labels.includes(FEATURE_LABEL)) {
+    return "feature";
   }
-  return { kind: "not_fixed", reason: "closed" };
+  if (labels.includes(BUG_LABEL)) {
+    return "bug";
+  }
+  return pulls.some(
+    (pull) => pull.state === "merged" && FEATURE_TITLE.test(pull.title.trim())
+  )
+    ? "feature"
+    : "bug";
 };
 
 export const deployVerdict = (
@@ -111,37 +133,30 @@ export const deployVerdict = (
     : "waiting";
 };
 
-export const planEarly = (
-  facts: TicketFacts,
-  done: ReadonlySet<Stage>,
-  nameOwner: boolean
-): Planned | null => {
-  const owner =
-    nameOwner && facts.stateType !== "triage"
-      ? firstName(facts.assignee)
-      : null;
-  if (!done.has("received")) {
-    return {
-      covers:
-        owner && !done.has("owner") ? ["received", "owner"] : ["received"],
-      stage: "received",
-      text: receivedText(owner),
-    };
+const SECTION_HEADING = /^#{2}\s+(.+?)\s*$/u;
+const FENCE = /```[\s\S]*?```/gu;
+const HTML_COMMENT = /<!--[\s\S]*?-->/gu;
+const HTML_TAG = /<[^>]+>/gu;
+const PULL_SECTIONS = new Set(["solution", "how it works"]);
+export const MAX_PULL_CONTEXT_CHARS = 4000;
+
+/** The Solution and How it works sections of a pull request description, with code, diagrams and markup removed. */
+export const pullContext = (body: string): string => {
+  const lines = body
+    .replace(FENCE, "")
+    .replace(HTML_COMMENT, "")
+    .replace(HTML_TAG, "")
+    .split("\n");
+  const kept: string[] = [];
+  let keep = false;
+  for (const line of lines) {
+    const heading = SECTION_HEADING.exec(line);
+    if (heading?.[1]) {
+      keep = PULL_SECTIONS.has(heading[1].toLowerCase());
+    }
+    if (keep) {
+      kept.push(line);
+    }
   }
-  if (owner && !done.has("owner")) {
-    return { covers: ["owner"], stage: "owner", text: ownerText(owner) };
-  }
-  return null;
+  return kept.join("\n").trim().slice(0, MAX_PULL_CONTEXT_CHARS);
 };
-
-export const planNotFixed = (reason: NotFixedReason): Planned => ({
-  covers: ["not_fixed"],
-  stage: "not_fixed",
-  text: notFixedText(reason),
-});
-
-export const planFixed = (): Planned => ({
-  covers: ["fixed"],
-  stage: "fixed",
-  text: fixedText(),
-});

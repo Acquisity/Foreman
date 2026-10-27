@@ -4,13 +4,13 @@ import { commentIdFor } from "./comment-id.js";
 import {
   bannedWordsIn,
   coversOf,
-  fixedText,
+  MAX_UPDATE_WORDS,
   notFixedText,
-  ownerText,
-  receivedText,
+  PAST_TEXTS,
   wordCount,
 } from "./copy.js";
 import {
+  FIXED,
   MERGE_SHA,
   merged,
   NEW_SHA,
@@ -18,6 +18,7 @@ import {
   OLD_SHA,
   PR_URL,
   pullKey,
+  RECEIVED,
   reconcile,
   SANDBOX,
   setup,
@@ -27,19 +28,16 @@ import {
 import { DEPLOY_REPOSITORY } from "./plan.js";
 import { runReporterUpdates } from "./run.js";
 
-describe("received and owner messages", () => {
-  it("posts one received message that names the owner, then nothing on a replay", async () => {
+describe("received message", () => {
+  it("posts one received message with the written phrase and no owner, then nothing on a replay", async () => {
     const s = setup();
     const first = await reconcile(s);
     assert.deepEqual(first, { kind: "posted", stage: "received" });
     assert.deepEqual(
       s.linear.posts.map((p) => p.body),
-      [receivedText("Sam")]
+      [RECEIVED]
     );
-    assert.deepEqual(await reconcile(s), {
-      kind: "skipped",
-      why: "nothing_due",
-    });
+    assert.ok(!RECEIVED.includes("Sam"));
     assert.deepEqual(await reconcile(s), {
       kind: "skipped",
       why: "nothing_due",
@@ -47,22 +45,30 @@ describe("received and owner messages", () => {
     assert.equal(s.linear.posts.length, 1);
   });
 
-  it("posts the owner message later, once, when the owner appears after triage", async () => {
-    const t = ticket({ assignee: "Aaron Fraga", stateType: "triage" });
+  it("never posts an owner message, even when an owner is assigned after triage", async () => {
+    const t = ticket({ assignee: null, stateType: "triage" });
     const s = setup([t]);
     await reconcile(s);
-    assert.deepEqual(
-      s.linear.posts.map((p) => p.body),
-      [receivedText(null)]
-    );
     Object.assign(t.facts, { assignee: "Sam Jones", stateType: "unstarted" });
-    assert.deepEqual(await reconcile(s), { kind: "posted", stage: "owner" });
-    assert.equal(s.linear.posts.at(-1)?.body, ownerText("Sam"));
     assert.deepEqual(await reconcile(s), {
       kind: "skipped",
       why: "nothing_due",
     });
-    assert.equal(s.linear.posts.length, 2);
+    assert.deepEqual(
+      s.linear.posts.map((p) => p.body),
+      [RECEIVED]
+    );
+  });
+
+  it("falls back to the plain received line when the written phrase names the owner", async () => {
+    const s = setup();
+    s.deps.write = () =>
+      Promise.resolve({ steps: null, what: "the export Sam is fixing" });
+    await reconcile(s);
+    assert.equal(
+      s.linear.posts[0]?.body,
+      "Thanks, got it. We're looking into this and will reply here when we know more."
+    );
   });
 
   it("never sends a received message for a ticket that was already Done when first seen", async () => {
@@ -176,10 +182,13 @@ describe("not fixed wording does not claim more than is known", () => {
     }
   });
 
-  it("uses the same wording for a Done ticket with no code and no label", async () => {
+  it("never answers a Done ticket with no code as fixed, done or closed when nothing describes a change", async () => {
     const s = setup([ticket({ stateType: "completed" })]);
-    await reconcile(s);
-    assert.equal(s.linear.posts[0]?.body, notFixedText("closed"));
+    assert.deepEqual(await reconcile(s), {
+      kind: "skipped",
+      why: "no_evidence_of_change",
+    });
+    assert.equal(s.linear.posts.length, 0);
   });
 
   it("still recognises the wording an earlier version posted", () => {
@@ -195,7 +204,10 @@ describe("not fixed wording does not claim more than is known", () => {
 describe("once only, and never lost", () => {
   it("records a message already in the thread instead of posting it again", async () => {
     const t = ticket({ stateName: "Duplicate", stateType: "canceled" });
-    t.foremanComments.push({ body: notFixedText("duplicate"), id: "existing" });
+    t.foremanComments.push({
+      body: PAST_TEXTS.not_fixed[1] ?? "",
+      id: "existing",
+    });
     const s = setup([t]);
     assert.deepEqual(await reconcile(s), {
       kind: "recorded",
@@ -285,12 +297,12 @@ describe("claims and recovery", () => {
     await tick();
   };
 
-  it("records both stages of a named received message when the record write failed, and never repeats the owner", async () => {
+  it("records the received message when the record write failed, and never repeats it", async () => {
     const s = setup([ticket()]);
     s.memory.state.failNextMarkSent = true;
     await assert.rejects(reconcile(s), { message: "database unavailable" });
     assert.equal(s.linear.posts.length, 1);
-    assert.equal(s.linear.posts[0]?.body, receivedText("Sam"));
+    assert.equal(s.linear.posts[0]?.body, RECEIVED);
     assert.deepEqual(await reconcile(s), {
       kind: "recorded",
       stage: "received",
@@ -299,10 +311,7 @@ describe("claims and recovery", () => {
       (await s.memory.store.rows("ENG-1"))
         .map((row) => [row.stage, row.status])
         .sort((a, b) => String(a[0]).localeCompare(String(b[0]))),
-      [
-        ["owner", "sent"],
-        ["received", "sent"],
-      ]
+      [["received", "sent"]]
     );
     assert.deepEqual(await reconcile(s), {
       kind: "skipped",
@@ -546,7 +555,7 @@ describe("run over several tickets", () => {
         .sort((a, b) => a.localeCompare(b)),
       ["ENG-1", "ENG-2", "ENG-3", "ENG-4", "ENG-5"]
     );
-    assert.ok(s.linear.posts.every((p) => p.body === fixedText()));
+    assert.ok(s.linear.posts.every((p) => p.body === FIXED));
 
     const replay = await runReporterUpdates(
       s.deps,
@@ -579,7 +588,7 @@ describe("run over several tickets", () => {
     s.probe.state.ancestors[`${MERGE_SHA.slice(0, -1)}1>${NEW_SHA}`] = true;
     await runReporterUpdates(s.deps, NOW + 600_000, () => NOW + 600_000);
     assert.equal(s.linear.posts.length, 1);
-    assert.equal(s.linear.posts[0]?.body, fixedText());
+    assert.equal(s.linear.posts[0]?.body, FIXED);
   });
 
   it("keeps going when one ticket fails and reports it", async () => {
@@ -649,13 +658,19 @@ describe("run over several tickets", () => {
         labels: ["User Error"],
         stateType: "completed",
       }),
-      ticket({ identifier: "ENG-4", stateType: "completed" }),
+      ticket({
+        closingComments: [
+          { body: "Removed the number.", createdAt: "2026-10-12T10:00:00Z" },
+        ],
+        identifier: "ENG-4",
+        stateType: "completed",
+      }),
     ];
     const s = setup(tickets);
     await runReporterUpdates(s.deps, NOW, () => NOW);
     assert.equal(s.linear.posts.length, 4);
     for (const post of s.linear.posts) {
-      assert.ok(wordCount(post.body) <= 50, post.body);
+      assert.ok(wordCount(post.body) <= MAX_UPDATE_WORDS, post.body);
       assert.deepEqual(bannedWordsIn(post.body), [], post.body);
     }
   });

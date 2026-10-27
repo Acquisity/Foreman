@@ -1,19 +1,21 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { fixedText, notFixedText, ownerText, receivedText } from "./copy.js";
+import { notFixedText } from "./copy.js";
 import { githubDeployProbe } from "./deploy.js";
 import {
   depsOf,
   fakeDeploy,
   fakeLinear,
-  MERGE_SHA,
+  FIXED,
   memoryStore,
+  MERGE_SHA,
   merged,
   NEW_SHA,
   NOW,
   OLD_SHA,
   PR_URL,
   pullKey,
+  RECEIVED,
   reconcile,
   SANDBOX,
   setup,
@@ -46,7 +48,7 @@ describe("fixed message waits for the deploy", () => {
     assert.deepEqual(await reconcile(s), { kind: "posted", stage: "fixed" });
     assert.deepEqual(
       s.linear.posts.map((p) => p.body),
-      [fixedText()]
+      [FIXED]
     );
     assert.deepEqual(await reconcile(s), {
       kind: "skipped",
@@ -104,7 +106,7 @@ describe("fixed message waits for the deploy", () => {
     assert.equal(s.linear.posts.length, 0);
   });
 
-  it("holds a fix in a repository with no deploy signal and a Done bug with no linked pull request", async () => {
+  it("holds a fix in a repository with no deploy signal, and never calls a Done bug with no linked pull request fixed", async () => {
     const other = setup(
       [
         ticket({
@@ -128,8 +130,8 @@ describe("fixed message waits for the deploy", () => {
     });
     const bug = setup([ticket({ labels: ["Bug"], stateType: "completed" })]);
     assert.deepEqual(await reconcile(bug), {
-      kind: "held",
-      why: "no_linked_pull",
+      kind: "skipped",
+      why: "no_evidence_of_change",
     });
     assert.equal(other.linear.posts.length + bug.linear.posts.length, 0);
   });
@@ -215,7 +217,7 @@ describe("a deploy wait that is no longer needed", () => {
     s.probe.state.liveSha = NEWER_SHA;
     s.probe.state.ancestors[`${MERGE_SHA}>${NEWER_SHA}`] = true;
     await runReporterUpdates(s.deps, NOW + 3 * MIN, () => NOW + 3 * MIN);
-    assert.ok(s.linear.posts.some((p) => p.body === fixedText()));
+    assert.ok(s.linear.posts.some((p) => p.body === FIXED));
   });
 
   describe("when the channel is turned off", () => {
@@ -245,7 +247,7 @@ describe("a deploy wait that is no longer needed", () => {
       await runReporterUpdates(s.deps, NOW + 3 * MIN, () => NOW + 3 * MIN);
       assert.deepEqual(
         s.linear.posts.map((p) => p.body),
-        [fixedText()]
+        [FIXED]
       );
     });
 
@@ -320,7 +322,7 @@ describe("a deploy wait that is no longer needed", () => {
 });
 
 describe("a slow deployment scan", () => {
-  it("leaves the received, owner and closed messages delivered in the same run, and makes fixed wait", async () => {
+  it("leaves the received and closed messages delivered in the same run, and makes fixed wait", async () => {
     const waiting = ticket({
       identifier: "ENG-1",
       pullUrls: [PR_URL],
@@ -387,9 +389,8 @@ describe("a slow deployment scan", () => {
         .map((p) => `${p.identifier} ${p.body}`)
         .sort((a, b) => a.localeCompare(b)),
       [
-        `ENG-2 ${receivedText("Sam")}`,
+        `ENG-2 ${RECEIVED}`,
         `ENG-3 ${notFixedText("closed")}`,
-        `ENG-4 ${ownerText("Sam")}`,
       ].sort((a, b) => a.localeCompare(b))
     );
     assert.equal(

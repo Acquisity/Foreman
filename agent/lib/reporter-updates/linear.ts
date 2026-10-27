@@ -49,12 +49,15 @@ const SLACK_THREAD =
 const ANCHOR_PREFIX = "Slack thread connected in ";
 const DISCOVER_PAGES = 20;
 const ANCHOR_LINK = /\]\((https:\/\/[^\s)]+)\)/u;
+const CLOSING_COMMENTS = 5;
 
 const TICKET_QUERY = `query ReporterTicket($id: String!) {
   viewer { id }
   issue(id: $id) {
     id
     identifier
+    title
+    description
     createdAt
     state { name type }
     assignee { name }
@@ -65,6 +68,7 @@ const TICKET_QUERY = `query ReporterTicket($id: String!) {
       state { type }
       attachments(first: 50) { nodes { title url } }
     }
+    relations(first: 50) { nodes { type relatedIssue { identifier } } }
     comments(first: 100) {
       pageInfo { hasNextPage }
       nodes { id body createdAt parent { id } user { id } }
@@ -115,6 +119,7 @@ const ticketSchema = z.object({
         pageInfo: z.object({ hasNextPage: z.boolean() }),
       }),
       createdAt: z.string(),
+      description: z.string().nullable(),
       id: z.string(),
       identifier: z.string(),
       labels: z.object({ nodes: z.array(z.object({ name: z.string() })) }),
@@ -125,7 +130,16 @@ const ticketSchema = z.object({
           state: z.object({ type: z.string() }),
         })
         .nullable(),
+      relations: z.object({
+        nodes: z.array(
+          z.object({
+            relatedIssue: z.object({ identifier: z.string() }).nullable(),
+            type: z.string(),
+          })
+        ),
+      }),
       state: z.object({ name: z.string(), type: z.string() }),
+      title: z.string(),
     })
     .nullable(),
   viewer: z.object({ id: z.string() }),
@@ -308,12 +322,33 @@ export const linearPort = (
       ]
         .map((node) => node.url.trim())
         .filter((url) => parsePullUrl(url) !== null);
+      const anchorIds = new Set(anchors.map((candidate) => candidate.id));
+      const closingComments = comments
+        .filter(
+          (comment) =>
+            comment.user !== null &&
+            comment.user.id !== data.viewer.id &&
+            !anchorIds.has(comment.id) &&
+            !(comment.parent && anchorIds.has(comment.parent.id))
+        )
+        .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
+        .slice(-CLOSING_COMMENTS)
+        .map((comment) => ({
+          body: comment.body,
+          createdAt: comment.createdAt,
+        }));
       return {
         anchorId: anchor ? delivery.anchorId : null,
         facts: {
           assignee: issue.assignee?.name ?? null,
           channel: delivery.channel,
+          closingComments,
           createdAt: issue.createdAt,
+          description: issue.description ?? "",
+          duplicateOf:
+            issue.relations.nodes.find(
+              (relation) => relation.type === "duplicate"
+            )?.relatedIssue?.identifier ?? null,
           identifier: issue.identifier,
           labels: issue.labels.nodes.map((label) => label.name),
           parent: issue.parent
@@ -325,6 +360,7 @@ export const linearPort = (
           pullUrls: [...new Set(pullUrls)],
           stateName: issue.state.name,
           stateType: issue.state.type,
+          title: issue.title,
         },
         foremanComments: comments
           .filter(

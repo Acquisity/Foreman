@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { ThreadIncompleteError } from "../requester-reply.js";
-import { fixedText, receivedText } from "./copy.js";
 import {
+  FIXED,
   MERGE_SHA,
   merged,
   NEW_SHA,
@@ -10,6 +10,7 @@ import {
   OLD_SHA,
   PR_URL,
   pullKey,
+  RECEIVED,
   setup,
   ticket,
   waitingIssues,
@@ -76,7 +77,7 @@ describe("discovery", () => {
     await run(s);
     assert.deepEqual(
       s.linear.posts.map((p) => p.body),
-      [fixedText()]
+      [FIXED]
     );
   });
 
@@ -410,7 +411,7 @@ describe("discovery", () => {
     await first;
     assert.deepEqual(
       s.linear.posts.map((p) => p.body),
-      [receivedText("Sam")]
+      [RECEIVED]
     );
     assert.equal(
       s.memory.pending.get("ENG-1")?.version,
@@ -426,7 +427,7 @@ describe("discovery", () => {
     );
     assert.deepEqual(
       s.linear.posts.map((p) => p.body),
-      [receivedText("Sam"), fixedText()]
+      [RECEIVED, FIXED]
     );
     assert.equal(s.memory.pending.size, 0);
   });
@@ -476,7 +477,7 @@ describe("discovery", () => {
     await run(s, NOW + 3_600_000);
     assert.deepEqual(
       s.linear.posts.map((p) => p.body),
-      [receivedText("Sam"), fixedText()]
+      [RECEIVED, FIXED]
     );
   });
 });

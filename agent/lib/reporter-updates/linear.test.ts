@@ -52,10 +52,17 @@ const issue = (over: Record<string, unknown> = {}) => ({
       }),
       comment("c-2", "my own reply", { parent: "c-anchor", user: "reporter" }),
       comment("c-3", "elsewhere", { parent: "other", user: "viewer" }),
+      comment("c-4", "Removed the wrong number from their contact.", {
+        createdAt: "2026-10-12T10:00:00Z",
+        user: "james",
+      }),
+      comment("c-5", "Triage notes from Foreman", { user: "viewer" }),
+      comment("c-6", "Synced from an integration", { user: null }),
     ],
     pageInfo: { hasNextPage: false },
   },
   createdAt: "2026-10-10T09:00:00Z",
+  description: "Exports stop at 500 rows.",
   id: "uuid-1",
   identifier: "ENG-1",
   labels: { nodes: [{ name: "Bug" }, { name: "Customer reported" }] },
@@ -72,7 +79,14 @@ const issue = (over: Record<string, unknown> = {}) => ({
     identifier: "ENG-9",
     state: { type: "completed" },
   },
+  relations: {
+    nodes: [
+      { relatedIssue: { identifier: "ENG-3" }, type: "related" },
+      { relatedIssue: { identifier: "ENG-2" }, type: "duplicate" },
+    ],
+  },
   state: { name: "Done", type: "completed" },
+  title: "Export is missing rows",
   ...over,
 });
 
@@ -100,13 +114,22 @@ describe("readTicket", () => {
     assert.deepEqual(view?.facts, {
       assignee: "Sam Jones",
       channel: SANDBOX,
+      closingComments: [
+        {
+          body: "Removed the wrong number from their contact.",
+          createdAt: "2026-10-12T10:00:00Z",
+        },
+      ],
       createdAt: "2026-10-10T09:00:00Z",
+      description: "Exports stop at 500 rows.",
+      duplicateOf: "ENG-2",
       identifier: "ENG-1",
       labels: ["Bug", "Customer reported"],
       parent: { identifier: "ENG-9", stateType: "completed" },
       pullUrls: [PR, "https://github.com/Acquisity/Acquisity/pull/8"],
       stateName: "Done",
       stateType: "completed",
+      title: "Export is missing rows",
     });
     assert.equal(view?.anchorId, "c-anchor");
     assert.equal(view?.issueId, "uuid-1");

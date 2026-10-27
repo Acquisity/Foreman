@@ -193,27 +193,48 @@ describe("pull", () => {
   it("reports merged, open and closed pull requests", async () => {
     const merged = probeWith({
       [path]: () =>
-        json({ merge_commit_sha: MERGE_SHA, merged: true, state: "closed" }),
+        json({
+          body: "## Solution\nAdd Email.",
+          merge_commit_sha: MERGE_SHA,
+          merged: true,
+          state: "closed",
+          title: "feat(crm): email from Power Dialer wrap-up",
+        }),
     });
     assert.deepEqual(await merged.probe.pull("Acquisity/Acquisity", 7), {
+      body: "## Solution\nAdd Email.",
       mergeSha: MERGE_SHA,
       number: 7,
       repo: "Acquisity/Acquisity",
       state: "merged",
+      title: "feat(crm): email from Power Dialer wrap-up",
     });
     const open = probeWith({
       [path]: () =>
-        json({ merge_commit_sha: NEW_SHA, merged: false, state: "open" }),
+        json({
+          body: null,
+          merge_commit_sha: NEW_SHA,
+          merged: false,
+          state: "open",
+          title: "fix: x",
+        }),
     });
     assert.deepEqual(await open.probe.pull("Acquisity/Acquisity", 7), {
+      body: "",
       mergeSha: null,
       number: 7,
       repo: "Acquisity/Acquisity",
       state: "open",
+      title: "fix: x",
     });
     const closed = probeWith({
       [path]: () =>
-        json({ merge_commit_sha: null, merged: false, state: "closed" }),
+        json({
+          merge_commit_sha: null,
+          merged: false,
+          state: "closed",
+          title: "fix: y",
+        }),
     });
     assert.equal(
       (await closed.probe.pull("Acquisity/Acquisity", 7)).state,

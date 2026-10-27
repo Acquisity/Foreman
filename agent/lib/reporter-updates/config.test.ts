@@ -44,17 +44,17 @@ describe("reporterUpdatesConfig", () => {
     );
     assert.equal(config?.since, "2026-10-01T00:00:00.000Z");
     assert.equal(config?.maxPosts, 20);
-    assert.equal(config?.nameOwner, false);
+    assert.equal("nameOwner" in (config ?? {}), false);
   });
 
-  it("bounds the post cap, and can switch owner names on", () => {
+  it("bounds the post cap, and ignores the retired owner-name switch", () => {
     const config = reporterUpdatesConfig({
       ...base,
       REPORTER_UPDATES_MAX_POSTS: "5000",
       REPORTER_UPDATES_NAME_OWNER: "true",
     });
     assert.equal(config?.maxPosts, 100);
-    assert.equal(config?.nameOwner, true);
+    assert.equal("nameOwner" in (config ?? {}), false);
     assert.equal(
       reporterUpdatesConfig({ ...base, REPORTER_UPDATES_MAX_POSTS: "abc" })
         ?.maxPosts,

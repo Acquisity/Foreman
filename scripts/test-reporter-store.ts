@@ -119,7 +119,7 @@ assert.equal(
   await store.complete(
     "ENG-2",
     "received",
-    ["received", "owner"],
+    ["received", "not_fixed"],
     "Hello",
     null,
     "comment-2",
@@ -131,7 +131,7 @@ assert.deepEqual(
   (await store.rows("ENG-2"))
     .map((row) => row.stage)
     .sort((a, b) => a.localeCompare(b)),
-  ["owner", "received"]
+  ["not_fixed", "received"]
 );
 
 await store.markWaiting("ENG-3", "sha-1");

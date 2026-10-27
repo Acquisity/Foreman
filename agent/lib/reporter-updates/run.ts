@@ -1,6 +1,17 @@
 import { logOpsEvent, type OpsFields } from "../ops-log.js";
+import {
+  composeChange,
+  composeDone,
+  composeNotFixed,
+  composeReceived,
+} from "./compose.js";
+import {
+  coversOf,
+  type LedgerStage,
+  type Stage,
+  stageOfCommentId,
+} from "./copy.js";
 import { commentIdFor } from "./comment-id.js";
-import { coversOf, STAGES, type Stage } from "./copy.js";
 import type { DeployProbe } from "./deploy.js";
 import type { LinearPort, TicketView } from "./linear.js";
 import {
@@ -10,20 +21,18 @@ import {
   type Planned,
   type PullFacts,
   parsePullUrl,
-  planEarly,
-  planFixed,
-  planNotFixed,
+  type TicketFacts,
 } from "./plan.js";
 import {
   GIVE_UP_LOG_ATTEMPTS,
   type ReporterStore,
   type WaitCleanup,
 } from "./store.js";
+import type { ReporterWriter } from "./writer.js";
 
 export interface RunConfig {
   channels: ReadonlySet<string>;
   maxPosts: number;
-  nameOwner: boolean;
   runDeadlineMs: number;
   since: string;
 }
@@ -34,11 +43,12 @@ export interface Deps {
   linear: LinearPort;
   log?: (event: string, fields: OpsFields) => void;
   store: ReporterStore;
+  write: ReporterWriter;
 }
 
 export type Outcome =
-  | { kind: "posted"; stage: Stage }
-  | { kind: "recorded"; stage: Stage }
+  | { kind: "posted"; stage: Stage; waiting?: true }
+  | { kind: "recorded"; stage: LedgerStage }
   | { kind: "waiting" }
   | { kind: "held"; why: string }
   | { kind: "skipped"; retryAfter?: number; why: string };
@@ -58,14 +68,12 @@ export const memoize = <T>(load: () => Promise<T>): (() => Promise<T>) => {
   };
 };
 
-const stagesInThread = (view: TicketView): Map<Stage, string> => {
-  const found = new Map<Stage, string>();
+const stagesInThread = (view: TicketView): Map<LedgerStage, string> => {
+  const found = new Map<LedgerStage, string>();
   const { identifier } = view.facts;
   for (const comment of view.foremanComments) {
-    const byId = STAGES.filter(
-      (stage) => commentIdFor(identifier, stage) === comment.id
-    );
-    for (const stage of [...coversOf(comment.body), ...byId]) {
+    const byId = stageOfCommentId(identifier, comment.id);
+    for (const stage of [...coversOf(comment.body), ...(byId ? [byId] : [])]) {
       if (!found.has(stage)) {
         found.set(stage, comment.id);
       }
@@ -76,8 +84,8 @@ const stagesInThread = (view: TicketView): Map<Stage, string> => {
 
 const recordThreadStages = async (
   view: TicketView,
-  inThread: ReadonlyMap<Stage, string>,
-  recorded: ReadonlySet<Stage>,
+  inThread: ReadonlyMap<LedgerStage, string>,
+  recorded: ReadonlySet<LedgerStage>,
   store: ReporterStore
 ): Promise<void> => {
   await Promise.all(
@@ -163,8 +171,9 @@ const deliver = async (
   return { kind: "posted", stage: planned.stage };
 };
 
-const fixedPlan = async (
+const changePlan = async (
   view: TicketView,
+  source: TicketFacts,
   pullUrls: readonly string[],
   deps: Deps,
   liveSha: () => Promise<string | null>
@@ -193,7 +202,7 @@ const fixedPlan = async (
   );
   const verdict = deployVerdict(pulls, live, ancestry);
   if (verdict === "live") {
-    return planFixed();
+    return composeChange(source, pulls, deps.write);
   }
   if (verdict === "waiting") {
     await deps.store.markWaiting(view.facts.identifier, live);
@@ -255,20 +264,8 @@ export const reconcileTicket = async (
     (stage) => !recorded.has(stage)
   );
   await recordThreadStages(view, inThread, recorded, deps.store);
-  const done = new Set<Stage>([...recorded, ...inThread.keys()]);
-  const closure = closureOf(facts);
-  let planned: Planned | Outcome | null = null;
-  if (closure.kind === "open") {
-    planned = planEarly(facts, done, deps.config.nameOwner);
-  } else if (closure.kind === "not_fixed") {
-    planned = done.has("not_fixed") ? null : planNotFixed(closure.reason);
-  } else if (closure.kind === "needs_deploy") {
-    planned = done.has("fixed")
-      ? null
-      : await fixedPlan(view, closure.pullUrls, deps, liveSha);
-  } else {
-    return { kind: "held", why: closure.why };
-  }
+  const done = new Set<LedgerStage>([...recorded, ...inThread.keys()]);
+  const planned = await nextMessage(view, done, deps, liveSha);
   if (planned === null) {
     const [stage] = unrecorded;
     return stage ? { kind: "recorded", stage } : skipped("nothing_due");
@@ -276,7 +273,82 @@ export const reconcileTicket = async (
   if (!isPlanned(planned)) {
     return planned;
   }
-  return deliver(view, planned, deps);
+  const outcome = await deliver(view, planned, deps);
+  const closure = closureOf(facts);
+  if (
+    outcome.kind === "posted" &&
+    planned.stage === "not_fixed" &&
+    facts.duplicateOf &&
+    closure.kind === "not_fixed" &&
+    closure.reason === "duplicate"
+  ) {
+    await deps.store.markWaiting(facts.identifier, null);
+    return { ...outcome, waiting: true };
+  }
+  return outcome;
+};
+
+const duplicateFollowUp = async (
+  view: TicketView,
+  deps: Deps,
+  liveSha: () => Promise<string | null>
+): Promise<Planned | Outcome | null> => {
+  const { duplicateOf, identifier } = view.facts;
+  const original = duplicateOf
+    ? await deps.linear.readTicket(duplicateOf)
+    : null;
+  if (!original) {
+    return null;
+  }
+  const closure = closureOf(original.facts);
+  if (closure.kind === "needs_deploy") {
+    return changePlan(view, original.facts, closure.pullUrls, deps, liveSha);
+  }
+  if (closure.kind === "open") {
+    await deps.store.markWaiting(identifier, await liveSha());
+    return { kind: "waiting" };
+  }
+  return null;
+};
+
+const skipDone = (view: TicketView, deps: Deps): Outcome => {
+  (deps.log ?? logOpsEvent)("reporter.update_skipped", {
+    code: "no_evidence_of_change",
+    issue: view.facts.identifier,
+    outcome: "skipped",
+  });
+  return skipped("no_evidence_of_change");
+};
+
+const nextMessage = async (
+  view: TicketView,
+  done: ReadonlySet<LedgerStage>,
+  deps: Deps,
+  liveSha: () => Promise<string | null>
+): Promise<Planned | Outcome | null> => {
+  const { facts } = view;
+  const closure = closureOf(facts);
+  if (closure.kind === "open") {
+    return done.has("received") ? null : composeReceived(facts, deps.write);
+  }
+  if (closure.kind === "not_fixed") {
+    if (!done.has("not_fixed")) {
+      return composeNotFixed(facts, closure.reason, deps.write);
+    }
+    return closure.reason === "duplicate" && !done.has("fixed")
+      ? duplicateFollowUp(view, deps, liveSha)
+      : null;
+  }
+  if (done.has("fixed")) {
+    return null;
+  }
+  if (closure.kind === "needs_deploy") {
+    return changePlan(view, facts, closure.pullUrls, deps, liveSha);
+  }
+  if (done.has("not_fixed")) {
+    return null;
+  }
+  return (await composeDone(facts, deps.write)) ?? skipDone(view, deps);
 };
 
 const CURSOR_OVERLAP_MS = 600_000;
@@ -306,7 +378,10 @@ const waitCleanup = async (
   outcome: Outcome,
   liveSha: () => Promise<string | null>
 ): Promise<WaitCleanup> => {
-  if (outcome.kind === "waiting") {
+  if (
+    outcome.kind === "waiting" ||
+    (outcome.kind === "posted" && outcome.waiting)
+  ) {
     return { kind: "keep" };
   }
   if (outcome.kind === "skipped" && outcome.why === "channel_not_enabled") {

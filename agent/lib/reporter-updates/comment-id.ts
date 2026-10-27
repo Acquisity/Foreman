@@ -1,9 +1,9 @@
 import { createHash } from "node:crypto";
-import type { Stage } from "./copy.js";
+import type { LedgerStage } from "./copy.js";
 
 const VARIANTS = "89ab";
 
-export const commentIdFor = (issue: string, stage: Stage): string => {
+export const commentIdFor = (issue: string, stage: LedgerStage): string => {
   const hex = createHash("sha256")
     .update(`reporter-update:${issue}:${stage}`)
     .digest("hex");

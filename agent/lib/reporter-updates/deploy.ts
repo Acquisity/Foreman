@@ -49,9 +49,11 @@ const isLive = (statuses: readonly Status[]): boolean => {
   );
 };
 const pullSchema = z.object({
+  body: z.string().nullish(),
   merge_commit_sha: z.string().regex(SHA).nullish(),
   merged: z.boolean(),
   state: z.enum(["open", "closed"]),
+  title: z.string(),
 });
 const compareSchema = z.object({ status: z.string() });
 
@@ -155,10 +157,12 @@ export const githubDeployProbe = (
       state = "closed";
     }
     return {
+      body: pull.body ?? "",
       mergeSha: pull.merged ? (pull.merge_commit_sha ?? null) : null,
       number,
       repo,
       state,
+      title: pull.title,
     };
   },
 });
