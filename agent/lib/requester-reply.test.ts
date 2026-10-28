@@ -10,6 +10,7 @@ import {
   promptedFollowUp,
   readAllComments,
   relayedFollowUp,
+  replyToRequester,
   type ThreadComment,
   ThreadIncompleteError,
 } from "./requester-reply.js";
@@ -536,4 +537,81 @@ test("acts on a person's direct status request on an ordinary ticket, and on not
     ),
     "skip"
   );
+});
+
+test("refuses an incomplete comment page without a continuation cursor", async () => {
+  await assert.rejects(
+    readAllComments(
+      "ENG-1",
+      async <T>() =>
+        ({
+          issue: {
+            comments: {
+              nodes: [],
+              pageInfo: { endCursor: null, hasNextPage: true },
+            },
+          },
+        }) as T
+    ),
+    {
+      message:
+        "ENG-1 has more comments but no continuation cursor, so the thread state cannot be checked.",
+    }
+  );
+});
+
+test("rejects a malformed comment page instead of normalizing missing fields", async () => {
+  await assert.rejects(
+    readAllComments(
+      "ENG-1",
+      async <T>() =>
+        ({
+          issue: {
+            comments: {
+              nodes: [
+                {
+                  body: "sample",
+                  createdAt: "2026-10-28T00:00:00Z",
+                  id: "sample",
+                  parent: null,
+                },
+              ],
+              pageInfo: { endCursor: null, hasNextPage: false },
+            },
+          },
+        }) as T
+    ),
+    { name: "ZodError" }
+  );
+});
+
+test("bounds the requester metadata and comment page requests with signals", async (t) => {
+  const signals: (AbortSignal | null | undefined)[] = [];
+  t.mock.method(globalThis, "fetch", (_url: unknown, init?: RequestInit) => {
+    signals.push(init?.signal);
+    const { query } = JSON.parse(String(init?.body)) as { query: string };
+    if (query.includes("IssueComments")) {
+      throw new Error("stop before write");
+    }
+    return Promise.resolve(
+      Response.json({
+        data: {
+          issue: { id: "issue", identifier: "ENG-1", project: null },
+          viewer: { id: FOREMAN },
+        },
+      })
+    );
+  });
+  await assert.rejects(
+    replyToRequester("ENG-1", "unused", "local-test-token"),
+    {
+      message: "stop before write",
+    }
+  );
+  assert.equal(signals.length, 2);
+  for (const signal of signals) {
+    assert.ok(signal instanceof AbortSignal);
+    assert.equal(signal.aborted, false);
+  }
+  assert.notEqual(signals[0], signals[1]);
 });

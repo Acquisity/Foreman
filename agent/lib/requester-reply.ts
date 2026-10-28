@@ -3,6 +3,7 @@ import {
   type LinearApiOptions,
   type LinearChannelCredentials,
 } from "eve/channels/linear";
+import { z } from "zod";
 import {
   decideFollowUp,
   type FollowUpInput,
@@ -146,20 +147,28 @@ export interface IssueComment extends ThreadComment {
   userName: string | null;
 }
 
-interface CommentsResponse {
-  issue: {
-    comments: {
-      nodes: {
-        body: string;
-        createdAt: string;
-        id: string;
-        parent: { id: string } | null;
-        user: { id: string; name: string } | null;
-      }[];
-      pageInfo: { endCursor: string | null; hasNextPage: boolean };
-    };
-  } | null;
-}
+const commentsResponseSchema = z.object({
+  issue: z
+    .object({
+      comments: z.object({
+        nodes: z.array(
+          z.object({
+            body: z.string(),
+            createdAt: z.string(),
+            id: z.string(),
+            parent: z.object({ id: z.string() }).nullable(),
+            user: z.object({ id: z.string(), name: z.string() }).nullable(),
+          })
+        ),
+        pageInfo: z.object({
+          endCursor: z.string().nullable(),
+          hasNextPage: z.boolean(),
+        }),
+      }),
+    })
+    .nullable(),
+});
+type CommentsResponse = z.infer<typeof commentsResponseSchema>;
 
 /**
  * Every comment on the issue, read page by page in order. Past the page bound
@@ -173,10 +182,11 @@ export function readAllComments(
     after: string | null,
     number: number
   ): Promise<IssueComment[]> => {
-    const data = await request<CommentsResponse>(
-      COMMENTS_QUERY,
-      "IssueComments",
-      { after, id: issue }
+    const data = commentsResponseSchema.parse(
+      await request<CommentsResponse>(COMMENTS_QUERY, "IssueComments", {
+        after,
+        id: issue,
+      })
     );
     if (!data.issue) {
       throw new Error(`Issue ${issue} was not found.`);
@@ -190,10 +200,15 @@ export function readAllComments(
       userId: c.user?.id ?? null,
       userName: c.user?.name ?? null,
     }));
-    if (!(pageInfo.hasNextPage && pageInfo.endCursor)) {
+    if (!pageInfo.hasNextPage) {
       return comments;
     }
     assertThreadComplete(issue, number >= COMMENT_PAGES);
+    if (!pageInfo.endCursor) {
+      throw new Error(
+        `${issue} has more comments but no continuation cursor, so the thread state cannot be checked.`
+      );
+    }
     return [...comments, ...(await page(pageInfo.endCursor, number + 1))];
   };
   return page(null, 1);
@@ -279,7 +294,12 @@ async function readThread(
   plan: ReplyPlan;
   widgetFeedback: boolean;
 }> {
+  const api: LinearApiOptions = {
+    fetch: (input, init) =>
+      fetch(input, { ...init, signal: AbortSignal.timeout(20_000) }),
+  };
   const thread = await callLinearGraphQL<ThreadResponse>({
+    api,
     credentials,
     query: THREAD_QUERY,
     queryName: "RequesterThread",
@@ -292,7 +312,7 @@ async function readThread(
   // missing, so the read refuses rather than risk a second message.
   const comments = withoutReporterUpdates(
     await readAllComments(issue, (query, queryName, variables) =>
-      callLinearGraphQL({ credentials, query, queryName, variables })
+      callLinearGraphQL({ api, credentials, query, queryName, variables })
     ),
     thread.viewer.id,
     thread.issue.identifier
