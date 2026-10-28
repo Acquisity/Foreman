@@ -237,7 +237,7 @@ describe("discovery", () => {
         : original(identifier);
     const report = await run(s);
     assert.equal(report.errors.length, 1);
-    assert.ok(report.errors[0]?.startsWith("ENG-1: ENG-1 has more than 100"));
+    assert.ok(report.errors[0]?.startsWith("ENG-1: ENG-1 has more than 1,000"));
     assert.equal(s.memory.pending.get("ENG-1")?.attempts, 1);
     assert.deepEqual(
       s.linear.posts.map((p) => p.identifier),

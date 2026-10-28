@@ -3,6 +3,7 @@ import {
   type LinearApiOptions,
   type LinearChannelCredentials,
 } from "eve/channels/linear";
+import { z } from "zod";
 import {
   decideFollowUp,
   type FollowUpInput,
@@ -120,12 +121,98 @@ const THREAD_QUERY = `query RequesterThread($id: String!) {
     id
     identifier
     project { id }
-    comments(first: 100) {
-      pageInfo { hasNextPage }
-      nodes { id body createdAt parent { id } user { id } }
+  }
+}`;
+
+const COMMENTS_QUERY = `query IssueComments($id: String!, $after: String) {
+  issue(id: $id) {
+    comments(first: 100, after: $after) {
+      pageInfo { hasNextPage endCursor }
+      nodes { id body createdAt parent { id } user { id name } }
     }
   }
 }`;
+
+/** 1,000 comments is far past any real intake thread. */
+const COMMENT_PAGES = 10;
+
+/** One Linear GraphQL request on the caller's own transport and deadline. */
+export type LinearRequest = <T>(
+  query: string,
+  queryName: string,
+  variables: NonNullable<Parameters<typeof callLinearGraphQL>[0]["variables"]>
+) => Promise<T>;
+
+export interface IssueComment extends ThreadComment {
+  userName: string | null;
+}
+
+const commentsResponseSchema = z.object({
+  issue: z
+    .object({
+      comments: z.object({
+        nodes: z.array(
+          z.object({
+            body: z.string(),
+            createdAt: z.string(),
+            id: z.string(),
+            parent: z.object({ id: z.string() }).nullable(),
+            user: z.object({ id: z.string(), name: z.string() }).nullable(),
+          })
+        ),
+        pageInfo: z.object({
+          endCursor: z.string().nullable(),
+          hasNextPage: z.boolean(),
+        }),
+      }),
+    })
+    .nullable(),
+});
+type CommentsResponse = z.infer<typeof commentsResponseSchema>;
+
+/**
+ * Every comment on the issue, read page by page in order. Past the page bound
+ * the latest replies may be missing, so it refuses rather than return a part.
+ */
+export function readAllComments(
+  issue: string,
+  request: LinearRequest
+): Promise<IssueComment[]> {
+  const page = async (
+    after: string | null,
+    number: number
+  ): Promise<IssueComment[]> => {
+    const data = commentsResponseSchema.parse(
+      await request<CommentsResponse>(COMMENTS_QUERY, "IssueComments", {
+        after,
+        id: issue,
+      })
+    );
+    if (!data.issue) {
+      throw new Error(`Issue ${issue} was not found.`);
+    }
+    const { nodes, pageInfo } = data.issue.comments;
+    const comments = nodes.map((c) => ({
+      body: c.body,
+      createdAt: c.createdAt,
+      id: c.id,
+      parentId: c.parent?.id ?? null,
+      userId: c.user?.id ?? null,
+      userName: c.user?.name ?? null,
+    }));
+    if (!pageInfo.hasNextPage) {
+      return comments;
+    }
+    assertThreadComplete(issue, number >= COMMENT_PAGES);
+    if (!pageInfo.endCursor) {
+      throw new Error(
+        `${issue} has more comments but no continuation cursor, so the thread state cannot be checked.`
+      );
+    }
+    return [...comments, ...(await page(pageInfo.endCursor, number + 1))];
+  };
+  return page(null, 1);
+}
 
 const ASK_FROM_QUERY = `query AskFrom($id: String!) {
   issue(id: $id) { description attachments(first: 50) { nodes { title url } } }
@@ -168,16 +255,6 @@ const REPLY_MUTATION = `mutation RequesterReply($input: CommentCreateInput!) {
 
 interface ThreadResponse {
   issue: {
-    comments: {
-      pageInfo: { hasNextPage: boolean };
-      nodes: {
-        body: string;
-        createdAt: string;
-        id: string;
-        parent: { id: string } | null;
-        user: { id: string } | null;
-      }[];
-    };
     id: string;
     identifier: string;
     project: { id: string } | null;
@@ -217,7 +294,12 @@ async function readThread(
   plan: ReplyPlan;
   widgetFeedback: boolean;
 }> {
+  const api: LinearApiOptions = {
+    fetch: (input, init) =>
+      fetch(input, { ...init, signal: AbortSignal.timeout(20_000) }),
+  };
   const thread = await callLinearGraphQL<ThreadResponse>({
+    api,
     credentials,
     query: THREAD_QUERY,
     queryName: "RequesterThread",
@@ -226,17 +308,12 @@ async function readThread(
   if (!thread.issue) {
     throw new Error(`Issue ${issue} was not found.`);
   }
-  // One page is the whole history for an intake ticket; past it the latest
-  // reply may be missing, so refuse rather than risk a second message.
-  assertThreadComplete(issue, thread.issue.comments.pageInfo.hasNextPage);
+  // The whole history, up to the page bound; past it the latest reply may be
+  // missing, so the read refuses rather than risk a second message.
   const comments = withoutReporterUpdates(
-    thread.issue.comments.nodes.map((c) => ({
-      body: c.body,
-      createdAt: c.createdAt,
-      id: c.id,
-      parentId: c.parent?.id ?? null,
-      userId: c.user?.id ?? null,
-    })),
+    await readAllComments(issue, (query, queryName, variables) =>
+      callLinearGraphQL({ api, credentials, query, queryName, variables })
+    ),
     thread.viewer.id,
     thread.issue.identifier
   );
@@ -426,7 +503,7 @@ export function directFollowUp(
 export class ThreadIncompleteError extends Error {
   constructor(issue: string) {
     super(
-      `${issue} has more than 100 comments, so the thread state cannot be checked; reply in Slack by hand.`
+      `${issue} has more than 1,000 comments, so the thread state cannot be checked; reply in Slack by hand.`
     );
     this.name = "ThreadIncompleteError";
   }

@@ -8,7 +8,9 @@ import {
   judgeFollowUp,
   planReply,
   promptedFollowUp,
+  readAllComments,
   relayedFollowUp,
+  replyToRequester,
   type ThreadComment,
   ThreadIncompleteError,
 } from "./requester-reply.js";
@@ -433,6 +435,67 @@ test("assertThreadComplete refuses a thread it cannot read in full", () => {
   );
 });
 
+/** Serves comment pages in order, as Linear does with `after`. */
+const pagesOf =
+  (pages: readonly ThreadComment[][], more = false) =>
+  <T>(_query: string, _name: string, variables: Record<string, unknown>) => {
+    const index = Number(variables.after ?? 0);
+    const next = more || index + 1 < pages.length;
+    return Promise.resolve({
+      issue: {
+        comments: {
+          nodes: (pages[index] ?? []).map((c) => ({
+            body: c.body,
+            createdAt: c.createdAt,
+            id: c.id,
+            parent: c.parentId ? { id: c.parentId } : null,
+            user: c.userId ? { id: c.userId, name: c.userId } : null,
+          })),
+          pageInfo: {
+            endCursor: next ? String(index + 1) : null,
+            hasNextPage: next,
+          },
+        },
+      },
+    } as T);
+  };
+
+test("reads every page, so a reply past the first page still counts", async () => {
+  const first = [
+    anchor,
+    reply("f1", FOREMAN, "2026-09-25T16:00:00Z"),
+    ...Array.from({ length: 98 }, (_, i) => ({
+      ...reply(`n${i}`, "aaron", "2026-09-25T16:30:00Z"),
+      parentId: null,
+    })),
+  ];
+  const second = [reply("r2", "requester", "2026-09-25T17:00:00Z")];
+  const comments = await readAllComments("ENG-1", pagesOf([first, second]));
+  assert.equal(comments.length, 101);
+  assert.deepEqual(planReply(comments, FOREMAN), {
+    anchorId: "anchor",
+    followUp: { lastReply: "text", replies: ["text"] },
+    ok: true,
+  });
+});
+
+test("refuses a thread longer than ten pages", async () => {
+  let calls = 0;
+  const endless = pagesOf([[anchor]], true);
+  await assert.rejects(
+    readAllComments("ENG-1", (query, name, variables) => {
+      calls += 1;
+      return endless(query, name, variables);
+    }),
+    {
+      message:
+        "ENG-1 has more than 1,000 comments, so the thread state cannot be checked; reply in Slack by hand.",
+      name: "ThreadIncompleteError",
+    }
+  );
+  assert.equal(calls, 10);
+});
+
 test("acts on a person's direct status request on an ordinary ticket, and on nothing else there", async () => {
   const markDone = said(
     "d1",
@@ -474,4 +537,81 @@ test("acts on a person's direct status request on an ordinary ticket, and on not
     ),
     "skip"
   );
+});
+
+test("refuses an incomplete comment page without a continuation cursor", async () => {
+  await assert.rejects(
+    readAllComments(
+      "ENG-1",
+      async <T>() =>
+        ({
+          issue: {
+            comments: {
+              nodes: [],
+              pageInfo: { endCursor: null, hasNextPage: true },
+            },
+          },
+        }) as T
+    ),
+    {
+      message:
+        "ENG-1 has more comments but no continuation cursor, so the thread state cannot be checked.",
+    }
+  );
+});
+
+test("rejects a malformed comment page instead of normalizing missing fields", async () => {
+  await assert.rejects(
+    readAllComments(
+      "ENG-1",
+      async <T>() =>
+        ({
+          issue: {
+            comments: {
+              nodes: [
+                {
+                  body: "sample",
+                  createdAt: "2026-10-28T00:00:00Z",
+                  id: "sample",
+                  parent: null,
+                },
+              ],
+              pageInfo: { endCursor: null, hasNextPage: false },
+            },
+          },
+        }) as T
+    ),
+    { name: "ZodError" }
+  );
+});
+
+test("bounds the requester metadata and comment page requests with signals", async (t) => {
+  const signals: (AbortSignal | null | undefined)[] = [];
+  t.mock.method(globalThis, "fetch", (_url: unknown, init?: RequestInit) => {
+    signals.push(init?.signal);
+    const { query } = JSON.parse(String(init?.body)) as { query: string };
+    if (query.includes("IssueComments")) {
+      throw new Error("stop before write");
+    }
+    return Promise.resolve(
+      Response.json({
+        data: {
+          issue: { id: "issue", identifier: "ENG-1", project: null },
+          viewer: { id: FOREMAN },
+        },
+      })
+    );
+  });
+  await assert.rejects(
+    replyToRequester("ENG-1", "unused", "local-test-token"),
+    {
+      message: "stop before write",
+    }
+  );
+  assert.equal(signals.length, 2);
+  for (const signal of signals) {
+    assert.ok(signal instanceof AbortSignal);
+    assert.equal(signal.aborted, false);
+  }
+  assert.notEqual(signals[0], signals[1]);
 });
