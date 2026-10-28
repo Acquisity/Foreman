@@ -291,6 +291,32 @@ export async function saveInvestigationDocument(
   return { created: true, ...(await readBack(documentCreate, opts)) };
 }
 
+/**
+ * The URLs of the investigation documents attached to a ticket, the documents
+ * where triage and staff record a change; decide_triage counts a document as
+ * change evidence only when it is one of these.
+ */
+export async function ticketDocumentUrls(
+  identifier: string,
+  opts?: LinearGraphqlOptions
+): Promise<string[]> {
+  const lists = await Promise.all(
+    Object.values(DOCUMENT_TITLES).map((title) =>
+      linearGraphql<{
+        issue: { documents: { nodes: Array<{ id: string }> } };
+      }>("IssueDocuments", { id: identifier, title }, opts)
+    )
+  );
+  const documents = await Promise.all(
+    lists
+      .flatMap(({ issue }) => issue.documents.nodes)
+      .map(({ id }) =>
+        linearGraphql<{ document: { url: string } }>("Document", { id }, opts)
+      )
+  );
+  return documents.map(({ document }) => document.url);
+}
+
 async function readBack(payload: DocumentPayload, opts?: LinearGraphqlOptions) {
   if (!payload.success) {
     throw new Error("Linear did not confirm the document write.");
@@ -651,13 +677,19 @@ async function duplicateParent(
     }
     return found;
   }
+  const required = routing.masterRequired || carriesBug(issue, input);
   if (input.parent !== undefined) {
+    if (required && isReport(await requireIssue(gql, input.parent))) {
+      throw new Error(
+        `${input.parent} is a customer report, not a master, so nothing was written. Pass the master as parent, or create one through engineering-handoff first.`
+      );
+    }
     if (await beforeCutoff(gql, input.parent, cutoff)) {
       throw staleMaster(input.parent, cutoff);
     }
     return input.parent;
   }
-  if (!(routing.masterRequired || carriesBug(issue, input))) {
+  if (!required) {
     return;
   }
   if (stale !== null) {

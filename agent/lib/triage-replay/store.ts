@@ -73,6 +73,8 @@ export interface ReplayState {
   issue: IssueFields;
   lists: FrozenLists;
   relations: { issueId: string; relatedIssueId: string; type: string }[];
+  /** Parents the run set on related snapshot issues, by identifier. */
+  reparented?: Record<string, string>;
   rootTurn: "completed" | "failed" | "cancelled" | null;
   routes: Record<string, unknown>[];
   stamp: { foremanCommit: string; startedAt: string };

@@ -43,6 +43,8 @@ const RELATION_NOT_RECORDED =
   /Nothing was written: the duplicate relation to ENG-9 was not recorded/u;
 const MASTER_OUTSIDE_MAP =
   /ENG-70 is held by Pieter Venter, who is not in the owner map, so nothing was written/u;
+const PARENT_NOT_MASTER =
+  /ENG-40 is a customer report, not a master, so nothing was written/u;
 const STALE_MASTER =
   /ENG-50 was created before 2026-09-28T00:00:00.000Z, so it cannot take new reports and nothing was written/u;
 
@@ -227,5 +229,36 @@ describe("routeTicket duplicate masters, review fixes", () => {
       { client: fake.fetchStub, mastersCreatedAfter: CUTOFF }
     );
     assert.equal(updateOf(fake)?.parentId, "i-ENG-30");
+  });
+
+  it("refuses a report passed as the parent of a Bug duplicate, so it cannot close without a master (C1)", async () => {
+    const fake = linear();
+    await assert.rejects(
+      routeTicket(
+        {
+          duplicateOf: "ENG-40",
+          issue: "ENG-1",
+          parent: "ENG-40",
+          state: "Duplicate",
+        },
+        { client: fake.fetchStub }
+      ),
+      PARENT_NOT_MASTER
+    );
+    assert.deepEqual(fake.writes(), []);
+  });
+
+  it("takes a master passed as the parent of a Bug duplicate of a lone report (C1)", async () => {
+    const fake = linear();
+    await routeTicket(
+      {
+        duplicateOf: "ENG-40",
+        issue: "ENG-1",
+        parent: "ENG-31",
+        state: "Duplicate",
+      },
+      { client: fake.fetchStub }
+    );
+    assert.equal(updateOf(fake)?.parentId, "i-ENG-31");
   });
 });

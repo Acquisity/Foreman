@@ -1,9 +1,12 @@
 import { defineTool } from "eve/tools";
 import { z } from "zod";
+import { executorClient } from "#lib/executor/client.js";
 import { LINEAR_ISSUE_ID_PATTERN } from "#lib/investigation-memory/scope.js";
 import { decideTriage } from "#lib/jev-decisions.js";
+import { ticketDocumentUrls } from "#lib/linear-api.js";
 import { logOpsEvent } from "#lib/ops-log.js";
 import { recordFor, regressionRecords } from "#lib/regression-record.js";
+import { isLinearDocumentUrl } from "#lib/regression-routing.js";
 import {
   confidenceFields,
   criticRounds,
@@ -38,9 +41,19 @@ export default defineTool({
         input.codePath,
         input.failureAt
       );
+      // A document link names no issue, so it counts only as one of the
+      // documents read from this ticket now.
+      const ticketDocuments =
+        input.changeMade && isLinearDocumentUrl(input.changeMade.recordedAt)
+          ? await ticketDocumentUrls(input.identifier, {
+              client: executorClient(ctx),
+              signal: ctx.abortSignal,
+            })
+          : [];
       const decision = await decideTriage(
         {
           ...input,
+          ticketDocuments,
           ...(record
             ? {
                 regression: {
@@ -140,7 +153,7 @@ export default defineTool({
           .url()
           .max(2000)
           .describe(
-            "The link to the comment or document on this ticket that records the change."
+            "The link to the comment on this ticket, or to its Triage or Billing investigation document, that records the change."
           ),
       })
       .optional()

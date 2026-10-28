@@ -78,16 +78,20 @@ export interface ChangeMade {
 }
 
 /**
- * A comment link on this ticket, or a Linear document link in either form
- * (`/document/<slug>` or `/d/<id>`). A document link names no issue, so it
- * cannot be tied to this ticket from the link alone; the investigation
- * document and staff notes attached to the ticket are where changes are
- * recorded, so both forms count.
+ * A comment link on this ticket, or a link to one of the documents attached to
+ * it, in either document form (`/document/<slug>` or `/d/<id>`). A document
+ * link names no issue, so it counts only when it is one the decide_triage
+ * tool read from this ticket.
  */
-const recordedOn = (identifier: string, url: string): boolean => {
+const recordedOn = (
+  identifier: string,
+  url: string,
+  ticketDocuments: readonly string[]
+): boolean => {
   const link = url.trim();
-  if (LINEAR_DOCUMENT_URL.test(link)) {
-    return true;
+  const key = documentKey(link);
+  if (key !== null) {
+    return ticketDocuments.some((attached) => documentKey(attached) === key);
   }
   return (
     LINEAR_ISSUE_URL.exec(link)?.[1]?.toUpperCase() === identifier.toUpperCase()
@@ -96,7 +100,14 @@ const recordedOn = (identifier: string, url: string): boolean => {
 const LINEAR_ISSUE_URL =
   /^https:\/\/linear\.app\/[\w-]+\/issue\/([A-Za-z]+-\d+)(?:[/?#]|$)/u;
 const LINEAR_DOCUMENT_URL =
-  /^https:\/\/linear\.app\/[\w-]+\/(?:document|d)\/[\w-]+(?:[/?#]|$)/u;
+  /^https:\/\/linear\.app\/[\w-]+\/(?:document|d)\/(?:[\w-]*-)?([\da-f]+)(?:[/?#]|$)/u;
+
+/** The id a Linear document URL ends in, the same in both URL forms. */
+const documentKey = (url: string): string | null =>
+  LINEAR_DOCUMENT_URL.exec(url.trim())?.[1] ?? null;
+
+export const isLinearDocumentUrl = (url: string): boolean =>
+  documentKey(url) !== null;
 
 export const CHANGE_GAP =
   "Evidence of the change that resolved it: a fix live in production (check_regression returns fixed on main and live) or the staff or triage action, passed as changeMade with the link to where this ticket records it. An explanation with no change is not Resolved by triage.";
@@ -120,7 +131,10 @@ export const resolvedPath = (
     return { path };
   }
   const change = input.changeMade;
-  if (change && recordedOn(input.identifier, change.recordedAt)) {
+  if (
+    change &&
+    recordedOn(input.identifier, change.recordedAt, input.ticketDocuments ?? [])
+  ) {
     notes.push(
       `Resolved by a ${change.by} change recorded on the ticket: ${change.action}`
     );

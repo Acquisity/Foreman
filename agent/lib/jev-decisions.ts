@@ -228,6 +228,8 @@ export interface TriageInput {
   regression?: RegressionOutcome;
   rootCauseLabels: string[];
   sourceLabels: string[];
+  /** The ticket's document URLs, read by the tool; never typed by the model. */
+  ticketDocuments?: string[];
   ticketLabels?: string[];
   unavailableLanes?: string[];
 }

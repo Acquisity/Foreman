@@ -45,6 +45,13 @@ function renderIssue(
   };
 }
 
+/** A snapshot issue's parent, after any parent the run set on it. */
+const parentOf = (
+  state: ReplayState,
+  identifier: string,
+  frozen: Parameters<typeof asOfName>[0]
+) => state.reparented?.[identifier] ?? asOfName(frozen);
+
 function routeIssue(state: ReplayState, id: unknown) {
   if (isCase(state, id)) {
     return renderIssue(state, CASE_ISSUE_ID, state.case.id, state.issue);
@@ -63,7 +70,7 @@ function routeIssue(state: ReplayState, id: unknown) {
     return null;
   }
   const assigneeName = asOfName(related.assignee);
-  const parent = asOfName(related.parent);
+  const parent = parentOf(state, related.id, related.parent);
   const assignee = assigneeName
     ? state.lists.users.find((u) => u.name === assigneeName)
     : undefined;
@@ -123,15 +130,17 @@ function relatedIssues(state: ReplayState, variables: Filter) {
   const created = createdIssue(state, (filter.id as Filter | undefined)?.eq);
   if (created) {
     return {
-      nodes: [
-        {
-          ...routeIssue(state, created.identifier),
-          createdAt: state.case.createdAt,
-          state: { name: created.fields.state, type: "unknown" },
-          title: created.identifier,
-        },
-      ],
-      pageInfo: { endCursor: null, hasNextPage: false },
+      issues: {
+        nodes: [
+          {
+            ...routeIssue(state, created.identifier),
+            createdAt: state.case.createdAt,
+            state: { name: created.fields.state, type: "unknown" },
+            title: created.identifier,
+          },
+        ],
+        pageInfo: { endCursor: null, hasNextPage: false },
+      },
     };
   }
   const nodes = snapshotAsOfCase(state)
@@ -145,7 +154,7 @@ function relatedIssues(state: ReplayState, variables: Filter) {
     )
     .map((r) => {
       const assignee = asOfName(r.assignee);
-      const parent = asOfName(r.parent);
+      const parent = parentOf(state, r.id, r.parent);
       return {
         assignee: assignee ? { name: assignee } : null,
         createdAt: r.createdAt,
@@ -224,6 +233,29 @@ function applyUpdate(state: ReplayState, issue: IssueFields, input: Filter) {
   }
 }
 
+/**
+ * A parent set on an existing snapshot issue, such as a lone report moved
+ * under the master this run created; its other fields stay as frozen.
+ */
+function reparentSnapshot(state: ReplayState, id: unknown, input: Filter) {
+  const identifier = String(id).startsWith("replay-")
+    ? String(id).slice(7)
+    : String(id);
+  if (
+    input.parentId === undefined ||
+    isCase(state, id) ||
+    createdIssue(state, id) ||
+    !relatedAsOfCase(state, identifier)
+  ) {
+    return;
+  }
+  const parent = String(input.parentId);
+  state.reparented = {
+    ...state.reparented,
+    [identifier]: parent.startsWith("replay-") ? parent.slice(7) : parent,
+  };
+}
+
 type Handler = (state: ReplayState, variables: Filter) => unknown;
 
 function caseDocumentsOnly(state: ReplayState, issue: unknown) {
@@ -279,6 +311,7 @@ const HANDLERS: Record<LinearOperation, Handler> = {
     if (created) {
       applyUpdate(state, created.fields, v.input as Filter);
     }
+    reparentSnapshot(state, v.id, v.input as Filter);
     return { issueUpdate: { success: true } };
   },
   RouteRelation: (state, v) => {

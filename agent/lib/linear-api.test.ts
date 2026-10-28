@@ -6,6 +6,7 @@ import {
   findRelatedIssues,
   linearGraphql,
   saveInvestigationDocument,
+  ticketDocumentUrls,
 } from "./linear-api.js";
 
 const WAS_WRITTEN = /was written/u;
@@ -363,5 +364,49 @@ describe("saveInvestigationDocument", () => {
     assert.equal(result.documentId, "doc1");
     assert.ok(calls[1]?.query.startsWith("linear.UpdateDocument"));
     assert.equal(calls[1]?.variables.id, "doc1");
+  });
+});
+
+describe("ticketDocumentUrls", () => {
+  it("lists the URLs of the investigation documents attached to the ticket (R1)", async () => {
+    const asked: string[] = [];
+    const client: ProviderClient = (request) => {
+      const variables =
+        "variables" in request.input ? request.input.variables : {};
+      if (request.operation === "linear.IssueDocuments") {
+        asked.push(String(variables.title));
+        const triage = variables.title === "Triage investigation";
+        return json({
+          data: {
+            issue: {
+              documents: {
+                nodes: triage
+                  ? [{ id: "doc-1", title: "Triage investigation" }]
+                  : [],
+              },
+              id: "issue-1",
+            },
+          },
+        });
+      }
+      assert.equal(request.operation, "linear.Document");
+      assert.equal(variables.id, "doc-1");
+      return json({
+        data: {
+          document: {
+            id: "doc-1",
+            updatedAt: "2026-10-28T00:00:00.000Z",
+            url: "https://linear.app/acquisity/document/triage-investigation-8a841e5cff51",
+          },
+        },
+      });
+    };
+    assert.deepEqual(await ticketDocumentUrls("ENG-1", { client }), [
+      "https://linear.app/acquisity/document/triage-investigation-8a841e5cff51",
+    ]);
+    assert.deepEqual(
+      asked.sort((a, b) => a.localeCompare(b)),
+      ["Billing investigation", "Triage investigation"]
+    );
   });
 });
