@@ -686,9 +686,18 @@ async function masterOf(
 const beforeCutoff = (createdAt: string, cutoff: string | null) =>
   cutoff !== null && Date.parse(createdAt) < Date.parse(cutoff);
 
-const staleMaster = (identifier: string, cutoff: string | null) =>
+/**
+ * The exact retry for a master past the cutoff: a new master, the match moved
+ * under it, then this call again with the new master as parent and owner
+ * source, which also holds when the match is itself the stale master.
+ */
+const staleMaster = (
+  identifier: string,
+  cutoff: string | null,
+  match: string
+) =>
   new Error(
-    `${identifier} was created before ${cutoff}, so it cannot take new reports and nothing was written. Create a new master through engineering-handoff from this investigation (aggregate evidence only: no organization id, email or customer rows), relate ${identifier} for history, parent the match under the new master with route_ticket, then call this again.`
+    `${identifier} was created before ${cutoff}, so it cannot take new reports and nothing was written. Create a new master through engineering-handoff from this investigation (aggregate evidence only: no organization id, email or customer rows), relate ${identifier} for history, call route_ticket with issue ${match} and parent set to the new master, then call this again with duplicateOf ${match}, parent the new master and inheritAssigneeFrom the new master.`
   );
 
 /**
@@ -718,7 +727,7 @@ async function checkedParent(
     cutoff !== null &&
     beforeCutoff(await createdAtOf(gql, parent, id), cutoff)
   ) {
-    throw staleMaster(parent, cutoff);
+    throw staleMaster(parent, cutoff, match.identifier);
   }
   return parent;
 }
@@ -758,7 +767,7 @@ async function duplicateParent(
     return;
   }
   if (stale !== null) {
-    throw staleMaster(stale, cutoff);
+    throw staleMaster(stale, cutoff, match.identifier);
   }
   throw new Error(
     `${match.identifier} is not a master and is not under one, so nothing was written. Create the master through engineering-handoff from this investigation (aggregate evidence only: no organization id, email or customer rows), call route_ticket with issue ${match.identifier} and parent set to the new master, then call this again.`

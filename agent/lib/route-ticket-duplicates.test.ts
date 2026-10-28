@@ -32,6 +32,7 @@ const ISSUES: Record<string, FakeIssue> = {
   "ENG-47": { labels: ["Customer reported"], parent: "ENG-46" },
   "ENG-48": { createdAt: STALE, labels: ["Customer reported"] },
   "ENG-50": { assignee: ANUJ, createdAt: STALE, master: true },
+  "ENG-51": { createdAt: STALE, master: true, parent: "ENG-31" },
   "ENG-60": { labels: ["Customer reported"], parent: "ENG-50" },
   "ENG-70": { assignee: GONE, createdAt: FRESH, master: true },
   "ENG-77": { createdAt: FRESH },
@@ -58,6 +59,8 @@ const UNLABELLED_NOT_MASTER =
   /ENG-45 is not a master and is not under one, so nothing was written/u;
 const OLD_PARENT =
   /ENG-48 was created before 2026-09-28T00:00:00.000Z, so it cannot take new reports and nothing was written/u;
+const STALE_MASTER_RETRY =
+  /relate ENG-50 for history, call route_ticket with issue ENG-50 and parent set to the new master, then call this again with duplicateOf ENG-50, parent the new master and inheritAssigneeFrom the new master\./u;
 const STALE_MATCH_NOT_UNDER =
   /ENG-60 is not under ENG-31, so nothing was written/u;
 const MATCH_NOT_UNDER = /ENG-40 is not under ENG-31, so nothing was written/u;
@@ -382,5 +385,29 @@ describe("routeTicket duplicate masters, review fixes", () => {
       OLD_PARENT
     );
     assert.deepEqual(fake.writes(), []);
+  });
+
+  it("gives the exact retry when the match is itself a master past the cutoff (R3)", async () => {
+    const fake = linear();
+    await assert.rejects(
+      routeTicket(
+        { duplicateOf: "ENG-50", issue: "ENG-1", state: "Duplicate" },
+        { client: fake.fetchStub, mastersCreatedAfter: CUTOFF }
+      ),
+      STALE_MASTER_RETRY
+    );
+    // The retry it names, once the stale master (ENG-51) sits under ENG-31.
+    const retried = linear();
+    await routeTicket(
+      {
+        duplicateOf: "ENG-51",
+        inheritAssigneeFrom: "ENG-31",
+        issue: "ENG-1",
+        parent: "ENG-31",
+        state: "Duplicate",
+      },
+      { client: retried.fetchStub, mastersCreatedAfter: CUTOFF }
+    );
+    assert.equal(updateOf(retried)?.parentId, "i-ENG-31");
   });
 });
