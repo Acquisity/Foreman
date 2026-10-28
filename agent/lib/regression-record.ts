@@ -21,6 +21,8 @@ export interface RegressionRecord {
   commitRead: string;
   /** The commit production serves, or null when it could not be established. */
   deployedCommit: string | null;
+  /** The failure time the check judged a fix against. */
+  failureAt: string;
   /** The blamed file and line range at the commit read: the record answers only for that code. */
   file: string;
   /** The function the blamed range sits in, as decide_triage's codePath names it. */
@@ -36,8 +38,9 @@ export interface RegressionRecord {
 
 /**
  * The record for the code a decision blames, or none: a record for any other
- * file, function, line range or commit read is stale evidence for a corrected
- * investigation, and a codePath without its line range matches nothing.
+ * file, function, line range, commit read or failure time is stale evidence
+ * for a corrected investigation, and a codePath without its line range or a
+ * decision without the failure time matches nothing.
  */
 export const recordFor = (
   record: RegressionRecord | undefined,
@@ -48,10 +51,14 @@ export const recordFor = (
         function: string;
         lines?: { end: number; start: number };
       }
-    | undefined
+    | undefined,
+  failureAt: string | undefined
 ): RegressionRecord | undefined =>
   record &&
   codePath?.lines &&
+  failureAt !== undefined &&
+  Number.isFinite(Date.parse(failureAt)) &&
+  Date.parse(record.failureAt) === Date.parse(failureAt) &&
   record.commitRead === codePath.commit &&
   record.file === codePath.file &&
   record.function === codePath.function &&

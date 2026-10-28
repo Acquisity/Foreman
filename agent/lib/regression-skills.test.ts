@@ -154,12 +154,12 @@ describe("the regression lane reads only what it can prove", () => {
     );
     assert.ok(
       reference.includes(
-        "The record answers only for the file, function, line range and commit read you passed"
+        "The record answers only for the file, function, line range, commit read and failure time you passed"
       )
     );
     assert.ok(
       reference.includes(
-        "Pass `decide_triage` the same file, function, line range (`codePath.lines`) and commit"
+        "Pass `decide_triage` the same file, function, line range (`codePath.lines`) and commit, and the same `failureAt`"
       )
     );
   });

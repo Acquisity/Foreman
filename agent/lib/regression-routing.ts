@@ -57,4 +57,4 @@ export const fixedRouting = (
  * unproven branch or to tell the requester anything.
  */
 export const REGRESSION_GAP =
-  "A regression check on the blamed code. Foreman closes this one itself: run check_regression for this ticket on exactly the file, function, line range and commit in codePath (pass codePath.lines too), label every commit it returns, and call decide_triage again. An unchecked result counts when the tool could not run. Do not take the unproven branch for it.";
+  "A regression check on the blamed code. Foreman closes this one itself: run check_regression for this ticket on exactly the file, function, line range and commit in codePath (pass codePath.lines too) and pass decide_triage the same failureAt, label every commit it returns, and call decide_triage again. An unchecked result counts when the tool could not run. Do not take the unproven branch for it.";

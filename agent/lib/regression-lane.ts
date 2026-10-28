@@ -436,6 +436,7 @@ const recordOf = (
   ...outcome,
   commitRead: input.readCommit,
   deployedCommit: deployed,
+  failureAt: input.failureAt,
   file: input.file,
   function: input.function,
   issue: input.issue,
@@ -558,13 +559,14 @@ export async function runCheckRegression(
 export const uncheckedRecord = (
   input: Pick<
     CheckInput,
-    "file" | "function" | "issue" | "lines" | "readCommit"
+    "failureAt" | "file" | "function" | "issue" | "lines" | "readCommit"
   >,
   reason: string
 ): RegressionRecord => ({
   ...unchecked(reason),
   commitRead: input.readCommit,
   deployedCommit: null,
+  failureAt: input.failureAt,
   file: input.file,
   function: input.function,
   issue: input.issue,

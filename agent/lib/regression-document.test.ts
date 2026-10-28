@@ -12,6 +12,7 @@ const record = (over: Partial<RegressionRecord> = {}): RegressionRecord => ({
   commit: FIX,
   commitRead: READ,
   deployedCommit: DEPLOYED,
+  failureAt: "2026-10-20T12:00:00.000Z",
   file: "src/send-limit.ts",
   function: "computeSendLimit",
   issue: "ENG-1",

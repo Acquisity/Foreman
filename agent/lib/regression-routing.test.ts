@@ -111,6 +111,7 @@ test("a record for any other checked target is stale evidence, so the Bug needs 
     commit: FIX,
     commitRead: read,
     deployedCommit: read,
+    failureAt: "2026-10-20T12:00:00.000Z",
     file: "webhook.ts",
     function: "handleReply",
     issue: "ENG-1",
@@ -125,7 +126,7 @@ test("a record for any other checked target is stale evidence, so the Bug needs 
     function: "handleReply",
     lines,
   };
-  assert.equal(recordFor(record, codePath), record);
+  assert.equal(recordFor(record, codePath, record.failureAt), record);
   for (const corrected of [
     { ...codePath, file: "inbox.ts" },
     { ...codePath, commit: "c".repeat(40) },
@@ -134,13 +135,57 @@ test("a record for any other checked target is stale evidence, so the Bug needs 
     { commit: read, file: "webhook.ts", function: "handleReply" },
     undefined,
   ]) {
-    const kept = recordFor(record, corrected);
+    const kept = recordFor(record, corrected, record.failureAt);
     assert.equal(kept, undefined, JSON.stringify(corrected));
     const decision = resolveTriage(
       triageInput({
         ...(corrected ? { codePath: corrected } : {}),
         regression: kept,
       }),
+      bugAnswers()
+    );
+    assert.ok(decision.outcome === "unproven");
+    assert.deepEqual(decision.missing, [REGRESSION_GAP]);
+  }
+});
+
+test("a record checked for another failure time is stale, so a corrected time needs a new check", () => {
+  const read = "a".repeat(40);
+  const lines = { end: 7, start: 5 };
+  const codePath = {
+    commit: read,
+    file: "webhook.ts",
+    function: "handleReply",
+    lines,
+  };
+  const eightDaysAgo = "2026-10-20T12:00:00.000Z";
+  const record = {
+    commit: FIX,
+    commitRead: read,
+    deployedCommit: read,
+    failureAt: eightDaysAgo,
+    file: "webhook.ts",
+    function: "handleReply",
+    issue: "ENG-1",
+    kind: "fixed_live" as const,
+    line: `fixed on main and live, by ${FIX}`,
+    lines,
+    windowDays: 30,
+  };
+  assert.equal(recordFor(record, codePath, eightDaysAgo), record);
+  assert.equal(
+    recordFor(record, codePath, "2026-10-20T16:00:00+04:00"),
+    record
+  );
+  for (const failureAt of [
+    "2026-10-26T12:00:00.000Z",
+    undefined,
+    "not a time",
+  ]) {
+    const kept = recordFor(record, codePath, failureAt);
+    assert.equal(kept, undefined, String(failureAt));
+    const decision = resolveTriage(
+      triageInput({ codePath, regression: kept }),
       bugAnswers()
     );
     assert.ok(decision.outcome === "unproven");
