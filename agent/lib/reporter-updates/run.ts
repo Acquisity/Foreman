@@ -289,13 +289,6 @@ export const reconcileTicket = async (
   return outcome;
 };
 
-/**
- * What a duplicate follows: its master (ENG-16608) and its match. The master's
- * outcome governs: a Canceled master ends the wait whatever the match shows,
- * and a failed master read keeps the wait for the next run. Otherwise the
- * fixing pull request may be linked to either, so their linked pull requests
- * are pooled; a failed match read never hides the master.
- */
 /** The Linear read of what a duplicate follows failed; nothing else is one. */
 class FollowedReadError extends Error {
   constructor(cause: unknown) {
@@ -304,6 +297,15 @@ class FollowedReadError extends Error {
   }
 }
 
+/**
+ * What a duplicate follows: its master (ENG-16608) and its match. The master's
+ * outcome governs: a Canceled master ends the wait whatever the match shows,
+ * and a failed master read keeps the wait for the next run. Otherwise the
+ * fixing pull request may be linked to either, including a match that is
+ * itself an earlier Duplicate, so their linked pull requests are pooled on the
+ * master; deployment is still checked before anything is posted. A failed
+ * match read never hides the master.
+ */
 const followedOriginal = async (
   master: string | undefined,
   match: string | null,
@@ -329,6 +331,26 @@ const followedOriginal = async (
   const governing = read.find((facts) => facts.identifier === master);
   if (governing && closureOf(governing).kind === "not_fixed") {
     return governing;
+  }
+  if (governing) {
+    const pooled = {
+      ...governing,
+      pullUrls: [
+        ...new Set(
+          read
+            .filter(
+              (facts) =>
+                facts === governing ||
+                facts.stateName === "Duplicate" ||
+                closureOf(facts).kind === "needs_deploy"
+            )
+            .flatMap((facts) => facts.pullUrls)
+        ),
+      ],
+    };
+    if (closureOf(pooled).kind === "needs_deploy") {
+      return pooled;
+    }
   }
   const fixed = read.filter(
     (facts) => closureOf(facts).kind === "needs_deploy"

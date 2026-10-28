@@ -416,4 +416,24 @@ describe("a duplicate under a master (ENG-16608)", () => {
     s.linear.state.failOriginals.clear();
     assert.deepEqual(await reconcile(s), { kind: "posted", stage: "fixed" });
   });
+
+  it("posts the live fix linked to a matched earlier Duplicate under a Done master with none (Aaron)", async () => {
+    const dup = duplicate();
+    dup.facts.parent = { identifier: "ENG-50", stateType: "completed" };
+    const earlier = doneOriginal({
+      parent: { identifier: "ENG-50", stateType: "completed" },
+      pullUrls: [PR_URL],
+      stateName: "Duplicate",
+      stateType: "canceled",
+    });
+    const master = doneOriginal({ identifier: "ENG-50" });
+    const s = setup([dup, earlier, master], LIVE);
+    withLog(s);
+    await reconcile(s);
+    assert.deepEqual(await reconcile(s), { kind: "posted", stage: "fixed" });
+    assert.deepEqual(
+      s.linear.posts.map((p) => p.body),
+      [DUPLICATE_TEXT, fixedText("the export now includes every row", null)]
+    );
+  });
 });
