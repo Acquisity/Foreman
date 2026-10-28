@@ -31,9 +31,16 @@ export const tool = defineTool({
     z.object({ missing: z.array(z.string()), reason: z.string() }),
     z.object({
       candidates: z.array(
-        z.object({ identifier: z.string(), title: z.string(), url: z.string() })
+        z.object({
+          excerpt: z.string(),
+          identifier: z.string(),
+          state: z.string(),
+          title: z.string(),
+          url: z.string(),
+        })
       ),
       reason: z.string(),
+      truncated: z.boolean(),
     }),
     z.object({ error: z.string() }),
   ]),

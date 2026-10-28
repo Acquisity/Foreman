@@ -1050,3 +1050,47 @@ describe("eve offers file_migration_ticket only in a ticket-filing thread", () =
     assert.deepEqual(await offered(slackAuth(APP_PUBLISHING), "app"), []);
   });
 });
+
+describe("file_migration_ticket tool output", () => {
+  it("keeps each candidate's state and excerpt, and the truncated flag", async () => {
+    const { tool } = await import("../tools/file_migration_ticket.js");
+    const shown = {
+      candidates: [candidate("ENG-15156")],
+      reason: "Read these open tickets.",
+      truncated: true,
+    };
+    assert.deepEqual(
+      (
+        tool.outputSchema as unknown as { parse: (value: unknown) => unknown }
+      ).parse(shown),
+      shown
+    );
+  });
+});
+
+const FULL_PAGE_REFUSAL = /25 or more tickets/;
+
+describe("file_migration_ticket thread read", () => {
+  it("refuses a thread whose read fills a whole page", async () => {
+    const scope = migrationTicketScope(slackAuth(MIGRATION)) ?? assert.fail();
+    const nodes = Array.from({ length: 25 }, (_, index) => ({
+      comments: { nodes: [] },
+      createdAt: "2026-10-28T10:00:00Z",
+      description: "Report.",
+      identifier: `ENG-${index + 1}`,
+      state: { name: "Triage" },
+      title: "t",
+      url: urlOf(`ENG-${index + 1}`),
+    }));
+    await assert.rejects(
+      readThreadTickets(scope, {
+        client: () =>
+          Promise.resolve({
+            data: { data: { issues: { nodes } } },
+            status: 200,
+          }),
+      }),
+      FULL_PAGE_REFUSAL
+    );
+  });
+});

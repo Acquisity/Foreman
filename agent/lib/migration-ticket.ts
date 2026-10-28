@@ -307,6 +307,13 @@ export async function readThreadTickets(
     },
     opts
   );
+  // A full page may hide the oldest ticket or a duplicate, so the thread's
+  // one ticket can't be told apart: refuse rather than guess.
+  if (issues.nodes.length >= ISSUE_BODIES_PAGE) {
+    throw new Error(
+      `This thread matches ${ISSUE_BODIES_PAGE} or more tickets, so its one ticket can't be told apart.`
+    );
+  }
   return issues.nodes
     .filter((node) => {
       const filed = migrationFiledReport(node.description);
