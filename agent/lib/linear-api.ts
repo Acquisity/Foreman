@@ -688,16 +688,48 @@ const beforeCutoff = (createdAt: string, cutoff: string | null) =>
 
 const staleMaster = (identifier: string, cutoff: string | null) =>
   new Error(
-    `${identifier} was created before ${cutoff}, so it cannot take new reports and nothing was written. Create a new master through engineering-handoff from this investigation (aggregate evidence only: no organization id, email or customer rows), relate ${identifier} for history, then call again with parent set to the new master.`
+    `${identifier} was created before ${cutoff}, so it cannot take new reports and nothing was written. Create a new master through engineering-handoff from this investigation (aggregate evidence only: no organization id, email or customer rows), relate ${identifier} for history, parent the match under the new master with route_ticket, then call this again.`
   );
+
+/**
+ * A parent passed in for a duplicate with no eligible master: inside the
+ * session's cutoff and, for a Bug, a master its match is already under, so
+ * both reports join it and neither is left detached.
+ */
+async function checkedParent(
+  gql: Gql,
+  match: RouteIssue,
+  parent: string,
+  required: boolean,
+  cutoff: string | null
+): Promise<string> {
+  const { id } = await requireIssue(gql, parent);
+  if (required && (await masterCreatedAt(gql, parent, id)) === null) {
+    throw new Error(
+      `${parent} is not a master, so nothing was written. Pass the master as parent, or create one through engineering-handoff first.`
+    );
+  }
+  if (required && match.parent?.identifier !== parent) {
+    throw new Error(
+      `${match.identifier} is not under ${parent}, so nothing was written. Call route_ticket with issue ${match.identifier} and parent ${parent} first, so both reports join that master, then call this again.`
+    );
+  }
+  if (
+    cutoff !== null &&
+    beforeCutoff(await createdAtOf(gql, parent, id), cutoff)
+  ) {
+    throw staleMaster(parent, cutoff);
+  }
+  return parent;
+}
 
 /**
  * The parent a duplicate joins (ENG-16608): the match when it is a master,
  * else the match's parent when that is one. A master created before the
  * session's master-search cutoff is not eligible. With no eligible master, a
  * Bug duplicate (by decision or by its Bug label) is refused until
- * engineering-handoff has made one, and a parent it is given must be a master;
- * any other duplicate closes unparented.
+ * engineering-handoff has made one, and a parent it is given must be a master
+ * its match is already under; any other duplicate closes unparented.
  */
 async function duplicateParent(
   gql: Gql,
@@ -720,19 +752,7 @@ async function duplicateParent(
   }
   const required = routing.masterRequired || carriesBug(issue, input);
   if (input.parent !== undefined) {
-    const { id } = await requireIssue(gql, input.parent);
-    if (required && (await masterCreatedAt(gql, input.parent, id)) === null) {
-      throw new Error(
-        `${input.parent} is not a master, so nothing was written. Pass the master as parent, or create one through engineering-handoff first.`
-      );
-    }
-    if (
-      cutoff !== null &&
-      beforeCutoff(await createdAtOf(gql, input.parent, id), cutoff)
-    ) {
-      throw staleMaster(input.parent, cutoff);
-    }
-    return input.parent;
+    return checkedParent(gql, match, input.parent, required, cutoff);
   }
   if (!required) {
     return;

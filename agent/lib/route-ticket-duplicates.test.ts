@@ -58,6 +58,9 @@ const UNLABELLED_NOT_MASTER =
   /ENG-45 is not a master and is not under one, so nothing was written/u;
 const OLD_PARENT =
   /ENG-48 was created before 2026-09-28T00:00:00.000Z, so it cannot take new reports and nothing was written/u;
+const STALE_MATCH_NOT_UNDER =
+  /ENG-60 is not under ENG-31, so nothing was written/u;
+const MATCH_NOT_UNDER = /ENG-40 is not under ENG-31, so nothing was written/u;
 const PARENT_NOT_MASTER = /ENG-40 is not a master, so nothing was written/u;
 const RETRY_FROM_MASTER =
   /Call route_ticket again without duplicateOf, with parent ENG-30 and inheritAssigneeFrom ENG-30/u;
@@ -214,19 +217,21 @@ describe("routeTicket duplicate masters, review fixes", () => {
     );
   });
 
-  it("takes a fresh master passed as parent when the match's master is past the cutoff (C4)", async () => {
+  it("refuses a fresh master passed as parent while the match still sits under its stale master (C4, R1)", async () => {
     const fake = linear();
-    await routeTicket(
-      {
-        duplicateOf: "ENG-60",
-        issue: "ENG-1",
-        parent: "ENG-31",
-        state: "Duplicate",
-      },
-      { client: fake.fetchStub, mastersCreatedAfter: CUTOFF }
+    await assert.rejects(
+      routeTicket(
+        {
+          duplicateOf: "ENG-60",
+          issue: "ENG-1",
+          parent: "ENG-31",
+          state: "Duplicate",
+        },
+        { client: fake.fetchStub, mastersCreatedAfter: CUTOFF }
+      ),
+      STALE_MATCH_NOT_UNDER
     );
-    assert.deepEqual(fake.relations, ["i-1>i-ENG-60"]);
-    assert.equal(updateOf(fake)?.parentId, "i-ENG-31");
+    assert.deepEqual(fake.writes(), []);
   });
 
   it("closes a non-Bug duplicate under a stale master without a parent (C4)", async () => {
@@ -264,18 +269,21 @@ describe("routeTicket duplicate masters, review fixes", () => {
     assert.deepEqual(fake.writes(), []);
   });
 
-  it("takes a master passed as the parent of a Bug duplicate of a lone report (C1)", async () => {
+  it("refuses a master passed as the parent of a Bug duplicate until the matched report is under it, so neither report is left detached (R1)", async () => {
     const fake = linear();
-    await routeTicket(
-      {
-        duplicateOf: "ENG-40",
-        issue: "ENG-1",
-        parent: "ENG-31",
-        state: "Duplicate",
-      },
-      { client: fake.fetchStub }
+    await assert.rejects(
+      routeTicket(
+        {
+          duplicateOf: "ENG-40",
+          issue: "ENG-1",
+          parent: "ENG-31",
+          state: "Duplicate",
+        },
+        { client: fake.fetchStub }
+      ),
+      MATCH_NOT_UNDER
     );
-    assert.equal(updateOf(fake)?.parentId, "i-ENG-31");
+    assert.deepEqual(fake.writes(), []);
   });
 
   it("inherits the owner of the master it parents the duplicate under, not the match's (Devin 1)", async () => {

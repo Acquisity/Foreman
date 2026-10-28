@@ -21,6 +21,7 @@ import { reconcileTicket, runReporterUpdates } from "./run.js";
 const DAY = 86_400_000;
 const MASTER_READ_FAILED = /ENG-50 read timed out/u;
 const GITHUB_BUSY = /GitHub is busy/u;
+const OPEN_PR_URL = PR_URL.replace(/\/7$/u, "/8");
 const LIVE = {
   ancestors: { [`${MERGE_SHA}>${NEW_SHA}`]: true },
   liveSha: NEW_SHA,
@@ -435,5 +436,27 @@ describe("a duplicate under a master (ENG-16608)", () => {
       s.linear.posts.map((p) => p.body),
       [DUPLICATE_TEXT, fixedText("the export now includes every row", null)]
     );
+  });
+
+  it("sends the master's live fix even when the matched Duplicate has an open pull request (Devin 11)", async () => {
+    const dup = duplicate();
+    dup.facts.parent = { identifier: "ENG-50", stateType: "completed" };
+    const earlier = doneOriginal({
+      parent: { identifier: "ENG-50", stateType: "completed" },
+      pullUrls: [OPEN_PR_URL],
+      stateName: "Duplicate",
+      stateType: "canceled",
+    });
+    const master = doneOriginal({ identifier: "ENG-50", pullUrls: [PR_URL] });
+    const s = setup([dup, earlier, master], {
+      ...LIVE,
+      pulls: {
+        ...LIVE.pulls,
+        [pullKey(8)]: merged({ mergeSha: null, number: 8, state: "open" }),
+      },
+    });
+    withLog(s);
+    await reconcile(s);
+    assert.deepEqual(await reconcile(s), { kind: "posted", stage: "fixed" });
   });
 });

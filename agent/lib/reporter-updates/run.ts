@@ -302,9 +302,9 @@ class FollowedReadError extends Error {
  * outcome governs: a Canceled master ends the wait whatever the match shows,
  * and a failed master read keeps the wait for the next run. Otherwise the
  * fixing pull request may be linked to either, including a match that is
- * itself an earlier Duplicate, so their linked pull requests are pooled on the
- * master; deployment is still checked before anything is posted. A failed
- * match read never hides the master.
+ * itself an earlier Duplicate: the master's own pull requests decide, and the
+ * match's are used only when the master has none; deployment is still checked
+ * before anything is posted. A failed match read never hides the master.
  */
 const followedOriginal = async (
   master: string | undefined,
@@ -333,20 +333,23 @@ const followedOriginal = async (
     return governing;
   }
   if (governing) {
+    // The master's own pull requests decide; a match's are borrowed only
+    // when the master has none, so an open one on the match never holds back
+    // the master's live fix.
+    const borrowed = read
+      .filter(
+        (facts) =>
+          facts !== governing &&
+          (facts.stateName === "Duplicate" ||
+            closureOf(facts).kind === "needs_deploy")
+      )
+      .flatMap((facts) => facts.pullUrls);
     const pooled = {
       ...governing,
-      pullUrls: [
-        ...new Set(
-          read
-            .filter(
-              (facts) =>
-                facts === governing ||
-                facts.stateName === "Duplicate" ||
-                closureOf(facts).kind === "needs_deploy"
-            )
-            .flatMap((facts) => facts.pullUrls)
-        ),
-      ],
+      pullUrls:
+        governing.pullUrls.length > 0
+          ? governing.pullUrls
+          : [...new Set(borrowed)],
     };
     if (closureOf(pooled).kind === "needs_deploy") {
       return pooled;
