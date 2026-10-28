@@ -9,7 +9,6 @@ import {
   type ProviderContext,
 } from "./executor/dispatch.js";
 import {
-  findRelatedIssues,
   type LinearGraphqlOptions,
   linearGraphql,
   phraseFilter,
@@ -24,8 +23,9 @@ import {
 import {
   filingScope,
   type MigrationTicketScope,
+  migrationFiledReport,
   migrationScopeBlock,
-  rememberFiledTicket,
+  rememberCancellable,
   slackThreadPermalink,
   threadKey,
 } from "./migration-ticket-scope.js";
@@ -150,10 +150,12 @@ export interface Candidate {
 
 export type MigrationTicketResult =
   | {
+      duplicatesLeft?: string[];
       existing: boolean;
       identifier: string;
       threadSynced: boolean;
       url: string;
+      warning?: string;
     }
   | { missing: string[]; reason: string }
   | { candidates: Candidate[]; reason: string; truncated: boolean }
@@ -193,7 +195,10 @@ export interface MigrationTicketDeps {
     issue: string,
     link: { title?: string; url: string }
   ) => Promise<boolean>;
-  thread: (key: string, ctx: ProviderContext) => Promise<ThreadTicket[]>;
+  thread: (
+    scope: MigrationTicketScope,
+    ctx: ProviderContext
+  ) => Promise<ThreadTicket[]>;
 }
 
 /** At most this many candidates are shown, and exactly those must be acknowledged. */
@@ -281,6 +286,45 @@ export async function readCandidates(
   };
 }
 
+/**
+ * This thread's live tickets: those not canceled whose description ends with
+ * this thread's own server-written scope block. Text that merely mentions the
+ * thread key never counts, so a ticket read here is safe to settle.
+ */
+export async function readThreadTickets(
+  scope: MigrationTicketScope,
+  opts: LinearGraphqlOptions
+): Promise<ThreadTicket[]> {
+  const { issues } = await linearGraphql<LinearResponse<"IssueBodies">>(
+    "IssueBodies",
+    {
+      filter: {
+        and: [
+          phraseFilter(threadKey(scope)),
+          { state: { type: { neq: "canceled" } } },
+        ],
+      },
+    },
+    opts
+  );
+  return issues.nodes
+    .filter((node) => {
+      const filed = migrationFiledReport(node.description);
+      return Boolean(
+        filed &&
+          node.description
+            ?.trimEnd()
+            .endsWith(migrationScopeBlock(scope, filed.reporter))
+      );
+    })
+    .map((node) => ({
+      createdAt: node.createdAt,
+      identifier: node.identifier,
+      stateType: "live",
+      url: node.url,
+    }));
+}
+
 const defaultDeps: MigrationTicketDeps = {
   cancel: cancelMigrationTicket,
   create: createMigrationTicket,
@@ -351,14 +395,11 @@ const defaultDeps: MigrationTicketDeps = {
       return false;
     }
   },
-  async thread(key, ctx) {
-    return (
-      await findRelatedIssues(
-        { phrases: [key], scope: "duplicates", windowed: false },
-        { client: executorClient(ctx), signal: ctx.abortSignal }
-      )
-    ).issues;
-  },
+  thread: (scope, ctx) =>
+    readThreadTickets(scope, {
+      client: executorClient(ctx),
+      signal: ctx.abortSignal,
+    }),
 };
 
 // A canceled ticket no longer covers the thread; a completed one still does,
@@ -516,6 +557,66 @@ async function workspaceFacts(
   };
 }
 
+/** Whether a cancel really went through: not refused, and no provider error inside. */
+const cancelSucceeded = (outcome: ExecutorOutcome): boolean => {
+  if (!outcome.ok) {
+    return false;
+  }
+  const data = outcome.data as { errors?: unknown[]; isError?: boolean } | null;
+  return !(data?.isError || data?.errors?.length);
+};
+
+/**
+ * Keeps the oldest live ticket and cancels every other live ticket of the
+ * thread, so a duplicate a failed cleanup left behind is settled by the next
+ * call. Returns the winner and any duplicate that could not be canceled.
+ */
+async function settleThread(
+  deps: MigrationTicketDeps,
+  ctx: ProviderContext,
+  scope: MigrationTicketScope,
+  tickets: ThreadTicket[]
+): Promise<{ left: string[]; winner: ThreadTicket | undefined }> {
+  const winner = threadWinner(tickets);
+  const extras = tickets.filter(
+    (ticket) => live(ticket) && ticket.identifier !== winner?.identifier
+  );
+  const left: string[] = [];
+  for (const extra of extras) {
+    rememberCancellable(scope, extra.identifier);
+    let ok = false;
+    try {
+      // biome-ignore lint/performance/noAwaitInLoops: one cancel at a time, so a failure names its ticket.
+      ok = cancelSucceeded(await deps.cancel(ctx, extra.identifier));
+    } catch (error) {
+      if (ctx.abortSignal.aborted) {
+        throw error;
+      }
+    }
+    logOpsEvent("migration.ticket.duplicate_cancelled", {
+      duplicateOf: winner?.identifier,
+      issue: extra.identifier,
+      outcome: ok ? "ok" : "error",
+    });
+    if (!ok) {
+      left.push(extra.identifier);
+    }
+  }
+  return { left, winner };
+}
+
+const withLeftovers = (
+  result: MigrationTicketResult,
+  left: string[]
+): MigrationTicketResult =>
+  left.length > 0 && "identifier" in result
+    ? {
+        ...result,
+        duplicatesLeft: left,
+        warning: `Duplicate tickets ${left.join(", ")} could not be canceled; the next call retries. Mention the ticket link only, and say nothing about duplicates to the rep.`,
+      }
+    : result;
+
 /**
  * The thread's ticket found again: its Slack sync is checked and repaired,
  * because the connected thread is how triage's reply and reporter updates
@@ -543,7 +644,8 @@ async function existingTicket(
 /**
  * After its own create, a filer re-reads the thread. Two filings racing in
  * one thread both see no ticket and both create; the oldest live ticket wins,
- * and a filer whose ticket is newer cancels it and returns the winner.
+ * and every newer one is canceled. A cancel that fails is reported, never
+ * returned as a clean success, and the next call retries it.
  */
 async function settleFiled(
   deps: MigrationTicketDeps,
@@ -552,16 +654,18 @@ async function settleFiled(
   issue: { identifier: string; url: string },
   link: { title: string; url: string }
 ): Promise<MigrationTicketResult> {
-  rememberFiledTicket(scope, issue.identifier);
-  const winner = threadWinner(await deps.thread(threadKey(scope), ctx));
+  rememberCancellable(scope, issue.identifier);
+  const { left, winner } = await settleThread(
+    deps,
+    ctx,
+    scope,
+    await deps.thread(scope, ctx)
+  );
   if (winner && winner.identifier !== issue.identifier) {
-    const cancelled = await deps.cancel(ctx, issue.identifier);
-    logOpsEvent("migration.ticket.duplicate_cancelled", {
-      duplicateOf: winner.identifier,
-      issue: issue.identifier,
-      outcome: cancelled.ok ? "ok" : "error",
-    });
-    return await existingTicket(deps, ctx, winner, link.url);
+    return withLeftovers(
+      await existingTicket(deps, ctx, winner, link.url),
+      left
+    );
   }
   const threadSynced = await deps.syncSlack(ctx, issue.identifier, link);
   logOpsEvent(
@@ -570,7 +674,7 @@ async function settleFiled(
       : "migration.ticket.thread_unsynced",
     { issue: issue.identifier }
   );
-  return { existing: false, ...issue, threadSynced };
+  return withLeftovers({ existing: false, ...issue, threadSynced }, left);
 }
 
 /**
@@ -594,10 +698,19 @@ export async function fileMigrationTicket(
   const input = migrationTicketInputSchema.parse(raw);
   const permalink = slackThreadPermalink(scope.channelId, scope.threadTs);
   try {
-    // One ticket per thread: every one carries the thread key in its scope block.
-    const existing = threadWinner(await deps.thread(threadKey(scope), ctx));
-    if (existing) {
-      return await existingTicket(deps, ctx, existing, permalink);
+    // One ticket per thread: every one ends with this thread's scope block.
+    // Extra live tickets a failed cleanup left are canceled here.
+    const { left, winner } = await settleThread(
+      deps,
+      ctx,
+      scope,
+      await deps.thread(scope, ctx)
+    );
+    if (winner) {
+      return withLeftovers(
+        await existingTicket(deps, ctx, winner, permalink),
+        left
+      );
     }
     const missing = missingFields(input);
     if (missing.length > 0) {

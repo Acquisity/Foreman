@@ -136,13 +136,15 @@ export function migrationFiledReport(
     : null;
 }
 
-// Tickets this process filed, per thread, for the one follow-up write the
-// lane gate allows: cancelling a newer duplicate the filing itself created.
+// Tickets this process may cancel, per thread: ones it filed, and ones it read
+// as this thread's own (description ending with its scope block) and found
+// newer than the thread's oldest live ticket. The lane gate allows no other
+// cancel.
 const FILED_LIMIT = 500;
 const filedHere = new Map<string, Set<string>>();
 
-/** Records a ticket the filing tool just created for this thread. */
-export function rememberFiledTicket(
+/** Records a ticket of this thread the filing tool may cancel. */
+export function rememberCancellable(
   scope: Pick<MigrationTicketScope, "channelId" | "threadTs">,
   identifier: string
 ): void {
@@ -159,8 +161,8 @@ export function rememberFiledTicket(
   }
 }
 
-/** Whether this process filed the ticket for this thread. */
-export const wasFiledHere = (
+/** Whether this process may cancel the ticket for this thread. */
+export const isCancellable = (
   scope: Pick<MigrationTicketScope, "channelId" | "threadTs">,
   identifier: string
 ): boolean => filedHere.get(threadKey(scope))?.has(identifier) === true;

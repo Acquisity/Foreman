@@ -4,11 +4,11 @@ import { z } from "zod";
 import { PRODUCTION_READ_QUERY_ARGS } from "../lookup-customer.js";
 import {
   filingScope,
+  isCancellable,
   type MigrationTicketScope,
   migrationFiledReport,
   migrationScopeBlock,
   slackThreadPermalink,
-  wasFiledHere,
 } from "../migration-ticket-scope.js";
 import { FALLBACK_OWNER, SUPPORT_OWNER } from "../owner-map.js";
 import { supportOperationPolicy } from "../support/policy.js";
@@ -89,7 +89,7 @@ const migrationLinearTicketInput = z.strictObject({
     }),
   ]),
 });
-/** The only other migration write: cancelling a newer duplicate this process just filed. */
+/** The only other migration write: cancelling a newer duplicate of this thread the tool verified. */
 const migrationCancelInput = z.strictObject({
   id: z.string().regex(/^ENG-\d{1,7}$/u),
   state: z.literal("Canceled"),
@@ -127,7 +127,7 @@ const isMigrationLaneWrite = (
   }
   const cancel = migrationCancelInput.safeParse(input);
   return cancel.success
-    ? wasFiledHere(scope, cancel.data.id)
+    ? isCancellable(scope, cancel.data.id)
     : isOwnMigrationTicket(scope, input);
 };
 

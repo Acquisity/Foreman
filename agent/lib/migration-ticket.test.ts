@@ -23,6 +23,7 @@ import {
   type MigrationTicketDeps,
   type MigrationTicketInput,
   readCandidates,
+  readThreadTickets,
 } from "./migration-ticket.js";
 import {
   filingScope,
@@ -30,6 +31,7 @@ import {
   migrationScopeBlock,
   migrationTicketScope,
   slackThreadPermalink,
+  threadKey,
 } from "./migration-ticket-scope.js";
 import { readAskFrom } from "./requester-reply.js";
 import { slackSessionAuth } from "./session-auth.js";
@@ -135,6 +137,9 @@ const urlOf = (identifier: string) =>
 /** A fake Linear: tickets live in one store every dependency reads and writes. */
 const recorder = (
   options: {
+    cancelOutcome?: (
+      identifier: string
+    ) => { data?: { isError?: boolean } | null; ok: boolean } | undefined;
     existing?: Omit<StoredTicket, "createdAt">[];
     memberOf?: Record<string, string[]>;
     records?: Record<string, string>;
@@ -160,11 +165,15 @@ const recorder = (
   rec.deps = {
     cancel: (_ctx, identifier) => {
       rec.cancelled.push(identifier);
+      const outcome = options.cancelOutcome?.(identifier) ?? {
+        data: {},
+        ok: true,
+      };
       const ticket = rec.store.find((item) => item.identifier === identifier);
-      if (ticket) {
+      if (ticket && outcome.ok && !outcome.data?.isError) {
         ticket.stateType = "canceled";
       }
-      return Promise.resolve({ data: {}, ok: true } as never);
+      return Promise.resolve(outcome as never);
     },
     create: async (_ctx, input) => {
       rec.created.push(input);
@@ -218,8 +227,8 @@ const recorder = (
       rec.synced.push({ issue, ...link });
       return Promise.resolve(true);
     },
-    thread: (key) => {
-      rec.searches.push([key]);
+    thread: (scope) => {
+      rec.searches.push([threadKey(scope)]);
       return Promise.resolve(rec.store.map((ticket) => ({ ...ticket })));
     },
   };
@@ -577,11 +586,121 @@ describe("file_migration_ticket filing", () => {
       live.map((ticket) => ticket.identifier),
       ["ENG-20001"]
     );
-    assert.deepEqual(rec.cancelled, ["ENG-20002"]);
+    // Both filers settle the thread the same way: only the newer is canceled.
+    assert.deepEqual([...new Set(rec.cancelled)], ["ENG-20002"]);
     for (const result of [first, second]) {
       assert.ok("identifier" in result);
       assert.equal(result.identifier, "ENG-20001");
     }
+  });
+});
+
+describe("file_migration_ticket duplicate cleanup", () => {
+  const raceThenFile = async (rec: Recorder) => {
+    const ctx = ctxFor(slackAuth(MIGRATION));
+    return await Promise.all([
+      fileMigrationTicket(ctx, complete, rec.deps),
+      fileMigrationTicket(ctx, complete, rec.deps),
+    ]);
+  };
+
+  it("R1: a refused cancel is reported, not returned as a clean success", async () => {
+    const rec = recorder({
+      cancelOutcome: () => ({ data: null, ok: false }),
+      memberOf: member,
+    });
+    const results = await raceThenFile(rec);
+    const reported = results.filter(
+      (result) => "duplicatesLeft" in result && result.duplicatesLeft
+    );
+    assert.ok(reported.length > 0);
+    for (const result of reported) {
+      assert.ok("duplicatesLeft" in result);
+      assert.deepEqual(result.duplicatesLeft, ["ENG-20002"]);
+      assert.ok("warning" in result && result.warning);
+    }
+  });
+
+  it("R1: a provider error inside an ok cancel counts as failed", async () => {
+    const rec = recorder({
+      cancelOutcome: () => ({ data: { isError: true }, ok: true }),
+      memberOf: member,
+    });
+    const results = await raceThenFile(rec);
+    assert.ok(
+      results.some(
+        (result) =>
+          "duplicatesLeft" in result &&
+          result.duplicatesLeft?.includes("ENG-20002")
+      )
+    );
+    assert.equal(
+      rec.store.find((ticket) => ticket.identifier === "ENG-20002")?.stateType,
+      "triage"
+    );
+  });
+
+  it("R1: a later call cancels the duplicate a failed cleanup left", async () => {
+    const state: { failing: boolean } = { failing: true };
+    const rec = recorder({
+      cancelOutcome: () =>
+        state.failing ? { data: null, ok: false } : undefined,
+      memberOf: member,
+    });
+    await raceThenFile(rec);
+    state.failing = false;
+    const later = await fileMigrationTicket(
+      ctxFor(slackAuth(MIGRATION)),
+      complete,
+      rec.deps
+    );
+    assert.deepEqual(later, {
+      existing: true,
+      identifier: "ENG-20001",
+      threadSynced: true,
+      url: urlOf("ENG-20001"),
+    });
+    assert.deepEqual(
+      rec.store
+        .filter((ticket) => ticket.stateType !== "canceled")
+        .map((ticket) => ticket.identifier),
+      ["ENG-20001"]
+    );
+    assert.equal(rec.created.length, 2);
+  });
+
+  it("R1: the thread read counts only tickets ending with this thread's scope block", async () => {
+    const scope = migrationTicketScope(slackAuth(MIGRATION)) ?? assert.fail();
+    const block = migrationScopeBlock(scope, "rep@example.com");
+    const node = (identifier: string, description: string) => ({
+      comments: { nodes: [] },
+      createdAt: "2026-10-28T10:00:00Z",
+      description,
+      identifier,
+      state: { name: "Triage" },
+      title: "t",
+      url: urlOf(identifier),
+    });
+    const tickets = await readThreadTickets(scope, {
+      client: () =>
+        Promise.resolve({
+          data: {
+            data: {
+              issues: {
+                nodes: [
+                  node("ENG-1", `Report.\n\n${block}`),
+                  node("ENG-2", `Mentions ${threadKey(scope)} in passing.`),
+                ],
+              },
+            },
+          },
+          status: 200,
+        }),
+    });
+    assert.deepEqual(
+      tickets.map((ticket) => ticket.identifier),
+      ["ENG-1"]
+    );
   });
 });
 

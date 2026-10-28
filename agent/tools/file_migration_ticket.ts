@@ -21,10 +21,12 @@ export const tool = defineTool({
   inputSchema: migrationTicketInputSchema,
   outputSchema: z.union([
     z.object({
+      duplicatesLeft: z.array(z.string()).optional(),
       existing: z.boolean(),
       identifier: z.string(),
       threadSynced: z.boolean(),
       url: z.string(),
+      warning: z.string().optional(),
     }),
     z.object({ missing: z.array(z.string()), reason: z.string() }),
     z.object({
