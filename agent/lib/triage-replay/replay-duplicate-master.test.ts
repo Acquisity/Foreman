@@ -14,7 +14,8 @@ import {
   TEST_SECRET,
   triageCase,
 } from "./fixtures.js";
-import { type ReplayState, seedReplayState } from "./store.js";
+import { answerLinear } from "./linear-simulation.js";
+import { issueIdOf, type ReplayState, seedReplayState } from "./store.js";
 
 /**
  * The lone-report branch of a Bug duplicate, replayed: the run creates a
@@ -105,5 +106,39 @@ describe("replayed duplicate masters (R2, R3)", () => {
       (read as { issue: { parent: string | null } }).issue.parent,
       "ENG-200"
     );
+  });
+});
+
+describe("replayed hand-made masters (Devin 10)", () => {
+  const childrenOf = (state: ReplayState, identifier: string) =>
+    (
+      answerLinear(state, "RelatedIssues", {
+        after: null,
+        filter: { parent: { id: { eq: issueIdOf(identifier) } } },
+        first: 1,
+        includeArchived: true,
+      }) as { issues: { nodes: { identifier: string }[] } }
+    ).issues.nodes.map((node) => node.identifier);
+
+  it("counts the case ticket and run-created issues as children, with the parents the run set", async () => {
+    const state = seeded();
+    state.created.push({
+      description: "A follow-up the run filed.",
+      fields: {
+        assignee: null,
+        labels: ["Bug"],
+        parent: "ENG-91",
+        priority: 3,
+        project: null,
+        state: "Todo",
+      },
+      identifier: "ENG-201",
+      title: "Follow-up",
+    });
+    assert.deepEqual(childrenOf(state, "ENG-91"), ["ENG-201"]);
+
+    const client = replayClient(state);
+    await routeTicket({ issue: "ENG-100", parent: "ENG-90" }, { client });
+    assert.deepEqual(childrenOf(state, "ENG-90"), ["ENG-100"]);
   });
 });

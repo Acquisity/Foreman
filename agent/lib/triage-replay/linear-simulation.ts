@@ -131,6 +131,29 @@ function matches(
   });
 }
 
+/**
+ * For a "children of this issue" read, the case ticket and the issues the run
+ * created whose parent (as the run set it) is that issue: live Linear counts
+ * them, and the snapshot holds neither.
+ */
+function childrenBeyondSnapshot(state: ReplayState, filter: Filter) {
+  if (filter.parent === undefined) {
+    return [];
+  }
+  const parentId = ((filter.parent as Filter).id as Filter | undefined)?.eq;
+  return [{ fields: state.issue, identifier: state.case.id }, ...state.created]
+    .filter(
+      ({ fields }) =>
+        fields.parent !== null && issueIdOf(fields.parent) === parentId
+    )
+    .map(({ identifier }) => ({
+      ...routeIssue(state, identifier),
+      createdAt: state.case.createdAt,
+      state: { name: "Todo", type: "unknown" },
+      title: identifier,
+    }));
+}
+
 function relatedIssues(state: ReplayState, variables: Filter) {
   const filter = variables.filter as Filter;
   // route_ticket reads a master by id for its creation time; a master this
@@ -186,7 +209,10 @@ function relatedIssues(state: ReplayState, variables: Filter) {
       };
     });
   return {
-    issues: { nodes, pageInfo: { endCursor: null, hasNextPage: false } },
+    issues: {
+      nodes: [...nodes, ...childrenBeyondSnapshot(state, filter)],
+      pageInfo: { endCursor: null, hasNextPage: false },
+    },
   };
 }
 
