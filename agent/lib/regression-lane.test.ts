@@ -41,6 +41,8 @@ const NO_PATCH = /git shows no patch/u;
 const NOT_PROVEN_LIVE =
   /cannot be shown to be in the commit production serves/u;
 const TOO_LONG = /patch too long/u;
+const AFTER_FAILURE = /dated after the failure time/u;
+const SHALLOW_LIST = /shallow list/u;
 
 after(removeSandbox);
 
@@ -222,6 +224,22 @@ describe("planted case: regression", () => {
     }
   });
 
+  it("does not name an introducing commit dated after the failure the customer saw", async () => {
+    const { bug, head, origin } = regressed();
+    const record = recorded(
+      await runCheckRegression(
+        deps(origin.clone(50), origin, head),
+        input({
+          failureAt: at(12),
+          labels: [{ role: "introduced", sha: bug }],
+          readCommit: head,
+        })
+      )
+    );
+    assert.equal(record.kind, "unchecked");
+    assert.match(record.line, AFTER_FAILURE);
+  });
+
   it("refuses an introducing commit that production does not run", async () => {
     const { bug, head, old, origin } = regressed();
     const record = recorded(
@@ -248,6 +266,7 @@ describe("later changes and labels", () => {
       await runCheckRegression(
         deps(worktree, origin, revert),
         input({
+          failureAt: at(1),
           labels: [
             { role: "introduced", sha: revert },
             ...(bothLabels(fix, bug) ?? []),
@@ -359,6 +378,41 @@ describe("history", () => {
     );
     assert.equal(offline.kind, "unchecked");
     assert.match(offline.line, NOT_PROVEN);
+  });
+
+  it("fails closed when a shallow clone's shallow list can't be read", async () => {
+    const origin = new Origin();
+    history(origin);
+    const head = origin.commit(3, note("recent"), "docs: recent");
+    const worktree = origin.clone(1);
+    const real = shellFor();
+    const unreadable: typeof real = (command) =>
+      command.startsWith("cat ")
+        ? Promise.resolve({
+            exitCode: 1,
+            stderr: "Permission denied",
+            stdout: "",
+          })
+        : real(command);
+    const ensured = await ensureHistory(unreadable, {
+      readCommit: head,
+      remote: origin.url,
+      since: sinceIso(NOW),
+      worktree,
+    });
+    assert.equal(ensured.ok, false);
+    const empty: typeof real = (command) =>
+      command.startsWith("cat ")
+        ? Promise.resolve({ exitCode: 0, stderr: "", stdout: "" })
+        : real(command);
+    const record = recorded(
+      await runCheckRegression(
+        { ...deps(worktree, origin), shell: empty },
+        input({ readCommit: head })
+      )
+    );
+    assert.equal(record.kind, "unchecked");
+    assert.match(record.line, SHALLOW_LIST);
   });
 
   it("deepens a shallow 50-commit clone until 30 days are proven complete", async () => {

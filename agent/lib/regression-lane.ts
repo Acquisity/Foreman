@@ -142,16 +142,29 @@ const windowBoundaries = async (
   readCommit: string,
   since: string
 ): Promise<string[] | Failure> => {
-  const path = await shell(git(worktree, "rev-parse --git-path shallow"));
+  const shallow = await shell(
+    git(worktree, "rev-parse --is-shallow-repository")
+  );
+  if (shallow.exitCode !== 0) {
+    return failure("Could not tell whether the clone is shallow", shallow);
+  }
+  if (trimmed(shallow) !== "true") {
+    return [];
+  }
+  const path = await shell(
+    git(worktree, "rev-parse --path-format=absolute --git-path shallow")
+  );
   if (path.exitCode !== 0) {
     return failure("Could not find the clone's shallow list", path);
   }
-  const listed = await shell(
-    `cat ${quote(`${worktree}/${trimmed(path)}`)} 2>/dev/null || true`
-  );
+  const listed = await shell(`cat ${quote(trimmed(path))}`);
   const boundaries = new Set(trimmed(listed).split("\n").filter(Boolean));
-  if (boundaries.size === 0) {
-    return [];
+  if (listed.exitCode !== 0 || boundaries.size === 0) {
+    return {
+      ok: false,
+      reason:
+        "The clone is shallow but its shallow list could not be read, so 30 days of history cannot be proven complete.",
+    };
   }
   const inWindow = await shell(
     git(worktree, `rev-list --since=${quote(since)} ${readCommit}`)
@@ -390,6 +403,11 @@ export async function resolveRegression(options: {
   }
   const { date, sha } = decisive.candidate;
   if (decisive.role === "introduced") {
+    if (Date.parse(date) > Date.parse(options.failureAt)) {
+      return unchecked(
+        "the introducing commit is dated after the failure time, so it cannot have caused the failure the customer saw"
+      );
+    }
     const served = live ? await ancestry(reads, sha, live) : null;
     if (served === false) {
       return unchecked(
