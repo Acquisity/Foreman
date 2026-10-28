@@ -32,7 +32,7 @@ export default defineTool({
     "Before a Bug verdict, check what the last 30 days of history did to the code the cause runs through, and whether production runs it (ENG-16056). " +
     "Read-only. Completes the clone's 30-day history and proves it, lists the commits that touched the blamed line range at readCommit (git follows the lines through earlier revisions), and with a label for every one of them resolves one result: " +
     "'introduced by <sha>', 'fixed on main and live, by <sha>', 'fixed on main, not deployed yet, by <sha>', 'fixed on main, deploy status unknown, by <sha>', 'none', or 'unchecked: <reason>'. " +
-    "Call it once without labels to get the commits and their patches, read them, then call it again with a label for each. Commits under unavailable are merges git shows no patch for: never label them. " +
+    "Call it once without labels to get the commits and their patches, read them, then call it again with a label for each. Commits under unavailable come with a reason: an unavailable commit is a merge git shows no patch for or a patch too long to show whole: never label it, and if it is newer than the deciding commit the result is unchecked. " +
     "Production's commit is read from Acquisity/Acquisity's GitHub production deployments, the same read the reporter updates use; nothing about deployments is passed in. " +
     "The record answers only for this file and commit read, and each call replaces the ticket's previous record: decide_triage and the investigation document read it, nothing passes it back in. " +
     "unchecked means the lane could not run or could not prove its history; record it as Could not run and carry on.",

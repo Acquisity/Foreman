@@ -164,3 +164,21 @@ describe("the regression lane reads only what it can prove", () => {
     );
   });
 });
+
+describe("unavailable commits", () => {
+  it("are described as a patchless merge or a patch too long, never labelled, and able to leave the result unchecked", () => {
+    const tool = read("tools/check_regression.ts");
+    const rule =
+      "an unavailable commit is a merge git shows no patch for or a patch too long to show whole: never label it, and if it is newer than the deciding commit the result is `unchecked`";
+    assert.ok(reference.includes(rule));
+    assert.ok(tool.includes(rule.replaceAll("`", "")));
+    for (const surface of [reference, tool]) {
+      assert.ok(
+        !surface.includes("unavailable are merges git shows no patch for")
+      );
+      assert.ok(
+        !surface.includes("`unavailable` are merges git shows no patch for")
+      );
+    }
+  });
+});
