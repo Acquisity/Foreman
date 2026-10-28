@@ -20,7 +20,12 @@ import { bugAnswers, triageInput } from "./triage-fixtures.js";
 const decide = (record: RegressionRecord) => {
   const decision = resolveTriage(
     triageInput({
-      codePath: { commit: record.commitRead, file: FILE, function: "limit" },
+      codePath: {
+        commit: record.commitRead,
+        file: FILE,
+        function: record.function,
+        lines: record.lines,
+      },
       identifier: record.issue,
       regression: {
         commit: record.commit,

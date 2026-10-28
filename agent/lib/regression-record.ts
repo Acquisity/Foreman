@@ -23,6 +23,8 @@ export interface RegressionRecord {
   deployedCommit: string | null;
   /** The blamed file and line range at the commit read: the record answers only for that code. */
   file: string;
+  /** The function the blamed range sits in, as decide_triage's codePath names it. */
+  function: string;
   issue: string;
   kind: RegressionKind;
   /** The one result line the investigation document must repeat. */
@@ -33,17 +35,28 @@ export interface RegressionRecord {
 }
 
 /**
- * The record for the code a decision blames, or none: a record from another
- * file or another commit read is stale evidence for a corrected investigation.
+ * The record for the code a decision blames, or none: a record for any other
+ * file, function, line range or commit read is stale evidence for a corrected
+ * investigation, and a codePath without its line range matches nothing.
  */
 export const recordFor = (
   record: RegressionRecord | undefined,
-  codePath: { commit: string; file: string } | undefined
+  codePath:
+    | {
+        commit: string;
+        file: string;
+        function: string;
+        lines?: { end: number; start: number };
+      }
+    | undefined
 ): RegressionRecord | undefined =>
   record &&
-  codePath &&
+  codePath?.lines &&
   record.commitRead === codePath.commit &&
-  record.file === codePath.file
+  record.file === codePath.file &&
+  record.function === codePath.function &&
+  record.lines.start === codePath.lines.start &&
+  record.lines.end === codePath.lines.end
     ? record
     : undefined;
 

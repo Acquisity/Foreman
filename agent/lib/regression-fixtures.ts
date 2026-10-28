@@ -189,6 +189,7 @@ export const input = (
     failureAt: at(8),
     failureAtSource: "claim",
     file: FILE,
+    function: "computeSendLimit",
     issue: "ENG-1",
     lines: BLAMED,
     ...over,

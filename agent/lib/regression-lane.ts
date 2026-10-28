@@ -396,6 +396,7 @@ export async function resolveRegression(options: {
 export interface CheckInput extends Blame {
   failureAt: string;
   failureAtSource: FailureTimeSource;
+  function: string;
   issue: string;
   labels?: Label[];
   readCommit: string;
@@ -436,6 +437,7 @@ const recordOf = (
   commitRead: input.readCommit,
   deployedCommit: deployed,
   file: input.file,
+  function: input.function,
   issue: input.issue,
   lines: input.lines,
   windowDays: HISTORY_DAYS,
@@ -554,13 +556,17 @@ export async function runCheckRegression(
 
 /** A record for a workspace that cannot be checked at all (a replay archive). */
 export const uncheckedRecord = (
-  input: Pick<CheckInput, "file" | "issue" | "lines" | "readCommit">,
+  input: Pick<
+    CheckInput,
+    "file" | "function" | "issue" | "lines" | "readCommit"
+  >,
   reason: string
 ): RegressionRecord => ({
   ...unchecked(reason),
   commitRead: input.readCommit,
   deployedCommit: null,
   file: input.file,
+  function: input.function,
   issue: input.issue,
   lines: input.lines,
   windowDays: HISTORY_DAYS,

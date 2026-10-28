@@ -121,6 +121,14 @@ export default defineTool({
       ),
     failureAtSource: z.enum(["claim", "ticket-created"]),
     file: z.string().min(1).max(300),
+    function: z
+      .string()
+      .trim()
+      .min(1)
+      .max(200)
+      .describe(
+        "The function the range sits in, exactly as decide_triage's codePath names it."
+      ),
     issue: z.string().trim().regex(LINEAR_ISSUE_ID_PATTERN),
     labels: z
       .array(

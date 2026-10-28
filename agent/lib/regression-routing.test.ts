@@ -104,32 +104,38 @@ test("the regression result changes nothing for a duplicate or a non-Bug", () =>
   assert.equal(userError.path, "User Error");
 });
 
-test("a record from another file or commit read is stale evidence, so the Bug needs a new check", () => {
+test("a record for any other checked target is stale evidence, so the Bug needs a new check", () => {
   const read = "a".repeat(40);
+  const lines = { end: 7, start: 5 };
   const record = {
     commit: FIX,
     commitRead: read,
     deployedCommit: read,
     file: "webhook.ts",
+    function: "handleReply",
     issue: "ENG-1",
     kind: "fixed_live" as const,
     line: `fixed on main and live, by ${FIX}`,
-    lines: { end: 7, start: 5 },
+    lines,
     windowDays: 30,
   };
   const codePath = {
     commit: read,
     file: "webhook.ts",
     function: "handleReply",
+    lines,
   };
   assert.equal(recordFor(record, codePath), record);
   for (const corrected of [
     { ...codePath, file: "inbox.ts" },
     { ...codePath, commit: "c".repeat(40) },
+    { ...codePath, function: "parseReply" },
+    { ...codePath, lines: { end: 30, start: 20 } },
+    { commit: read, file: "webhook.ts", function: "handleReply" },
     undefined,
   ]) {
     const kept = recordFor(record, corrected);
-    assert.equal(kept, undefined);
+    assert.equal(kept, undefined, JSON.stringify(corrected));
     const decision = resolveTriage(
       triageInput({
         ...(corrected ? { codePath: corrected } : {}),

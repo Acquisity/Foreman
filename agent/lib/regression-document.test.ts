@@ -13,6 +13,7 @@ const record = (over: Partial<RegressionRecord> = {}): RegressionRecord => ({
   commitRead: READ,
   deployedCommit: DEPLOYED,
   file: "src/send-limit.ts",
+  function: "computeSendLimit",
   issue: "ENG-1",
   kind: "fixed_live",
   line: `fixed on main and live, by ${FIX}`,

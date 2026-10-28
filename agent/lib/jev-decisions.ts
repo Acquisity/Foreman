@@ -200,7 +200,12 @@ export interface TriageInput {
     users: number;
   };
   claim: string;
-  codePath?: { commit: string; file: string; function: string };
+  codePath?: {
+    commit: string;
+    file: string;
+    function: string;
+    lines?: { end: number; start: number };
+  };
   duplicateCandidates: {
     identifier: string;
     priority?: number;
