@@ -28,7 +28,29 @@ export interface Candidate {
   patch: string;
   sha: string;
   subject: string;
+  /** Why the patch can't be shown whole, so the commit can't be labelled. */
+  unavailable?: string;
 }
+
+export interface Unavailable {
+  reason: string;
+  sha: string;
+}
+
+const NO_MERGE_PATCH = "git shows no patch for the merge";
+const PATCH_TOO_LONG = "patch too long";
+
+const withPatch = (
+  candidate: Omit<Candidate, "patch" | "unavailable">,
+  patch: string
+): Candidate => {
+  if (!patch) {
+    return { ...candidate, patch: "", unavailable: NO_MERGE_PATCH };
+  }
+  return patch.length > MAX_PATCH_CHARS
+    ? { ...candidate, patch: "", unavailable: PATCH_TOO_LONG }
+    : { ...candidate, patch };
+};
 
 export type Role = "fixed" | "introduced" | "neither";
 export interface Label {
@@ -220,9 +242,10 @@ export async function ensureHistory(
  * The commits from the window that touched the blamed lines, newest first by
  * topology, each with its patch. `git log -L` tracks the range back through
  * every revision itself, so each patch shows the lines as they were in that
- * commit. A merge whose resolution git can't show for the range comes back
- * with an empty patch: it is never offered for a label, and if it is newer
- * than the decisive commit the result is unchecked. More than
+ * commit. A merge whose resolution git can't show for the range, or a patch
+ * longer than {@link MAX_PATCH_CHARS}, is never cut or offered for a label:
+ * it is unavailable, and if it is newer than the decisive commit the result
+ * is unchecked. More than
  * {@link MAX_CANDIDATES} is refused: every candidate has to be labelled, so a
  * range that busy needs narrowing.
  */
@@ -249,14 +272,14 @@ export async function listCandidates(
       const newline = entry.indexOf("\n");
       const header = newline === -1 ? entry : entry.slice(0, newline);
       const [sha = "", date = "", ...subject] = header.split(FIELD_SEPARATOR);
-      return {
-        date,
-        patch: (newline === -1 ? "" : entry.slice(newline + 1))
-          .trim()
-          .slice(0, MAX_PATCH_CHARS),
-        sha: sha.trim(),
-        subject: subject.join(FIELD_SEPARATOR).trim(),
-      };
+      return withPatch(
+        {
+          date,
+          sha: sha.trim(),
+          subject: subject.join(FIELD_SEPARATOR).trim(),
+        },
+        (newline === -1 ? "" : entry.slice(newline + 1)).trim()
+      );
     })
     .filter((candidate) => isSha(candidate.sha));
   if (candidates.length > MAX_CANDIDATES) {
@@ -352,9 +375,9 @@ export async function resolveRegression(options: {
   const decisive = candidates
     .map((candidate) => ({
       candidate,
-      role: candidate.patch
-        ? options.labels.find((label) => label.sha === candidate.sha)?.role
-        : "unavailable",
+      role: candidate.unavailable
+        ? "unavailable"
+        : options.labels.find((label) => label.sha === candidate.sha)?.role,
     }))
     .find((entry) => entry.role && entry.role !== "neither");
   if (!decisive) {
@@ -362,17 +385,22 @@ export async function resolveRegression(options: {
   }
   if (decisive.role === "unavailable") {
     return unchecked(
-      `merge ${decisive.candidate.sha} changed the blamed lines but git shows no patch for it, so its effect cannot be labelled`
+      `commit ${decisive.candidate.sha} changed the blamed lines but cannot be labelled (${decisive.candidate.unavailable})`
     );
   }
   const { date, sha } = decisive.candidate;
   if (decisive.role === "introduced") {
-    if (live && (await ancestry(reads, sha, live)) === false) {
+    const served = live ? await ancestry(reads, sha, live) : null;
+    if (served === false) {
       return unchecked(
         "the introducing commit is not in the commit production serves, so production cannot show a bug from it"
       );
     }
-    return resolution("introduced", sha);
+    return served
+      ? resolution("introduced", sha)
+      : unchecked(
+          "the introducing commit cannot be shown to be in the commit production serves, because production's commit or its history could not be read"
+        );
   }
   if (Date.parse(date) <= Date.parse(options.failureAt)) {
     const when =
@@ -413,7 +441,11 @@ export interface CheckDeps {
 }
 
 export type CheckResult =
-  | { candidates: Candidate[]; status: "labels_needed"; unavailable: string[] }
+  | {
+      candidates: Candidate[];
+      status: "labels_needed";
+      unavailable: Unavailable[];
+    }
   | { error: string; status: "error" }
   | { candidates: Candidate[]; record: RegressionRecord; status: "recorded" };
 
@@ -488,14 +520,18 @@ const check = async (
   if (!listed.ok) {
     return unusable(listed.reason);
   }
-  const labelable = listed.candidates.filter((candidate) => candidate.patch);
+  const labelable = listed.candidates.filter(
+    (candidate) => !candidate.unavailable
+  );
   if (labelable.length > 0 && !input.labels) {
     return {
       candidates: labelable,
       status: "labels_needed",
-      unavailable: listed.candidates
-        .filter((candidate) => !candidate.patch)
-        .map((candidate) => candidate.sha),
+      unavailable: listed.candidates.flatMap((candidate) =>
+        candidate.unavailable
+          ? [{ reason: candidate.unavailable, sha: candidate.sha }]
+          : []
+      ),
     };
   }
   const bad = labelProblem(labelable, input.labels ?? []);

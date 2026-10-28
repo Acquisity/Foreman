@@ -38,6 +38,9 @@ const NARROW = /narrow the line range/u;
 const THROWN = /^unchecked: the check failed: broker down/u;
 const NOT_PROVEN = /could not|Could not/u;
 const NO_PATCH = /git shows no patch/u;
+const NOT_PROVEN_LIVE =
+  /cannot be shown to be in the commit production serves/u;
+const TOO_LONG = /patch too long/u;
 
 after(removeSandbox);
 
@@ -189,6 +192,34 @@ describe("planted case: regression", () => {
     );
     assert.equal(record.line, `introduced by ${bug}`);
     assert.ok(Date.parse(at(30)) < Date.parse(at(10)));
+  });
+
+  it("never names an introducing commit when production's commit or ancestry can't be read", async () => {
+    const { bug, head, origin } = regressed();
+    const worktree = origin.clone(50);
+    for (const deploy of [
+      {
+        isAncestor: () => Promise.resolve(true),
+        liveSha: () => Promise.resolve(null),
+      },
+      {
+        isAncestor: () => Promise.reject(new Error("HTTP 403")),
+        liveSha: () => Promise.resolve(head),
+      },
+    ]) {
+      const record = recorded(
+        // biome-ignore lint/performance/noAwaitInLoops: one clone, checked in turn.
+        await runCheckRegression(
+          { ...deps(worktree, origin), deploy },
+          input({
+            labels: [{ role: "introduced", sha: bug }],
+            readCommit: head,
+          })
+        )
+      );
+      assert.equal(record.kind, "unchecked");
+      assert.match(record.line, NOT_PROVEN_LIVE);
+    }
   });
 
   it("refuses an introducing commit that production does not run", async () => {
@@ -464,7 +495,9 @@ describe("merges whose change git log -L cannot show", () => {
     assert.ok(!shas.includes(merge));
     assert.ok(first.candidates.every((candidate) => candidate.patch.trim()));
     assert.deepEqual([...shas].sort(), [main, side].sort());
-    assert.deepEqual(first.unavailable, [merge]);
+    assert.deepEqual(first.unavailable, [
+      { reason: "git shows no patch for the merge", sha: merge },
+    ]);
     const record = recorded(
       await runCheckRegression(
         deps(worktree, origin, merge),
@@ -492,6 +525,48 @@ describe("merges whose change git log -L cannot show", () => {
       })
     );
     assert.equal(labelled.status, "error");
+  });
+});
+
+describe("patches too long to show whole", () => {
+  it("never offers a cut patch for a label, and a long one newer than the decisive commit leaves it unchecked", async () => {
+    const origin = new Origin();
+    history(origin);
+    const bug = origin.commit(
+      12,
+      { [FILE]: sendLimit("count * 2") },
+      "feat: double"
+    );
+    const long = origin.commit(
+      6,
+      { [FILE]: sendLimit(`count + ${"1 + ".repeat(1500)}0`) },
+      "refactor: a very long expression"
+    );
+    const worktree = origin.clone(50);
+    const first = await runCheckRegression(
+      deps(worktree, origin, long),
+      input({ readCommit: long })
+    );
+    assert.ok(
+      first.status === "labels_needed",
+      JSON.stringify(first).slice(0, 300)
+    );
+    assert.deepEqual(
+      first.candidates.map((candidate) => candidate.sha),
+      [bug]
+    );
+    assert.deepEqual(first.unavailable, [
+      { reason: "patch too long", sha: long },
+    ]);
+    const record = recorded(
+      await runCheckRegression(
+        deps(worktree, origin, long),
+        input({ labels: [{ role: "introduced", sha: bug }], readCommit: long })
+      )
+    );
+    assert.equal(record.kind, "unchecked");
+    assert.match(record.line, TOO_LONG);
+    assert.ok(record.line.includes(long));
   });
 });
 
