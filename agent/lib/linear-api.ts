@@ -120,7 +120,7 @@ export interface FindRelatedIssuesInput {
  * missed a master carrying every one of those words).
  */
 const WORDS = /\s+/u;
-const phraseFilter = (phrase: string) => ({
+export const phraseFilter = (phrase: string) => ({
   and: phrase.split(WORDS).map((word) => ({
     or: [
       { title: { containsIgnoreCase: word } },

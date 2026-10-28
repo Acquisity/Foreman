@@ -12,6 +12,7 @@ import {
   SLACK_PROMPT,
 } from "./follow-up-decisions.js";
 import { askFromName, isTriageIntakeAsk } from "./linear-context.js";
+import { migrationFiledReport } from "./migration-ticket-scope.js";
 import { withoutReporterUpdates } from "./reporter-updates/copy.js";
 import { WIDGET_FEEDBACK_PROJECT_ID } from "./widget-feedback.js";
 import { isWidgetFiledDescription } from "./widget-ticket-marker.js";
@@ -221,7 +222,7 @@ const ASK_FROM_QUERY = `query AskFrom($id: String!) {
 /**
  * The intake requester from the issue's 'Ask from <name>' attachment, or null,
  * and whether the ticket is a triage intake ticket: its 'Ask from' link points
- * at a triage ask channel, or the widget filed it.
+ * at a triage ask channel, or the widget or file_migration_ticket filed it.
  */
 export async function readAskFrom(
   issue: string,
@@ -241,11 +242,20 @@ export async function readAskFrom(
     variables: { id: issue },
   });
   const attachments = result.issue?.attachments.nodes ?? [];
+  const description = result.issue?.description ?? null;
+  // A ticket file_migration_ticket filed is delegated as it is created, so
+  // its session can open before Linear has added the 'Ask from' link; its
+  // server-written Slack scope block names the reporter and channel already.
+  const migration = migrationFiledReport(description);
   return {
-    requester: askFromName(attachments.map((node) => node.title)),
+    requester:
+      askFromName(attachments.map((node) => node.title)) ??
+      migration?.reporter ??
+      null,
     triageIntake:
       isTriageIntakeAsk(attachments) ||
-      isWidgetFiledDescription(result.issue?.description ?? null),
+      isWidgetFiledDescription(description) ||
+      migration !== null,
   };
 }
 
