@@ -131,6 +131,12 @@ export const asOfText = (value: string, fallback: string): string =>
   value === "unknown" ? fallback : value;
 export const asOfName = (value: string | null): string | null =>
   value === "unknown" ? null : value;
+/** A snapshot issue's parent, after any parent the run set on it. */
+export const parentAsOfRun = <T>(
+  state: ReplayState,
+  identifier: string,
+  frozen: T
+): T | string => state.reparented?.[identifier] ?? frozen;
 export const asOfList = (value: string[] | "unknown"): string[] =>
   value === "unknown" ? [] : value;
 

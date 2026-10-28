@@ -7,6 +7,7 @@ import {
   type FrozenLists,
   type IssueFields,
   isCase,
+  parentAsOfRun,
   type ReplayState,
   relatedAsOfCase,
   tick,
@@ -131,7 +132,10 @@ export function replayIssueView(
     return null;
   }
   return {
-    issue: related,
+    issue: {
+      ...related,
+      parent: parentAsOfRun(state, related.id, related.parent),
+    },
     replay: comments.length > 0 ? { comments } : null,
   };
 }

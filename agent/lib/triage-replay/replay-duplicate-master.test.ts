@@ -1,9 +1,20 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
+import { tool as readIssueTool } from "../../tools/read_triage_replay_issue.js";
 import type { ProviderClient } from "../executor/operations.js";
 import { routeTicket } from "../linear-api.js";
 import type { LinearOperation } from "../linear-operations.js";
-import { ARCHIVE_URL, KEY, lists, triageCase } from "./fixtures.js";
+import { memoryBackend, seedReplayStore, setReplayBackend } from "./backend.js";
+import {
+  ARCHIVE_URL,
+  ctx,
+  KEY,
+  lists,
+  outputOf,
+  RUN,
+  TEST_SECRET,
+  triageCase,
+} from "./fixtures.js";
 import { answerLinear } from "./linear-simulation.js";
 import { type ReplayState, seedReplayState } from "./store.js";
 
@@ -71,7 +82,7 @@ const replayClient =
   };
 
 describe("replayed duplicate masters (R2, R3)", () => {
-  it("parents an existing lone report under a run-created master, then routes the case under that master inside the cutoff", async () => {
+  it("parents an existing lone report under a run-created master, then routes the case under that master inside the cutoff", async (t) => {
     const state = seeded();
     const client = replayClient(state);
     const parented = await routeTicket(
@@ -91,5 +102,26 @@ describe("replayed duplicate masters (R2, R3)", () => {
     assert.equal(routed.parentIdentifier, "ENG-200");
     assert.equal(routed.duplicateOf, "ENG-91");
     assert.equal(state.issue.parent, "ENG-200");
+
+    const prior = { ...process.env };
+    t.after(() => {
+      process.env = prior;
+    });
+    process.env.TRIAGE_REPLAY = "1";
+    process.env.FOREMAN_DIAGNOSTICS_SECRET = TEST_SECRET;
+    setReplayBackend(memoryBackend());
+    await seedReplayStore(state, RUN);
+    const read = await outputOf(
+      readIssueTool.execute({ issue: "ENG-91" }, {
+        ...ctx,
+        getToken: () =>
+          Promise.reject(new Error("no Linear token in a replay")),
+      } as never)
+    );
+    assert.equal(read.found, true);
+    assert.equal(
+      (read as { issue: { parent: string | null } }).issue.parent,
+      "ENG-200"
+    );
   });
 });

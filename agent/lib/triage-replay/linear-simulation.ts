@@ -9,6 +9,7 @@ import {
   type IssueFields,
   isCase,
   issueIdOf,
+  parentAsOfRun,
   type ReplayState,
   relatedAsOfCase,
   snapshotAsOfCase,
@@ -45,13 +46,6 @@ function renderIssue(
   };
 }
 
-/** A snapshot issue's parent, after any parent the run set on it. */
-const parentOf = (
-  state: ReplayState,
-  identifier: string,
-  frozen: Parameters<typeof asOfName>[0]
-) => state.reparented?.[identifier] ?? asOfName(frozen);
-
 function routeIssue(state: ReplayState, id: unknown) {
   if (isCase(state, id)) {
     return renderIssue(state, CASE_ISSUE_ID, state.case.id, state.issue);
@@ -70,7 +64,7 @@ function routeIssue(state: ReplayState, id: unknown) {
     return null;
   }
   const assigneeName = asOfName(related.assignee);
-  const parent = parentOf(state, related.id, related.parent);
+  const parent = asOfName(parentAsOfRun(state, related.id, related.parent));
   const assignee = assigneeName
     ? state.lists.users.find((u) => u.name === assigneeName)
     : undefined;
@@ -154,7 +148,7 @@ function relatedIssues(state: ReplayState, variables: Filter) {
     )
     .map((r) => {
       const assignee = asOfName(r.assignee);
-      const parent = parentOf(state, r.id, r.parent);
+      const parent = asOfName(parentAsOfRun(state, r.id, r.parent));
       return {
         assignee: assignee ? { name: assignee } : null,
         createdAt: r.createdAt,
