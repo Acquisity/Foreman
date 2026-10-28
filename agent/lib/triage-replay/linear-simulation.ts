@@ -87,7 +87,7 @@ type Filter = Record<string, unknown>;
 
 function matches(
   filter: Filter,
-  issue: { createdAt: string; description: string; title: string }
+  issue: { createdAt: string; description: string; id: string; title: string }
 ): boolean {
   return Object.entries(filter).every(([key, value]) => {
     const v = value as Filter;
@@ -108,6 +108,8 @@ function matches(
         );
       case "team":
         return true;
+      case "id":
+        return v.eq === issue.id;
       default:
         return false;
     }
@@ -116,11 +118,28 @@ function matches(
 
 function relatedIssues(state: ReplayState, variables: Filter) {
   const filter = variables.filter as Filter;
+  // route_ticket reads a master by id for its creation time; a master this
+  // run created is as new as the case.
+  const created = createdIssue(state, (filter.id as Filter | undefined)?.eq);
+  if (created) {
+    return {
+      nodes: [
+        {
+          ...routeIssue(state, created.identifier),
+          createdAt: state.case.createdAt,
+          state: { name: created.fields.state, type: "unknown" },
+          title: created.identifier,
+        },
+      ],
+      pageInfo: { endCursor: null, hasNextPage: false },
+    };
+  }
   const nodes = snapshotAsOfCase(state)
     .filter((r) =>
       matches(filter, {
         createdAt: r.createdAt,
         description: asOfText(r.description, ""),
+        id: issueIdOf(r.id),
         title: asOfText(r.title, ""),
       })
     )

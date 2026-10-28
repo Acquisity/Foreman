@@ -77,12 +77,26 @@ export interface ChangeMade {
   recordedAt: string;
 }
 
+/**
+ * A comment link on this ticket, or a Linear document link in either form
+ * (`/document/<slug>` or `/d/<id>`). A document link names no issue, so it
+ * cannot be tied to this ticket from the link alone; the investigation
+ * document and staff notes attached to the ticket are where changes are
+ * recorded, so both forms count.
+ */
 const recordedOn = (identifier: string, url: string): boolean => {
-  const match = LINEAR_ISSUE_URL.exec(url.trim());
-  return match?.[1]?.toUpperCase() === identifier.toUpperCase();
+  const link = url.trim();
+  if (LINEAR_DOCUMENT_URL.test(link)) {
+    return true;
+  }
+  return (
+    LINEAR_ISSUE_URL.exec(link)?.[1]?.toUpperCase() === identifier.toUpperCase()
+  );
 };
 const LINEAR_ISSUE_URL =
   /^https:\/\/linear\.app\/[\w-]+\/issue\/([A-Za-z]+-\d+)(?:[/?#]|$)/u;
+const LINEAR_DOCUMENT_URL =
+  /^https:\/\/linear\.app\/[\w-]+\/(?:document|d)\/[\w-]+(?:[/?#]|$)/u;
 
 export const CHANGE_GAP =
   "Evidence of the change that resolved it: a fix live in production (check_regression returns fixed on main and live) or the staff or triage action, passed as changeMade with the link to where this ticket records it. An explanation with no change is not Resolved by triage.";

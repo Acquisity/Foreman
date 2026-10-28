@@ -299,3 +299,35 @@ test("a change recorded on another ticket does not count", () => {
   assert.equal(decision.path, "User Error");
   assert.equal(decision.route.state, "Canceled");
 });
+
+test("a change recorded in a Linear document counts, in both document URL forms (C2)", () => {
+  for (const recordedAt of [
+    "https://linear.app/acquisity/document/triage-investigation-8a841e5cff51",
+    "https://linear.app/acquisity/d/8a841e5cff51",
+  ]) {
+    const decision = resolveTriage(
+      triageInput({ changeMade: { ...CHANGE, recordedAt } }),
+      bugAnswers({
+        classification: pick("user_error"),
+        path: pick("Resolved by triage"),
+      })
+    );
+    assert.ok(decision.outcome === "route", recordedAt);
+    assert.equal(decision.path, "Resolved by triage", recordedAt);
+    assert.equal(decision.route.state, "Done", recordedAt);
+  }
+});
+
+test("a link outside Linear does not count as a recorded change", () => {
+  const decision = resolveTriage(
+    triageInput({
+      changeMade: { ...CHANGE, recordedAt: "https://example.com/d/1" },
+    }),
+    bugAnswers({
+      classification: pick("user_error"),
+      path: pick("Resolved by triage"),
+    })
+  );
+  assert.ok(decision.outcome === "route");
+  assert.equal(decision.route.state, "Canceled");
+});

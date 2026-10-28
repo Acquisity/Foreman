@@ -50,6 +50,17 @@ export const ENGINEERING_TEAM_ID = "8eaf95ab-56ac-4490-8253-f6a96793dc40";
 /** Recency window for eligible masters in intake-only Slack sessions. */
 export const MASTER_WINDOW_DAYS = 30;
 
+/** The creation time a master must reach, or null when no window applies. */
+export const masterCreatedAfter = (
+  windowed: boolean,
+  now: Date = new Date()
+): string | null =>
+  windowed
+    ? new Date(
+        now.getTime() - MASTER_WINDOW_DAYS * 24 * 60 * 60 * 1000
+      ).toISOString()
+    : null;
+
 const DUPLICATES_PAGE_SIZE = 50;
 const MASTERS_PAGE_SIZE = 250;
 const MAX_PAGES = 20;
@@ -183,13 +194,7 @@ export async function findRelatedIssues(
   opts?: LinearGraphqlOptions & { now?: Date }
 ): Promise<FindRelatedIssuesResult> {
   const masters = input.scope === "masters";
-  const createdAfter =
-    masters && input.windowed
-      ? new Date(
-          (opts?.now ?? new Date()).getTime() -
-            MASTER_WINDOW_DAYS * 24 * 60 * 60 * 1000
-        ).toISOString()
-      : null;
+  const createdAfter = masterCreatedAfter(masters && input.windowed, opts?.now);
 
   const byId = new Map<string, RelatedIssue>();
   let truncated = false;
@@ -497,11 +502,6 @@ async function chooseAssignee(
       return { id: source.assignee.id, warnings };
     }
     if (source.assignee && !holder) {
-      if (input.parent === input.inheritAssigneeFrom) {
-        throw new Error(
-          `${input.inheritAssigneeFrom} is held by ${source.assignee.name}, who is not in the owner map, so nothing was written. Move that master to its area owner first, so the report and its master keep one owner.`
-        );
-      }
       warnings.push(
         `${input.inheritAssigneeFrom} is held by ${source.assignee.name}, who is not in the owner map, so the assignee was not inherited.`
       );
@@ -573,34 +573,116 @@ const isReport = (issue: RouteIssue): boolean =>
     REPORT_LABELS.has(label.name.toLowerCase())
   );
 
+/** Whether the ticket carries the Bug label once this call's label changes land. */
+const carriesBug = (issue: RouteIssue, input: RouteTicketInput): boolean => {
+  const removed = new Set(
+    (input.removeLabels ?? []).map((name) => name.toLowerCase())
+  );
+  return [
+    ...issue.labels.nodes
+      .map((label) => label.name)
+      .filter((name) => !removed.has(name.toLowerCase())),
+    ...(input.addLabels ?? []),
+  ].some((name) => name.toLowerCase() === BUG_LABEL.toLowerCase());
+};
+
+export interface DuplicateRouting {
+  /** The triage decision settled a Bug; the ticket's Bug label counts too. */
+  masterRequired?: boolean;
+  /** The master search cutoff for this session (`masterCreatedAfter`). */
+  mastersCreatedAfter?: string | null;
+}
+
+/** Whether a master was created before the session's cutoff, read through the master search's own query. */
+async function beforeCutoff(
+  gql: Gql,
+  identifier: string,
+  cutoff: string | null
+): Promise<boolean> {
+  if (cutoff === null) {
+    return false;
+  }
+  const { id } = await requireIssue(gql, identifier);
+  const { issues } = await gql<IssuesData>("RelatedIssues", {
+    after: null,
+    filter: { id: { eq: id } },
+    first: 1,
+    includeArchived: true,
+  });
+  const createdAt = issues.nodes[0]?.createdAt;
+  if (!createdAt) {
+    throw new Error(
+      `Could not read when ${identifier} was created, so nothing was written.`
+    );
+  }
+  return Date.parse(createdAt) < Date.parse(cutoff);
+}
+
+const staleMaster = (identifier: string, cutoff: string | null) =>
+  new Error(
+    `${identifier} was created before ${cutoff}, so it cannot take new reports and nothing was written. Create a new master through engineering-handoff from this investigation (aggregate evidence only: no organization id, email or customer rows), relate ${identifier} for history, then call again with parent set to the new master.`
+  );
+
 /**
  * The parent a duplicate joins (ENG-16608): a match that is not a report is
- * the master itself; a report's parent is its master. A lone report has none,
- * so a Bug duplicate of one is refused until engineering-handoff has made the
- * master and parented the report under it.
+ * the master itself; a report's parent is its master. A master created before
+ * the session's master-search cutoff is not eligible. With no eligible master,
+ * a Bug duplicate (by decision or by its Bug label) is refused until
+ * engineering-handoff has made one; any other duplicate closes unparented.
  */
-function duplicateParent(
+async function duplicateParent(
+  gql: Gql,
+  issue: RouteIssue,
   match: RouteIssue,
   input: RouteTicketInput,
-  masterRequired: boolean
-): string | undefined {
-  const master = isReport(match)
+  routing: DuplicateRouting
+): Promise<string | undefined> {
+  const cutoff = routing.mastersCreatedAfter ?? null;
+  const found = isReport(match)
     ? (match.parent?.identifier ?? null)
     : match.identifier;
-  if (master === null) {
-    if (masterRequired) {
+  const stale =
+    found !== null && (await beforeCutoff(gql, found, cutoff)) ? found : null;
+  if (found !== null && stale === null) {
+    if (input.parent !== undefined && input.parent !== found) {
       throw new Error(
-        `${match.identifier} is a customer report with no master, so nothing was written. Create the master through engineering-handoff from this investigation (aggregate evidence only: no organization id, email or customer rows), call route_ticket with issue ${match.identifier} and parent set to the new master, then call this again.`
+        `${match.identifier} belongs under its master ${found}, not ${input.parent}, so nothing was written. Drop parent or pass ${found}.`
       );
+    }
+    return found;
+  }
+  if (input.parent !== undefined) {
+    if (await beforeCutoff(gql, input.parent, cutoff)) {
+      throw staleMaster(input.parent, cutoff);
     }
     return input.parent;
   }
-  if (input.parent !== undefined && input.parent !== master) {
+  if (!(routing.masterRequired || carriesBug(issue, input))) {
+    return;
+  }
+  if (stale !== null) {
+    throw staleMaster(stale, cutoff);
+  }
+  throw new Error(
+    `${match.identifier} is a customer report with no master, so nothing was written. Create the master through engineering-handoff from this investigation (aggregate evidence only: no organization id, email or customer rows), call route_ticket with issue ${match.identifier} and parent set to the new master, then call this again.`
+  );
+}
+
+/**
+ * The parent, however it was chosen, refused when someone outside the owner
+ * map holds it, so a report and its master keep one owner.
+ */
+async function requireOwnedParent(
+  gql: Gql,
+  identifier: string
+): Promise<RouteIssue> {
+  const parent = await requireIssue(gql, identifier);
+  if (parent.assignee && !mappedOwner(parent.assignee.name)) {
     throw new Error(
-      `${match.identifier} belongs under its master ${master}, not ${input.parent}, so nothing was written. Drop parent or pass ${master}.`
+      `${identifier} is held by ${parent.assignee.name}, who is not in the owner map, so nothing was written. Move that master to its area owner first, so the report and its master keep one owner.`
     );
   }
-  return master;
+  return parent;
 }
 
 /** Builds the single issueUpdate input from the decisions given. */
@@ -635,17 +717,17 @@ async function buildUpdate(
       projects.nodes
     );
   }
+  if (parent !== undefined) {
+    update.parentId = (await requireOwnedParent(gql, parent)).id;
+  }
   const assignee = await resolveAssigneeId(gql, issue, input, labels);
   if (assignee.id !== undefined) {
     update.assigneeId = assignee.id;
   }
-  if (parent !== undefined) {
-    update.parentId = (await requireIssue(gql, parent)).id;
-  }
   return { update, warnings: assignee.warnings };
 }
 
-const errorReason = (error: unknown) =>
+const reason = (error: unknown) =>
   error instanceof Error ? error.message : String(error);
 
 /** The duplicate relation, written before the update; a failure writes nothing. */
@@ -669,7 +751,7 @@ async function writeDuplicateRelation(
       throw error;
     }
     throw new Error(
-      `Nothing was written: the duplicate relation to ${match.identifier} was not recorded (${errorReason(error)}).`,
+      `Nothing was written: the duplicate relation to ${match.identifier} was not recorded (${reason(error)}).`,
       { cause: error }
     );
   }
@@ -696,7 +778,7 @@ async function writeUpdate(
       throw error;
     }
     throw new Error(
-      `The duplicate relation to ${after.duplicateOf} was recorded, but the update failed (${errorReason(error)}). Call route_ticket again without duplicateOf${after.parent ? `, with parent ${after.parent}` : ""}, to apply the rest.`,
+      `The duplicate relation to ${after.duplicateOf} was recorded, but the update failed (${reason(error)}). Call route_ticket again without duplicateOf${after.parent ? `, with parent ${after.parent}` : ""}, to apply the rest.`,
       { cause: error }
     );
   }
@@ -717,7 +799,7 @@ async function writeUpdate(
  */
 export async function routeTicket(
   input: RouteTicketInput,
-  opts?: LinearGraphqlOptions & { masterRequired?: boolean }
+  opts?: LinearGraphqlOptions & DuplicateRouting
 ): Promise<RouteTicketResult> {
   const gql: Gql = (query, variables) => linearGraphql(query, variables, opts);
 
@@ -729,12 +811,10 @@ export async function routeTicket(
       ? null
       : await requireIssue(gql, input.duplicateOf);
   const parent = match
-    ? duplicateParent(match, input, opts?.masterRequired === true)
+    ? await duplicateParent(gql, issue, match, input, opts ?? {})
     : input.parent;
   const { update, warnings } = await buildUpdate(gql, issue, input, parent);
 
-  const reason = (error: unknown) =>
-    error instanceof Error ? error.message : String(error);
   // Caller cancellation is never a warning; the tool rethrows it.
   const warn = (error: unknown, message: string) => {
     if (opts?.signal?.aborted) {
