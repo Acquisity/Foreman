@@ -122,6 +122,58 @@ describe("planted case: fixed on main and live", () => {
   });
 });
 
+describe("production moved on after the commit read", () => {
+  it("does not call a fix live when a later production commit touched the blamed file", async () => {
+    const { bug, fix, head, origin } = fixedChain();
+    const worktree = origin.clone(50);
+    const reverted = origin.commit(
+      1,
+      { [FILE]: sendLimit("count * 2") },
+      "Revert: send limit"
+    );
+    const record = recorded(
+      await runCheckRegression(
+        deps(worktree, origin, reverted),
+        input({ labels: bothLabels(fix, bug), readCommit: head })
+      )
+    );
+    assert.equal(record.kind, "fixed_deploy_unknown");
+  });
+
+  it("keeps fixed and live when only other files changed after the commit read", async () => {
+    const { bug, fix, head, origin } = fixedChain();
+    const worktree = origin.clone(50);
+    const later = origin.commit(1, note("later"), "docs: later");
+    const record = recorded(
+      await runCheckRegression(
+        deps(worktree, origin, later),
+        input({ labels: bothLabels(fix, bug), readCommit: head })
+      )
+    );
+    assert.equal(record.kind, "fixed_live");
+  });
+
+  it("says the deploy status is unknown when the later changes can't be read", async () => {
+    const { bug, fix, head, origin } = fixedChain();
+    const worktree = origin.clone(50);
+    const later = origin.commit(1, note("later"), "docs: later");
+    const base = deps(worktree, origin, later);
+    const record = recorded(
+      await runCheckRegression(
+        {
+          ...base,
+          deploy: {
+            ...base.deploy,
+            changedFiles: () => Promise.reject(new Error("HTTP 502")),
+          },
+        },
+        input({ labels: bothLabels(fix, bug), readCommit: head })
+      )
+    );
+    assert.equal(record.kind, "fixed_deploy_unknown");
+  });
+});
+
 describe("planted case: fixed on main, not deployed", () => {
   it("names the fix and says it is not live when production serves an older commit", async () => {
     const { bug, fix, head, older, origin } = fixedChain();
@@ -147,14 +199,17 @@ describe("planted case: fixed on main, not deployed", () => {
       );
     for (const deploy of [
       {
+        changedFiles: () => Promise.resolve([]),
         isAncestor: () => Promise.resolve(true),
         liveSha: () => Promise.resolve(null),
       },
       {
+        changedFiles: () => Promise.resolve([]),
         isAncestor: () => Promise.resolve(true),
         liveSha: () => Promise.reject(new Error("HTTP 404")),
       },
       {
+        changedFiles: () => Promise.resolve([]),
         isAncestor: () => Promise.reject(new Error("HTTP 403")),
         liveSha: () => Promise.resolve(head),
       },
@@ -201,10 +256,12 @@ describe("planted case: regression", () => {
     const worktree = origin.clone(50);
     for (const deploy of [
       {
+        changedFiles: () => Promise.resolve([]),
         isAncestor: () => Promise.resolve(true),
         liveSha: () => Promise.resolve(null),
       },
       {
+        changedFiles: () => Promise.resolve([]),
         isAncestor: () => Promise.reject(new Error("HTTP 403")),
         liveSha: () => Promise.resolve(head),
       },

@@ -60,6 +60,8 @@ export interface Label {
 
 /** Production's deployed commit and ancestry, read from GitHub (the reporter-updates probe). */
 export interface DeployReads {
+  /** The files changed between two commits, from GitHub's compare. */
+  changedFiles: (base: string, head: string) => Promise<string[]>;
   isAncestor: (base: string, head: string) => Promise<boolean>;
   liveSha: () => Promise<string | null>;
 }
@@ -361,6 +363,24 @@ export const labelProblem = (
     : "Each commit takes exactly one label.";
 };
 
+/**
+ * Whether nothing production gained after the commit read touched the blamed
+ * file. History is only read up to the commit read, so a later revert of the
+ * fix would otherwise pass as live; a failed read counts as touched.
+ */
+const untouchedSince = (
+  reads: DeployReads,
+  readCommit: string,
+  live: string,
+  file: string
+): Promise<boolean> =>
+  live === readCommit
+    ? Promise.resolve(true)
+    : reads.changedFiles(readCommit, live).then(
+        (files) => !files.includes(file),
+        () => false
+      );
+
 const ancestry = (reads: DeployReads, base: string, head: string) =>
   reads.isAncestor(base, head).then(
     (contained) => contained,
@@ -380,8 +400,10 @@ export async function resolveRegression(options: {
   candidates: Candidate[];
   failureAt: string;
   failureAtSource: FailureTimeSource;
+  file: string;
   labels: Label[];
   live: string | null;
+  readCommit: string;
   reads: DeployReads;
 }): Promise<Resolution> {
   const { candidates, live, reads } = options;
@@ -433,6 +455,12 @@ export async function resolveRegression(options: {
     return resolution("fixed_deploy_unknown", sha);
   }
   const contained = await ancestry(reads, sha, live);
+  if (
+    contained &&
+    !(await untouchedSince(reads, options.readCommit, live, options.file))
+  ) {
+    return resolution("fixed_deploy_unknown", sha);
+  }
   if (contained === null) {
     return resolution("fixed_deploy_unknown", sha);
   }
@@ -564,8 +592,10 @@ const check = async (
     candidates: listed.candidates,
     failureAt: input.failureAt,
     failureAtSource: input.failureAtSource,
+    file: input.file,
     labels: input.labels ?? [],
     live,
+    readCommit: input.readCommit,
     reads: deps.deploy,
   });
   return {

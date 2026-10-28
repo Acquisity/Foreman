@@ -159,6 +159,12 @@ export const productionAt = (
   origin: Origin,
   live: string | null
 ): DeployReads => ({
+  changedFiles: (base, head) =>
+    Promise.resolve(
+      git(origin.path, ["diff", "--name-only", base, head])
+        .split("\n")
+        .filter(Boolean)
+    ),
   isAncestor: (base, head) =>
     Promise.resolve(
       spawnSync("git", ["merge-base", "--is-ancestor", base, head], {
