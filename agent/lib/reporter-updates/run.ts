@@ -378,17 +378,27 @@ const duplicateFollowUp = async (
   deps: Deps,
   liveSha: () => Promise<string | null>
 ): Promise<Planned | Outcome | null> => {
-  const next = await originalFollowUp(view, deps, liveSha);
   const closedAt = Date.parse(view.facts.closedAt ?? "");
   const expired =
     !Number.isNaN(closedAt) &&
     (deps.now ?? Date.now)() - closedAt > DUPLICATE_WAIT_MS;
+  // Past the limit, a master that cannot be read ends the wait too, so a
+  // read that keeps failing never keeps a duplicate waiting forever.
+  const next = await originalFollowUp(view, deps, liveSha).catch(
+    (error: unknown) => {
+      if (expired) {
+        return WAITING;
+      }
+      throw error;
+    }
+  );
   return next !== null && !isPlanned(next) && next.kind === "waiting" && expired
     ? dropDuplicate(view.facts.identifier, "expired", deps)
     : next;
 };
 
 const DUPLICATE_WAIT_MS = 30 * 86_400_000;
+const WAITING = { kind: "waiting" } as const;
 
 const dropDuplicate = (identifier: string, code: string, deps: Deps): null => {
   (deps.log ?? logOpsEvent)("reporter.update.duplicate_dropped", {

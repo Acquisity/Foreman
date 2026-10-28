@@ -221,6 +221,23 @@ describe("duplicate of an original that is Done without a linked change", () => 
 describe("the 30-day limit on every waiting duplicate", () => {
   const expired = { code: "expired", issue: "ENG-1", outcome: "skipped" };
 
+  it("expires a duplicate past 30 days whose master cannot be read (Devin 8)", async () => {
+    const dup = duplicate(31);
+    dup.facts.parent = { identifier: "ENG-50", stateType: "started" };
+    const s = setup([dup, doneOriginal(), ticket({ identifier: "ENG-50" })]);
+    const events = withLog(s);
+    await reconcile(s);
+    s.linear.state.failOriginals.add("ENG-50");
+    assert.deepEqual(await reconcile(s), {
+      kind: "skipped",
+      why: "nothing_due",
+    });
+    assert.deepEqual(events.at(-1), {
+      event: "reporter.update.duplicate_dropped",
+      fields: expired,
+    });
+  });
+
   it("stops waiting on an open original 30 days after the duplicate was closed", async () => {
     const original = ticket({ identifier: "ENG-9" });
     original.anchorId = null;
