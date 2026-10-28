@@ -1,9 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { tool as readIssueTool } from "../../tools/read_triage_replay_issue.js";
-import type { ProviderClient } from "../executor/operations.js";
 import { routeTicket } from "../linear-api.js";
-import type { LinearOperation } from "../linear-operations.js";
 import { memoryBackend, seedReplayStore, setReplayBackend } from "./backend.js";
 import {
   ARCHIVE_URL,
@@ -12,13 +10,11 @@ import {
   lists,
   outputOf,
   RUN,
+  replayClient,
   TEST_SECRET,
   triageCase,
 } from "./fixtures.js";
-import { answerLinear } from "./linear-simulation.js";
 import { type ReplayState, seedReplayState } from "./store.js";
-
-const LINEAR_PREFIX = /^linear\./u;
 
 /**
  * The lone-report branch of a Bug duplicate, replayed: the run creates a
@@ -66,21 +62,6 @@ const seeded = (): ReplayState => {
   });
   return state;
 };
-
-const replayClient =
-  (state: ReplayState): ProviderClient =>
-  (request) => {
-    const operation = request.operation.replace(
-      LINEAR_PREFIX,
-      ""
-    ) as LinearOperation;
-    const variables =
-      "variables" in request.input ? request.input.variables : {};
-    return Promise.resolve({
-      data: { data: answerLinear(state, operation, variables) },
-      status: 200,
-    });
-  };
 
 describe("replayed duplicate masters (R2, R3)", () => {
   it("parents an existing lone report under a run-created master, then routes the case under that master inside the cutoff", async (t) => {

@@ -16,10 +16,11 @@ import {
   ticket,
   waitingIssues,
 } from "./fakes.js";
-import { runReporterUpdates } from "./run.js";
+import { reconcileTicket, runReporterUpdates } from "./run.js";
 
 const DAY = 86_400_000;
 const MASTER_READ_FAILED = /ENG-50 read timed out/u;
+const GITHUB_BUSY = /GitHub is busy/u;
 const LIVE = {
   ancestors: { [`${MERGE_SHA}>${NEW_SHA}`]: true },
   liveSha: NEW_SHA,
@@ -220,6 +221,25 @@ describe("duplicate of an original that is Done without a linked change", () => 
 
 describe("the 30-day limit on every waiting duplicate", () => {
   const expired = { code: "expired", issue: "ENG-1", outcome: "skipped" };
+
+  it("keeps a past-30-day duplicate waiting when a deploy check fails, so its live fix is retried, not dropped (CodeRabbit 5)", async () => {
+    const dup = duplicate(31);
+    dup.facts.parent = { identifier: "ENG-50", stateType: "completed" };
+    const master = doneOriginal({ identifier: "ENG-50", pullUrls: [PR_URL] });
+    const s = setup([dup, doneOriginal(), master], LIVE);
+    const events = withLog(s);
+    await reconcile(s);
+    await assert.rejects(
+      reconcileTicket("ENG-1", s.deps, () =>
+        Promise.reject(new Error("GitHub is busy"))
+      ),
+      GITHUB_BUSY
+    );
+    assert.ok(
+      !events.some((e) => e.event === "reporter.update.duplicate_dropped")
+    );
+    assert.deepEqual(await reconcile(s), { kind: "posted", stage: "fixed" });
+  });
 
   it("expires a duplicate past 30 days whose master cannot be read (Devin 8)", async () => {
     const dup = duplicate(31);

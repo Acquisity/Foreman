@@ -45,6 +45,14 @@ const renderIssue = (id: string, issue: FakeIssue) => ({
 });
 
 /** The one RelatedIssues read route_ticket makes: an issue by id, for its creation time. */
+/** The RouteIssue id of an issue: the default master ENG-9 is i-9. */
+const fakeId = (identifier: string) =>
+  identifier === DEFAULT_MASTER[0] ? DEFAULT_MASTER[1] : `i-${identifier}`;
+
+/**
+ * The RelatedIssues reads route_ticket makes: an issue by id (with the master
+ * marker when the filter asks for it), or the children of a parent by id.
+ */
 const relatedById = (
   variables: Record<string, unknown>,
   issues: Record<string, FakeIssue>
@@ -52,17 +60,21 @@ const relatedById = (
   const filter = variables.filter as {
     description?: { contains?: string };
     id?: { eq?: string };
+    parent?: { id?: { eq?: string } };
   };
-  const id = filter.id?.eq ?? "";
-  const nodes = [
+  const all = [
     DEFAULT_MASTER,
     ...Object.entries(issues).map(
-      ([identifier, issue]) => [identifier, `i-${identifier}`, issue] as const
+      ([identifier, issue]) => [identifier, fakeId(identifier), issue] as const
     ),
-  ]
-    .filter(
-      ([, issueId, issue]) =>
-        issueId === id && (filter.description === undefined || issue.master)
+  ];
+  const parentId = filter.parent?.id?.eq;
+  const nodes = all
+    .filter(([, issueId, issue]) =>
+      parentId === undefined
+        ? issueId === filter.id?.eq &&
+          (filter.description === undefined || issue.master)
+        : issue.parent !== undefined && fakeId(issue.parent) === parentId
     )
     .map(([identifier, issueId, issue]) => ({
       assignee: issue.assignee ? { name: issue.assignee.name } : null,

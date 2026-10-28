@@ -296,6 +296,14 @@ export const reconcileTicket = async (
  * fixing pull request may be linked to either, so their linked pull requests
  * are pooled; a failed match read never hides the master.
  */
+/** The Linear read of what a duplicate follows failed; nothing else is one. */
+class FollowedReadError extends Error {
+  constructor(cause: unknown) {
+    super(cause instanceof Error ? cause.message : String(cause), { cause });
+    this.name = "FollowedReadError";
+  }
+}
+
 const followedOriginal = async (
   master: string | undefined,
   match: string | null,
@@ -312,11 +320,11 @@ const followedOriginal = async (
   // keeps waiting and is retried, never decided from the match alone.
   const [masterRead] = results;
   if (master && masterRead?.status === "rejected") {
-    throw masterRead.reason;
+    throw new FollowedReadError(masterRead.reason);
   }
   const failed = results.find((result) => result.status === "rejected");
   if (failed && read.length === 0) {
-    throw failed.reason;
+    throw new FollowedReadError(failed.reason);
   }
   const governing = read.find((facts) => facts.identifier === master);
   if (governing && closureOf(governing).kind === "not_fixed") {
@@ -382,11 +390,12 @@ const duplicateFollowUp = async (
   const expired =
     !Number.isNaN(closedAt) &&
     (deps.now ?? Date.now)() - closedAt > DUPLICATE_WAIT_MS;
-  // Past the limit, a master that cannot be read ends the wait too, so a
-  // read that keeps failing never keeps a duplicate waiting forever.
+  // Past the limit, a master or match that cannot be read ends the wait too,
+  // so a Linear read that keeps failing never keeps a duplicate waiting
+  // forever; any other failure (a deploy check, the writer) is retried.
   const next = await originalFollowUp(view, deps, liveSha).catch(
     (error: unknown) => {
-      if (expired) {
+      if (expired && error instanceof FollowedReadError) {
         return WAITING;
       }
       throw error;

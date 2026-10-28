@@ -6,6 +6,7 @@ import {
   asOfText,
   CASE_ISSUE_ID,
   createdIssue,
+  documentUrlOf,
   type IssueFields,
   isCase,
   issueIdOf,
@@ -88,7 +89,13 @@ type Filter = Record<string, unknown>;
 
 function matches(
   filter: Filter,
-  issue: { createdAt: string; description: string; id: string; title: string }
+  issue: {
+    createdAt: string;
+    description: string;
+    id: string;
+    parent: string | null;
+    title: string;
+  }
 ): boolean {
   return Object.entries(filter).every(([key, value]) => {
     const v = value as Filter;
@@ -113,6 +120,11 @@ function matches(
         return true;
       case "id":
         return v.eq === issue.id;
+      case "parent":
+        return (
+          issue.parent !== null &&
+          (v.id as Filter | undefined)?.eq === issueIdOf(issue.parent)
+        );
       default:
         return false;
     }
@@ -130,6 +142,7 @@ function relatedIssues(state: ReplayState, variables: Filter) {
       createdAt: state.case.createdAt,
       description: created.description,
       id: issueIdOf(created.identifier),
+      parent: created.fields.parent,
       title: created.title,
     })
   ) {
@@ -153,6 +166,7 @@ function relatedIssues(state: ReplayState, variables: Filter) {
         createdAt: r.createdAt,
         description: asOfText(r.description, ""),
         id: issueIdOf(r.id),
+        parent: asOfName(parentAsOfRun(state, r.id, r.parent)),
         title: asOfText(r.title, ""),
       })
     )
@@ -204,7 +218,7 @@ function saveDocument(
     document: {
       id: doc.id,
       updatedAt: doc.updatedAt,
-      url: urlOf(state.case.id),
+      url: documentUrlOf(doc.id),
     },
     success: true,
   };
@@ -280,7 +294,7 @@ const HANDLERS: Record<LinearOperation, Handler> = {
     const doc = state.documents.find((d) => d.id === v.id);
     return {
       document: doc
-        ? { id: doc.id, updatedAt: doc.updatedAt, url: urlOf(state.case.id) }
+        ? { id: doc.id, updatedAt: doc.updatedAt, url: documentUrlOf(doc.id) }
         : null,
     };
   },

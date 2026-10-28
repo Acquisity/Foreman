@@ -585,9 +585,10 @@ async function resolveAssigneeId(
 
 /**
  * What marks a master (ENG-16608): engineering-handoff writes every master
- * from its template, whose Regression seam section no customer report has.
- * Labels cannot mark one: masters carry no marker label, and a report on the
- * unproven branch keeps no labels either, so having none proves nothing.
+ * from its template, whose Regression seam section no customer report has; a
+ * master made by hand is known by already parenting an issue. Labels cannot
+ * mark one: masters carry no marker label, and a report on the unproven
+ * branch keeps no labels either, so having none proves nothing.
  */
 export const MASTER_MARKER = "## Regression seam";
 
@@ -611,19 +612,54 @@ export interface DuplicateRouting {
   mastersCreatedAfter?: string | null;
 }
 
-/**
- * When the issue was created if it is a master, else null, read through the
- * master search's own query: the issue by id, only when its description holds
- * the master marker.
- */
-async function masterCreatedAt(gql: Gql, id: string): Promise<string | null> {
+/** One RelatedIssues read, the master search's own query, for at most one issue. */
+async function relatedOne(
+  gql: Gql,
+  filter: Record<string, unknown>
+): Promise<{ createdAt: string } | undefined> {
   const { issues } = await gql<IssuesData>("RelatedIssues", {
     after: null,
-    filter: { description: { contains: MASTER_MARKER }, id: { eq: id } },
+    filter,
     first: 1,
     includeArchived: true,
   });
-  return issues.nodes[0]?.createdAt ?? null;
+  return issues.nodes[0];
+}
+
+/** When the issue was created; a missing issue refuses before any write. */
+async function createdAtOf(
+  gql: Gql,
+  identifier: string,
+  id: string
+): Promise<string> {
+  const node = await relatedOne(gql, { id: { eq: id } });
+  if (!node) {
+    throw new Error(
+      `Could not read when ${identifier} was created, so nothing was written.`
+    );
+  }
+  return node.createdAt;
+}
+
+/**
+ * When the issue was created if it is a master, else null. A master carries
+ * the master marker (engineering-handoff writes it), or was made by hand and
+ * already parents an issue, as reused masters do; a lone report has neither.
+ */
+async function masterCreatedAt(
+  gql: Gql,
+  identifier: string,
+  id: string
+): Promise<string | null> {
+  const marked = await relatedOne(gql, {
+    description: { contains: MASTER_MARKER },
+    id: { eq: id },
+  });
+  if (marked) {
+    return marked.createdAt;
+  }
+  const child = await relatedOne(gql, { parent: { id: { eq: id } } });
+  return child ? createdAtOf(gql, identifier, id) : null;
 }
 
 /** The match itself when it is a master, else its parent when that is one. */
@@ -631,7 +667,7 @@ async function masterOf(
   gql: Gql,
   match: RouteIssue
 ): Promise<{ createdAt: string; identifier: string } | null> {
-  const own = await masterCreatedAt(gql, match.id);
+  const own = await masterCreatedAt(gql, match.identifier, match.id);
   if (own !== null) {
     return { createdAt: own, identifier: match.identifier };
   }
@@ -641,6 +677,7 @@ async function masterOf(
   }
   const createdAt = await masterCreatedAt(
     gql,
+    parent,
     (await requireIssue(gql, parent)).id
   );
   return createdAt === null ? null : { createdAt, identifier: parent };
@@ -683,16 +720,16 @@ async function duplicateParent(
   }
   const required = routing.masterRequired || carriesBug(issue, input);
   if (input.parent !== undefined) {
-    const createdAt = await masterCreatedAt(
-      gql,
-      (await requireIssue(gql, input.parent)).id
-    );
-    if (required && createdAt === null) {
+    const { id } = await requireIssue(gql, input.parent);
+    if (required && (await masterCreatedAt(gql, input.parent, id)) === null) {
       throw new Error(
         `${input.parent} is not a master, so nothing was written. Pass the master as parent, or create one through engineering-handoff first.`
       );
     }
-    if (createdAt !== null && beforeCutoff(createdAt, cutoff)) {
+    if (
+      cutoff !== null &&
+      beforeCutoff(await createdAtOf(gql, input.parent, id), cutoff)
+    ) {
       throw staleMaster(input.parent, cutoff);
     }
     return input.parent;

@@ -83,6 +83,12 @@ export interface ReplayState {
 export const CASE_ISSUE_ID = "replay-case";
 export const issueIdOf = (identifier: string) => `replay-${identifier}`;
 export const urlOf = (identifier: string) => `${ticketUrl(identifier)}/replay`;
+/**
+ * A replay document's link, shaped like a Linear document link so it is read
+ * as one (its key is the document number), never the ticket's own link.
+ */
+export const documentUrlOf = (id: string) =>
+  `https://linear.app/acquisity/document/${id}`;
 
 export function seedReplayState(
   triageCase: TriageCase,

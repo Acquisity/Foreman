@@ -12,7 +12,8 @@ const CUTOFF = "2026-09-28T00:00:00.000Z";
 /**
  * ENG-30 and ENG-31 are masters (they carry the master template's Regression
  * seam section), ENG-20 a report under ENG-30, ENG-40 a lone report, ENG-45 a
- * lone report the unproven branch left with no labels, ENG-50 a master created before the cutoff with report ENG-60 under
+ * lone report the unproven branch left with no labels, ENG-46 a master made by
+ * hand (no marker) already parenting report ENG-47, ENG-48 an old report, ENG-50 a master created before the cutoff with report ENG-60 under
  * it, and ENG-70 a master held outside the owner map with report ENG-21.
  */
 const ISSUES: Record<string, FakeIssue> = {
@@ -27,6 +28,9 @@ const ISSUES: Record<string, FakeIssue> = {
   "ENG-31": { assignee: ANUJ, createdAt: FRESH, master: true },
   "ENG-40": { labels: ["intercom-sourced", "Customer reported"] },
   "ENG-45": { createdAt: FRESH },
+  "ENG-46": { assignee: ANUJ, createdAt: FRESH },
+  "ENG-47": { labels: ["Customer reported"], parent: "ENG-46" },
+  "ENG-48": { createdAt: STALE, labels: ["Customer reported"] },
   "ENG-50": { assignee: ANUJ, createdAt: STALE, master: true },
   "ENG-60": { labels: ["Customer reported"], parent: "ENG-50" },
   "ENG-70": { assignee: GONE, createdAt: FRESH, master: true },
@@ -52,6 +56,8 @@ const MASTER_OUTSIDE_MAP =
   /ENG-70 is held by Pieter Venter, who is not in the owner map, so nothing was written/u;
 const UNLABELLED_NOT_MASTER =
   /ENG-45 is not a master and is not under one, so nothing was written/u;
+const OLD_PARENT =
+  /ENG-48 was created before 2026-09-28T00:00:00.000Z, so it cannot take new reports and nothing was written/u;
 const PARENT_NOT_MASTER = /ENG-40 is not a master, so nothing was written/u;
 const RETRY_FROM_MASTER =
   /Call route_ticket again without duplicateOf, with parent ENG-30 and inheritAssigneeFrom ENG-30/u;
@@ -336,5 +342,37 @@ describe("routeTicket duplicate masters, review fixes", () => {
       { client: fake.fetchStub }
     );
     assert.equal(updateOf(fake)?.parentId, "i-ENG-31");
+  });
+
+  it("accepts a master made by hand without the marker once it parents a report (R1)", async () => {
+    for (const [duplicateOf, parent] of [
+      ["ENG-46", "i-ENG-46"],
+      ["ENG-47", "i-ENG-46"],
+    ]) {
+      const fake = linear();
+      // biome-ignore lint/performance/noAwaitInLoops: each case reads its own fake in turn.
+      await routeTicket(
+        { duplicateOf, issue: "ENG-1", state: "Duplicate" },
+        { client: fake.fetchStub }
+      );
+      assert.equal(updateOf(fake)?.parentId, parent, duplicateOf);
+    }
+  });
+
+  it("applies the session cutoff to an explicit parent by its creation time, master or not (Devin 9)", async () => {
+    const fake = linear({ ticketLabels: NOT_A_BUG });
+    await assert.rejects(
+      routeTicket(
+        {
+          duplicateOf: "ENG-40",
+          issue: "ENG-1",
+          parent: "ENG-48",
+          state: "Duplicate",
+        },
+        { client: fake.fetchStub, mastersCreatedAfter: CUTOFF }
+      ),
+      OLD_PARENT
+    );
+    assert.deepEqual(fake.writes(), []);
   });
 });
