@@ -7,6 +7,7 @@ import { githubDeployProbe } from "./deploy.js";
 import { linearPort } from "./linear.js";
 import { runReporterUpdates } from "./run.js";
 import { databaseReporterStore } from "./store.js";
+import { reporterWriter } from "./writer.js";
 
 const TOKEN_DEADLINE_MS = 15_000;
 const LINEAR_SCOPES = ["read", "write", "issues:create", "comments:create"];
@@ -32,6 +33,7 @@ export const runScheduledReporterUpdates = async (): Promise<void> => {
       ),
       linear: linearPort(linearToken),
       store: databaseReporterStore(),
+      write: reporterWriter(),
     },
     Date.now()
   );

@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { privateDatabase } from "../private-postgres.js";
-import { STAGES, type Stage } from "./copy.js";
+import { LEDGER_STAGES, type LedgerStage, type Stage } from "./copy.js";
 
 export type Query = (
   text: string,
@@ -11,7 +11,7 @@ export type Query = (
 export interface LedgerRow {
   checkedSha: string | null;
   commentId: string | null;
-  stage: Stage;
+  stage: LedgerStage;
   status: "claimed" | "sent" | "waiting";
 }
 
@@ -67,14 +67,14 @@ export interface ReporterStore {
   failPending: (ticket: PendingTicket) => Promise<void>;
   markSent: (
     issue: string,
-    stages: Stage[],
+    stages: LedgerStage[],
     message: string,
     channel: string | null,
     commentId: string
   ) => Promise<void>;
   markWaiting: (issue: string, checkedSha: string | null) => Promise<void>;
   nextPending: (limit: number) => Promise<PendingTicket[]>;
-  queueWaiting: (liveSha: string) => Promise<void>;
+  queueWaiting: (liveSha: string | null) => Promise<void>;
   readCursor: () => Promise<DiscoveryCursor>;
   release: (issue: string, stage: Stage, token: string) => Promise<void>;
   resolvePending: (
@@ -86,7 +86,7 @@ export interface ReporterStore {
   saveSweep: (sweep: Sweep) => Promise<void>;
 }
 
-const ROW_STAGE = z.enum(STAGES as [Stage, ...Stage[]]);
+const ROW_STAGE = z.enum(LEDGER_STAGES as [LedgerStage, ...LedgerStage[]]);
 const rowSchema = z.object({
   checked_sha: z.string().nullable(),
   comment_id: z.string().nullable(),
@@ -106,6 +106,9 @@ const cursorSchema = z.object({
 });
 
 const STALE_CLAIM = "10 minutes";
+const WAITING_RECHECK_MINUTES = 60;
+/** A waiting row is rechecked at least this often even with no new release, so a waiting duplicate notices its original change. */
+export const WAITING_RECHECK_MS = WAITING_RECHECK_MINUTES * 60_000;
 export const GIVE_UP_LOG_ATTEMPTS = 5;
 const BACKOFF_BASE_MINUTES = 5;
 const BACKOFF_MAX_HOURS = 6;
@@ -257,7 +260,9 @@ export const createReporterStore = (query: Query): ReporterStore => {
       await query(
         `INSERT INTO reporter_pending (issue)
          SELECT issue FROM reporter_updates
-         WHERE stage = 'fixed' AND status = 'waiting' AND checked_sha IS DISTINCT FROM $1
+         WHERE stage = 'fixed' AND status = 'waiting'
+           AND (($1::text IS NOT NULL AND checked_sha IS DISTINCT FROM $1)
+                OR updated_at < now() - interval '${WAITING_RECHECK_MINUTES} minutes')
          ON CONFLICT (issue) DO NOTHING`,
         [liveSha]
       );

@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
+import { commentIdFor } from "./comment-id.js";
 import { linearPort } from "./linear.js";
 
 const SANDBOX = "C0AAAAAAAAA";
@@ -10,6 +11,12 @@ const PR = "https://github.com/Acquisity/Acquisity/pull/7";
 const ok = (data: unknown) =>
   new Response(JSON.stringify({ data }), { status: 200 });
 
+const NAMES: Record<string, string> = {
+  aaron: "Aaron Fraga",
+  james: "James Keeble",
+  viewer: "Acquisity Foreman",
+};
+
 const comment = (
   id: string,
   body: string,
@@ -18,14 +25,16 @@ const comment = (
     user?: string | null;
     createdAt?: string;
   } = {}
-) => ({
-  body,
-  createdAt: over.createdAt ?? "2026-10-10T10:00:00Z",
-  id,
-  parent: over.parent ? { id: over.parent } : null,
-  user:
-    over.user === undefined ? { id: "bot" } : over.user && { id: over.user },
-});
+) => {
+  const user = over.user === undefined ? "bot" : over.user;
+  return {
+    body,
+    createdAt: over.createdAt ?? "2026-10-10T10:00:00Z",
+    id,
+    parent: over.parent ? { id: over.parent } : null,
+    user: user && { id: user, name: NAMES[user] ?? `User ${user}` },
+  };
+};
 
 const issue = (over: Record<string, unknown> = {}) => ({
   assignee: { name: "Sam Jones" },
@@ -40,6 +49,7 @@ const issue = (over: Record<string, unknown> = {}) => ({
       { title: "Notes", url: "https://example.com/notes" },
     ],
   },
+  canceledAt: null,
   comments: {
     nodes: [
       comment(
@@ -52,10 +62,18 @@ const issue = (over: Record<string, unknown> = {}) => ({
       }),
       comment("c-2", "my own reply", { parent: "c-anchor", user: "reporter" }),
       comment("c-3", "elsewhere", { parent: "other", user: "viewer" }),
+      comment("c-4", "Removed the wrong number from their contact.", {
+        createdAt: "2026-10-12T10:00:00Z",
+        user: "james",
+      }),
+      comment("c-5", "Triage notes from Foreman", { user: "viewer" }),
+      comment("c-6", "Synced from an integration", { user: null }),
     ],
     pageInfo: { hasNextPage: false },
   },
+  completedAt: "2026-10-12T11:00:00Z",
   createdAt: "2026-10-10T09:00:00Z",
+  description: "Exports stop at 500 rows.",
   id: "uuid-1",
   identifier: "ENG-1",
   labels: { nodes: [{ name: "Bug" }, { name: "Customer reported" }] },
@@ -72,7 +90,14 @@ const issue = (over: Record<string, unknown> = {}) => ({
     identifier: "ENG-9",
     state: { type: "completed" },
   },
+  relations: {
+    nodes: [
+      { relatedIssue: { identifier: "ENG-3" }, type: "related" },
+      { relatedIssue: { identifier: "ENG-2" }, type: "duplicate" },
+    ],
+  },
   state: { name: "Done", type: "completed" },
+  title: "Export is missing rows",
   ...over,
 });
 
@@ -100,13 +125,39 @@ describe("readTicket", () => {
     assert.deepEqual(view?.facts, {
       assignee: "Sam Jones",
       channel: SANDBOX,
+      closedAt: "2026-10-12T11:00:00Z",
+      closingComments: [
+        {
+          author: "foreman",
+          body: "We've received your report",
+          createdAt: "2026-10-10T10:00:00Z",
+        },
+        {
+          author: "foreman",
+          body: "elsewhere",
+          createdAt: "2026-10-10T10:00:00Z",
+        },
+        {
+          author: "foreman",
+          body: "Triage notes from Foreman",
+          createdAt: "2026-10-10T10:00:00Z",
+        },
+        {
+          author: "staff",
+          body: "Removed the wrong number from their contact.",
+          createdAt: "2026-10-12T10:00:00Z",
+        },
+      ],
       createdAt: "2026-10-10T09:00:00Z",
+      description: "Exports stop at 500 rows.",
+      duplicateOf: "ENG-2",
       identifier: "ENG-1",
       labels: ["Bug", "Customer reported"],
       parent: { identifier: "ENG-9", stateType: "completed" },
       pullUrls: [PR, "https://github.com/Acquisity/Acquisity/pull/8"],
       stateName: "Done",
       stateType: "completed",
+      title: "Export is missing rows",
     });
     assert.equal(view?.anchorId, "c-anchor");
     assert.equal(view?.issueId, "uuid-1");
@@ -419,6 +470,161 @@ describe("readTicket", () => {
     await assert.rejects(long.port.readTicket("ENG-1"), {
       name: "ThreadIncompleteError",
     });
+  });
+});
+
+describe("closing comments", () => {
+  const BOT_ANCHOR = comment(
+    "c-anchor",
+    `Slack thread connected in [#sandbox](https://x.slack.com/archives/${SANDBOX}/p1700000000000001)`,
+    { user: null }
+  );
+  const at = (minute: number) =>
+    `2026-10-12T10:${String(minute).padStart(2, "0")}:00Z`;
+  const read = async (nodes: ReturnType<typeof comment>[]) => {
+    const { port } = portWith(() =>
+      ok({
+        issue: issue({
+          comments: {
+            nodes: [BOT_ANCHOR, ...nodes],
+            pageInfo: { hasNextPage: false },
+          },
+        }),
+        viewer: { id: "viewer" },
+      })
+    );
+    return (await port.readTicket("ENG-1"))?.facts.closingComments ?? [];
+  };
+
+  it("counts staff replies in the Linear-bot Slack thread and in a staff-started thread, and nobody else's", async () => {
+    const found = await read([
+      comment("a-1", "Looking at this now.", {
+        createdAt: at(1),
+        parent: "c-anchor",
+        user: "aaron",
+      }),
+      comment("f-1", "This works as designed.", {
+        createdAt: at(2),
+        parent: "c-anchor",
+        user: "viewer",
+      }),
+      comment("r-1", "It is still wrong for me.", {
+        createdAt: at(3),
+        parent: "c-anchor",
+        user: "reporter",
+      }),
+      comment(commentIdFor("ENG-1", "received"), "Thanks, got it.", {
+        createdAt: at(4),
+        parent: "c-anchor",
+        user: "viewer",
+      }),
+      comment("t-1", "Removing the wrong number.", {
+        createdAt: at(5),
+        user: "aaron",
+      }),
+      comment("t-2", "Removed it from the CRM.", {
+        createdAt: at(6),
+        parent: "t-1",
+        user: "aaron",
+      }),
+      comment("t-3", "Thanks.", {
+        createdAt: at(7),
+        parent: "t-1",
+        user: "outsider",
+      }),
+      comment("b-1", "Synced by an integration.", {
+        createdAt: at(8),
+        user: null,
+      }),
+    ]);
+    assert.deepEqual(
+      found.map((c) => [c.author, c.body]),
+      [
+        ["staff", "Looking at this now."],
+        ["foreman", "This works as designed."],
+        ["staff", "Removing the wrong number."],
+        ["staff", "Removed it from the CRM."],
+      ]
+    );
+  });
+
+  it("keeps a staff comment even when many Foreman notes follow it, and caps each group", async () => {
+    const found = await read([
+      comment("a-1", "Fixed their data.", { createdAt: at(1), user: "aaron" }),
+      ...Array.from({ length: 7 }, (_, i) =>
+        comment(`f-${i}`, `Foreman note ${i}`, {
+          createdAt: at(10 + i),
+          user: "viewer",
+        })
+      ),
+    ]);
+    assert.deepEqual(
+      found.filter((c) => c.author === "staff").map((c) => c.body),
+      ["Fixed their data."]
+    );
+    assert.deepEqual(
+      found.filter((c) => c.author === "foreman").map((c) => c.body),
+      [
+        "Foreman note 2",
+        "Foreman note 3",
+        "Foreman note 4",
+        "Foreman note 5",
+        "Foreman note 6",
+      ]
+    );
+  });
+});
+
+describe("readOriginal", () => {
+  const original = (comments: ReturnType<typeof comment>[]) => ({
+    issue: {
+      assignee: null,
+      attachments: { nodes: [{ title: "Fix", url: PR }] },
+      comments: { nodes: comments },
+      description: null,
+      identifier: "ENG-9",
+      labels: { nodes: [{ name: "Feature Request" }] },
+      parent: null,
+      state: { name: "Done", type: "completed" },
+      title: "Email from the dialler",
+    },
+    viewer: { id: "viewer" },
+  });
+
+  it("reads only state, labels and linked pull requests, never the original's comments", async () => {
+    const { port, requests } = portWith(() =>
+      ok(
+        original([
+          comment("a-1", "Removed the number.", { user: "aaron" }),
+          comment("r-1", "Thanks!", { user: "reporter" }),
+        ])
+      )
+    );
+    const facts = await port.readOriginal("ENG-9");
+    assert.ok(!requests[0]?.query.includes("comments"));
+    assert.deepEqual(
+      facts && {
+        closingComments: facts.closingComments.map((c) => [c.author, c.body]),
+        labels: facts.labels,
+        pullUrls: facts.pullUrls,
+        stateType: facts.stateType,
+        title: facts.title,
+      },
+      {
+        closingComments: [],
+        labels: ["Feature Request"],
+        pullUrls: [PR],
+        stateType: "completed",
+        title: "Email from the dialler",
+      }
+    );
+  });
+
+  it("returns null for a missing original", async () => {
+    const { port } = portWith(() =>
+      ok({ issue: null, viewer: { id: "viewer" } })
+    );
+    assert.equal(await port.readOriginal("ENG-9"), null);
   });
 });
 

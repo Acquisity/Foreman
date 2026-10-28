@@ -39,7 +39,6 @@ export const reporterUpdatesConfig = (
       DEFAULT_MAX_POSTS,
       MAX_MAX_POSTS
     ),
-    nameOwner: env.REPORTER_UPDATES_NAME_OWNER === "true",
     runDeadlineMs: RUN_DEADLINE_MS,
     since: new Date(since).toISOString(),
   };

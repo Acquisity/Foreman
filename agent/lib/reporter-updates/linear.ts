@@ -1,12 +1,14 @@
 import { callLinearGraphQL } from "eve/channels/linear";
 import { z } from "zod";
 import { ENGINEERING_TEAM_ID } from "../linear-api.js";
+import { mappedOwner } from "../owner-map.js";
 import {
   assertThreadComplete,
   createThreadComment,
   SLACK_ANCHOR_PATTERN,
 } from "../requester-reply.js";
-import { parsePullUrl, type TicketFacts } from "./plan.js";
+import { isReporterUpdate } from "./copy.js";
+import { type ClosingComment, parsePullUrl, type TicketFacts } from "./plan.js";
 import type { DiscoveredTicket } from "./store.js";
 
 export interface ThreadComment {
@@ -22,6 +24,51 @@ export interface TicketView {
   undeliverable: string[] | null;
 }
 
+interface CommentNode {
+  body: string;
+  createdAt: string;
+  id: string;
+  parent: { id: string } | null;
+  user: { id: string; name: string } | null;
+}
+
+/**
+ * The comments the writer reads to judge a close, from anywhere on the ticket
+ * including the Slack thread: the newest staff comments (authors in the owner
+ * map) and, separately, the newest of Foreman's own, each group capped. Only
+ * staff count as evidence of a change; bots, external users, reporters and
+ * anyone else outside the owner map never do. Foreman's reporter updates are
+ * left out.
+ */
+export const closingCommentsOf = (
+  comments: readonly CommentNode[],
+  viewerId: string,
+  identifier: string
+): ClosingComment[] => {
+  const sorted = [...comments].sort((a, b) =>
+    a.createdAt.localeCompare(b.createdAt)
+  );
+  const foreman = sorted
+    .filter(
+      (comment) =>
+        comment.user?.id === viewerId && !isReporterUpdate(identifier, comment)
+    )
+    .slice(-CLOSING_COMMENTS)
+    .map((comment) => ({ ...comment, author: "foreman" as const }));
+  const staff = sorted
+    .filter(
+      (comment) =>
+        comment.user !== null &&
+        comment.user.id !== viewerId &&
+        mappedOwner(comment.user.name) !== null
+    )
+    .slice(-CLOSING_COMMENTS)
+    .map((comment) => ({ ...comment, author: "staff" as const }));
+  return [...staff, ...foreman]
+    .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
+    .map(({ author, body, createdAt }) => ({ author, body, createdAt }));
+};
+
 export interface LinearPort {
   discover: (
     updatedSince: string,
@@ -35,6 +82,7 @@ export interface LinearPort {
     body: string,
     id: string
   ) => Promise<string>;
+  readOriginal: (identifier: string) => Promise<TicketFacts | null>;
   readTicket: (identifier: string) => Promise<TicketView | null>;
 }
 
@@ -49,13 +97,18 @@ const SLACK_THREAD =
 const ANCHOR_PREFIX = "Slack thread connected in ";
 const DISCOVER_PAGES = 20;
 const ANCHOR_LINK = /\]\((https:\/\/[^\s)]+)\)/u;
+const CLOSING_COMMENTS = 5;
 
 const TICKET_QUERY = `query ReporterTicket($id: String!) {
   viewer { id }
   issue(id: $id) {
     id
     identifier
+    title
+    description
     createdAt
+    canceledAt
+    completedAt
     state { name type }
     assignee { name }
     labels(first: 50) { nodes { name } }
@@ -65,10 +118,24 @@ const TICKET_QUERY = `query ReporterTicket($id: String!) {
       state { type }
       attachments(first: 50) { nodes { title url } }
     }
+    relations(first: 50) { nodes { type relatedIssue { identifier } } }
     comments(first: 100) {
       pageInfo { hasNextPage }
-      nodes { id body createdAt parent { id } user { id } }
+      nodes { id body createdAt parent { id } user { id name } }
     }
+  }
+}`;
+
+const ORIGINAL_QUERY = `query ReporterOriginal($id: String!) {
+  issue(id: $id) {
+    identifier
+    title
+    description
+    state { name type }
+    assignee { name }
+    labels(first: 50) { nodes { name } }
+    attachments(first: 50) { nodes { title url } }
+    parent { identifier state { type } attachments(first: 50) { nodes { title url } } }
   }
 }`;
 
@@ -102,6 +169,7 @@ const ticketSchema = z.object({
     .object({
       assignee: z.object({ name: z.string() }).nullable(),
       attachments,
+      canceledAt: z.string().nullable(),
       comments: z.object({
         nodes: z.array(
           z.object({
@@ -109,12 +177,14 @@ const ticketSchema = z.object({
             createdAt: z.string(),
             id: z.string(),
             parent: z.object({ id: z.string() }).nullable(),
-            user: z.object({ id: z.string() }).nullable(),
+            user: z.object({ id: z.string(), name: z.string() }).nullable(),
           })
         ),
         pageInfo: z.object({ hasNextPage: z.boolean() }),
       }),
+      completedAt: z.string().nullable(),
       createdAt: z.string(),
+      description: z.string().nullable(),
       id: z.string(),
       identifier: z.string(),
       labels: z.object({ nodes: z.array(z.object({ name: z.string() })) }),
@@ -125,11 +195,52 @@ const ticketSchema = z.object({
           state: z.object({ type: z.string() }),
         })
         .nullable(),
+      relations: z.object({
+        nodes: z.array(
+          z.object({
+            relatedIssue: z.object({ identifier: z.string() }).nullable(),
+            type: z.string(),
+          })
+        ),
+      }),
       state: z.object({ name: z.string(), type: z.string() }),
+      title: z.string(),
     })
     .nullable(),
   viewer: z.object({ id: z.string() }),
 });
+const linkNodes = z.object({
+  nodes: z.array(z.object({ title: z.string(), url: z.string() })),
+});
+const originalSchema = z.object({
+  issue: z
+    .object({
+      assignee: z.object({ name: z.string() }).nullable(),
+      attachments: linkNodes,
+      description: z.string().nullable(),
+      identifier: z.string(),
+      labels: z.object({ nodes: z.array(z.object({ name: z.string() })) }),
+      parent: z
+        .object({
+          attachments: linkNodes,
+          identifier: z.string(),
+          state: z.object({ type: z.string() }),
+        })
+        .nullable(),
+      state: z.object({ name: z.string(), type: z.string() }),
+      title: z.string(),
+    })
+    .nullable(),
+});
+
+const pullUrlsOf = (nodes: readonly { url: string }[]): string[] => [
+  ...new Set(
+    nodes
+      .map((node) => node.url.trim())
+      .filter((url) => parsePullUrl(url) !== null)
+  ),
+];
+
 const commentSchema = z.object({
   comment: z
     .object({ id: z.string(), parent: z.object({ id: z.string() }).nullable() })
@@ -284,6 +395,37 @@ export const linearPort = (
       });
       return created.id;
     },
+    async readOriginal(identifier) {
+      const { issue } = originalSchema.parse(
+        await call(ORIGINAL_QUERY, "ReporterOriginal", { id: identifier })
+      );
+      return issue
+        ? {
+            assignee: issue.assignee?.name ?? null,
+            channel: null,
+            closedAt: null,
+            closingComments: [],
+            createdAt: "",
+            description: issue.description ?? "",
+            duplicateOf: null,
+            identifier: issue.identifier,
+            labels: issue.labels.nodes.map((label) => label.name),
+            parent: issue.parent
+              ? {
+                  identifier: issue.parent.identifier,
+                  stateType: issue.parent.state.type,
+                }
+              : null,
+            pullUrls: pullUrlsOf([
+              ...issue.attachments.nodes,
+              ...(issue.parent?.attachments.nodes ?? []),
+            ]),
+            stateName: issue.state.name,
+            stateType: issue.state.type,
+            title: issue.title,
+          }
+        : null;
+    },
     async readTicket(identifier) {
       const data = ticketSchema.parse(
         await call(TICKET_QUERY, "ReporterTicket", { id: identifier })
@@ -308,12 +450,24 @@ export const linearPort = (
       ]
         .map((node) => node.url.trim())
         .filter((url) => parsePullUrl(url) !== null);
+      const closingComments = closingCommentsOf(
+        comments,
+        data.viewer.id,
+        issue.identifier
+      );
       return {
         anchorId: anchor ? delivery.anchorId : null,
         facts: {
           assignee: issue.assignee?.name ?? null,
           channel: delivery.channel,
+          closedAt: issue.canceledAt ?? issue.completedAt,
+          closingComments,
           createdAt: issue.createdAt,
+          description: issue.description ?? "",
+          duplicateOf:
+            issue.relations.nodes.find(
+              (relation) => relation.type === "duplicate"
+            )?.relatedIssue?.identifier ?? null,
           identifier: issue.identifier,
           labels: issue.labels.nodes.map((label) => label.name),
           parent: issue.parent
@@ -325,6 +479,7 @@ export const linearPort = (
           pullUrls: [...new Set(pullUrls)],
           stateName: issue.state.name,
           stateType: issue.state.type,
+          title: issue.title,
         },
         foremanComments: comments
           .filter(

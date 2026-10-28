@@ -40,11 +40,12 @@ If missing evidence materially limits the answer, name the product fact that rem
 
 ## Automatic reporter updates
 
-Four messages are posted by the scheduled reporter-updates job, not by a model turn: received, owner assigned, fixed, and not fixed. Their wording is fixed in `agent/lib/reporter-updates/copy.ts`; change it there, keep the old text in `PAST_TEXTS` so earlier messages are still recognised, and keep these rules:
+The scheduled reporter-updates job, not a session turn, posts these messages: received, fixed (a bug), live (a feature, with how to use it), done (a change made without code), not a bug, duplicate (then fixed or live when the original's code change ships, or done only when staff confirm a change on the duplicate itself; a manual change on the original is never passed on) and closed. The fixed lines and fallbacks live in `agent/lib/reporter-updates/copy.ts`; the short phrases inside them come from the `writer` slot (`writer.ts`). Change wording there, keep any text an earlier version posted in `PAST_TEXTS` so those messages are still recognised, and keep these rules:
 
-- Under 50 words each, and longer only when explaining something.
-- The first sentence says whether the report is handled.
-- Name one owner by first name, only in the received and owner messages. This is the one exception to the rule above against naming assignees; it applies only when `REPORTER_UPDATES_NAME_OWNER=true`, which is off by default.
-- Give at most one action, or say "Nothing for you to do".
-- Never use file paths, PR numbers, CI, ticket states or IDs, model names, "root cause", "deploy", "merge" or raw error codes. A test checks every message against this list.
-- A fixed message is sent only after the fix is live for users, never when the ticket merely moves to Done.
+- About 40 words at most; a message that runs over drops its optional part or uses its fallback line.
+- Never name an owner or developer. Reporters don't know them. A written phrase that contains any owner-map person's name falls back to the fixed line.
+- When something new ships, say how to use it and where to find it on screen, naming the button, page or menu.
+- Never say a change was made unless one was. A Done ticket with no linked change posts "Done" only when a staff member's closing comment describes the change; otherwise nothing is posted.
+- No filler such as "Nothing for you to do", "Good news" or "as soon as there's news". A test checks every message.
+- Never use file paths, PR numbers, CI, ticket states or IDs, model names, "root cause", "deploy", "merge" or raw error codes.
+- A fixed or live message is sent only after the change is live for users, never when the ticket merely moves to Done.
