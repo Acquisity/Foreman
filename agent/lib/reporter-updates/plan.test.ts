@@ -1,23 +1,19 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
-import type { Stage } from "./copy.js";
-import { facts, MERGE_SHA, NEW_SHA } from "./fakes.js";
+import { facts, MERGE_SHA, NEW_SHA, merged as pull } from "./fakes.js";
 import {
+  changeKindOf,
   closureOf,
   DEPLOY_REPOSITORY,
   deployVerdict,
-  type PullFacts,
   parsePullUrl,
-  planEarly,
+  pullContext,
 } from "./plan.js";
 
-const pull = (over: Partial<PullFacts> = {}): PullFacts => ({
-  mergeSha: MERGE_SHA,
-  number: 7,
-  repo: DEPLOY_REPOSITORY,
-  state: "merged",
-  ...over,
-});
+const PR_7638: { body: string; title: string } = JSON.parse(
+  readFileSync(new URL("./fixtures/pr-7638.json", import.meta.url), "utf8")
+);
 const PR = `https://github.com/${DEPLOY_REPOSITORY}/pull/7`;
 
 describe("closureOf", () => {
@@ -74,11 +70,29 @@ describe("closureOf", () => {
     );
   });
 
-  it("gives a plain no-change answer to a Done ticket with no code and no label", () => {
+  it("sends a Done ticket with no code and no label to the done-without-change check", () => {
     assert.deepEqual(closureOf(facts({ stateType: "completed" })), {
-      kind: "not_fixed",
-      reason: "closed",
+      kind: "done_without_pull",
     });
+  });
+
+  it("answers a Canceled ticket labelled User Error or Platform Limitation as not a bug, and any other as closed", () => {
+    for (const label of ["User Error", "Platform Limitation"]) {
+      assert.deepEqual(
+        closureOf(
+          facts({
+            labels: [label],
+            stateName: "Canceled",
+            stateType: "canceled",
+          })
+        ),
+        { kind: "not_fixed", reason: "not_a_bug" }
+      );
+    }
+    assert.deepEqual(
+      closureOf(facts({ stateName: "Canceled", stateType: "canceled" })),
+      { kind: "not_fixed", reason: "closed" }
+    );
   });
 
   it("answers a Done ticket that is labelled both Bug and User Error and has no code, instead of holding it", () => {
@@ -117,11 +131,56 @@ describe("closureOf", () => {
     );
   });
 
-  it("holds a Done bug that has no linked pull request instead of calling it not fixed", () => {
+  it("sends a Done bug with no linked pull request to the done-without-change check, never to fixed", () => {
     assert.deepEqual(
       closureOf(facts({ labels: ["Bug"], stateType: "completed" })),
-      { kind: "held", why: "no_linked_pull" }
+      { kind: "done_without_pull" }
     );
+  });
+});
+
+describe("changeKindOf", () => {
+  it("reads Feature Request as a feature and Bug as a bug, whatever the title", () => {
+    assert.equal(
+      changeKindOf(["Feature Request"], [pull({ title: "fix: x" })]),
+      "feature"
+    );
+    assert.equal(changeKindOf(["Bug"], [pull({ title: "feat: x" })]), "bug");
+  });
+
+  it("falls back to the merged pull request title, and calls anything else a fix", () => {
+    assert.equal(changeKindOf([], [pull({ title: PR_7638.title })]), "feature");
+    assert.equal(changeKindOf([], [pull({ title: "fix(crm): x" })]), "bug");
+    assert.equal(
+      changeKindOf([], [pull({ state: "closed", title: "feat: x" })]),
+      "bug"
+    );
+    assert.equal(changeKindOf([], []), "bug");
+  });
+});
+
+describe("pullContext", () => {
+  it("keeps only the Solution and How it works sections of a real description, without the diagram", () => {
+    const context = pullContext(PR_7638.body);
+    assert.ok(context.startsWith("## Solution"));
+    assert.ok(context.includes("Add Email to the existing next-step controls"));
+    assert.ok(
+      context.includes("### Power Dialer wrap-up and completed-call dock")
+    );
+    for (const dropped of [
+      "## Problem",
+      "## Verification",
+      "mermaid",
+      "codesmith",
+      "Blast radius",
+      "Closes ENG-15846",
+    ]) {
+      assert.ok(!context.includes(dropped), dropped);
+    }
+  });
+
+  it("is empty when the description has neither section", () => {
+    assert.equal(pullContext("## Problem\nSomething.\n## Notes\nNone."), "");
   });
 });
 
@@ -181,46 +240,6 @@ describe("deployVerdict", () => {
         ancestors(true)
       ),
       "unsupported"
-    );
-  });
-});
-
-describe("planEarly", () => {
-  const none = new Set<Stage>();
-
-  it("sends one received message that names the owner when there is one", () => {
-    const planned = planEarly(facts(), none, true);
-    assert.deepEqual(planned?.covers, ["received", "owner"]);
-    assert.ok(planned?.text.includes("Sam is looking after it"));
-  });
-
-  it("does not name an owner while the ticket is still in triage", () => {
-    const planned = planEarly(facts({ stateType: "triage" }), none, true);
-    assert.deepEqual(planned?.covers, ["received"]);
-    assert.ok(!planned?.text.includes("Sam"));
-  });
-
-  it("sends a separate owner message once the ticket is routed", () => {
-    const planned = planEarly(facts(), new Set<Stage>(["received"]), true);
-    assert.equal(planned?.stage, "owner");
-    assert.ok(
-      planned?.text.startsWith("Sam is now looking after your report.")
-    );
-  });
-
-  it("sends nothing more once both are done, or when naming the owner is off", () => {
-    assert.equal(
-      planEarly(facts(), new Set<Stage>(["received", "owner"]), true),
-      null
-    );
-    assert.equal(planEarly(facts(), new Set<Stage>(["received"]), false), null);
-    assert.deepEqual(planEarly(facts(), none, false)?.covers, ["received"]);
-  });
-
-  it("sends no owner message when nobody is assigned", () => {
-    assert.equal(
-      planEarly(facts({ assignee: null }), new Set<Stage>(["received"]), true),
-      null
     );
   });
 });

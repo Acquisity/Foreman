@@ -118,6 +118,7 @@ const THREAD_QUERY = `query RequesterThread($id: String!) {
   viewer { id displayName url }
   issue(id: $id) {
     id
+    identifier
     project { id }
     comments(first: 100) {
       pageInfo { hasNextPage }
@@ -178,6 +179,7 @@ interface ThreadResponse {
       }[];
     };
     id: string;
+    identifier: string;
     project: { id: string } | null;
   } | null;
   viewer: ForemanUser;
@@ -235,7 +237,8 @@ async function readThread(
       parentId: c.parent?.id ?? null,
       userId: c.user?.id ?? null,
     })),
-    thread.viewer.id
+    thread.viewer.id,
+    thread.issue.identifier
   );
   return {
     comments,
