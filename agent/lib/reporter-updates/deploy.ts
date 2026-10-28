@@ -56,7 +56,14 @@ const pullSchema = z.object({
 const compareSchema = z.object({ status: z.string() });
 const COMPARE_FILES_MAX = 300;
 const compareFilesSchema = z.object({
-  files: z.array(z.object({ filename: z.string() })).max(COMPARE_FILES_MAX),
+  files: z
+    .array(
+      z.object({
+        filename: z.string(),
+        previous_filename: z.string().optional(),
+      })
+    )
+    .max(COMPARE_FILES_MAX),
   status: z.string(),
 });
 
@@ -116,9 +123,10 @@ const scanDeployments = async (
 
 /**
  * The files changed from `base` to `head` in Acquisity/Acquisity, through the
- * same compare read the probe uses. A head that is not ahead of the base, or a
- * compare at GitHub's file cap (so possibly cut), throws: the caller treats it
- * as unknown.
+ * same compare read the probe uses, a renamed file under both its names. A
+ * head that trails the base changed nothing after it; a diverged compare, or
+ * one at GitHub's file cap (so possibly cut), throws: the caller treats it as
+ * unknown.
  */
 export const githubChangedFiles =
   (
@@ -138,13 +146,20 @@ export const githubChangedFiles =
         timeoutMs
       )
     );
-    if (compare.status !== "ahead" && compare.status !== "identical") {
+    if (compare.status === "behind" || compare.status === "identical") {
+      return [];
+    }
+    if (compare.status !== "ahead") {
       throw new Error(`The compare is ${compare.status}, not ahead.`);
     }
     if (compare.files.length >= COMPARE_FILES_MAX) {
       throw new Error("The compare reached GitHub's file cap.");
     }
-    return compare.files.map((entry) => entry.filename);
+    return compare.files.flatMap((entry) =>
+      entry.previous_filename
+        ? [entry.filename, entry.previous_filename]
+        : [entry.filename]
+    );
   };
 
 export const githubDeployProbe = (

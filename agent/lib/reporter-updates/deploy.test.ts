@@ -323,6 +323,25 @@ describe("changed files after a commit", () => {
     );
   });
 
+  it("lists a renamed file under both names, and nothing when the head trails the base", async () => {
+    assert.deepEqual(
+      await changedWith({
+        files: [
+          { filename: "src/limit.ts", previous_filename: "src/send-limit.ts" },
+        ],
+        status: "ahead",
+      }),
+      ["src/limit.ts", "src/send-limit.ts"]
+    );
+    assert.deepEqual(
+      await changedWith({
+        files: [{ filename: "src/send-limit.ts" }],
+        status: "behind",
+      }),
+      []
+    );
+  });
+
   it("refuses a diverged compare, a capped file list or a failed read", async () => {
     await assert.rejects(changedWith({ files: [], status: "diverged" }));
     await assert.rejects(

@@ -1,3 +1,4 @@
+import { posix } from "node:path";
 import type { RegressionKind, RegressionRecord } from "./regression-record.js";
 
 /**
@@ -90,6 +91,16 @@ export const quote = (value: string) => `'${value.replaceAll("'", "'\\''")}'`;
 export const isSha = (value: string) => SHA_PATTERN.test(value);
 
 const FORBIDDEN_TEXT = /[\0\n\r]/u;
+const LEADING_DOT_SLASH = /^(?:\.\/)+/u;
+const PATH_SEPARATOR = /[\\/]/u;
+
+/**
+ * The one spelling of a repository path, the one GitHub uses: POSIX
+ * separators, no `./` or empty segments. Callers refuse `..` and absolute
+ * paths first, with {@link blameProblem}.
+ */
+export const repositoryPath = (file: string): string =>
+  posix.normalize(file.replaceAll("\\", "/")).replace(LEADING_DOT_SLASH, "");
 
 /** Why a blamed file or range can't be put on a command line, or null. */
 export const blameProblem = (blame: Blame): string | null => {
@@ -97,7 +108,8 @@ export const blameProblem = (blame: Blame): string | null => {
     !blame.file ||
     blame.file.startsWith("-") ||
     blame.file.startsWith("/") ||
-    blame.file.split("/").includes("..") ||
+    blame.file.split(PATH_SEPARATOR).includes("..") ||
+    blame.file.startsWith("\\") ||
     FORBIDDEN_TEXT.test(blame.file) ||
     blame.file.length > 300
   ) {
@@ -613,12 +625,13 @@ const check = async (
  */
 export async function runCheckRegression(
   deps: CheckDeps,
-  input: CheckInput
+  given: CheckInput
 ): Promise<CheckResult> {
-  const problem = inputProblem(input);
+  const problem = inputProblem(given);
   if (problem) {
     return { error: problem, status: "error" };
   }
+  const input = { ...given, file: repositoryPath(given.file) };
   try {
     return await check(deps, input);
   } catch (error) {
@@ -651,7 +664,7 @@ export const uncheckedRecord = (
   commitRead: input.readCommit,
   deployedCommit: null,
   failureAt: input.failureAt,
-  file: input.file,
+  file: repositoryPath(input.file),
   function: input.function,
   issue: input.issue,
   lines: input.lines,

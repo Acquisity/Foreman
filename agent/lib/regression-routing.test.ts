@@ -127,6 +127,10 @@ test("a record for any other checked target is stale evidence, so the Bug needs 
     lines,
   };
   assert.equal(recordFor(record, codePath, record.failureAt), record);
+  assert.equal(
+    recordFor(record, { ...codePath, file: "./webhook.ts" }, record.failureAt),
+    record
+  );
   for (const corrected of [
     { ...codePath, file: "inbox.ts" },
     { ...codePath, commit: "c".repeat(40) },

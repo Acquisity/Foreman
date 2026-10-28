@@ -140,6 +140,78 @@ describe("production moved on after the commit read", () => {
     assert.equal(record.kind, "fixed_deploy_unknown");
   });
 
+  it("matches the blamed file however the path is written, and through a rename", async () => {
+    const { bug, fix, head, origin } = fixedChain();
+    const worktree = origin.clone(50);
+    const reverted = origin.commit(
+      1,
+      { [FILE]: sendLimit("count * 2") },
+      "Revert: send limit"
+    );
+    const dotted = recorded(
+      await runCheckRegression(
+        deps(worktree, origin, reverted),
+        input({
+          file: `./${FILE}`,
+          labels: bothLabels(fix, bug),
+          readCommit: head,
+        })
+      )
+    );
+    assert.equal(dotted.kind, "fixed_deploy_unknown");
+    assert.equal(dotted.file, FILE);
+
+    const other = fixedChain();
+    git(other.origin.path, ["mv", FILE, "src/limit.ts"]);
+    const renamed = other.origin.commit(1, {}, "refactor: rename");
+    const record = recorded(
+      await runCheckRegression(
+        deps(other.origin.clone(50), other.origin, renamed),
+        input({
+          labels: bothLabels(other.fix, other.bug),
+          readCommit: other.head,
+        })
+      )
+    );
+    assert.equal(record.kind, "fixed_deploy_unknown");
+  });
+
+  it("keeps fixed and live when production trails the commit read and contains the fix", async () => {
+    const origin = new Origin();
+    history(origin);
+    const bug = origin.commit(
+      20,
+      { [FILE]: sendLimit("count * 2") },
+      "feat: double"
+    );
+    const fix = origin.commit(
+      5,
+      { [FILE]: sendLimit("count") },
+      "fix: send limit"
+    );
+    const deployed = origin.commit(4, note("deployed"), "docs: deployed");
+    const read = origin.commit(3, note("read"), "docs: read");
+    const record = recorded(
+      await runCheckRegression(
+        deps(origin.clone(50), origin, deployed),
+        input({ labels: bothLabels(fix, bug), readCommit: read })
+      )
+    );
+    assert.equal(record.kind, "fixed_live");
+  });
+
+  it("refuses a path that climbs out of the repository", async () => {
+    const { head, origin } = fixedChain();
+    for (const file of ["../secret.ts", "/etc/passwd", "src/../../x.ts"]) {
+      // biome-ignore lint/performance/noAwaitInLoops: each input is checked in turn.
+      const result = await runCheckRegression(
+        deps(origin.clone(50), origin, head),
+        input({ file, readCommit: head })
+      );
+      assert.equal(result.status, "error", file);
+    }
+  });
+
   it("keeps fixed and live when only other files changed after the commit read", async () => {
     const { bug, fix, head, origin } = fixedChain();
     const worktree = origin.clone(50);

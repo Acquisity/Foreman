@@ -1,4 +1,5 @@
 import { defineState } from "eve/context";
+import { repositoryPath } from "./regression-lane.js";
 
 /**
  * What the regression check concluded about the code a triage blames
@@ -60,7 +61,7 @@ export const recordFor = (
   Number.isFinite(Date.parse(failureAt)) &&
   Date.parse(record.failureAt) === Date.parse(failureAt) &&
   record.commitRead === codePath.commit &&
-  record.file === codePath.file &&
+  record.file === repositoryPath(codePath.file) &&
   record.function === codePath.function &&
   record.lines.start === codePath.lines.start &&
   record.lines.end === codePath.lines.end
