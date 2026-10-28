@@ -3,8 +3,8 @@ import { z } from "zod";
 import { ENGINEERING_TEAM_ID } from "../linear-api.js";
 import { mappedOwner } from "../owner-map.js";
 import {
-  assertThreadComplete,
   createThreadComment,
+  readAllComments,
   SLACK_ANCHOR_PATTERN,
 } from "../requester-reply.js";
 import { isReporterUpdate } from "./copy.js";
@@ -119,10 +119,6 @@ const TICKET_QUERY = `query ReporterTicket($id: String!) {
       attachments(first: 50) { nodes { title url } }
     }
     relations(first: 50) { nodes { type relatedIssue { identifier } } }
-    comments(first: 100) {
-      pageInfo { hasNextPage }
-      nodes { id body createdAt parent { id } user { id name } }
-    }
   }
 }`;
 
@@ -170,18 +166,6 @@ const ticketSchema = z.object({
       assignee: z.object({ name: z.string() }).nullable(),
       attachments,
       canceledAt: z.string().nullable(),
-      comments: z.object({
-        nodes: z.array(
-          z.object({
-            body: z.string(),
-            createdAt: z.string(),
-            id: z.string(),
-            parent: z.object({ id: z.string() }).nullable(),
-            user: z.object({ id: z.string(), name: z.string() }).nullable(),
-          })
-        ),
-        pageInfo: z.object({ hasNextPage: z.boolean() }),
-      }),
       completedAt: z.string().nullable(),
       createdAt: z.string(),
       description: z.string().nullable(),
@@ -434,8 +418,17 @@ export const linearPort = (
       if (!issue) {
         return null;
       }
-      assertThreadComplete(identifier, issue.comments.pageInfo.hasNextPage);
-      const comments = issue.comments.nodes;
+      const comments: CommentNode[] = (
+        await readAllComments(identifier, call)
+      ).map((comment) => ({
+        body: comment.body,
+        createdAt: comment.createdAt,
+        id: comment.id,
+        parent: comment.parentId ? { id: comment.parentId } : null,
+        user: comment.userId
+          ? { id: comment.userId, name: comment.userName ?? "" }
+          : null,
+      }));
       const anchors = comments
         .filter(
           (comment) =>

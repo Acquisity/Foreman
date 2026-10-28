@@ -50,27 +50,24 @@ const issue = (over: Record<string, unknown> = {}) => ({
     ],
   },
   canceledAt: null,
-  comments: {
-    nodes: [
-      comment(
-        "c-anchor",
-        `Slack thread connected in [#sandbox](https://x.slack.com/archives/${SANDBOX}/p1700000000000001)`
-      ),
-      comment("c-1", "We've received your report", {
-        parent: "c-anchor",
-        user: "viewer",
-      }),
-      comment("c-2", "my own reply", { parent: "c-anchor", user: "reporter" }),
-      comment("c-3", "elsewhere", { parent: "other", user: "viewer" }),
-      comment("c-4", "Removed the wrong number from their contact.", {
-        createdAt: "2026-10-12T10:00:00Z",
-        user: "james",
-      }),
-      comment("c-5", "Triage notes from Foreman", { user: "viewer" }),
-      comment("c-6", "Synced from an integration", { user: null }),
-    ],
-    pageInfo: { hasNextPage: false },
-  },
+  comments: [
+    comment(
+      "c-anchor",
+      `Slack thread connected in [#sandbox](https://x.slack.com/archives/${SANDBOX}/p1700000000000001)`
+    ),
+    comment("c-1", "We've received your report", {
+      parent: "c-anchor",
+      user: "viewer",
+    }),
+    comment("c-2", "my own reply", { parent: "c-anchor", user: "reporter" }),
+    comment("c-3", "elsewhere", { parent: "other", user: "viewer" }),
+    comment("c-4", "Removed the wrong number from their contact.", {
+      createdAt: "2026-10-12T10:00:00Z",
+      user: "james",
+    }),
+    comment("c-5", "Triage notes from Foreman", { user: "viewer" }),
+    comment("c-6", "Synced from an integration", { user: null }),
+  ],
   completedAt: "2026-10-12T11:00:00Z",
   createdAt: "2026-10-10T09:00:00Z",
   description: "Exports stop at 500 rows.",
@@ -116,10 +113,58 @@ const portWith = (
   return { port, requests };
 };
 
+/**
+ * Serves the ticket query, and the ticket's comments on the separate
+ * comment-page query, `perPage` at a time.
+ */
+const ticketWith =
+  (
+    data: { issue: ReturnType<typeof issue> | null; viewer: { id: string } },
+    perPage = 100
+  ) =>
+  (query: string, variables: Record<string, unknown>) => {
+    const { comments = [], ...ticket } = data.issue ?? {};
+    if (!query.includes("IssueComments")) {
+      assert.ok(!query.includes("comments("));
+      return ok({ issue: data.issue && ticket, viewer: data.viewer });
+    }
+    const all = comments as ReturnType<typeof comment>[];
+    const start = Number(variables.after ?? 0);
+    const end = start + perPage;
+    const more = end < all.length;
+    return ok({
+      issue: {
+        comments: {
+          nodes: all.slice(start, end),
+          pageInfo: { endCursor: more ? String(end) : null, hasNextPage: more },
+        },
+      },
+    });
+  };
+
+/** A ticket whose comment pages never end. */
+const endless = (query: string, variables: Record<string, unknown>) =>
+  query.includes("IssueComments")
+    ? ok({
+        issue: {
+          comments: {
+            nodes: [],
+            pageInfo: {
+              endCursor: String(Number(variables.after ?? 0) + 1),
+              hasNextPage: true,
+            },
+          },
+        },
+      })
+    : ticketWith({ issue: issue(), viewer: { id: "viewer" } })(
+        query,
+        variables
+      );
+
 describe("readTicket", () => {
   it("builds the facts, the thread anchor and Foreman's own comments under it", async () => {
-    const { port } = portWith(() =>
-      ok({ issue: issue(), viewer: { id: "viewer" } })
+    const { port } = portWith(
+      ticketWith({ issue: issue(), viewer: { id: "viewer" } })
     );
     const view = await port.readTicket("ENG-1");
     assert.deepEqual(view?.facts, {
@@ -167,8 +212,8 @@ describe("readTicket", () => {
   });
 
   it("falls back to the thread link when there is no Ask from link", async () => {
-    const { port } = portWith(() =>
-      ok({
+    const { port } = portWith(
+      ticketWith({
         issue: issue({ attachments: { nodes: [] } }),
         viewer: { id: "viewer" },
       })
@@ -178,18 +223,15 @@ describe("readTicket", () => {
   });
 
   it("refuses a thread when the Ask link and the anchor name different channels", async () => {
-    const { port } = portWith(() =>
-      ok({
+    const { port } = portWith(
+      ticketWith({
         issue: issue({
-          comments: {
-            nodes: [
-              comment(
-                "c-anchor",
-                "Slack thread connected in [#other](https://x.slack.com/archives/C0ZZZZZZZZZ/p1700000000000001)"
-              ),
-            ],
-            pageInfo: { hasNextPage: false },
-          },
+          comments: [
+            comment(
+              "c-anchor",
+              "Slack thread connected in [#other](https://x.slack.com/archives/C0ZZZZZZZZZ/p1700000000000001)"
+            ),
+          ],
         }),
         viewer: { id: "viewer" },
       })
@@ -198,25 +240,22 @@ describe("readTicket", () => {
   });
 
   it("refuses a ticket whose Slack threads sit in two channels", async () => {
-    const { port } = portWith(() =>
-      ok({
+    const { port } = portWith(
+      ticketWith({
         issue: issue({
           attachments: { nodes: [] },
-          comments: {
-            nodes: [
-              comment(
-                "a1",
-                `Slack thread connected in [#a](https://x.slack.com/archives/${SANDBOX}/p1700000000000001)`,
-                { createdAt: "2026-10-10T10:00:00Z" }
-              ),
-              comment(
-                "a2",
-                "Slack thread connected in [#b](https://x.slack.com/archives/C0ZZZZZZZZZ/p1700000000000002)",
-                { createdAt: "2026-10-11T10:00:00Z" }
-              ),
-            ],
-            pageInfo: { hasNextPage: false },
-          },
+          comments: [
+            comment(
+              "a1",
+              `Slack thread connected in [#a](https://x.slack.com/archives/${SANDBOX}/p1700000000000001)`,
+              { createdAt: "2026-10-10T10:00:00Z" }
+            ),
+            comment(
+              "a2",
+              "Slack thread connected in [#b](https://x.slack.com/archives/C0ZZZZZZZZZ/p1700000000000002)",
+              { createdAt: "2026-10-11T10:00:00Z" }
+            ),
+          ],
         }),
         viewer: { id: "viewer" },
       })
@@ -225,35 +264,29 @@ describe("readTicket", () => {
   });
 
   it("names the channel when the Ask link and the anchor agree, and when a duplicate has lost its Ask link", async () => {
-    const agree = portWith(() =>
-      ok({
+    const agree = portWith(
+      ticketWith({
         issue: issue({
-          comments: {
-            nodes: [
-              comment(
-                "c-anchor",
-                `Slack thread connected in [#a](https://x.slack.com/archives/${SANDBOX}/p1700000000000001)`
-              ),
-            ],
-            pageInfo: { hasNextPage: false },
-          },
+          comments: [
+            comment(
+              "c-anchor",
+              `Slack thread connected in [#a](https://x.slack.com/archives/${SANDBOX}/p1700000000000001)`
+            ),
+          ],
         }),
         viewer: { id: "viewer" },
       })
     );
-    const duplicate = portWith(() =>
-      ok({
+    const duplicate = portWith(
+      ticketWith({
         issue: issue({
           attachments: { nodes: [] },
-          comments: {
-            nodes: [
-              comment(
-                "c-anchor",
-                `Slack thread connected in [#a](https://x.slack.com/archives/${SANDBOX}/p1700000000000001)`
-              ),
-            ],
-            pageInfo: { hasNextPage: false },
-          },
+          comments: [
+            comment(
+              "c-anchor",
+              `Slack thread connected in [#a](https://x.slack.com/archives/${SANDBOX}/p1700000000000001)`
+            ),
+          ],
         }),
         viewer: { id: "viewer" },
       })
@@ -280,8 +313,8 @@ describe("readTicket", () => {
       url: "https://x.slack.com/archives/C0YYYYYYYYY/p1700000000000009",
     };
     const readWith = (nodes: unknown[]) =>
-      portWith(() =>
-        ok({
+      portWith(
+        ticketWith({
           issue: issue({ attachments: { nodes } }),
           viewer: { id: "viewer" },
         })
@@ -324,8 +357,8 @@ describe("readTicket", () => {
   });
 
   it("writes under the exact anchor whose channel was checked, not under an older one", async () => {
-    const { port } = portWith(() =>
-      ok({
+    const { port } = portWith(
+      ticketWith({
         issue: issue({
           attachments: {
             nodes: [
@@ -336,25 +369,22 @@ describe("readTicket", () => {
               },
             ],
           },
-          comments: {
-            nodes: [
-              comment(
-                "anchor-a",
-                `Slack thread connected in [#a](https://x.slack.com/archives/${SANDBOX}/p1700000000000001)`,
-                { createdAt: "2026-10-10T10:00:00Z" }
-              ),
-              comment(
-                "anchor-b",
-                "Slack thread connected in [#b](https://x.slack.com/archives/C0YYYYYYYYY/p1700000000000009)",
-                { createdAt: "2026-10-11T10:00:00Z" }
-              ),
-              comment("f1", "We looked into this", {
-                parent: "anchor-b",
-                user: "viewer",
-              }),
-            ],
-            pageInfo: { hasNextPage: false },
-          },
+          comments: [
+            comment(
+              "anchor-a",
+              `Slack thread connected in [#a](https://x.slack.com/archives/${SANDBOX}/p1700000000000001)`,
+              { createdAt: "2026-10-10T10:00:00Z" }
+            ),
+            comment(
+              "anchor-b",
+              "Slack thread connected in [#b](https://x.slack.com/archives/C0YYYYYYYYY/p1700000000000009)",
+              { createdAt: "2026-10-11T10:00:00Z" }
+            ),
+            comment("f1", "We looked into this", {
+              parent: "anchor-b",
+              user: "viewer",
+            }),
+          ],
         }),
         viewer: { id: "viewer" },
       })
@@ -369,8 +399,8 @@ describe("readTicket", () => {
   });
 
   it("refuses a ticket whose only Ask links belong to threads it does not own", async () => {
-    const { port } = portWith(() =>
-      ok({
+    const { port } = portWith(
+      ticketWith({
         issue: issue({
           attachments: {
             nodes: [
@@ -389,18 +419,15 @@ describe("readTicket", () => {
   });
 
   it("matches an owned thread to its Ask link even when the anchor link carries a query string", async () => {
-    const { port } = portWith(() =>
-      ok({
+    const { port } = portWith(
+      ticketWith({
         issue: issue({
-          comments: {
-            nodes: [
-              comment(
-                "c-anchor",
-                `Slack thread connected in [#a](https://x.slack.com/archives/${SANDBOX}/p1700000000000001?thread_ts=1.2&cid=${SANDBOX})`
-              ),
-            ],
-            pageInfo: { hasNextPage: false },
-          },
+          comments: [
+            comment(
+              "c-anchor",
+              `Slack thread connected in [#a](https://x.slack.com/archives/${SANDBOX}/p1700000000000001?thread_ts=1.2&cid=${SANDBOX})`
+            ),
+          ],
         }),
         viewer: { id: "viewer" },
       })
@@ -409,18 +436,15 @@ describe("readTicket", () => {
   });
 
   it("does not treat a support inbox note as a reporter thread", async () => {
-    const { port } = portWith(() =>
-      ok({
+    const { port } = portWith(
+      ticketWith({
         issue: issue({
-          comments: {
-            nodes: [
-              comment(
-                "n",
-                "Support conversation connected in [inbox](https://example.com/c/1)"
-              ),
-            ],
-            pageInfo: { hasNextPage: false },
-          },
+          comments: [
+            comment(
+              "n",
+              "Support conversation connected in [inbox](https://example.com/c/1)"
+            ),
+          ],
         }),
         viewer: { id: "viewer" },
       })
@@ -429,24 +453,21 @@ describe("readTicket", () => {
   });
 
   it("uses the earliest Slack thread when a ticket has more than one", async () => {
-    const { port } = portWith(() =>
-      ok({
+    const { port } = portWith(
+      ticketWith({
         issue: issue({
-          comments: {
-            nodes: [
-              comment(
-                "late",
-                "Slack thread connected in [#a](https://x.slack.com/archives/C0YYYYYYYYY/p1700000000000002)",
-                { createdAt: "2026-10-12T10:00:00Z" }
-              ),
-              comment(
-                "early",
-                "Slack thread connected in [#a](https://x.slack.com/archives/C0YYYYYYYYY/p1700000000000001)",
-                { createdAt: "2026-10-11T10:00:00Z" }
-              ),
-            ],
-            pageInfo: { hasNextPage: false },
-          },
+          comments: [
+            comment(
+              "late",
+              "Slack thread connected in [#a](https://x.slack.com/archives/C0YYYYYYYYY/p1700000000000002)",
+              { createdAt: "2026-10-12T10:00:00Z" }
+            ),
+            comment(
+              "early",
+              "Slack thread connected in [#a](https://x.slack.com/archives/C0YYYYYYYYY/p1700000000000001)",
+              { createdAt: "2026-10-11T10:00:00Z" }
+            ),
+          ],
         }),
         viewer: { id: "viewer" },
       })
@@ -454,22 +475,58 @@ describe("readTicket", () => {
     assert.equal((await port.readTicket("ENG-1"))?.anchorId, "early");
   });
 
+  it("finds the anchor and Foreman's earlier reporter comment on page two of three", async () => {
+    const { port, requests } = portWith(
+      ticketWith(
+        {
+          issue: issue({
+            comments: [
+              comment("n-1", "note", { user: "james" }),
+              comment("n-2", "note", { user: "james" }),
+              comment(
+                "c-anchor",
+                `Slack thread connected in [#sandbox](https://x.slack.com/archives/${SANDBOX}/p1700000000000001)`
+              ),
+              comment("c-1", "We've received your report", {
+                parent: "c-anchor",
+                user: "viewer",
+              }),
+              comment("n-3", "note", { user: "james" }),
+            ],
+          }),
+          viewer: { id: "viewer" },
+        },
+        2
+      )
+    );
+    const view = await port.readTicket("ENG-1");
+    assert.equal(view?.anchorId, "c-anchor");
+    assert.deepEqual(view?.foremanComments, [
+      { body: "We've received your report", id: "c-1" },
+    ]);
+    assert.deepEqual(
+      requests
+        .filter((r) => r.query.includes("IssueComments"))
+        .map((r) => r.variables.after),
+      [null, "2", "4"]
+    );
+  });
+
   it("returns null for a missing ticket and refuses a thread it cannot read in full", async () => {
-    const missing = portWith(() =>
-      ok({ issue: null, viewer: { id: "viewer" } })
+    const missing = portWith(
+      ticketWith({ issue: null, viewer: { id: "viewer" } })
     );
     assert.equal(await missing.port.readTicket("ENG-1"), null);
-    const long = portWith(() =>
-      ok({
-        issue: issue({
-          comments: { nodes: [], pageInfo: { hasNextPage: true } },
-        }),
-        viewer: { id: "viewer" },
-      })
-    );
+    const long = portWith(endless);
     await assert.rejects(long.port.readTicket("ENG-1"), {
+      message:
+        "ENG-1 has more than 1,000 comments, so the thread state cannot be checked; reply in Slack by hand.",
       name: "ThreadIncompleteError",
     });
+    assert.equal(
+      long.requests.filter((r) => r.query.includes("IssueComments")).length,
+      10
+    );
   });
 });
 
@@ -482,14 +539,9 @@ describe("closing comments", () => {
   const at = (minute: number) =>
     `2026-10-12T10:${String(minute).padStart(2, "0")}:00Z`;
   const read = async (nodes: ReturnType<typeof comment>[]) => {
-    const { port } = portWith(() =>
-      ok({
-        issue: issue({
-          comments: {
-            nodes: [BOT_ANCHOR, ...nodes],
-            pageInfo: { hasNextPage: false },
-          },
-        }),
+    const { port } = portWith(
+      ticketWith({
+        issue: issue({ comments: [BOT_ANCHOR, ...nodes] }),
         viewer: { id: "viewer" },
       })
     );

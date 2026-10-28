@@ -8,6 +8,7 @@ import {
   judgeFollowUp,
   planReply,
   promptedFollowUp,
+  readAllComments,
   relayedFollowUp,
   type ThreadComment,
   ThreadIncompleteError,
@@ -431,6 +432,67 @@ test("assertThreadComplete refuses a thread it cannot read in full", () => {
     () => assertThreadComplete("ENG-1", true),
     ThreadIncompleteError
   );
+});
+
+/** Serves comment pages in order, as Linear does with `after`. */
+const pagesOf =
+  (pages: readonly ThreadComment[][], more = false) =>
+  <T>(_query: string, _name: string, variables: Record<string, unknown>) => {
+    const index = Number(variables.after ?? 0);
+    const next = more || index + 1 < pages.length;
+    return Promise.resolve({
+      issue: {
+        comments: {
+          nodes: (pages[index] ?? []).map((c) => ({
+            body: c.body,
+            createdAt: c.createdAt,
+            id: c.id,
+            parent: c.parentId ? { id: c.parentId } : null,
+            user: c.userId ? { id: c.userId, name: c.userId } : null,
+          })),
+          pageInfo: {
+            endCursor: next ? String(index + 1) : null,
+            hasNextPage: next,
+          },
+        },
+      },
+    } as T);
+  };
+
+test("reads every page, so a reply past the first page still counts", async () => {
+  const first = [
+    anchor,
+    reply("f1", FOREMAN, "2026-09-25T16:00:00Z"),
+    ...Array.from({ length: 98 }, (_, i) => ({
+      ...reply(`n${i}`, "aaron", "2026-09-25T16:30:00Z"),
+      parentId: null,
+    })),
+  ];
+  const second = [reply("r2", "requester", "2026-09-25T17:00:00Z")];
+  const comments = await readAllComments("ENG-1", pagesOf([first, second]));
+  assert.equal(comments.length, 101);
+  assert.deepEqual(planReply(comments, FOREMAN), {
+    anchorId: "anchor",
+    followUp: { lastReply: "text", replies: ["text"] },
+    ok: true,
+  });
+});
+
+test("refuses a thread longer than ten pages", async () => {
+  let calls = 0;
+  const endless = pagesOf([[anchor]], true);
+  await assert.rejects(
+    readAllComments("ENG-1", (query, name, variables) => {
+      calls += 1;
+      return endless(query, name, variables);
+    }),
+    {
+      message:
+        "ENG-1 has more than 1,000 comments, so the thread state cannot be checked; reply in Slack by hand.",
+      name: "ThreadIncompleteError",
+    }
+  );
+  assert.equal(calls, 10);
 });
 
 test("acts on a person's direct status request on an ordinary ticket, and on nothing else there", async () => {
