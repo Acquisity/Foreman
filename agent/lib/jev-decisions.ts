@@ -511,6 +511,8 @@ interface BarContext {
   duplicate: ReturnType<typeof findDuplicate>;
   input: TriageInput;
   pathConfidence: number;
+  /** A trusted regression record already set the path (ENG-16056). */
+  pathFromRecord: boolean;
 }
 
 const barGap = (
@@ -522,7 +524,10 @@ const barGap = (
       note: "The classification was not clear enough to act on.",
     };
   }
-  if (!context.duplicate && context.pathConfidence < BARS.path) {
+  if (
+    !(context.duplicate || context.pathFromRecord) &&
+    context.pathConfidence < BARS.path
+  ) {
     return {
       missing: ["A deciding confirmation for the handling path."],
       note: "The handling path was not clear enough to act on.",
@@ -622,23 +627,25 @@ export function resolveTriage(
   if (billed) {
     confidence.path = pathPick.confidence;
   }
+  const settled = billed ? "Platform Limitation" : classification;
+  const match = billed ? undefined : duplicate;
+  const fixedNotes: string[] = [];
+  const fixed = fixedRouting(input, settled, match !== undefined, fixedNotes);
   const gap = barGap({
     answers,
     billed,
     classification,
     classificationConfidence: classificationPick.confidence,
-    duplicate: billed ? undefined : duplicate,
+    duplicate: match,
     input,
     pathConfidence: pathPick.confidence,
+    pathFromRecord: fixed !== undefined,
   });
   if (gap) {
     notes.push(gap.note);
     return unproven(gap.missing);
   }
-
-  const settled = billed ? "Platform Limitation" : classification;
-  const match = billed ? undefined : duplicate;
-  const fixed = fixedRouting(input, settled, match !== undefined, notes);
+  notes.push(...fixedNotes);
   const path = routedPath(billed, match, pathPick.choice, fixed?.path);
   const project = choiceOf(answers.project);
   const projectSettled =

@@ -192,3 +192,32 @@ test("a record checked for another failure time is stale, so a corrected time ne
     assert.deepEqual(decision.missing, [REGRESSION_GAP]);
   }
 });
+
+test("a trusted fixed record sets the path, so a low path confidence does not make it unproven", () => {
+  for (const kind of [
+    "fixed_live",
+    "fixed_not_deployed",
+    "fixed_deploy_unknown",
+  ] as const) {
+    const decision = resolveTriage(
+      triageInput({
+        regression: { commit: FIX, kind, line: `${kind} by ${FIX}` },
+      }),
+      bugAnswers({ path: pick("Engineering Todo", 0.55) })
+    );
+    assert.ok(decision.outcome === "route", kind);
+    assert.notEqual(decision.path, "Engineering Todo", kind);
+  }
+  const engineering = resolveTriage(
+    triageInput(),
+    bugAnswers({ path: pick("Engineering Todo", 0.55) })
+  );
+  assert.equal(engineering.outcome, "unproven");
+  const weakClassification = resolveTriage(
+    triageInput({
+      regression: { commit: FIX, kind: "fixed_live", line: `fixed by ${FIX}` },
+    }),
+    bugAnswers({ classification: pick("bug", 0.55) })
+  );
+  assert.equal(weakClassification.outcome, "unproven");
+});
