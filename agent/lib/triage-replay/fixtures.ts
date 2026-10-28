@@ -117,7 +117,8 @@ export const triageCase: TriageCase = {
     {
       assignee: "Anthony Adewale",
       createdAt: "2026-09-20T00:00:00.000Z",
-      description: "Inbox reconnect fails after the token expires",
+      description:
+        "## Root cause\n\nInbox reconnect fails after the token expires.\n\n## Regression seam\n\nA send after the token expires.",
       id: "ENG-90",
       labels: ["Bug"],
       parent: null,

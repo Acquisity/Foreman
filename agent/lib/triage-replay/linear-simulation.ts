@@ -98,10 +98,12 @@ function matches(
       case "or":
         return (value as Filter[]).some((f) => matches(f, issue));
       case "title":
-      case "description": {
-        const needle = String(v.containsIgnoreCase ?? "").toLowerCase();
-        return issue[key].toLowerCase().includes(needle);
-      }
+      case "description":
+        return v.contains === undefined
+          ? issue[key]
+              .toLowerCase()
+              .includes(String(v.containsIgnoreCase ?? "").toLowerCase())
+          : issue[key].includes(String(v.contains));
       case "createdAt":
         return (
           (v.gte === undefined || issue.createdAt >= String(v.gte)) &&
@@ -122,7 +124,15 @@ function relatedIssues(state: ReplayState, variables: Filter) {
   // route_ticket reads a master by id for its creation time; a master this
   // run created is as new as the case.
   const created = createdIssue(state, (filter.id as Filter | undefined)?.eq);
-  if (created) {
+  if (
+    created &&
+    matches(filter, {
+      createdAt: state.case.createdAt,
+      description: created.description,
+      id: issueIdOf(created.identifier),
+      title: created.title,
+    })
+  ) {
     return {
       issues: {
         nodes: [

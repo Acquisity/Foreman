@@ -13,13 +13,21 @@ export interface Call {
 
 export const MISSING_RELATION = "missing duplicate relation";
 
-/** An extra issue: no source label makes it a master, a source label a report. */
+/** An extra issue; `master` gives it the master template's Regression seam section. */
 export interface FakeIssue {
   assignee?: { id: string; name: string };
   createdAt?: string;
   labels?: string[];
+  master?: boolean;
   parent?: string;
 }
+
+/** The default master ENG-9, whose RouteIssue id is i-9. */
+const DEFAULT_MASTER: [string, string, FakeIssue] = [
+  "ENG-9",
+  "i-9",
+  { master: true },
+];
 
 const renderIssue = (id: string, issue: FakeIssue) => ({
   assignee: issue.assignee ?? null,
@@ -41,14 +49,25 @@ const relatedById = (
   variables: Record<string, unknown>,
   issues: Record<string, FakeIssue>
 ) => {
-  const filter = variables.filter as { id?: { eq?: string } };
+  const filter = variables.filter as {
+    description?: { contains?: string };
+    id?: { eq?: string };
+  };
   const id = filter.id?.eq ?? "";
-  const nodes = Object.entries(issues)
-    .filter(([identifier]) => `i-${identifier}` === id)
-    .map(([identifier, issue]) => ({
+  const nodes = [
+    DEFAULT_MASTER,
+    ...Object.entries(issues).map(
+      ([identifier, issue]) => [identifier, `i-${identifier}`, issue] as const
+    ),
+  ]
+    .filter(
+      ([, issueId, issue]) =>
+        issueId === id && (filter.description === undefined || issue.master)
+    )
+    .map(([identifier, issueId, issue]) => ({
       assignee: issue.assignee ? { name: issue.assignee.name } : null,
       createdAt: issue.createdAt ?? "2026-10-20T00:00:00.000Z",
-      id,
+      id: issueId,
       identifier,
       labels: { nodes: (issue.labels ?? []).map((name) => ({ name })) },
       parent: issue.parent ? { identifier: issue.parent } : null,

@@ -10,8 +10,9 @@ const STALE = "2026-08-01T00:00:00.000Z";
 const CUTOFF = "2026-09-28T00:00:00.000Z";
 
 /**
- * ENG-30 and ENG-31 are masters, ENG-20 a report under ENG-30, ENG-40 a lone
- * report, ENG-50 a master created before the cutoff with report ENG-60 under
+ * ENG-30 and ENG-31 are masters (they carry the master template's Regression
+ * seam section), ENG-20 a report under ENG-30, ENG-40 a lone report, ENG-45 a
+ * lone report the unproven branch left with no labels, ENG-50 a master created before the cutoff with report ENG-60 under
  * it, and ENG-70 a master held outside the owner map with report ENG-21.
  */
 const ISSUES: Record<string, FakeIssue> = {
@@ -22,12 +23,13 @@ const ISSUES: Record<string, FakeIssue> = {
     labels: ["Customer reported"],
     parent: "ENG-30",
   },
-  "ENG-30": { assignee: ANUJ, createdAt: FRESH },
-  "ENG-31": { assignee: ANUJ, createdAt: FRESH },
+  "ENG-30": { assignee: ANUJ, createdAt: FRESH, master: true },
+  "ENG-31": { assignee: ANUJ, createdAt: FRESH, master: true },
   "ENG-40": { labels: ["intercom-sourced", "Customer reported"] },
-  "ENG-50": { assignee: ANUJ, createdAt: STALE },
+  "ENG-45": { createdAt: FRESH },
+  "ENG-50": { assignee: ANUJ, createdAt: STALE, master: true },
   "ENG-60": { labels: ["Customer reported"], parent: "ENG-50" },
-  "ENG-70": { assignee: GONE, createdAt: FRESH },
+  "ENG-70": { assignee: GONE, createdAt: FRESH, master: true },
   "ENG-77": { createdAt: FRESH },
 };
 
@@ -41,15 +43,16 @@ const updateOf = (fake: ReturnType<typeof fakeLinear>) =>
   fake.updates()[0]?.variables.input as Record<string, unknown> | undefined;
 
 const NO_MASTER =
-  /ENG-40 is a customer report with no master, so nothing was written/u;
+  /ENG-40 is not a master and is not under one, so nothing was written/u;
 const WRONG_PARENT =
   /ENG-20 belongs under its master ENG-30, not ENG-77, so nothing was written/u;
 const RELATION_NOT_RECORDED =
   /Nothing was written: the duplicate relation to ENG-9 was not recorded/u;
 const MASTER_OUTSIDE_MAP =
   /ENG-70 is held by Pieter Venter, who is not in the owner map, so nothing was written/u;
-const PARENT_NOT_MASTER =
-  /ENG-40 is a customer report, not a master, so nothing was written/u;
+const UNLABELLED_NOT_MASTER =
+  /ENG-45 is not a master and is not under one, so nothing was written/u;
+const PARENT_NOT_MASTER = /ENG-40 is not a master, so nothing was written/u;
 const RETRY_FROM_MASTER =
   /Call route_ticket again without duplicateOf, with parent ENG-30 and inheritAssigneeFrom ENG-30/u;
 const STALE_MASTER =
@@ -312,5 +315,26 @@ describe("routeTicket duplicate masters, review fixes", () => {
     >;
     assert.equal(landed.parentId, "i-ENG-30");
     assert.equal(landed.assigneeId, "u-anuj");
+  });
+
+  it("never takes an unlabelled report for a master: only the master template's Regression seam section marks one (R1)", async () => {
+    const fake = linear();
+    await assert.rejects(
+      routeTicket(
+        { duplicateOf: "ENG-45", issue: "ENG-1", state: "Duplicate" },
+        { client: fake.fetchStub }
+      ),
+      UNLABELLED_NOT_MASTER
+    );
+    assert.deepEqual(fake.writes(), []);
+  });
+
+  it("recognises a master engineering-handoff made by its Regression seam section (R1)", async () => {
+    const fake = linear();
+    await routeTicket(
+      { duplicateOf: "ENG-31", issue: "ENG-1", state: "Duplicate" },
+      { client: fake.fetchStub }
+    );
+    assert.equal(updateOf(fake)?.parentId, "i-ENG-31");
   });
 });

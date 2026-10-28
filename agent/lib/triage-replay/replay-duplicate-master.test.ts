@@ -51,7 +51,8 @@ const seeded = (): ReplayState => {
     }
   );
   state.created.push({
-    description: "Root cause: the token refresh drops the inbox session.",
+    description:
+      "## Root cause\n\nThe token refresh drops the inbox session.\n\n## Regression seam\n\nReconnect after a send.",
     fields: {
       assignee: null,
       labels: ["Bug"],

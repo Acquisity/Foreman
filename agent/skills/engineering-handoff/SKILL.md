@@ -123,4 +123,4 @@ The public boundary, trigger, and observable red-before, green-after behavior a 
 The customer tickets this master owns, as Linear links.
 ```
 
-Where evidence proves a section cannot apply, write `Not applicable: <short reason>`. Where it is unknown, write `Not settled: <what is missing and who can supply it>`. Never pad a thin root cause into a full-looking ticket.
+Keep the `## Regression seam` heading on every master: `route_ticket` recognises a master only by it. Where evidence proves a section cannot apply, write `Not applicable: <short reason>`. Where it is unknown, write `Not settled: <what is missing and who can supply it>`. Never pad a thin root cause into a full-looking ticket.

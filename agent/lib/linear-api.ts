@@ -584,20 +584,12 @@ async function resolveAssigneeId(
 }
 
 /**
- * The labels a customer report carries and a master never does: masters have
- * no marker label (engineering-handoff), and every report gets its source
- * labels from classify_ask.
+ * What marks a master (ENG-16608): engineering-handoff writes every master
+ * from its template, whose Regression seam section no customer report has.
+ * Labels cannot mark one: masters carry no marker label, and a report on the
+ * unproven branch keeps no labels either, so having none proves nothing.
  */
-const REPORT_LABELS = new Set(
-  ["Customer reported", "Internal reported", "intercom-sourced"].map((name) =>
-    name.toLowerCase()
-  )
-);
-
-const isReport = (issue: RouteIssue): boolean =>
-  issue.labels.nodes.some((label) =>
-    REPORT_LABELS.has(label.name.toLowerCase())
-  );
+export const MASTER_MARKER = "## Regression seam";
 
 /** Whether the ticket carries the Bug label once this call's label changes land. */
 const carriesBug = (issue: RouteIssue, input: RouteTicketInput): boolean => {
@@ -619,30 +611,43 @@ export interface DuplicateRouting {
   mastersCreatedAfter?: string | null;
 }
 
-/** Whether a master was created before the session's cutoff, read through the master search's own query. */
-async function beforeCutoff(
-  gql: Gql,
-  identifier: string,
-  cutoff: string | null
-): Promise<boolean> {
-  if (cutoff === null) {
-    return false;
-  }
-  const { id } = await requireIssue(gql, identifier);
+/**
+ * When the issue was created if it is a master, else null, read through the
+ * master search's own query: the issue by id, only when its description holds
+ * the master marker.
+ */
+async function masterCreatedAt(gql: Gql, id: string): Promise<string | null> {
   const { issues } = await gql<IssuesData>("RelatedIssues", {
     after: null,
-    filter: { id: { eq: id } },
+    filter: { description: { contains: MASTER_MARKER }, id: { eq: id } },
     first: 1,
     includeArchived: true,
   });
-  const createdAt = issues.nodes[0]?.createdAt;
-  if (!createdAt) {
-    throw new Error(
-      `Could not read when ${identifier} was created, so nothing was written.`
-    );
-  }
-  return Date.parse(createdAt) < Date.parse(cutoff);
+  return issues.nodes[0]?.createdAt ?? null;
 }
+
+/** The match itself when it is a master, else its parent when that is one. */
+async function masterOf(
+  gql: Gql,
+  match: RouteIssue
+): Promise<{ createdAt: string; identifier: string } | null> {
+  const own = await masterCreatedAt(gql, match.id);
+  if (own !== null) {
+    return { createdAt: own, identifier: match.identifier };
+  }
+  const parent = match.parent?.identifier;
+  if (!parent) {
+    return null;
+  }
+  const createdAt = await masterCreatedAt(
+    gql,
+    (await requireIssue(gql, parent)).id
+  );
+  return createdAt === null ? null : { createdAt, identifier: parent };
+}
+
+const beforeCutoff = (createdAt: string, cutoff: string | null) =>
+  cutoff !== null && Date.parse(createdAt) < Date.parse(cutoff);
 
 const staleMaster = (identifier: string, cutoff: string | null) =>
   new Error(
@@ -650,11 +655,12 @@ const staleMaster = (identifier: string, cutoff: string | null) =>
   );
 
 /**
- * The parent a duplicate joins (ENG-16608): a match that is not a report is
- * the master itself; a report's parent is its master. A master created before
- * the session's master-search cutoff is not eligible. With no eligible master,
- * a Bug duplicate (by decision or by its Bug label) is refused until
- * engineering-handoff has made one; any other duplicate closes unparented.
+ * The parent a duplicate joins (ENG-16608): the match when it is a master,
+ * else the match's parent when that is one. A master created before the
+ * session's master-search cutoff is not eligible. With no eligible master, a
+ * Bug duplicate (by decision or by its Bug label) is refused until
+ * engineering-handoff has made one, and a parent it is given must be a master;
+ * any other duplicate closes unparented.
  */
 async function duplicateParent(
   gql: Gql,
@@ -664,27 +670,29 @@ async function duplicateParent(
   routing: DuplicateRouting
 ): Promise<string | undefined> {
   const cutoff = routing.mastersCreatedAfter ?? null;
-  const found = isReport(match)
-    ? (match.parent?.identifier ?? null)
-    : match.identifier;
+  const master = await masterOf(gql, match);
   const stale =
-    found !== null && (await beforeCutoff(gql, found, cutoff)) ? found : null;
-  if (found !== null && stale === null) {
-    if (input.parent !== undefined && input.parent !== found) {
+    master && beforeCutoff(master.createdAt, cutoff) ? master.identifier : null;
+  if (master && stale === null) {
+    if (input.parent !== undefined && input.parent !== master.identifier) {
       throw new Error(
-        `${match.identifier} belongs under its master ${found}, not ${input.parent}, so nothing was written. Drop parent or pass ${found}.`
+        `${match.identifier} belongs under its master ${master.identifier}, not ${input.parent}, so nothing was written. Drop parent or pass ${master.identifier}.`
       );
     }
-    return found;
+    return master.identifier;
   }
   const required = routing.masterRequired || carriesBug(issue, input);
   if (input.parent !== undefined) {
-    if (required && isReport(await requireIssue(gql, input.parent))) {
+    const createdAt = await masterCreatedAt(
+      gql,
+      (await requireIssue(gql, input.parent)).id
+    );
+    if (required && createdAt === null) {
       throw new Error(
-        `${input.parent} is a customer report, not a master, so nothing was written. Pass the master as parent, or create one through engineering-handoff first.`
+        `${input.parent} is not a master, so nothing was written. Pass the master as parent, or create one through engineering-handoff first.`
       );
     }
-    if (await beforeCutoff(gql, input.parent, cutoff)) {
+    if (createdAt !== null && beforeCutoff(createdAt, cutoff)) {
       throw staleMaster(input.parent, cutoff);
     }
     return input.parent;
@@ -696,7 +704,7 @@ async function duplicateParent(
     throw staleMaster(stale, cutoff);
   }
   throw new Error(
-    `${match.identifier} is a customer report with no master, so nothing was written. Create the master through engineering-handoff from this investigation (aggregate evidence only: no organization id, email or customer rows), call route_ticket with issue ${match.identifier} and parent set to the new master, then call this again.`
+    `${match.identifier} is not a master and is not under one, so nothing was written. Create the master through engineering-handoff from this investigation (aggregate evidence only: no organization id, email or customer rows), call route_ticket with issue ${match.identifier} and parent set to the new master, then call this again.`
   );
 }
 
