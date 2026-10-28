@@ -3,11 +3,18 @@ import { z } from "zod";
 import { linearAuth } from "./constants.js";
 import { executorClient } from "./executor/client.js";
 import {
+  cancelMigrationTicket,
   createMigrationTicket,
   type ExecutorOutcome,
   type ProviderContext,
 } from "./executor/dispatch.js";
-import { findRelatedIssues } from "./linear-api.js";
+import {
+  findRelatedIssues,
+  type LinearGraphqlOptions,
+  linearGraphql,
+  phraseFilter,
+} from "./linear-api.js";
+import type { LinearResponse } from "./linear-response.js";
 import { confirmedIssue } from "./linear-ticket-report.js";
 import {
   customerEmailSchema,
@@ -16,10 +23,9 @@ import {
 } from "./lookup-customer.js";
 import {
   filingScope,
-  MIGRATION_TICKET_OWNER,
-  type MigrationLinearTicket,
   type MigrationTicketScope,
   migrationScopeBlock,
+  rememberFiledTicket,
   slackThreadPermalink,
   threadKey,
 } from "./migration-ticket-scope.js";
@@ -28,6 +34,7 @@ import {
   callPlanetscaleReadQuery,
   parseReadQueryResult,
 } from "./planetscale.js";
+import { SLACK_ANCHOR_PATTERN } from "./requester-reply.js";
 import {
   lookupSlackRequester,
   type SlackRequester,
@@ -125,27 +132,45 @@ const REQUIRED = [
   "where",
 ] as const;
 
-interface IssueRef {
+interface ThreadTicket {
+  createdAt: string;
   identifier: string;
   stateType: string;
-  title?: string;
+  url: string;
+}
+
+/** An open ticket that may already cover the report, with enough text to judge it. */
+export interface Candidate {
+  excerpt: string;
+  identifier: string;
+  state: string;
+  title: string;
   url: string;
 }
 
 export type MigrationTicketResult =
-  | { existing: true; identifier: string; url: string }
-  | { existing: false; identifier: string; threadSynced: boolean; url: string }
-  | { missing: string[]; reason: string }
   | {
-      candidates: { identifier: string; title: string; url: string }[];
-      reason: string;
+      existing: boolean;
+      identifier: string;
+      threadSynced: boolean;
+      url: string;
     }
+  | { missing: string[]; reason: string }
+  | { candidates: Candidate[]; reason: string; truncated: boolean }
   | { error: string };
 
 export interface MigrationTicketDeps {
+  cancel: (
+    ctx: ProviderContext,
+    identifier: string
+  ) => Promise<ExecutorOutcome>;
   create: (
     ctx: ProviderContext,
-    ticket: MigrationLinearTicket
+    input: {
+      description: string;
+      link: { title: string; url: string };
+      title: string;
+    }
   ) => Promise<ExecutorOutcome>;
   lookupMemberships: (
     email: string,
@@ -156,26 +181,26 @@ export interface MigrationTicketDeps {
     record: { id: string; type: (typeof RECORD_TYPES)[number] },
     organizationId: string
   ) => Promise<string | null>;
-  related: (phrases: string[], ctx: ProviderContext) => Promise<IssueRef[]>;
+  related: (
+    phrases: string[],
+    ctx: ProviderContext
+  ) => Promise<{ issues: Candidate[]; truncated: boolean }>;
   requester: (userId: string) => Promise<SlackRequester>;
-  search: (phrases: string[], ctx: ProviderContext) => Promise<IssueRef[]>;
+  /** Whether the ticket's Slack thread is connected; null when that could not be read. */
+  synced: (ctx: ProviderContext, issue: string) => Promise<boolean | null>;
   syncSlack: (
     ctx: ProviderContext,
     issue: string,
-    link: { title: string; url: string }
+    link: { title?: string; url: string }
   ) => Promise<boolean>;
+  thread: (key: string, ctx: ProviderContext) => Promise<ThreadTicket[]>;
 }
 
-const searchIssues = async (
-  phrases: string[],
-  ctx: ProviderContext
-): Promise<IssueRef[]> =>
-  (
-    await findRelatedIssues(
-      { phrases, scope: "duplicates", windowed: false },
-      { client: executorClient(ctx), signal: ctx.abortSignal }
-    )
-  ).issues;
+/** At most this many candidates are shown, and exactly those must be acknowledged. */
+export const MAX_CANDIDATES = 20;
+const EXCERPT_CHARS = 600;
+// IssueBodies returns one page of this many.
+const ISSUE_BODIES_PAGE = 25;
 
 const runRead = (ctx: ProviderContext) => (query: string) =>
   callPlanetscaleReadQuery(ctx, { ...PRODUCTION_READ_QUERY_ARGS, query });
@@ -186,12 +211,78 @@ const RECORD_TABLE = {
   deal: "crm_deal",
 } as const;
 
-const SLACK_LINK_MUTATION = `mutation MigrationSlackThread($issueId: String!, $url: String!, $title: String!) {
+const SLACK_LINK_MUTATION = `mutation MigrationSlackThread($issueId: String!, $url: String!, $title: String) {
   attachmentLinkSlack(issueId: $issueId, url: $url, title: $title, syncToCommentThread: true) { success }
 }`;
-const SLACK_LINK_TIMEOUT_MS = 15_000;
+const ANCHOR_QUERY = `query MigrationThreadAnchor($id: String!) {
+  issue(id: $id) { comments(first: 100) { nodes { body parent { id } } } }
+}`;
+const FOREMAN_LINEAR_TIMEOUT_MS = 15_000;
+
+/** One call with Foreman's own Linear app token, bounded and cancellable. */
+const foremanLinear = async <T>(
+  ctx: ProviderContext,
+  query: string,
+  queryName: string,
+  variables: Record<string, string>
+): Promise<T> => {
+  const { token } = await ctx.getToken(linearAuth);
+  const signal = AbortSignal.any([
+    ctx.abortSignal,
+    AbortSignal.timeout(FOREMAN_LINEAR_TIMEOUT_MS),
+  ]);
+  return await callLinearGraphQL<T>({
+    api: { fetch: (url, init) => fetch(url, { ...init, signal }) },
+    credentials: { accessToken: token },
+    query,
+    queryName,
+    variables,
+  });
+};
+
+const excerpt = (text: string | null) => {
+  const flat = (text ?? "").replace(/\s+/gu, " ").trim();
+  return flat.length > EXCERPT_CHARS
+    ? `${flat.slice(0, EXCERPT_CHARS)}...`
+    : flat;
+};
+
+/**
+ * Open tickets matching any phrasing, with each one's state and a bounded
+ * description excerpt from the same read, so the model can judge it without
+ * the Linear reads this lane does not have. The read returns one page, so a
+ * full page counts as truncated.
+ */
+export async function readCandidates(
+  phrases: string[],
+  opts: LinearGraphqlOptions
+): Promise<{ issues: Candidate[]; truncated: boolean }> {
+  const { issues } = await linearGraphql<LinearResponse<"IssueBodies">>(
+    "IssueBodies",
+    {
+      filter: {
+        and: [
+          { or: phrases.map(phraseFilter) },
+          { state: { type: { nin: ["canceled", "completed"] } } },
+        ],
+      },
+    },
+    opts
+  );
+  return {
+    issues: issues.nodes.map((node) => ({
+      excerpt: excerpt(node.description),
+      identifier: node.identifier,
+      state: node.state.name,
+      title: node.title,
+      url: node.url,
+    })),
+    truncated: issues.nodes.length >= ISSUE_BODIES_PAGE,
+  };
+}
 
 const defaultDeps: MigrationTicketDeps = {
+  cancel: cancelMigrationTicket,
   create: createMigrationTicket,
   async lookupMemberships(email, ctx) {
     const result = await lookupCustomer(email, runRead(ctx));
@@ -219,24 +310,38 @@ const defaultDeps: MigrationTicketDeps = {
       ? name.trim().slice(0, 200)
       : null;
   },
-  related: searchIssues,
+  related: (phrases, ctx) =>
+    readCandidates(phrases, {
+      client: executorClient(ctx),
+      signal: ctx.abortSignal,
+    }),
   requester: (userId) => lookupSlackRequester(userId),
-  search: searchIssues,
+  async synced(ctx, issue) {
+    try {
+      const result = await foremanLinear<{
+        issue: {
+          comments: { nodes: { body: string; parent: unknown }[] };
+        } | null;
+      }>(ctx, ANCHOR_QUERY, "MigrationThreadAnchor", { id: issue });
+      return (result.issue?.comments.nodes ?? []).some(
+        (comment) =>
+          !comment.parent && SLACK_ANCHOR_PATTERN.test(comment.body.trim())
+      );
+    } catch (error) {
+      if (ctx.abortSignal.aborted) {
+        throw error;
+      }
+      return null;
+    }
+  },
   async syncSlack(ctx, issue, link) {
     try {
-      const { token } = await ctx.getToken(linearAuth);
-      const signal = AbortSignal.any([
-        ctx.abortSignal,
-        AbortSignal.timeout(SLACK_LINK_TIMEOUT_MS),
-      ]);
-      const result = await callLinearGraphQL<{
+      const result = await foremanLinear<{
         attachmentLinkSlack: { success: boolean };
-      }>({
-        api: { fetch: (url, init) => fetch(url, { ...init, signal }) },
-        credentials: { accessToken: token },
-        query: SLACK_LINK_MUTATION,
-        queryName: "MigrationSlackThread",
-        variables: { issueId: issue, title: link.title, url: link.url },
+      }>(ctx, SLACK_LINK_MUTATION, "MigrationSlackThread", {
+        issueId: issue,
+        url: link.url,
+        ...(link.title ? { title: link.title } : {}),
       });
       return result.attachmentLinkSlack.success === true;
     } catch (error) {
@@ -246,10 +351,32 @@ const defaultDeps: MigrationTicketDeps = {
       return false;
     }
   },
+  async thread(key, ctx) {
+    return (
+      await findRelatedIssues(
+        { phrases: [key], scope: "duplicates", windowed: false },
+        { client: executorClient(ctx), signal: ctx.abortSignal }
+      )
+    ).issues;
+  },
 };
 
-const OPEN = (issue: IssueRef) =>
-  issue.stateType !== "canceled" && issue.stateType !== "completed";
+// A canceled ticket no longer covers the thread; a completed one still does,
+// as for a widget conversation.
+const live = (ticket: ThreadTicket) => ticket.stateType !== "canceled";
+
+const ticketNumber = (identifier: string) =>
+  Number(identifier.slice(identifier.indexOf("-") + 1));
+
+/** The thread's ticket: the oldest live one, so every racing filer agrees. */
+const threadWinner = (tickets: ThreadTicket[]): ThreadTicket | undefined =>
+  tickets
+    .filter(live)
+    .sort(
+      (a, b) =>
+        a.createdAt.localeCompare(b.createdAt) ||
+        ticketNumber(a.identifier) - ticketNumber(b.identifier)
+    )[0];
 
 const CLASSIFICATION_LABEL = {
   bug: "Bug",
@@ -322,6 +449,130 @@ export function migrationTicketDescription(
 const UNVERIFIED =
   "The workspace check could not run, so nothing was filed. Do not retry automatically; tell the rep you could not file it yet.";
 
+type Refusal = Extract<
+  MigrationTicketResult,
+  { missing: string[] } | { candidates: Candidate[] } | { error: string }
+>;
+
+/**
+ * Exactly the candidates shown must be acknowledged, so a long result can
+ * always be completed and a stale acknowledgment never files.
+ */
+async function candidateCheck(
+  deps: MigrationTicketDeps,
+  ctx: ProviderContext,
+  input: Complete
+): Promise<Refusal | null> {
+  const related = await deps.related(input.searchPhrases, ctx);
+  const shown = related.issues.slice(0, MAX_CANDIDATES);
+  const reviewed = new Set(input.reviewedCandidates ?? []);
+  const acknowledged =
+    reviewed.size === shown.length &&
+    shown.every((candidate) => reviewed.has(candidate.identifier));
+  if (shown.length === 0 || acknowledged) {
+    return null;
+  }
+  const truncated = related.truncated || related.issues.length > MAX_CANDIDATES;
+  return {
+    candidates: shown,
+    reason: `Read these open tickets. If one covers this report, reply with its link and say the team is already working on it, and file nothing. Otherwise call again with exactly these identifiers in reviewedCandidates.${truncated ? " More matched than are shown, so sharper searchPhrases may find a closer match." : ""}`,
+    truncated,
+  };
+}
+
+/** The affected user and named record, each resolved inside the pinned workspace. */
+async function workspaceFacts(
+  deps: MigrationTicketDeps,
+  ctx: ProviderContext,
+  scope: MigrationTicketScope,
+  input: Complete,
+  requesterEmail: string
+): Promise<Refusal | { affectedEmail: string; record: string | null }> {
+  const affectedEmail =
+    input.affectedUser === "reporter" ? requesterEmail : input.affectedUser;
+  const membership = await deps.lookupMemberships(affectedEmail, ctx);
+  if (membership.error) {
+    return { error: UNVERIFIED };
+  }
+  if (!membership.orgs.includes(scope.workspace.id)) {
+    return {
+      missing: ["affectedUser"],
+      reason: `That user is not a member of ${scope.workspace.name}. Ask the rep for the email of the user it happened to in this workspace.`,
+    };
+  }
+  if (!input.record) {
+    return { affectedEmail, record: null };
+  }
+  const name = await deps.readRecord(ctx, input.record, scope.workspace.id);
+  if (!name) {
+    return {
+      missing: ["record"],
+      reason: `No ${input.record.type} with that id is in ${scope.workspace.name}. Ask the rep which record it is, or file without one.`,
+    };
+  }
+  return {
+    affectedEmail,
+    record: `${clean(name)} (${input.record.type} ${input.record.id})`,
+  };
+}
+
+/**
+ * The thread's ticket found again: its Slack sync is checked and repaired,
+ * because the connected thread is how triage's reply and reporter updates
+ * reach the rep. The repair passes no title, so the 'Ask from' title stays.
+ */
+async function existingTicket(
+  deps: MigrationTicketDeps,
+  ctx: ProviderContext,
+  ticket: ThreadTicket,
+  permalink: string
+): Promise<MigrationTicketResult> {
+  const synced = await deps.synced(ctx, ticket.identifier);
+  const threadSynced =
+    synced === false
+      ? await deps.syncSlack(ctx, ticket.identifier, { url: permalink })
+      : synced === true;
+  return {
+    existing: true,
+    identifier: ticket.identifier,
+    threadSynced,
+    url: ticket.url,
+  };
+}
+
+/**
+ * After its own create, a filer re-reads the thread. Two filings racing in
+ * one thread both see no ticket and both create; the oldest live ticket wins,
+ * and a filer whose ticket is newer cancels it and returns the winner.
+ */
+async function settleFiled(
+  deps: MigrationTicketDeps,
+  ctx: ProviderContext,
+  scope: MigrationTicketScope,
+  issue: { identifier: string; url: string },
+  link: { title: string; url: string }
+): Promise<MigrationTicketResult> {
+  rememberFiledTicket(scope, issue.identifier);
+  const winner = threadWinner(await deps.thread(threadKey(scope), ctx));
+  if (winner && winner.identifier !== issue.identifier) {
+    const cancelled = await deps.cancel(ctx, issue.identifier);
+    logOpsEvent("migration.ticket.duplicate_cancelled", {
+      duplicateOf: winner.identifier,
+      issue: issue.identifier,
+      outcome: cancelled.ok ? "ok" : "error",
+    });
+    return await existingTicket(deps, ctx, winner, link.url);
+  }
+  const threadSynced = await deps.syncSlack(ctx, issue.identifier, link);
+  logOpsEvent(
+    threadSynced
+      ? "migration.ticket.filed"
+      : "migration.ticket.thread_unsynced",
+    { issue: issue.identifier }
+  );
+  return { existing: false, ...issue, threadSynced };
+}
+
 /**
  * Files this Slack thread's one ticket, or returns the one it already has
  * (ENG-16581). Team, state, owner, workspace and thread come from the signed
@@ -333,7 +584,7 @@ export async function fileMigrationTicket(
   overrides: Partial<MigrationTicketDeps> = {}
 ): Promise<MigrationTicketResult> {
   const deps = { ...defaultDeps, ...overrides };
-  const scope = ctx.session ? filingScope(ctx.session.auth) : null;
+  const scope = filingScope(ctx.session);
   if (!scope) {
     return {
       error:
@@ -341,18 +592,12 @@ export async function fileMigrationTicket(
     };
   }
   const input = migrationTicketInputSchema.parse(raw);
+  const permalink = slackThreadPermalink(scope.channelId, scope.threadTs);
   try {
-    // One ticket per thread: every one carries the thread key in its scope
-    // block. A canceled one no longer covers the thread.
-    const [existing] = (await deps.search([threadKey(scope)], ctx)).filter(
-      OPEN
-    );
+    // One ticket per thread: every one carries the thread key in its scope block.
+    const existing = threadWinner(await deps.thread(threadKey(scope), ctx));
     if (existing) {
-      return {
-        existing: true,
-        identifier: existing.identifier,
-        url: existing.url,
-      };
+      return await existingTicket(deps, ctx, existing, permalink);
     }
     const missing = missingFields(input);
     if (missing.length > 0) {
@@ -370,64 +615,27 @@ export async function fileMigrationTicket(
           "The requester's Slack email could not be read, so this ticket cannot be filed here. Ask them to report it with /acquisityasks.",
       };
     }
-    const reviewed = new Set(complete.reviewedCandidates ?? []);
-    const candidates = (await deps.related(complete.searchPhrases, ctx))
-      .filter(OPEN)
-      .filter((candidate) => !reviewed.has(candidate.identifier));
-    if (candidates.length > 0) {
-      return {
-        candidates: candidates.slice(0, 10).map((candidate) => ({
-          identifier: candidate.identifier,
-          title: candidate.title ?? "",
-          url: candidate.url,
-        })),
-        reason:
-          "Read these open tickets. If one covers this report, reply with its link and say the team is already working on it, and file nothing. Otherwise call again with them in reviewedCandidates.",
-      };
+    const covered = await candidateCheck(deps, ctx, complete);
+    if (covered) {
+      return covered;
     }
-    const affectedEmail =
-      complete.affectedUser === "reporter"
-        ? requester.email
-        : complete.affectedUser;
-    const membership = await deps.lookupMemberships(affectedEmail, ctx);
-    if (membership.error) {
-      return { error: UNVERIFIED };
+    const facts = await workspaceFacts(
+      deps,
+      ctx,
+      scope,
+      complete,
+      requester.email
+    );
+    if (!("affectedEmail" in facts)) {
+      return facts;
     }
-    if (!membership.orgs.includes(scope.workspace.id)) {
-      return {
-        missing: ["affectedUser"],
-        reason: `That user is not a member of ${scope.workspace.name}. Ask the rep for the email of the user it happened to in this workspace.`,
-      };
-    }
-    let record: string | null = null;
-    if (complete.record) {
-      const name = await deps.readRecord(
-        ctx,
-        complete.record,
-        scope.workspace.id
-      );
-      if (!name) {
-        return {
-          missing: ["record"],
-          reason: `No ${complete.record.type} with that id is in ${scope.workspace.name}. Ask the rep which record it is, or file without one.`,
-        };
-      }
-      record = `${clean(name)} (${complete.record.type} ${complete.record.id})`;
-    }
-    const link = {
-      title: `Ask from ${requester.email}`,
-      url: slackThreadPermalink(scope.channelId, scope.threadTs),
-    };
+    const link = { title: `Ask from ${requester.email}`, url: permalink };
     const result = await deps.create(ctx, {
-      ...MIGRATION_TICKET_OWNER,
       description: migrationTicketDescription(complete, scope, {
-        affectedEmail,
-        record,
+        ...facts,
         reporterEmail: requester.email,
       }),
-      links: [link],
-      state: "Triage",
-      team: "Engineering Team",
+      link,
       title: clean(complete.title).slice(0, 160),
     });
     if (!result.ok) {
@@ -442,16 +650,7 @@ export async function fileMigrationTicket(
           "Linear accepted the request but did not return a confirmed ticket. Do not retry automatically.",
       };
     }
-    // The synced thread is how triage's reply and reporter updates reach the
-    // rep. A failed sync leaves the ticket filed; triage still starts.
-    const threadSynced = await deps.syncSlack(ctx, issue.identifier, link);
-    logOpsEvent(
-      threadSynced
-        ? "migration.ticket.filed"
-        : "migration.ticket.thread_unsynced",
-      { issue: issue.identifier }
-    );
-    return { existing: false, ...issue, threadSynced };
+    return await settleFiled(deps, ctx, scope, issue, link);
   } catch (error) {
     if (ctx.abortSignal.aborted) {
       throw error;

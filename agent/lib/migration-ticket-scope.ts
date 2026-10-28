@@ -1,6 +1,4 @@
 import type { SessionAuthContext } from "eve/context";
-import { z } from "zod";
-import { FALLBACK_OWNER } from "./owner-map.js";
 import {
   QUESTIONS_ONLY_WORKSPACES,
   type QuestionsOnlyWorkspace,
@@ -24,15 +22,6 @@ const SLACK_USER = /^[UW][A-Z0-9]{2,30}$/u;
 
 /** The Slack workspace the AIA channels live in, as their permalinks show. */
 const SLACK_HOST = "acquisityworkspace.slack.com";
-
-/**
- * A migration ticket is the form's: James holds it, and delegating it to the
- * Foreman Linear agent opens the triage session, as for a widget ticket.
- */
-export const MIGRATION_TICKET_OWNER = {
-  assignee: FALLBACK_OWNER,
-  delegate: "d5325c6f-fbc8-451e-9fed-358667e58ad3",
-} as const;
 
 const text = (value: unknown): string | undefined =>
   typeof value === "string" && value.length > 0 ? value : undefined;
@@ -73,15 +62,25 @@ export function migrationTicketScope(
 
 /**
  * The scope of the turn that is filing: the current author's, in the same
- * channel and thread the session started in. A delegated child or a caller
- * from another thread has none.
+ * channel and thread the session started in. A delegated child (any session
+ * with a parent) or a caller from another thread has none.
  */
-export function filingScope(auth: {
-  current: SessionAuthContext | null;
-  initiator?: SessionAuthContext | null;
-}): MigrationTicketScope | null {
-  const current = migrationTicketScope(auth.current);
-  const initiator = migrationTicketScope(auth.initiator ?? null);
+export function filingScope(
+  session:
+    | {
+        auth: {
+          current: SessionAuthContext | null;
+          initiator?: SessionAuthContext | null;
+        };
+        parent?: unknown;
+      }
+    | undefined
+): MigrationTicketScope | null {
+  if (!session || session.parent) {
+    return null;
+  }
+  const current = migrationTicketScope(session.auth.current);
+  const initiator = migrationTicketScope(session.auth.initiator ?? null);
   return current &&
     initiator &&
     current.channelId === initiator.channelId &&
@@ -137,47 +136,31 @@ export function migrationFiledReport(
     : null;
 }
 
-/** The exact save_issue input a migration ticket is, and nothing else. */
-export const migrationLinearTicketInput = z.strictObject({
-  assignee: z.literal(MIGRATION_TICKET_OWNER.assignee),
-  delegate: z.literal(MIGRATION_TICKET_OWNER.delegate),
-  description: z.string().min(1).max(16_000),
-  links: z.tuple([
-    z.strictObject({
-      title: z.string().regex(/^Ask from [^\n]{1,100}$/u),
-      url: z.string().max(200),
-    }),
-  ]),
-  state: z.literal("Triage"),
-  team: z.literal("Engineering Team"),
-  title: z.string().min(1).max(160),
-});
+// Tickets this process filed, per thread, for the one follow-up write the
+// lane gate allows: cancelling a newer duplicate the filing itself created.
+const FILED_LIMIT = 500;
+const filedHere = new Map<string, Set<string>>();
 
-export type MigrationLinearTicket = z.infer<typeof migrationLinearTicketInput>;
-
-/**
- * Whether an Executor input is the one Linear write a ticket-filing session
- * may make: a migration ticket for its own thread, linked to that thread.
- */
-export function isOwnMigrationTicket(
-  auth: {
-    current: SessionAuthContext | null;
-    initiator?: SessionAuthContext | null;
-  },
-  input: Record<string, unknown>
-): boolean {
-  const scope = filingScope(auth);
-  const parsed = migrationLinearTicketInput.safeParse(input);
-  if (!(scope && parsed.success)) {
-    return false;
+/** Records a ticket the filing tool just created for this thread. */
+export function rememberFiledTicket(
+  scope: Pick<MigrationTicketScope, "channelId" | "threadTs">,
+  identifier: string
+): void {
+  const key = threadKey(scope);
+  const filed = filedHere.get(key) ?? new Set<string>();
+  filed.add(identifier);
+  filedHere.delete(key);
+  filedHere.set(key, filed);
+  if (filedHere.size > FILED_LIMIT) {
+    const [oldest] = filedHere.keys();
+    if (oldest !== undefined) {
+      filedHere.delete(oldest);
+    }
   }
-  const filed = migrationFiledReport(parsed.data.description);
-  return Boolean(
-    filed &&
-      parsed.data.description.endsWith(
-        migrationScopeBlock(scope, filed.reporter)
-      ) &&
-      parsed.data.links[0].url ===
-        slackThreadPermalink(scope.channelId, scope.threadTs)
-  );
 }
+
+/** Whether this process filed the ticket for this thread. */
+export const wasFiledHere = (
+  scope: Pick<MigrationTicketScope, "channelId" | "threadTs">,
+  identifier: string
+): boolean => filedHere.get(threadKey(scope))?.has(identifier) === true;

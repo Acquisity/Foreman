@@ -3,10 +3,14 @@ import type { ToolContext } from "eve/tools";
 import { z } from "zod";
 import { PRODUCTION_READ_QUERY_ARGS } from "../lookup-customer.js";
 import {
-  isOwnMigrationTicket,
-  type MigrationLinearTicket,
+  filingScope,
+  type MigrationTicketScope,
+  migrationFiledReport,
+  migrationScopeBlock,
+  slackThreadPermalink,
+  wasFiledHere,
 } from "../migration-ticket-scope.js";
-import { SUPPORT_OWNER } from "../owner-map.js";
+import { FALLBACK_OWNER, SUPPORT_OWNER } from "../owner-map.js";
 import { supportOperationPolicy } from "../support/policy.js";
 import { isTriageReplay } from "../triage-replay/mode.js";
 import { isQuestionsOnly } from "../trust.js";
@@ -44,20 +48,89 @@ export const REFUND_TICKET = {
   project: "P-ENG-20",
 } as const;
 
+/** The Foreman Linear agent: delegating a ticket to it opens Foreman's triage session. */
+export const FOREMAN_LINEAR_AGENT = "d5325c6f-fbc8-451e-9fed-358667e58ad3";
+
 /** Every widget ticket is Aaron's, with the work delegated to the Foreman Linear agent. */
 export const WIDGET_TICKET_OWNER = {
   assignee: SUPPORT_OWNER,
-  delegate: "d5325c6f-fbc8-451e-9fed-358667e58ad3",
+  delegate: FOREMAN_LINEAR_AGENT,
 } as const;
 
-const widgetTicketShape = {
-  assignee: z.literal(WIDGET_TICKET_OWNER.assignee),
-  delegate: z.literal(WIDGET_TICKET_OWNER.delegate),
+/**
+ * A migration channel ticket is the form's: James holds it, and the work is
+ * delegated to the Foreman Linear agent, which opens triage (ENG-16581).
+ */
+export const MIGRATION_TICKET_OWNER = {
+  assignee: FALLBACK_OWNER,
+  delegate: FOREMAN_LINEAR_AGENT,
+} as const;
+
+/** What every ticket a lane files into Foreman's triage shares. */
+const triageTicketShape = {
+  delegate: z.literal(FOREMAN_LINEAR_AGENT),
   description: z.string().min(1).max(16_000),
   state: z.literal("Triage"),
   team: z.literal("Engineering Team"),
   title: z.string().min(1).max(160),
 };
+const widgetTicketShape = {
+  ...triageTicketShape,
+  assignee: z.literal(WIDGET_TICKET_OWNER.assignee),
+};
+/** The migration lane's ticket: the shared shape, its owner, and the thread link. */
+const migrationLinearTicketInput = z.strictObject({
+  ...triageTicketShape,
+  assignee: z.literal(MIGRATION_TICKET_OWNER.assignee),
+  links: z.tuple([
+    z.strictObject({
+      title: z.string().regex(/^Ask from [^\n]{1,100}$/u),
+      url: z.string().max(200),
+    }),
+  ]),
+});
+/** The only other migration write: cancelling a newer duplicate this process just filed. */
+const migrationCancelInput = z.strictObject({
+  id: z.string().regex(/^ENG-\d{1,7}$/u),
+  state: z.literal("Canceled"),
+});
+
+/** Whether the input is a migration ticket for this scope's own thread. */
+const isOwnMigrationTicket = (
+  scope: MigrationTicketScope,
+  input: Record<string, unknown>
+): boolean => {
+  const parsed = migrationLinearTicketInput.safeParse(input);
+  const filed = parsed.success
+    ? migrationFiledReport(parsed.data.description)
+    : null;
+  return Boolean(
+    parsed.success &&
+      filed &&
+      parsed.data.description.endsWith(
+        migrationScopeBlock(scope, filed.reporter)
+      ) &&
+      parsed.data.links[0].url ===
+        slackThreadPermalink(scope.channelId, scope.threadTs)
+  );
+};
+
+/** Whether a questions-only session's Linear write is one the migration lane may make. */
+const isMigrationLaneWrite = (
+  ctx: ProviderContext,
+  path: string,
+  input: Record<string, unknown>
+): boolean => {
+  const scope = filingScope(ctx.session);
+  if (!scope || path !== LINEAR_TICKET_PATH) {
+    return false;
+  }
+  const cancel = migrationCancelInput.safeParse(input);
+  return cancel.success
+    ? wasFiledHere(scope, cancel.data.id)
+    : isOwnMigrationTicket(scope, input);
+};
+
 const widgetLinearTicketInput = z.union([
   z.strictObject(widgetTicketShape),
   z.strictObject({
@@ -155,7 +228,7 @@ function assertLaneOperation(
     auth &&
     (isQuestionsOnly(auth.current) || isQuestionsOnly(auth.initiator)) &&
     LINEAR_WRITE_PATH.test(path) &&
-    !(path === LINEAR_TICKET_PATH && isOwnMigrationTicket(auth, input))
+    !isMigrationLaneWrite(ctx, path, input)
   ) {
     throw new ExecutorError("questions_only", 403, { dispatched: false });
   }
@@ -270,18 +343,43 @@ export async function createWidgetTicket(
 }
 
 /**
- * A ticket-filing questions-only channel's one provider write (ENG-16581). The
- * ticket is built by `migration-ticket.ts`; the lane gate above re-checks its
- * fixed owner, team and state and its server-written Slack scope block.
+ * A ticket-filing questions-only channel's one provider write (ENG-16581).
+ * Owner, team and state are fixed here; the description already ends with the
+ * server-written Slack scope block, which the lane gate above re-checks.
  */
 export async function createMigrationTicket(
   ctx: ProviderContext,
-  ticket: MigrationLinearTicket
+  input: {
+    description: string;
+    link: { title: string; url: string };
+    title: string;
+  }
 ): Promise<ExecutorOutcome> {
   return await invokeProvider(
     ctx,
     LINEAR_TICKET_PATH,
-    { ...ticket, links: [...ticket.links] },
+    {
+      ...MIGRATION_TICKET_OWNER,
+      description: input.description,
+      links: [input.link],
+      state: "Triage",
+      team: "Engineering Team",
+      title: input.title,
+    },
+    undefined,
+    { maxBytes: LINEAR_TICKET_MAX_BYTES, timeoutMs: 15_000 }
+  );
+}
+
+/** Cancels a newer duplicate this process just filed for the same thread. */
+export async function cancelMigrationTicket(
+  ctx: ProviderContext,
+  identifier: string
+): Promise<ExecutorOutcome> {
+  return await invokeProvider(
+    ctx,
+    LINEAR_TICKET_PATH,
+    { id: identifier, state: "Canceled" },
     undefined,
     { maxBytes: LINEAR_TICKET_MAX_BYTES, timeoutMs: 15_000 }
   );

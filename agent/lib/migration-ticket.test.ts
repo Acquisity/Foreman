@@ -7,16 +7,25 @@ import {
   COMPILED_MANIFEST_PATH,
   readCompiledManifest,
 } from "./capability-budget.js";
-import { createMigrationTicket, invokeProvider } from "./executor/dispatch.js";
+import {
+  cancelMigrationTicket,
+  createMigrationTicket,
+  FOREMAN_LINEAR_AGENT,
+  invokeProvider,
+  MIGRATION_TICKET_OWNER,
+} from "./executor/dispatch.js";
 import { ExecutorError, executorTransport } from "./executor/transport.js";
 import { isTriageIntakeAsk } from "./linear-context.js";
 import {
+  type Candidate,
   fileMigrationTicket,
+  MAX_CANDIDATES,
   type MigrationTicketDeps,
   type MigrationTicketInput,
+  readCandidates,
 } from "./migration-ticket.js";
 import {
-  MIGRATION_TICKET_OWNER,
+  filingScope,
   migrationFiledReport,
   migrationScopeBlock,
   migrationTicketScope,
@@ -74,12 +83,13 @@ const slackAuth = (
 
 const ctxFor = (
   current: SessionAuthContext,
-  initiator: SessionAuthContext = current
+  initiator: SessionAuthContext = current,
+  parent?: { sessionId: string }
 ) =>
   ({
     abortSignal: AbortSignal.timeout(2000),
     getToken: async () => ({ token: "test-token" }),
-    session: { auth: { current, initiator } },
+    session: { auth: { current, initiator }, ...(parent ? { parent } : {}) },
   }) as never;
 
 const complete: MigrationTicketInput = {
@@ -98,45 +108,80 @@ const complete: MigrationTicketInput = {
   where: "Conversations, Needs reply tab",
 };
 
-interface Recorder {
-  created: Record<string, unknown>[];
-  deps: Partial<MigrationTicketDeps>;
-  lookups: string[];
-  searches: string[][];
-  synced: { issue: string; title: string; url: string }[];
+interface StoredTicket {
+  createdAt: string;
+  identifier: string;
+  stateType: string;
+  url: string;
 }
 
+interface Recorder {
+  cancelled: string[];
+  created: {
+    description: string;
+    link: { title: string; url: string };
+    title: string;
+  }[];
+  deps: MigrationTicketDeps;
+  lookups: string[];
+  searches: string[][];
+  store: StoredTicket[];
+  synced: { issue: string; title?: string; url: string }[];
+}
+
+const urlOf = (identifier: string) =>
+  `https://linear.app/acquisity/issue/${identifier}/texts-fail`;
+
+/** A fake Linear: tickets live in one store every dependency reads and writes. */
 const recorder = (
   options: {
-    existing?: { identifier: string; stateType: string; url: string }[];
-    related?: {
-      identifier: string;
-      stateType: string;
-      title: string;
-      url: string;
-    }[];
+    existing?: Omit<StoredTicket, "createdAt">[];
     memberOf?: Record<string, string[]>;
     records?: Record<string, string>;
+    related?: Candidate[];
+    relatedTruncated?: boolean;
     reporter?: string | null;
+    synced?: Record<string, boolean | null>;
   } = {}
 ): Recorder => {
+  let next = 20_001;
   const rec: Recorder = {
+    cancelled: [],
     created: [],
-    deps: {},
+    deps: {} as MigrationTicketDeps,
     lookups: [],
     searches: [],
+    store: (options.existing ?? []).map((ticket, index) => ({
+      ...ticket,
+      createdAt: `2026-10-27T00:00:0${index}Z`,
+    })),
     synced: [],
   };
   rec.deps = {
-    create: (_ctx, input) => {
+    cancel: (_ctx, identifier) => {
+      rec.cancelled.push(identifier);
+      const ticket = rec.store.find((item) => item.identifier === identifier);
+      if (ticket) {
+        ticket.stateType = "canceled";
+      }
+      return Promise.resolve({ data: {}, ok: true } as never);
+    },
+    create: async (_ctx, input) => {
       rec.created.push(input);
-      return Promise.resolve({
-        data: {
-          id: "ENG-20001",
-          url: "https://linear.app/acquisity/issue/ENG-20001/texts-fail",
-        },
+      const identifier = `ENG-${next}`;
+      next += 1;
+      // Yield first, so two racing filers both read before either writes.
+      await Promise.resolve();
+      rec.store.push({
+        createdAt: `2026-10-28T10:00:${String(next).slice(-2)}Z`,
+        identifier,
+        stateType: "triage",
+        url: urlOf(identifier),
+      });
+      return {
+        data: { id: identifier, url: urlOf(identifier) },
         ok: true,
-      } as never);
+      } as never;
     },
     lookupMemberships: (email) => {
       rec.lookups.push(email);
@@ -149,7 +194,11 @@ const recorder = (
       Promise.resolve(
         organizationId === AIA ? (options.records?.[record.id] ?? null) : null
       ),
-    related: () => Promise.resolve(options.related ?? []),
+    related: () =>
+      Promise.resolve({
+        issues: options.related ?? [],
+        truncated: options.relatedTruncated ?? false,
+      }),
     requester: () =>
       Promise.resolve(
         options.reporter === null
@@ -159,19 +208,31 @@ const recorder = (
               status: "known" as const,
             }
       ),
-    search: (phrases) => {
-      rec.searches.push(phrases);
-      return Promise.resolve(
-        (options.existing ?? []).map((issue) => ({ ...issue }))
-      );
-    },
+    synced: (_ctx, issue) =>
+      Promise.resolve(
+        options.synced && issue in options.synced
+          ? (options.synced[issue] ?? null)
+          : true
+      ),
     syncSlack: (_ctx, issue, link) => {
       rec.synced.push({ issue, ...link });
       return Promise.resolve(true);
     },
+    thread: (key) => {
+      rec.searches.push([key]);
+      return Promise.resolve(rec.store.map((ticket) => ({ ...ticket })));
+    },
   };
   return rec;
 };
+
+const candidate = (identifier: string): Candidate => ({
+  excerpt: "Texts sent from Conversations fail with message failed.",
+  identifier,
+  state: "In Progress",
+  title: "Texts fail from Conversations",
+  url: urlOf(identifier),
+});
 
 const member = { "rep@example.com": [AIA] };
 
@@ -328,7 +389,7 @@ describe("file_migration_ticket affected user", () => {
 });
 
 describe("file_migration_ticket filing", () => {
-  it("files a form-shaped Triage ticket that reaches Foreman's triage", async () => {
+  it("files a form-shaped ticket linked to the thread", async () => {
     const rec = recorder({ memberOf: member });
     const result = await fileMigrationTicket(
       ctxFor(slackAuth(MIGRATION)),
@@ -343,25 +404,20 @@ describe("file_migration_ticket filing", () => {
       existing: false,
       identifier: "ENG-20001",
       threadSynced: true,
-      url: "https://linear.app/acquisity/issue/ENG-20001/texts-fail",
+      url: urlOf("ENG-20001"),
     });
     const [input] = rec.created;
-    assert.equal(input?.team, "Engineering Team");
-    assert.equal(input?.state, "Triage");
-    assert.equal(input?.assignee, MIGRATION_TICKET_OWNER.assignee);
-    assert.equal(input?.delegate, MIGRATION_TICKET_OWNER.delegate);
-    assert.equal("labels" in (input ?? {}), false);
     const permalink = slackThreadPermalink(MIGRATION, THREAD);
     assert.equal(
       permalink,
       "https://acquisityworkspace.slack.com/archives/C0BQM9V6P47/p1789231558984729"
     );
-    const links = input?.links as { title: string; url: string }[];
-    assert.deepEqual(links, [
-      { title: "Ask from rep@example.com", url: permalink },
-    ]);
+    assert.deepEqual(input?.link, {
+      title: "Ask from rep@example.com",
+      url: permalink,
+    });
     // The same check the Linear channel runs before a triage session starts.
-    assert.equal(isTriageIntakeAsk(links), true);
+    assert.equal(isTriageIntakeAsk(input ? [input.link] : []), true);
     const description = String(input?.description);
     for (const heading of FORM_HEADINGS) {
       assert.ok(description.includes(`#### ${heading}\n`), heading);
@@ -378,11 +434,7 @@ describe("file_migration_ticket filing", () => {
       )
     );
     assert.deepEqual(rec.synced, [
-      {
-        issue: "ENG-20001",
-        title: "Ask from rep@example.com",
-        url: permalink,
-      },
+      { issue: "ENG-20001", title: "Ask from rep@example.com", url: permalink },
     ]);
   });
 
@@ -392,7 +444,7 @@ describe("file_migration_ticket filing", () => {
         {
           identifier: "ENG-19999",
           stateType: "triage",
-          url: "https://linear.app/acquisity/issue/ENG-19999/x",
+          url: urlOf("ENG-19999"),
         },
       ],
       memberOf: member,
@@ -405,30 +457,51 @@ describe("file_migration_ticket filing", () => {
     assert.deepEqual(result, {
       existing: true,
       identifier: "ENG-19999",
-      url: "https://linear.app/acquisity/issue/ENG-19999/x",
+      threadSynced: true,
+      url: urlOf("ENG-19999"),
     });
     assert.deepEqual(rec.searches, [[`${MIGRATION}/${THREAD}`]]);
     assert.equal(rec.created.length, 0);
   });
 
-  it("files again only when the thread's earlier ticket was canceled", async () => {
-    const rec = recorder({
+  it("C3: a completed ticket still covers the thread; only a canceled one does not", async () => {
+    const done = recorder({
       existing: [
         {
           identifier: "ENG-19999",
-          stateType: "canceled",
-          url: "https://linear.app/acquisity/issue/ENG-19999/x",
+          stateType: "completed",
+          url: urlOf("ENG-19999"),
         },
       ],
       memberOf: member,
     });
-    const result = await fileMigrationTicket(
+    const doneResult = await fileMigrationTicket(
       ctxFor(slackAuth(MIGRATION)),
       complete,
-      rec.deps
+      done.deps
     );
-    assert.ok("identifier" in result && result.existing === false);
-    assert.equal(rec.created.length, 1);
+    assert.ok("identifier" in doneResult && doneResult.existing === true);
+    assert.equal(doneResult.identifier, "ENG-19999");
+    assert.equal(done.created.length, 0);
+    const canceled = recorder({
+      existing: [
+        {
+          identifier: "ENG-19999",
+          stateType: "canceled",
+          url: urlOf("ENG-19999"),
+        },
+      ],
+      memberOf: member,
+    });
+    const canceledResult = await fileMigrationTicket(
+      ctxFor(slackAuth(MIGRATION)),
+      complete,
+      canceled.deps
+    );
+    assert.ok(
+      "identifier" in canceledResult && canceledResult.existing === false
+    );
+    assert.equal(canceled.created.length, 1);
   });
 
   it("keeps the ticket when the Slack thread sync fails", async () => {
@@ -441,25 +514,82 @@ describe("file_migration_ticket filing", () => {
     );
     assert.ok("identifier" in result);
     assert.equal(result.existing, false);
-    assert.equal("threadSynced" in result && result.threadSynced, false);
+    assert.equal(result.threadSynced, false);
+  });
+
+  it("C4: a later call repairs an unsynced thread and always reports threadSynced", async () => {
+    const existing = [
+      { identifier: "ENG-19999", stateType: "triage", url: urlOf("ENG-19999") },
+    ];
+    const unsynced = recorder({
+      existing,
+      memberOf: member,
+      synced: { "ENG-19999": false },
+    });
+    const repaired = await fileMigrationTicket(
+      ctxFor(slackAuth(MIGRATION)),
+      complete,
+      unsynced.deps
+    );
+    assert.deepEqual(repaired, {
+      existing: true,
+      identifier: "ENG-19999",
+      threadSynced: true,
+      url: urlOf("ENG-19999"),
+    });
+    // The repair passes no title, so the reporter's 'Ask from' title stays.
+    assert.deepEqual(unsynced.synced, [
+      { issue: "ENG-19999", url: slackThreadPermalink(MIGRATION, THREAD) },
+    ]);
+    const alreadySynced = recorder({ existing, memberOf: member });
+    const kept = await fileMigrationTicket(
+      ctxFor(slackAuth(MIGRATION)),
+      complete,
+      alreadySynced.deps
+    );
+    assert.ok("threadSynced" in kept && kept.threadSynced === true);
+    assert.equal(alreadySynced.synced.length, 0);
+    // When the anchor cannot be read, nothing is re-linked blindly.
+    const unreadable = recorder({
+      existing,
+      memberOf: member,
+      synced: { "ENG-19999": null },
+    });
+    const unknown = await fileMigrationTicket(
+      ctxFor(slackAuth(MIGRATION)),
+      complete,
+      unreadable.deps
+    );
+    assert.ok("threadSynced" in unknown && unknown.threadSynced === false);
+    assert.equal(unreadable.synced.length, 0);
+  });
+
+  it("C1: two concurrent filings in one thread leave exactly one live ticket", async () => {
+    const rec = recorder({ memberOf: member });
+    const ctx = ctxFor(slackAuth(MIGRATION));
+    const [first, second] = await Promise.all([
+      fileMigrationTicket(ctx, complete, rec.deps),
+      fileMigrationTicket(ctx, complete, rec.deps),
+    ]);
+    assert.equal(rec.created.length, 2);
+    const live = rec.store.filter((ticket) => ticket.stateType !== "canceled");
+    assert.deepEqual(
+      live.map((ticket) => ticket.identifier),
+      ["ENG-20001"]
+    );
+    assert.deepEqual(rec.cancelled, ["ENG-20002"]);
+    for (const result of [first, second]) {
+      assert.ok("identifier" in result);
+      assert.equal(result.identifier, "ENG-20001");
+    }
   });
 });
 
 describe("file_migration_ticket related tickets", () => {
-  const covering = {
-    identifier: "ENG-15156",
-    stateType: "started",
-    title: "Texts fail from Conversations",
-    url: "https://linear.app/acquisity/issue/ENG-15156/x",
-  };
-
-  it("lists an open ticket that may already cover the report and files nothing", async () => {
+  it("C2: lists open candidates with their state and a description excerpt", async () => {
     const rec = recorder({
       memberOf: member,
-      related: [
-        covering,
-        { ...covering, identifier: "ENG-1", stateType: "completed" },
-      ],
+      related: [candidate("ENG-15156")],
     });
     const result = await fileMigrationTicket(
       ctxFor(slackAuth(MIGRATION)),
@@ -467,21 +597,111 @@ describe("file_migration_ticket related tickets", () => {
       rec.deps
     );
     assert.ok("candidates" in result);
-    assert.deepEqual(
-      result.candidates.map((candidate) => candidate.identifier),
-      ["ENG-15156"]
-    );
+    assert.deepEqual(result.candidates, [candidate("ENG-15156")]);
+    assert.equal(result.truncated, false);
     assert.equal(rec.created.length, 0);
   });
 
-  it("files once the model has read the candidates and none covers it", async () => {
-    const rec = recorder({ memberOf: member, related: [covering] });
+  it("C2: reads candidates once, open ones only, with a bounded excerpt", async () => {
+    const requests: unknown[] = [];
+    const long = "x".repeat(2000);
+    const { issues, truncated } = await readCandidates(
+      ["text message failed", "composer send"],
+      {
+        client: (request) => {
+          requests.push(request);
+          return Promise.resolve({
+            data: {
+              data: {
+                issues: {
+                  nodes: [
+                    {
+                      comments: { nodes: [] },
+                      createdAt: "2026-10-20T00:00:00Z",
+                      description: long,
+                      identifier: "ENG-15156",
+                      state: { name: "In Progress" },
+                      title: "Texts fail",
+                      url: urlOf("ENG-15156"),
+                    },
+                  ],
+                },
+              },
+            },
+            status: 200,
+          });
+        },
+      }
+    );
+    assert.equal(requests.length, 1);
+    const sent = requests[0] as {
+      input: { variables: { filter: { and: unknown[] } } };
+      operation: string;
+    };
+    assert.equal(sent.operation, "linear.IssueBodies");
+    assert.deepEqual(sent.input.variables.filter.and[1], {
+      state: { type: { nin: ["canceled", "completed"] } },
+    });
+    assert.equal(issues[0]?.state, "In Progress");
+    assert.equal(issues[0]?.excerpt.length, 603);
+    assert.equal(truncated, false);
+  });
+
+  it("files once the model acknowledges exactly the candidates shown", async () => {
+    const rec = recorder({
+      memberOf: member,
+      related: [candidate("ENG-15156")],
+    });
     const result = await fileMigrationTicket(
       ctxFor(slackAuth(MIGRATION)),
       { ...complete, reviewedCandidates: ["ENG-15156"] },
       rec.deps
     );
     assert.ok("identifier" in result && result.existing === false);
+  });
+
+  it("T3: shows at most 20, needs exactly those acknowledged, and says when more matched", async () => {
+    const many = Array.from({ length: 21 }, (_, index) =>
+      candidate(`ENG-${15_000 + index}`)
+    );
+    const rec = recorder({ memberOf: member, related: many });
+    const first = await fileMigrationTicket(
+      ctxFor(slackAuth(MIGRATION)),
+      complete,
+      rec.deps
+    );
+    assert.ok("candidates" in first);
+    assert.equal(first.candidates.length, MAX_CANDIDATES);
+    assert.equal(first.truncated, true);
+    const shown = first.candidates.map((item) => item.identifier);
+    // Acknowledging fewer than shown does not file.
+    const partial = await fileMigrationTicket(
+      ctxFor(slackAuth(MIGRATION)),
+      { ...complete, reviewedCandidates: shown.slice(1) },
+      rec.deps
+    );
+    assert.ok("candidates" in partial);
+    const filed = await fileMigrationTicket(
+      ctxFor(slackAuth(MIGRATION)),
+      { ...complete, reviewedCandidates: shown },
+      rec.deps
+    );
+    assert.ok("identifier" in filed && filed.existing === false);
+    assert.equal(rec.created.length, 1);
+  });
+
+  it("T3: carries the read's own truncation through", async () => {
+    const rec = recorder({
+      memberOf: member,
+      related: [candidate("ENG-15156")],
+      relatedTruncated: true,
+    });
+    const result = await fileMigrationTicket(
+      ctxFor(slackAuth(MIGRATION)),
+      complete,
+      rec.deps
+    );
+    assert.ok("candidates" in result && result.truncated === true);
   });
 });
 
@@ -529,6 +749,35 @@ describe("file_migration_ticket channel gating", () => {
     );
     assert.ok("error" in appPublishing);
     assert.equal(rec.created.length, 0);
+  });
+
+  it("C1: refuses a delegated child that inherited the rep's Slack auth", async () => {
+    const rec = recorder({ memberOf: member });
+    const auth = slackAuth(MIGRATION);
+    const child = ctxFor(auth, auth, { sessionId: "parent-session" });
+    assert.equal(
+      filingScope({
+        auth: { current: auth, initiator: auth },
+        parent: { sessionId: "parent-session" },
+      }),
+      null
+    );
+    const result = await fileMigrationTicket(child, complete, rec.deps);
+    assert.ok("error" in result);
+    assert.equal(rec.created.length, 0);
+    // The Executor gate refuses the child's write too, before dispatch.
+    await assert.rejects(
+      createMigrationTicket(child, {
+        description: `x\n\n${migrationScopeBlock(migrationTicketScope(auth) ?? assert.fail(), "rep@example.com")}`,
+        link: {
+          title: "Ask from rep@example.com",
+          url: slackThreadPermalink(MIGRATION, THREAD),
+        },
+        title: "Forged",
+      }),
+      (error: unknown) =>
+        error instanceof ExecutorError && error.code === "questions_only"
+    );
   });
 
   it("refuses a hand-built Linear ticket write from a questions-only session before dispatch", async () => {
@@ -601,44 +850,55 @@ describe("a filed ticket reaches Foreman's triage", () => {
 });
 
 describe("the real ticket write passes the questions-only gate", () => {
-  it("dispatches the built ticket, and only for its own thread", async () => {
+  it("dispatches the shared-contract ticket, and only for its own thread", async () => {
     const original = executorTransport.call;
     const calls: unknown[][] = [];
     executorTransport.call = ((...args: unknown[]) => {
       calls.push(args);
       return Promise.resolve({
-        data: {
-          id: "ENG-20001",
-          url: "https://linear.app/acquisity/issue/ENG-20001/texts-fail",
-        },
+        data: { id: "ENG-20001", url: urlOf("ENG-20001") },
         ok: true,
       });
     }) as typeof executorTransport.call;
     try {
       const rec = recorder({ memberOf: member });
-      const { create: _recorded, ...deps } = rec.deps;
+      const { cancel: _cancel, create: _create, ...deps } = rec.deps;
       const ctx = ctxFor(slackAuth(MIGRATION));
       const result = await fileMigrationTicket(ctx, complete, deps);
       assert.ok("identifier" in result && result.existing === false);
       assert.equal(calls.length, 1);
       assert.equal(calls[0]?.[1], "linear.org.workspaceLinear.save_issue");
-      // The same ticket sent from another thread of the same channel is refused.
       const sent = calls[0]?.[2] as Record<string, unknown>;
+      assert.equal(sent.team, "Engineering Team");
+      assert.equal(sent.state, "Triage");
+      assert.equal(sent.assignee, MIGRATION_TICKET_OWNER.assignee);
+      assert.equal(sent.delegate, FOREMAN_LINEAR_AGENT);
+      assert.equal("labels" in sent, false);
+      const [link] = sent.links as { title: string; url: string }[];
+      assert.ok(link);
+      // The same ticket sent from another thread of the same channel is refused.
       await assert.rejects(
         createMigrationTicket(
           ctxFor(slackAuth(MIGRATION, "U0REP", "1789231999.000001")),
-          sent as never
+          { description: String(sent.description), link, title: "Forged" }
         ),
         (error: unknown) =>
           error instanceof ExecutorError && error.code === "questions_only"
       );
-      assert.equal(calls.length, 1);
+      // Cancelling is allowed only for a ticket this thread just filed here.
+      await cancelMigrationTicket(ctx, "ENG-20001");
+      assert.deepEqual(calls[1]?.[2], { id: "ENG-20001", state: "Canceled" });
+      await assert.rejects(
+        cancelMigrationTicket(ctx, "ENG-1"),
+        (error: unknown) =>
+          error instanceof ExecutorError && error.code === "questions_only"
+      );
+      assert.equal(calls.length, 2);
     } finally {
       executorTransport.call = original;
     }
   });
 });
-
 describe("eve offers file_migration_ticket only in a ticket-filing thread", () => {
   it("admits the tool with stamped callbacks for the migration thread alone", {
     skip: [COMPILED_MANIFEST_PATH, COMPILE_METADATA_PATH].every((path) =>

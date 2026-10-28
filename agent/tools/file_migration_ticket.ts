@@ -9,7 +9,7 @@ import { filingScope } from "#lib/migration-ticket-scope.js";
 
 export const tool = defineTool({
   approval: (ctx) =>
-    filingScope(ctx.session.auth)
+    filingScope(ctx.session)
       ? "not-applicable"
       : {
           reason: "Only a person in a ticket-filing channel's thread can file.",
@@ -21,12 +21,7 @@ export const tool = defineTool({
   inputSchema: migrationTicketInputSchema,
   outputSchema: z.union([
     z.object({
-      existing: z.literal(true),
-      identifier: z.string(),
-      url: z.string(),
-    }),
-    z.object({
-      existing: z.literal(false),
+      existing: z.boolean(),
       identifier: z.string(),
       threadSynced: z.boolean(),
       url: z.string(),
@@ -44,7 +39,6 @@ export const tool = defineTool({
 
 export default defineDynamic({
   events: {
-    "step.started": (_event, ctx) =>
-      filingScope(ctx.session.auth) ? tool : null,
+    "step.started": (_event, ctx) => (filingScope(ctx.session) ? tool : null),
   },
 });
