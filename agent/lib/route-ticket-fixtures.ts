@@ -84,6 +84,7 @@ export const fakeLinear = ({
   masterAssignee = { id: "u-anuj", name: "Anuj Bhatt" },
   readBackFails = false,
   relationFails = false,
+  updateFailures = 0,
   teamLabels = [],
   ticketAssignee = null,
   ticketLabels,
@@ -92,12 +93,15 @@ export const fakeLinear = ({
   masterAssignee?: { id: string; name: string };
   readBackFails?: boolean;
   relationFails?: boolean;
+  /** How many issue updates fail before one lands. */
+  updateFailures?: number;
   teamLabels?: { id: string; name: string }[];
   ticketAssignee?: { id: string; name: string } | null;
   ticketLabels?: { id: string; name: string }[];
 } = {}) => {
   const calls: Call[] = [];
   const relations: string[] = [];
+  let failedUpdates = 0;
   type Vars = Record<string, unknown>;
   const routeIssue = (variables: Vars) => {
     if (variables.id === "ENG-999999") {
@@ -157,11 +161,19 @@ export const fakeLinear = ({
       "linear.RouteIssue": routeIssue,
       // Linear refuses the Duplicate state until the duplicate relation
       // exists, and then writes nothing (ENG-15734, ENG-15935, ENG-15785).
-      "linear.RouteIssueUpdate": (variables) =>
-        (variables.input as Vars).stateId === "s-duplicate" &&
-        !relations.some((r) => r.startsWith(`${variables.id}>`))
-          ? json({ errors: [{ message: MISSING_RELATION }] })
-          : json({ data: { issueUpdate: { success: true } } }),
+      "linear.RouteIssueUpdate": (variables) => {
+        if (
+          (variables.input as Vars).stateId === "s-duplicate" &&
+          !relations.some((r) => r.startsWith(`${variables.id}>`))
+        ) {
+          return json({ errors: [{ message: MISSING_RELATION }] });
+        }
+        if (failedUpdates < updateFailures) {
+          failedUpdates += 1;
+          return json({ errors: [{ message: "Linear is busy" }] });
+        }
+        return json({ data: { issueUpdate: { success: true } } });
+      },
       "linear.RouteRelation": (variables) => {
         if (!relationFails) {
           const input = variables.input as Record<string, string>;

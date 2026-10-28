@@ -320,4 +320,38 @@ describe("a duplicate under a master (ENG-16608)", () => {
     await reconcile(s);
     assert.deepEqual(await reconcile(s), { kind: "posted", stage: "fixed" });
   });
+
+  it("lets a Canceled master govern, so a fixed match sends no fixed message (Devin 4)", async () => {
+    const dup = duplicate();
+    dup.facts.parent = { identifier: "ENG-50", stateType: "canceled" };
+    const report = doneOriginal({ pullUrls: [PR_URL] });
+    const master = doneOriginal({
+      identifier: "ENG-50",
+      stateName: "Canceled",
+      stateType: "canceled",
+    });
+    const s = setup([dup, report, master], LIVE);
+    const events = withLog(s);
+    await reconcile(s);
+    await reconcile(s);
+    assert.deepEqual(
+      s.linear.posts.map((p) => p.body),
+      [DUPLICATE_TEXT]
+    );
+    assert.deepEqual(events.at(-1), {
+      event: "reporter.update.duplicate_dropped",
+      fields: { code: "original_canceled", issue: "ENG-1", outcome: "skipped" },
+    });
+  });
+
+  it("still posts the master's live fix when the matched report cannot be read (Devin 6)", async () => {
+    const dup = duplicate();
+    dup.facts.parent = { identifier: "ENG-50", stateType: "completed" };
+    const master = doneOriginal({ identifier: "ENG-50", pullUrls: [PR_URL] });
+    const s = setup([dup, doneOriginal(), master], LIVE);
+    s.linear.state.failOriginals.add("ENG-9");
+    withLog(s);
+    await reconcile(s);
+    assert.deepEqual(await reconcile(s), { kind: "posted", stage: "fixed" });
+  });
 });

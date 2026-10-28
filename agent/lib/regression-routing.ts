@@ -112,8 +112,9 @@ const recordedOn = (input: TriageInput, url: string): boolean => {
     )
   );
 };
+/** A comment link names its comment by the first 8 hex digits of its id, or by the whole id. */
 const LINEAR_COMMENT_URL =
-  /^https:\/\/linear\.app\/[\w-]+\/issue\/([A-Za-z]+-\d+)(?:\/[\w-]*)?#comment-([\da-f]{8,})$/iu;
+  /^https:\/\/linear\.app\/[\w-]+\/issue\/([A-Za-z]+-\d+)(?:\/[\w-]*)?#comment-([\da-f]{8}(?:-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12})?)$/iu;
 const LINEAR_DOCUMENT_URL =
   /^https:\/\/linear\.app\/[\w-]+\/(?:document|d)\/(?:[\w-]*-)?([\da-f]+)(?:[/?#]|$)/u;
 

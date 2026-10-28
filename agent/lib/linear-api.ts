@@ -810,7 +810,7 @@ async function writeUpdate(
       throw error;
     }
     throw new Error(
-      `The duplicate relation to ${after.duplicateOf} was recorded, but the update failed (${reason(error)}). Call route_ticket again without duplicateOf${after.parent ? `, with parent ${after.parent}` : ""}, to apply the rest.`,
+      `The duplicate relation to ${after.duplicateOf} was recorded, but the update failed (${reason(error)}). Call route_ticket again without duplicateOf${after.parent ? `, with parent ${after.parent} and inheritAssigneeFrom ${after.parent}` : ""}, to apply the rest.`,
       { cause: error }
     );
   }

@@ -290,26 +290,39 @@ export const reconcileTicket = async (
 };
 
 /**
- * What a duplicate follows: its master (ENG-16608) and its match, master
- * first. The fixing pull request may be linked to either, so any of them with
- * linked pull requests wins and their pull requests are pooled; otherwise the
- * master decides, because the match may be an earlier duplicate closed unfixed.
+ * What a duplicate follows: its master (ENG-16608) and its match. The master's
+ * outcome governs: a Canceled master ends the wait whatever the match shows.
+ * Otherwise the fixing pull request may be linked to either, so their linked
+ * pull requests are pooled. Each is read on its own, so one failed read never
+ * hides the other; only when every read fails does the error stand.
  */
 const followedOriginal = async (
-  identifiers: (string | null | undefined)[],
+  master: string | undefined,
+  match: string | null,
   deps: Deps
 ): Promise<TicketFacts | null> => {
-  const wanted = [...new Set(identifiers.filter((id): id is string => !!id))];
-  const read = (
-    await Promise.all(wanted.map((id) => deps.linear.readOriginal(id)))
-  ).filter((facts): facts is TicketFacts => facts !== null);
+  const wanted = [...new Set([master, match].filter((id) => !!id))] as string[];
+  const results = await Promise.allSettled(
+    wanted.map((id) => deps.linear.readOriginal(id))
+  );
+  const read = results.flatMap((result) =>
+    result.status === "fulfilled" && result.value ? [result.value] : []
+  );
+  const failed = results.find((result) => result.status === "rejected");
+  if (failed && read.length === 0) {
+    throw failed.reason;
+  }
+  const governing = read.find((facts) => facts.identifier === master);
+  if (governing && closureOf(governing).kind === "not_fixed") {
+    return governing;
+  }
   const fixed = read.filter(
     (facts) => closureOf(facts).kind === "needs_deploy"
   );
   const [first] = fixed;
   return first
     ? { ...first, pullUrls: [...new Set(fixed.flatMap((f) => f.pullUrls))] }
-    : (read[0] ?? null);
+    : (governing ?? read[0] ?? null);
 };
 
 const originalFollowUp = async (
@@ -319,7 +332,8 @@ const originalFollowUp = async (
 ): Promise<Planned | Outcome | null> => {
   const { duplicateOf, identifier, parent } = view.facts;
   const original = await followedOriginal(
-    [parent?.identifier, duplicateOf],
+    parent?.identifier,
+    duplicateOf,
     deps
   );
   if (!original) {

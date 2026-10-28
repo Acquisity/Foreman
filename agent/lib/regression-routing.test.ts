@@ -442,3 +442,16 @@ test("an explanation reads the ticket's change records once and keeps Done when 
   assert.equal(decision.route.state, "Done");
   assert.equal(reads, 1);
 });
+
+test("a comment link in Linear's full comment id form counts when that comment is on this ticket (Devin 5)", () => {
+  const found = explanationOf(
+    "https://linear.app/acquisity/issue/ENG-1/replies-stopped#comment-1a2b3c4d-0000-4000-8000-000000000001"
+  );
+  assert.ok(found.outcome === "route");
+  assert.equal(found.route.state, "Done");
+  const missing = explanationOf(
+    "https://linear.app/acquisity/issue/ENG-1#comment-9f9f9f9f-0000-4000-8000-000000000009"
+  );
+  assert.ok(missing.outcome === "route");
+  assert.equal(missing.route.state, "Canceled");
+});

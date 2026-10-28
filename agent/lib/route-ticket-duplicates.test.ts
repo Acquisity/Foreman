@@ -50,6 +50,8 @@ const MASTER_OUTSIDE_MAP =
   /ENG-70 is held by Pieter Venter, who is not in the owner map, so nothing was written/u;
 const PARENT_NOT_MASTER =
   /ENG-40 is a customer report, not a master, so nothing was written/u;
+const RETRY_FROM_MASTER =
+  /Call route_ticket again without duplicateOf, with parent ENG-30 and inheritAssigneeFrom ENG-30/u;
 const STALE_MASTER =
   /ENG-50 was created before 2026-09-28T00:00:00.000Z, so it cannot take new reports and nothing was written/u;
 
@@ -280,5 +282,35 @@ describe("routeTicket duplicate masters, review fixes", () => {
     );
     assert.equal(updateOf(fake)?.parentId, "i-ENG-30");
     assert.equal(updateOf(fake)?.assigneeId, "u-anuj");
+  });
+
+  it("tells a retry after a recorded relation to inherit from the master, so the match's owner never lands (R2)", async () => {
+    const fake = linear({ updateFailures: 1 });
+    const first = {
+      duplicateOf: "ENG-22",
+      inheritAssigneeFrom: "ENG-22",
+      issue: "ENG-1",
+      state: "Duplicate",
+    };
+    const refusal = await routeTicket(first, { client: fake.fetchStub }).then(
+      () => "",
+      (error: Error) => error.message
+    );
+    assert.match(refusal, RETRY_FROM_MASTER);
+    await routeTicket(
+      {
+        inheritAssigneeFrom: "ENG-30",
+        issue: "ENG-1",
+        parent: "ENG-30",
+        state: "Duplicate",
+      },
+      { client: fake.fetchStub }
+    );
+    const landed = fake.updates().at(-1)?.variables.input as Record<
+      string,
+      unknown
+    >;
+    assert.equal(landed.parentId, "i-ENG-30");
+    assert.equal(landed.assigneeId, "u-anuj");
   });
 });
