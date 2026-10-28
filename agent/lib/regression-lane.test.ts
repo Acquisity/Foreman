@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import { mkdirSync } from "node:fs";
 import { after, describe, it } from "node:test";
 import {
@@ -36,6 +37,7 @@ const NO_HISTORY = /no git history/u;
 const NARROW = /narrow the line range/u;
 const THROWN = /^unchecked: the check failed: broker down/u;
 const NOT_PROVEN = /could not|Could not/u;
+const NO_PATCH = /git shows no patch/u;
 
 after(removeSandbox);
 
@@ -419,6 +421,77 @@ describe("history", () => {
     });
     assert.ok(!listed.ok);
     assert.match(listed.reason, NARROW);
+  });
+});
+
+describe("merges whose change git log -L cannot show", () => {
+  const mergeResolution = () => {
+    const origin = new Origin();
+    history(origin);
+    git(origin.path, ["checkout", "--quiet", "-b", "side"]);
+    const side = origin.commit(
+      12,
+      { [FILE]: sendLimit("count * 2") },
+      "feat: side"
+    );
+    git(origin.path, ["checkout", "--quiet", "main"]);
+    const main = origin.commit(
+      11,
+      { [FILE]: sendLimit("count * 3") },
+      "feat: main"
+    );
+    spawnSync("git", ["merge", "--quiet", "--no-edit", "side"], {
+      cwd: origin.path,
+      env: { ...process.env, GIT_CONFIG_GLOBAL: "/dev/null" },
+    });
+    const merge = origin.commit(
+      6,
+      { [FILE]: sendLimit("count") },
+      "Merge side, resolving the limit"
+    );
+    return { main, merge, origin, side };
+  };
+
+  it("never asks for a label without a patch, and a merge newer than the decisive commit leaves it unchecked", async () => {
+    const { main, merge, origin, side } = mergeResolution();
+    const worktree = origin.clone(50);
+    const first = await runCheckRegression(
+      deps(worktree, origin, merge),
+      input({ readCommit: merge })
+    );
+    assert.ok(first.status === "labels_needed", JSON.stringify(first));
+    const shas = first.candidates.map((candidate) => candidate.sha);
+    assert.ok(!shas.includes(merge));
+    assert.ok(first.candidates.every((candidate) => candidate.patch.trim()));
+    assert.deepEqual([...shas].sort(), [main, side].sort());
+    assert.deepEqual(first.unavailable, [merge]);
+    const record = recorded(
+      await runCheckRegression(
+        deps(worktree, origin, merge),
+        input({
+          labels: [
+            { role: "introduced", sha: main },
+            { role: "introduced", sha: side },
+          ],
+          readCommit: merge,
+        })
+      )
+    );
+    assert.equal(record.kind, "unchecked");
+    assert.match(record.line, NO_PATCH);
+    assert.ok(record.line.includes(merge));
+    const labelled = await runCheckRegression(
+      deps(worktree, origin, merge),
+      input({
+        labels: [
+          { role: "fixed", sha: merge },
+          { role: "introduced", sha: main },
+          { role: "introduced", sha: side },
+        ],
+        readCommit: merge,
+      })
+    );
+    assert.equal(labelled.status, "error");
   });
 });
 

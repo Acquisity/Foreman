@@ -220,8 +220,11 @@ export async function ensureHistory(
  * The commits from the window that touched the blamed lines, newest first by
  * topology, each with its patch. `git log -L` tracks the range back through
  * every revision itself, so each patch shows the lines as they were in that
- * commit. More than {@link MAX_CANDIDATES} is refused: every candidate has to
- * be labelled, so a range that busy needs narrowing.
+ * commit. A merge whose resolution git can't show for the range comes back
+ * with an empty patch: it is never offered for a label, and if it is newer
+ * than the decisive commit the result is unchecked. More than
+ * {@link MAX_CANDIDATES} is refused: every candidate has to be labelled, so a
+ * range that busy needs narrowing.
  */
 export async function listCandidates(
   shell: Shell,
@@ -349,11 +352,18 @@ export async function resolveRegression(options: {
   const decisive = candidates
     .map((candidate) => ({
       candidate,
-      role: options.labels.find((label) => label.sha === candidate.sha)?.role,
+      role: candidate.patch
+        ? options.labels.find((label) => label.sha === candidate.sha)?.role
+        : "unavailable",
     }))
     .find((entry) => entry.role && entry.role !== "neither");
   if (!decisive) {
     return resolution("none");
+  }
+  if (decisive.role === "unavailable") {
+    return unchecked(
+      `merge ${decisive.candidate.sha} changed the blamed lines but git shows no patch for it, so its effect cannot be labelled`
+    );
   }
   const { date, sha } = decisive.candidate;
   if (decisive.role === "introduced") {
@@ -402,7 +412,7 @@ export interface CheckDeps {
 }
 
 export type CheckResult =
-  | { candidates: Candidate[]; status: "labels_needed" }
+  | { candidates: Candidate[]; status: "labels_needed"; unavailable: string[] }
   | { error: string; status: "error" }
   | { candidates: Candidate[]; record: RegressionRecord; status: "recorded" };
 
@@ -475,10 +485,17 @@ const check = async (
   if (!listed.ok) {
     return unusable(listed.reason);
   }
-  if (listed.candidates.length > 0 && !input.labels) {
-    return { candidates: listed.candidates, status: "labels_needed" };
+  const labelable = listed.candidates.filter((candidate) => candidate.patch);
+  if (labelable.length > 0 && !input.labels) {
+    return {
+      candidates: labelable,
+      status: "labels_needed",
+      unavailable: listed.candidates
+        .filter((candidate) => !candidate.patch)
+        .map((candidate) => candidate.sha),
+    };
   }
-  const bad = labelProblem(listed.candidates, input.labels ?? []);
+  const bad = labelProblem(labelable, input.labels ?? []);
   if (bad) {
     return { error: bad, status: "error" };
   }
@@ -495,7 +512,7 @@ const check = async (
     reads: deps.deploy,
   });
   return {
-    candidates: listed.candidates,
+    candidates: labelable,
     record: recordOf(input, resolved, live),
     status: "recorded",
   };
