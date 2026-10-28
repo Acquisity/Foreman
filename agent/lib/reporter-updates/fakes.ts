@@ -406,6 +406,8 @@ export const fakeLinear = (tickets: FakeTicket[]) => {
     }[];
     failAfterCreate: boolean;
     failNextPost: boolean;
+    /** Issues whose light original read fails. */
+    failOriginals: Set<string>;
     holdNextPost: Promise<void> | null;
     longThreads: Set<string>;
     originalReads: number;
@@ -416,6 +418,7 @@ export const fakeLinear = (tickets: FakeTicket[]) => {
     discoverPageSize: Number.POSITIVE_INFINITY,
     failAfterCreate: false,
     failNextPost: false,
+    failOriginals: new Set<string>(),
     holdNextPost: null,
     longThreads: new Set<string>(),
     originalReads: 0,
@@ -485,6 +488,9 @@ export const fakeLinear = (tickets: FakeTicket[]) => {
     },
     readOriginal(identifier) {
       state.originalReads += 1;
+      if (state.failOriginals.has(identifier)) {
+        return Promise.reject(new Error(`${identifier} read timed out`));
+      }
       const found = tickets.find(
         (entry) => entry.facts.identifier === identifier
       );

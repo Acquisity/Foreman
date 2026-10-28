@@ -1,9 +1,19 @@
 import { defineTool } from "eve/tools";
 import { z } from "zod";
+import { linearAuth } from "#lib/constants.js";
+import { executorClient } from "#lib/executor/client.js";
 import { LINEAR_ISSUE_ID_PATTERN } from "#lib/investigation-memory/scope.js";
 import { decideTriage } from "#lib/jev-decisions.js";
+import { ticketDocumentUrls } from "#lib/linear-api.js";
 import { logOpsEvent } from "#lib/ops-log.js";
 import { recordFor, regressionRecords } from "#lib/regression-record.js";
+import {
+  type ChangeEvidence,
+  type ChangeMade,
+  isLinearCommentUrl,
+  isLinearDocumentUrl,
+} from "#lib/regression-routing.js";
+import { ticketCommentIds } from "#lib/requester-reply.js";
 import {
   confidenceFields,
   criticRounds,
@@ -12,9 +22,46 @@ import {
   recordDecision,
   triageDecisions,
 } from "#lib/triage-log.js";
+import { replaySessionOf } from "#lib/triage-replay/mode.js";
 
 const identifier = z.string().trim().regex(LINEAR_ISSUE_ID_PATTERN);
 const text = (max: number) => z.string().trim().min(1).max(max);
+
+/**
+ * The ticket's comments and documents a change link must name: a comment link
+ * names a comment this ticket carries (a replay keeps no comment ids), and a
+ * document link, which names no issue, one of its investigation documents.
+ * decideTriage reads them only when they decide the outcome.
+ */
+async function readChangeRecords(
+  ticket: string,
+  change: ChangeMade | undefined,
+  ctx: Parameters<typeof executorClient>[0] & {
+    getToken: (auth: typeof linearAuth) => Promise<{ token: string }>;
+  }
+): Promise<ChangeEvidence> {
+  const link = change?.recordedAt ?? "";
+  if (isLinearDocumentUrl(link)) {
+    return {
+      ticketDocuments: await ticketDocumentUrls(ticket, {
+        client: executorClient(ctx),
+        signal: ctx.abortSignal,
+      }),
+    };
+  }
+  if (
+    isLinearCommentUrl(link) &&
+    !replaySessionOf(ctx.session?.auth.initiator)
+  ) {
+    return {
+      ticketCommentIds: await ticketCommentIds(
+        ticket,
+        (await ctx.getToken(linearAuth)).token
+      ),
+    };
+  }
+  return {};
+}
 
 export default defineTool({
   approval: () => "not-applicable",
@@ -26,6 +73,7 @@ export default defineTool({
     "review says whether a second check by the critic is required for this decision and why; a duplicate, a platform limitation, a user error with a lane that could not run or a failure the customer saw, and an inbox error set aside as billing all need one. " +
     "An inbox error needs billingFacts before it can be a Bug or a duplicate; if they show non-payment, failing payments or domains not live, the decision is billing (Support/Financial), never a code bug. " +
     "A Bug needs check_regression run for the ticket first (label every commit it returns), on exactly the file, function, line range and commit codePath names, and the same failureAt; its result is read from the session, never passed in, and a result for other code does not count. If the regression check is the only item in missing, run it and call this again: never take the unproven branch or tell the requester for that. A Bug main already fixes comes back as Resolved by triage, state Done (fixed and live), or Support/Product follow-up held by the area owner (fixed, not live yet): neither gets a master. " +
+    "Resolved by triage closes Done only with evidence of a change: that live fix, or changeMade naming the staff or triage action and where this ticket records it. Without one, an explanation comes back as User Error or Platform Limitation (Canceled) and a Bug comes back unproven. " +
     "For a Bug that is not a Duplicate, hotlane carries the incident-hotlane route, impact, and proposed label. " +
     "outcome route carries the exact state, priority, addLabels (including the Area label), project, assignee, and duplicate fields for route_ticket; pass them unchanged. decision.assignee is the mapped owner of the area it chose, James Keeble when no area fits, and null when the ticket may not go to a developer (not a confirmed Bug, or a feature request nobody approved); decision.area names the Area label the route already carries. approval needed means a feature request waits for James to approve it. " +
     "Put every note in the Triage investigation document. " +
@@ -51,7 +99,8 @@ export default defineTool({
               }
             : {}),
         },
-        { signal: ctx.abortSignal }
+        { signal: ctx.abortSignal },
+        () => readChangeRecords(input.identifier, input.changeMade, ctx)
       );
       logOpsEvent("jev.decision", {
         code: decision.outcome === "route" ? decision.hotlane?.route : null,
@@ -127,6 +176,25 @@ export default defineTool({
       })
       .optional()
       .describe("Only when a query counted it; omit an estimate."),
+    changeMade: z
+      .object({
+        action: text(500).describe("What was changed, in one sentence."),
+        by: z
+          .enum(["staff", "triage"])
+          .describe("A staff member made it, or this triage did."),
+        recordedAt: z
+          .string()
+          .trim()
+          .url()
+          .max(2000)
+          .describe(
+            "The link to the comment on this ticket (with its #comment- id), or to its Triage or Billing investigation document, that records the change. The ticket's own link does not count."
+          ),
+      })
+      .optional()
+      .describe(
+        "Only when a person or this triage changed something that resolved the report, recorded on this ticket. Resolved by triage needs this or a live fix; an explanation with no change closes as User Error or Platform Limitation."
+      ),
     claim: text(1000).describe("The one testable sentence from Stage 1."),
     codePath: z
       .object({

@@ -3,10 +3,12 @@ import { z } from "zod";
 import { executorClient } from "#lib/executor/client.js";
 import { questionsOnlyPolicy } from "#lib/github/approval.js";
 import { LINEAR_ISSUE_ID_PATTERN } from "#lib/investigation-memory/scope.js";
-import { routeTicket } from "#lib/linear-api.js";
+import { masterCreatedAfter, routeTicket } from "#lib/linear-api.js";
+import { masterWindow } from "#lib/master-window.js";
 import { logOpsEvent } from "#lib/ops-log.js";
 import {
   criticRounds,
+  duplicateNeedsMaster,
   routeDecisionEvent,
   routeRefusal,
   triageDecisions,
@@ -22,9 +24,11 @@ export default defineTool({
     "Apply final routing decisions to a Linear ticket in one write: state, priority, labels to add, project, assignee, parent, and duplicate relation, then read it back. " +
     "Labels are added to the ones already on the ticket, never replaced, and removeLabels takes named ones off; an unknown label name to add fails before any write and lists the valid names. " +
     "Names are resolved for you: state by name within the ticket's team and project by name. The assignee must be a person in the owner map, given by name; any other name fails before any write. A developer takes a ticket only when it is labelled Bug, or Feature Request and Approved, counting the labels being added; the one exception is James holding a Feature Request with Needs approval while he decides it; support owners are not gated. A label change that would leave the current developer holder outside that rule fails before any write unless it also names a new assignee or passes releaseDeveloper. " +
-    "For a duplicate pass duplicateOf and inheritAssigneeFrom with the same master; when that master has an assignee it is inherited, otherwise assignee (the area owner) is used as the fallback. " +
+    "For a duplicate pass duplicateOf and inheritAssigneeFrom with the same match; when it has an assignee it is inherited, otherwise assignee (the area owner) is used as the fallback. " +
+    "A duplicate is parented under its master for you: the match when it is a master (its description has the master template's Regression seam section, or it already parents an issue), else the match's parent when that is one. A parent that differs fails before any write. A master past the master search's recency cutoff is not eligible. A Bug duplicate (by decision or Bug label) with no eligible master fails before any write: make the master through engineering-handoff, parent the match under it, then call again; a parent passed for a Bug duplicate must be a master the match is already under. A parent held outside the owner map fails before any write. " +
+    "The duplicate relation is written before the update, because Linear will not move a ticket to Duplicate without it; when the relation fails nothing is written. " +
     "links attach urls as resources on the ticket. Use the returned projectId for memory recording. " +
-    "routed true with warnings means the ticket was updated but a relation or link after it failed; read the warning before retrying only that part.",
+    "routed true with warnings means the ticket was updated but a link or the read-back after it failed; read the warning before retrying only that part.",
   async execute(input, ctx) {
     const refusal = routeRefusal(
       triageDecisions.get(),
@@ -36,8 +40,19 @@ export default defineTool({
       return { error: refusal, routed: false as const };
     }
     try {
+      const mastersWindow = input.duplicateOf
+        ? await masterWindow(ctx.session.auth)
+        : { windowed: false };
       const ticket = await routeTicket(input, {
         client: executorClient(ctx),
+        masterRequired: duplicateNeedsMaster(
+          triageDecisions.get(),
+          input.issue
+        ),
+        mastersCreatedAfter: masterCreatedAfter(
+          mastersWindow.windowed,
+          mastersWindow.now
+        ),
         signal: ctx.abortSignal,
       });
       logOpsEvent("triage.decision", {
@@ -82,7 +97,11 @@ export default defineTool({
       .array(z.object({ title: name, url: z.string().url().max(2000) }))
       .max(5)
       .optional(),
-    parent: identifier.optional().describe("Parent this ticket to that issue."),
+    parent: identifier
+      .optional()
+      .describe(
+        "Parent this ticket to that issue. For a duplicate it is set to the match's master for you."
+      ),
     priority: z
       .number()
       .int()

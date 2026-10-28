@@ -289,15 +289,92 @@ export const reconcileTicket = async (
   return outcome;
 };
 
+/** The Linear read of what a duplicate follows failed; nothing else is one. */
+class FollowedReadError extends Error {
+  constructor(cause: unknown) {
+    super(cause instanceof Error ? cause.message : String(cause), { cause });
+    this.name = "FollowedReadError";
+  }
+}
+
+/**
+ * What a duplicate follows: its master (ENG-16608) and its match. The master's
+ * outcome governs: a Canceled master ends the wait whatever the match shows,
+ * and a failed master read keeps the wait for the next run. Otherwise the
+ * fixing pull request may be linked to either, including a match that is
+ * itself an earlier Duplicate: the master's own pull requests decide, and the
+ * match's are used only when the master has none; deployment is still checked
+ * before anything is posted. A failed match read never hides the master.
+ */
+const followedOriginal = async (
+  master: string | undefined,
+  match: string | null,
+  deps: Deps
+): Promise<TicketFacts | null> => {
+  const wanted = [...new Set([master, match].filter((id) => !!id))] as string[];
+  const results = await Promise.allSettled(
+    wanted.map((id) => deps.linear.readOriginal(id))
+  );
+  const read = results.flatMap((result) =>
+    result.status === "fulfilled" && result.value ? [result.value] : []
+  );
+  // The master is read first and decides: when its read fails the duplicate
+  // keeps waiting and is retried, never decided from the match alone.
+  const [masterRead] = results;
+  if (master && masterRead?.status === "rejected") {
+    throw new FollowedReadError(masterRead.reason);
+  }
+  const failed = results.find((result) => result.status === "rejected");
+  if (failed && read.length === 0) {
+    throw new FollowedReadError(failed.reason);
+  }
+  const governing = read.find((facts) => facts.identifier === master);
+  if (governing && closureOf(governing).kind === "not_fixed") {
+    return governing;
+  }
+  if (governing) {
+    // The master's own pull requests decide; a match's are borrowed only
+    // when the master has none, so an open one on the match never holds back
+    // the master's live fix.
+    const borrowed = read
+      .filter(
+        (facts) =>
+          facts !== governing &&
+          (facts.stateName === "Duplicate" ||
+            closureOf(facts).kind === "needs_deploy")
+      )
+      .flatMap((facts) => facts.pullUrls);
+    const pooled = {
+      ...governing,
+      pullUrls:
+        governing.pullUrls.length > 0
+          ? governing.pullUrls
+          : [...new Set(borrowed)],
+    };
+    if (closureOf(pooled).kind === "needs_deploy") {
+      return pooled;
+    }
+  }
+  const fixed = read.filter(
+    (facts) => closureOf(facts).kind === "needs_deploy"
+  );
+  const [first] = fixed;
+  return first
+    ? { ...first, pullUrls: [...new Set(fixed.flatMap((f) => f.pullUrls))] }
+    : (governing ?? read[0] ?? null);
+};
+
 const originalFollowUp = async (
   view: TicketView,
   deps: Deps,
   liveSha: () => Promise<string | null>
 ): Promise<Planned | Outcome | null> => {
-  const { duplicateOf, identifier } = view.facts;
-  const original = duplicateOf
-    ? await deps.linear.readOriginal(duplicateOf)
-    : null;
+  const { duplicateOf, identifier, parent } = view.facts;
+  const original = await followedOriginal(
+    parent?.identifier,
+    duplicateOf,
+    deps
+  );
   if (!original) {
     return null;
   }
@@ -325,26 +402,37 @@ const originalFollowUp = async (
 };
 
 /**
- * The fixed, live or done message for a duplicate once its original has one.
- * Until then the duplicate waits, for at most 30 days after it was closed,
- * whatever the original is waiting on.
+ * The fixed, live or done message for a duplicate once its master, or its
+ * original when it has no master, has one. Until then the duplicate waits,
+ * for at most 30 days after it was closed, whatever that is waiting on.
  */
 const duplicateFollowUp = async (
   view: TicketView,
   deps: Deps,
   liveSha: () => Promise<string | null>
 ): Promise<Planned | Outcome | null> => {
-  const next = await originalFollowUp(view, deps, liveSha);
   const closedAt = Date.parse(view.facts.closedAt ?? "");
   const expired =
     !Number.isNaN(closedAt) &&
     (deps.now ?? Date.now)() - closedAt > DUPLICATE_WAIT_MS;
+  // Past the limit, a master or match that cannot be read ends the wait too,
+  // so a Linear read that keeps failing never keeps a duplicate waiting
+  // forever; any other failure (a deploy check, the writer) is retried.
+  const next = await originalFollowUp(view, deps, liveSha).catch(
+    (error: unknown) => {
+      if (expired && error instanceof FollowedReadError) {
+        return WAITING;
+      }
+      throw error;
+    }
+  );
   return next !== null && !isPlanned(next) && next.kind === "waiting" && expired
     ? dropDuplicate(view.facts.identifier, "expired", deps)
     : next;
 };
 
 const DUPLICATE_WAIT_MS = 30 * 86_400_000;
+const WAITING = { kind: "waiting" } as const;
 
 const dropDuplicate = (identifier: string, code: string, deps: Deps): null => {
   (deps.log ?? logOpsEvent)("reporter.update.duplicate_dropped", {

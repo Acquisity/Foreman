@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { ProviderClient } from "./executor/operations.js";
 import { routeTicket } from "./linear-api.js";
+import { type Call, fakeLinear } from "./route-ticket-fixtures.js";
 
 process.env.LINEAR_CONNECTOR ??= "linear/test";
 
@@ -12,154 +13,10 @@ const NO_ISSUE = /No issue ENG-999999/u;
 const UNKNOWN_LABEL =
   /Unknown label "Nope"\. Valid labels: Bug, Customer reported/u;
 
-const json = (body: unknown) => Promise.resolve({ data: body, status: 200 });
-
-interface Call {
-  query: string;
-  variables: Record<string, unknown>;
-}
-
-/** A Linear stand-in: ENG-1 (Bug label, unassigned) and master ENG-9 (assigned to Anuj). */
 const READ_BACK_FAILED = /could not be read back/u;
 const BEFORE_ROUTING = /before routing/u;
 const LINEAR_BUSY = /Linear is busy/u;
 const NOTHING_WRITTEN = /Nothing was written/u;
-
-const labelsFor = (
-  master: boolean,
-  readBack: boolean,
-  ticketLabels?: { id: string; name: string }[]
-) => {
-  if (master) {
-    return [];
-  }
-  if (ticketLabels) {
-    return ticketLabels;
-  }
-  return readBack
-    ? [
-        { id: "l-bug", name: "Bug" },
-        { id: "l-cr", name: "Customer reported" },
-      ]
-    : [{ id: "l-bug", name: "Bug" }];
-};
-
-const fakeLinear = ({
-  masterAssignee = { id: "u-anuj", name: "Anuj Bhatt" },
-  readBackFails = false,
-  relationFails = false,
-  teamLabels = [],
-  ticketAssignee = null,
-  ticketLabels,
-}: {
-  masterAssignee?: { id: string; name: string };
-  readBackFails?: boolean;
-  relationFails?: boolean;
-  teamLabels?: { id: string; name: string }[];
-  ticketAssignee?: { id: string; name: string } | null;
-  ticketLabels?: { id: string; name: string }[];
-} = {}) => {
-  const calls: Call[] = [];
-  const fetchStub: ProviderClient = (request) => {
-    const body = {
-      query: request.operation,
-      variables: "variables" in request.input ? request.input.variables : {},
-    } as Call;
-    calls.push(body);
-    const q = body.query;
-    if (q === "linear.RouteIssue") {
-      if (body.variables.id === "ENG-999999") {
-        return json({ data: { issue: null } });
-      }
-      const master = body.variables.id === "ENG-9";
-      // A read of ENG-1 after any write is the read-back.
-      const readBack =
-        !master &&
-        calls.some((c) =>
-          [
-            "linear.RouteIssueUpdate",
-            "linear.RouteRelation",
-            "linear.RouteAttachment",
-          ].includes(c.query)
-        );
-      if (readBack && readBackFails) {
-        return json({ errors: [{ message: "Linear is busy" }] });
-      }
-      return json({
-        data: {
-          issue: {
-            assignee: master || readBack ? masterAssignee : ticketAssignee,
-            id: master ? "i-9" : "i-1",
-            identifier: body.variables.id,
-            labels: { nodes: labelsFor(master, readBack, ticketLabels) },
-            parent: null,
-            priority: readBack ? 3 : 0,
-            project: readBack ? { id: "p-support", name: "Support" } : null,
-            state: { name: readBack ? "Done" : "Triage" },
-            team: { id: "t-eng" },
-            url: `https://linear.app/acquisity/issue/${body.variables.id}`,
-          },
-        },
-      });
-    }
-    if (q === "linear.TeamLabels") {
-      // Two pages: the second carries the label the union needs.
-      return body.variables.after === null
-        ? json({
-            data: {
-              issueLabels: {
-                nodes: [{ id: "l-bug", name: "Bug" }],
-                pageInfo: { endCursor: "lc1", hasNextPage: true },
-              },
-            },
-          })
-        : json({
-            data: {
-              issueLabels: {
-                nodes: [
-                  { id: "l-cr", name: "Customer reported" },
-                  ...teamLabels,
-                ],
-                pageInfo: { endCursor: null, hasNextPage: false },
-              },
-            },
-          });
-    }
-    if (q === "linear.WorkflowStates") {
-      return json({
-        data: { workflowStates: { nodes: [{ id: "s-done", name: "Done" }] } },
-      });
-    }
-    if (q === "linear.Projects") {
-      assert.equal(body.variables.teamId, "t-eng");
-      return json({
-        data: { projects: { nodes: [{ id: "p-support", name: "Support" }] } },
-      });
-    }
-    if (q === "linear.Users") {
-      return json({
-        data: { users: { nodes: [{ id: "u-ebu", name: "Ebubeker Rexha" }] } },
-      });
-    }
-    if (q === "linear.RouteIssueUpdate") {
-      return json({ data: { issueUpdate: { success: true } } });
-    }
-    if (q === "linear.RouteRelation") {
-      return json({
-        data: { issueRelationCreate: { success: !relationFails } },
-      });
-    }
-    if (q === "linear.RouteAttachment") {
-      return String(body.variables.url).includes("broken")
-        ? json({ errors: [{ message: "Unable to fetch url information" }] })
-        : json({ data: { attachmentLinkURL: { success: true } } });
-    }
-    throw new Error(`Unexpected query: ${q.slice(0, 40)}`);
-  };
-  const updates = () =>
-    calls.filter((c) => c.query === "linear.RouteIssueUpdate");
-  return { calls, fetchStub, updates };
-};
 
 describe("routeTicket", () => {
   it("unions labels, resolves names, inherits the assignee, and writes one update", async () => {
@@ -187,6 +44,7 @@ describe("routeTicket", () => {
     assert.deepEqual(update?.variables.input, {
       assigneeId: "u-anuj",
       labelIds: ["l-bug", "l-cr"],
+      parentId: "i-9",
       priority: 3,
       projectId: "p-support",
       stateId: "s-done",
@@ -208,14 +66,16 @@ describe("routeTicket", () => {
     assert.equal(result.duplicateOf, "ENG-9");
   });
 
-  it("reports no duplicate when the relation was not recorded", async () => {
+  it("writes nothing when the relation was not recorded", async () => {
     const linear = fakeLinear({ relationFails: true });
-    const result = await routeTicket(
-      { duplicateOf: "ENG-9", issue: "ENG-1", state: "Done" },
-      { client: linear.fetchStub }
+    await assert.rejects(
+      routeTicket(
+        { duplicateOf: "ENG-9", issue: "ENG-1", state: "Done" },
+        { client: linear.fetchStub }
+      ),
+      NOTHING_WRITTEN
     );
-    assert.equal(result.duplicateOf, null);
-    assert.equal(result.warnings.length, 1);
+    assert.equal(linear.updates().length, 0);
   });
 
   it("reports a failed link as a warning on a routed ticket", async () => {

@@ -287,6 +287,30 @@ export type ReplyResult =
       reason: string;
     };
 
+/**
+ * The ids of every comment on the issue, so decide_triage can check that a
+ * comment link given as change evidence names a comment this ticket carries.
+ */
+export async function ticketCommentIds(
+  issue: string,
+  accessToken: string
+): Promise<string[]> {
+  const api: LinearApiOptions = {
+    fetch: (input, init) =>
+      fetch(input, { ...init, signal: AbortSignal.timeout(20_000) }),
+  };
+  const comments = await readAllComments(issue, (query, queryName, variables) =>
+    callLinearGraphQL({
+      api,
+      credentials: { accessToken },
+      query,
+      queryName,
+      variables,
+    })
+  );
+  return comments.map((comment) => comment.id);
+}
+
 /** Foreman's own Linear app user, as the thread read's viewer. */
 export interface ForemanUser {
   displayName: string;

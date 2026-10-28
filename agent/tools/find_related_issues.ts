@@ -2,9 +2,7 @@ import { defineTool } from "eve/tools";
 import { z } from "zod";
 import { executorClient } from "#lib/executor/client.js";
 import { findRelatedIssues } from "#lib/linear-api.js";
-import { readReplayState } from "#lib/triage-replay/backend.js";
-import { replaySessionOf } from "#lib/triage-replay/mode.js";
-import { isIntakeOnly, isLinearSession } from "#lib/trust.js";
+import { masterWindow } from "#lib/master-window.js";
 
 const relatedIssueSchema = z.object({
   assignee: z.string().nullable(),
@@ -26,20 +24,10 @@ export default defineTool({
     "Pass 2 to 4 phrasings: the customer outcome, the visible error text, the feature or object name, and for masters the root cause and code path. " +
     "Each hit lists the phrases that matched it. truncated true means candidates were dropped, so narrow the phrases. Read every hit before deciding; a keyword match is not a duplicate.",
   async execute(input, ctx) {
-    const auth = ctx.session.auth.current;
-    const replay = replaySessionOf(ctx.session.auth.initiator);
     try {
-      const now = replay
-        ? new Date(
-            (await readReplayState(replay.runId, replay.caseKey)).case.createdAt
-          )
-        : undefined;
+      const { now, windowed } = await masterWindow(ctx.session.auth);
       return await findRelatedIssues(
-        {
-          ...input,
-          windowed:
-            replay !== null || isIntakeOnly(auth) || isLinearSession(auth),
-        },
+        { ...input, windowed },
         { client: executorClient(ctx), now, signal: ctx.abortSignal }
       );
     } catch (error) {

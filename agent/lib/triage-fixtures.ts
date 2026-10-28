@@ -17,6 +17,16 @@ export const band = (probabilities: Record<string, number>): JevAnswer => ({
   type: "score",
 });
 
+/** A triage action recorded on ENG-1, the evidence Resolved by triage needs. */
+export const RECORDED_CHANGE = {
+  action: "Reconnected the customer's sending inbox.",
+  by: "triage" as const,
+  recordedAt: "https://linear.app/acquisity/issue/ENG-1#comment-1a2b3c4d",
+};
+
+/** The comments on ENG-1, as decide_triage reads them: RECORDED_CHANGE's is one. */
+export const TICKET_COMMENT_IDS = ["1a2b3c4d-0000-4000-8000-000000000001"];
+
 export const triageInput = (over: Partial<TriageInput> = {}): TriageInput => ({
   blastRadius: {
     countedAt: "2026-09-25",
@@ -37,6 +47,7 @@ export const triageInput = (over: Partial<TriageInput> = {}): TriageInput => ({
   regression: { kind: "none", line: "none" },
   rootCauseLabels: [],
   sourceLabels: ["Customer reported"],
+  ticketCommentIds: TICKET_COMMENT_IDS,
   ...over,
 });
 

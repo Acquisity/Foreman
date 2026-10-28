@@ -14,6 +14,7 @@ import {
   criticVerdictFields,
   criticVerdictIssue,
   decisionFields,
+  duplicateNeedsMaster,
   routeDecisionEvent,
   routeRefusal,
   settleCriticRound,
@@ -447,5 +448,22 @@ describe("the critic's second check", () => {
     );
     assert.equal(criticBlocked(rounds, "ENG-1"), false);
     assert.equal(criticBlocked(rounds, "ENG-2"), false);
+  });
+});
+
+describe("duplicate masters", () => {
+  it("needs a master only for a Bug duplicate", () => {
+    const decided = (classification: string | null) => ({
+      "ENG-1": {
+        classification,
+        issue: "ENG-1",
+        outcome: "route" as const,
+        path: "Duplicate",
+      },
+    });
+    assert.equal(duplicateNeedsMaster(decided("Bug"), "ENG-1"), true);
+    assert.equal(duplicateNeedsMaster(decided("User Error"), "ENG-1"), false);
+    assert.equal(duplicateNeedsMaster(decided(null), "ENG-1"), false);
+    assert.equal(duplicateNeedsMaster({}, "ENG-1"), false);
   });
 });

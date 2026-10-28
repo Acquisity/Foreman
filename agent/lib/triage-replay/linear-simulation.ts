@@ -6,9 +6,11 @@ import {
   asOfText,
   CASE_ISSUE_ID,
   createdIssue,
+  documentUrlOf,
   type IssueFields,
   isCase,
   issueIdOf,
+  parentAsOfRun,
   type ReplayState,
   relatedAsOfCase,
   snapshotAsOfCase,
@@ -63,7 +65,7 @@ function routeIssue(state: ReplayState, id: unknown) {
     return null;
   }
   const assigneeName = asOfName(related.assignee);
-  const parent = asOfName(related.parent);
+  const parent = asOfName(parentAsOfRun(state, related.id, related.parent));
   const assignee = assigneeName
     ? state.lists.users.find((u) => u.name === assigneeName)
     : undefined;
@@ -87,7 +89,13 @@ type Filter = Record<string, unknown>;
 
 function matches(
   filter: Filter,
-  issue: { createdAt: string; description: string; title: string }
+  issue: {
+    createdAt: string;
+    description: string;
+    id: string;
+    parent: string | null;
+    title: string;
+  }
 ): boolean {
   return Object.entries(filter).every(([key, value]) => {
     const v = value as Filter;
@@ -97,10 +105,12 @@ function matches(
       case "or":
         return (value as Filter[]).some((f) => matches(f, issue));
       case "title":
-      case "description": {
-        const needle = String(v.containsIgnoreCase ?? "").toLowerCase();
-        return issue[key].toLowerCase().includes(needle);
-      }
+      case "description":
+        return v.contains === undefined
+          ? issue[key]
+              .toLowerCase()
+              .includes(String(v.containsIgnoreCase ?? "").toLowerCase())
+          : issue[key].includes(String(v.contains));
       case "createdAt":
         return (
           (v.gte === undefined || issue.createdAt >= String(v.gte)) &&
@@ -108,25 +118,84 @@ function matches(
         );
       case "team":
         return true;
+      case "id":
+        return v.eq === issue.id;
+      case "parent":
+        return (
+          issue.parent !== null &&
+          (v.id as Filter | undefined)?.eq === issueIdOf(issue.parent)
+        );
       default:
         return false;
     }
   });
 }
 
+/**
+ * For a "children of this issue" read, the case ticket and the issues the run
+ * created whose parent (as the run set it) is that issue: live Linear counts
+ * them, and the snapshot holds neither.
+ */
+function childrenBeyondSnapshot(state: ReplayState, filter: Filter) {
+  if (filter.parent === undefined) {
+    return [];
+  }
+  const parentId = ((filter.parent as Filter).id as Filter | undefined)?.eq;
+  return [{ fields: state.issue, identifier: state.case.id }, ...state.created]
+    .filter(
+      ({ fields }) =>
+        fields.parent !== null && issueIdOf(fields.parent) === parentId
+    )
+    .map(({ identifier }) => ({
+      ...routeIssue(state, identifier),
+      createdAt: state.case.createdAt,
+      state: { name: "Todo", type: "unknown" },
+      title: identifier,
+    }));
+}
+
 function relatedIssues(state: ReplayState, variables: Filter) {
   const filter = variables.filter as Filter;
+  // route_ticket reads a master by id for its creation time; a master this
+  // run created is as new as the case.
+  const created = createdIssue(state, (filter.id as Filter | undefined)?.eq);
+  if (
+    created &&
+    matches(filter, {
+      createdAt: state.case.createdAt,
+      description: created.description,
+      id: issueIdOf(created.identifier),
+      parent: created.fields.parent,
+      title: created.title,
+    })
+  ) {
+    return {
+      issues: {
+        nodes: [
+          {
+            ...routeIssue(state, created.identifier),
+            createdAt: state.case.createdAt,
+            state: { name: created.fields.state, type: "unknown" },
+            title: created.identifier,
+          },
+        ],
+        pageInfo: { endCursor: null, hasNextPage: false },
+      },
+    };
+  }
   const nodes = snapshotAsOfCase(state)
     .filter((r) =>
       matches(filter, {
         createdAt: r.createdAt,
         description: asOfText(r.description, ""),
+        id: issueIdOf(r.id),
+        parent: asOfName(parentAsOfRun(state, r.id, r.parent)),
         title: asOfText(r.title, ""),
       })
     )
     .map((r) => {
       const assignee = asOfName(r.assignee);
-      const parent = asOfName(r.parent);
+      const parent = asOfName(parentAsOfRun(state, r.id, r.parent));
       return {
         assignee: assignee ? { name: assignee } : null,
         createdAt: r.createdAt,
@@ -140,7 +209,10 @@ function relatedIssues(state: ReplayState, variables: Filter) {
       };
     });
   return {
-    issues: { nodes, pageInfo: { endCursor: null, hasNextPage: false } },
+    issues: {
+      nodes: [...nodes, ...childrenBeyondSnapshot(state, filter)],
+      pageInfo: { endCursor: null, hasNextPage: false },
+    },
   };
 }
 
@@ -172,7 +244,7 @@ function saveDocument(
     document: {
       id: doc.id,
       updatedAt: doc.updatedAt,
-      url: urlOf(state.case.id),
+      url: documentUrlOf(doc.id),
     },
     success: true,
   };
@@ -205,6 +277,29 @@ function applyUpdate(state: ReplayState, issue: IssueFields, input: Filter) {
   }
 }
 
+/**
+ * A parent set on an existing snapshot issue, such as a lone report moved
+ * under the master this run created; its other fields stay as frozen.
+ */
+function reparentSnapshot(state: ReplayState, id: unknown, input: Filter) {
+  const identifier = String(id).startsWith("replay-")
+    ? String(id).slice(7)
+    : String(id);
+  if (
+    input.parentId === undefined ||
+    isCase(state, id) ||
+    createdIssue(state, id) ||
+    !relatedAsOfCase(state, identifier)
+  ) {
+    return;
+  }
+  const parent = String(input.parentId);
+  state.reparented = {
+    ...state.reparented,
+    [identifier]: parent.startsWith("replay-") ? parent.slice(7) : parent,
+  };
+}
+
 type Handler = (state: ReplayState, variables: Filter) => unknown;
 
 function caseDocumentsOnly(state: ReplayState, issue: unknown) {
@@ -225,7 +320,7 @@ const HANDLERS: Record<LinearOperation, Handler> = {
     const doc = state.documents.find((d) => d.id === v.id);
     return {
       document: doc
-        ? { id: doc.id, updatedAt: doc.updatedAt, url: urlOf(state.case.id) }
+        ? { id: doc.id, updatedAt: doc.updatedAt, url: documentUrlOf(doc.id) }
         : null,
     };
   },
@@ -260,6 +355,7 @@ const HANDLERS: Record<LinearOperation, Handler> = {
     if (created) {
       applyUpdate(state, created.fields, v.input as Filter);
     }
+    reparentSnapshot(state, v.id, v.input as Filter);
     return { issueUpdate: { success: true } };
   },
   RouteRelation: (state, v) => {

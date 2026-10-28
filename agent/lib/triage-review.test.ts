@@ -8,7 +8,13 @@ import {
   triageQuestions,
 } from "./jev-decisions.js";
 import { SUPPORT_OWNER } from "./owner-map.js";
-import { bugAnswers, pick, triageInput, yes } from "./triage-fixtures.js";
+import {
+  bugAnswers,
+  pick,
+  RECORDED_CHANGE,
+  triageInput,
+  yes,
+} from "./triage-fixtures.js";
 import { ownershipRoute, resolveOwnership } from "./triage-ownership.js";
 import { gateInboxError } from "./triage-review.js";
 
@@ -404,12 +410,16 @@ test("a close where nothing changed is Canceled, so Done always means a change w
   );
   assert.ok(limit.outcome === "route");
   assert.equal(limit.route.state, "Canceled");
+  const resolvedAnswers = bugAnswers({
+    classification: pick("user_error"),
+    path: pick("Resolved by triage"),
+  });
+  const explained = resolveTriage(triageInput(), resolvedAnswers);
+  assert.ok(explained.outcome === "route");
+  assert.equal(explained.route.state, "Canceled");
   const resolved = resolveTriage(
-    triageInput(),
-    bugAnswers({
-      classification: pick("user_error"),
-      path: pick("Resolved by triage"),
-    })
+    triageInput({ changeMade: RECORDED_CHANGE }),
+    resolvedAnswers
   );
   assert.ok(resolved.outcome === "route");
   assert.equal(resolved.route.state, "Done");

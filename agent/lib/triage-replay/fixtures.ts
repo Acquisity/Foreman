@@ -1,6 +1,8 @@
 import type { TestContext } from "node:test";
 import { evePackageUrl } from "../eve-dynamic-tools.js";
 import type { executorClient } from "../executor/client.js";
+import type { ProviderClient } from "../executor/operations.js";
+import type { LinearOperation } from "../linear-operations.js";
 import {
   memoryBackend,
   readReplayState,
@@ -8,9 +10,10 @@ import {
   setReplayBackend,
 } from "./backend.js";
 import { triageReplayHook } from "./hook.js";
+import { answerLinear } from "./linear-simulation.js";
 import { replayAuth } from "./route.js";
 import type { TriageCase, TriageLabel, TriageResult } from "./schema.js";
-import { seedReplayState } from "./store.js";
+import { type ReplayState, seedReplayState } from "./store.js";
 
 export const makeCase = (
   id: string,
@@ -117,7 +120,8 @@ export const triageCase: TriageCase = {
     {
       assignee: "Anthony Adewale",
       createdAt: "2026-09-20T00:00:00.000Z",
-      description: "Inbox reconnect fails after the token expires",
+      description:
+        "## Root cause\n\nInbox reconnect fails after the token expires.\n\n## Regression seam\n\nA send after the token expires.",
       id: "ENG-90",
       labels: ["Bug"],
       parent: null,
@@ -253,3 +257,21 @@ const enterContext = contextStorage.run.bind(contextStorage);
 
 export const inSession = <T>(body: () => T): T =>
   enterContext(new ContextContainer(), body);
+
+const LINEAR_PREFIX = /^linear\./u;
+
+/** A provider client answering Linear operations from one replay state in memory. */
+export const replayClient =
+  (replayState: ReplayState): ProviderClient =>
+  (request) => {
+    const operation = request.operation.replace(
+      LINEAR_PREFIX,
+      ""
+    ) as LinearOperation;
+    const variables =
+      "variables" in request.input ? request.input.variables : {};
+    return Promise.resolve({
+      data: { data: answerLinear(replayState, operation, variables) },
+      status: 200,
+    });
+  };

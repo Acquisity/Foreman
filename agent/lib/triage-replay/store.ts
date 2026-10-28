@@ -73,6 +73,8 @@ export interface ReplayState {
   issue: IssueFields;
   lists: FrozenLists;
   relations: { issueId: string; relatedIssueId: string; type: string }[];
+  /** Parents the run set on related snapshot issues, by identifier. */
+  reparented?: Record<string, string>;
   rootTurn: "completed" | "failed" | "cancelled" | null;
   routes: Record<string, unknown>[];
   stamp: { foremanCommit: string; startedAt: string };
@@ -81,6 +83,12 @@ export interface ReplayState {
 export const CASE_ISSUE_ID = "replay-case";
 export const issueIdOf = (identifier: string) => `replay-${identifier}`;
 export const urlOf = (identifier: string) => `${ticketUrl(identifier)}/replay`;
+/**
+ * A replay document's link, shaped like a Linear document link so it is read
+ * as one (its key is the document number), never the ticket's own link.
+ */
+export const documentUrlOf = (id: string) =>
+  `https://linear.app/acquisity/document/${id}`;
 
 export function seedReplayState(
   triageCase: TriageCase,
@@ -129,6 +137,12 @@ export const asOfText = (value: string, fallback: string): string =>
   value === "unknown" ? fallback : value;
 export const asOfName = (value: string | null): string | null =>
   value === "unknown" ? null : value;
+/** A snapshot issue's parent, after any parent the run set on it. */
+export const parentAsOfRun = <T>(
+  state: ReplayState,
+  identifier: string,
+  frozen: T
+): T | string => state.reparented?.[identifier] ?? frozen;
 export const asOfList = (value: string[] | "unknown"): string[] =>
   value === "unknown" ? [] : value;
 

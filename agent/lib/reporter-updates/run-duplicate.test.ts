@@ -16,9 +16,12 @@ import {
   ticket,
   waitingIssues,
 } from "./fakes.js";
-import { runReporterUpdates } from "./run.js";
+import { reconcileTicket, runReporterUpdates } from "./run.js";
 
 const DAY = 86_400_000;
+const MASTER_READ_FAILED = /ENG-50 read timed out/u;
+const GITHUB_BUSY = /GitHub is busy/u;
+const OPEN_PR_URL = PR_URL.replace(/\/7$/u, "/8");
 const LIVE = {
   ancestors: { [`${MERGE_SHA}>${NEW_SHA}`]: true },
   liveSha: NEW_SHA,
@@ -220,6 +223,42 @@ describe("duplicate of an original that is Done without a linked change", () => 
 describe("the 30-day limit on every waiting duplicate", () => {
   const expired = { code: "expired", issue: "ENG-1", outcome: "skipped" };
 
+  it("keeps a past-30-day duplicate waiting when a deploy check fails, so its live fix is retried, not dropped (CodeRabbit 5)", async () => {
+    const dup = duplicate(31);
+    dup.facts.parent = { identifier: "ENG-50", stateType: "completed" };
+    const master = doneOriginal({ identifier: "ENG-50", pullUrls: [PR_URL] });
+    const s = setup([dup, doneOriginal(), master], LIVE);
+    const events = withLog(s);
+    await reconcile(s);
+    await assert.rejects(
+      reconcileTicket("ENG-1", s.deps, () =>
+        Promise.reject(new Error("GitHub is busy"))
+      ),
+      GITHUB_BUSY
+    );
+    assert.ok(
+      !events.some((e) => e.event === "reporter.update.duplicate_dropped")
+    );
+    assert.deepEqual(await reconcile(s), { kind: "posted", stage: "fixed" });
+  });
+
+  it("expires a duplicate past 30 days whose master cannot be read (Devin 8)", async () => {
+    const dup = duplicate(31);
+    dup.facts.parent = { identifier: "ENG-50", stateType: "started" };
+    const s = setup([dup, doneOriginal(), ticket({ identifier: "ENG-50" })]);
+    const events = withLog(s);
+    await reconcile(s);
+    s.linear.state.failOriginals.add("ENG-50");
+    assert.deepEqual(await reconcile(s), {
+      kind: "skipped",
+      why: "nothing_due",
+    });
+    assert.deepEqual(events.at(-1), {
+      event: "reporter.update.duplicate_dropped",
+      fields: expired,
+    });
+  });
+
   it("stops waiting on an open original 30 days after the duplicate was closed", async () => {
     const original = ticket({ identifier: "ENG-9" });
     original.anchorId = null;
@@ -259,6 +298,163 @@ describe("the 30-day limit on every waiting duplicate", () => {
       [duplicate(31), doneOriginal({ pullUrls: [PR_URL] })],
       LIVE
     );
+    withLog(s);
+    await reconcile(s);
+    assert.deepEqual(await reconcile(s), { kind: "posted", stage: "fixed" });
+  });
+});
+
+describe("a duplicate under a master (ENG-16608)", () => {
+  const underMaster = () => {
+    const dup = duplicate();
+    dup.facts.parent = { identifier: "ENG-50", stateType: "completed" };
+    const earlier = doneOriginal({
+      parent: { identifier: "ENG-50", stateType: "completed" },
+      stateName: "Duplicate",
+      stateType: "canceled",
+    });
+    const master = doneOriginal({ identifier: "ENG-50", pullUrls: [PR_URL] });
+    return { dup, earlier, master };
+  };
+
+  it("follows the master's fixing pull request when its match is an earlier duplicate", async () => {
+    const { dup, earlier, master } = underMaster();
+    const s = setup([dup, earlier, master], LIVE);
+    withLog(s);
+    await reconcile(s);
+    assert.deepEqual(await reconcile(s), { kind: "posted", stage: "fixed" });
+    assert.deepEqual(
+      s.linear.posts.map((p) => p.body),
+      [DUPLICATE_TEXT, fixedText("the export now includes every row", null)]
+    );
+  });
+
+  it("drops the wait when the master itself is Canceled", async () => {
+    const { dup, earlier } = underMaster();
+    const master = doneOriginal({
+      identifier: "ENG-50",
+      stateName: "Canceled",
+      stateType: "canceled",
+    });
+    const s = setup([dup, earlier, master]);
+    const events = withLog(s);
+    await reconcile(s);
+    await reconcile(s);
+    assert.deepEqual(events.at(-1), {
+      event: "reporter.update.duplicate_dropped",
+      fields: { code: "original_canceled", issue: "ENG-1", outcome: "skipped" },
+    });
+  });
+
+  it("posts the fix linked to the matched report when its Done master has none (CodeRabbit 3)", async () => {
+    const dup = duplicate();
+    dup.facts.parent = { identifier: "ENG-50", stateType: "completed" };
+    const report = doneOriginal({
+      parent: { identifier: "ENG-50", stateType: "completed" },
+      pullUrls: [PR_URL],
+    });
+    const master = doneOriginal({ identifier: "ENG-50" });
+    const s = setup([dup, report, master], LIVE);
+    withLog(s);
+    await reconcile(s);
+    assert.deepEqual(await reconcile(s), { kind: "posted", stage: "fixed" });
+  });
+
+  it("lets a Canceled master govern, so a fixed match sends no fixed message (Devin 4)", async () => {
+    const dup = duplicate();
+    dup.facts.parent = { identifier: "ENG-50", stateType: "canceled" };
+    const report = doneOriginal({ pullUrls: [PR_URL] });
+    const master = doneOriginal({
+      identifier: "ENG-50",
+      stateName: "Canceled",
+      stateType: "canceled",
+    });
+    const s = setup([dup, report, master], LIVE);
+    const events = withLog(s);
+    await reconcile(s);
+    await reconcile(s);
+    assert.deepEqual(
+      s.linear.posts.map((p) => p.body),
+      [DUPLICATE_TEXT]
+    );
+    assert.deepEqual(events.at(-1), {
+      event: "reporter.update.duplicate_dropped",
+      fields: { code: "original_canceled", issue: "ENG-1", outcome: "skipped" },
+    });
+  });
+
+  it("still posts the master's live fix when the matched report cannot be read (Devin 6)", async () => {
+    const dup = duplicate();
+    dup.facts.parent = { identifier: "ENG-50", stateType: "completed" };
+    const master = doneOriginal({ identifier: "ENG-50", pullUrls: [PR_URL] });
+    const s = setup([dup, doneOriginal(), master], LIVE);
+    s.linear.state.failOriginals.add("ENG-9");
+    withLog(s);
+    await reconcile(s);
+    assert.deepEqual(await reconcile(s), { kind: "posted", stage: "fixed" });
+  });
+
+  it("waits for the master when its read fails, never deciding from the match, then sends the master's outcome (Devin 7)", async () => {
+    const dup = duplicate();
+    dup.facts.parent = { identifier: "ENG-50", stateType: "completed" };
+    const report = doneOriginal({
+      stateName: "Canceled",
+      stateType: "canceled",
+    });
+    const master = doneOriginal({ identifier: "ENG-50", pullUrls: [PR_URL] });
+    const s = setup([dup, report, master], LIVE);
+    const events = withLog(s);
+    await reconcile(s);
+    s.linear.state.failOriginals.add("ENG-50");
+    await assert.rejects(reconcile(s), MASTER_READ_FAILED);
+    assert.deepEqual(
+      s.linear.posts.map((p) => p.body),
+      [DUPLICATE_TEXT]
+    );
+    assert.ok(
+      !events.some((e) => e.event === "reporter.update.duplicate_dropped")
+    );
+    s.linear.state.failOriginals.clear();
+    assert.deepEqual(await reconcile(s), { kind: "posted", stage: "fixed" });
+  });
+
+  it("posts the live fix linked to a matched earlier Duplicate under a Done master with none (Aaron)", async () => {
+    const dup = duplicate();
+    dup.facts.parent = { identifier: "ENG-50", stateType: "completed" };
+    const earlier = doneOriginal({
+      parent: { identifier: "ENG-50", stateType: "completed" },
+      pullUrls: [PR_URL],
+      stateName: "Duplicate",
+      stateType: "canceled",
+    });
+    const master = doneOriginal({ identifier: "ENG-50" });
+    const s = setup([dup, earlier, master], LIVE);
+    withLog(s);
+    await reconcile(s);
+    assert.deepEqual(await reconcile(s), { kind: "posted", stage: "fixed" });
+    assert.deepEqual(
+      s.linear.posts.map((p) => p.body),
+      [DUPLICATE_TEXT, fixedText("the export now includes every row", null)]
+    );
+  });
+
+  it("sends the master's live fix even when the matched Duplicate has an open pull request (Devin 11)", async () => {
+    const dup = duplicate();
+    dup.facts.parent = { identifier: "ENG-50", stateType: "completed" };
+    const earlier = doneOriginal({
+      parent: { identifier: "ENG-50", stateType: "completed" },
+      pullUrls: [OPEN_PR_URL],
+      stateName: "Duplicate",
+      stateType: "canceled",
+    });
+    const master = doneOriginal({ identifier: "ENG-50", pullUrls: [PR_URL] });
+    const s = setup([dup, earlier, master], {
+      ...LIVE,
+      pulls: {
+        ...LIVE.pulls,
+        [pullKey(8)]: merged({ mergeSha: null, number: 8, state: "open" }),
+      },
+    });
     withLog(s);
     await reconcile(s);
     assert.deepEqual(await reconcile(s), { kind: "posted", stage: "fixed" });
