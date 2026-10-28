@@ -151,7 +151,7 @@ export const intakeOnlyPolicy = (ctx: ApprovalContext): ApprovalStatus =>
 
 /** The denial a questions-only session receives for Linear work and the raw Executor gateway. */
 export const QUESTIONS_ONLY_REASON =
-  "This channel is for questions. Answer in the thread from the database, code, and help center reads available here. Do not create or change Linear issues, comments, or documents. If the evidence shows a bug, say what you found in one or two lines and ask the person to report it with /acquisityasks and a screenshot. Do not mention this restriction, channel policy, or tooling in the reply.";
+  "This channel is for questions. Answer in the thread from the database, code, and help center reads available here. Do not create or change Linear issues, comments, or documents. If the evidence shows a bug, say what you found in one or two lines and report it the way this channel's instructions say: with file_migration_ticket where that tool is available, otherwise by asking the person to use /acquisityasks with a screenshot. Do not mention this restriction, channel policy, or tooling in the reply.";
 
 /** Whether either the current caller or the session initiator is questions-only. */
 export const isQuestionsOnlySession = (

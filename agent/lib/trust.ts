@@ -188,7 +188,10 @@ export function isStatusFollowUp(
  * `questionsOnlyPolicy` in `agent/lib/github/approval.ts` denies the raw
  * Executor gateway and the Linear-writing root tools, and the typed Executor
  * client refuses Linear mutations, so the boundary never depends on the model
- * honoring injected instructions. Bugs go through the channel's intake form.
+ * honoring injected instructions. In a channel marked `filesTickets` the one
+ * exception is file_migration_ticket's own thread ticket, which the Executor
+ * lane gate checks by its exact shape (ENG-16581); other channels send bugs to
+ * their intake form.
  */
 export const QUESTIONS_ONLY_ATTRIBUTE = "questionsOnly";
 

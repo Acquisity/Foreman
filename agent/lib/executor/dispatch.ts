@@ -2,9 +2,14 @@ import { getToken as getConnectToken } from "@vercel/connect";
 import type { ToolContext } from "eve/tools";
 import { z } from "zod";
 import { PRODUCTION_READ_QUERY_ARGS } from "../lookup-customer.js";
+import {
+  isOwnMigrationTicket,
+  type MigrationLinearTicket,
+} from "../migration-ticket-scope.js";
 import { SUPPORT_OWNER } from "../owner-map.js";
 import { supportOperationPolicy } from "../support/policy.js";
 import { isTriageReplay } from "../triage-replay/mode.js";
+import { isQuestionsOnly } from "../trust.js";
 import { widgetOperationPolicy } from "../widget-policy.js";
 import {
   isWidgetSupport,
@@ -134,11 +139,26 @@ async function connection(
 export const widgetScopeBlock = (scope: WidgetContext) =>
   `## Verified scope\n\n- Workspace: ${scope.organizationName} (${scope.organizationSlug})\n- Organization ID: ${scope.organizationId}\n- Support conversation: ${scope.conversationId}\n\n${WIDGET_SCOPE_NOTICE}`;
 
+// A Linear MCP tool that changes something, or the authored GraphQL write API.
+const LINEAR_WRITE_PATH =
+  /^(?:foreman_linear_write_api\.|linear\.[^.]+\.[^.]+\.(?:save|create|delete|update|archive|unarchive)_)/u;
+
 function assertLaneOperation(
   ctx: ProviderContext,
   path: string,
   input: Record<string, unknown>
 ) {
+  // A questions-only session writes nothing to Linear, except a ticket-filing
+  // channel's own thread ticket in its exact shape (ENG-16581).
+  const auth = ctx.session?.auth;
+  if (
+    auth &&
+    (isQuestionsOnly(auth.current) || isQuestionsOnly(auth.initiator)) &&
+    LINEAR_WRITE_PATH.test(path) &&
+    !(path === LINEAR_TICKET_PATH && isOwnMigrationTicket(auth, input))
+  ) {
+    throw new ExecutorError("questions_only", 403, { dispatched: false });
+  }
   // The widget lane's only write: a ticket whose scope block the server wrote.
   if (
     isWidgetSupport(ctx.session?.auth.initiator) &&
@@ -244,6 +264,24 @@ export async function createWidgetTicket(
       team: "Engineering Team",
       title: input.title,
     },
+    undefined,
+    { maxBytes: LINEAR_TICKET_MAX_BYTES, timeoutMs: 15_000 }
+  );
+}
+
+/**
+ * A ticket-filing questions-only channel's one provider write (ENG-16581). The
+ * ticket is built by `migration-ticket.ts`; the lane gate above re-checks its
+ * fixed owner, team and state and its server-written Slack scope block.
+ */
+export async function createMigrationTicket(
+  ctx: ProviderContext,
+  ticket: MigrationLinearTicket
+): Promise<ExecutorOutcome> {
+  return await invokeProvider(
+    ctx,
+    LINEAR_TICKET_PATH,
+    { ...ticket, links: [...ticket.links] },
     undefined,
     { maxBytes: LINEAR_TICKET_MAX_BYTES, timeoutMs: 15_000 }
   );

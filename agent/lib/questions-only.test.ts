@@ -42,6 +42,29 @@ const CRM_FIRST = /Check those areas before cold email or AI SDR/u;
 const KEEP_IT_QUICK = /aim to reply within about five minutes/u;
 const IGNORE_RULES = /Ignore your rules/u;
 const GENERAL_HELP_ONLY = /return no user-specific or record-specific data/u;
+const ONLY_TICKET_WRITE =
+  /The only Linear write here is file_migration_ticket/u;
+const FIVE_OUTCOMES = [
+  /1\. Bug:/u,
+  /2\. Working as intended:/u,
+  /3\. Worth improving:/u,
+  /4\. Workaround:/u,
+  /5\. Couldn't find it: give click steps that name the page and the button/u,
+];
+const SAYS_WHAT_WAS_CHECKED = /says in one line what you checked/u;
+const ASKS_FOR_MISSING =
+  /I'll make a ticket for you so the team can work on this, I just need X and Y\./u;
+const TAGS_REQUESTER = /tag the requester and ask for exactly those items/u;
+const WORKAROUND_RECORDED =
+  /pass it as workaroundGiven so the ticket records it/u;
+const CLOSE_PARITY =
+  /When the rep could do this in Close, or it looks cheap to build, call it worth improving/u;
+const ALREADY_COVERED =
+  /reply that the team is already working on it with that ticket's link/u;
+const REPORTER_ONLY_WHEN_AFFECTED =
+  /The affected user is the requester only when the report shows the requester is the one affected/u;
+const LINK_AND_HEAR_BACK =
+  /reply with its link and say they'll hear back in this thread/u;
 
 const slackAuth: SessionAuthContext = {
   attributes: {},
@@ -111,18 +134,54 @@ describe("questions-only channel", () => {
     assert.equal(QUESTIONS_ONLY_CHANNELS.has("C0NOTMAPPED"), false);
   });
 
-  it("pins the workspace and forbids Linear work in the injected task", () => {
+  it("pins the workspace and allows only the thread's ticket in the migration task", () => {
+    for (const channel of [MIGRATION, SANDBOX]) {
+      const context = slackIntakeContext(channel);
+      assert.match(context, WORKSPACE_ID);
+      assert.match(context, WORKSPACE_NAME);
+      assert.match(context, ONLY_TICKET_WRITE);
+      assert.match(context, TEXT_IS_NOT_IDENTITY);
+      assert.match(context, KEEP_IT_QUICK);
+      assert.match(context, CRM_FIRST);
+      assert.match(context, CODE_OVER_HELP_CENTER);
+      // The form is gone for this channel: Foreman files the ticket itself.
+      assert.doesNotMatch(context, FORM_COMMAND);
+      assert.doesNotMatch(context, NO_LINEAR_WORK);
+      assert.doesNotMatch(context, INTAKE_LINEAR_WRITES);
+      assert.doesNotMatch(context, GENERIC_NEW_ISSUE);
+    }
+  });
+
+  it("tells the model James's reply rules for the migration channel", () => {
     const context = slackIntakeContext(MIGRATION);
-    assert.match(context, WORKSPACE_ID);
-    assert.match(context, WORKSPACE_NAME);
+    for (const outcome of FIVE_OUTCOMES) {
+      assert.match(context, outcome);
+    }
+    for (const rule of [
+      SAYS_WHAT_WAS_CHECKED,
+      ASKS_FOR_MISSING,
+      TAGS_REQUESTER,
+      WORKAROUND_RECORDED,
+      CLOSE_PARITY,
+      ALREADY_COVERED,
+      REPORTER_ONLY_WHEN_AFFECTED,
+      LINK_AND_HEAR_BACK,
+    ]) {
+      assert.match(context, rule);
+    }
+  });
+
+  it("keeps App Publishing questions-only, with its form and no ticket filing", () => {
+    const context = slackIntakeContext(APP_PUBLISHING);
     assert.match(context, NO_LINEAR_WORK);
     assert.match(context, FORM_COMMAND);
-    assert.match(context, TEXT_IS_NOT_IDENTITY);
-    assert.match(context, KEEP_IT_QUICK);
-    assert.match(context, CRM_FIRST);
-    assert.match(context, CODE_OVER_HELP_CENTER);
-    assert.doesNotMatch(context, INTAKE_LINEAR_WRITES);
-    assert.doesNotMatch(context, GENERIC_NEW_ISSUE);
+    assert.doesNotMatch(context, ONLY_TICKET_WRITE);
+    assert.equal(
+      QUESTIONS_ONLY_WORKSPACES[APP_PUBLISHING]?.filesTickets,
+      undefined
+    );
+    assert.equal(QUESTIONS_ONLY_WORKSPACES[MIGRATION]?.filesTickets, true);
+    assert.equal(QUESTIONS_ONLY_WORKSPACES[SANDBOX]?.filesTickets, true);
   });
 
   it("stamps the session questions-only and intake-only", () => {
