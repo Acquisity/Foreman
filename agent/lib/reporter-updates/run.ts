@@ -291,10 +291,10 @@ export const reconcileTicket = async (
 
 /**
  * What a duplicate follows: its master (ENG-16608) and its match. The master's
- * outcome governs: a Canceled master ends the wait whatever the match shows.
- * Otherwise the fixing pull request may be linked to either, so their linked
- * pull requests are pooled. Each is read on its own, so one failed read never
- * hides the other; only when every read fails does the error stand.
+ * outcome governs: a Canceled master ends the wait whatever the match shows,
+ * and a failed master read keeps the wait for the next run. Otherwise the
+ * fixing pull request may be linked to either, so their linked pull requests
+ * are pooled; a failed match read never hides the master.
  */
 const followedOriginal = async (
   master: string | undefined,
@@ -308,6 +308,12 @@ const followedOriginal = async (
   const read = results.flatMap((result) =>
     result.status === "fulfilled" && result.value ? [result.value] : []
   );
+  // The master is read first and decides: when its read fails the duplicate
+  // keeps waiting and is retried, never decided from the match alone.
+  const [masterRead] = results;
+  if (master && masterRead?.status === "rejected") {
+    throw masterRead.reason;
+  }
   const failed = results.find((result) => result.status === "rejected");
   if (failed && read.length === 0) {
     throw failed.reason;

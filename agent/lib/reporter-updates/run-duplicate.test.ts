@@ -19,6 +19,7 @@ import {
 import { runReporterUpdates } from "./run.js";
 
 const DAY = 86_400_000;
+const MASTER_READ_FAILED = /ENG-50 read timed out/u;
 const LIVE = {
   ancestors: { [`${MERGE_SHA}>${NEW_SHA}`]: true },
   liveSha: NEW_SHA,
@@ -352,6 +353,30 @@ describe("a duplicate under a master (ENG-16608)", () => {
     s.linear.state.failOriginals.add("ENG-9");
     withLog(s);
     await reconcile(s);
+    assert.deepEqual(await reconcile(s), { kind: "posted", stage: "fixed" });
+  });
+
+  it("waits for the master when its read fails, never deciding from the match, then sends the master's outcome (Devin 7)", async () => {
+    const dup = duplicate();
+    dup.facts.parent = { identifier: "ENG-50", stateType: "completed" };
+    const report = doneOriginal({
+      stateName: "Canceled",
+      stateType: "canceled",
+    });
+    const master = doneOriginal({ identifier: "ENG-50", pullUrls: [PR_URL] });
+    const s = setup([dup, report, master], LIVE);
+    const events = withLog(s);
+    await reconcile(s);
+    s.linear.state.failOriginals.add("ENG-50");
+    await assert.rejects(reconcile(s), MASTER_READ_FAILED);
+    assert.deepEqual(
+      s.linear.posts.map((p) => p.body),
+      [DUPLICATE_TEXT]
+    );
+    assert.ok(
+      !events.some((e) => e.event === "reporter.update.duplicate_dropped")
+    );
+    s.linear.state.failOriginals.clear();
     assert.deepEqual(await reconcile(s), { kind: "posted", stage: "fixed" });
   });
 });
