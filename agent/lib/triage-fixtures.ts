@@ -21,8 +21,11 @@ export const band = (probabilities: Record<string, number>): JevAnswer => ({
 export const RECORDED_CHANGE = {
   action: "Reconnected the customer's sending inbox.",
   by: "triage" as const,
-  recordedAt: "https://linear.app/acquisity/issue/ENG-1#comment-1",
+  recordedAt: "https://linear.app/acquisity/issue/ENG-1#comment-1a2b3c4d",
 };
+
+/** The comments on ENG-1, as decide_triage reads them: RECORDED_CHANGE's is one. */
+export const TICKET_COMMENT_IDS = ["1a2b3c4d-0000-4000-8000-000000000001"];
 
 export const triageInput = (over: Partial<TriageInput> = {}): TriageInput => ({
   blastRadius: {
@@ -44,6 +47,7 @@ export const triageInput = (over: Partial<TriageInput> = {}): TriageInput => ({
   regression: { kind: "none", line: "none" },
   rootCauseLabels: [],
   sourceLabels: ["Customer reported"],
+  ticketCommentIds: TICKET_COMMENT_IDS,
   ...over,
 });
 

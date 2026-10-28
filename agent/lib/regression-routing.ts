@@ -69,6 +69,17 @@ export const routedPath = (
   return fixedPath ?? (choice as HandlingPath);
 };
 
+/**
+ * Evidence that something changed: the action the model names, and the
+ * ticket's comment ids and document URLs that decide_triage reads to check
+ * where it is recorded (never typed by the model).
+ */
+export interface ChangeEvidence {
+  changeMade?: ChangeMade;
+  ticketCommentIds?: string[];
+  ticketDocuments?: string[];
+}
+
 /** A staff or triage action that changed something for this customer, as recorded on the ticket. */
 export interface ChangeMade {
   action: string;
@@ -78,27 +89,31 @@ export interface ChangeMade {
 }
 
 /**
- * A comment link on this ticket, or a link to one of the documents attached to
- * it, in either document form (`/document/<slug>` or `/d/<id>`). A document
- * link names no issue, so it counts only when it is one the decide_triage
- * tool read from this ticket.
+ * A link to a comment that is on this ticket, or to one of the documents
+ * attached to it, in either document form (`/document/<slug>` or `/d/<id>`).
+ * Neither the ticket's own link nor a comment the ticket does not carry
+ * counts: decide_triage reads the ticket's comments and documents, and a link
+ * must name one of them.
  */
-const recordedOn = (
-  identifier: string,
-  url: string,
-  ticketDocuments: readonly string[]
-): boolean => {
+const recordedOn = (input: TriageInput, url: string): boolean => {
   const link = url.trim();
   const key = documentKey(link);
   if (key !== null) {
-    return ticketDocuments.some((attached) => documentKey(attached) === key);
+    return (input.ticketDocuments ?? []).some(
+      (attached) => documentKey(attached) === key
+    );
   }
+  const [, issue, fragment] = LINEAR_COMMENT_URL.exec(link) ?? [];
   return (
-    LINEAR_ISSUE_URL.exec(link)?.[1]?.toUpperCase() === identifier.toUpperCase()
+    issue?.toUpperCase() === input.identifier.toUpperCase() &&
+    fragment !== undefined &&
+    (input.ticketCommentIds ?? []).some((id) =>
+      id.toLowerCase().startsWith(fragment.toLowerCase())
+    )
   );
 };
-const LINEAR_ISSUE_URL =
-  /^https:\/\/linear\.app\/[\w-]+\/issue\/([A-Za-z]+-\d+)(?:[/?#]|$)/u;
+const LINEAR_COMMENT_URL =
+  /^https:\/\/linear\.app\/[\w-]+\/issue\/([A-Za-z]+-\d+)(?:\/[\w-]*)?#comment-([\da-f]{8,})$/iu;
 const LINEAR_DOCUMENT_URL =
   /^https:\/\/linear\.app\/[\w-]+\/(?:document|d)\/(?:[\w-]*-)?([\da-f]+)(?:[/?#]|$)/u;
 
@@ -108,6 +123,23 @@ const documentKey = (url: string): string | null =>
 
 export const isLinearDocumentUrl = (url: string): boolean =>
   documentKey(url) !== null;
+
+export const isLinearCommentUrl = (url: string): boolean =>
+  LINEAR_COMMENT_URL.test(url.trim());
+
+const NO_CHANGE = "Resolved by triage needs evidence of a change";
+
+/**
+ * Whether the ticket's comments and documents would change this decision: a
+ * change was named but not found among them. A live fix or any other path
+ * never needs them, so a failed read of them can never cost that decision.
+ */
+export const needsChangeRecords = (
+  input: ChangeEvidence,
+  decision: { notes: string[] }
+): boolean =>
+  input.changeMade !== undefined &&
+  decision.notes.some((note) => note.startsWith(NO_CHANGE));
 
 export const CHANGE_GAP =
   "Evidence of the change that resolved it: a fix live in production (check_regression returns fixed on main and live) or the staff or triage action, passed as changeMade with the link to where this ticket records it. An explanation with no change is not Resolved by triage.";
@@ -131,23 +163,18 @@ export const resolvedPath = (
     return { path };
   }
   const change = input.changeMade;
-  if (
-    change &&
-    recordedOn(input.identifier, change.recordedAt, input.ticketDocuments ?? [])
-  ) {
+  if (change && recordedOn(input, change.recordedAt)) {
     notes.push(
       `Resolved by a ${change.by} change recorded on the ticket: ${change.action}`
     );
     return { path };
   }
   if (classification === "Bug") {
-    notes.push(
-      "Resolved by triage needs evidence of a change, and this Bug has none."
-    );
+    notes.push(`${NO_CHANGE}, and this Bug has none.`);
     return { missing: [CHANGE_GAP] };
   }
   notes.push(
-    `Resolved by triage needs evidence of a change, and there is none: closed as ${classification}, Canceled.`
+    `${NO_CHANGE}, and there is none: closed as ${classification}, Canceled.`
   );
   return { path: classification };
 };

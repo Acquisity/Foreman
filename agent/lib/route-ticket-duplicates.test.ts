@@ -17,6 +17,11 @@ const CUTOFF = "2026-09-28T00:00:00.000Z";
 const ISSUES: Record<string, FakeIssue> = {
   "ENG-20": { labels: ["Customer reported"], parent: "ENG-30" },
   "ENG-21": { labels: ["Customer reported"], parent: "ENG-70" },
+  "ENG-22": {
+    assignee: { id: "u-aaron", name: "Aaron Fraga" },
+    labels: ["Customer reported"],
+    parent: "ENG-30",
+  },
   "ENG-30": { assignee: ANUJ, createdAt: FRESH },
   "ENG-31": { assignee: ANUJ, createdAt: FRESH },
   "ENG-40": { labels: ["intercom-sourced", "Customer reported"] },
@@ -260,5 +265,20 @@ describe("routeTicket duplicate masters, review fixes", () => {
       { client: fake.fetchStub }
     );
     assert.equal(updateOf(fake)?.parentId, "i-ENG-31");
+  });
+
+  it("inherits the owner of the master it parents the duplicate under, not the match's (Devin 1)", async () => {
+    const fake = linear();
+    await routeTicket(
+      {
+        duplicateOf: "ENG-22",
+        inheritAssigneeFrom: "ENG-22",
+        issue: "ENG-1",
+        state: "Duplicate",
+      },
+      { client: fake.fetchStub }
+    );
+    assert.equal(updateOf(fake)?.parentId, "i-ENG-30");
+    assert.equal(updateOf(fake)?.assigneeId, "u-anuj");
   });
 });

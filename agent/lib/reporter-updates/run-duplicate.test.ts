@@ -306,4 +306,18 @@ describe("a duplicate under a master (ENG-16608)", () => {
       fields: { code: "original_canceled", issue: "ENG-1", outcome: "skipped" },
     });
   });
+
+  it("posts the fix linked to the matched report when its Done master has none (CodeRabbit 3)", async () => {
+    const dup = duplicate();
+    dup.facts.parent = { identifier: "ENG-50", stateType: "completed" };
+    const report = doneOriginal({
+      parent: { identifier: "ENG-50", stateType: "completed" },
+      pullUrls: [PR_URL],
+    });
+    const master = doneOriginal({ identifier: "ENG-50" });
+    const s = setup([dup, report, master], LIVE);
+    withLog(s);
+    await reconcile(s);
+    assert.deepEqual(await reconcile(s), { kind: "posted", stage: "fixed" });
+  });
 });

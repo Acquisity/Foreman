@@ -289,16 +289,39 @@ export const reconcileTicket = async (
   return outcome;
 };
 
+/**
+ * What a duplicate follows: its master (ENG-16608) and its match, master
+ * first. The fixing pull request may be linked to either, so any of them with
+ * linked pull requests wins and their pull requests are pooled; otherwise the
+ * master decides, because the match may be an earlier duplicate closed unfixed.
+ */
+const followedOriginal = async (
+  identifiers: (string | null | undefined)[],
+  deps: Deps
+): Promise<TicketFacts | null> => {
+  const wanted = [...new Set(identifiers.filter((id): id is string => !!id))];
+  const read = (
+    await Promise.all(wanted.map((id) => deps.linear.readOriginal(id)))
+  ).filter((facts): facts is TicketFacts => facts !== null);
+  const fixed = read.filter(
+    (facts) => closureOf(facts).kind === "needs_deploy"
+  );
+  const [first] = fixed;
+  return first
+    ? { ...first, pullUrls: [...new Set(fixed.flatMap((f) => f.pullUrls))] }
+    : (read[0] ?? null);
+};
+
 const originalFollowUp = async (
   view: TicketView,
   deps: Deps,
   liveSha: () => Promise<string | null>
 ): Promise<Planned | Outcome | null> => {
   const { duplicateOf, identifier, parent } = view.facts;
-  // A duplicate sits under its master (ENG-16608), which holds the fixing
-  // pull request; its match may be an earlier duplicate that closed unfixed.
-  const followed = parent?.identifier ?? duplicateOf;
-  const original = followed ? await deps.linear.readOriginal(followed) : null;
+  const original = await followedOriginal(
+    [parent?.identifier, duplicateOf],
+    deps
+  );
   if (!original) {
     return null;
   }

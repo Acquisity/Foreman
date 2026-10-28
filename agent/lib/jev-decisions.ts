@@ -9,8 +9,9 @@ import {
 import { SUPPORT_OWNER } from "./owner-map.js";
 import type { RegressionOutcome } from "./regression-record.js";
 import {
-  type ChangeMade,
+  type ChangeEvidence,
   fixedRouting,
+  needsChangeRecords,
   REGRESSION_GAP,
   resolvedPath,
   routedPath,
@@ -197,7 +198,7 @@ const LOW_PATHS = new Set<HandlingPath>([
   "Resolved by triage",
 ]);
 
-export interface TriageInput {
+export interface TriageInput extends ChangeEvidence {
   billingFacts?: BillingFacts;
   blastRadius?: {
     countedAt: string;
@@ -205,8 +206,6 @@ export interface TriageInput {
     query: string;
     users: number;
   };
-  /** The staff or triage action recorded on the ticket that resolved it. */
-  changeMade?: ChangeMade;
   claim: string;
   codePath?: {
     commit: string;
@@ -228,8 +227,6 @@ export interface TriageInput {
   regression?: RegressionOutcome;
   rootCauseLabels: string[];
   sourceLabels: string[];
-  /** The ticket's document URLs, read by the tool; never typed by the model. */
-  ticketDocuments?: string[];
   ticketLabels?: string[];
   unavailableLanes?: string[];
 }
@@ -641,12 +638,8 @@ export function resolveTriage(
     return unproven(gap.missing);
   }
   notes.push(...fixedNotes);
-  const resolved = resolvedPath(
-    input,
-    settled,
-    routedPath(billed, match, pathPick.choice, fixed?.path),
-    notes
-  );
+  const routed = routedPath(billed, match, pathPick.choice, fixed?.path);
+  const resolved = resolvedPath(input, settled, routed, notes);
   if ("missing" in resolved) {
     return unproven(resolved.missing);
   }
@@ -723,7 +716,8 @@ export function resolveTriage(
 
 export async function decideTriage(
   input: TriageInput,
-  opts?: JevOptions
+  opts?: JevOptions,
+  readRecords?: () => Promise<ChangeEvidence>
 ): Promise<TriageDecision> {
   const state = {
     blastRadius: input.blastRadius ?? null,
@@ -741,7 +735,10 @@ export async function decideTriage(
     regression: input.regression?.line ?? null,
   };
   const answers = await askJev(triageQuestions(input), state, opts);
-  return resolveTriage(input, answers);
+  const decision = resolveTriage(input, answers);
+  return readRecords && needsChangeRecords(input, decision)
+    ? resolveTriage({ ...input, ...(await readRecords()) }, answers)
+    : decision;
 }
 
 // ---------------------------------------------------------------- prior work

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { resolveTriage } from "./jev-decisions.js";
+import { decideTriage, resolveTriage } from "./jev-decisions.js";
 import { recordFor } from "./regression-record.js";
 import { REGRESSION_GAP } from "./regression-routing.js";
 import { bugAnswers, pick, triageInput } from "./triage-fixtures.js";
@@ -230,7 +230,7 @@ const CHANGE = {
   action: "Reconnected the customer's sending inbox.",
   by: "triage" as const,
   recordedAt:
-    "https://linear.app/acquisity/issue/ENG-1/replies-stopped#comment-1a2b",
+    "https://linear.app/acquisity/issue/ENG-1/replies-stopped#comment-1a2b3c4d",
 };
 const NO_CHANGE = /Resolved by triage needs evidence of a change/u;
 
@@ -356,4 +356,89 @@ test("a link outside Linear does not count as a recorded change", () => {
   );
   assert.ok(decision.outcome === "route");
   assert.equal(decision.route.state, "Canceled");
+});
+
+const explanationOf = (recordedAt: string) =>
+  resolveTriage(
+    triageInput({ changeMade: { ...CHANGE, recordedAt } }),
+    bugAnswers({
+      classification: pick("user_error"),
+      path: pick("Resolved by triage"),
+    })
+  );
+
+test("a bare link to this ticket is not a recorded change (Devin 2)", () => {
+  for (const recordedAt of [
+    "https://linear.app/acquisity/issue/ENG-1",
+    "https://linear.app/acquisity/issue/ENG-1/replies-stopped",
+  ]) {
+    const decision = explanationOf(recordedAt);
+    assert.ok(decision.outcome === "route", recordedAt);
+    assert.equal(decision.route.state, "Canceled", recordedAt);
+  }
+});
+
+test("a comment link counts only when that comment is on this ticket (Devin 2)", () => {
+  const missing = explanationOf(
+    "https://linear.app/acquisity/issue/ENG-1/replies-stopped#comment-9f9f9f9f"
+  );
+  assert.ok(missing.outcome === "route");
+  assert.equal(missing.route.state, "Canceled");
+  const found = explanationOf(CHANGE.recordedAt);
+  assert.ok(found.outcome === "route");
+  assert.equal(found.route.state, "Done");
+});
+
+const jevAnswering = (answers: ReturnType<typeof bugAnswers>) => ({
+  fetch: () =>
+    Promise.resolve(Response.json({ answers, model: "typesafe-ai/jev" })),
+  token: "t",
+});
+const DOCUMENT = "https://linear.app/acquisity/document/notes-8a841e5cff51";
+
+test("a live fix decides without reading the ticket's change records, so a failed read cannot cost it (CodeRabbit 4)", async () => {
+  let reads = 0;
+  const decision = await decideTriage(
+    triageInput({
+      changeMade: { ...CHANGE, recordedAt: DOCUMENT },
+      regression: {
+        commit: FIX,
+        kind: "fixed_live",
+        line: `fixed on main and live, by ${FIX}`,
+      },
+      ticketCommentIds: undefined,
+    }),
+    jevAnswering(bugAnswers({ area: pick("ai_sdr") })),
+    () => {
+      reads += 1;
+      return Promise.reject(new Error("Linear is busy"));
+    }
+  );
+  assert.ok(decision.outcome === "route");
+  assert.equal(decision.path, "Resolved by triage");
+  assert.equal(reads, 0);
+});
+
+test("an explanation reads the ticket's change records once and keeps Done when they hold the link (CodeRabbit 4)", async () => {
+  let reads = 0;
+  const decision = await decideTriage(
+    triageInput({
+      changeMade: { ...CHANGE, recordedAt: DOCUMENT },
+      ticketCommentIds: undefined,
+    }),
+    jevAnswering(
+      bugAnswers({
+        area: pick("ai_sdr"),
+        classification: pick("user_error"),
+        path: pick("Resolved by triage"),
+      })
+    ),
+    () => {
+      reads += 1;
+      return Promise.resolve({ ticketDocuments: [DOCUMENT] });
+    }
+  );
+  assert.ok(decision.outcome === "route");
+  assert.equal(decision.route.state, "Done");
+  assert.equal(reads, 1);
 });

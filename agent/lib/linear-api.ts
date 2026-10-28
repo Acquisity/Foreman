@@ -845,7 +845,14 @@ export async function routeTicket(
   const parent = match
     ? await duplicateParent(gql, issue, match, input, opts ?? {})
     : input.parent;
-  const { update, warnings } = await buildUpdate(gql, issue, input, parent);
+  // A duplicate takes its owner from the master it is parented under, so the
+  // report and its master keep one owner even when the match is held by
+  // someone else; the area owner stays the fallback.
+  const owned =
+    match && parent !== undefined && input.inheritAssigneeFrom !== undefined
+      ? { ...input, inheritAssigneeFrom: parent }
+      : input;
+  const { update, warnings } = await buildUpdate(gql, issue, owned, parent);
 
   // Caller cancellation is never a warning; the tool rethrows it.
   const warn = (error: unknown, message: string) => {

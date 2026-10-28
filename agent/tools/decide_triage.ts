@@ -1,12 +1,19 @@
 import { defineTool } from "eve/tools";
 import { z } from "zod";
+import { linearAuth } from "#lib/constants.js";
 import { executorClient } from "#lib/executor/client.js";
 import { LINEAR_ISSUE_ID_PATTERN } from "#lib/investigation-memory/scope.js";
 import { decideTriage } from "#lib/jev-decisions.js";
 import { ticketDocumentUrls } from "#lib/linear-api.js";
 import { logOpsEvent } from "#lib/ops-log.js";
 import { recordFor, regressionRecords } from "#lib/regression-record.js";
-import { isLinearDocumentUrl } from "#lib/regression-routing.js";
+import {
+  type ChangeEvidence,
+  type ChangeMade,
+  isLinearCommentUrl,
+  isLinearDocumentUrl,
+} from "#lib/regression-routing.js";
+import { ticketCommentIds } from "#lib/requester-reply.js";
 import {
   confidenceFields,
   criticRounds,
@@ -15,9 +22,46 @@ import {
   recordDecision,
   triageDecisions,
 } from "#lib/triage-log.js";
+import { replaySessionOf } from "#lib/triage-replay/mode.js";
 
 const identifier = z.string().trim().regex(LINEAR_ISSUE_ID_PATTERN);
 const text = (max: number) => z.string().trim().min(1).max(max);
+
+/**
+ * The ticket's comments and documents a change link must name: a comment link
+ * names a comment this ticket carries (a replay keeps no comment ids), and a
+ * document link, which names no issue, one of its investigation documents.
+ * decideTriage reads them only when they decide the outcome.
+ */
+async function readChangeRecords(
+  ticket: string,
+  change: ChangeMade | undefined,
+  ctx: Parameters<typeof executorClient>[0] & {
+    getToken: (auth: typeof linearAuth) => Promise<{ token: string }>;
+  }
+): Promise<ChangeEvidence> {
+  const link = change?.recordedAt ?? "";
+  if (isLinearDocumentUrl(link)) {
+    return {
+      ticketDocuments: await ticketDocumentUrls(ticket, {
+        client: executorClient(ctx),
+        signal: ctx.abortSignal,
+      }),
+    };
+  }
+  if (
+    isLinearCommentUrl(link) &&
+    !replaySessionOf(ctx.session?.auth.initiator)
+  ) {
+    return {
+      ticketCommentIds: await ticketCommentIds(
+        ticket,
+        (await ctx.getToken(linearAuth)).token
+      ),
+    };
+  }
+  return {};
+}
 
 export default defineTool({
   approval: () => "not-applicable",
@@ -41,19 +85,9 @@ export default defineTool({
         input.codePath,
         input.failureAt
       );
-      // A document link names no issue, so it counts only as one of the
-      // documents read from this ticket now.
-      const ticketDocuments =
-        input.changeMade && isLinearDocumentUrl(input.changeMade.recordedAt)
-          ? await ticketDocumentUrls(input.identifier, {
-              client: executorClient(ctx),
-              signal: ctx.abortSignal,
-            })
-          : [];
       const decision = await decideTriage(
         {
           ...input,
-          ticketDocuments,
           ...(record
             ? {
                 regression: {
@@ -65,7 +99,8 @@ export default defineTool({
               }
             : {}),
         },
-        { signal: ctx.abortSignal }
+        { signal: ctx.abortSignal },
+        () => readChangeRecords(input.identifier, input.changeMade, ctx)
       );
       logOpsEvent("jev.decision", {
         code: decision.outcome === "route" ? decision.hotlane?.route : null,
@@ -153,7 +188,7 @@ export default defineTool({
           .url()
           .max(2000)
           .describe(
-            "The link to the comment on this ticket, or to its Triage or Billing investigation document, that records the change."
+            "The link to the comment on this ticket (with its #comment- id), or to its Triage or Billing investigation document, that records the change. The ticket's own link does not count."
           ),
       })
       .optional()
