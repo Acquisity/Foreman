@@ -7,6 +7,8 @@ import {
   probabilityOf,
 } from "./jev.js";
 import { SUPPORT_OWNER } from "./owner-map.js";
+import type { RegressionOutcome } from "./regression-record.js";
+import { fixedRouting, REGRESSION_GAP } from "./regression-routing.js";
 import { BARS } from "./triage-bars.js";
 import {
   HOTLANE_IMPACTS,
@@ -198,7 +200,12 @@ export interface TriageInput {
     users: number;
   };
   claim: string;
-  codePath?: { commit: string; file: string; function: string };
+  codePath?: {
+    commit: string;
+    file: string;
+    function: string;
+    lines?: { end: number; start: number };
+  };
   duplicateCandidates: {
     identifier: string;
     priority?: number;
@@ -209,6 +216,8 @@ export interface TriageInput {
   identifier: string;
   organizationId?: string;
   projects: { description?: string; name: string }[];
+  /** What check_regression concluded about the blamed code (ENG-16056). */
+  regression?: RegressionOutcome;
   rootCauseLabels: string[];
   sourceLabels: string[];
   ticketLabels?: string[];
@@ -433,10 +442,11 @@ const findDuplicate = (input: TriageInput, answers: Answers) =>
     .sort((a, b) => b.confidence - a.confidence)
     .at(0);
 
-/** What a Bug verdict still lacks: all three are required, and two are checked in code. */
+/** What a Bug verdict still lacks: all four are required, and three are checked in code. */
 const bugBarGaps = (input: TriageInput, answers: Answers): string[] =>
   [
     input.codePath ? null : "A named file and function the cause runs through.",
+    input.regression ? null : REGRESSION_GAP,
     probabilityOf(answers.direct_evidence) >= BARS.signal
       ? null
       : "Direct production-data or runtime/provider evidence of the failure.",
@@ -501,6 +511,8 @@ interface BarContext {
   duplicate: ReturnType<typeof findDuplicate>;
   input: TriageInput;
   pathConfidence: number;
+  /** A trusted regression record already set the path (ENG-16056). */
+  pathFromRecord: boolean;
 }
 
 const barGap = (
@@ -512,7 +524,10 @@ const barGap = (
       note: "The classification was not clear enough to act on.",
     };
   }
-  if (!context.duplicate && context.pathConfidence < BARS.path) {
+  if (
+    !(context.duplicate || context.pathFromRecord) &&
+    context.pathConfidence < BARS.path
+  ) {
     return {
       missing: ["A deciding confirmation for the handling path."],
       note: "The handling path was not clear enough to act on.",
@@ -534,12 +549,16 @@ const barGap = (
 const routedPath = (
   billed: boolean,
   match: DuplicateMatch,
-  choice: string
+  choice: string,
+  fixedPath?: HandlingPath
 ): HandlingPath => {
   if (billed) {
     return "Support/Financial";
   }
-  return match ? "Duplicate" : (choice as HandlingPath);
+  if (match) {
+    return "Duplicate";
+  }
+  return fixedPath ?? (choice as HandlingPath);
 };
 
 const routeProjectOf = (
@@ -608,23 +627,26 @@ export function resolveTriage(
   if (billed) {
     confidence.path = pathPick.confidence;
   }
+  const settled = billed ? "Platform Limitation" : classification;
+  const match = billed ? undefined : duplicate;
+  const fixedNotes: string[] = [];
+  const fixed = fixedRouting(input, settled, match !== undefined, fixedNotes);
   const gap = barGap({
     answers,
     billed,
     classification,
     classificationConfidence: classificationPick.confidence,
-    duplicate: billed ? undefined : duplicate,
+    duplicate: match,
     input,
     pathConfidence: pathPick.confidence,
+    pathFromRecord: fixed !== undefined,
   });
   if (gap) {
     notes.push(gap.note);
     return unproven(gap.missing);
   }
-
-  const settled = billed ? "Platform Limitation" : classification;
-  const match = billed ? undefined : duplicate;
-  const path = routedPath(billed, match, pathPick.choice);
+  notes.push(...fixedNotes);
+  const path = routedPath(billed, match, pathPick.choice, fixed?.path);
   const project = choiceOf(answers.project);
   const projectSettled =
     project.choice !== UNDETERMINED && project.confidence >= BARS.project;
@@ -640,6 +662,7 @@ export function resolveTriage(
     classification: settled,
     closed: ["Canceled", "Done", "Duplicate"].includes(PATH_STATE[path]),
     duplicate: match !== undefined,
+    fixPending: fixed?.ownerFollowUp === true,
     input,
     notes,
     path,
@@ -711,6 +734,7 @@ export async function decideTriage(
       })
     ),
     evidence: input.evidence,
+    regression: input.regression?.line ?? null,
   };
   const answers = await askJev(triageQuestions(input), state, opts);
   return resolveTriage(input, answers);

@@ -3,6 +3,7 @@ import { z } from "zod";
 import { LINEAR_ISSUE_ID_PATTERN } from "#lib/investigation-memory/scope.js";
 import { decideTriage } from "#lib/jev-decisions.js";
 import { logOpsEvent } from "#lib/ops-log.js";
+import { recordFor, regressionRecords } from "#lib/regression-record.js";
 import {
   confidenceFields,
   criticRounds,
@@ -24,13 +25,34 @@ export default defineTool({
     "confidence carries the verdict, classification and path confidence; below 0.6 on the classification or path the outcome is unproven. " +
     "review says whether a second check by the critic is required for this decision and why; a duplicate, a platform limitation, a user error with a lane that could not run or a failure the customer saw, and an inbox error set aside as billing all need one. " +
     "An inbox error needs billingFacts before it can be a Bug or a duplicate; if they show non-payment, failing payments or domains not live, the decision is billing (Support/Financial), never a code bug. " +
+    "A Bug needs check_regression run for the ticket first (label every commit it returns), on exactly the file, function, line range and commit codePath names, and the same failureAt; its result is read from the session, never passed in, and a result for other code does not count. If the regression check is the only item in missing, run it and call this again: never take the unproven branch or tell the requester for that. A Bug main already fixes comes back as Resolved by triage, state Done (fixed and live), or Support/Product follow-up held by the area owner (fixed, not live yet): neither gets a master. " +
     "For a Bug that is not a Duplicate, hotlane carries the incident-hotlane route, impact, and proposed label. " +
     "outcome route carries the exact state, priority, addLabels (including the Area label), project, assignee, and duplicate fields for route_ticket; pass them unchanged. decision.assignee is the mapped owner of the area it chose, James Keeble when no area fits, and null when the ticket may not go to a developer (not a confirmed Bug, or a feature request nobody approved); decision.area names the Area label the route already carries. approval needed means a feature request waits for James to approve it. " +
     "Put every note in the Triage investigation document. " +
     "decided false means Jev could not answer: decide by the skill's rules and say so in the document; route_ticket then holds any route but the owner assignment until the critic has reviewed the fallback decision.",
   async execute(input, ctx) {
     try {
-      const decision = await decideTriage(input, { signal: ctx.abortSignal });
+      const record = recordFor(
+        regressionRecords.get()[input.identifier],
+        input.codePath,
+        input.failureAt
+      );
+      const decision = await decideTriage(
+        {
+          ...input,
+          ...(record
+            ? {
+                regression: {
+                  commit: record.commit,
+                  kind: record.kind,
+                  line: record.line,
+                  reason: record.reason,
+                },
+              }
+            : {}),
+        },
+        { signal: ctx.abortSignal }
+      );
       logOpsEvent("jev.decision", {
         code: decision.outcome === "route" ? decision.hotlane?.route : null,
         outcome: decision.outcome === "route" ? decision.path : "unproven",
@@ -114,9 +136,17 @@ export default defineTool({
           .regex(/^[0-9a-f]{40}$/u),
         file: text(300),
         function: text(200),
+        lines: z
+          .object({ end: z.number().int(), start: z.number().int() })
+          .optional()
+          .describe(
+            "The line range at commit, the same range passed to check_regression."
+          ),
       })
       .optional()
-      .describe("The file and function the cause runs through, when found."),
+      .describe(
+        "The file, function and line range the cause runs through, when found."
+      ),
     duplicateCandidates: z
       .array(
         z.object({
@@ -137,6 +167,14 @@ export default defineTool({
     evidence: text(20_000).describe(
       "The Stage 4 evidence record: every lane with what it returned, contrary evidence, the unblock, and what was ruled out."
     ),
+    failureAt: z
+      .string()
+      .trim()
+      .max(40)
+      .optional()
+      .describe(
+        "For a Bug: the same ISO failure time passed to check_regression; a regression record checked for another time does not count."
+      ),
     identifier: identifier.describe(
       "The ticket being triaged, such as ENG-123."
     ),

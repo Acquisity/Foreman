@@ -8,7 +8,10 @@ import {
   DOCUMENT_MAX_CHARS,
   saveInvestigationDocument,
 } from "#lib/linear-api.js";
+import { isBugDocument } from "#lib/regression-document.js";
+import { regressionRecords } from "#lib/regression-record.js";
 import { triageDocumentGaps } from "#lib/triage-document.js";
+import { triageDecisions } from "#lib/triage-log.js";
 import { isTriageIntake } from "#lib/trust.js";
 
 /** 13 to 19 digits with optional separators; only a Luhn-valid run counts as a card number. */
@@ -51,6 +54,10 @@ export default defineTool({
     "Returns documentId and updatedAt, which is the version pin the critic packet needs, plus the url for the ticket comment. " +
     "Do not call this in a read-only validation run.",
   async execute(draft, ctx) {
+    const bug = draft.lane === "triage" && isBugDocument(draft.content);
+    const regression = bug ? regressionRecords.get()[draft.issue] : undefined;
+    const duplicate =
+      bug && triageDecisions.get()[draft.issue]?.path === "Duplicate";
     const refuses = (document: typeof draft) =>
       document.lane === "billing" &&
       (hasCardNumber(document.content) || IBAN.test(document.content));
@@ -63,7 +70,9 @@ export default defineTool({
       return refusal;
     }
     const gaps =
-      draft.lane === "triage" ? triageDocumentGaps(draft.content) : [];
+      draft.lane === "triage"
+        ? triageDocumentGaps(draft.content, regression, duplicate)
+        : [];
     if (gaps.length > 0) {
       return {
         error: `The triage document needs ${gaps.join(" and ")}. Add it and save again.`,
@@ -76,7 +85,8 @@ export default defineTool({
     const input = {
       ...draft,
       content:
-        draft.lane === "triage" && triageDocumentGaps(reworded).length > 0
+        draft.lane === "triage" &&
+        triageDocumentGaps(reworded, regression, duplicate).length > 0
           ? draft.content
           : reworded,
     };

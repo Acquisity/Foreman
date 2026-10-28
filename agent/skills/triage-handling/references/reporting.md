@@ -99,6 +99,11 @@ N orgs and N users as an exact figure, or the tightest bound with what blocks th
 ## Code path
 Files and functions in Acquisity/Acquisity that the cause runs through, with the commit the investigation read.
 
+## Regression check
+**Deployed commit**: <the 40-character commit production serves, or `Not available: <reason>`>
+**Commit read**: <the commit the Code path names>
+**Result**: <the one line check_regression returned, or `Not applicable: Duplicate of <ticket>`>
+
 ## Unblock
 What gets the customer working now, who performs it, whether it has been done, and confirmation that it costs the customer neither data nor money. `None found: <reason>` when there is nothing.
 
@@ -108,6 +113,8 @@ What was checked and eliminated, so the next agent does not redo it.
 ## Next steps
 What action the root cause warrants.
 ```
+
+The three regression lines are copied from the `check_regression` record, and the save refuses a Bug document whose lines differ from it. Under them note what the critic needs to rerun it: the file and line range, the failure time and its source, and the fixing or introducing commit's subject; for a fix not yet live, add the deploy note.
 
 The `**Confidence**` numbers are `decision.confidence` copied as returned. A decision that fell back to the skill because Jev failed writes `**Confidence**: Not available: Jev did not answer`. The `**Review**` line is never blank: a reviewed ticket shows the critic's result, and an unreviewed one shows `Not required:` with the decision's reason.
 

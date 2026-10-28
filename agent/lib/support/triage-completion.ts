@@ -41,6 +41,11 @@ const NOT_REQUIRED = /^Not required(?::[ \t]+\S.*)?$/;
 const BLOCKED_REVIEW =
   /^Blocked \S+ at [a-f0-9]{40}: (?:CHALLENGE|INSUFFICIENT_EVIDENCE) twice\b.*$/;
 
+const REGRESSION_RESULT =
+  /^## Regression check\s*$[\s\S]*?^\*\*Result\*\*:[ \t]*(.+?)[ \t]*$/mu;
+const PENDING_FIX =
+  /^fixed on main, (?:not deployed yet|deploy status unknown), by [0-9a-f]{40}$/u;
+
 const ENGINEERING_PATH = "Engineering Todo";
 
 const isEngineering = (
@@ -93,9 +98,13 @@ const ownerRecordMissing = (
 const needsMaster = (
   issue: z.infer<typeof issueSchema>,
   classification: string | undefined,
-  handlingPath: string | undefined
+  handlingPath: string | undefined,
+  pendingFix: boolean
 ): boolean => {
   if (issue.status !== "Todo" || issue.parentId) {
+    return false;
+  }
+  if (pendingFix && handlingPath?.startsWith("Support/")) {
     return false;
   }
   if (handlingPath === ENGINEERING_PATH) {
@@ -194,7 +203,12 @@ export function assertTriageOutputs(
       issue.labels.includes(label)
     ) ||
     missesTypeLabels(issue, classification, handlingPath) ||
-    needsMaster(issue, classification, handlingPath) ||
+    needsMaster(
+      issue,
+      classification,
+      handlingPath,
+      PENDING_FIX.test(REGRESSION_RESULT.exec(document.content)?.[1] ?? "")
+    ) ||
     (duplicate && !issue.relations?.duplicateOf)
   ) {
     throw new SupportRefusal(

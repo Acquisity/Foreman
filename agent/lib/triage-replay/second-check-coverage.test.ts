@@ -40,6 +40,7 @@ const input = (duplicate: boolean): TriageInput => ({
   evidence: "every lane ran",
   identifier: "ENG-2",
   projects: [{ name: "CRM" }],
+  regression: { kind: "none", line: "none" },
   rootCauseLabels: [],
   sourceLabels: [],
 });

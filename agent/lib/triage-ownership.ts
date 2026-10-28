@@ -112,9 +112,10 @@ const bugAssignee = (
   area: AreaKey,
   path: HandlingPath,
   duplicate: boolean,
-  closed: boolean
+  closed: boolean,
+  fixPending: boolean
 ): string | null => {
-  if (duplicate || path === "Engineering Todo") {
+  if (duplicate || fixPending || path === "Engineering Todo") {
     return ownerForArea(area);
   }
   return path.startsWith("Support/") && !closed ? SUPPORT_OWNER : null;
@@ -127,6 +128,8 @@ export function resolveOwnership(context: {
   classification: TriageClassification;
   closed: boolean;
   duplicate: boolean;
+  /** A fix main holds but production does not serve yet: the area owner follows it. */
+  fixPending?: boolean;
   input: TriageInput;
   notes: string[];
   path: HandlingPath;
@@ -156,7 +159,13 @@ export function resolveOwnership(context: {
   };
   if (classification === "Bug") {
     const area = place();
-    const assignee = bugAssignee(area.key, path, duplicate, context.closed);
+    const assignee = bugAssignee(
+      area.key,
+      path,
+      duplicate,
+      context.closed,
+      context.fixPending === true
+    );
     if (assignee && !area.matched && assignee !== SUPPORT_OWNER) {
       notes.push(
         `The evidence does not place this in a mapped area, so it goes to ${FALLBACK_OWNER}; say which evidence is missing in the document.`

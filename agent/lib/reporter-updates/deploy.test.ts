@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { DeadlineError } from "./deadline.js";
-import { githubDeployProbe } from "./deploy.js";
+import { githubChangedFiles, githubDeployProbe } from "./deploy.js";
 import { MERGE_SHA, NEW_SHA, OLD_SHA } from "./fakes.js";
 
 const json = (body: unknown, status = 200) =>
@@ -318,5 +318,59 @@ describe("overall scan deadline", () => {
       500
     );
     await assert.rejects(probe.liveSha(), DeadlineError);
+  });
+});
+
+describe("changed files after a commit", () => {
+  const changedWith = (body: unknown, status = 200) =>
+    githubChangedFiles(
+      () => Promise.resolve("token"),
+      (input: string | URL | Request) => {
+        assert.equal(
+          String(input),
+          `https://api.github.com/repos/Acquisity/Acquisity/compare/${OLD_SHA}...${NEW_SHA}`
+        );
+        return Promise.resolve(json(body, status));
+      }
+    )(OLD_SHA, NEW_SHA);
+
+  it("lists the files a head ahead of its base changed", async () => {
+    assert.deepEqual(
+      await changedWith({
+        files: [{ filename: "a.ts" }, { filename: "b.ts" }],
+        status: "ahead",
+      }),
+      ["a.ts", "b.ts"]
+    );
+  });
+
+  it("lists a renamed file under both names, and nothing when the head trails the base", async () => {
+    assert.deepEqual(
+      await changedWith({
+        files: [
+          { filename: "src/limit.ts", previous_filename: "src/send-limit.ts" },
+        ],
+        status: "ahead",
+      }),
+      ["src/limit.ts", "src/send-limit.ts"]
+    );
+    assert.deepEqual(
+      await changedWith({
+        files: [{ filename: "src/send-limit.ts" }],
+        status: "behind",
+      }),
+      []
+    );
+  });
+
+  it("refuses a diverged compare, a capped file list or a failed read", async () => {
+    await assert.rejects(changedWith({ files: [], status: "diverged" }));
+    await assert.rejects(
+      changedWith({
+        files: Array.from({ length: 300 }, (_, i) => ({ filename: `${i}.ts` })),
+        status: "ahead",
+      })
+    );
+    await assert.rejects(changedWith({}, 502));
   });
 });

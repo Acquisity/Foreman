@@ -18,7 +18,7 @@ Read the document first. It holds the claim, root cause, evidence lanes, prior c
 
 ## Where you can look
 
-You have your own sandbox. Before checking any code claim, call `prepare_repository` with `Acquisity/Acquisity`, then `checkout_commit` with the commit you were given. That pins `/workspace/repo` to the commit the investigation read. Echo the commit that `checkout_commit` returned in `reviewed.commit`. If preparation or checkout fails, put the word `unpinned` there instead, say what failed under `evidence_integrity`, and verify code claims only where they still hold at whatever HEAD you have.
+You have your own sandbox, and `check_regression` deepens it to 30 days for the regression check. Before checking any code claim, call `prepare_repository` with `Acquisity/Acquisity`, then `checkout_commit` with the commit you were given. That pins `/workspace/repo` to the commit the investigation read. Echo the commit that `checkout_commit` returned in `reviewed.commit`. If preparation or checkout fails, put the word `unpinned` there instead, say what failed under `evidence_integrity`, and verify code claims only where they still hold at whatever HEAD you have.
 
 Read [references/tools.md](references/tools.md) for the exact tools and connections you have, how each is called, and which sources are not available to you. Use them to independently verify a claim that would change the outcome: the code path, the production data behind the blast radius, the runtime or provider evidence, the Linear context of duplicate and master candidates, and prior cases in investigation memory. Scope customer evidence to the workspace identity the document pins. Treat failed, truncated, stale, cross-workspace, or unparsed evidence as unavailable.
 
@@ -31,7 +31,7 @@ You verify the claims that matter; you do not repeat the whole investigation.
 Judge each separately, in this order, citing the evidence you used. Return exactly one result per slug.
 
 1. `claim_fidelity`: the claim in the document matches what the customer reported, including timing, identity, and expected result.
-2. `reachability`: the named file, function, job, state transition, or provider path is reachable from the reported entry point at the reviewed commit.
+2. `reachability`: the named file, function, job, state transition, or provider path is reachable from the reported entry point at the reviewed commit. For a `Bug`, also check the document's `## Regression check`: call `check_regression` at the pinned commit with the document's file, function, line range and failure time, label the commits yourself from their patches, and compare your result line with the document's. Start this result with `Regression: held` (same line), `Regression: disputed` (a different line, or a decisive commit the document missed; the criterion is then `FAIL`), or `Regression: not checked` (the tool returned `unchecked`, or the document says `Not applicable`).
 3. `causality`: the evidence supports the whole causal chain, not correlation, symptom similarity, or a prior case copied forward.
 4. `alternatives`: configuration, entitlement, provider, stale state, retry, concurrency, and expected-behavior explanations were checked where relevant.
 5. `evidence_integrity`: no conclusion rests on truncated, incomplete, failed, unparsed, stale, cross-workspace, or mismatched data, and the repository commit matched.
