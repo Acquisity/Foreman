@@ -294,10 +294,11 @@ const originalFollowUp = async (
   deps: Deps,
   liveSha: () => Promise<string | null>
 ): Promise<Planned | Outcome | null> => {
-  const { duplicateOf, identifier } = view.facts;
-  const original = duplicateOf
-    ? await deps.linear.readOriginal(duplicateOf)
-    : null;
+  const { duplicateOf, identifier, parent } = view.facts;
+  // A duplicate sits under its master (ENG-16608), which holds the fixing
+  // pull request; its match may be an earlier duplicate that closed unfixed.
+  const followed = parent?.identifier ?? duplicateOf;
+  const original = followed ? await deps.linear.readOriginal(followed) : null;
   if (!original) {
     return null;
   }
@@ -325,9 +326,9 @@ const originalFollowUp = async (
 };
 
 /**
- * The fixed, live or done message for a duplicate once its original has one.
- * Until then the duplicate waits, for at most 30 days after it was closed,
- * whatever the original is waiting on.
+ * The fixed, live or done message for a duplicate once its master, or its
+ * original when it has no master, has one. Until then the duplicate waits,
+ * for at most 30 days after it was closed, whatever that is waiting on.
  */
 const duplicateFollowUp = async (
   view: TicketView,

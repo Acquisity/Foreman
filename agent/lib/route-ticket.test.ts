@@ -187,6 +187,7 @@ describe("routeTicket", () => {
     assert.deepEqual(update?.variables.input, {
       assigneeId: "u-anuj",
       labelIds: ["l-bug", "l-cr"],
+      parentId: "i-9",
       priority: 3,
       projectId: "p-support",
       stateId: "s-done",
@@ -208,14 +209,16 @@ describe("routeTicket", () => {
     assert.equal(result.duplicateOf, "ENG-9");
   });
 
-  it("reports no duplicate when the relation was not recorded", async () => {
+  it("writes nothing when the relation was not recorded", async () => {
     const linear = fakeLinear({ relationFails: true });
-    const result = await routeTicket(
-      { duplicateOf: "ENG-9", issue: "ENG-1", state: "Done" },
-      { client: linear.fetchStub }
+    await assert.rejects(
+      routeTicket(
+        { duplicateOf: "ENG-9", issue: "ENG-1", state: "Done" },
+        { client: linear.fetchStub }
+      ),
+      NOTHING_WRITTEN
     );
-    assert.equal(result.duplicateOf, null);
-    assert.equal(result.warnings.length, 1);
+    assert.equal(linear.updates().length, 0);
   });
 
   it("reports a failed link as a warning on a routed ticket", async () => {
@@ -851,5 +854,219 @@ describe("route_ticket tool", () => {
       ).type,
       "denied"
     );
+  });
+});
+
+const MISSING_RELATION = "missing duplicate relation";
+const NO_MASTER =
+  /ENG-40 is a customer report with no master, so nothing was written/u;
+const WRONG_PARENT =
+  /ENG-20 belongs under its master ENG-30, not ENG-77, so nothing was written/u;
+const RELATION_NOT_RECORDED =
+  /Nothing was written: the duplicate relation to ENG-9 was not recorded/u;
+
+interface FakeIssue {
+  assignee?: { id: string; name: string };
+  labels?: string[];
+  parent?: string;
+}
+
+/**
+ * Linear as it behaved on ENG-15734, ENG-15935 and ENG-15785: an update that
+ * moves a ticket to the Duplicate state fails with "missing duplicate
+ * relation" until the duplicate relation exists, and writes nothing.
+ * ENG-9 is a master (no source label), ENG-20 a report under master ENG-30,
+ * ENG-40 a lone report.
+ */
+const linearWithDuplicates = ({
+  relationFails = false,
+}: {
+  relationFails?: boolean;
+} = {}) => {
+  const issues: Record<string, FakeIssue> = {
+    "ENG-1": { labels: ["Customer reported"] },
+    "ENG-9": { assignee: { id: "u-anuj", name: "Anuj Bhatt" } },
+    "ENG-20": { labels: ["Customer reported"], parent: "ENG-30" },
+    "ENG-30": { assignee: { id: "u-anuj", name: "Anuj Bhatt" } },
+    "ENG-40": { labels: ["intercom-sourced", "Customer reported"] },
+    "ENG-77": {},
+  };
+  const calls: Call[] = [];
+  const relations: string[] = [];
+  const fetchStub: ProviderClient = (request) => {
+    const body = {
+      query: request.operation,
+      variables: "variables" in request.input ? request.input.variables : {},
+    } as Call;
+    calls.push(body);
+    const { variables } = body;
+    switch (body.query) {
+      case "linear.RouteIssue": {
+        const id = String(variables.id);
+        const issue = issues[id];
+        return json({
+          data: {
+            issue: issue
+              ? {
+                  assignee: issue.assignee ?? null,
+                  id: `i-${id}`,
+                  identifier: id,
+                  labels: {
+                    nodes: (issue.labels ?? []).map((name) => ({
+                      id: `l-${name}`,
+                      name,
+                    })),
+                  },
+                  parent: issue.parent ? { identifier: issue.parent } : null,
+                  priority: 0,
+                  project: null,
+                  state: { name: "Triage" },
+                  team: { id: "t-eng" },
+                  url: `https://linear.app/acquisity/issue/${id}`,
+                }
+              : null,
+          },
+        });
+      }
+      case "linear.WorkflowStates":
+        return json({
+          data: {
+            workflowStates: {
+              nodes: [
+                {
+                  id: `s-${String(variables.name).toLowerCase()}`,
+                  name: variables.name,
+                },
+              ],
+            },
+          },
+        });
+      case "linear.RouteRelation": {
+        if (relationFails) {
+          return json({ errors: [{ message: "Linear is busy" }] });
+        }
+        const input = variables.input as Record<string, string>;
+        relations.push(`${input.issueId}>${input.relatedIssueId}`);
+        return json({ data: { issueRelationCreate: { success: true } } });
+      }
+      case "linear.RouteIssueUpdate": {
+        const input = variables.input as Record<string, unknown>;
+        if (
+          input.stateId === "s-duplicate" &&
+          !relations.some((r) => r.startsWith(`${variables.id}>`))
+        ) {
+          return json({ errors: [{ message: MISSING_RELATION }] });
+        }
+        return json({ data: { issueUpdate: { success: true } } });
+      }
+      default:
+        throw new Error(`Unexpected query: ${body.query}`);
+    }
+  };
+  const order = () =>
+    calls
+      .map((c) => c.query)
+      .filter((q) =>
+        ["linear.RouteRelation", "linear.RouteIssueUpdate"].includes(q)
+      );
+  const update = () =>
+    calls.find((c) => c.query === "linear.RouteIssueUpdate")?.variables.input as
+      | Record<string, unknown>
+      | undefined;
+  return { calls, fetchStub, order, relations, update };
+};
+
+describe("routeTicket duplicates", () => {
+  it("records the duplicate relation before moving the ticket to Duplicate, as Linear requires (ENG-15734, ENG-15935, ENG-15785)", async () => {
+    const linear = linearWithDuplicates();
+    const result = await routeTicket(
+      { duplicateOf: "ENG-9", issue: "ENG-1", priority: 2, state: "Duplicate" },
+      { client: linear.fetchStub }
+    );
+    assert.deepEqual(linear.order(), [
+      "linear.RouteRelation",
+      "linear.RouteIssueUpdate",
+    ]);
+    assert.equal(linear.update()?.stateId, "s-duplicate");
+    assert.equal(result.duplicateOf, "ENG-9");
+    assert.deepEqual(result.warnings, []);
+  });
+
+  it("parents a duplicate of a master under that master", async () => {
+    const linear = linearWithDuplicates();
+    await routeTicket(
+      {
+        duplicateOf: "ENG-9",
+        inheritAssigneeFrom: "ENG-9",
+        issue: "ENG-1",
+        state: "Duplicate",
+      },
+      { client: linear.fetchStub, masterRequired: true }
+    );
+    assert.deepEqual(linear.relations, ["i-ENG-1>i-ENG-9"]);
+    assert.equal(linear.update()?.parentId, "i-ENG-9");
+    assert.equal(linear.update()?.stateId, "s-duplicate");
+  });
+
+  it("parents a duplicate of a report under that report's master, keeping the relation to the report", async () => {
+    const linear = linearWithDuplicates();
+    const result = await routeTicket(
+      { duplicateOf: "ENG-20", issue: "ENG-1", state: "Duplicate" },
+      { client: linear.fetchStub, masterRequired: true }
+    );
+    assert.deepEqual(linear.relations, ["i-ENG-1>i-ENG-20"]);
+    assert.equal(linear.update()?.parentId, "i-ENG-30");
+    assert.equal(result.duplicateOf, "ENG-20");
+  });
+
+  it("refuses a Bug duplicate of a lone report before any write, so the master is made first", async () => {
+    const linear = linearWithDuplicates();
+    await assert.rejects(
+      routeTicket(
+        { duplicateOf: "ENG-40", issue: "ENG-1", state: "Duplicate" },
+        { client: linear.fetchStub, masterRequired: true }
+      ),
+      NO_MASTER
+    );
+    assert.deepEqual(linear.order(), []);
+  });
+
+  it("closes a duplicate of a lone report without a parent when no master is needed", async () => {
+    const linear = linearWithDuplicates();
+    await routeTicket(
+      { duplicateOf: "ENG-40", issue: "ENG-1", state: "Duplicate" },
+      { client: linear.fetchStub }
+    );
+    assert.deepEqual(linear.relations, ["i-ENG-1>i-ENG-40"]);
+    assert.equal(linear.update()?.parentId, undefined);
+  });
+
+  it("refuses a parent that is not the match's master before any write", async () => {
+    const linear = linearWithDuplicates();
+    await assert.rejects(
+      routeTicket(
+        {
+          duplicateOf: "ENG-20",
+          issue: "ENG-1",
+          parent: "ENG-77",
+          state: "Duplicate",
+        },
+        { client: linear.fetchStub }
+      ),
+      WRONG_PARENT
+    );
+    assert.deepEqual(linear.order(), []);
+  });
+
+  it("writes nothing when the duplicate relation fails, instead of a Duplicate with no relation", async () => {
+    const linear = linearWithDuplicates({ relationFails: true });
+    await assert.rejects(
+      routeTicket(
+        { duplicateOf: "ENG-9", issue: "ENG-1", state: "Duplicate" },
+        { client: linear.fetchStub }
+      ),
+      RELATION_NOT_RECORDED
+    );
+    assert.equal(linear.update(), undefined);
   });
 });

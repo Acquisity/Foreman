@@ -225,3 +225,77 @@ test("a trusted fixed record sets the path, so a low path confidence does not ma
   );
   assert.equal(weakClassification.outcome, "unproven");
 });
+
+const CHANGE = {
+  action: "Reconnected the customer's sending inbox.",
+  by: "triage" as const,
+  recordedAt:
+    "https://linear.app/acquisity/issue/ENG-1/replies-stopped#comment-1a2b",
+};
+const NO_CHANGE = /Resolved by triage needs evidence of a change/u;
+
+test("an explanation with no change is refused as Resolved by triage and closes Canceled (ENG-16608)", () => {
+  for (const [choice, path] of [
+    ["user_error", "User Error"],
+    ["platform_limitation", "Platform Limitation"],
+  ] as const) {
+    const decision = resolveTriage(
+      triageInput(),
+      bugAnswers({
+        classification: pick(choice),
+        path: pick("Resolved by triage"),
+      })
+    );
+    assert.ok(decision.outcome === "route", choice);
+    assert.equal(decision.path, path, choice);
+    assert.equal(decision.route.state, "Canceled", choice);
+    assert.ok(
+      decision.notes.some((note) => NO_CHANGE.test(note)),
+      choice
+    );
+  }
+});
+
+test("a Bug resolved with no live fix and no recorded change is unproven, never Done", () => {
+  const decision = resolveTriage(
+    triageInput(),
+    bugAnswers({ path: pick("Resolved by triage") })
+  );
+  assert.equal(decision.outcome, "unproven");
+  assert.ok(
+    decision.outcome === "unproven" &&
+      decision.missing.some((gap) => gap.includes("changeMade"))
+  );
+});
+
+test("a change recorded on this ticket keeps Resolved by triage Done", () => {
+  const decision = resolveTriage(
+    triageInput({ changeMade: CHANGE }),
+    bugAnswers({
+      classification: pick("user_error"),
+      path: pick("Resolved by triage"),
+    })
+  );
+  assert.ok(decision.outcome === "route");
+  assert.equal(decision.path, "Resolved by triage");
+  assert.equal(decision.route.state, "Done");
+  assert.ok(decision.notes.some((note) => note.includes(CHANGE.action)));
+});
+
+test("a change recorded on another ticket does not count", () => {
+  const decision = resolveTriage(
+    triageInput({
+      changeMade: {
+        ...CHANGE,
+        recordedAt: "https://linear.app/acquisity/issue/ENG-12/other#comment-1",
+      },
+    }),
+    bugAnswers({
+      classification: pick("user_error"),
+      path: pick("Resolved by triage"),
+    })
+  );
+  assert.ok(decision.outcome === "route");
+  assert.equal(decision.path, "User Error");
+  assert.equal(decision.route.state, "Canceled");
+});

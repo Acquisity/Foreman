@@ -264,3 +264,46 @@ describe("the 30-day limit on every waiting duplicate", () => {
     assert.deepEqual(await reconcile(s), { kind: "posted", stage: "fixed" });
   });
 });
+
+describe("a duplicate under a master (ENG-16608)", () => {
+  const underMaster = () => {
+    const dup = duplicate();
+    dup.facts.parent = { identifier: "ENG-50", stateType: "completed" };
+    const earlier = doneOriginal({
+      parent: { identifier: "ENG-50", stateType: "completed" },
+      stateName: "Duplicate",
+      stateType: "canceled",
+    });
+    const master = doneOriginal({ identifier: "ENG-50", pullUrls: [PR_URL] });
+    return { dup, earlier, master };
+  };
+
+  it("follows the master's fixing pull request when its match is an earlier duplicate", async () => {
+    const { dup, earlier, master } = underMaster();
+    const s = setup([dup, earlier, master], LIVE);
+    withLog(s);
+    await reconcile(s);
+    assert.deepEqual(await reconcile(s), { kind: "posted", stage: "fixed" });
+    assert.deepEqual(
+      s.linear.posts.map((p) => p.body),
+      [DUPLICATE_TEXT, fixedText("the export now includes every row", null)]
+    );
+  });
+
+  it("drops the wait when the master itself is Canceled", async () => {
+    const { dup, earlier } = underMaster();
+    const master = doneOriginal({
+      identifier: "ENG-50",
+      stateName: "Canceled",
+      stateType: "canceled",
+    });
+    const s = setup([dup, earlier, master]);
+    const events = withLog(s);
+    await reconcile(s);
+    await reconcile(s);
+    assert.deepEqual(events.at(-1), {
+      event: "reporter.update.duplicate_dropped",
+      fields: { code: "original_canceled", issue: "ENG-1", outcome: "skipped" },
+    });
+  });
+});

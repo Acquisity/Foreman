@@ -557,11 +557,58 @@ async function resolveAssigneeId(
   return chosen;
 }
 
+/**
+ * The labels a customer report carries and a master never does: masters have
+ * no marker label (engineering-handoff), and every report gets its source
+ * labels from classify_ask.
+ */
+const REPORT_LABELS = new Set(
+  ["Customer reported", "Internal reported", "intercom-sourced"].map((name) =>
+    name.toLowerCase()
+  )
+);
+
+const isReport = (issue: RouteIssue): boolean =>
+  issue.labels.nodes.some((label) =>
+    REPORT_LABELS.has(label.name.toLowerCase())
+  );
+
+/**
+ * The parent a duplicate joins (ENG-16608): a match that is not a report is
+ * the master itself; a report's parent is its master. A lone report has none,
+ * so a Bug duplicate of one is refused until engineering-handoff has made the
+ * master and parented the report under it.
+ */
+function duplicateParent(
+  match: RouteIssue,
+  input: RouteTicketInput,
+  masterRequired: boolean
+): string | undefined {
+  const master = isReport(match)
+    ? (match.parent?.identifier ?? null)
+    : match.identifier;
+  if (master === null) {
+    if (masterRequired) {
+      throw new Error(
+        `${match.identifier} is a customer report with no master, so nothing was written. Create the master through engineering-handoff from this investigation (aggregate evidence only: no organization id, email or customer rows), call route_ticket with issue ${match.identifier} and parent set to the new master, then call this again.`
+      );
+    }
+    return input.parent;
+  }
+  if (input.parent !== undefined && input.parent !== master) {
+    throw new Error(
+      `${match.identifier} belongs under its master ${master}, not ${input.parent}, so nothing was written. Drop parent or pass ${master}.`
+    );
+  }
+  return master;
+}
+
 /** Builds the single issueUpdate input from the decisions given. */
 async function buildUpdate(
   gql: Gql,
   issue: RouteIssue,
-  input: RouteTicketInput
+  input: RouteTicketInput,
+  parent: string | undefined
 ): Promise<{ update: Record<string, unknown>; warnings: string[] }> {
   const update: Record<string, unknown> = {};
   const labels = await resolveLabels(gql, issue, input);
@@ -592,41 +639,51 @@ async function buildUpdate(
   if (assignee.id !== undefined) {
     update.assigneeId = assignee.id;
   }
-  if (input.parent !== undefined) {
-    update.parentId = (await requireIssue(gql, input.parent)).id;
+  if (parent !== undefined) {
+    update.parentId = (await requireIssue(gql, parent)).id;
   }
   return { update, warnings: assignee.warnings };
 }
 
-/**
- * One routing write. Reads the ticket, resolves every name to an id, unions
- * the labels to add with the labels already on the ticket, takes the assignee
- * from `inheritAssigneeFrom` when that issue has one and from `assignee`
- * otherwise, runs one
- * `issueUpdate`, then the optional duplicate relation and link attachments,
- * and reads the ticket back. Unknown label names fail before any write and
- * list the team's labels. Once the update lands the result is always routed;
- * a failed relation, link, or read-back becomes a warning.
- */
-export async function routeTicket(
-  input: RouteTicketInput,
-  opts?: LinearGraphqlOptions
-): Promise<RouteTicketResult> {
-  const gql: Gql = (query, variables) => linearGraphql(query, variables, opts);
+const errorReason = (error: unknown) =>
+  error instanceof Error ? error.message : String(error);
 
-  const issue = await requireIssue(gql, input.issue);
+/** The duplicate relation, written before the update; a failure writes nothing. */
+async function writeDuplicateRelation(
+  gql: Gql,
+  issue: RouteIssue,
+  match: RouteIssue,
+  signal?: AbortSignal
+): Promise<string> {
+  try {
+    const { issueRelationCreate } = await gql<{
+      issueRelationCreate: { success: boolean };
+    }>("RouteRelation", {
+      input: { issueId: issue.id, relatedIssueId: match.id, type: "duplicate" },
+    });
+    if (!issueRelationCreate.success) {
+      throw new Error("Linear did not confirm the relation.");
+    }
+  } catch (error) {
+    if (signal?.aborted) {
+      throw error;
+    }
+    throw new Error(
+      `Nothing was written: the duplicate relation to ${match.identifier} was not recorded (${errorReason(error)}).`,
+      { cause: error }
+    );
+  }
+  return match.identifier;
+}
 
-  const { update, warnings } = await buildUpdate(gql, issue, input);
-  // Resolve the duplicate target before the first write, so a bad identifier
-  // fails the whole call rather than leaving a routed ticket with no relation.
-  const master =
-    input.duplicateOf === undefined
-      ? null
-      : await requireIssue(gql, input.duplicateOf);
-  // A relation-only or links-only call has no issueUpdate; then the relation
-  // and links are the write, and a routed result needs at least one to land.
-  let wrote = Object.keys(update).length > 0;
-  if (wrote) {
+/** The one issueUpdate; after a recorded relation, a failure says how to finish. */
+async function writeUpdate(
+  gql: Gql,
+  issue: RouteIssue,
+  update: Record<string, unknown>,
+  after: { duplicateOf: string | null; parent?: string; signal?: AbortSignal }
+): Promise<void> {
+  try {
     const { issueUpdate } = await gql<{ issueUpdate: { success: boolean } }>(
       "RouteIssueUpdate",
       { id: issue.id, input: update }
@@ -634,10 +691,48 @@ export async function routeTicket(
     if (!issueUpdate.success) {
       throw new Error("Linear did not confirm the issue update.");
     }
+  } catch (error) {
+    if (after.duplicateOf === null || after.signal?.aborted) {
+      throw error;
+    }
+    throw new Error(
+      `The duplicate relation to ${after.duplicateOf} was recorded, but the update failed (${errorReason(error)}). Call route_ticket again without duplicateOf${after.parent ? `, with parent ${after.parent}` : ""}, to apply the rest.`,
+      { cause: error }
+    );
   }
+}
 
-  // The update above is the write. Anything after it that fails is reported
-  // as a warning on a routed result, never as an unrouted ticket.
+/**
+ * One routing write. Reads the ticket, resolves every name to an id, unions
+ * the labels to add with the labels already on the ticket, takes the assignee
+ * from `inheritAssigneeFrom` when that issue has one and from `assignee`
+ * otherwise, and resolves a duplicate's master as its parent. The duplicate
+ * relation is written first, because Linear refuses to move a ticket to the
+ * Duplicate state without one and then writes nothing ("missing duplicate
+ * relation", ENG-15734, ENG-15935, ENG-15785); a failed relation fails the
+ * call. Then one `issueUpdate`, the link attachments, and the read-back.
+ * Unknown label names fail before any write and list the team's labels. Once
+ * the update lands the result is always routed; a failed link or read-back
+ * becomes a warning.
+ */
+export async function routeTicket(
+  input: RouteTicketInput,
+  opts?: LinearGraphqlOptions & { masterRequired?: boolean }
+): Promise<RouteTicketResult> {
+  const gql: Gql = (query, variables) => linearGraphql(query, variables, opts);
+
+  const issue = await requireIssue(gql, input.issue);
+  // Resolve the duplicate target before the first write, so a bad identifier
+  // fails the whole call rather than leaving a routed ticket with no relation.
+  const match =
+    input.duplicateOf === undefined
+      ? null
+      : await requireIssue(gql, input.duplicateOf);
+  const parent = match
+    ? duplicateParent(match, input, opts?.masterRequired === true)
+    : input.parent;
+  const { update, warnings } = await buildUpdate(gql, issue, input, parent);
+
   const reason = (error: unknown) =>
     error instanceof Error ? error.message : String(error);
   // Caller cancellation is never a warning; the tool rethrows it.
@@ -648,31 +743,23 @@ export async function routeTicket(
     warnings.push(`${message}: ${reason(error)}`);
   };
 
-  let duplicateOf: string | null = null;
-  if (master) {
-    try {
-      const { issueRelationCreate } = await gql<{
-        issueRelationCreate: { success: boolean };
-      }>("RouteRelation", {
-        input: {
-          issueId: issue.id,
-          relatedIssueId: master.id,
-          type: "duplicate",
-        },
-      });
-      if (!issueRelationCreate.success) {
-        throw new Error("Linear did not confirm the relation.");
-      }
-      wrote = true;
-      duplicateOf = master.identifier;
-    } catch (error) {
-      warn(
-        error,
-        `Duplicate relation to ${input.duplicateOf} was not recorded`
-      );
-    }
+  const duplicateOf = match
+    ? await writeDuplicateRelation(gql, issue, match, opts?.signal)
+    : null;
+  // A relation-only or links-only call has no issueUpdate; then the relation
+  // and links are the write, and a routed result needs at least one to land.
+  let wrote = duplicateOf !== null;
+  if (Object.keys(update).length > 0) {
+    await writeUpdate(gql, issue, update, {
+      duplicateOf,
+      parent,
+      signal: opts?.signal,
+    });
+    wrote = true;
   }
 
+  // The writes above are the routing. Anything after them that fails is
+  // reported as a warning on a routed result, never as an unrouted ticket.
   for (const link of input.links ?? []) {
     try {
       // biome-ignore lint/performance/noAwaitInLoops: attachments are written one at a time so a failure names the link.

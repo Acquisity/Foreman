@@ -8,7 +8,13 @@ import {
 } from "./jev.js";
 import { SUPPORT_OWNER } from "./owner-map.js";
 import type { RegressionOutcome } from "./regression-record.js";
-import { fixedRouting, REGRESSION_GAP } from "./regression-routing.js";
+import {
+  type ChangeMade,
+  fixedRouting,
+  REGRESSION_GAP,
+  resolvedPath,
+  routedPath,
+} from "./regression-routing.js";
 import { BARS } from "./triage-bars.js";
 import {
   HOTLANE_IMPACTS,
@@ -199,6 +205,8 @@ export interface TriageInput {
     query: string;
     users: number;
   };
+  /** The staff or triage action recorded on the ticket that resolved it. */
+  changeMade?: ChangeMade;
   claim: string;
   codePath?: {
     commit: string;
@@ -546,21 +554,6 @@ const barGap = (
   return null;
 };
 
-const routedPath = (
-  billed: boolean,
-  match: DuplicateMatch,
-  choice: string,
-  fixedPath?: HandlingPath
-): HandlingPath => {
-  if (billed) {
-    return "Support/Financial";
-  }
-  if (match) {
-    return "Duplicate";
-  }
-  return fixedPath ?? (choice as HandlingPath);
-};
-
 const routeProjectOf = (
   billed: boolean,
   project: string | null
@@ -646,7 +639,16 @@ export function resolveTriage(
     return unproven(gap.missing);
   }
   notes.push(...fixedNotes);
-  const path = routedPath(billed, match, pathPick.choice, fixed?.path);
+  const resolved = resolvedPath(
+    input,
+    settled,
+    routedPath(billed, match, pathPick.choice, fixed?.path),
+    notes
+  );
+  if ("missing" in resolved) {
+    return unproven(resolved.missing);
+  }
+  const { path } = resolved;
   const project = choiceOf(answers.project);
   const projectSettled =
     project.choice !== UNDETERMINED && project.confidence >= BARS.project;

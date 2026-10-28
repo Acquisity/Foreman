@@ -26,6 +26,7 @@ import {
   bugAnswers,
   no,
   pick,
+  RECORDED_CHANGE,
   triageInput,
   yes,
 } from "./triage-fixtures.js";
@@ -108,7 +109,7 @@ test("data loss is Urgent and a money blocker is at least High", () => {
   assert.equal(urgent.route.priority, 1);
 
   const money = resolveTriage(
-    triageInput(),
+    triageInput({ changeMade: RECORDED_CHANGE }),
     bugAnswers({
       classification: pick("user_error"),
       money_blocker: yes(),
@@ -747,7 +748,7 @@ test("a reply at the claim limit is still checked in full", async () => {
 test("a confirmed Bug that needs no developer still carries its Area label", () => {
   for (const path of ["Backlog/low-impact", "Resolved by triage"]) {
     const decision = resolveTriage(
-      triageInput(),
+      triageInput({ changeMade: RECORDED_CHANGE }),
       bugAnswers({ area: pick("ai_sdr"), path: pick(path) })
     );
     assert.ok(decision.outcome === "route");
@@ -827,7 +828,10 @@ test("an approved feature request takes the engineering path so the hand-off can
 test("an approved feature request on a path that closes or delegates it keeps that path", () => {
   for (const path of ["Resolved by triage", "Support/Product follow-up"]) {
     const decision = resolveTriage(
-      triageInput({ ticketLabels: ["Approved", "Feature Request"] }),
+      triageInput({
+        changeMade: RECORDED_CHANGE,
+        ticketLabels: ["Approved", "Feature Request"],
+      }),
       bugAnswers({
         area: pick("ai_sdr"),
         classification: pick("platform_limitation"),

@@ -477,6 +477,16 @@ interface RouteInput {
   project?: string;
 }
 
+/**
+ * Whether a duplicate must join a master: a Bug's root cause gets one master
+ * (engineering-handoff), so a Bug duplicate of a lone report waits for one.
+ * An explanation has no engineering work, so its duplicate needs none.
+ */
+export const duplicateNeedsMaster = (
+  decisions: Readonly<Record<string, LatestTriageDecision>>,
+  issue: string
+): boolean => decisions[issue]?.classification === "Bug";
+
 export function routeDecisionEvent(
   decisions: Readonly<Record<string, LatestTriageDecision>>,
   input: RouteInput
