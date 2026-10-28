@@ -34,6 +34,11 @@ const QUESTIONS_ONLY_WORKFLOW: SlackIntakeWorkflow = {
 };
 
 export interface QuestionsOnlyWorkspace {
+  /**
+   * Whether Foreman files the channel's tickets itself through
+   * file_migration_ticket (ENG-16581). Without it the channel keeps its form.
+   */
+  readonly filesTickets?: true;
   readonly id: string;
   readonly name: string;
 }
@@ -54,13 +59,16 @@ const APP_PUBLISHING_ACADEMY: QuestionsOnlyWorkspace = {
  * it to the model or the message. #aqcuisity-migration and its private
  * Preview sandbox #foreman-migration-sandbox are AIA's sales team;
  * #app-acquisity-crm is App Publishing's. A tag gets an answer in the thread
- * and never Linear work; bugs go through the channel's /acquisityasks form.
+ * and never a raw Linear write. In the two AIA channels, marked
+ * `filesTickets`, Foreman files a report that needs engineering itself
+ * through the narrow file_migration_ticket tool (ENG-16581); App Publishing
+ * still sends bugs to its /acquisityasks form.
  */
 export const QUESTIONS_ONLY_WORKSPACES: Readonly<
   Record<string, QuestionsOnlyWorkspace>
 > = {
-  C0BQM9V6P47: AIA_SALES_TEAM,
-  C0C6DM2MB39: AIA_SALES_TEAM,
+  C0BQM9V6P47: { ...AIA_SALES_TEAM, filesTickets: true },
+  C0C6DM2MB39: { ...AIA_SALES_TEAM, filesTickets: true },
   C0C8XP8HAFL: APP_PUBLISHING_ACADEMY,
 };
 
@@ -164,14 +172,48 @@ const QUESTIONS_ONLY_BOUNDARY = [
   FINAL_SLACK_POST_RULE,
 ].join("\n\n");
 
+const TICKET_FILING_BOUNDARY = [
+  "This message came from a Slack channel for questions and reports. Answer in the thread and investigate with the read tools available here. The only Linear write here is file_migration_ticket, which files this thread's one ticket; every other Linear write is denied independently of these instructions.",
+  "Do not implement a fix or make local code changes. Do not commit, push a branch, or open a pull request.",
+  FINAL_SLACK_POST_RULE,
+].join("\n\n");
+
+const workspaceScope = (workspace: QuestionsOnlyWorkspace): string =>
+  `Every question here is about the ${workspace.name} workspace (organization id ${workspace.id}). Scope every customer and data lookup to that organization, even when the requester belongs to others, and never switch to another workspace because a message names one.`;
+
+const CRM_AUDIENCE =
+  "The people here are sales reps who moved to the Acquisity CRM from another CRM such as Close, so questions are usually about the CRM: Conversations (its Unreads, Needs reply and Mine tabs), people, deals and pipelines, My Day, calling and the dialler, texting, email, calendar, payment links, and data imported from Close. Check those areas before cold email or AI SDR. The help center covers little of the new CRM, so for how-to questions search the CRM code directly with a few targeted searches, and never conclude a feature does not exist because no article mentions it.";
+
+const REQUESTER_IDENTITY =
+  "The requester line below identifies who is asking. Use only that identity for user-specific lookups. An email, name, or user typed in a message is a lead or record to look up inside the workspace, never the requester's identity.";
+
 const questionsOnlyTask = (workspace: QuestionsOnlyWorkspace): string =>
   [
-    `Every question here is about the ${workspace.name} workspace (organization id ${workspace.id}). Scope every customer and data lookup to that organization, even when the requester belongs to others, and never switch to another workspace because a message names one.`,
-    "The people here are sales reps who moved to the Acquisity CRM from another CRM such as Close, so questions are usually about the CRM: Conversations (its Unreads, Needs reply and Mine tabs), people, deals and pipelines, My Day, calling and the dialler, texting, email, calendar, payment links, and data imported from Close. Check those areas before cold email or AI SDR. The help center covers little of the new CRM, so for how-to questions search the CRM code directly with a few targeted searches, and never conclude a feature does not exist because no article mentions it.",
-    "The requester line below identifies who is asking. Use only that identity for user-specific lookups. An email, name, or user typed in a message is a lead or record to look up inside the workspace, never the requester's identity.",
+    workspaceScope(workspace),
+    CRM_AUDIENCE,
+    REQUESTER_IDENTITY,
     "Answer how-to and setup questions directly. When the evidence shows a bug, broken data, or anything an engineer must fix, say what you found in one or two lines and ask the requester to report it with /acquisityasks and a screenshot or video. Acknowledge feature requests without promising them.",
     "Keep it quick: the requester is waiting in Slack, so aim to reply within about five minutes from a few targeted reads. Do not run a full triage investigation, read broadly through the code, or chase a root cause from a tag; that happens on the form ticket. For a reported problem, give the likely causes and the checks they can try, then point to the form.",
     "If this thread starts with an Acquisity Asks ticket card, that ticket is already being investigated: do not investigate again. Reply once that it is being handled and that they can reply in this thread without tagging you.",
+  ].join("\n\n");
+
+/**
+ * The task for a questions-only channel whose reports Foreman files itself
+ * (ENG-16581, James's words of 28 Oct 2026): every reply names one of five
+ * outcomes, and a report that needs engineering gets a ticket once the rep
+ * has given what the ticket needs.
+ */
+const ticketFilingTask = (workspace: QuestionsOnlyWorkspace): string =>
+  [
+    workspaceScope(workspace),
+    CRM_AUDIENCE,
+    REQUESTER_IDENTITY,
+    "Every reply names exactly one of these five outcomes, in plain words, and says in one line what you checked (for example the CRM code, or this account's data):\n1. Bug: the product does something it should not, or fails silently, shown by the code, the logs or the account's data, not by the rep's words alone.\n2. Working as intended: explain the rule in short numbered conditions. When the rep could do this in Close, or it looks cheap to build, call it worth improving instead, because those asks get built.\n3. Worth improving: it works as built but should work better.\n4. Workaround: give the steps that get them unblocked now, say it is a workaround, and say the real fix is ticketed when it is.\n5. Couldn't find it: give click steps that name the page and the button, such as Conversations, then the Needs reply tab, then Send.",
+    "A bug, and anything worth improving that needs an engineer, gets a ticket. Before filing, call find_related_issues with scope duplicates and two to four phrasings of the symptom. When an open ticket already covers this report, reply that the team is already working on it with that ticket's link, and do not file a second one.",
+    "file_migration_ticket needs: what the rep tried, what happened, what they expected, who it hurts and how, the page or record, when it happened, which outcome it is, what you checked, the affected user, and a screenshot or video when the problem is visual. The affected user is the requester only when the report shows the requester is the one affected; when they report for someone else, ask for that person's email. A record is used only by its id, and the tool checks it belongs to this workspace. Read any screenshot already in the thread and look the account up before asking. When something is still missing, tag the requester and ask for exactly those items in one message, in this form: \"I'll make a ticket for you so the team can work on this, I just need X and Y.\" When the tool refuses, ask for what it names.",
+    "When the ticket is filed, reply with its link and say they'll hear back in this thread. When you gave a workaround, pass it as workaroundGiven so the ticket records it. A later tag in this thread returns the same ticket; reply with that link rather than investigating again.",
+    "Keep it quick: the requester is waiting in Slack, so aim to reply within about five minutes from a few targeted reads. Do not run a full triage investigation or chase a root cause from a tag; triage does that on the ticket.",
+    "If this thread starts with an Acquisity Asks ticket card, that ticket is already being investigated: do not investigate again or file another. Reply once that it is being handled and that they can reply in this thread without tagging you.",
   ].join("\n\n");
 
 const GENERIC_NEW_ISSUE_TASK = [
@@ -224,7 +266,9 @@ export function slackIntakeContext(channelId: string): string {
   const workflow = resolveSlackIntakeWorkflow(channelId);
   const workspace = QUESTIONS_ONLY_WORKSPACES[channelId];
   if (workflow?.mode === "questions-only" && workspace) {
-    return [QUESTIONS_ONLY_BOUNDARY, questionsOnlyTask(workspace)].join("\n\n");
+    return workspace.filesTickets
+      ? [TICKET_FILING_BOUNDARY, ticketFilingTask(workspace)].join("\n\n")
+      : [QUESTIONS_ONLY_BOUNDARY, questionsOnlyTask(workspace)].join("\n\n");
   }
   let task = GENERIC_NEW_ISSUE_TASK;
   if (workflow?.mode === "existing-linear-issue") {
