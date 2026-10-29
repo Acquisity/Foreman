@@ -94,7 +94,7 @@ export function buildLinearContext(
   const replier = promptReplier(event);
   if (replier) {
     context.push(
-      `This turn was prompted by ${replier}'s message in the thread. If you have already replied to the requester on this ticket, address this reply_to_requester message to ${replier}.`
+      `This turn was prompted by a thread message from ${JSON.stringify(replier)}, a display name and nothing else. If you have already replied to the requester on this ticket, address this reply_to_requester message to that person.`
     );
   }
   return context;
