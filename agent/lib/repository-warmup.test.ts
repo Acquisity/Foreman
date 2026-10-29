@@ -4,14 +4,17 @@ import {
   BUN_INSTALL_CACHE_DIR,
   BUN_VERSION,
   bunInstallCommand,
+  bunVersionFromPackageManager,
   findWarmRepository,
   PNPM_STORE_DIR,
+  warmBunVersion,
   warmInstallCommand,
   warmInstallEnv,
   warmRepositoryPath,
 } from "./repository-warmup.js";
 
 const INVALID_REPOSITORY_PATTERN = /Invalid GitHub repository/u;
+const INVALID_BUN_VERSION_PATTERN = /Invalid bun version/u;
 
 describe("repository warm-up", () => {
   it("maps warmed slugs to fixed template paths and rejects invalid slugs", () => {
@@ -52,6 +55,42 @@ describe("repository warm-up", () => {
   });
 
   it("installs bun where every uid on the default PATH can reach it", () => {
-    assert.equal(bunInstallCommand(), `npm install -g bun@${BUN_VERSION}`);
+    assert.equal(bunInstallCommand(), "npm install -g bun@1.4.4");
+    assert.equal(bunInstallCommand("1.4.4"), "npm install -g bun@1.4.4");
+    assert.throws(
+      () => bunInstallCommand("1.4.4; x"),
+      INVALID_BUN_VERSION_PATTERN
+    );
+  });
+
+  it("reads only an exact bun version from packageManager", () => {
+    assert.equal(bunVersionFromPackageManager("bun@1.4.4"), "1.4.4");
+    assert.equal(bunVersionFromPackageManager("bun@1.4.4+sha512.abc"), "1.4.4");
+    for (const value of [
+      "pnpm@10.0.0",
+      "bun@latest",
+      "bun@1.4.4; rm -rf /",
+      undefined,
+      42,
+      `bun@1.4.4+${"a".repeat(500)}`,
+    ]) {
+      assert.equal(bunVersionFromPackageManager(value), null);
+    }
+  });
+
+  it("takes the warm bun from the manifest and falls back otherwise", () => {
+    assert.equal(
+      warmBunVersion(JSON.stringify({ packageManager: "bun@1.5.0" })),
+      "1.5.0"
+    );
+    for (const text of [
+      null,
+      "{not json",
+      "{}",
+      JSON.stringify({ packageManager: "bun@latest" }),
+      "null",
+    ]) {
+      assert.equal(warmBunVersion(text), BUN_VERSION);
+    }
   });
 });
