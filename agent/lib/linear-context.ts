@@ -1,4 +1,5 @@
 import type { LinearAgentSessionEvent } from "eve/channels/linear";
+import { SLACK_PROMPT } from "./follow-up-decisions.js";
 import {
   QUESTIONS_ONLY_CHANNELS,
   RECEIVER_ONLY_CHANNELS,
@@ -15,7 +16,7 @@ const ASK_FROM = /^Ask from (.{1,100})$/;
 /**
  * The intake requester named by an issue's 'Ask from <name>' attachment. The
  * Asks receiver opens intake sessions with one person's key, so neither the
- * session opener nor a prompt's author is the requester there (ENG-14588).
+ * session opener nor a prompt's Linear author is the requester there (ENG-14588).
  */
 export const askFromName = (titles: readonly string[]): string | null => {
   for (const title of titles) {
@@ -56,6 +57,13 @@ export const isTriageIntakeAsk = (
       TRIAGE_ASK_CHANNELS.has(SLACK_ARCHIVE.exec(url)?.[1] ?? "")
   );
 
+/** The Slack author (or support inbox teammate) a relayed prompt names; never a Linear user. */
+export const promptReplier = (event: LinearAgentSessionEvent): string | null =>
+  event.action === "prompted"
+    ? SLACK_PROMPT.exec(event.agentActivity?.body?.trim() ?? "")?.[1]?.trim() ||
+      null
+    : null;
+
 /**
  * @param route - Replaces the triage line for a session whose issue has its
  *   own playbook (widget feedback); omitted, the session gets today's triage.
@@ -73,19 +81,20 @@ export function buildLinearContext(
   if (route !== LINEAR_TRIAGE_ROUTE) {
     return context;
   }
-  // Naming the opener alongside the requester was not enough: the model
-  // still greeted the opener (ENG-14406, ENG-14588), so it is left out here.
-  if (askFrom) {
+  // The opener is always the Asks receiver's key, so it is never read: naming
+  // it made the model greet it (ENG-14406, ENG-14588). A follow-up addresses
+  // whoever it answers, by the name the relay carries (ENG-16843).
+  const names =
+    "Take a name only from the 'Ask from' link or a '**Name** replied in Slack' or '**Name** added a note in the support inbox' line, never from who opened this Linear session or who authored a Linear comment";
+  context.push(
+    askFrom
+      ? `The requester is ${askFrom}, from the ticket's 'Ask from' link. Your first reply_to_requester message on this ticket is addressed to ${askFrom}. After that, address each reply_to_requester message to the person whose message it answers. ${names}: the Asks receiver posts every relay under one teammate's account.`
+      : `When the ticket has an 'Ask from <name>' link, your first reply_to_requester message goes to that person; on a support inbox thread, to the teammate who wrote the latest note. After that, address each reply_to_requester message to the person whose message it answers. ${names}.`
+  );
+  const replier = promptReplier(event);
+  if (replier) {
     context.push(
-      `The requester is ${askFrom}, from the ticket's 'Ask from' link. Address every reply_to_requester message to ${askFrom}, not to whoever opened this session or wrote last in the Slack thread.`
-    );
-    return context;
-  }
-  const requester = event.agentActivity?.user ?? event.agentSession.creator;
-  const requesterName = requester?.displayName ?? requester?.name;
-  if (requesterName) {
-    context.push(
-      `This Linear session was opened by ${requesterName}. When the ticket has an 'Ask from <name>' link, that person is the requester: address every reply_to_requester message to them, never to ${requesterName} or whoever wrote last in the Slack thread. On a support inbox thread, the requester is the teammate who wrote the latest note. Otherwise ${requesterName} is the requester.`
+      `This turn was prompted by ${replier}'s message in the thread. If you have already replied to the requester on this ticket, address this reply_to_requester message to ${replier}.`
     );
   }
   return context;
