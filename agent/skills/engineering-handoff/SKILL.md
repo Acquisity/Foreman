@@ -112,6 +112,10 @@ Decided scope, important exclusions, dependencies, and any separately filed cont
 
 The public boundary, trigger, and observable red-before, green-after behavior a test can prove.
 
+## Reproduce
+
+How the fixer sees the bug happen before changing code, following Acquisity's `docs/agents/reproducing-customer-bugs.md`: `Replica:` with the reason when the bug depends on the customer's data, naming the report ticket that holds the workspace and the path to walk to the symptom; or `Fixture:` with the reason it reproduces on any workspace. Name any part of the path a replica can't run yet, such as an uploaded file or a calendar write.
+
 ## Done when
 
 - Checkable observable outcome.
@@ -123,4 +127,4 @@ The public boundary, trigger, and observable red-before, green-after behavior a 
 The customer tickets this master owns, as Linear links.
 ```
 
-Keep the `## Regression seam` heading on every master: `route_ticket` recognises a master by it, or by its already parenting an issue. Where evidence proves a section cannot apply, write `Not applicable: <short reason>`. Where it is unknown, write `Not settled: <what is missing and who can supply it>`. Never pad a thin root cause into a full-looking ticket.
+The `## Reproduce` section names a report ticket, never its workspace id or customer, because the master carries only sanitized context (Content boundary). Keep the `## Regression seam` heading on every master: `route_ticket` recognises a master by it, or by its already parenting an issue. Where evidence proves a section cannot apply, write `Not applicable: <short reason>`. Where it is unknown, write `Not settled: <what is missing and who can supply it>`. Never pad a thin root cause into a full-looking ticket.

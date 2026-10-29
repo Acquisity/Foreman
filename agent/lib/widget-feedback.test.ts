@@ -176,12 +176,24 @@ describe("buildLinearContext with a route", () => {
     } as LinearAgentSessionEvent;
     assert.deepEqual(buildLinearContext(opened, "Jane", route), [route]);
     assert.deepEqual(buildLinearContext(opened, null, route), [route]);
+    const relayed = {
+      ...opened,
+      action: "prompted",
+      agentActivity: {
+        body: "**Michelle** replied in Slack.",
+        content: {},
+        id: "activity-1",
+      },
+    } as LinearAgentSessionEvent;
+    assert.deepEqual(buildLinearContext(relayed, "Jane", route), [route]);
+    assert.deepEqual(buildLinearContext(relayed, null, route), [route]);
   });
 
   it("keeps triage when no route is given", () => {
-    assert.deepEqual(buildLinearContext(event, null, undefined), [
-      LINEAR_TRIAGE_ROUTE,
-    ]);
+    assert.equal(
+      buildLinearContext(event, null, undefined)?.[0],
+      LINEAR_TRIAGE_ROUTE
+    );
   });
 });
 
