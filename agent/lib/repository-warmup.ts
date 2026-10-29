@@ -82,11 +82,51 @@ export const warmLockfile = (kind: WarmKind): string =>
   kind === "pnpm" ? "pnpm-lock.yaml" : "bun.lock";
 
 /**
- * The bun the snapshot installs, matching the `setup-bun` pin in
- * Acquisity/Acquisity's own CI so the warm install reads `bun.lock` the same
- * way its build machines do. Bump it when that pin moves.
+ * The bun the snapshot installs when the warmed Acquisity/Acquisity checkout's
+ * `packageManager` cannot be read.
+ *
+ * @remarks
+ * The snapshot normally installs the bun that checkout pins, so the warm
+ * install reads `bun.lock` the way its own build machines do. The runtime
+ * install in `prepare_repository` uses whatever bun the snapshot carries, so a
+ * bun bump in Acquisity needs `rebuild_warm_snapshot`.
  */
-export const BUN_VERSION = "1.3.5";
+export const BUN_VERSION = "1.4.4";
+
+const SEMVER_PATTERN = /^\d+\.\d+\.\d+$/u;
+const BUN_PACKAGE_MANAGER_PATTERN = /^bun@(\d+\.\d+\.\d+)(?:\+[\w.-]+)?$/u;
+const MAX_PACKAGE_MANAGER_LENGTH = 200;
+
+/**
+ * The exact bun version a `packageManager` field pins (`bun@x.y.z`, with an
+ * optional `+hash` suffix), or null for anything else.
+ */
+export const bunVersionFromPackageManager = (value: unknown): string | null => {
+  if (typeof value !== "string" || value.length > MAX_PACKAGE_MANAGER_LENGTH) {
+    return null;
+  }
+  return BUN_PACKAGE_MANAGER_PATTERN.exec(value)?.[1] ?? null;
+};
+
+/**
+ * The bun to install for a warmed checkout's `package.json` text, falling back
+ * to `BUN_VERSION` when it is missing, unparseable, or pins no exact bun.
+ */
+export const warmBunVersion = (packageJson: string | null): string => {
+  if (packageJson === null) {
+    return BUN_VERSION;
+  }
+  try {
+    const parsed: unknown = JSON.parse(packageJson);
+    const packageManager =
+      typeof parsed === "object" && parsed !== null
+        ? (parsed as { packageManager?: unknown }).packageManager
+        : undefined;
+    return bunVersionFromPackageManager(packageManager) ?? BUN_VERSION;
+  } catch {
+    return BUN_VERSION;
+  }
+};
 
 /**
  * Installs bun into the snapshot at a path every uid shares.
@@ -99,5 +139,9 @@ export const BUN_VERSION = "1.3.5";
  * it too. The official installer would put it under the builder's HOME, where
  * the session user could not reach it.
  */
-export const bunInstallCommand = (): string =>
-  `npm install -g bun@${BUN_VERSION}`;
+export const bunInstallCommand = (version = BUN_VERSION): string => {
+  if (!SEMVER_PATTERN.test(version)) {
+    throw new Error(`Invalid bun version '${version}'.`);
+  }
+  return `npm install -g bun@${version}`;
+};

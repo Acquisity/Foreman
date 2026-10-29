@@ -78,7 +78,7 @@ Settled investigations, including ticketless Intercom and Slack ones and conclus
 | `FOREMAN_REVIEW_BOT_LOGINS` | empty | Comma-separated lowercase bot logins for an explicitly requested AI review-bot loop; supply the chosen logins in the request because the sandbox cannot read this setting. It does not start automatic reviews. |
 | `SLACK_INTAKE_ONLY_CHANNELS` | empty | Comma-separated Slack channel IDs that can talk and investigate but cannot deliver code |
 | `FOREMAN_MEMORY_DATABASE_URL` | unset | Pooled Postgres connection for investigation memory; unset disables it without affecting triage |
-| `VERCEL_SANDBOX_BASE_SNAPSHOT_ID` | unset | Warm snapshot id for the session template; unset falls back to a cold clone; rebuild it after every eve upgrade |
+| `VERCEL_SANDBOX_BASE_SNAPSHOT_ID` | unset | Warm snapshot id for the session template; unset falls back to a cold clone; rebuild it after every eve upgrade and after Acquisity changes its bun version |
 
 See [.env.example](.env.example) for the Executor and retained channel/personal connection settings. No repository or setup command is configured through the environment.
 

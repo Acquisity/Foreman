@@ -13,8 +13,10 @@ import { createWarmSnapshot } from "#lib/repository-snapshot.js";
  * than in code, and both repositories change their lockfiles a few times a
  * week at most. Rebuilding is therefore worth it when the warm-up itself
  * changes (a new repository, a different install command, a cache layout
- * move), or after an eve upgrade, because the snapshot carries eve's sandbox
- * image. That is why this is a tool rather than a cron.
+ * move), after an eve upgrade, because the snapshot carries eve's sandbox
+ * image, or after Acquisity/Acquisity changes the bun version its
+ * `packageManager` pins, because the snapshot installs that bun and the
+ * runtime install uses it. That is why this is a tool rather than a cron.
  *
  * The returned id is not applied automatically. Set it as
  * `VERCEL_SANDBOX_BASE_SNAPSHOT_ID` and redeploy, because the sandbox
@@ -23,7 +25,7 @@ import { createWarmSnapshot } from "#lib/repository-snapshot.js";
 export default defineTool({
   approval: warmSnapshotPolicy,
   description:
-    "Rebuild the warm dependency snapshot for the pre-warmed repositories and return its id. Takes several minutes. Run it after the warm-up itself changes or after an eve upgrade or EVE_SANDBOX_IMAGE_TAG change (the snapshot carries eve's sandbox image), not to pick up new commits. The id must then be set as VERCEL_SANDBOX_BASE_SNAPSHOT_ID and the app redeployed before it takes effect.",
+    "Rebuild the warm dependency snapshot for the pre-warmed repositories and return its id. Takes several minutes. Run it after the warm-up itself changes or after an eve upgrade or EVE_SANDBOX_IMAGE_TAG change (the snapshot carries eve's sandbox image), or after Acquisity/Acquisity changes the bun version in its packageManager field (the snapshot installs that bun), not to pick up new commits. The id must then be set as VERCEL_SANDBOX_BASE_SNAPSHOT_ID and the app redeployed before it takes effect.",
   execute: async () => {
     try {
       const snapshotId = await createWarmSnapshot();

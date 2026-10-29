@@ -9,6 +9,7 @@ import {
   PNPM_STORE_DIR,
   WARM_REPOSITORIES,
   WARM_ROOT,
+  warmBunVersion,
   warmInstallCommand,
   warmInstallEnv,
   warmRepositoryPath,
@@ -77,6 +78,24 @@ const run = async (
 };
 
 /**
+ * Reads a checkout's `package.json`, or null when the read fails.
+ */
+const readPackageJson = async (
+  sandbox: Sandbox,
+  path: string
+): Promise<string | null> => {
+  try {
+    const result = await sandbox.runCommand({
+      args: [`${path}/package.json`],
+      cmd: "cat",
+    });
+    return result.exitCode === 0 ? await result.stdout() : null;
+  } catch {
+    return null;
+  }
+};
+
+/**
  * Builds the warm repository snapshot: clones and installs every configured
  * repository in a throwaway sandbox running eve's own image, then snapshots the
  * result and returns the snapshot id.
@@ -132,8 +151,16 @@ export const createWarmSnapshot = async (): Promise<string> => {
 
     // Also after the token window: installing bun runs the npm package's own
     // lifecycle scripts, which is the same hazard as a repository's.
-    if (WARM_REPOSITORIES.some((repository) => repository.kind === "bun")) {
-      await run(sandbox, bunInstallCommand());
+    // The bun comes from the warmed bun checkout's own `packageManager` pin, so
+    // a frozen install reads its lockfile the way its build machines do.
+    const bunRepository = WARM_REPOSITORIES.find(
+      (repository) => repository.kind === "bun"
+    );
+    if (bunRepository) {
+      const version = warmBunVersion(
+        await readPackageJson(sandbox, warmRepositoryPath(bunRepository.slug))
+      );
+      await run(sandbox, bunInstallCommand(version));
     }
 
     await Promise.all(
