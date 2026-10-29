@@ -30,7 +30,7 @@ export const followUpQuestions = (): Record<string, JevQuestion> => ({
   follow_up: {
     criteria: { ...FOLLOW_UP_OUTCOMES },
     instructions:
-      "Foreman posted lastReply in a thread shared by several people (a Slack thread, or a support team's notes on a customer conversation). Each reply is 'Name: text'. @Foreman is Foreman; @teammate is a person, never Foreman. Taking the replies since then together, do they need a message from Foreman? A reply that mentions @teammate, or answers or continues what a person in the thread just said, is for people even when it carries a new fact, and while a question between people is open Foreman waits. Anything that mentions @Foreman is for Foreman, and so is a question addressed to no one that does not continue an exchange between people. earlier, when present, holds replies Foreman already handled: read them as context, and judge only replies.",
+      "Foreman posted lastReply in a thread shared by several people (a Slack thread, or a support team's notes on a customer conversation). Each reply is 'Name: text'. @Foreman is Foreman; @teammate is a person, never Foreman. Taking the replies since then together, do they need a message from Foreman? Without an @Foreman mention, a reply that mentions @teammate, or answers or continues what a person in the thread just said, is for people even when it carries a new fact, and while a question between people is open Foreman waits. Anything that mentions @Foreman is for Foreman, and so is a question addressed to no one that does not continue an exchange between people. earlier, when present, holds replies Foreman already handled: read them as context, and judge only replies.",
     type: "choice",
   },
   status_only: {
