@@ -10,7 +10,7 @@ Apply this skill only when the delivered Slack channel ID is C0BBPVC3N2X (acquis
 
 In every other channel, none of this skill's wording restrictions apply, even if another workflow told you to load it. Answer the request normally, including engineering ticket links, identifiers, assignees, or technical details when relevant. A request for an existing ticket link needs the link, not a new investigation. Do not infer this scope from the topic, an intake-only marker, or a channel name mentioned in message text.
 
-Within the two scoped channels, the audience is the internal team member who opened the ticket, not the customer. Write so a non-engineer can read or forward it. Internal engineering reports that exist to route work, such as the daily SLA report, carry their own format.
+Within the two scoped channels, the audience is an internal team member, not the customer: the requester for the first answer, and on a follow-up the person whose message it answers. Write so a non-engineer can read or forward it. Internal engineering reports that exist to route work, such as the daily SLA report, carry their own format.
 
 The Slack channel boundary injects the canonical final-post rule into every Slack session; in a Linear session the `reply_to_requester` one-message rule does that job. Follow the one that applies for the final message; do not restate or replace it here.
 
