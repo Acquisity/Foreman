@@ -10,6 +10,10 @@ import {
   LINEAR_TRIAGE_ROUTE,
 } from "./linear-context.js";
 
+import { composePrompt, GENERAL_PROMPT, MEMORY } from "./prompts.js";
+import { sessionLane } from "./session-lane.js";
+import { canUseInvestigationMemory } from "./trust.js";
+
 process.env.LINEAR_CONNECTOR ??= "stub/stub";
 const { onAgentSession, sessionRoute } = await import("../channels/linear.js");
 
@@ -57,6 +61,28 @@ describe("Linear front door route (ENG-16061)", () => {
     // The front door replies to the requester, so it keeps the naming line.
     assert.equal(context.length, 2);
     assert.ok(context[1]?.includes("'Ask from <name>' link"));
+  });
+
+  it("omits memory instructions and access only on the front-door route", async () => {
+    process.env.FIXY_TRIAGE_TEAMS = "SAN";
+    const front = await onAgentSession(
+      {} as LinearSessionContext,
+      created("SAN-145")
+    );
+    assert.ok(front && "auth" in front && front.auth);
+    const prompt = composePrompt(sessionLane(front.auth));
+    assert.equal(canUseInvestigationMemory(front.auth), false);
+    assert.ok(!prompt.includes("search_investigation_memory"));
+    assert.ok(!prompt.includes("correct_investigation_case"));
+    assert.equal(prompt, GENERAL_PROMPT.replace(`${MEMORY}\n\n`, ""));
+    process.env.FIXY_TRIAGE_TEAMS = "";
+    const triage = await onAgentSession(
+      {} as LinearSessionContext,
+      created("SAN-145")
+    );
+    assert.ok(triage && "auth" in triage && triage.auth);
+    assert.equal(canUseInvestigationMemory(triage.auth), true);
+    assert.equal(composePrompt(sessionLane(triage.auth)), GENERAL_PROMPT);
   });
 
   it("leaves every other team on today's triage", async () => {

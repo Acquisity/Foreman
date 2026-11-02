@@ -22,6 +22,7 @@ import {
 import { extractRepositoryUrls, stampRepository } from "../lib/repository.js";
 import { readAskFrom, relayedFollowUpOutcome } from "../lib/requester-reply.js";
 import {
+  stampFrontDoor,
   stampInvestigationMemory,
   stampStatusFollowUp,
   stampTriageIntake,
@@ -200,12 +201,13 @@ export const onAgentSession = async (
   const repositories = extractRepositoryUrls(
     JSON.stringify(event.agentSession.issue ?? {})
   );
-  // Every Agent Session is opened by a workspace member, which is the same
-  // gate triage itself runs behind, so Linear is an authorized investigation
-  // memory surface.
-  const trusted = stampInvestigationMemory(
-    stampTrusted(defaultLinearAuth(event))
-  );
+  const selectedRoute = sessionRoute(event, route);
+  const member = stampTrusted(defaultLinearAuth(event));
+  // Front-door intake never investigates or uses investigation memory.
+  const trusted =
+    selectedRoute === LINEAR_FRONT_DOOR_ROUTE
+      ? stampFrontDoor(member)
+      : stampInvestigationMemory(member);
   const auth = ask?.triageIntake ? stampTriageIntake(trusted) : trusted;
   const [repository] = repositories;
   const withRepository =
@@ -213,11 +215,7 @@ export const onAgentSession = async (
       ? stampRepository(auth, repository.slug, "explicit")
       : auth;
   const context =
-    buildLinearContext(
-      event,
-      ask?.requester ?? null,
-      sessionRoute(event, route)
-    ) ?? [];
+    buildLinearContext(event, ask?.requester ?? null, selectedRoute) ?? [];
   // Only the widget playbook forbids the status move; the front door keeps it.
   return followUpDispatch(withRepository, context, outcome, Boolean(route));
 };

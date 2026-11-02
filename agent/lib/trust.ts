@@ -309,7 +309,7 @@ export function isStripeDisputeSession(
  * which is a narrower question with a different answer. A trusted GitHub
  * collaborator is exactly the caller the two must not agree on.
  *
- * Stamped only on operational surfaces that run triage: Linear Agent Sessions,
+ * Stamped only on operational surfaces that run triage: Linear Agent Sessions outside the front-door route,
  * every Slack surface the app is invited into, and the local dev TUI. Never on GitHub
  * sessions or schedules.
  */
@@ -356,4 +356,20 @@ export function canUseInvestigationMemory(
  */
 export function isLinearSession(auth: SessionAuthContext | null): boolean {
   return Boolean(auth?.attributes.agent_session_id);
+}
+
+/** The signed Linear route selected front-door intake rather than investigation. */
+export const FRONT_DOOR_ATTRIBUTE = "frontDoor";
+
+export function stampFrontDoor(auth: SessionAuthContext): SessionAuthContext {
+  return {
+    ...auth,
+    attributes: { ...auth.attributes, [FRONT_DOOR_ATTRIBUTE]: "true" },
+  };
+}
+
+export function isFrontDoor(
+  auth: SessionAuthContext | null | undefined
+): boolean {
+  return auth?.attributes[FRONT_DOOR_ATTRIBUTE] === "true";
 }

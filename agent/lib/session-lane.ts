@@ -2,6 +2,7 @@ import type { SessionAuthContext } from "eve/context";
 import { EXECUTOR_DISCOVERY } from "./executor/instructions.js";
 import { isSupportAuth } from "./support/auth.js";
 import { SUPPORT_DISCOVERY, SUPPORT_PROMPT } from "./support/instructions.js";
+import { isFrontDoor } from "./trust.js";
 import {
   WIDGET_DISCOVERY,
   WIDGET_GUIDE,
@@ -35,6 +36,7 @@ export function sessionLane(auth: SessionAuthContext | null | undefined) {
         customer: false,
         discovery: EXECUTOR_DISCOVERY,
         instructions: "",
+        memory: !isFrontDoor(auth),
         repository: true,
       };
 }
