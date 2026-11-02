@@ -11,7 +11,7 @@ I fixed and proved the "webhook guide" bug, and the PR (https://github.com/Acqui
 - **Before**, on main's code (CI run 41321199938): clicking "webhook guide" opened a 404. This is a link bug, so clicking it is the reproduction.
 - **After**, on the fix (`ad2cebe6b7`, CI run 41322801735): the same click opens the public Webhooks guide.
 - The walk only viewed the page and clicked a link, so no second replay was needed.
-- Comparison image: https://uploads.linear.app/8807bf43-0482-43f0-9330-ad288c517bf2/7cc3e8b0-8ffd-4e79-899c-4bd1decd696a/515dfecd-df97-4377-90d5-07741d82ad70
+- Comparison image: https://uploads.linear.app/<redacted>
 
 **Measured or inferred:**
 - Measured: the link opened a 404 on main and opens the public guide on the fix, in the browser on the replica.
