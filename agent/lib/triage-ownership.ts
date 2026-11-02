@@ -1,9 +1,4 @@
-import {
-  choiceOf,
-  type JevAnswer,
-  type JevQuestion,
-  probabilityOf,
-} from "./jev.js";
+import { choiceOf, type JevAnswer, type JevQuestion } from "./jev.js";
 import type {
   HandlingPath,
   TriageClassification,
@@ -15,6 +10,7 @@ import {
   AREAS,
   type AreaKey,
   areaForProject,
+  DECLINED_LABEL,
   FALLBACK_AREA,
   FALLBACK_OWNER,
   hasLabel,
@@ -28,14 +24,7 @@ import {
 
 type Answers = Record<string, JevAnswer>;
 
-const PARKABLE_PATHS: readonly HandlingPath[] = [
-  "Backlog/low-impact",
-  "Engineering Todo",
-  "Platform Limitation",
-];
-
 const UNDETERMINED = "undetermined";
-const SIGNAL_BAR = 0.5;
 
 export interface Ownership {
   approval: "approved" | "needed" | "not-applicable";
@@ -87,24 +76,20 @@ const settledArea = (
     : { key: FALLBACK_AREA, matched: false };
 };
 
-const isFeatureRequest = (
-  classification: TriageClassification,
-  answers: Answers
-): boolean =>
-  classification === "Platform Limitation" &&
-  probabilityOf(answers.wants_limit_lifted) >= SIGNAL_BAR;
-
+/**
+ * An unapproved feature request never closes, whatever path Jev picked: it
+ * waits in Backlog with James, who approves or declines it (ENG-15932).
+ */
 const awaitingApproval = (none: Ownership, notes: string[]): Ownership => {
   notes.push(
-    `A feature request that nobody has approved gets no developer. It is labelled "${NEEDS_APPROVAL_LABEL}" for James to approve; add the "${APPROVED_LABEL}" label to release it.`
+    `A feature request that nobody has approved gets no developer and never closes. It waits in Backlog, labelled "${NEEDS_APPROVAL_LABEL}", for James to approve; the "${APPROVED_LABEL}" label releases it and the "${DECLINED_LABEL}" label closes it.`
   );
-  const parked = PARKABLE_PATHS.includes(none.path);
   return {
     ...none,
     approval: "needed",
-    assignee: parked ? FALLBACK_OWNER : none.assignee,
-    path: parked ? "Backlog/low-impact" : none.path,
-    releaseDeveloper: parked ? false : none.releaseDeveloper,
+    assignee: FALLBACK_OWNER,
+    path: "Feature Request",
+    releaseDeveloper: false,
   };
 };
 
@@ -173,13 +158,25 @@ export function resolveOwnership(context: {
     }
     return { ...none, area, assignee };
   }
-  if (!isFeatureRequest(classification, answers)) {
+  if (classification !== "Feature Request") {
     return none;
   }
-  if (!hasLabel(input.ticketLabels ?? [], APPROVED_LABEL)) {
+  const labels = input.ticketLabels ?? [];
+  if (hasLabel(labels, DECLINED_LABEL)) {
+    notes.push(
+      `A person declined this feature request ("${DECLINED_LABEL}"), so it stays Canceled.`
+    );
+    return {
+      ...none,
+      assignee: null,
+      path: "Declined",
+      releaseDeveloper: true,
+    };
+  }
+  if (!hasLabel(labels, APPROVED_LABEL)) {
     return awaitingApproval(none, notes);
   }
-  if (path !== "Platform Limitation" && path !== "Engineering Todo") {
+  if (path === "Resolved by triage" || path.startsWith("Support/")) {
     return { ...none, approval: "approved" };
   }
   const area = place();

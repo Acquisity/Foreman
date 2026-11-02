@@ -5,6 +5,10 @@ export const BUG_LABEL = "Bug";
 export const FEATURE_REQUEST_LABEL = "Feature Request";
 export const APPROVED_LABEL = "Approved";
 export const NEEDS_APPROVAL_LABEL = "Needs approval";
+/** A person turned the feature request down; only a person or the approval flow writes it. */
+export const DECLINED_LABEL = "Declined";
+/** A report left for the grouping sweep to put under its master. */
+export const NEEDS_GROUPING_LABEL = "Needs grouping";
 
 export const AREA_KEYS = [
   "ai_sdr",

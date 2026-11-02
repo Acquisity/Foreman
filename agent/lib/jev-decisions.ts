@@ -18,6 +18,14 @@ import {
 } from "./regression-routing.js";
 import { BARS } from "./triage-bars.js";
 import {
+  classificationQuestion,
+  groupingLabel,
+  matchRoute,
+  settleClassification,
+  splitMatch,
+  type TriageClassification,
+} from "./triage-classification.js";
+import {
   HOTLANE_IMPACTS,
   HOTLANE_ROUTES,
   type HotlaneDecision,
@@ -167,6 +175,8 @@ export const HANDLING_PATHS = {
   "Backlog/low-impact":
     "a real but low-impact issue nobody needs to act on now",
   "Engineering Todo": "a root cause engineering must fix",
+  "Feature Request":
+    "the customer asks for a new capability or a lifted limit; it waits in Backlog for approval",
   "Platform Limitation":
     "expected behaviour, a provider limit, or a plan or entitlement limit",
   "Resolved by triage": "already fixed or resolved during this investigation",
@@ -176,12 +186,19 @@ export const HANDLING_PATHS = {
   "User Error":
     "settings, configuration, or something the customer or support can fix",
 } as const;
-export type HandlingPath = keyof typeof HANDLING_PATHS | "Duplicate";
+/** Declined is a person's decision on a feature request, never Jev's choice. */
+export type { TriageClassification } from "./triage-classification.js";
+export type HandlingPath =
+  | keyof typeof HANDLING_PATHS
+  | "Declined"
+  | "Duplicate";
 
 const PATH_STATE: Record<HandlingPath, string> = {
   "Backlog/low-impact": "Backlog",
+  Declined: "Canceled",
   Duplicate: "Duplicate",
   "Engineering Todo": "Todo",
+  "Feature Request": "Backlog",
   "Platform Limitation": "Canceled",
   "Resolved by triage": "Done",
   "Support/Financial": "Todo",
@@ -194,6 +211,8 @@ const SUPPORT_PROJECT = "Support";
 /** Paths whose band is Low unless data loss or money raises it. */
 const LOW_PATHS = new Set<HandlingPath>([
   "Backlog/low-impact",
+  "Declined",
+  "Feature Request",
   "Platform Limitation",
   "Resolved by triage",
 ]);
@@ -238,6 +257,8 @@ export interface TriageRoute {
   inheritAssigneeFrom?: string;
   priority: number;
   project?: string;
+  /** A match an open report is linked to without closing: it joins the match's master, or waits for grouping. */
+  relatedTo?: string;
   releaseDeveloper?: boolean;
   removeLabels?: string[];
   state: string;
@@ -270,22 +291,6 @@ export type TriageDecision =
       verdict: { confidence: number; value: string };
     };
 
-const CLASSIFICATIONS = {
-  bug: "an internal failure that settings, configuration, and platform limits do not explain",
-  platform_limitation:
-    "expected behaviour, or a provider, billing, entitlement, or plan limit",
-  user_error:
-    "settings, configuration, or something support can explain or follow up on",
-} as const;
-
-const CLASSIFICATION_NAMES = {
-  bug: "Bug",
-  platform_limitation: "Platform Limitation",
-  user_error: "User Error",
-} as const;
-export type TriageClassification =
-  (typeof CLASSIFICATION_NAMES)[keyof typeof CLASSIFICATION_NAMES];
-
 const DUPLICATE_OUTCOMES = {
   not_relevant: "unrelated beyond shared words or components",
   partial_or_adjacent: "related, but a different symptom or cause",
@@ -298,12 +303,7 @@ export function triageQuestions(
 ): Record<string, JevQuestion> {
   const questions: Record<string, JevQuestion> = {
     area: areaQuestion(),
-    classification: {
-      criteria: { ...CLASSIFICATIONS },
-      instructions:
-        "Given the evidence, which one classification fits the root cause? Rule out settings, configuration, permissions, billing, provider limits, and expected behaviour before calling it a bug.",
-      type: "choice",
-    },
+    classification: classificationQuestion(),
     customer_saw_failure: {
       instructions:
         "Does the report describe a failure the customer saw, such as an error message, something that stopped working, or a wrong result?",
@@ -382,11 +382,6 @@ export function triageQuestions(
       instructions:
         "Does the evidence support the claim, contradict it, or leave it unproven?",
       type: "choice",
-    },
-    wants_limit_lifted: {
-      instructions:
-        "Does the customer want a platform limit lifted or a missing capability added?",
-      type: "boolean",
     },
   };
   if (input.rootCauseLabels.length > 0) {
@@ -492,13 +487,8 @@ const resolveLabels = (
   answers: Answers
 ): string[] => {
   const labels = [...input.sourceLabels];
-  if (classification === "Bug") {
-    labels.push("Bug");
-  } else if (
-    classification === "Platform Limitation" &&
-    probabilityOf(answers.wants_limit_lifted) >= BARS.signal
-  ) {
-    labels.push("Feature Request");
+  if (classification === "Bug" || classification === "Feature Request") {
+    labels.push(classification);
   }
   if (answers.root_cause_label) {
     const { choice, confidence } = choiceOf(answers.root_cause_label);
@@ -525,6 +515,9 @@ interface BarContext {
 const barGap = (
   context: BarContext
 ): { missing: string[]; note: string } | null => {
+  if (context.classification === "Feature Request") {
+    return null;
+  }
   if (context.classificationConfidence < BARS.classification) {
     return {
       missing: ["A deciding confirmation for the classification."],
@@ -594,11 +587,15 @@ export function resolveTriage(
     return unproven(["A deciding confirmation for the claim."]);
   }
 
-  const duplicate = findDuplicate(input, answers);
-  const classification =
-    CLASSIFICATION_NAMES[
-      classificationPick.choice as keyof typeof CLASSIFICATION_NAMES
-    ];
+  const classification = settleClassification(
+    classificationPick,
+    input.ticketLabels ?? [],
+    notes
+  );
+  const { duplicate, related } = splitMatch(
+    classification,
+    findDuplicate(input, answers)
+  );
   if (duplicate) {
     confidence.path = duplicate.confidence;
   }
@@ -665,9 +662,13 @@ export function resolveTriage(
     path,
     project: projectSettled ? project.choice : null,
   });
+  const state = PATH_STATE[ownership.path];
   const labels = billed
     ? [...new Set(input.sourceLabels)]
-    : resolveLabels(input, classification, answers);
+    : [
+        ...resolveLabels(input, classification, answers),
+        ...groupingLabel(settled, state),
+      ];
   const priority = resolvePriority(
     ownership.path,
     match?.candidate.priority,
@@ -678,7 +679,7 @@ export function resolveTriage(
     ? BILLING_INBOX_REVIEW
     : reviewOf(input, answers, {
         classification,
-        closes: ["Canceled", "Done"].includes(PATH_STATE[ownership.path]),
+        closes: ["Canceled", "Done"].includes(state),
         duplicate: Boolean(match),
         path: ownership.path,
         signal: BARS.signal,
@@ -701,14 +702,9 @@ export function resolveTriage(
     route: {
       ...ownershipRoute(ownership, labels),
       priority,
-      state: PATH_STATE[ownership.path],
+      state,
       ...routeProjectOf(billed, projectSettled ? project.choice : null),
-      ...(match
-        ? {
-            duplicateOf: match.candidate.identifier,
-            inheritAssigneeFrom: match.candidate.identifier,
-          }
-        : {}),
+      ...matchRoute(related, match?.candidate.identifier),
     },
     verdict,
   };

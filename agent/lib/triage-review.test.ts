@@ -382,10 +382,10 @@ test("the billing gate returns a disposition and the owner map builds the billin
   assert.ok(!REVIEW_SOURCE.includes(SUPPORT_OWNER));
 });
 
-test("a billed inbox error stays a support follow-up even when a lifted limit is wanted", () => {
+test("a billed inbox error stays a support follow-up and never waits for feature approval", () => {
   const decision = resolveTriage(
     inboxInput({ billingFacts: billingFacts({ domainsLive: false }) }),
-    inboxAnswers({ wants_limit_lifted: yes() }),
+    inboxAnswers(),
     NOW
   );
   assert.ok(decision.outcome === "route");

@@ -66,7 +66,6 @@ export const bugAnswers = (
   path: pick("Engineering Todo"),
   project: pick("AI SDR Core"),
   verdict: pick("supported"),
-  wants_limit_lifted: no(),
   ...over,
 });
 
