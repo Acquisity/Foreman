@@ -47,8 +47,19 @@ export interface ThreadComment {
 }
 
 export type ReplyPlan =
-  | { anchorId: string; followUp: FollowUpInput | null; ok: true }
-  | { alreadyReplied?: true; error: string; ok: false };
+  | {
+      anchorId: string;
+      followUp: FollowUpInput | null;
+      /** When Foreman last spoke in this thread, if it has. */
+      lastReplyAt?: string;
+      ok: true;
+    }
+  | {
+      alreadyReplied?: true;
+      error: string;
+      lastReplyAt?: string;
+      ok: false;
+    };
 
 export function planReply(
   comments: readonly ThreadComment[],
@@ -81,11 +92,13 @@ export function planReply(
     };
   }
   const thread = comments.filter((c) => c.parentId === anchor.id).sort(byTime);
-  if (thread.at(-1)?.userId === foremanUserId) {
+  const newest = thread.at(-1);
+  if (newest?.userId === foremanUserId) {
     return {
       alreadyReplied: true,
       error:
         "Foreman already replied and the requester has not answered since. Do not post again; put anything new in the investigation document.",
+      lastReplyAt: newest.createdAt,
       ok: false,
     };
   }
@@ -97,7 +110,13 @@ export function planReply(
           lastReply: thread[lastReply]?.body ?? "",
           replies: thread.slice(lastReply + 1).map((c) => c.body),
         };
-  return { anchorId: anchor.id, followUp, ok: true };
+  const lastReplyAt = thread[lastReply]?.createdAt;
+  return {
+    anchorId: anchor.id,
+    followUp,
+    ...(lastReplyAt ? { lastReplyAt } : {}),
+    ok: true,
+  };
 }
 
 /** What the tool tells Foreman when Jev says a follow-up needs no message. */
@@ -285,6 +304,8 @@ export type ReplyResult =
   | {
       /** skip: their reply needs nothing; already_replied: Foreman's answer is the newest message. */
       outcome: "already_replied" | "skip";
+      /** When Foreman's standing answer was posted, so route_ticket can tell whether it answers the current decision. */
+      lastReplyAt?: string;
       posted: false;
       reason: string;
     };
@@ -596,14 +617,24 @@ export async function replyToRequester(
   const { issueId, plan } = await readThread(issue, credentials);
   if (!plan.ok) {
     if (plan.alreadyReplied) {
-      return { outcome: "already_replied", posted: false, reason: plan.error };
+      return {
+        ...(plan.lastReplyAt ? { lastReplyAt: plan.lastReplyAt } : {}),
+        outcome: "already_replied",
+        posted: false,
+        reason: plan.error,
+      };
     }
     throw new Error(plan.error);
   }
   if (plan.followUp) {
     const outcome = await followUpOutcome(plan.followUp, signal);
     if (outcome === "skip") {
-      return { outcome, posted: false, reason: SKIP_REASON };
+      return {
+        ...(plan.lastReplyAt ? { lastReplyAt: plan.lastReplyAt } : {}),
+        outcome,
+        posted: false,
+        reason: SKIP_REASON,
+      };
     }
   }
   const created = await createThreadComment({

@@ -108,7 +108,10 @@ export default defineTool({
         sessionId: ctx.session.id,
         tool: "decide_triage",
       });
-      const fields = decisionFields(input.identifier, decision);
+      const fields = {
+        ...decisionFields(input.identifier, decision),
+        decidedAt: new Date().toISOString(),
+      };
       const settled = recordDecision(
         triageDecisions.get(),
         criticRounds.get(),
@@ -130,7 +133,10 @@ export default defineTool({
       const fallback = recordDecision(
         triageDecisions.get(),
         criticRounds.get(),
-        fallbackDecisionFields(input.identifier)
+        {
+          ...fallbackDecisionFields(input.identifier),
+          decidedAt: new Date().toISOString(),
+        }
       );
       triageDecisions.update(() => fallback.decisions);
       criticRounds.update(() => fallback.rounds);

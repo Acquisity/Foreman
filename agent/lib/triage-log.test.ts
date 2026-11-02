@@ -15,11 +15,12 @@ import {
   criticVerdictFields,
   criticVerdictIssue,
   decisionFields,
+  decisionKey,
+  deliveryKey,
   routeDecisionEvent,
   routeRefusal,
   settleCriticRound,
   settleDecision,
-  toldIssue,
 } from "./triage-log.js";
 
 const FIRST_LINE_RULE = /Source issue: ENG-1/u;
@@ -453,43 +454,98 @@ describe("the critic's second check", () => {
 });
 
 describe("duplicate masters", () => {
-  it("counts a requester as told only when the reply posted or their follow-up needed nothing", () => {
-    assert.equal(toldIssue({ issue: "ENG-1", posted: true }), "ENG-1");
+  const DECIDED_AT = "2026-11-02T10:00:00.000Z";
+  const decision = (
+    classification: string | null,
+    over: { fallback?: boolean; path?: string } = {}
+  ) => ({
+    classification,
+    decidedAt: DECIDED_AT,
+    issue: "ENG-1",
+    outcome: "route" as const,
+    path: over.path ?? "User Error",
+    ...(over.fallback ? { fallback: true } : {}),
+  });
+  const decided = (
+    classification: string | null,
+    over: { fallback?: boolean; path?: string } = {}
+  ) => ({ "ENG-1": decision(classification, over) });
+
+  it("binds a delivered reply to the decision it answered (C1)", () => {
+    const current = decision("User Error");
+    const key = decisionKey(current);
+    assert.equal(deliveryKey(current, { issue: "ENG-1", posted: true }), key);
     assert.equal(
-      toldIssue({ issue: "ENG-1", outcome: "skip", posted: false }),
-      "ENG-1"
+      deliveryKey(undefined, { issue: "ENG-1", posted: true }),
+      null
     );
-    assert.equal(
-      toldIssue({ issue: "ENG-1", outcome: "already_replied", posted: false }),
-      "ENG-1"
+    assert.equal(deliveryKey(current, { posted: false }), null);
+    assert.notEqual(
+      decisionKey(
+        decision("Platform Limitation", { path: "Platform Limitation" })
+      ),
+      key
     );
-    assert.equal(toldIssue({ posted: false }), null);
-    assert.equal(toldIssue({ issue: "ENG-1", posted: false }), null);
   });
 
-  it("holds an explanation's closure until the requester is told, in a Linear session (rule 4)", () => {
-    const decided = (classification: string | null, fallback = false) => ({
-      "ENG-1": {
-        classification,
-        issue: "ENG-1",
-        outcome: "route" as const,
-        path: "User Error",
-        ...(fallback ? { fallback: true } : {}),
-      },
-    });
-    for (const classification of ["User Error", "Platform Limitation"]) {
+  it("counts an earlier answer only when it went out after the current decision (C1)", () => {
+    const current = decision("User Error");
+    for (const outcome of ["already_replied", "skip"]) {
       assert.equal(
-        closureHeld(decided(classification), {}, "ENG-1", true),
+        deliveryKey(current, {
+          issue: "ENG-1",
+          lastReplyAt: "2026-11-02T09:59:00.000Z",
+          outcome,
+          posted: false,
+        }),
+        null,
+        outcome
+      );
+      assert.equal(
+        deliveryKey(current, {
+          issue: "ENG-1",
+          lastReplyAt: "2026-11-02T10:01:00.000Z",
+          outcome,
+          posted: false,
+        }),
+        decisionKey(current),
+        outcome
+      );
+      assert.equal(
+        deliveryKey(current, { issue: "ENG-1", outcome, posted: false }),
+        null,
+        outcome
+      );
+    }
+  });
+
+  it("holds an explanation's closure until the requester is told about the current decision, in a Linear session (rule 4, C1)", () => {
+    for (const classification of ["User Error", "Platform Limitation"]) {
+      const decisions = decided(classification);
+      const key = decisionKey(decisions["ENG-1"]);
+      assert.equal(
+        closureHeld(decisions, {}, "ENG-1", true),
         true,
         classification
       );
       assert.equal(
-        closureHeld(decided(classification), { "ENG-1": true }, "ENG-1", true),
+        closureHeld(decisions, { "ENG-1": key }, "ENG-1", true),
         false,
         classification
       );
     }
-    assert.equal(closureHeld(decided(null, true), {}, "ENG-1", true), true);
+    const corrected = decided("Platform Limitation", {
+      path: "Platform Limitation",
+    });
+    const earlier = decisionKey(decision("User Error"));
+    assert.equal(
+      closureHeld(corrected, { "ENG-1": earlier }, "ENG-1", true),
+      true
+    );
+    assert.equal(
+      closureHeld(decided(null, { fallback: true }), {}, "ENG-1", true),
+      true
+    );
     assert.equal(closureHeld(decided("Bug"), {}, "ENG-1", true), false);
     assert.equal(closureHeld(decided("User Error"), {}, "ENG-1", false), false);
     assert.equal(closureHeld({}, {}, "ENG-1", true), false);
