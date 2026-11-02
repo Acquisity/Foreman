@@ -8,17 +8,18 @@ import {
   BILLING_PATH,
   billingDecisionFields,
   blockedDecision,
+  closureHeld,
   confidenceFields,
   criticBlocked,
   criticTaskIssue,
   criticVerdictFields,
   criticVerdictIssue,
   decisionFields,
-  duplicateNeedsMaster,
   routeDecisionEvent,
   routeRefusal,
   settleCriticRound,
   settleDecision,
+  toldIssue,
 } from "./triage-log.js";
 
 const FIRST_LINE_RULE = /Source issue: ENG-1/u;
@@ -452,18 +453,41 @@ describe("the critic's second check", () => {
 });
 
 describe("duplicate masters", () => {
-  it("needs a master only for a Bug duplicate", () => {
-    const decided = (classification: string | null) => ({
+  it("counts a requester as told only when the reply posted or their follow-up needed nothing", () => {
+    assert.equal(toldIssue({ issue: "ENG-1", posted: true }), "ENG-1");
+    assert.equal(
+      toldIssue({ issue: "ENG-1", outcome: "skip", posted: false }),
+      "ENG-1"
+    );
+    assert.equal(toldIssue({ posted: false }), null);
+    assert.equal(toldIssue({ issue: "ENG-1", posted: false }), null);
+  });
+
+  it("holds an explanation's closure until the requester is told, in a Linear session (rule 4)", () => {
+    const decided = (classification: string | null, fallback = false) => ({
       "ENG-1": {
         classification,
         issue: "ENG-1",
         outcome: "route" as const,
-        path: "Duplicate",
+        path: "User Error",
+        ...(fallback ? { fallback: true } : {}),
       },
     });
-    assert.equal(duplicateNeedsMaster(decided("Bug"), "ENG-1"), true);
-    assert.equal(duplicateNeedsMaster(decided("User Error"), "ENG-1"), false);
-    assert.equal(duplicateNeedsMaster(decided(null), "ENG-1"), false);
-    assert.equal(duplicateNeedsMaster({}, "ENG-1"), false);
+    for (const classification of ["User Error", "Platform Limitation"]) {
+      assert.equal(
+        closureHeld(decided(classification), {}, "ENG-1", true),
+        true,
+        classification
+      );
+      assert.equal(
+        closureHeld(decided(classification), { "ENG-1": true }, "ENG-1", true),
+        false,
+        classification
+      );
+    }
+    assert.equal(closureHeld(decided(null, true), {}, "ENG-1", true), true);
+    assert.equal(closureHeld(decided("Bug"), {}, "ENG-1", true), false);
+    assert.equal(closureHeld(decided("User Error"), {}, "ENG-1", false), false);
+    assert.equal(closureHeld({}, {}, "ENG-1", true), false);
   });
 });

@@ -41,34 +41,54 @@ const ISSUES: Record<string, FakeIssue> = {
 /** ENG-1 without the Bug label: an explanation's duplicate. */
 const NOT_A_BUG = [{ id: "l-cr", name: "Customer reported" }];
 
+const GROUPING = { id: "l-grouping", name: "Needs grouping" };
+
 const linear = (over: Parameters<typeof fakeLinear>[0] = {}) =>
-  fakeLinear({ issues: ISSUES, ...over });
+  fakeLinear({ issues: ISSUES, teamLabels: [GROUPING], ...over });
+
+/** A report left open for grouping: related to its match, no state, no parent, the grouping label. */
+const leftOpen = async (
+  fake: ReturnType<typeof fakeLinear>,
+  routed: Promise<{ grouping: string | null; warnings: string[] }>,
+  match: string,
+  why: RegExp
+) => {
+  const result = await routed;
+  assert.deepEqual(fake.relations, [`i-1>i-${match}`]);
+  assert.deepEqual(fake.relationTypes, ["related"]);
+  const update = fake.updates()[0]?.variables.input as Record<string, unknown>;
+  assert.equal(update.stateId, undefined);
+  assert.equal(update.parentId, undefined);
+  assert.ok((update.labelIds as string[]).includes("l-grouping"));
+  assert.equal(result.grouping, "needs-grouping");
+  assert.match(result.warnings.join(" "), why);
+};
 
 const updateOf = (fake: ReturnType<typeof fakeLinear>) =>
   fake.updates()[0]?.variables.input as Record<string, unknown> | undefined;
 
-const NO_MASTER =
-  /ENG-40 is not a master and is not under one, so nothing was written/u;
+const NO_MASTER = /ENG-40 is not a master and is not under one/u;
+const MAKE_MASTER = /create the master through engineering-handoff/u;
 const WRONG_PARENT =
   /ENG-20 belongs under its master ENG-30, not ENG-77, so nothing was written/u;
 const RELATION_NOT_RECORDED =
   /Nothing was written: the duplicate relation to ENG-9 was not recorded/u;
 const MASTER_OUTSIDE_MAP =
   /ENG-70 is held by Pieter Venter, who is not in the owner map, so nothing was written/u;
-const UNLABELLED_NOT_MASTER =
-  /ENG-45 is not a master and is not under one, so nothing was written/u;
+const UNLABELLED_NOT_MASTER = /ENG-45 is not a master and is not under one/u;
 const OLD_PARENT =
-  /ENG-48 was created before 2026-09-28T00:00:00.000Z, so it cannot take new reports and nothing was written/u;
+  /ENG-50 was created before 2026-09-28T00:00:00.000Z, so it cannot take new reports and nothing was written/u;
 const STALE_MASTER_RETRY =
   /relate ENG-50 for history, call route_ticket with issue ENG-50 and parent set to the new master, then call this again with duplicateOf ENG-50, parent the new master and inheritAssigneeFrom the new master\./u;
 const STALE_MATCH_NOT_UNDER =
   /ENG-60 is not under ENG-31, so nothing was written/u;
 const MATCH_NOT_UNDER = /ENG-40 is not under ENG-31, so nothing was written/u;
 const PARENT_NOT_MASTER = /ENG-40 is not a master, so nothing was written/u;
+const NOT_A_MASTER_PARENT = /ENG-48 is not a master, so nothing was written/u;
 const RETRY_FROM_MASTER =
   /Call route_ticket again without duplicateOf, with parent ENG-30 and inheritAssigneeFrom ENG-30/u;
 const STALE_MASTER =
-  /ENG-50 was created before 2026-09-28T00:00:00.000Z, so it cannot take new reports and nothing was written/u;
+  /ENG-50 was created before 2026-09-28T00:00:00.000Z, so it cannot take new reports\. Create a new master/u;
 
 describe("routeTicket duplicates", () => {
   it("records the duplicate relation before moving the ticket to Duplicate, as Linear requires (ENG-15734, ENG-15935, ENG-15785)", async () => {
@@ -108,26 +128,30 @@ describe("routeTicket duplicates", () => {
     assert.equal(result.duplicateOf, "ENG-20");
   });
 
-  it("refuses a Bug duplicate of a lone report before any write, so the master is made first", async () => {
+  it("leaves a Bug duplicate of a lone report open for grouping and says how to make the master (ENG-17138)", async () => {
     const fake = linear();
-    await assert.rejects(
+    await leftOpen(
+      fake,
       routeTicket(
         { duplicateOf: "ENG-40", issue: "ENG-1", state: "Duplicate" },
-        { client: fake.fetchStub, masterRequired: true }
+        { client: fake.fetchStub }
       ),
-      NO_MASTER
+      "ENG-40",
+      MAKE_MASTER
     );
-    assert.deepEqual(fake.writes(), []);
   });
 
-  it("closes a duplicate of a lone report without a parent when it is not a Bug", async () => {
+  it("never closes a non-Bug duplicate of a lone report: it stays open, related and labelled for grouping (ENG-17138)", async () => {
     const fake = linear({ ticketLabels: NOT_A_BUG });
-    await routeTicket(
-      { duplicateOf: "ENG-40", issue: "ENG-1", state: "Duplicate" },
-      { client: fake.fetchStub }
+    await leftOpen(
+      fake,
+      routeTicket(
+        { duplicateOf: "ENG-40", issue: "ENG-1", state: "Duplicate" },
+        { client: fake.fetchStub }
+      ),
+      "ENG-40",
+      NO_MASTER
     );
-    assert.deepEqual(fake.relations, ["i-1>i-ENG-40"]);
-    assert.equal(updateOf(fake)?.parentId, undefined);
   });
 
   it("refuses a parent that is not the match's master before any write", async () => {
@@ -161,17 +185,10 @@ describe("routeTicket duplicates", () => {
 });
 
 describe("routeTicket duplicate masters, review fixes", () => {
-  it("needs a master for a ticket labelled Bug even when no decision says Bug, as after a fallback decision (C1)", async () => {
-    const labelled = linear();
-    await assert.rejects(
-      routeTicket(
-        { duplicateOf: "ENG-40", issue: "ENG-1", state: "Duplicate" },
-        { client: labelled.fetchStub }
-      ),
-      NO_MASTER
-    );
+  it("tells a ticket labelled Bug, or gaining the label, how to make its master, even when no decision says Bug (C1)", async () => {
     const adding = linear({ ticketLabels: NOT_A_BUG });
-    await assert.rejects(
+    await leftOpen(
+      adding,
       routeTicket(
         {
           addLabels: ["Bug"],
@@ -181,9 +198,9 @@ describe("routeTicket duplicate masters, review fixes", () => {
         },
         { client: adding.fetchStub }
       ),
-      NO_MASTER
+      "ENG-40",
+      MAKE_MASTER
     );
-    assert.deepEqual([...labelled.writes(), ...adding.writes()], []);
   });
 
   it("refuses a computed master held outside the owner map before any write, whoever is assigned (C3)", async () => {
@@ -203,19 +220,19 @@ describe("routeTicket duplicate masters, review fixes", () => {
     assert.deepEqual(fake.writes(), []);
   });
 
-  it("refuses a Bug duplicate whose master is older than the cutoff, the same cutoff master searches use (C4)", async () => {
+  it("does not close a duplicate whose master is older than the cutoff, the same cutoff master searches use (C4)", async () => {
     await Promise.all(
       ["ENG-50", "ENG-60"].map(async (duplicateOf) => {
         const fake = linear();
-        await assert.rejects(
+        await leftOpen(
+          fake,
           routeTicket(
             { duplicateOf, issue: "ENG-1", state: "Duplicate" },
             { client: fake.fetchStub, mastersCreatedAfter: CUTOFF }
           ),
-          STALE_MASTER,
-          duplicateOf
+          duplicateOf,
+          STALE_MASTER
         );
-        assert.deepEqual(fake.writes(), [], duplicateOf);
       })
     );
   });
@@ -237,13 +254,17 @@ describe("routeTicket duplicate masters, review fixes", () => {
     assert.deepEqual(fake.writes(), []);
   });
 
-  it("closes a non-Bug duplicate under a stale master without a parent (C4)", async () => {
+  it("leaves a non-Bug duplicate under a stale master open for grouping instead of closing it unparented (C4)", async () => {
     const fake = linear({ ticketLabels: NOT_A_BUG });
-    await routeTicket(
-      { duplicateOf: "ENG-60", issue: "ENG-1", state: "Duplicate" },
-      { client: fake.fetchStub, mastersCreatedAfter: CUTOFF }
+    await leftOpen(
+      fake,
+      routeTicket(
+        { duplicateOf: "ENG-60", issue: "ENG-1", state: "Duplicate" },
+        { client: fake.fetchStub, mastersCreatedAfter: CUTOFF }
+      ),
+      "ENG-60",
+      STALE_MASTER
     );
-    assert.equal(updateOf(fake)?.parentId, undefined);
   });
 
   it("keeps a master inside the cutoff (C4)", async () => {
@@ -336,14 +357,15 @@ describe("routeTicket duplicate masters, review fixes", () => {
 
   it("never takes an unlabelled report for a master: only the master template's Regression seam section marks one (R1)", async () => {
     const fake = linear();
-    await assert.rejects(
+    await leftOpen(
+      fake,
       routeTicket(
         { duplicateOf: "ENG-45", issue: "ENG-1", state: "Duplicate" },
         { client: fake.fetchStub }
       ),
+      "ENG-45",
       UNLABELLED_NOT_MASTER
     );
-    assert.deepEqual(fake.writes(), []);
   });
 
   it("recognises a master engineering-handoff made by its Regression seam section (R1)", async () => {
@@ -370,8 +392,21 @@ describe("routeTicket duplicate masters, review fixes", () => {
     }
   });
 
-  it("applies the session cutoff to an explicit parent by its creation time, master or not (Devin 9)", async () => {
-    const fake = linear({ ticketLabels: NOT_A_BUG });
+  it("applies the session cutoff to an explicit parent, and refuses one that is no master, for every classification (Devin 9)", async () => {
+    const stale = linear({ ticketLabels: NOT_A_BUG });
+    await assert.rejects(
+      routeTicket(
+        {
+          duplicateOf: "ENG-60",
+          issue: "ENG-1",
+          parent: "ENG-50",
+          state: "Duplicate",
+        },
+        { client: stale.fetchStub, mastersCreatedAfter: CUTOFF }
+      ),
+      OLD_PARENT
+    );
+    const report = linear({ ticketLabels: NOT_A_BUG });
     await assert.rejects(
       routeTicket(
         {
@@ -380,20 +415,22 @@ describe("routeTicket duplicate masters, review fixes", () => {
           parent: "ENG-48",
           state: "Duplicate",
         },
-        { client: fake.fetchStub, mastersCreatedAfter: CUTOFF }
+        { client: report.fetchStub, mastersCreatedAfter: CUTOFF }
       ),
-      OLD_PARENT
+      NOT_A_MASTER_PARENT
     );
-    assert.deepEqual(fake.writes(), []);
+    assert.deepEqual([...stale.writes(), ...report.writes()], []);
   });
 
   it("gives the exact retry when the match is itself a master past the cutoff (R3)", async () => {
     const fake = linear();
-    await assert.rejects(
+    await leftOpen(
+      fake,
       routeTicket(
         { duplicateOf: "ENG-50", issue: "ENG-1", state: "Duplicate" },
         { client: fake.fetchStub, mastersCreatedAfter: CUTOFF }
       ),
+      "ENG-50",
       STALE_MASTER_RETRY
     );
     // The retry it names, once the stale master (ENG-51) sits under ENG-31.

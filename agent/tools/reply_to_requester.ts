@@ -18,10 +18,10 @@ export default defineTool({
   async execute({ issue, message }, ctx) {
     const replayed = replayReply(ctx.session.auth.initiator, issue);
     if (replayed) {
-      return replayed;
+      return { ...replayed, issue };
     }
     try {
-      return await replyToRequester(
+      const result = await replyToRequester(
         issue,
         message,
         (await ctx.getToken(linearAuth)).token,
@@ -30,6 +30,9 @@ export default defineTool({
           ? (draft) => rewriteDraft(draft, MESSAGE_MAX_CHARS, ctx.abortSignal)
           : undefined
       );
+      // The issue rides on the result so the ops hook can record that this
+      // requester was told, which route_ticket needs before an explanation closes.
+      return { ...result, issue };
     } catch (error) {
       if (ctx.abortSignal.aborted) {
         throw error;

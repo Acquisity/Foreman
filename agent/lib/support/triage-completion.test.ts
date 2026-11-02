@@ -866,3 +866,56 @@ test("completion refuses anyone but James as the owner of a request waiting in B
     )
   );
 });
+
+test("completion accepts a Feature Request waiting in Backlog and refuses one closed without a person declining it (ENG-15932)", () => {
+  const waiting = {
+    ...report,
+    assignee: "James Keeble",
+    labels: [
+      "intercom-sourced",
+      "Customer reported",
+      "Feature Request",
+      "Needs approval",
+    ],
+    parentId: null,
+    project: null,
+    status: "Backlog",
+  };
+  const content = {
+    ...document,
+    content:
+      "# Triage investigation\n**Classification**: Feature Request\n**Handling path**: Feature Request\n**Review**: Not required",
+  };
+  assert.doesNotThrow(() => assertTriageOutputs(waiting, content, comments));
+  for (const status of ["Canceled", "Done", "Duplicate"]) {
+    assert.throws(
+      () => assertTriageOutputs({ ...waiting, status }, content, comments),
+      SupportRefusal,
+      status
+    );
+  }
+  assert.doesNotThrow(() =>
+    assertTriageOutputs(
+      {
+        ...waiting,
+        assignee: null,
+        labels: [...waiting.labels, "Declined"],
+        status: "Canceled",
+      },
+      content,
+      comments
+    )
+  );
+  assert.throws(
+    () =>
+      assertTriageOutputs(
+        {
+          ...waiting,
+          labels: waiting.labels.filter((label) => label !== "Feature Request"),
+        },
+        content,
+        comments
+      ),
+    SupportRefusal
+  );
+});

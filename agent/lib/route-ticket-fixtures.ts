@@ -20,6 +20,8 @@ export interface FakeIssue {
   labels?: string[];
   master?: boolean;
   parent?: string;
+  /** Linear's state type; open issues are `triage` unless set. */
+  stateType?: string;
 }
 
 /** The default master ENG-9, whose RouteIssue id is i-9. */
@@ -83,7 +85,7 @@ const relatedById = (
       identifier,
       labels: { nodes: (issue.labels ?? []).map((name) => ({ name })) },
       parent: issue.parent ? { identifier: issue.parent } : null,
-      state: { name: "Triage", type: "triage" },
+      state: { name: "Triage", type: issue.stateType ?? "triage" },
       title: identifier,
       url: `https://linear.app/acquisity/issue/${identifier}`,
     }));
@@ -110,7 +112,13 @@ const labelsFor = (
     : [{ id: "l-bug", name: "Bug" }];
 };
 
+/** The identifier behind a RouteIssue id: i-9 is ENG-9, i-ENG-30 is ENG-30. */
+const ID_PREFIX = /^i-/u;
+const identifierOf = (id: string) =>
+  id === DEFAULT_MASTER[1] ? DEFAULT_MASTER[0] : id.replace(ID_PREFIX, "");
+
 export const fakeLinear = ({
+  dropParent = false,
   issues = {},
   masterAssignee = { id: "u-anuj", name: "Anuj Bhatt" },
   readBackFails = false,
@@ -120,6 +128,8 @@ export const fakeLinear = ({
   ticketAssignee = null,
   ticketLabels,
 }: {
+  /** The read-back loses the parent the update set, as a failed parent write would. */
+  dropParent?: boolean;
   issues?: Record<string, FakeIssue>;
   masterAssignee?: { id: string; name: string };
   readBackFails?: boolean;
@@ -132,8 +142,12 @@ export const fakeLinear = ({
 } = {}) => {
   const calls: Call[] = [];
   const relations: string[] = [];
+  const relationTypes: string[] = [];
+  let parentSet: string | null = null;
   let failedUpdates = 0;
   type Vars = Record<string, unknown>;
+  const readBackParent = (readBack: boolean) =>
+    readBack && parentSet && !dropParent ? { identifier: parentSet } : null;
   const routeIssue = (variables: Vars) => {
     if (variables.id === "ENG-999999") {
       return json({ data: { issue: null } });
@@ -165,7 +179,7 @@ export const fakeLinear = ({
           id: master ? "i-9" : "i-1",
           identifier: variables.id,
           labels: { nodes: labelsFor(master, readBack, ticketLabels) },
-          parent: null,
+          parent: readBackParent(readBack),
           priority: readBack ? 3 : 0,
           project: readBack ? { id: "p-support", name: "Support" } : null,
           state: { name: readBack ? "Done" : "Triage" },
@@ -195,7 +209,11 @@ export const fakeLinear = ({
       "linear.RouteIssueUpdate": (variables) => {
         if (
           (variables.input as Vars).stateId === "s-duplicate" &&
-          !relations.some((r) => r.startsWith(`${variables.id}>`))
+          !relations.some(
+            (r, index) =>
+              r.startsWith(`${variables.id}>`) &&
+              relationTypes[index] === "duplicate"
+          )
         ) {
           return json({ errors: [{ message: MISSING_RELATION }] });
         }
@@ -203,12 +221,17 @@ export const fakeLinear = ({
           failedUpdates += 1;
           return json({ errors: [{ message: "Linear is busy" }] });
         }
+        const { parentId } = variables.input as Vars;
+        if (typeof parentId === "string") {
+          parentSet = identifierOf(parentId);
+        }
         return json({ data: { issueUpdate: { success: true } } });
       },
       "linear.RouteRelation": (variables) => {
         if (!relationFails) {
           const input = variables.input as Record<string, string>;
           relations.push(`${input.issueId}>${input.relatedIssueId}`);
+          relationTypes.push(String(input.type));
         }
         return json({
           data: { issueRelationCreate: { success: !relationFails } },
@@ -270,5 +293,5 @@ export const fakeLinear = ({
       .filter((query) =>
         ["linear.RouteRelation", "linear.RouteIssueUpdate"].includes(query)
       );
-  return { calls, fetchStub, relations, updates, writes };
+  return { calls, fetchStub, relations, relationTypes, updates, writes };
 };

@@ -78,7 +78,6 @@ describe("replayed duplicate masters (R2, R3)", () => {
       { duplicateOf: "ENG-91", issue: "ENG-100", state: "Duplicate" },
       {
         client,
-        masterRequired: true,
         mastersCreatedAfter: "2026-09-01T00:00:00.000Z",
       }
     );

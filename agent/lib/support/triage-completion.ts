@@ -2,7 +2,9 @@ import { z } from "zod";
 import type { ProviderContext } from "../executor/dispatch.js";
 import {
   areaLabels,
+  DECLINED_LABEL,
   FALLBACK_OWNER,
+  FEATURE_REQUEST_LABEL,
   NEEDS_APPROVAL_LABEL,
   SUPPORT_OWNER,
 } from "../owner-map.js";
@@ -113,6 +115,15 @@ const needsMaster = (
   return classification === "Bug" && !isSupportFollowUp(issue, handlingPath);
 };
 
+/** A feature request closes only when a person declined it (ENG-15932). */
+const closedUnseen = (
+  issue: z.infer<typeof issueSchema>,
+  classification: string | undefined
+): boolean =>
+  classification === FEATURE_REQUEST_LABEL &&
+  CLOSED_STATES.includes(issue.status) &&
+  !issue.labels.includes(DECLINED_LABEL);
+
 const missesTypeLabels = (
   issue: z.infer<typeof issueSchema>,
   classification: string | undefined,
@@ -120,6 +131,12 @@ const missesTypeLabels = (
 ): boolean => {
   if (classification === "Bug") {
     return !issue.labels.includes("Bug");
+  }
+  if (
+    classification === FEATURE_REQUEST_LABEL &&
+    !issue.labels.includes(FEATURE_REQUEST_LABEL)
+  ) {
+    return true;
   }
   if (
     issue.labels.includes("Feature Request") &&
@@ -175,7 +192,12 @@ export function assertTriageOutputs(
     return;
   }
   if (
-    !["Bug", "User Error", "Platform Limitation"].includes(classification ?? "")
+    ![
+      "Bug",
+      FEATURE_REQUEST_LABEL,
+      "User Error",
+      "Platform Limitation",
+    ].includes(classification ?? "")
   ) {
     throw new SupportRefusal(
       "Record the settled classification or the documented unproven/urgent-human branch."
@@ -203,6 +225,7 @@ export function assertTriageOutputs(
       issue.labels.includes(label)
     ) ||
     missesTypeLabels(issue, classification, handlingPath) ||
+    closedUnseen(issue, classification) ||
     needsMaster(
       issue,
       classification,

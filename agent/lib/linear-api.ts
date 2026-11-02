@@ -9,6 +9,7 @@ import {
   mappedOwner,
   mayHoldTicket,
   NEEDS_APPROVAL_LABEL,
+  NEEDS_GROUPING_LABEL,
   ownerNames,
 } from "./owner-map.js";
 
@@ -367,6 +368,8 @@ export interface RouteTicketInput {
   parent?: string;
   priority?: number;
   project?: string;
+  /** A match the report stays open beside: it joins the match's open master, or waits for grouping. */
+  relatedTo?: string;
   releaseDeveloper?: boolean;
   removeLabels?: string[];
   state?: string;
@@ -374,7 +377,11 @@ export interface RouteTicketInput {
 
 export interface RouteTicketResult {
   assignee: string | null;
+  /** The closure was held open because the requester has not been told yet. */
+  closureHeld: boolean;
   duplicateOf: string | null;
+  /** With a match: joined its open master, or left open for the grouping sweep. */
+  grouping: "joined" | "needs-grouping" | null;
   identifier: string;
   labels: string[];
   parentIdentifier: string | null;
@@ -429,13 +436,19 @@ interface RouteIssue {
   url: string;
 }
 
+interface Outcome {
+  closureHeld: boolean;
+  duplicateOf: string | null;
+  grouping: RouteTicketResult["grouping"];
+}
+
 const toResult = (
   issue: RouteIssue,
   warnings: string[],
-  duplicateOf: string | null
+  outcome: Outcome
 ): RouteTicketResult => ({
   assignee: issue.assignee?.name ?? null,
-  duplicateOf,
+  ...outcome,
   identifier: issue.identifier,
   labels: issue.labels.nodes.map((label) => label.name),
   parentIdentifier: issue.parent?.identifier ?? null,
@@ -606,8 +619,8 @@ const carriesBug = (issue: RouteIssue, input: RouteTicketInput): boolean => {
 };
 
 export interface DuplicateRouting {
-  /** The triage decision settled a Bug; the ticket's Bug label counts too. */
-  masterRequired?: boolean;
+  /** The requester has not been told yet, so a Canceled or Duplicate state is not set. */
+  holdClosure?: boolean;
   /** The master search cutoff for this session (`masterCreatedAfter`). */
   mastersCreatedAfter?: string | null;
 }
@@ -616,7 +629,7 @@ export interface DuplicateRouting {
 async function relatedOne(
   gql: Gql,
   filter: Record<string, unknown>
-): Promise<{ createdAt: string } | undefined> {
+): Promise<IssueNode | undefined> {
   const { issues } = await gql<IssuesData>("RelatedIssues", {
     after: null,
     filter,
@@ -626,61 +639,65 @@ async function relatedOne(
   return issues.nodes[0];
 }
 
-/** When the issue was created; a missing issue refuses before any write. */
-async function createdAtOf(
+const CLOSED_STATE_TYPES = new Set(["canceled", "completed"]);
+
+interface MasterFacts {
+  createdAt: string;
+  open: boolean;
+}
+
+/**
+ * The master's creation time and whether it is still open, or null when the
+ * issue is no master. A master carries the master marker (engineering-handoff
+ * writes it), or was made by hand and already parents an issue, as reused
+ * masters do; a lone report has neither.
+ */
+async function masterFacts(
   gql: Gql,
   identifier: string,
   id: string
-): Promise<string> {
-  const node = await relatedOne(gql, { id: { eq: id } });
+): Promise<MasterFacts | null> {
+  const marked = await relatedOne(gql, {
+    description: { contains: MASTER_MARKER },
+    id: { eq: id },
+  });
+  const child = marked
+    ? undefined
+    : await relatedOne(gql, { parent: { id: { eq: id } } });
+  if (!(marked || child)) {
+    return null;
+  }
+  const node = marked ?? (await relatedOne(gql, { id: { eq: id } }));
   if (!node) {
     throw new Error(
       `Could not read when ${identifier} was created, so nothing was written.`
     );
   }
-  return node.createdAt;
-}
-
-/**
- * When the issue was created if it is a master, else null. A master carries
- * the master marker (engineering-handoff writes it), or was made by hand and
- * already parents an issue, as reused masters do; a lone report has neither.
- */
-async function masterCreatedAt(
-  gql: Gql,
-  identifier: string,
-  id: string
-): Promise<string | null> {
-  const marked = await relatedOne(gql, {
-    description: { contains: MASTER_MARKER },
-    id: { eq: id },
-  });
-  if (marked) {
-    return marked.createdAt;
-  }
-  const child = await relatedOne(gql, { parent: { id: { eq: id } } });
-  return child ? createdAtOf(gql, identifier, id) : null;
+  return {
+    createdAt: node.createdAt,
+    open: !CLOSED_STATE_TYPES.has(node.state.type),
+  };
 }
 
 /** The match itself when it is a master, else its parent when that is one. */
 async function masterOf(
   gql: Gql,
   match: RouteIssue
-): Promise<{ createdAt: string; identifier: string } | null> {
-  const own = await masterCreatedAt(gql, match.identifier, match.id);
+): Promise<(MasterFacts & { identifier: string }) | null> {
+  const own = await masterFacts(gql, match.identifier, match.id);
   if (own !== null) {
-    return { createdAt: own, identifier: match.identifier };
+    return { ...own, identifier: match.identifier };
   }
   const parent = match.parent?.identifier;
   if (!parent) {
     return null;
   }
-  const createdAt = await masterCreatedAt(
+  const facts = await masterFacts(
     gql,
     parent,
     (await requireIssue(gql, parent)).id
   );
-  return createdAt === null ? null : { createdAt, identifier: parent };
+  return facts === null ? null : { ...facts, identifier: parent };
 }
 
 const beforeCutoff = (createdAt: string, cutoff: string | null) =>
@@ -694,84 +711,105 @@ const beforeCutoff = (createdAt: string, cutoff: string | null) =>
 const staleMaster = (
   identifier: string,
   cutoff: string | null,
-  match: string
+  match: string,
+  refused = true
 ) =>
   new Error(
-    `${identifier} was created before ${cutoff}, so it cannot take new reports and nothing was written. Create a new master through engineering-handoff from this investigation (aggregate evidence only: no organization id, email or customer rows), relate ${identifier} for history, call route_ticket with issue ${match} and parent set to the new master, then call this again with duplicateOf ${match}, parent the new master and inheritAssigneeFrom the new master.`
+    `${identifier} was created before ${cutoff}, so it cannot take new reports${refused ? " and nothing was written" : ""}. Create a new master through engineering-handoff from this investigation (aggregate evidence only: no organization id, email or customer rows), relate ${identifier} for history, call route_ticket with issue ${match} and parent set to the new master, then call this again with duplicateOf ${match}, parent the new master and inheritAssigneeFrom the new master.`
   );
 
 /**
- * A parent passed in for a duplicate with no eligible master: inside the
- * session's cutoff and, for a Bug, a master its match is already under, so
- * both reports join it and neither is left detached.
+ * A parent passed in for a match with no eligible master: an open master the
+ * match is already under, inside the session's cutoff, so both reports join
+ * it and neither is left detached.
  */
 async function checkedParent(
   gql: Gql,
   match: RouteIssue,
   parent: string,
-  required: boolean,
   cutoff: string | null
 ): Promise<string> {
   const { id } = await requireIssue(gql, parent);
-  if (required && (await masterCreatedAt(gql, parent, id)) === null) {
+  const facts = await masterFacts(gql, parent, id);
+  if (facts === null) {
     throw new Error(
       `${parent} is not a master, so nothing was written. Pass the master as parent, or create one through engineering-handoff first.`
     );
   }
-  if (required && match.parent?.identifier !== parent) {
+  if (match.parent?.identifier !== parent) {
     throw new Error(
       `${match.identifier} is not under ${parent}, so nothing was written. Call route_ticket with issue ${match.identifier} and parent ${parent} first, so both reports join that master, then call this again.`
     );
   }
-  if (
-    cutoff !== null &&
-    beforeCutoff(await createdAtOf(gql, parent, id), cutoff)
-  ) {
+  if (beforeCutoff(facts.createdAt, cutoff)) {
     throw staleMaster(parent, cutoff, match.identifier);
+  }
+  if (!facts.open) {
+    throw new Error(
+      `${parent} is closed, so it cannot take new reports and nothing was written.`
+    );
   }
   return parent;
 }
 
+type Grouping = { parent: string } | { reason: string };
+
 /**
- * The parent a duplicate joins (ENG-16608): the match when it is a master,
- * else the match's parent when that is one. A master created before the
- * session's master-search cutoff is not eligible. With no eligible master, a
- * Bug duplicate (by decision or by its Bug label) is refused until
- * engineering-handoff has made one, and a parent it is given must be a master
- * its match is already under; any other duplicate closes unparented.
+ * Where a matched report goes (ENG-16608, ENG-17138): under the match when it
+ * is an open master, else under the match's parent when that is one. A master
+ * created before the session's master-search cutoff, or one already closed,
+ * is not eligible. With no eligible master, the report is not closed: it is
+ * related to the match and labelled for the grouping sweep, whatever its
+ * classification, so a repeat is never closed on a lone or closed ticket.
  */
-async function duplicateParent(
+async function groupingOf(
   gql: Gql,
-  issue: RouteIssue,
   match: RouteIssue,
   input: RouteTicketInput,
-  routing: DuplicateRouting
-): Promise<string | undefined> {
-  const cutoff = routing.mastersCreatedAfter ?? null;
+  cutoff: string | null
+): Promise<Grouping> {
   const master = await masterOf(gql, match);
-  const stale =
-    master && beforeCutoff(master.createdAt, cutoff) ? master.identifier : null;
-  if (master && stale === null) {
+  const stale = master ? beforeCutoff(master.createdAt, cutoff) : false;
+  if (master && !stale && master.open) {
     if (input.parent !== undefined && input.parent !== master.identifier) {
       throw new Error(
         `${match.identifier} belongs under its master ${master.identifier}, not ${input.parent}, so nothing was written. Drop parent or pass ${master.identifier}.`
       );
     }
-    return master.identifier;
+    return { parent: master.identifier };
   }
-  const required = routing.masterRequired || carriesBug(issue, input);
   if (input.parent !== undefined) {
-    return checkedParent(gql, match, input.parent, required, cutoff);
+    return { parent: await checkedParent(gql, match, input.parent, cutoff) };
   }
-  if (!required) {
-    return;
+  if (master && stale) {
+    return {
+      reason: staleMaster(master.identifier, cutoff, match.identifier, false)
+        .message,
+    };
   }
-  if (stale !== null) {
-    throw staleMaster(stale, cutoff, match.identifier);
+  return {
+    reason: master
+      ? `its master ${master.identifier} is already closed`
+      : `${match.identifier} is not a master and is not under one`,
+  };
+}
+
+const named = (state: string | undefined, ...names: string[]) =>
+  state !== undefined && names.includes(state.trim().toLowerCase());
+
+/** Without a match, Duplicate needs an open master passed as parent, as on a retry after the relation landed. */
+async function requireOpenMasterParent(
+  gql: Gql,
+  parent: string | undefined
+): Promise<void> {
+  const facts = parent
+    ? await masterFacts(gql, parent, (await requireIssue(gql, parent)).id)
+    : null;
+  if (!facts?.open) {
+    throw new Error(
+      "A ticket moves to Duplicate only under an open master, so nothing was written. Pass duplicateOf with the match, or parent with the open master it already joined."
+    );
   }
-  throw new Error(
-    `${match.identifier} is not a master and is not under one, so nothing was written. Create the master through engineering-handoff from this investigation (aggregate evidence only: no organization id, email or customer rows), call route_ticket with issue ${match.identifier} and parent set to the new master, then call this again.`
-  );
 }
 
 /**
@@ -836,18 +874,19 @@ async function buildUpdate(
 const reason = (error: unknown) =>
   error instanceof Error ? error.message : String(error);
 
-/** The duplicate relation, written before the update; a failure writes nothing. */
-async function writeDuplicateRelation(
+/** The match's relation, written before the update; a failure writes nothing. */
+async function writeMatchRelation(
   gql: Gql,
   issue: RouteIssue,
   match: RouteIssue,
+  type: "duplicate" | "related",
   signal?: AbortSignal
 ): Promise<string> {
   try {
     const { issueRelationCreate } = await gql<{
       issueRelationCreate: { success: boolean };
     }>("RouteRelation", {
-      input: { issueId: issue.id, relatedIssueId: match.id, type: "duplicate" },
+      input: { issueId: issue.id, relatedIssueId: match.id, type },
     });
     if (!issueRelationCreate.success) {
       throw new Error("Linear did not confirm the relation.");
@@ -857,7 +896,7 @@ async function writeDuplicateRelation(
       throw error;
     }
     throw new Error(
-      `Nothing was written: the duplicate relation to ${match.identifier} was not recorded (${reason(error)}).`,
+      `Nothing was written: the ${type} relation to ${match.identifier} was not recorded (${reason(error)}).`,
       { cause: error }
     );
   }
@@ -884,76 +923,164 @@ async function writeUpdate(
       throw error;
     }
     throw new Error(
-      `The duplicate relation to ${after.duplicateOf} was recorded, but the update failed (${reason(error)}). Call route_ticket again without duplicateOf${after.parent ? `, with parent ${after.parent} and inheritAssigneeFrom ${after.parent}` : ""}, to apply the rest.`,
+      `The relation to ${after.duplicateOf} was recorded, but the update failed (${reason(error)}). Call route_ticket again without duplicateOf${after.parent ? `, with parent ${after.parent} and inheritAssigneeFrom ${after.parent}` : ""}, to apply the rest.`,
       { cause: error }
     );
   }
 }
 
-/**
- * One routing write. Reads the ticket, resolves every name to an id, unions
- * the labels to add with the labels already on the ticket, takes the assignee
- * from `inheritAssigneeFrom` when that issue has one and from `assignee`
- * otherwise, and resolves a duplicate's master as its parent. The duplicate
- * relation is written first, because Linear refuses to move a ticket to the
- * Duplicate state without one and then writes nothing ("missing duplicate
- * relation", ENG-15734, ENG-15935, ENG-15785); a failed relation fails the
- * call. Then one `issueUpdate`, the link attachments, and the read-back.
- * Unknown label names fail before any write and list the team's labels. Once
- * the update lands the result is always routed; a failed link or read-back
- * becomes a warning.
- */
-export async function routeTicket(
-  input: RouteTicketInput,
-  opts?: LinearGraphqlOptions & DuplicateRouting
-): Promise<RouteTicketResult> {
-  const gql: Gql = (query, variables) => linearGraphql(query, variables, opts);
+/** What the matched report does: close under its master, stay open beside it, or wait for grouping. */
+interface MatchPlan {
+  /** The master the report joins, when there is an eligible one. */
+  parent?: string;
+  /** Why no master took it; the report stays open with the grouping label. */
+  unjoined?: string;
+}
 
-  const issue = await requireIssue(gql, input.issue);
-  // Resolve the duplicate target before the first write, so a bad identifier
-  // fails the whole call rather than leaving a routed ticket with no relation.
-  const match =
-    input.duplicateOf === undefined
-      ? null
-      : await requireIssue(gql, input.duplicateOf);
-  const parent = match
-    ? await duplicateParent(gql, issue, match, input, opts ?? {})
-    : input.parent;
-  // A duplicate takes its owner from the master it is parented under, so the
-  // report and its master keep one owner even when the match is held by
-  // someone else; the area owner stays the fallback.
-  const owned =
-    match && parent !== undefined && input.inheritAssigneeFrom !== undefined
-      ? { ...input, inheritAssigneeFrom: parent }
-      : input;
-  const { update, warnings } = await buildUpdate(gql, issue, owned, parent);
+const TRAILING_STOP = /\.$/u;
 
-  // Caller cancellation is never a warning; the tool rethrows it.
-  const warn = (error: unknown, message: string) => {
-    if (opts?.signal?.aborted) {
-      throw error;
-    }
-    warnings.push(`${message}: ${reason(error)}`);
-  };
+const groupingWarning = (
+  issue: RouteIssue,
+  match: string,
+  why: string,
+  bug: boolean
+) =>
+  `${issue.identifier} stays open because ${why.replace(TRAILING_STOP, "")}. It is related to ${match} and labelled ${NEEDS_GROUPING_LABEL}, so the grouping sweep puts it under a master.${
+    bug
+      ? ` To close it now as a Bug duplicate, create the master through engineering-handoff (aggregate evidence only), call route_ticket with issue ${match} and parent set to the new master, then call this again.`
+      : ""
+  }`;
 
-  const duplicateOf = match
-    ? await writeDuplicateRelation(gql, issue, match, opts?.signal)
-    : null;
-  // A relation-only or links-only call has no issueUpdate; then the relation
-  // and links are the write, and a routed result needs at least one to land.
-  let wrote = duplicateOf !== null;
-  if (Object.keys(update).length > 0) {
-    await writeUpdate(gql, issue, update, {
-      duplicateOf,
-      parent,
-      signal: opts?.signal,
-    });
-    wrote = true;
+const heldWarning = (issue: RouteIssue, state: string) =>
+  `${issue.identifier} was not moved to ${state} because the requester has not been told: no reply_to_requester call in this session posted the answer. Send the reply, then call route_ticket again with the same input to close it.`;
+
+/** The route a call resolves to before any write: the match, its master, and what is held. */
+interface RoutePlan {
+  closes: boolean;
+  held: boolean;
+  keepsState: boolean;
+  match: RouteIssue | null;
+  owned: RouteTicketInput;
+  parent: string | undefined;
+  plan: MatchPlan;
+  warnings: string[];
+}
+
+function refuseMatchMisuse(input: RouteTicketInput): void {
+  if (input.duplicateOf !== undefined && input.relatedTo !== undefined) {
+    throw new Error(
+      "Pass duplicateOf to close on a match or relatedTo to stay open beside it, not both. Nothing was written."
+    );
   }
+  if (input.relatedTo !== undefined && named(input.state, "duplicate")) {
+    throw new Error(
+      "relatedTo keeps the report open, so it cannot move to Duplicate. Nothing was written."
+    );
+  }
+}
 
-  // The writes above are the routing. Anything after them that fails is
-  // reported as a warning on a routed result, never as an unrouted ticket.
-  for (const link of input.links ?? []) {
+async function matchPlanOf(
+  gql: Gql,
+  match: RouteIssue | null,
+  input: RouteTicketInput,
+  opts: DuplicateRouting,
+  held: boolean
+): Promise<MatchPlan> {
+  if (!match) {
+    if (named(input.state, "duplicate") && !held) {
+      await requireOpenMasterParent(gql, input.parent);
+    }
+    return {};
+  }
+  const grouping = await groupingOf(
+    gql,
+    match,
+    input,
+    opts.mastersCreatedAfter ?? null
+  );
+  return "parent" in grouping
+    ? { parent: grouping.parent }
+    : { unjoined: grouping.reason };
+}
+
+/** Resolves the match and its master and settles what this call may close, before any write. */
+async function planRoute(
+  gql: Gql,
+  issue: RouteIssue,
+  input: RouteTicketInput,
+  opts: DuplicateRouting
+): Promise<RoutePlan> {
+  refuseMatchMisuse(input);
+  // Resolve the match before the first write, so a bad identifier fails the
+  // whole call rather than leaving a routed ticket with no relation.
+  const matchId = input.duplicateOf ?? input.relatedTo;
+  const match = matchId === undefined ? null : await requireIssue(gql, matchId);
+  const held =
+    opts.holdClosure === true && named(input.state, "canceled", "duplicate");
+  const plan = await matchPlanOf(gql, match, input, opts, held);
+  const warnings: string[] = [];
+  if (match && plan.unjoined !== undefined) {
+    warnings.push(
+      groupingWarning(
+        issue,
+        match.identifier,
+        plan.unjoined,
+        carriesBug(issue, input)
+      )
+    );
+  }
+  if (held && input.state) {
+    warnings.push(heldWarning(issue, input.state));
+  }
+  const keepsState = !(
+    held ||
+    (plan.unjoined !== undefined &&
+      named(input.state, "canceled", "done", "duplicate"))
+  );
+  const parent = match ? plan.parent : input.parent;
+  // A matched report takes its owner from the master it is parented under,
+  // so the report and its master keep one owner even when the match is held
+  // by someone else; the area owner stays the fallback.
+  const inherit =
+    match && parent !== undefined && input.inheritAssigneeFrom !== undefined;
+  return {
+    // A duplicate relation only for a report that joins its master and is
+    // not held open; every other match is related, so it never closes it.
+    closes:
+      input.duplicateOf !== undefined && !held && plan.parent !== undefined,
+    held,
+    keepsState,
+    match,
+    owned: {
+      ...input,
+      ...(plan.unjoined === undefined
+        ? {}
+        : { addLabels: [...(input.addLabels ?? []), NEEDS_GROUPING_LABEL] }),
+      ...(inherit ? { inheritAssigneeFrom: parent } : {}),
+      state: keepsState ? input.state : undefined,
+    },
+    parent,
+    plan,
+    warnings,
+  };
+}
+
+const groupingOutcome = (routed: RoutePlan): RouteTicketResult["grouping"] => {
+  if (!routed.match) {
+    return null;
+  }
+  return routed.plan.parent ? "joined" : "needs-grouping";
+};
+
+/** Attaches each link; a failed one is a warning, and the result says whether any landed. */
+async function writeLinks(
+  gql: Gql,
+  issue: RouteIssue,
+  links: RouteTicketInput["links"],
+  warn: (error: unknown, message: string) => void
+): Promise<boolean> {
+  let wrote = false;
+  for (const link of links ?? []) {
     try {
       // biome-ignore lint/performance/noAwaitInLoops: attachments are written one at a time so a failure names the link.
       const { attachmentLinkURL } = await gql<{
@@ -971,25 +1098,115 @@ export async function routeTicket(
       warn(error, `Link ${link.url} was not attached`);
     }
   }
+  return wrote;
+}
 
-  if (!wrote && warnings.length > 0) {
+/**
+ * The read-back. A Duplicate is a success only once it shows the report under
+ * its master; any other read-back failure is a warning on a routed ticket,
+ * reported with the fields from before routing.
+ */
+async function readBackRouted(
+  gql: Gql,
+  input: RouteTicketInput,
+  confirmsParent: string | undefined,
+  warn: (error: unknown, message: string) => void,
+  signal?: AbortSignal
+): Promise<RouteIssue | null> {
+  let after: RouteIssue | null = null;
+  try {
+    after = await requireIssue(gql, input.issue);
+  } catch (error) {
+    if (confirmsParent === undefined) {
+      warn(
+        error,
+        "The ticket was updated but could not be read back, so the fields below are from before routing"
+      );
+    } else if (signal?.aborted) {
+      throw error;
+    }
+  }
+  if (
+    confirmsParent !== undefined &&
+    after?.parent?.identifier !== confirmsParent
+  ) {
+    throw new Error(
+      `${input.issue} was written but could not be confirmed under ${confirmsParent} by the read-back. Read ${input.issue} and call route_ticket again with parent ${confirmsParent} and state ${input.state}.`
+    );
+  }
+  return after;
+}
+
+/**
+ * One routing write. Reads the ticket, resolves every name to an id, unions
+ * the labels to add with the labels already on the ticket, takes the assignee
+ * from `inheritAssigneeFrom` when that issue has one and from `assignee`
+ * otherwise, and resolves a match's open master as the parent. Duplicate is
+ * set only when the report joins that master in the same call, read back
+ * before success; with no eligible master the report stays open, related to
+ * the match and labelled for grouping (ENG-17138). The duplicate relation is
+ * written first, because Linear refuses to move a ticket to the Duplicate
+ * state without one ("missing duplicate relation", ENG-15734, ENG-15935,
+ * ENG-15785); a failed relation fails the call. Then one `issueUpdate`, the
+ * link attachments, and the read-back. Unknown label names fail before any
+ * write and list the team's labels. A held closure (the requester not told
+ * yet) applies everything but the Canceled or Duplicate state.
+ */
+export async function routeTicket(
+  input: RouteTicketInput,
+  opts?: LinearGraphqlOptions & DuplicateRouting
+): Promise<RouteTicketResult> {
+  const gql: Gql = (query, variables) => linearGraphql(query, variables, opts);
+  const issue = await requireIssue(gql, input.issue);
+  const routed = await planRoute(gql, issue, input, opts ?? {});
+  const { match, parent, warnings } = routed;
+  const built = await buildUpdate(gql, issue, routed.owned, parent);
+  warnings.push(...built.warnings);
+
+  // Caller cancellation is never a warning; the tool rethrows it.
+  const warn = (error: unknown, message: string) => {
+    if (opts?.signal?.aborted) {
+      throw error;
+    }
+    warnings.push(`${message}: ${reason(error)}`);
+  };
+
+  const related = match
+    ? await writeMatchRelation(
+        gql,
+        issue,
+        match,
+        routed.closes ? "duplicate" : "related",
+        opts?.signal
+      )
+    : null;
+  // A relation-only or links-only call has no issueUpdate; then the relation
+  // and links are the write, and a routed result needs at least one to land.
+  let wrote = related !== null;
+  if (Object.keys(built.update).length > 0) {
+    await writeUpdate(gql, issue, built.update, {
+      duplicateOf: related,
+      parent,
+      signal: opts?.signal,
+    });
+    wrote = true;
+  }
+  // The writes above are the routing. Anything after them that fails is
+  // reported as a warning on a routed result, never as an unrouted ticket.
+  const linked = await writeLinks(gql, issue, input.links, warn);
+  if (!(wrote || linked) && warnings.length > 0) {
     throw new Error(`Nothing was written. ${warnings.join(" ")}`);
   }
-
-  // The read-back is after the write too: when it fails, the ticket is still
-  // routed, so report the pre-routing fields with a warning rather than a
-  // failure that would send the caller back to route it again.
-  try {
-    return toResult(
-      await requireIssue(gql, input.issue),
-      warnings,
-      duplicateOf
-    );
-  } catch (error) {
-    warn(
-      error,
-      "The ticket was updated but could not be read back, so the fields below are from before routing"
-    );
-    return toResult(issue, warnings, duplicateOf);
-  }
+  const after = await readBackRouted(
+    gql,
+    input,
+    routed.keepsState && named(input.state, "duplicate") ? parent : undefined,
+    warn,
+    opts?.signal
+  );
+  return toResult(after ?? issue, warnings, {
+    closureHeld: routed.held,
+    duplicateOf: routed.closes ? related : null,
+    grouping: groupingOutcome(routed),
+  });
 }

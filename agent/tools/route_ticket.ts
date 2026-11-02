@@ -7,13 +7,14 @@ import { masterCreatedAfter, routeTicket } from "#lib/linear-api.js";
 import { masterWindow } from "#lib/master-window.js";
 import { logOpsEvent } from "#lib/ops-log.js";
 import {
+  closureHeld,
   criticRounds,
-  duplicateNeedsMaster,
+  requesterReplies,
   routeDecisionEvent,
   routeRefusal,
   triageDecisions,
 } from "#lib/triage-log.js";
-import { isStatusFollowUp } from "#lib/trust.js";
+import { isLinearSession, isStatusFollowUp } from "#lib/trust.js";
 
 const identifier = z.string().trim().regex(LINEAR_ISSUE_ID_PATTERN);
 const name = z.string().trim().min(1).max(120);
@@ -24,9 +25,10 @@ export default defineTool({
     "Apply final routing decisions to a Linear ticket in one write: state, priority, labels to add, project, assignee, parent, and duplicate relation, then read it back. " +
     "Labels are added to the ones already on the ticket, never replaced, and removeLabels takes named ones off; an unknown label name to add fails before any write and lists the valid names. " +
     "Names are resolved for you: state by name within the ticket's team and project by name. The assignee must be a person in the owner map, given by name; any other name fails before any write. A developer takes a ticket only when it is labelled Bug, or Feature Request and Approved, counting the labels being added; the one exception is James holding a Feature Request with Needs approval while he decides it; support owners are not gated. A label change that would leave the current developer holder outside that rule fails before any write unless it also names a new assignee or passes releaseDeveloper. " +
-    "For a duplicate pass duplicateOf and inheritAssigneeFrom with the same match; when it has an assignee it is inherited, otherwise assignee (the area owner) is used as the fallback. " +
-    "A duplicate is parented under its master for you: the match when it is a master (its description has the master template's Regression seam section, or it already parents an issue), else the match's parent when that is one. A parent that differs fails before any write. A master past the master search's recency cutoff is not eligible. A Bug duplicate (by decision or Bug label) with no eligible master fails before any write: make the master through engineering-handoff, parent the match under it, then call again; a parent passed for a Bug duplicate must be a master the match is already under. A parent held outside the owner map fails before any write. " +
-    "The duplicate relation is written before the update, because Linear will not move a ticket to Duplicate without it; when the relation fails nothing is written. " +
+    "For a duplicate pass duplicateOf and inheritAssigneeFrom with the same match; when it has an assignee it is inherited, otherwise assignee (the area owner) is used as the fallback. For a report that stays open beside a match (a feature request) pass relatedTo instead. " +
+    "A match's report is parented under its open master for you: the match when it is a master (its description has the master template's Regression seam section, or it already parents an issue), else the match's parent when that is one. A parent that differs fails before any write; a parent passed must be an open master the match is already under. A master past the master search's recency cutoff, or one already closed, is not eligible. Duplicate is set only when the report joins that master in the same call and the read-back shows it there. With no eligible master, for every classification, the report is not closed: it is related to the match, labelled Needs grouping, keeps its current state, and grouping says needs-grouping; a Bug can still join a master made through engineering-handoff on a later call. Duplicate without duplicateOf needs parent set to an open master. A parent held outside the owner map fails before any write. " +
+    "In a Linear session a User Error or Platform Limitation (or a fallback decision) is not moved to Canceled or Duplicate until reply_to_requester has told the requester; closureHeld true means everything else landed and the ticket stays open, so reply and call again. " +
+    "The match's relation is written before the update, because Linear will not move a ticket to Duplicate without it; when the relation fails nothing is written. " +
     "links attach urls as resources on the ticket. Use the returned projectId for memory recording. " +
     "routed true with warnings means the ticket was updated but a link or the read-back after it failed; read the warning before retrying only that part.",
   async execute(input, ctx) {
@@ -40,14 +42,17 @@ export default defineTool({
       return { error: refusal, routed: false as const };
     }
     try {
-      const mastersWindow = input.duplicateOf
-        ? await masterWindow(ctx.session.auth)
-        : { windowed: false };
+      const mastersWindow =
+        input.duplicateOf || input.relatedTo
+          ? await masterWindow(ctx.session.auth)
+          : { windowed: false };
       const ticket = await routeTicket(input, {
         client: executorClient(ctx),
-        masterRequired: duplicateNeedsMaster(
+        holdClosure: closureHeld(
           triageDecisions.get(),
-          input.issue
+          requesterReplies.get(),
+          input.issue,
+          isLinearSession(ctx.session.auth.current)
         ),
         mastersCreatedAfter: masterCreatedAfter(
           mastersWindow.windowed,
@@ -110,6 +115,11 @@ export default defineTool({
       .optional()
       .describe("1 Urgent, 2 High, 3 Medium, 4 Low, 0 none."),
     project: name.optional().describe("Project name."),
+    relatedTo: identifier
+      .optional()
+      .describe(
+        "Keep this ticket open and relate it to that match: it joins the match's open master, or waits labelled Needs grouping."
+      ),
     releaseDeveloper: z
       .boolean()
       .optional()
@@ -127,7 +137,9 @@ export default defineTool({
   }),
   outputSchema: z.object({
     assignee: z.string().nullable().optional(),
+    closureHeld: z.boolean().optional(),
     error: z.string().optional(),
+    grouping: z.enum(["joined", "needs-grouping"]).nullable().optional(),
     identifier: z.string().optional(),
     labels: z.array(z.string()).optional(),
     parentIdentifier: z.string().nullable().optional(),

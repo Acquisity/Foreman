@@ -478,14 +478,48 @@ interface RouteInput {
 }
 
 /**
- * Whether a duplicate must join a master: a Bug's root cause gets one master
- * (engineering-handoff), so a Bug duplicate of a lone report waits for one.
- * An explanation has no engineering work, so its duplicate needs none.
+ * The issues whose requester a reply_to_requester call in this session told,
+ * so an explanation may close: it posted, or the requester's latest reply
+ * needed nothing more.
  */
-export const duplicateNeedsMaster = (
+export const requesterReplies = defineState<Record<string, true>>(
+  "foreman.requesterReplies",
+  () => ({})
+);
+
+/** The issue a reply_to_requester result says was told: it posted, or the follow-up needed nothing. */
+export const toldIssue = (output: {
+  issue?: string;
+  outcome?: string;
+  posted: boolean;
+}): string | null =>
+  output.issue && (output.posted || output.outcome === "skip")
+    ? output.issue
+    : null;
+
+const EXPLANATIONS = new Set(["Platform Limitation", "User Error"]);
+
+/**
+ * Whether route_ticket holds a Canceled or Duplicate state open (rule 4 of
+ * the ENG-15932 plan): in a Linear session an explanation, or a fallback
+ * decision the skill made without Jev, closes only once the requester has
+ * been told. A Slack session answers in its own thread, so it holds nothing.
+ */
+export const closureHeld = (
   decisions: Readonly<Record<string, LatestTriageDecision>>,
-  issue: string
-): boolean => decisions[issue]?.classification === "Bug";
+  replies: Readonly<Record<string, true>>,
+  issue: string,
+  linearSession: boolean
+): boolean => {
+  const decision = decisions[issue];
+  if (!(linearSession && decision) || replies[issue]) {
+    return false;
+  }
+  return (
+    decision.fallback === true ||
+    EXPLANATIONS.has(decision.classification ?? "")
+  );
+};
 
 export function routeDecisionEvent(
   decisions: Readonly<Record<string, LatestTriageDecision>>,
