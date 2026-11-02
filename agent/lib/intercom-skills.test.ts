@@ -91,7 +91,7 @@ test("Intercom non-Bug outcomes end in the skill without the shared stages", () 
   assert.ok(nonBug.includes("## Step 8: Record the case"));
   assert.ok(nonBug.includes("## Step 9: Reply in Slack"));
   for (const outcome of [
-    "User Error, a Platform Limitation nobody wants lifted, ordinary feedback, or an unproven claim",
+    "User Error, a Platform Limitation, ordinary feedback, or an unproven claim",
     "Support/Product follow-up",
   ]) {
     assert.ok(nonBug.includes(outcome), outcome);

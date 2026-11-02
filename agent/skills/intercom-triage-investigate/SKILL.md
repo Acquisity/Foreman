@@ -80,7 +80,8 @@ Load `clarify-with-requester` and run its final stop gate before the verdict.
 Use exactly one settled classification:
 
 - `User Error`: configuration, setup, or another operator-solvable cause.
-- `Platform Limitation`: expected behavior, provider limitation, entitlement, plan limit, or unsupported behavior.
+- `Platform Limitation`: expected behavior, provider limitation, entitlement, plan limit, or unsupported behavior, with nothing asked for.
+- `Feature Request`: any ask for a new capability or a lifted limit, however infeasible.
 - `Bug`: direct evidence of an internal failure that configuration and limitations do not explain.
 
 When a deciding confirmation is still missing, report an unproven claim with the reopen condition. Do not force a classification.
@@ -91,8 +92,6 @@ A confirmed `Bug` requires all three:
 2. Direct current production or runtime evidence.
 3. A blast radius counted from a current query.
 
-Missing any item means the claim is not a confirmed Bug yet.
-
 ### A confirmed Bug: create the report, then hand off
 
 The report must exist before the handoff: the shared review needs its id for its document and critic. Create it with one linear `save_issue` with team `8eaf95ab-56ac-4490-8253-f6a96793dc40`: the conversation URL, bounded conversation context, and testable claim in the description, `labels: ["intercom-sourced", "Customer reported"]`, and `links: [{ url: <canonical conversation URL>, title: "Intercom conversation" }]`. Attach it to the customer report, never the shared root-cause master. Leave state, priority, project, parent, and assignee to the shared stages.
@@ -101,13 +100,13 @@ Then write `STAGE 4 COMPLETE: evidence record ready` in working context and load
 
 ## Step 7: Decide whether a follow-up is warranted
 
-For User Error, a Platform Limitation nobody wants lifted, ordinary feedback, or an unproven claim, do not manufacture engineering work. Give the finding, unblock, and reopen condition in Slack. Create a Support/Product follow-up only when a real human action needs a durable record: one linear `save_issue` with team `8eaf95ab-56ac-4490-8253-f6a96793dc40`: the conversation URL, bounded context, and finding in the description, then one `route_ticket` call with `state: "Todo"`, the `Support` project, Aaron Fraga as assignee, the same `links` attachment, and `addLabels` `intercom-sourced` and `Customer reported`. Label and route it as support or feedback, never as a Bug or an engineering master.
+For User Error, a Platform Limitation, ordinary feedback, or an unproven claim, do not manufacture engineering work. Give the finding, unblock, and reopen condition in Slack. Create a Support/Product follow-up only when a real human action needs a durable record: one linear `save_issue` with team `8eaf95ab-56ac-4490-8253-f6a96793dc40`: the conversation URL, bounded context, and finding in the description, then one `route_ticket` call with `state: "Todo"`, the `Support` project, Aaron Fraga as assignee, the same `links` attachment, and `addLabels` `intercom-sourced` and `Customer reported`. Label and route it as support or feedback, never as a Bug or an engineering master.
 
 ## Step 8: Record the case
 
 Every settled verdict is recorded exactly once, with or without a Linear issue. A Bug or feature request is recorded by `triage-handling` Stage 7 under its ticket identifier; skip this step for it.
 
-For a User Error, a Platform Limitation nobody wants lifted, or an unproven verdict, call `record_investigation_case` with `sourceIssueId` set to `intercom:<conversation id>`, the canonical conversation URL as `sourceIssueUrl`, no project id, and the live product area the verified evidence points at in `primaryFeatureKey`. A Support/Product follow-up is a human action, not the case; the key stays the conversation. Put the unblock in `resolution` in the product's own words. Ordinary feedback with no finding is not recorded.
+For a User Error, a Platform Limitation, or an unproven verdict, call `record_investigation_case` with `sourceIssueId` set to `intercom:<conversation id>`, the canonical conversation URL as `sourceIssueUrl`, no project id, and the live product area the verified evidence points at in `primaryFeatureKey`. A Support/Product follow-up is a human action, not the case; the key stays the conversation. Put the unblock in `resolution` in the product's own words. Ordinary feedback with no finding is not recorded.
 
 Store only the sanitized pattern: never emails, organization or user ids, production rows, raw logs, attachments, or credentials.
 

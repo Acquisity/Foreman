@@ -144,7 +144,7 @@ test("handling stays behind the explicit Stage 4 checkpoint", () => {
 test("Stage 5 names the Linear state for every handling path", () => {
   assert.ok(
     triageHandlingSkill.includes(
-      "`Engineering Todo` is `Todo` (the master owns the work; the report stays open under it), `Duplicate` is `Duplicate`, `Backlog/low-impact` is `Backlog`, `Support/Financial` and `Support/Product follow-up` are `Todo` (a person still acts), `Resolved by triage` is `Done`, and `User Error` and `Platform Limitation` are `Canceled`: nothing changed. `Resolved by triage` needs a live fix or `changeMade`, else it is refused."
+      "`Engineering Todo` is `Todo` (the master owns the work; the report stays open under it), `Duplicate` is `Duplicate`, `Backlog/low-impact` and `Feature Request` are `Backlog`, `Support/Financial` and `Support/Product follow-up` are `Todo` (a person still acts), `Resolved by triage` is `Done`, and `User Error` and `Platform Limitation` are `Canceled`: nothing changed. `Resolved by triage` needs a live fix or `changeMade`, else it is refused."
     )
   );
 });
@@ -1190,7 +1190,12 @@ test("the engineering hand-off admits an approved feature request", () => {
     "## Preconditions",
     "## Match by cause, not symptom"
   );
-  assert.ok(preconditions.includes("feature request labelled `Approved`"));
+  assert.ok(preconditions.includes("`Feature Request` labelled `Approved`"));
+  assert.ok(
+    preconditions.includes(
+      "Never create a master for an unapproved feature request or a closed explanation"
+    )
+  );
   assert.ok(preconditions.includes("`Engineering Todo` path"));
   assert.ok(preconditions.includes("`Feature Request` type label"));
 });
@@ -1265,7 +1270,9 @@ test("the not-engineering branch covers an unapproved feature request waiting in
     "### When the ticket is not engineering actionable"
   );
   assert.ok(
-    roster.includes("waits in Backlog with `Needs approval` and James")
+    roster.includes(
+      "waits in Backlog with `Needs approval` and James until a person adds `Approved` or `Declined`"
+    )
   );
   const branch = extractInstruction(
     triageHandlingSkill,
@@ -1273,7 +1280,10 @@ test("the not-engineering branch covers an unapproved feature request waiting in
     "### When the root cause warrants action"
   );
   assert.ok(branch.includes("`Backlog/low-impact`"));
-  assert.ok(branch.includes("unless a lift is wanted"));
+  assert.ok(branch.includes("`Feature Request`"));
+  assert.equal(branch.includes("unless a lift is wanted"), false);
+  assert.ok(branch.includes("`closureHeld: true`"));
+  assert.ok(branch.includes('`grouping: "needs-grouping"`'));
 });
 
 test("the unblock never replaces the root cause or the master ticket", () => {
@@ -1323,7 +1333,13 @@ test("the Intercom skill sends a feature request through the report and hand-off
     "## Step 7:",
     "## Step 8:"
   );
-  assert.ok(followUp.includes("a Platform Limitation nobody wants lifted"));
+  assert.ok(followUp.includes("For User Error, a Platform Limitation,"));
+  assert.equal(followUp.includes("nobody wants lifted"), false);
+  assert.ok(
+    intercomTriageSkill.includes(
+      "- `Feature Request`: any ask for a new capability or a lifted limit, however infeasible."
+    )
+  );
   const record = extractInstruction(
     intercomTriageSkill,
     "## Step 8:",
@@ -1376,7 +1392,7 @@ test("a correction to a feature request supersedes its case because both use the
   );
   assert.ok(
     record.includes(
-      "For a User Error, a Platform Limitation nobody wants lifted, or an unproven verdict"
+      "For a User Error, a Platform Limitation, or an unproven verdict"
     )
   );
   const correction = extractInstruction(
@@ -1403,7 +1419,7 @@ test("a correction to a feature request supersedes its case because both use the
   );
   assert.ok(
     tools.includes(
-      "Step 8 records a User Error, a Platform Limitation nobody wants lifted, or an unproven claim"
+      "Step 8 records a User Error, a Platform Limitation, or an unproven claim"
     )
   );
 });

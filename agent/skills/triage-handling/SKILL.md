@@ -40,15 +40,15 @@ Every decision above is provisional until the review below has settled the docum
 
 Say so in the document.
 
-Classify as `User Error`, `Platform Limitation`, or `Bug` per the classification rules in `triage-investigate`. A `Bug` verdict requires all four: a named file and function, direct evidence from the current production-data or runtime/provider lanes, a blast radius counted by a query, and a `check_regression` result. Missing any one, it is not a Bug yet: say what is missing and who can supply it.
+Classify as `User Error`, `Platform Limitation`, `Feature Request`, or `Bug` per the classification rules in `triage-investigate`. A `Bug` verdict requires all four: a named file and function, direct evidence from the current production-data or runtime/provider lanes, a blast radius counted by a query, and a `check_regression` result. Missing any one, it is not a Bug yet: say what is missing and who can supply it.
 
 #### Decide the handling path
 
-Pick one: `Duplicate`, `Resolved by triage`, `User Error`, `Platform Limitation`, `Support/Financial`, `Support/Product follow-up`, `Backlog/low-impact`, `Engineering Todo`. The path classifies the root cause, not the remedy: a ticket can be `Engineering Todo` with the customer unblocked in the same pass, and the two are recorded separately, neither cancelling the other.
+Pick one: `Duplicate`, `Resolved by triage`, `User Error`, `Platform Limitation`, `Feature Request`, `Support/Financial`, `Support/Product follow-up`, `Backlog/low-impact`, `Engineering Todo`. The path classifies the root cause, not the remedy: a ticket can be `Engineering Todo` with the customer unblocked in the same pass, and the two are recorded separately, neither cancelling the other.
 
 #### Decide the final Linear state
 
-Set the state that matches the handling path: `Engineering Todo` is `Todo` (the master owns the work; the report stays open under it), `Duplicate` is `Duplicate`, `Backlog/low-impact` is `Backlog`, `Support/Financial` and `Support/Product follow-up` are `Todo` (a person still acts), `Resolved by triage` is `Done`, and `User Error` and `Platform Limitation` are `Canceled`: nothing changed. `Resolved by triage` needs a live fix or `changeMade`, else it is refused.
+Set the state that matches the handling path: `Engineering Todo` is `Todo` (the master owns the work; the report stays open under it), `Duplicate` is `Duplicate`, `Backlog/low-impact` and `Feature Request` are `Backlog`, `Support/Financial` and `Support/Product follow-up` are `Todo` (a person still acts), `Resolved by triage` is `Done`, and `User Error` and `Platform Limitation` are `Canceled`: nothing changed. `Resolved by triage` needs a live fix or `changeMade`, else it is refused.
 
 #### Set Linear priority
 
@@ -67,13 +67,13 @@ Bands:
 - `Medium`: a real defect with single-org impact, or non-blocking money follow-up.
 - `Low`: cosmetic, edge case, platform limitation, resolved-by-triage, or backlog.
 
-A workaround never lowers the band. Between two adjacent bands take the higher one and flag the rationale for a domain expert where the verdict lives. Duplicates inherit the parent's priority and the parent's assignee.
+A workaround never lowers the band. Between two adjacent bands take the higher one and flag the rationale for a domain expert where the verdict lives.
 
 #### Label the ticket
 
 Apply the fewest labels that place the ticket, as `addLabels` in Stage 6; never invent a label:
 
-- One type label from the verdict: `Bug` for a Bug, `Feature Request` for a Platform Limitation the customer wants lifted, and no type label for User Error.
+- One type label from the verdict: `Bug` or `Feature Request`; a closing explanation gets `Needs grouping` instead.
 - The source labels (`classify_ask` returns them): `intercom-sourced` when it came from an Intercom conversation, `Customer reported` when a customer raised it, `Internal reported` when AIA CS or another internal reporter did. More than one can be true.
 - One `Root Cause` label when the team has one that matches the cause found in Stage 4.
 
@@ -110,15 +110,15 @@ When Aaron explicitly requests read-only validation during an attended manual te
 
 Take the product area from the evidence, never from the incoming project, title, symptom, repository name, or memory. `route` carries the `Area:` label and `assignee` from the owner map in [references/roster.md](references/roster.md); pass it unchanged.
 
-A developer gets only a confirmed Bug or a feature request labelled `Approved`; an unapproved one waits in Backlog with `Needs approval` and James. Questions, user errors, platform limits, billing and support get none.
+A developer gets only a confirmed Bug or a feature request labelled `Approved`; an unapproved one waits in Backlog with `Needs approval` and James until a person adds `Approved` or `Declined`. Questions, user errors, platform limits, billing and support get none.
 
 SAN sandbox tickets route to Aaron Fraga. No fitting area means James Keeble; repeat the reason in the report. Never route to retired or legacy projects.
 
 ### When the ticket is not engineering actionable
 
-`User Error`, `Platform Limitation`, `Resolved by triage`, `Duplicate`, `Backlog/low-impact`, and the `Support/` paths end here: call `route_ticket` once with the decision's `route` unchanged, after the critic settles when `review.required`. `route` names Aaron Fraga for an open follow-up, no one for a closed outcome. The ticket carries the explanation and moves to the Stage 5 state; nothing goes to engineering. `Platform Limitation` closes unless a lift is wanted; `Support/` paths stay `Todo`.
+`User Error`, `Platform Limitation`, `Feature Request`, `Resolved by triage`, `Duplicate`, `Backlog/low-impact`, and the `Support/` paths end here: call `route_ticket` once with the decision's `route` unchanged, after the critic settles when `review.required`. `route` names Aaron Fraga for an open follow-up, no one for a closed outcome. Nothing goes to engineering. `closureHeld: true` means the requester was not told yet: reply, then route again.
 
-A `Duplicate` passes `route`, adding the area owner as `assignee` only for a confirmed Bug whose `route` names none; `route_ticket` inherits the match's roster assignee and parents the ticket under the match's master. If it refuses a lone-report match, run `engineering-handoff` "Create one master", parent the match under it, route again.
+A `Duplicate` passes `route`, adding the area owner as `assignee` only for a confirmed Bug whose `route` names none. `grouping: "needs-grouping"` means the match had no open master, so the report stays open for the grouping sweep; for a Bug you may run `engineering-handoff` "Create one master", parent the match under it, and route again.
 
 ### When the root cause warrants action
 
@@ -140,7 +140,7 @@ Load slack-wording in C0BBPVC3N2X, C0BC011NAQL, and for every `reply_to_requeste
 
 ### Record the investigation in memory
 
-Before the reply, after the Triage investigation document is attached and the classification is final, call `record_investigation_case`. A reviewed `Bug` is final once its review has settled, approved or adjudicated; a hotlane-stopped or blocked review records nothing. A `Duplicate` is final once its master link is saved. Not before: a case from a half-finished investigation is a wrong answer the next ticket inherits.
+Before the reply, after the Triage investigation document is attached and the classification is final, call `record_investigation_case`. A reviewed `Bug` is final once its review has settled, approved or adjudicated; a hotlane-stopped or blocked review records nothing. A `Duplicate` is final once its master link is saved. Record a `Feature Request` as `platform_limitation`. Not before: a case from a half-finished investigation is a wrong answer the next ticket inherits.
 
 Send the pattern, not the customer: the claim, root cause, symptoms in the product's own words, identifier-stripped error signatures, the Stage 4 code path and commit, conclusions ruled out, stable evidence handles (Sentry issue ids, Inngest run ids, the document link), counts with the date counted, and links back to the ticket. Never an email address, organization or user id, production row, log, or anything credential-shaped; the tool refuses them and they stay in the document.
 
