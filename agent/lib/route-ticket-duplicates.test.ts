@@ -57,7 +57,7 @@ const leftOpen = async (
   assert.deepEqual(fake.relations, [`i-1>i-${match}`]);
   assert.deepEqual(fake.relationTypes, ["related"]);
   const update = fake.updates()[0]?.variables.input as Record<string, unknown>;
-  assert.equal(update.stateId, undefined);
+  assert.equal(update.stateId, "s-backlog");
   assert.equal(update.parentId, undefined);
   assert.ok((update.labelIds as string[]).includes("l-grouping"));
   assert.equal(result.grouping, "needs-grouping");

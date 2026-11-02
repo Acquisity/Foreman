@@ -286,7 +286,12 @@ async function writeUpdate(
   gql: Gql,
   issue: RouteIssue,
   update: Record<string, unknown>,
-  after: { duplicateOf: string | null; parent?: string; signal?: AbortSignal }
+  after: {
+    duplicateOf: string | null;
+    parent?: string;
+    relation: "duplicate" | "related";
+    signal?: AbortSignal;
+  }
 ): Promise<void> {
   try {
     const { issueUpdate } = await gql<{ issueUpdate: { success: boolean } }>(
@@ -300,8 +305,12 @@ async function writeUpdate(
     if (after.duplicateOf === null || after.signal?.aborted) {
       throw error;
     }
+    // A related link is not the duplicate relation Linear needs before
+    // Duplicate, so its retry keeps duplicateOf; a duplicate relation's does not.
     throw new Error(
-      `The relation to ${after.duplicateOf} was recorded, but the update failed (${reason(error)}). Call route_ticket again without duplicateOf${after.parent ? `, with parent ${after.parent} and inheritAssigneeFrom ${after.parent}` : ""}, to apply the rest.`,
+      after.relation === "related"
+        ? `Only a related link to ${after.duplicateOf} was recorded, but the update failed (${reason(error)}). Call route_ticket again with the same input, duplicateOf ${after.duplicateOf} included, to apply the rest.`
+        : `The duplicate relation to ${after.duplicateOf} was recorded, but the update failed (${reason(error)}). Call route_ticket again without duplicateOf${after.parent ? `, with parent ${after.parent} and inheritAssigneeFrom ${after.parent}` : ""}, to apply the rest.`,
       { cause: error }
     );
   }
@@ -422,6 +431,7 @@ export async function routeTicket(
     await writeUpdate(gql, issue, built.update, {
       duplicateOf: related,
       parent,
+      relation: routed.closes ? "duplicate" : "related",
       signal: opts?.signal,
     });
     wrote = true;

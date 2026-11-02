@@ -115,14 +115,15 @@ const needsMaster = (
   return classification === "Bug" && !isSupportFollowUp(issue, handlingPath);
 };
 
-/** A feature request closes only when a person declined it (ENG-15932). */
+/** A feature request closes only once a person decided it: Declined, or Approved and then resolved (ENG-15932). */
 const closedUnseen = (
   issue: z.infer<typeof issueSchema>,
   classification: string | undefined
 ): boolean =>
   classification === FEATURE_REQUEST_LABEL &&
   CLOSED_STATES.includes(issue.status) &&
-  !issue.labels.includes(DECLINED_LABEL);
+  !issue.labels.includes(DECLINED_LABEL) &&
+  !issue.labels.includes("Approved");
 
 const missesTypeLabels = (
   issue: z.infer<typeof issueSchema>,

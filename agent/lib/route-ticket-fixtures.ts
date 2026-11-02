@@ -117,6 +117,12 @@ const ID_PREFIX = /^i-/u;
 const identifierOf = (id: string) =>
   id === DEFAULT_MASTER[1] ? DEFAULT_MASTER[0] : id.replace(ID_PREFIX, "");
 
+/** The users the Users read finds by name; anyone else reads as Ebubeker. */
+const USERS: Record<string, { id: string; name: string }> = {
+  "Aaron Fraga": { id: "u-aaron", name: "Aaron Fraga" },
+  "James Keeble": { id: "u-james", name: "James Keeble" },
+};
+
 export const fakeLinear = ({
   dropParent = false,
   issues = {},
@@ -256,10 +262,17 @@ export const fakeLinear = ({
                   },
           },
         }),
-      "linear.Users": () =>
+      "linear.Users": (variables) =>
         json({
           data: {
-            users: { nodes: [{ id: "u-ebu", name: "Ebubeker Rexha" }] },
+            users: {
+              nodes: [
+                USERS[String(variables.name)] ?? {
+                  id: "u-ebu",
+                  name: "Ebubeker Rexha",
+                },
+              ],
+            },
           },
         }),
       "linear.WorkflowStates": (variables) => {

@@ -919,3 +919,51 @@ test("completion accepts a Feature Request waiting in Backlog and refuses one cl
     SupportRefusal
   );
 });
+
+test("completion accepts an Approved Feature Request a person resolved Done, as the router allows (C3)", () => {
+  const resolved = {
+    ...report,
+    assignee: null,
+    labels: [
+      "intercom-sourced",
+      "Customer reported",
+      "Feature Request",
+      "Approved",
+    ],
+    parentId: null,
+    project: null,
+    status: "Done",
+  };
+  const content = {
+    ...document,
+    content:
+      "# Triage investigation\n**Classification**: Feature Request\n**Handling path**: Resolved by triage\n**Review**: Not required",
+  };
+  assert.doesNotThrow(() => assertTriageOutputs(resolved, content, comments));
+});
+
+test("completion accepts a repeat report left open in Backlog for grouping (C6)", () => {
+  for (const classification of ["User Error", "Bug"]) {
+    const grouped = {
+      ...report,
+      assignee: "Aaron Fraga",
+      labels: [
+        "intercom-sourced",
+        "Customer reported",
+        ...(classification === "Bug" ? ["Bug"] : []),
+        "Needs grouping",
+      ],
+      parentId: null,
+      project: null,
+      status: "Backlog",
+    };
+    const content = {
+      ...document,
+      content: `# Triage investigation\n**Classification**: ${classification}\n**Handling path**: Duplicate\n**Review**: Approved 2026-09-10T12:00:00Z at ${"a".repeat(40)}`,
+    };
+    assert.doesNotThrow(
+      () => assertTriageOutputs(grouped, content, comments),
+      classification
+    );
+  }
+});

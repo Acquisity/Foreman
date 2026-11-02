@@ -7,7 +7,11 @@ import {
   FEATURE_REQUEST_LABEL,
   NEEDS_APPROVAL_LABEL,
   NEEDS_GROUPING_LABEL,
+  SUPPORT_OWNER,
 } from "./owner-map.js";
+
+/** Where a repeat with no open master waits for the grouping sweep. */
+const DEFERRED_STATE = "Backlog";
 import {
   type Gql,
   named,
@@ -284,7 +288,7 @@ const groupingWarning = (
   why: string,
   bug: boolean
 ) =>
-  `${issue.identifier} stays open because ${why.replace(TRAILING_STOP, "")}. It is related to ${match} and labelled ${NEEDS_GROUPING_LABEL}, so the grouping sweep puts it under a master.${
+  `${issue.identifier} stays open because ${why.replace(TRAILING_STOP, "")}. It is related to ${match}, labelled ${NEEDS_GROUPING_LABEL}, and a closing state became Backlog, so the grouping sweep puts it under a master.${
     bug
       ? ` To close it now as a Bug duplicate, create the master through engineering-handoff (aggregate evidence only), call route_ticket with issue ${match} and parent set to the new master, then call this again.`
       : ""
@@ -372,11 +376,12 @@ export async function planRoute(
   if (held && input.state) {
     warnings.push(heldWarning(issue, input.state));
   }
-  const keepsState = !(
-    held ||
-    (plan.unjoined !== undefined &&
-      named(input.state, "canceled", "done", "duplicate"))
-  );
+  // A closing route with no open master is deferred to the grouping sweep: it
+  // leaves Triage for Backlog with a person who sees it, not the match's owner.
+  const deferred =
+    plan.unjoined !== undefined &&
+    named(input.state, "canceled", "done", "duplicate");
+  const keepsState = !(held || deferred);
   const parent = match ? plan.parent : input.parent;
   // A matched report takes its owner from the master it is parented under,
   // so the report and its master keep one owner even when the match is held
@@ -398,6 +403,17 @@ export async function planRoute(
         : { addLabels: [...(input.addLabels ?? []), NEEDS_GROUPING_LABEL] }),
       ...(inherit ? { inheritAssigneeFrom: parent } : {}),
       state: keepsState ? input.state : undefined,
+      ...(deferred
+        ? {
+            assignee: finalLabels(issue, input).has(
+              FEATURE_REQUEST_LABEL.toLowerCase()
+            )
+              ? FALLBACK_OWNER
+              : SUPPORT_OWNER,
+            inheritAssigneeFrom: undefined,
+            state: DEFERRED_STATE,
+          }
+        : {}),
     },
     parent,
     plan,

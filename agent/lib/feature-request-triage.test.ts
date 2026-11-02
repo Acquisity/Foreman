@@ -154,7 +154,7 @@ describe("fail open below 0.7 on an explanation", () => {
     });
   }
 
-  it("leaves an explanation below the classification bar open as unproven, never closed", () => {
+  it("turns a supported non-Bug whose explanations are both below 0.7, however low, into an open Feature Request (C7)", () => {
     const decision = resolveTriage(
       triageInput(),
       bugAnswers({
@@ -164,6 +164,20 @@ describe("fail open below 0.7 on an explanation", () => {
           user_error: 0.4,
         }),
         path: pick("Platform Limitation"),
+      })
+    );
+    assert.ok(decision.outcome === "route");
+    assert.equal(decision.classification, "Feature Request");
+    assert.equal(decision.route.state, "Backlog");
+    assert.ok(decision.route.addLabels.includes("Needs approval"));
+  });
+
+  it("keeps an unproven verdict unproven, whatever the classification", () => {
+    const decision = resolveTriage(
+      triageInput(),
+      bugAnswers({
+        classification: pick("platform_limitation", 0.4),
+        verdict: pick("unproven"),
       })
     );
     assert.equal(decision.outcome, "unproven");
@@ -220,5 +234,44 @@ describe("person decisions survive retriage", () => {
       assert.equal(decision.route.state, "Canceled", classification);
       assert.equal(decision.route.assignee, undefined, classification);
     }
+  });
+});
+
+describe("person decisions come before classification (C2, C4)", () => {
+  it("keeps a Declined ticket Canceled even when retriage meets the Bug bar (C2)", () => {
+    const decision = resolveTriage(
+      triageInput({ ticketLabels: ["Declined", "Feature Request"] }),
+      bugAnswers()
+    );
+    assert.ok(decision.outcome === "route");
+    assert.equal(decision.path, "Declined");
+    assert.equal(decision.route.state, "Canceled");
+    assert.equal(decision.route.assignee, undefined);
+    assert.equal(decision.route.addLabels.includes("Bug"), false);
+  });
+
+  it("parks a sandbox Feature Request in Backlog with Needs approval before handing it to Aaron (C4)", () => {
+    const decision = resolveTriage(
+      triageInput({ identifier: "SAN-7" }),
+      request({ path: pick("Engineering Todo") })
+    );
+    assert.ok(decision.outcome === "route");
+    assert.equal(decision.path, "Feature Request");
+    assert.equal(decision.route.state, "Backlog");
+    assert.equal(decision.approval, "needed");
+    assert.ok(decision.route.addLabels.includes("Needs approval"));
+    assert.equal(decision.route.assignee, "Aaron Fraga");
+  });
+
+  it("keeps a declined sandbox Feature Request Canceled (C4)", () => {
+    const decision = resolveTriage(
+      triageInput({
+        identifier: "SAN-7",
+        ticketLabels: ["Declined", "Feature Request"],
+      }),
+      request()
+    );
+    assert.ok(decision.outcome === "route");
+    assert.equal(decision.route.state, "Canceled");
   });
 });

@@ -47,6 +47,9 @@ const labelIdsOf = (fake: ReturnType<typeof fakeLinear>) =>
 
 const UNAPPROVED_CLOSE =
   /an unapproved Feature Request never closes unless a person declined it/u;
+const RELATED_LANDED =
+  /related link to ENG-20 was recorded.*Call route_ticket again with the same input, duplicateOf ENG-20 included/su;
+const WITHOUT_DUPLICATE = /without duplicateOf/u;
 const NOT_CONFIRMED = /could not be confirmed under ENG-30/u;
 const DUPLICATE_NEEDS_MASTER = /Duplicate only under an open master/u;
 
@@ -69,7 +72,7 @@ describe("route_ticket never closes a bare duplicate (ENG-17138)", () => {
       assert.deepEqual(fake.relations, ["i-1>i-ENG-40"]);
       assert.deepEqual(fake.relationTypes, ["related"]);
       const update = updateOf(fake);
-      assert.equal(update?.stateId, undefined);
+      assert.equal(update?.stateId, "s-backlog");
       assert.equal(update?.parentId, undefined);
       assert.ok(labelIdsOf(fake).includes("l-grouping"));
       assert.equal(result.duplicateOf, null);
@@ -85,7 +88,7 @@ describe("route_ticket never closes a bare duplicate (ENG-17138)", () => {
       { client: fake.fetchStub }
     );
     assert.deepEqual(fake.relationTypes, ["related"]);
-    assert.equal(updateOf(fake)?.stateId, undefined);
+    assert.equal(updateOf(fake)?.stateId, "s-backlog");
     assert.equal(result.grouping, "needs-grouping");
   });
 
@@ -285,5 +288,63 @@ describe("route_ticket never closes an unapproved feature request (ENG-15932)", 
       { client: fake.fetchStub }
     );
     assert.equal(updateOf(fake)?.stateId, "s-canceled");
+  });
+});
+
+describe("a report left for grouping leaves Triage (C6)", () => {
+  it("moves a non-feature repeat with no open master to Backlog with Aaron, not the match's owner", async () => {
+    for (const ticketLabels of [CLASSIFIED.Bug, CLASSIFIED["User Error"]]) {
+      const fake = linear({ ticketLabels });
+      // biome-ignore lint/performance/noAwaitInLoops: each case reads its own fake in turn.
+      await routeTicket(
+        {
+          duplicateOf: "ENG-40",
+          inheritAssigneeFrom: "ENG-40",
+          issue: "ENG-1",
+          state: "Duplicate",
+        },
+        { client: fake.fetchStub }
+      );
+      assert.equal(updateOf(fake)?.stateId, "s-backlog");
+      assert.equal(updateOf(fake)?.assigneeId, "u-aaron");
+    }
+  });
+
+  it("moves an approved feature request with no open master to Backlog with James", async () => {
+    const fake = linear({
+      ticketLabels: [
+        { id: "l-fr", name: "Feature Request" },
+        { id: "l-ok", name: "Approved" },
+      ],
+    });
+    await routeTicket(
+      { duplicateOf: "ENG-40", issue: "ENG-1", state: "Duplicate" },
+      { client: fake.fetchStub }
+    );
+    assert.equal(updateOf(fake)?.stateId, "s-backlog");
+    assert.equal(updateOf(fake)?.assigneeId, "u-james");
+  });
+});
+
+describe("a failed update after the relation keeps the retry able to close (C5)", () => {
+  it("tells a held duplicate to retry with duplicateOf, since only a related link landed", async () => {
+    const fake = linear({
+      ticketLabels: CLASSIFIED["User Error"],
+      updateFailures: 1,
+    });
+    const message = await routeTicket(
+      {
+        duplicateOf: "ENG-20",
+        issue: "ENG-1",
+        releaseDeveloper: true,
+        state: "Duplicate",
+      },
+      { client: fake.fetchStub, holdClosure: true }
+    ).then(
+      () => "",
+      (error: Error) => error.message
+    );
+    assert.match(message, RELATED_LANDED);
+    assert.doesNotMatch(message, WITHOUT_DUPLICATE);
   });
 });

@@ -35,11 +35,12 @@ export const classificationQuestion = (): JevQuestion => ({
 });
 
 /**
- * The classification code acts on. Feature Request fails open: a person's
- * Approved or Declined label means one was already decided, and an
- * explanation Jev is not sure of (below `BARS.closeExplanation`) would close a
- * ticket nobody saw, so both stay feature requests (ENG-15932). One below the
- * classification bar is left to the bar, which keeps it open as unproven.
+ * The classification code acts on. A person's decision comes first: a
+ * Declined ticket stays a declined feature request whatever retriage finds,
+ * and an Approved one keeps its feature routing over an explanation. Then
+ * Feature Request fails open: an explanation Jev is not sure of (below
+ * `BARS.closeExplanation`, however low) would close a ticket nobody saw, so
+ * it stays a feature request (ENG-15932).
  */
 export const settleClassification = (
   pick: { choice: string; confidence: number },
@@ -48,22 +49,24 @@ export const settleClassification = (
 ): TriageClassification => {
   const named =
     CLASSIFICATION_NAMES[pick.choice as keyof typeof CLASSIFICATION_NAMES];
+  if (hasLabel(ticketLabels, DECLINED_LABEL)) {
+    if (named !== "Feature Request") {
+      notes.push(
+        `A person declined this feature request (${DECLINED_LABEL}), so it keeps that decision instead of routing as ${named}.`
+      );
+    }
+    return "Feature Request";
+  }
   if (!EXPLANATIONS.has(pick.choice)) {
     return named;
   }
-  if (
-    hasLabel(ticketLabels, APPROVED_LABEL) ||
-    hasLabel(ticketLabels, DECLINED_LABEL)
-  ) {
+  if (hasLabel(ticketLabels, APPROVED_LABEL)) {
     notes.push(
-      `A person already decided this feature request (${APPROVED_LABEL} or ${DECLINED_LABEL}), so it keeps that decision instead of closing as ${named}.`
+      `A person approved this feature request (${APPROVED_LABEL}), so it keeps that decision instead of closing as ${named}.`
     );
     return "Feature Request";
   }
-  if (
-    pick.confidence >= BARS.classification &&
-    pick.confidence < BARS.closeExplanation
-  ) {
+  if (pick.confidence < BARS.closeExplanation) {
     notes.push(
       `${named} was below ${BARS.closeExplanation}, too unsure to close the ticket, so it stays open as a Feature Request for James to see.`
     );

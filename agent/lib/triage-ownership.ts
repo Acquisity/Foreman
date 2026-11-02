@@ -130,7 +130,8 @@ export function resolveOwnership(context: {
     path,
     releaseDeveloper: classification !== "Bug" && followUp === null,
   };
-  if (context.billing || input.identifier.toUpperCase().startsWith("SAN-")) {
+  const sandbox = input.identifier.toUpperCase().startsWith("SAN-");
+  if (context.billing || (sandbox && classification !== "Feature Request")) {
     return { ...none, assignee: SUPPORT_OWNER, releaseDeveloper: false };
   }
   const place = () => {
@@ -161,6 +162,20 @@ export function resolveOwnership(context: {
   if (classification !== "Feature Request") {
     return none;
   }
+  const request = featureOwnership(context, none, place);
+  // A SAN sandbox ticket settles approval, state and Declined like any other,
+  // then goes to Aaron, who runs the sandbox tests.
+  return sandbox
+    ? { ...request, assignee: SUPPORT_OWNER, releaseDeveloper: false }
+    : request;
+}
+
+function featureOwnership(
+  context: { input: TriageInput; notes: string[]; path: HandlingPath },
+  none: Ownership,
+  place: () => NonNullable<Ownership["area"]>
+): Ownership {
+  const { input, notes, path } = context;
   const labels = input.ticketLabels ?? [];
   if (hasLabel(labels, DECLINED_LABEL)) {
     notes.push(
