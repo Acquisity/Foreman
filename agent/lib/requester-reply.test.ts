@@ -43,9 +43,13 @@ test("replies under the anchor when Foreman has not spoken yet", () => {
   });
 });
 
-test("refuses a second reply until the requester answers", () => {
+test("refuses a second reply until the requester answers, saying the requester was already told", () => {
   const spoke = [anchor, reply("r1", FOREMAN, "2026-09-25T15:34:00Z")];
-  assert.equal(planReply(spoke, FOREMAN).ok, false);
+  const refused = planReply(spoke, FOREMAN);
+  assert.equal(refused.ok, false);
+  assert.ok(!refused.ok && refused.alreadyReplied === true);
+  const none = planReply([], FOREMAN);
+  assert.ok(!none.ok && none.alreadyReplied !== true);
   const answered = [...spoke, reply("r2", "aaron", "2026-09-25T15:40:00Z")];
   assert.equal(planReply(answered, FOREMAN).ok, true);
 });

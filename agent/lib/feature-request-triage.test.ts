@@ -79,6 +79,30 @@ describe("Feature Request is its own classification (ENG-15932, ENG-17138)", () 
     assert.equal(decision.needsCriticReview, false);
   });
 
+  it("replays ENG-15932: a text-notification ask stays open in Backlog for James instead of closing Done as a platform limitation", () => {
+    const decision = resolveTriage(
+      triageInput({
+        blastRadius: undefined,
+        claim:
+          "The rep wants a text notification when a lead replies; the CRM only sends email notifications.",
+        codePath: undefined,
+        evidence:
+          "Notification settings offer email and in-app channels only; no SMS channel exists in the notification code.",
+        regression: undefined,
+      }),
+      request({ path: pick("Platform Limitation") })
+    );
+    assert.ok(decision.outcome === "route");
+    assert.equal(decision.route.state, "Backlog");
+    assert.equal(decision.route.assignee, "James Keeble");
+    assert.deepEqual(
+      ["Feature Request", "Needs approval"].filter((label) =>
+        decision.route.addLabels.includes(label)
+      ),
+      ["Feature Request", "Needs approval"]
+    );
+  });
+
   it("classes a provider limit the customer wants lifted as a Feature Request, not a closed Platform Limitation", () => {
     const decision = resolveTriage(
       triageInput({

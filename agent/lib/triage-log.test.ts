@@ -459,6 +459,10 @@ describe("duplicate masters", () => {
       toldIssue({ issue: "ENG-1", outcome: "skip", posted: false }),
       "ENG-1"
     );
+    assert.equal(
+      toldIssue({ issue: "ENG-1", outcome: "already_replied", posted: false }),
+      "ENG-1"
+    );
     assert.equal(toldIssue({ posted: false }), null);
     assert.equal(toldIssue({ issue: "ENG-1", posted: false }), null);
   });

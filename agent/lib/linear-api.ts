@@ -4,6 +4,7 @@ import { parseLinearResponse } from "./linear-response.js";
 import {
   APPROVED_LABEL,
   BUG_LABEL,
+  DECLINED_LABEL,
   FALLBACK_OWNER,
   FEATURE_REQUEST_LABEL,
   mappedOwner,
@@ -605,18 +606,52 @@ async function resolveAssigneeId(
  */
 export const MASTER_MARKER = "## Regression seam";
 
-/** Whether the ticket carries the Bug label once this call's label changes land. */
-const carriesBug = (issue: RouteIssue, input: RouteTicketInput): boolean => {
+/** The ticket's label names, lower-cased, once this call's label changes land. */
+const finalLabels = (
+  issue: RouteIssue,
+  input: RouteTicketInput
+): Set<string> => {
   const removed = new Set(
     (input.removeLabels ?? []).map((name) => name.toLowerCase())
   );
-  return [
-    ...issue.labels.nodes
-      .map((label) => label.name)
-      .filter((name) => !removed.has(name.toLowerCase())),
-    ...(input.addLabels ?? []),
-  ].some((name) => name.toLowerCase() === BUG_LABEL.toLowerCase());
+  return new Set(
+    [
+      ...issue.labels.nodes.map((label) => label.name),
+      ...(input.addLabels ?? []),
+    ]
+      .map((name) => name.toLowerCase())
+      .filter(
+        (name, index) =>
+          index >= issue.labels.nodes.length || !removed.has(name)
+      )
+  );
 };
+
+/** Whether the ticket carries the Bug label once this call's label changes land. */
+const carriesBug = (issue: RouteIssue, input: RouteTicketInput): boolean =>
+  finalLabels(issue, input).has(BUG_LABEL.toLowerCase());
+
+/**
+ * An unapproved feature request never closes unless a person declined it
+ * (ENG-15932): the decision code parks it in Backlog, and this refuses a
+ * fallback or hand-written route that would close it anyway.
+ */
+function refuseUnapprovedClose(
+  issue: RouteIssue,
+  input: RouteTicketInput
+): void {
+  const labels = finalLabels(issue, input);
+  if (
+    named(input.state, "canceled", "done", "duplicate") &&
+    labels.has(FEATURE_REQUEST_LABEL.toLowerCase()) &&
+    !labels.has(APPROVED_LABEL.toLowerCase()) &&
+    !labels.has(DECLINED_LABEL.toLowerCase())
+  ) {
+    throw new Error(
+      `${issue.identifier} would be ${input.state}, but an unapproved Feature Request never closes unless a person declined it, so nothing was written. Route it to Backlog with ${NEEDS_APPROVAL_LABEL} and ${FALLBACK_OWNER}, using relatedTo for its match.`
+    );
+  }
+}
 
 export interface DuplicateRouting {
   /** The requester has not been told yet, so a Canceled or Duplicate state is not set. */
@@ -1011,6 +1046,7 @@ async function planRoute(
   opts: DuplicateRouting
 ): Promise<RoutePlan> {
   refuseMatchMisuse(input);
+  refuseUnapprovedClose(issue, input);
   // Resolve the match before the first write, so a bad identifier fails the
   // whole call rather than leaving a routed ticket with no relation.
   const matchId = input.duplicateOf ?? input.relatedTo;

@@ -418,7 +418,8 @@ describe("routeTicket owner map", () => {
             duplicateOf: "ENG-9",
             inheritAssigneeFrom: "ENG-9",
             issue: "ENG-1",
-            state: "Done",
+            // Open, because an unapproved Feature Request may not close.
+            state: "Todo",
           },
           { client: linear.fetchStub }
         );

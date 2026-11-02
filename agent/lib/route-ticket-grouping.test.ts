@@ -45,11 +45,15 @@ const updateOf = (fake: ReturnType<typeof fakeLinear>) =>
 const labelIdsOf = (fake: ReturnType<typeof fakeLinear>) =>
   (updateOf(fake)?.labelIds ?? []) as string[];
 
+const UNAPPROVED_CLOSE =
+  /an unapproved Feature Request never closes unless a person declined it/u;
 const NOT_CONFIRMED = /could not be confirmed under ENG-30/u;
 const DUPLICATE_NEEDS_MASTER = /Duplicate only under an open master/u;
 
 describe("route_ticket never closes a bare duplicate (ENG-17138)", () => {
-  for (const [classification, ticketLabels] of Object.entries(CLASSIFIED)) {
+  for (const [classification, ticketLabels] of Object.entries(
+    CLASSIFIED
+  ).filter(([name]) => name !== "Feature Request")) {
     it(`leaves a ${classification} duplicate of a lone closed report open, related and labelled Needs grouping`, async () => {
       const fake = linear({ ticketLabels });
       const result = await routeTicket(
@@ -232,5 +236,54 @@ describe("route_ticket holds a closure until the requester is told", () => {
     assert.equal(updateOf(fake)?.stateId, undefined);
     assert.equal(updateOf(fake)?.priority, 4);
     assert.equal(result.closureHeld, true);
+  });
+});
+
+describe("route_ticket never closes an unapproved feature request (ENG-15932)", () => {
+  it("refuses Canceled, Done or Duplicate for a Feature Request with no Approved or Declined, before any write", async () => {
+    for (const state of ["Canceled", "Done", "Duplicate"]) {
+      const fake = linear({ ticketLabels: CLASSIFIED["Feature Request"] });
+      // biome-ignore lint/performance/noAwaitInLoops: each case reads its own fake in turn.
+      await assert.rejects(
+        routeTicket(
+          {
+            issue: "ENG-1",
+            state,
+            ...(state === "Duplicate" ? { duplicateOf: "ENG-20" } : {}),
+          },
+          { client: fake.fetchStub }
+        ),
+        UNAPPROVED_CLOSE,
+        state
+      );
+      assert.deepEqual(fake.writes(), [], state);
+    }
+  });
+
+  it("refuses the closure when this call adds the Feature Request label", async () => {
+    const fake = linear({ ticketLabels: CLASSIFIED["User Error"] });
+    await assert.rejects(
+      routeTicket(
+        {
+          addLabels: ["Feature Request"],
+          issue: "ENG-1",
+          state: "Canceled",
+        },
+        { client: fake.fetchStub }
+      ),
+      UNAPPROVED_CLOSE
+    );
+  });
+
+  it("lets a declined feature request close", async () => {
+    const fake = linear({
+      teamLabels: [GROUPING, { id: "l-declined", name: "Declined" }],
+      ticketLabels: CLASSIFIED["Feature Request"],
+    });
+    await routeTicket(
+      { addLabels: ["Declined"], issue: "ENG-1", state: "Canceled" },
+      { client: fake.fetchStub }
+    );
+    assert.equal(updateOf(fake)?.stateId, "s-canceled");
   });
 });

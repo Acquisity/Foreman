@@ -487,13 +487,16 @@ export const requesterReplies = defineState<Record<string, true>>(
   () => ({})
 );
 
-/** The issue a reply_to_requester result says was told: it posted, or the follow-up needed nothing. */
+/** The issue a reply_to_requester result says was told: it posted, its answer is already the newest message, or the follow-up needed nothing. */
 export const toldIssue = (output: {
   issue?: string;
   outcome?: string;
   posted: boolean;
 }): string | null =>
-  output.issue && (output.posted || output.outcome === "skip")
+  output.issue &&
+  (output.posted ||
+    output.outcome === "skip" ||
+    output.outcome === "already_replied")
     ? output.issue
     : null;
 

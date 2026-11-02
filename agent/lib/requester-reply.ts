@@ -48,7 +48,7 @@ export interface ThreadComment {
 
 export type ReplyPlan =
   | { anchorId: string; followUp: FollowUpInput | null; ok: true }
-  | { error: string; ok: false };
+  | { alreadyReplied?: true; error: string; ok: false };
 
 export function planReply(
   comments: readonly ThreadComment[],
@@ -83,6 +83,7 @@ export function planReply(
   const thread = comments.filter((c) => c.parentId === anchor.id).sort(byTime);
   if (thread.at(-1)?.userId === foremanUserId) {
     return {
+      alreadyReplied: true,
       error:
         "Foreman already replied and the requester has not answered since. Do not post again; put anything new in the investigation document.",
       ok: false,
@@ -282,7 +283,8 @@ interface ReplyResponse {
 export type ReplyResult =
   | { commentId: string; posted: true; url: string }
   | {
-      outcome: "skip";
+      /** skip: their reply needs nothing; already_replied: Foreman's answer is the newest message. */
+      outcome: "already_replied" | "skip";
       posted: false;
       reason: string;
     };
@@ -593,6 +595,9 @@ export async function replyToRequester(
   const credentials = { accessToken };
   const { issueId, plan } = await readThread(issue, credentials);
   if (!plan.ok) {
+    if (plan.alreadyReplied) {
+      return { outcome: "already_replied", posted: false, reason: plan.error };
+    }
     throw new Error(plan.error);
   }
   if (plan.followUp) {
