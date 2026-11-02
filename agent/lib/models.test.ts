@@ -6,8 +6,8 @@ const { gatewayRouting, MODELS, modelFor, parseModelOverrides } = await import(
 );
 
 describe("MODELS", () => {
-  it("runs the general root on Claude and no root slot on DeepSeek", () => {
-    assert.ok(MODELS.orchestrator.startsWith("anthropic/"));
+  it("runs the general root on GPT-6.1 Sol and no root slot on DeepSeek", () => {
+    assert.equal(MODELS.orchestrator, "openai/gpt-6.1-sol");
     for (const slot of ["orchestrator", "triage", "widget"] as const) {
       assert.ok(!MODELS[slot].startsWith("deepseek/"), slot);
     }
@@ -145,6 +145,15 @@ describe("modelFor", () => {
         () => modelFor("anthropic/claude-sonnet-5.5"),
         PROXY_MISSING
       );
+    });
+  });
+
+  it("routes the general root through the gateway without proxy credentials", () => {
+    withProxy({}, () => {
+      assert.deepEqual(describeModel(MODELS.orchestrator), {
+        modelId: "openai/gpt-6.1-sol",
+        provider: "gateway",
+      });
     });
   });
 

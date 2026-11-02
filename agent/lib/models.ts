@@ -9,7 +9,7 @@ import { MODEL_OVERRIDES_PREFIX, readDocument, writeDocument } from "./blob.js";
 // These are the compiled defaults; a live override saved by set_agent_models wins over them.
 // Each agent.ts resolves its model through resolveModel(<agent>) at session start.
 export const MODELS = {
-  // Independent triage reviewer: a different vendor from the orchestrator on purpose.
+  // Independent triage reviewer; triage intake runs on Claude.
   critic: "openai/gpt-5.6-sol",
   // Support widget egress reviewer: never investigates, never composes. On 111
   // real cases, two calls each (ENG-14669), gpt-5.6-sol with the same prompt let
@@ -38,9 +38,9 @@ export const MODELS = {
   kbSelect: "google/gemini-3.5-flash-lite",
   // Root model for every other session: general Slack, intake-only and
   // questions-only channels, Linear outside triage intake, GitHub, local eve
-  // and schedules. Moved off DeepSeek to Sonnet 5.5 on the CLI Proxy
-  // (ENG-16434); it reads images itself.
-  orchestrator: "anthropic/claude-sonnet-5.5",
+  // and schedules. Temporarily uses GPT-6.1 Sol on the gateway instead of
+  // Sonnet 5.5 on the CLI Proxy (ENG-16434); it reads images itself.
+  orchestrator: "openai/gpt-6.1-sol",
   // Root model for every triage intake session (ENG-15226, ENG-16055): the two
   // Asks-receiver channels, the Intercom intake channels, Linear tickets from
   // a migration form channel or from the widget.
