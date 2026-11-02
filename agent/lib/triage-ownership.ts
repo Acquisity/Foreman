@@ -13,6 +13,7 @@ import {
   DECLINED_LABEL,
   FALLBACK_AREA,
   FALLBACK_OWNER,
+  FEATURE_REQUEST_LABEL,
   hasLabel,
   isAreaKey,
   isCrmArea,
@@ -30,6 +31,8 @@ export interface Ownership {
   approval: "approved" | "needed" | "not-applicable";
   area: { key: AreaKey; label: string; matched: boolean } | null;
   assignee: string | null;
+  /** Evidence showed a Bug, so an unapproved Feature Request label and its approval wait come off. */
+  dropsFeature?: boolean;
   path: HandlingPath;
   releaseDeveloper: boolean;
 }
@@ -157,7 +160,15 @@ export function resolveOwnership(context: {
         `The evidence does not place this in a mapped area, so it goes to ${FALLBACK_OWNER}; say which evidence is missing in the document.`
       );
     }
-    return { ...none, area, assignee };
+    const labels = input.ticketLabels ?? [];
+    return {
+      ...none,
+      area,
+      assignee,
+      dropsFeature:
+        hasLabel(labels, FEATURE_REQUEST_LABEL) &&
+        !hasLabel(labels, APPROVED_LABEL),
+    };
   }
   if (classification !== "Feature Request") {
     return none;
@@ -220,9 +231,13 @@ export const ownershipRoute = (
       ...(ownership.approval === "needed" ? [NEEDS_APPROVAL_LABEL] : []),
     ]),
   ],
-  // A person's decision, Approved or Declined, ends the wait for approval.
+  // A person's decision, Approved or Declined, ends the wait for approval,
+  // and a proven Bug is no longer a feature request waiting for one.
   ...(ownership.approval === "approved" || ownership.path === "Declined"
     ? { removeLabels: [NEEDS_APPROVAL_LABEL] }
+    : {}),
+  ...(ownership.dropsFeature
+    ? { removeLabels: [FEATURE_REQUEST_LABEL, NEEDS_APPROVAL_LABEL] }
     : {}),
   ...(ownership.assignee ? { assignee: ownership.assignee } : {}),
   ...(ownership.releaseDeveloper ? { releaseDeveloper: true } : {}),

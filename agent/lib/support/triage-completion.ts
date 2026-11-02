@@ -115,15 +115,32 @@ const needsMaster = (
   return classification === "Bug" && !isSupportFollowUp(issue, handlingPath);
 };
 
-/** A feature request closes only once a person decided it: Declined, or Approved and then resolved (ENG-15932). */
+/**
+ * A feature request closes only on a person's matching decision (ENG-15932):
+ * Canceled when they declined it, Done when they approved it and triage
+ * resolved it, and never Duplicate.
+ */
 const closedUnseen = (
   issue: z.infer<typeof issueSchema>,
-  classification: string | undefined
-): boolean =>
-  classification === FEATURE_REQUEST_LABEL &&
-  CLOSED_STATES.includes(issue.status) &&
-  !issue.labels.includes(DECLINED_LABEL) &&
-  !issue.labels.includes("Approved");
+  classification: string | undefined,
+  handlingPath: string | undefined
+): boolean => {
+  if (
+    classification !== FEATURE_REQUEST_LABEL ||
+    !CLOSED_STATES.includes(issue.status)
+  ) {
+    return false;
+  }
+  if (issue.status === "Canceled") {
+    return !issue.labels.includes(DECLINED_LABEL);
+  }
+  if (issue.status === "Done") {
+    return !(
+      issue.labels.includes("Approved") && handlingPath === "Resolved by triage"
+    );
+  }
+  return true;
+};
 
 const missesTypeLabels = (
   issue: z.infer<typeof issueSchema>,
@@ -229,7 +246,7 @@ export function assertTriageOutputs(
       issue.labels.includes(label)
     ) ||
     missesTypeLabels(issue, classification, handlingPath) ||
-    closedUnseen(issue, classification) ||
+    closedUnseen(issue, classification, handlingPath) ||
     needsMaster(
       issue,
       classification,

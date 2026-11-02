@@ -367,3 +367,30 @@ describe("Cubic review of #259, decisions", () => {
     assert.ok(decision.route.addLabels.includes("Needs grouping"));
   });
 });
+
+describe("CodeRabbit review of #259, decisions", () => {
+  it("takes Feature Request and Needs approval off a ticket the evidence shows is a Bug, so its route can land", () => {
+    const decision = resolveTriage(
+      triageInput({ ticketLabels: ["Feature Request", "Needs approval"] }),
+      bugAnswers()
+    );
+    assert.ok(decision.outcome === "route");
+    assert.equal(decision.classification, "Bug");
+    assert.deepEqual([...(decision.route.removeLabels ?? [])].sort(), [
+      "Feature Request",
+      "Needs approval",
+    ]);
+  });
+
+  it("keeps an approved request's Feature Request label when the evidence shows a Bug", () => {
+    const decision = resolveTriage(
+      triageInput({ ticketLabels: ["Approved", "Feature Request"] }),
+      bugAnswers()
+    );
+    assert.ok(decision.outcome === "route");
+    assert.equal(
+      decision.route.removeLabels?.includes("Feature Request") ?? false,
+      false
+    );
+  });
+});

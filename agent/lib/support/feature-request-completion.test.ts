@@ -148,3 +148,48 @@ test("completion accepts a declined Feature Request Canceled without Needs appro
   };
   assert.doesNotThrow(() => assertTriageOutputs(declined, content, comments));
 });
+
+test("completion matches a closed Feature Request's state to the person's decision", () => {
+  const closed = (status: string, decision: string, path: string) => ({
+    report: {
+      ...report,
+      assignee: null,
+      labels: [
+        "intercom-sourced",
+        "Customer reported",
+        "Feature Request",
+        decision,
+      ],
+      parentId: null,
+      project: null,
+      status,
+    },
+    written: {
+      ...document,
+      content: `# Triage investigation\n**Classification**: Feature Request\n**Handling path**: ${path}\n**Review**: Not required`,
+    },
+  });
+  for (const [status, decision, path] of [
+    ["Canceled", "Approved", "Resolved by triage"],
+    ["Done", "Declined", "Declined"],
+    ["Duplicate", "Approved", "Duplicate"],
+    ["Done", "Approved", "Engineering Todo"],
+  ]) {
+    const { report: issue, written } = closed(status, decision, path);
+    assert.throws(
+      () => assertTriageOutputs(issue, written, comments),
+      SupportRefusal,
+      `${status} with ${decision} on ${path}`
+    );
+  }
+  for (const [status, decision, path] of [
+    ["Canceled", "Declined", "Declined"],
+    ["Done", "Approved", "Resolved by triage"],
+  ]) {
+    const { report: issue, written } = closed(status, decision, path);
+    assert.doesNotThrow(
+      () => assertTriageOutputs(issue, written, comments),
+      `${status} with ${decision} on ${path}`
+    );
+  }
+});

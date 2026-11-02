@@ -158,7 +158,9 @@ export async function masterFacts(
   }
   return {
     createdAt: node.createdAt,
-    open: !CLOSED_STATE_TYPES.has(node.state.type),
+    // An untyped state (a replay of a custom workflow state) fails closed.
+    open:
+      !CLOSED_STATE_TYPES.has(node.state.type) && node.state.type !== "unknown",
   };
 }
 
@@ -321,10 +323,10 @@ const groupingWarning = (
   issue: RouteIssue,
   match: string,
   why: string,
-  bug: boolean
+  flags: { bug: boolean; deferred: boolean }
 ) =>
-  `${issue.identifier} stays open because ${why.replace(TRAILING_STOP, "")}. It is related to ${match}, labelled ${NEEDS_GROUPING_LABEL}, and a closing state became Backlog, so the grouping sweep puts it under a master.${
-    bug
+  `${issue.identifier} is not closed on ${match} because ${why.replace(TRAILING_STOP, "")}. It is related to ${match} and labelled ${NEEDS_GROUPING_LABEL}${flags.deferred ? ", and its closing state became Backlog" : ""}, so the grouping sweep puts it under a master.${
+    flags.bug
       ? ` To close it now as a Bug duplicate, create the master through engineering-handoff (aggregate evidence only), call route_ticket with issue ${match} and parent set to the new master, then call this again.`
       : ""
   }`;
@@ -406,17 +408,6 @@ export async function planRoute(
   const matchId = input.duplicateOf ?? input.relatedTo;
   const match = matchId === undefined ? null : await requireIssue(gql, matchId);
   const plan = await matchPlanOf(gql, match, input, opts);
-  const warnings: string[] = [];
-  if (match && plan.unjoined !== undefined) {
-    warnings.push(
-      groupingWarning(
-        issue,
-        match.identifier,
-        plan.unjoined,
-        carriesBug(issue, input)
-      )
-    );
-  }
   // A closing route with no open master is deferred to the grouping sweep: it
   // leaves Triage for Backlog with a person who sees it, not the match's owner.
   // A person's Declined decision keeps its Canceled state: it is only related
@@ -425,6 +416,15 @@ export async function planRoute(
     plan.unjoined !== undefined &&
     named(input.state, "canceled", "done", "duplicate") &&
     !declinedByPerson(issue);
+  const warnings: string[] = [];
+  if (match && plan.unjoined !== undefined) {
+    warnings.push(
+      groupingWarning(issue, match.identifier, plan.unjoined, {
+        bug: carriesBug(issue, input),
+        deferred,
+      })
+    );
+  }
   const keepsState = !deferred;
   const parent = match ? plan.parent : input.parent;
   // A matched report takes its owner from the master it is parented under,

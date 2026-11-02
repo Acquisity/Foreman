@@ -65,6 +65,7 @@ const DUPLICATE_FIELD = /duplicateOf/u;
 const SELF_APPROVE = /already carry Approved/u;
 const RELATED_CLOSE = /relatedTo keeps the report open/u;
 const STALE_PARENT = /was created before 2026-10-25T00:00:00.000Z/u;
+const BECAME_BACKLOG = /closing state became Backlog/u;
 const NOT_CONFIRMED = /could not be confirmed under ENG-30/u;
 const DUPLICATE_NEEDS_MASTER = /Duplicate only under an open master/u;
 
@@ -424,5 +425,28 @@ describe("Cubic review of #259", () => {
       STALE_PARENT
     );
     assert.deepEqual(fake.writes(), []);
+  });
+});
+
+describe("CodeRabbit review of #259, routes", () => {
+  it("says a closing state became Backlog only when it did", async () => {
+    const fake = linear({ ticketLabels: CLASSIFIED["Feature Request"] });
+    const result = await routeTicket(
+      {
+        assignee: "James Keeble",
+        issue: "ENG-1",
+        relatedTo: "ENG-40",
+        state: "Backlog",
+      },
+      { client: fake.fetchStub }
+    );
+    assert.equal(result.grouping, "needs-grouping");
+    assert.doesNotMatch(result.warnings.join(" "), BECAME_BACKLOG);
+    const closing = linear({ ticketLabels: CLASSIFIED["User Error"] });
+    const deferred = await routeTicket(
+      { duplicateOf: "ENG-40", issue: "ENG-1", state: "Duplicate" },
+      { client: closing.fetchStub }
+    );
+    assert.match(deferred.warnings.join(" "), BECAME_BACKLOG);
   });
 });

@@ -294,3 +294,11 @@ test("the handling skill follows the returned decision instead of a 0.6 unproven
     )
   );
 });
+
+test("the roster keeps the SAN sandbox exception after the approval decision", () => {
+  assert.ok(
+    triageHandlingSkill.includes(
+      "SAN sandbox tickets go to Aaron Fraga, a feature request once its approval state is settled."
+    )
+  );
+});
