@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
   FIXY_LINEAR_USER_ID,
+  fixyHandoffCommentId,
   fixyTriageTeams,
   renderFixyHandoff,
 } from "../fixy-handoff.js";
@@ -30,6 +31,7 @@ const comment = (
     parent?: string | null;
     user?: string | null;
     createdAt?: string;
+    updatedAt?: string;
   } = {}
 ) => {
   const user = over.user === undefined ? "bot" : over.user;
@@ -38,6 +40,7 @@ const comment = (
     createdAt: over.createdAt ?? "2026-10-10T10:00:00Z",
     id,
     parent: over.parent ? { id: over.parent } : null,
+    updatedAt: over.updatedAt ?? over.createdAt ?? "2026-10-10T10:00:00Z",
     user: user && { id: user, name: NAMES[user] ?? `User ${user}` },
   };
 };
@@ -100,6 +103,7 @@ const issue = (over: Record<string, unknown> = {}) => ({
     ],
   },
   state: { name: "Done", type: "completed" },
+  team: { key: "ENG" },
   title: "Export is missing rows",
   ...over,
 });
@@ -208,6 +212,7 @@ describe("readTicket", () => {
       createdAt: "2026-10-10T09:00:00Z",
       description: "Exports stop at 500 rows.",
       duplicateOf: "ENG-2",
+      fixyHandoffUpdatedAt: null,
       fixyVerdict: null,
       identifier: "ENG-1",
       labels: ["Bug", "Customer reported"],
@@ -215,6 +220,7 @@ describe("readTicket", () => {
       pullUrls: [PR, "https://github.com/Acquisity/Acquisity/pull/8"],
       stateName: "Done",
       stateType: "completed",
+      teamKey: "ENG",
       title: "Export is missing rows",
     });
     assert.equal(view?.anchorId, "c-anchor");
@@ -652,6 +658,39 @@ describe("Fixy's verdict and handoff", () => {
     );
     return (await port.readTicket("ENG-1"))?.facts;
   };
+
+  it("reads only Foreman's deterministic handoff and its latest update for verdict planning", async () => {
+    const id = fixyHandoffCommentId("uuid-1");
+    const edited = "2026-11-01T18:00:00Z";
+    const facts = await read([
+      comment(id, "## Fixy handoff", { updatedAt: edited, user: "viewer" }),
+      fixy("reply", "Fixed it", "2026-11-01T17:00:00Z"),
+    ]);
+    assert.equal(facts?.fixyHandoffUpdatedAt, edited);
+    assert.equal(facts?.teamKey, "ENG");
+    assert.equal(
+      (
+        await read([
+          comment(id, "## Fixy handoff", {
+            updatedAt: edited,
+            user: "reporter",
+          }),
+        ])
+      )?.fixyHandoffUpdatedAt,
+      null
+    );
+    assert.equal(
+      (
+        await read([
+          comment("other-id", "## Fixy handoff", {
+            updatedAt: edited,
+            user: "viewer",
+          }),
+        ])
+      )?.fixyHandoffUpdatedAt,
+      null
+    );
+  });
 
   it("takes Fixy's newest reply, never its run-finished note or anyone else's comment", async () => {
     const facts = await read([

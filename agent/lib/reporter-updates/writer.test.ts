@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 import { MockLanguageModelV4 } from "ai/test";
 import type { OpsFields } from "../ops-log.js";
@@ -45,7 +46,6 @@ describe("reporterWriter", () => {
         JSON.stringify({
           asDesigned: null,
           steps: null,
-          verdict: null,
           what: "why your email threads won't load",
         })
       )
@@ -53,9 +53,31 @@ describe("reporterWriter", () => {
     assert.deepEqual(await write(TASK), {
       asDesigned: null,
       steps: null,
-      verdict: null,
       what: "why your email threads won't load",
     });
+  });
+
+  it("keeps the received prompt and three-field schema identical to main", async () => {
+    const main = JSON.parse(
+      readFileSync(
+        new URL("./fixtures/received-writer-main.json", import.meta.url),
+        "utf8"
+      )
+    );
+    const model = answer(
+      JSON.stringify({
+        asDesigned: null,
+        steps: null,
+        what: "why your email threads won't load",
+      })
+    );
+    const result = await reporterWriter(model)(TASK);
+    assert.equal(result.what, "why your email threads won't load");
+    assert.equal(writerPrompt(TASK), main.prompt);
+    assert.deepEqual(
+      model.doGenerateCalls[0]?.responseFormat,
+      main.responseFormat
+    );
   });
 
   it("returns the verdict outcome, and no reply for an outcome it does not know", async () => {

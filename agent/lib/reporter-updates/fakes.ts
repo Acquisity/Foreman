@@ -75,6 +75,7 @@ export const facts = (over: Partial<TicketFacts> = {}): TicketFacts => ({
   createdAt: "2026-10-10T10:00:00.000Z",
   description: "Exports stop at 500 rows.",
   duplicateOf: null,
+  fixyHandoffUpdatedAt: null,
   fixyVerdict: null,
   identifier: "ENG-1",
   labels: [],
@@ -82,6 +83,7 @@ export const facts = (over: Partial<TicketFacts> = {}): TicketFacts => ({
   pullUrls: [],
   stateName: "Todo",
   stateType: "unstarted",
+  teamKey: "ENG",
   title: "Export is missing rows",
   ...over,
 });

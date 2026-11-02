@@ -43,8 +43,11 @@ export const NO_REPLY: WriterReply = {
 const replySchema = z.object({
   asDesigned: z.boolean().nullable(),
   steps: z.string().max(400).nullable(),
-  verdict: z.enum(VERDICT_OUTCOMES).nullable(),
   what: z.string().max(300).nullable(),
+});
+
+const verdictReplySchema = replySchema.extend({
+  verdict: z.enum(VERDICT_OUTCOMES).nullable(),
 });
 
 const RULES = [
@@ -52,7 +55,6 @@ const RULES = [
   "Write in plain, friendly words a customer uses. Never mention developers, owners, names of staff, tickets, pull requests, code, merges, deploys, file paths, error codes or AI models.",
   "No markdown, no quotes, no links, no emoji and no em dashes.",
   "Say only what the text below supports. Never invent a change, a button or a page.",
-  "Return JSON with four fields, what, steps, asDesigned and verdict. Use null for a field you cannot write from the text, and for asDesigned and verdict unless the task asks for them.",
 ].join("\n");
 
 const TASKS: Record<WriterTask["kind"], string> = {
@@ -126,8 +128,13 @@ const contextOf = (task: WriterTask): string => {
   return parts.join("\n\n");
 };
 
-export const writerPrompt = (task: WriterTask): string =>
-  `${RULES}\n\n${TASKS[task.kind]}\n\n${contextOf(task)}`;
+export const writerPrompt = (task: WriterTask): string => {
+  const fields =
+    task.kind === "verdict"
+      ? "Return JSON with four fields, what, steps, asDesigned and verdict. Use null for a field you cannot write from the text, and for asDesigned and verdict unless the task asks for them."
+      : "Return JSON with three fields, what, steps and asDesigned. Use null for a field you cannot write from the text, and for asDesigned unless the task asks for it.";
+  return `${RULES}\n${fields}\n\n${TASKS[task.kind]}\n\n${contextOf(task)}`;
+};
 
 /**
  * Writes the short phrases inside a reporter update on the `writer` slot, with
@@ -147,7 +154,9 @@ export const reporterWriter =
       const { output } = await generateText({
         abortSignal: AbortSignal.timeout(timeoutMs),
         model: model ?? modelFor(await resolveModel("writer")),
-        output: Output.object({ schema: replySchema }),
+        output: Output.object({
+          schema: task.kind === "verdict" ? verdictReplySchema : replySchema,
+        }),
         prompt: writerPrompt(task),
       });
       return output;

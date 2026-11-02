@@ -1,3 +1,4 @@
+import { isFixyTriageTeam } from "../fixy-handoff.js";
 import type { NotFixedReason, Stage } from "./copy.js";
 
 export const DEPLOY_REPOSITORY = "Acquisity/Acquisity";
@@ -16,6 +17,7 @@ export interface TicketFacts {
   createdAt: string;
   description: string;
   duplicateOf: string | null;
+  fixyHandoffUpdatedAt: string | null;
   /** Fixy's newest reply on the ticket, past its run-finished note. */
   fixyVerdict: { body: string; createdAt: string } | null;
   identifier: string;
@@ -24,6 +26,7 @@ export interface TicketFacts {
   pullUrls: string[];
   stateName: string;
   stateType: string;
+  teamKey: string;
   title: string;
 }
 
@@ -103,7 +106,13 @@ export const closureOf = (facts: TicketFacts): Closure => {
 export const finishedFixyVerdict = (
   facts: TicketFacts
 ): TicketFacts["fixyVerdict"] =>
-  facts.labels.includes(BUG_LABEL) && !facts.labels.includes(FIXY_RUNNING_LABEL)
+  isFixyTriageTeam(facts.teamKey) &&
+  facts.fixyHandoffUpdatedAt !== null &&
+  facts.fixyVerdict !== null &&
+  Date.parse(facts.fixyVerdict.createdAt) >
+    Date.parse(facts.fixyHandoffUpdatedAt) &&
+  facts.labels.includes(BUG_LABEL) &&
+  !facts.labels.includes(FIXY_RUNNING_LABEL)
     ? facts.fixyVerdict
     : null;
 

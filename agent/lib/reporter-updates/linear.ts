@@ -2,6 +2,7 @@ import { callLinearGraphQL } from "eve/channels/linear";
 import { z } from "zod";
 import {
   FIXY_LINEAR_USER_ID,
+  fixyHandoffCommentId,
   fixyTriageTeams,
   parseFixyHandoff,
 } from "../fixy-handoff.js";
@@ -34,6 +35,7 @@ interface CommentNode {
   createdAt: string;
   id: string;
   parent: { id: string } | null;
+  updatedAt?: string;
   user: { id: string; name: string } | null;
 }
 
@@ -131,6 +133,7 @@ const TICKET_QUERY = `query ReporterTicket($id: String!) {
     title
     description
     createdAt
+    team { key }
     canceledAt
     completedAt
     state { name type }
@@ -218,6 +221,7 @@ const ticketSchema = z.object({
         ),
       }),
       state: z.object({ name: z.string(), type: z.string() }),
+      team: z.object({ key: z.string() }),
       title: z.string(),
     })
     .nullable(),
@@ -425,6 +429,7 @@ export const linearPort = (
             createdAt: "",
             description: issue.description ?? "",
             duplicateOf: null,
+            fixyHandoffUpdatedAt: null,
             fixyVerdict: null,
             identifier: issue.identifier,
             labels: issue.labels.nodes.map((label) => label.name),
@@ -440,6 +445,7 @@ export const linearPort = (
             ]),
             stateName: issue.state.name,
             stateType: issue.state.type,
+            teamKey: "",
             title: issue.title,
           }
         : null;
@@ -459,6 +465,7 @@ export const linearPort = (
         createdAt: comment.createdAt,
         id: comment.id,
         parent: comment.parentId ? { id: comment.parentId } : null,
+        updatedAt: comment.updatedAt,
         user: comment.userId
           ? { id: comment.userId, name: comment.userName ?? "" }
           : null,
@@ -482,6 +489,11 @@ export const linearPort = (
         data.viewer.id,
         issue.identifier
       );
+      const handoff = comments.find(
+        (comment) =>
+          comment.id === fixyHandoffCommentId(issue.id) &&
+          comment.user?.id === data.viewer.id
+      );
       return {
         anchorId: anchor ? delivery.anchorId : null,
         facts: {
@@ -495,6 +507,7 @@ export const linearPort = (
             issue.relations.nodes.find(
               (relation) => relation.type === "duplicate"
             )?.relatedIssue?.identifier ?? null,
+          fixyHandoffUpdatedAt: handoff?.updatedAt ?? null,
           fixyVerdict: fixyVerdictOf(comments),
           identifier: issue.identifier,
           labels: issue.labels.nodes.map((label) => label.name),
@@ -507,6 +520,7 @@ export const linearPort = (
           pullUrls: [...new Set(pullUrls)],
           stateName: issue.state.name,
           stateType: issue.state.type,
+          teamKey: issue.team.key,
           title: issue.title,
         },
         foremanComments: comments

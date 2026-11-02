@@ -50,7 +50,7 @@ export interface Deps {
 }
 
 export type Outcome =
-  | { kind: "posted"; stage: Stage; waiting?: true }
+  | { kind: "posted"; stage: Stage; waiting?: true; pendingVerdict?: true }
   | { kind: "recorded"; stage: LedgerStage }
   | { kind: "waiting" }
   | { kind: "held"; why: string }
@@ -278,6 +278,14 @@ export const reconcileTicket = async (
   }
   const outcome = await deliver(view, planned, deps);
   const closure = closureOf(facts);
+  if (
+    outcome.kind === "posted" &&
+    planned.stage === "received" &&
+    !done.has("verdict") &&
+    finishedFixyVerdict(facts)
+  ) {
+    return { ...outcome, pendingVerdict: true };
+  }
   if (
     outcome.kind === "posted" &&
     planned.stage === "not_fixed" &&
@@ -636,7 +644,10 @@ export const runReporterUpdates = async (
     }
     report.outcomes.push({ identifier, outcome: result.outcome });
     posts += result.outcome.kind === "posted" ? 1 : 0;
-    if (
+    if (result.outcome.kind === "posted" && result.outcome.pendingVerdict) {
+      // Keep this queue entry even when posting does not change issue.updatedAt.
+      await deps.store.deferPending(pending, clock());
+    } else if (
       result.outcome.kind === "skipped" &&
       result.outcome.retryAfter !== undefined
     ) {

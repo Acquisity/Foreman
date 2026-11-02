@@ -1,18 +1,20 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { describe, it } from "node:test";
+import { afterEach, beforeEach, describe, it } from "node:test";
 import type { OpsFields } from "../ops-log.js";
 import { commentIdFor } from "./comment-id.js";
 import { notFixedText, type VerdictOutcome, verdictText } from "./copy.js";
 import {
   type FakeTicket,
   fakeWriter,
+  NOW,
   RECEIVED,
   reconcile,
   setup,
   ticket,
 } from "./fakes.js";
 import type { TicketFacts } from "./plan.js";
+import { runReporterUpdates } from "./run.js";
 import { NO_REPLY, type WriterReply } from "./writer.js";
 
 const SAN_145 = readFileSync(
@@ -31,10 +33,12 @@ const reply = (body: string): TicketFacts["fixyVerdict"] => ({
 /** An open Bug ticket whose Fixy run finished. */
 const verdictTicket = (over: Partial<TicketFacts> = {}): FakeTicket =>
   ticket({
+    fixyHandoffUpdatedAt: "2026-10-11T10:00:00.000Z",
     fixyVerdict: reply(SAN_145),
     labels: ["Bug", "factory:pr-open"],
     stateName: "In Review",
     stateType: "started",
+    teamKey: "SAN",
     ...over,
   });
 
@@ -76,7 +80,74 @@ const verdictOf = (
   what,
 });
 
+const previousTeams = process.env.FIXY_TRIAGE_TEAMS;
+beforeEach(() => {
+  process.env.FIXY_TRIAGE_TEAMS = "SAN";
+});
+afterEach(() => {
+  if (previousTeams === undefined) {
+    Reflect.deleteProperty(process.env, "FIXY_TRIAGE_TEAMS");
+  } else {
+    process.env.FIXY_TRIAGE_TEAMS = previousTeams;
+  }
+});
+
 describe("Fixy's verdict for the reporter", () => {
+  for (const [name, teams, over] of [
+    ["empty setting", "", {}],
+    ["off-list current team", "SAN", { teamKey: "ENG" }],
+    ["missing handoff", "SAN", { fixyHandoffUpdatedAt: null }],
+    [
+      "reply older than the latest handoff edit",
+      "SAN",
+      { fixyHandoffUpdatedAt: "2026-10-13T10:00:00.000Z" },
+    ],
+  ] as const) {
+    it(`does not plan a verdict with ${name}`, async () => {
+      process.env.FIXY_TRIAGE_TEAMS = teams;
+      const s = await setupWith(verdictTicket(over));
+      assert.deepEqual(await reconcile(s), {
+        kind: "skipped",
+        why: "nothing_due",
+      });
+      assert.equal(s.linear.posts.length, 0);
+      assert.equal(s.writer.tasks.length, 0);
+    });
+  }
+
+  it("rechecks the current team setting for a queued ticket after it is disabled", async () => {
+    const t = verdictTicket();
+    t.updatedAt = new Date(NOW - 3_600_000).toISOString();
+    const s = await setupWith(t);
+    await s.memory.store.saveCursor(NOW);
+    await s.memory.store.enqueue([
+      { issue: "ENG-1", version: Date.parse(t.updatedAt) },
+    ]);
+    process.env.FIXY_TRIAGE_TEAMS = "";
+    await runReporterUpdates(s.deps, NOW, () => NOW);
+    assert.equal(s.linear.posts.length, 0);
+    assert.equal(s.writer.tasks.length, 0);
+  });
+
+  it("keeps a due verdict pending after a delayed received with unchanged updatedAt", async () => {
+    const t = verdictTicket();
+    t.updatedAt = new Date(NOW - 3_600_000).toISOString();
+    const s = await setupWith(t, false);
+    s.memory.state.now = NOW;
+    await s.memory.store.saveCursor(NOW);
+    await s.memory.store.enqueue([
+      { issue: "ENG-1", version: Date.parse(t.updatedAt) },
+    ]);
+    await runReporterUpdates(s.deps, NOW, () => NOW);
+    assert.equal(s.linear.posts[0]?.id, commentIdFor("ENG-1", "received"));
+    assert.equal(s.memory.pending.has("ENG-1"), true);
+    assert.equal(t.updatedAt, new Date(NOW - 3_600_000).toISOString());
+    s.memory.state.now += 60_000;
+    await runReporterUpdates(s.deps, NOW + 60_000, () => NOW + 60_000);
+    assert.equal(s.linear.posts[1]?.id, VERDICT_ID);
+    assert.equal(s.memory.pending.has("ENG-1"), false);
+  });
+
   it("posts one verdict update for SAN-145's reply under the Slack anchor, and never a second", async () => {
     const s = await setupWith(verdictTicket());
     const writer = answering(s, verdictOf("fix_in_review"));
@@ -138,7 +209,11 @@ describe("Fixy's verdict for the reporter", () => {
   it("posts received first and the verdict on a later run", async () => {
     const s = await setupWith(verdictTicket(), false);
     answering(s, verdictOf("fix_in_review"));
-    assert.deepEqual(await reconcile(s), { kind: "posted", stage: "received" });
+    assert.deepEqual(await reconcile(s), {
+      kind: "posted",
+      pendingVerdict: true,
+      stage: "received",
+    });
     assert.deepEqual(await reconcile(s), { kind: "posted", stage: "verdict" });
     assert.deepEqual(
       s.linear.posts.map((post) => post.id),
