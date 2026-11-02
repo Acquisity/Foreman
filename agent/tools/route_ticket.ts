@@ -18,6 +18,23 @@ import { isStatusFollowUp } from "#lib/trust.js";
 const identifier = z.string().trim().regex(LINEAR_ISSUE_ID_PATTERN);
 const name = z.string().trim().min(1).max(120);
 
+/**
+ * Whether this call chooses a master, so the session's master cutoff applies:
+ * a match to join, or a parent-only Duplicate, as on the retry writeUpdate
+ * recommends after the relation landed.
+ */
+const picksMaster = (input: {
+  duplicateOf?: string;
+  parent?: string;
+  relatedTo?: string;
+  state?: string;
+}): boolean =>
+  Boolean(
+    input.duplicateOf ||
+      input.relatedTo ||
+      (input.parent && input.state?.trim().toLowerCase() === "duplicate")
+  );
+
 export default defineTool({
   approval: questionsOnlyPolicy,
   description:
@@ -40,10 +57,9 @@ export default defineTool({
       return { error: refusal, routed: false as const };
     }
     try {
-      const mastersWindow =
-        input.duplicateOf || input.relatedTo
-          ? await masterWindow(ctx.session.auth)
-          : { windowed: false };
+      const mastersWindow = picksMaster(input)
+        ? await masterWindow(ctx.session.auth)
+        : { windowed: false };
       const ticket = await routeTicket(input, {
         client: executorClient(ctx),
         mastersCreatedAfter: masterCreatedAfter(
