@@ -7,6 +7,12 @@ const skill = readFileSync(
   "utf8"
 );
 
+import type { ProviderClient } from "./executor/operations.js";
+import { routeTicket } from "./linear-api.js";
+import { SUPPORT_OWNER } from "./owner-map.js";
+import { fakeLinear, json } from "./route-ticket-fixtures.js";
+
+const ASSIGNEE = /`assignee: "([^"`]+)"`/u;
 const BOLD = /\*\*[^*]+\*\*/u;
 
 const section = (heading: string) => {
@@ -112,4 +118,118 @@ test("the requester is asked once and told nothing on a plain hand-off", () => {
 test("the skill follows the agent-facing text rules", () => {
   assert.ok(!skill.includes("—"), "no em dashes");
   assert.ok(!BOLD.test(skill), "no bold");
+});
+
+for (const [heading, state] of [
+  ["3. How-to or expected behaviour", "Canceled"],
+  ["4. Known issue", "Duplicate"],
+] as const) {
+  test(`the prescribed ${state} route succeeds for a James-held report without Bug`, async () => {
+    const step = section(heading);
+    const assignee = ASSIGNEE.exec(step)?.[1];
+    const linear = fakeLinear({
+      teamLabels: [{ id: "user-error", name: "User Error" }],
+      ticketAssignee: { id: "james", name: "James Keeble" },
+      ticketLabels: [],
+    });
+    const client: ProviderClient = (request) =>
+      request.operation === "linear.Users"
+        ? json({
+            data: {
+              users: { nodes: [{ id: "support", name: SUPPORT_OWNER }] },
+            },
+          })
+        : linear.fetchStub(request);
+    const result = await routeTicket(
+      {
+        addLabels:
+          state === "Canceled"
+            ? ["Customer reported", "User Error"]
+            : ["Customer reported"],
+        assignee,
+        issue: "ENG-1",
+        state,
+        ...(state === "Duplicate"
+          ? { duplicateOf: "ENG-9", inheritAssigneeFrom: "ENG-9" }
+          : {}),
+      },
+      { client }
+    );
+    assert.equal(assignee, SUPPORT_OWNER);
+    const [update] = linear.updates();
+    assert.ok(update);
+    assert.equal(
+      (update.variables.input as Record<string, unknown>).assigneeId,
+      "support"
+    );
+    assert.ok(!result.labels.includes("Bug"));
+    assert.equal(linear.relations.length, state === "Duplicate" ? 1 : 0);
+    if (state === "Duplicate") {
+      assert.ok(
+        result.warnings.some((warning) => warning.includes("not inherited"))
+      );
+    }
+  });
+}
+
+test("an eligible known issue assignee takes precedence over the support fallback", async () => {
+  const assignee = ASSIGNEE.exec(section("4. Known issue"))?.[1];
+  assert.equal(assignee, SUPPORT_OWNER);
+  const linear = fakeLinear();
+  await routeTicket(
+    {
+      assignee,
+      duplicateOf: "ENG-9",
+      inheritAssigneeFrom: "ENG-9",
+      issue: "ENG-1",
+      state: "Duplicate",
+    },
+    { client: linear.fetchStub }
+  );
+  const [update] = linear.updates();
+  assert.ok(update);
+  assert.equal(
+    (update.variables.input as Record<string, unknown>).assigneeId,
+    "u-anuj"
+  );
+});
+
+test("a handoff comment marks follow-ups, and Bug without it still gets intake", () => {
+  assert.ok(
+    section("1. Read the ticket").includes(
+      "already has the `## Fixy handoff` comment"
+    )
+  );
+  assert.ok(
+    section("1. Read the ticket").includes("Fixy may already have started")
+  );
+});
+
+test("new details after a finished run get a top-level escalation without automatic retry", () => {
+  const follow = section("8. Follow-ups after the hand-off");
+  assert.ok(follow.includes("`factory:needs-you` or `factory:failed`"));
+  assert.ok(follow.includes("top-level ticket comment"));
+  assert.ok(follow.includes("a person should decide whether to re-run Fixy"));
+  assert.ok(follow.includes("do not remove or re-add labels automatically"));
+});
+
+test("a duplicate retries only missing optional labels once", () => {
+  const known = section("4. Known issue");
+  assert.ok(
+    known.includes("retry once without precisely those missing labels")
+  );
+  assert.ok(
+    known.includes(
+      "keeping the valid labels, assignee arguments and duplicate target"
+    )
+  );
+  assert.ok(known.includes("refuses for another reason or the retry fails"));
+});
+
+test("an undecided prior-work call continues without an investigation document", () => {
+  const known = section("4. Known issue");
+  assert.ok(
+    known.includes("`decided: false`, continue to missing details or handoff")
+  );
+  assert.ok(known.includes("create no investigation document"));
 });

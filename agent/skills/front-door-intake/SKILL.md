@@ -24,7 +24,7 @@ Read the full issue through the Linear connection: title, description, attachmen
 
 Call `classify_ask` once with the issue text and comments, and keep its `sourceLabels`. A money ask: load the billing-triage skill, which replaces this one. Otherwise continue here.
 
-When the ticket already has the `Bug` label, it was handed to Fixy before: go to step 8.
+When the ticket already has the `## Fixy handoff` comment, go to step 8. The `Bug` label alone does not mean a handoff was written. When Bug is present without that comment, continue here and write the handoff in step 6; note that Fixy may already have started.
 
 ## 2. Find the workspace
 
@@ -37,20 +37,20 @@ When the report asks how to do something, or whether something is meant to work 
 1. `find_help_article` with the feature and the action in the product's own words, then read the article body: `prepare_repository` with `Acquisity/Acquisity` and `read_file` at the path it returns.
 2. Only when the article does not explain how the feature works, a few targeted `grep` and `read_file` reads of the product code.
 3. Send the answer with `reply_to_requester`.
-4. Close the ticket with one `route_ticket` call: state `Canceled`, the `sourceLabels`, and the label `User Error` when the requester can do it themselves, or `Platform Limitation` when the product does not do it. When the team has no such label, the tool lists the valid names: close it `Canceled` without it.
+4. Close the ticket with one `route_ticket` call: state `Canceled`, `assignee: "Aaron Fraga"` (the support owner), the `sourceLabels`, and the label `User Error` when the requester can do it themselves, or `Platform Limitation` when the product does not do it. When the team has no such label, the tool lists the valid names: close it `Canceled` without it.
 
 A report that says something went wrong is not a how-to: an error, missing or wrong data, a send or sync that did not happen, or "isn't working". It is a real report even when it may turn out to be user error. Fixy decides that, so go on to step 4.
 
 ## 4. Known issue
 
-Call `find_related_issues` with `scope: "masters"` and again with `scope: "duplicates"`, each with 2 to 4 phrasings of what went wrong. Read the hits, then call `decide_prior_work` with the report and the hits, at most 8 at a time.
+Call `find_related_issues` with `scope: "masters"` and again with `scope: "duplicates"`, each with 2 to 4 phrasings of what went wrong. Read the hits, then call `decide_prior_work` with the report and the hits, at most 8 at a time. When it returns `decided: false`, continue to missing details or handoff, keep any useful candidate in `notes`, and create no investigation document.
 
 When it returns `known_issue` and that issue is open (not completed or canceled):
 
-1. Route the report as a duplicate with one `route_ticket` call: state `Duplicate`, `duplicateOf` and `inheritAssigneeFrom` set to the known issue, and the `sourceLabels`.
+1. Route the report as a duplicate with one `route_ticket` call: state `Duplicate`, `duplicateOf` and `inheritAssigneeFrom` set to the known issue, `assignee: "Aaron Fraga"` as the support fallback, and the `sourceLabels`. The tool inherits the known issue's assignee when eligible and otherwise uses that fallback. Do not add Bug to permit developer assignment.
 2. Tell the requester in one `reply_to_requester` message that their report joined a known issue the team is already working on.
 
-When `route_ticket` refuses, or the known issue is completed or canceled, do not retry: hand the report to Fixy in step 6 and name the candidate in `notes`.
+When `route_ticket` refuses only because optional labels are missing, retry once without precisely those missing labels, keeping the valid labels, assignee arguments and duplicate target. When `route_ticket` refuses for another reason or the retry fails, or the known issue is completed or canceled, hand the report to Fixy in step 6 and name the candidate in `notes`.
 
 ## 5. Missing details
 
@@ -82,8 +82,8 @@ End with one short line saying what you did: answered, joined a known issue, ask
 
 ## 8. Follow-ups after the hand-off
 
-When the ticket already has the `Bug` label, Fixy has it. Do not restart anything.
+The `## Fixy handoff` comment marks an earlier handoff. Do not restart anything.
 
 - A question from the requester: answer briefly with `reply_to_requester`, from what the ticket already says.
-- A new detail Fixy needs, such as the workspace, a step, or when it started: call `hand_to_fixy` again with everything known, so it updates the handoff comment.
+- A new detail Fixy needs, such as the workspace, a step, or when it started: call `hand_to_fixy` again with everything known, so it updates the handoff comment. If the ticket carries `factory:needs-you` or `factory:failed`, then post one short top-level ticket comment saying the handoff has the new detail and a person should decide whether to re-run Fixy. Updating the handoff does not notify a run when Bug was already present (`fixyNotified: false`). Fixy retries a blocked claim when Bug is removed and added again; do not remove or re-add labels automatically.
 - Nothing new: end the session with one short line.
