@@ -17,6 +17,7 @@ import {
 import {
   exactlyOne,
   type Gql,
+  keptLabels,
   type Named,
   named,
   type RouteIssue,
@@ -34,7 +35,6 @@ interface LabelPage {
 }
 
 interface Outcome {
-  closureHeld: boolean;
   duplicateOf: string | null;
   grouping: RouteTicketResult["grouping"];
 }
@@ -104,12 +104,7 @@ async function resolveLabels(
   issue: RouteIssue,
   input: RouteTicketInput
 ): Promise<FinalLabels> {
-  const removed = new Set(
-    (input.removeLabels ?? []).map((name) => name.toLowerCase())
-  );
-  const kept = issue.labels.nodes.filter(
-    (label) => !removed.has(label.name.toLowerCase())
-  );
+  const kept = keptLabels(issue, input);
   const added = input.addLabels?.length
     ? await teamLabelsNamed(gql, issue, input.addLabels)
     : [];
@@ -393,8 +388,7 @@ async function readBackRouted(
  * state without one ("missing duplicate relation", ENG-15734, ENG-15935,
  * ENG-15785); a failed relation fails the call. Then one `issueUpdate`, the
  * link attachments, and the read-back. Unknown label names fail before any
- * write and list the team's labels. A held closure (the requester not told
- * yet) applies everything but the Canceled or Duplicate state.
+ * write and list the team's labels.
  */
 export async function routeTicket(
   input: RouteTicketInput,
@@ -450,7 +444,6 @@ export async function routeTicket(
     opts?.signal
   );
   return toResult(after ?? issue, warnings, {
-    closureHeld: routed.held,
     duplicateOf: routed.closes ? related : null,
     grouping: groupingOutcome(routed),
   });

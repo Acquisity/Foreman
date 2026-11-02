@@ -15,6 +15,7 @@ const DEFERRED_STATE = "Backlog";
 
 import {
   type Gql,
+  keptLabels,
   named,
   type RouteIssue,
   type RouteTicketInput,
@@ -33,26 +34,40 @@ import {
  */
 export const MASTER_MARKER = "## Regression seam";
 
-/** The ticket's label names, lower-cased, once this call's label changes land. */
+/** The ticket's label names, lower-cased, once this call's label changes land: the kept labels the write saves, then the ones it adds. */
 export const finalLabels = (
   issue: RouteIssue,
   input: RouteTicketInput
-): Set<string> => {
-  const removed = new Set(
-    (input.removeLabels ?? []).map((name) => name.toLowerCase())
-  );
-  return new Set(
+): Set<string> =>
+  new Set(
     [
-      ...issue.labels.nodes.map((label) => label.name),
+      ...keptLabels(issue, input).map((label) => label.name),
       ...(input.addLabels ?? []),
-    ]
-      .map((name) => name.toLowerCase())
-      .filter(
-        (name, index) =>
-          index >= issue.labels.nodes.length || !removed.has(name)
-      )
+    ].map((name) => name.toLowerCase())
   );
-};
+
+/**
+ * Whether a person declined this request: the Declined label is already on
+ * the ticket as read from Linear before this call. A label this call would
+ * add never counts, and `refuseSelfDecline` refuses one.
+ */
+const declinedByPerson = (issue: RouteIssue): boolean =>
+  issue.labels.nodes.some(
+    (label) => label.name.toLowerCase() === DECLINED_LABEL.toLowerCase()
+  );
+
+/** Only a person, or the approval flow's decision, writes Declined; Foreman never declines a request itself. */
+function refuseSelfDecline(input: RouteTicketInput): void {
+  if (
+    (input.addLabels ?? []).some(
+      (name) => name.trim().toLowerCase() === DECLINED_LABEL.toLowerCase()
+    )
+  ) {
+    throw new Error(
+      `Only a person adds ${DECLINED_LABEL}, so nothing was written. Leave the request in Backlog with ${NEEDS_APPROVAL_LABEL} for ${FALLBACK_OWNER} to decide.`
+    );
+  }
+}
 
 /** Whether the ticket carries the Bug label once this call's label changes land. */
 export const carriesBug = (
@@ -74,7 +89,7 @@ export function refuseUnapprovedClose(
     named(input.state, "canceled", "done", "duplicate") &&
     labels.has(FEATURE_REQUEST_LABEL.toLowerCase()) &&
     !labels.has(APPROVED_LABEL.toLowerCase()) &&
-    !labels.has(DECLINED_LABEL.toLowerCase())
+    !declinedByPerson(issue)
   ) {
     throw new Error(
       `${issue.identifier} would be ${input.state}, but an unapproved Feature Request never closes unless a person declined it, so nothing was written. Route it to Backlog with ${NEEDS_APPROVAL_LABEL} and ${FALLBACK_OWNER}, using relatedTo for its match.`
@@ -83,8 +98,6 @@ export function refuseUnapprovedClose(
 }
 
 export interface DuplicateRouting {
-  /** The requester has not been told yet, so a Canceled or Duplicate state is not set. */
-  holdClosure?: boolean;
   /** The master search cutoff for this session (`masterCreatedAfter`). */
   mastersCreatedAfter?: string | null;
 }
@@ -295,13 +308,9 @@ const groupingWarning = (
       : ""
   }`;
 
-const heldWarning = (issue: RouteIssue, state: string) =>
-  `${issue.identifier} was not moved to ${state} because the requester has not been told: no reply_to_requester call in this session posted the answer. Send the reply, then call route_ticket again with the same input to close it.`;
-
-/** The route a call resolves to before any write: the match, its master, and what is held. */
+/** The route a call resolves to before any write: the match, its master, and what it may close. */
 export interface RoutePlan {
   closes: boolean;
-  held: boolean;
   keepsState: boolean;
   match: RouteIssue | null;
   owned: RouteTicketInput;
@@ -327,11 +336,10 @@ async function matchPlanOf(
   gql: Gql,
   match: RouteIssue | null,
   input: RouteTicketInput,
-  opts: DuplicateRouting,
-  held: boolean
+  opts: DuplicateRouting
 ): Promise<MatchPlan> {
   if (!match) {
-    if (named(input.state, "duplicate") && !held) {
+    if (named(input.state, "duplicate")) {
       await requireOpenMasterParent(gql, input.parent);
     }
     return {};
@@ -355,14 +363,13 @@ export async function planRoute(
   opts: DuplicateRouting
 ): Promise<RoutePlan> {
   refuseMatchMisuse(input);
+  refuseSelfDecline(input);
   refuseUnapprovedClose(issue, input);
   // Resolve the match before the first write, so a bad identifier fails the
   // whole call rather than leaving a routed ticket with no relation.
   const matchId = input.duplicateOf ?? input.relatedTo;
   const match = matchId === undefined ? null : await requireIssue(gql, matchId);
-  const held =
-    opts.holdClosure === true && named(input.state, "canceled", "duplicate");
-  const plan = await matchPlanOf(gql, match, input, opts, held);
+  const plan = await matchPlanOf(gql, match, input, opts);
   const warnings: string[] = [];
   if (match && plan.unjoined !== undefined) {
     warnings.push(
@@ -374,9 +381,6 @@ export async function planRoute(
       )
     );
   }
-  if (held && input.state) {
-    warnings.push(heldWarning(issue, input.state));
-  }
   // A closing route with no open master is deferred to the grouping sweep: it
   // leaves Triage for Backlog with a person who sees it, not the match's owner.
   // A person's Declined decision keeps its Canceled state: it is only related
@@ -384,8 +388,8 @@ export async function planRoute(
   const deferred =
     plan.unjoined !== undefined &&
     named(input.state, "canceled", "done", "duplicate") &&
-    !finalLabels(issue, input).has(DECLINED_LABEL.toLowerCase());
-  const keepsState = !(held || deferred);
+    !declinedByPerson(issue);
+  const keepsState = !deferred;
   const parent = match ? plan.parent : input.parent;
   // A matched report takes its owner from the master it is parented under,
   // so the report and its master keep one owner even when the match is held
@@ -393,11 +397,9 @@ export async function planRoute(
   const inherit =
     match && parent !== undefined && input.inheritAssigneeFrom !== undefined;
   return {
-    // A duplicate relation only for a report that joins its master and is
-    // not held open; every other match is related, so it never closes it.
-    closes:
-      input.duplicateOf !== undefined && !held && plan.parent !== undefined,
-    held,
+    // A duplicate relation only for a report that joins its master; every
+    // other match is related, so it never closes the report.
+    closes: input.duplicateOf !== undefined && plan.parent !== undefined,
     keepsState,
     match,
     owned: {

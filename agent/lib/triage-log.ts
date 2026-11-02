@@ -12,8 +12,6 @@ import { SUPPORT_OWNER } from "./owner-map.js";
 export interface LatestTriageDecision {
   classification: string | null;
   closureReview?: boolean;
-  /** When decide_triage or its fallback made it, so an earlier reply can be told apart. */
-  decidedAt?: string;
   fallback?: boolean;
   issue: string;
   outcome: "route" | "unproven";
@@ -478,85 +476,6 @@ interface RouteInput {
   issue: string;
   project?: string;
 }
-
-/**
- * Per issue, the decision whose answer a reply_to_requester call in this
- * session delivered (`decisionKey`), so a corrected decision needs its own.
- */
-export const requesterReplies = defineState<Record<string, string>>(
-  "foreman.requesterReplies",
-  () => ({})
-);
-
-/**
- * Which decision a reply answered: its outcome, classification and path, and
- * when it was made, so every new decision, even one with the same class and
- * path, needs its own delivered reply.
- */
-export const decisionKey = (decision: LatestTriageDecision): string =>
-  JSON.stringify([
-    decision.outcome,
-    decision.classification,
-    decision.path,
-    decision.fallback === true,
-    decision.decidedAt ?? null,
-  ]);
-
-/**
- * The decision a reply_to_requester result delivered, or null. A post
- * delivers the current decision. A reply that posted nothing (Foreman's
- * answer is still the newest message, or the requester's follow-up needed
- * nothing) proves it only when that answer went out after the decision.
- */
-export const deliveryKey = (
-  decision: LatestTriageDecision | undefined,
-  output: {
-    issue?: string;
-    lastReplyAt?: string;
-    outcome?: string;
-    posted: boolean;
-  }
-): string | null => {
-  if (!decision) {
-    return null;
-  }
-  if (output.posted) {
-    return decisionKey(decision);
-  }
-  const answeredAfter =
-    (output.outcome === "already_replied" || output.outcome === "skip") &&
-    output.lastReplyAt !== undefined &&
-    decision.decidedAt !== undefined &&
-    Date.parse(output.lastReplyAt) >= Date.parse(decision.decidedAt);
-  return answeredAfter ? decisionKey(decision) : null;
-};
-
-const EXPLANATIONS = new Set(["Platform Limitation", "User Error"]);
-
-/**
- * Whether route_ticket holds a Canceled or Duplicate state open (rule 4 of
- * the ENG-15932 plan): in a Linear session an explanation, or a fallback
- * decision the skill made without Jev, closes only once the requester has
- * been told this decision; a reply to an earlier one does not count. A Slack session answers in its own thread, so it holds nothing.
- */
-export const closureHeld = (
-  decisions: Readonly<Record<string, LatestTriageDecision>>,
-  replies: Readonly<Record<string, string>>,
-  issue: string,
-  linearSession: boolean
-): boolean => {
-  const decision = decisions[issue];
-  if (
-    !(linearSession && decision) ||
-    replies[issue] === decisionKey(decision)
-  ) {
-    return false;
-  }
-  return (
-    decision.fallback === true ||
-    EXPLANATIONS.has(decision.classification ?? "")
-  );
-};
 
 export function routeDecisionEvent(
   decisions: Readonly<Record<string, LatestTriageDecision>>,

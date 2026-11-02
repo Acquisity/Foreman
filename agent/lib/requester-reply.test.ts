@@ -43,14 +43,9 @@ test("replies under the anchor when Foreman has not spoken yet", () => {
   });
 });
 
-test("refuses a second reply until the requester answers, saying the requester was already told", () => {
+test("refuses a second reply until the requester answers", () => {
   const spoke = [anchor, reply("r1", FOREMAN, "2026-09-25T15:34:00Z")];
-  const refused = planReply(spoke, FOREMAN);
-  assert.equal(refused.ok, false);
-  assert.ok(!refused.ok && refused.alreadyReplied === true);
-  assert.ok(!refused.ok && refused.lastReplyAt === "2026-09-25T15:34:00Z");
-  const none = planReply([], FOREMAN);
-  assert.ok(!none.ok && none.alreadyReplied !== true);
+  assert.equal(planReply(spoke, FOREMAN).ok, false);
   const answered = [...spoke, reply("r2", "aaron", "2026-09-25T15:40:00Z")];
   assert.equal(planReply(answered, FOREMAN).ok, true);
 });
@@ -143,7 +138,6 @@ test("a reply after Foreman spoke is a follow-up carrying everything said since"
       lastReply: "scope ask",
       replies: ["<@U0950315SDC>", "This is a refund save."],
     },
-    lastReplyAt: "2026-09-26T10:04:00Z",
     ok: true,
   });
 });
@@ -481,7 +475,6 @@ test("reads every page, so a reply past the first page still counts", async () =
   assert.deepEqual(planReply(comments, FOREMAN), {
     anchorId: "anchor",
     followUp: { lastReply: "text", replies: ["text"] },
-    lastReplyAt: "2026-09-25T16:00:00Z",
     ok: true,
   });
 });

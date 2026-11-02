@@ -175,7 +175,9 @@ export const resolvedPath = (
     return { missing: [CHANGE_GAP] };
   }
   notes.push(
-    `${NO_CHANGE}, and there is none: closed as ${classification}, Canceled.`
+    classification === "Feature Request"
+      ? `${NO_CHANGE}, and there is none: it stays open as a Feature Request.`
+      : `${NO_CHANGE}, and there is none: closed as ${classification}, Canceled.`
   );
   return { path: classification };
 };

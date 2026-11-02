@@ -26,8 +26,6 @@ export interface RouteTicketInput {
 
 export interface RouteTicketResult {
   assignee: string | null;
-  /** The closure was held open because the requester has not been told yet. */
-  closureHeld: boolean;
   duplicateOf: string | null;
   /** With a match: joined its open master, or left open for the grouping sweep. */
   grouping: "joined" | "needs-grouping" | null;
@@ -93,3 +91,20 @@ export const reason = (error: unknown) =>
 
 export const named = (state: string | undefined, ...names: string[]) =>
   state !== undefined && names.includes(state.trim().toLowerCase());
+
+/**
+ * The labels the ticket keeps once this call's removals land. route_ticket's
+ * write and its closure guards both start from this, so they judge the same
+ * label set the write saves.
+ */
+export const keptLabels = (
+  issue: RouteIssue,
+  input: RouteTicketInput
+): Named[] => {
+  const removed = new Set(
+    (input.removeLabels ?? []).map((name) => name.toLowerCase())
+  );
+  return issue.labels.nodes.filter(
+    (label) => !removed.has(label.name.toLowerCase())
+  );
+};

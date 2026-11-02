@@ -302,3 +302,23 @@ describe("an approved request that can close still needs a clear path (R4)", () 
     assert.equal(decision.route.state, "Backlog");
   });
 });
+
+describe("notes match where a feature request goes (C5)", () => {
+  it("never notes a Canceled close for a Feature Request Jev called resolved without a change", () => {
+    const decision = resolveTriage(
+      triageInput(),
+      request({ path: pick("Resolved by triage") })
+    );
+    assert.ok(decision.outcome === "route");
+    assert.equal(decision.route.state, "Backlog");
+    assert.equal(
+      decision.notes.some((note) => note.includes("Canceled")),
+      false
+    );
+    assert.ok(
+      decision.notes.some((note) =>
+        note.includes("stays open as a Feature Request")
+      )
+    );
+  });
+});

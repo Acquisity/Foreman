@@ -45,10 +45,11 @@ const updateOf = (fake: ReturnType<typeof fakeLinear>) =>
 const labelIdsOf = (fake: ReturnType<typeof fakeLinear>) =>
   (updateOf(fake)?.labelIds ?? []) as string[];
 
+const SELF_DECLINE = /Only a person adds Declined/u;
 const UNAPPROVED_CLOSE =
   /an unapproved Feature Request never closes unless a person declined it/u;
 const RELATED_LANDED =
-  /related link to ENG-20 was recorded.*Call route_ticket again with the same input, duplicateOf ENG-20 included/su;
+  /related link to ENG-40 was recorded.*Call route_ticket again with the same input, duplicateOf ENG-40 included/su;
 const WITHOUT_DUPLICATE = /without duplicateOf/u;
 const NOT_CONFIRMED = /could not be confirmed under ENG-30/u;
 const DUPLICATE_NEEDS_MASTER = /Duplicate only under an open master/u;
@@ -159,89 +160,6 @@ describe("route_ticket keeps a related report open", () => {
   });
 });
 
-describe("route_ticket holds a closure until the requester is told", () => {
-  it("parents the report under its master but leaves it open when the closure is held", async () => {
-    const fake = linear({ ticketLabels: CLASSIFIED["Platform Limitation"] });
-    const result = await routeTicket(
-      {
-        addLabels: ["Needs grouping"],
-        duplicateOf: "ENG-20",
-        issue: "ENG-1",
-        state: "Duplicate",
-      },
-      { client: fake.fetchStub, holdClosure: true }
-    );
-    assert.deepEqual(fake.relationTypes, ["related"]);
-    assert.equal(updateOf(fake)?.parentId, "i-ENG-30");
-    assert.equal(updateOf(fake)?.stateId, undefined);
-    assert.equal(result.closureHeld, true);
-  });
-
-  it("closes the held duplicate under its master with Needs grouping once the reply has gone out", async () => {
-    const route = {
-      addLabels: ["Needs grouping"],
-      duplicateOf: "ENG-20",
-      issue: "ENG-1",
-      releaseDeveloper: true,
-      state: "Duplicate",
-    };
-    const fake = linear({ ticketLabels: CLASSIFIED["User Error"] });
-    const held = await routeTicket(route, {
-      client: fake.fetchStub,
-      holdClosure: true,
-    });
-    assert.equal(held.closureHeld, true);
-    const told = await routeTicket(route, {
-      client: fake.fetchStub,
-      holdClosure: false,
-    });
-    assert.equal(told.closureHeld, false);
-    assert.deepEqual(fake.relationTypes, ["related", "duplicate"]);
-    const closing = fake.updates().at(-1)?.variables.input as Record<
-      string,
-      unknown
-    >;
-    assert.equal(closing.stateId, "s-duplicate");
-    assert.equal(closing.parentId, "i-ENG-30");
-    assert.ok((closing.labelIds as string[]).includes("l-grouping"));
-    assert.equal(told.duplicateOf, "ENG-20");
-  });
-
-  it("closes a held Canceled route once the reply has gone out", async () => {
-    const route = {
-      addLabels: ["Needs grouping"],
-      issue: "ENG-1",
-      releaseDeveloper: true,
-      state: "Canceled",
-    };
-    const fake = linear({ ticketLabels: CLASSIFIED["User Error"] });
-    await routeTicket(route, { client: fake.fetchStub, holdClosure: true });
-    await routeTicket(route, { client: fake.fetchStub });
-    const closing = fake.updates().at(-1)?.variables.input as Record<
-      string,
-      unknown
-    >;
-    assert.equal(closing.stateId, "s-canceled");
-    assert.ok((closing.labelIds as string[]).includes("l-grouping"));
-  });
-
-  it("leaves a held Canceled route open with its other fields applied", async () => {
-    const fake = linear({ ticketLabels: CLASSIFIED["User Error"] });
-    const result = await routeTicket(
-      {
-        addLabels: ["Needs grouping"],
-        issue: "ENG-1",
-        priority: 4,
-        state: "Canceled",
-      },
-      { client: fake.fetchStub, holdClosure: true }
-    );
-    assert.equal(updateOf(fake)?.stateId, undefined);
-    assert.equal(updateOf(fake)?.priority, 4);
-    assert.equal(result.closureHeld, true);
-  });
-});
-
 describe("route_ticket never closes an unapproved feature request (ENG-15932)", () => {
   it("refuses Canceled, Done or Duplicate for a Feature Request with no Approved or Declined, before any write", async () => {
     for (const state of ["Canceled", "Done", "Duplicate"]) {
@@ -278,16 +196,37 @@ describe("route_ticket never closes an unapproved feature request (ENG-15932)", 
     );
   });
 
-  it("lets a declined feature request close", async () => {
+  it("lets a feature request a person already declined close", async () => {
     const fake = linear({
-      teamLabels: [GROUPING, { id: "l-declined", name: "Declined" }],
-      ticketLabels: CLASSIFIED["Feature Request"],
+      ticketLabels: [
+        { id: "l-fr", name: "Feature Request" },
+        { id: "l-declined", name: "Declined" },
+      ],
     });
     await routeTicket(
-      { addLabels: ["Declined"], issue: "ENG-1", state: "Canceled" },
+      { issue: "ENG-1", state: "Canceled" },
       { client: fake.fetchStub }
     );
     assert.equal(updateOf(fake)?.stateId, "s-canceled");
+  });
+
+  it("refuses a route that adds Declined itself, before any write, so Foreman never declines for a person", async () => {
+    for (const state of ["Canceled", "Backlog"]) {
+      const fake = linear({
+        teamLabels: [GROUPING, { id: "l-declined", name: "Declined" }],
+        ticketLabels: CLASSIFIED["Feature Request"],
+      });
+      // biome-ignore lint/performance/noAwaitInLoops: each case reads its own fake in turn.
+      await assert.rejects(
+        routeTicket(
+          { addLabels: ["Declined"], issue: "ENG-1", state },
+          { client: fake.fetchStub }
+        ),
+        SELF_DECLINE,
+        state
+      );
+      assert.deepEqual(fake.writes(), [], state);
+    }
   });
 });
 
@@ -327,19 +266,19 @@ describe("a report left for grouping leaves Triage (C6)", () => {
 });
 
 describe("a failed update after the relation keeps the retry able to close (C5)", () => {
-  it("tells a held duplicate to retry with duplicateOf, since only a related link landed", async () => {
+  it("tells a repeat that only got a related link to retry with duplicateOf", async () => {
     const fake = linear({
       ticketLabels: CLASSIFIED["User Error"],
       updateFailures: 1,
     });
     const message = await routeTicket(
       {
-        duplicateOf: "ENG-20",
+        duplicateOf: "ENG-40",
         issue: "ENG-1",
         releaseDeveloper: true,
         state: "Duplicate",
       },
-      { client: fake.fetchStub, holdClosure: true }
+      { client: fake.fetchStub }
     ).then(
       () => "",
       (error: Error) => error.message

@@ -127,7 +127,7 @@ test("the not-engineering branch covers an unapproved feature request waiting in
   assert.ok(branch.includes("`Backlog/low-impact`"));
   assert.ok(branch.includes("`Feature Request`"));
   assert.equal(branch.includes("unless a lift is wanted"), false);
-  assert.ok(branch.includes("`closureHeld: true`"));
+  assert.equal(branch.includes("closureHeld"), false);
   assert.ok(branch.includes('`grouping: "needs-grouping"`'));
 });
 

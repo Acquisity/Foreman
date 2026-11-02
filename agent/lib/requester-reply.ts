@@ -47,29 +47,12 @@ export interface ThreadComment {
 }
 
 export type ReplyPlan =
-  | {
-      anchorId: string;
-      followUp: FollowUpInput | null;
-      /** When Foreman last spoke in this thread, if it has. */
-      lastReplyAt?: string;
-      ok: true;
-    }
-  | {
-      alreadyReplied?: true;
-      error: string;
-      lastReplyAt?: string;
-      ok: false;
-    };
+  | { anchorId: string; followUp: FollowUpInput | null; ok: true }
+  | { error: string; ok: false };
 
 export function planReply(
   comments: readonly ThreadComment[],
-  foremanUserId: string,
-  /**
-   * When the current triage decision was made. A decision newer than
-   * Foreman's standing answer (a correction after the critic) may reply once,
-   * so the requester hears the decision that closes their ticket.
-   */
-  decidedAt?: string
+  foremanUserId: string
 ): ReplyPlan {
   const byTime = (a: ThreadComment, b: ThreadComment) =>
     a.createdAt.localeCompare(b.createdAt);
@@ -98,25 +81,10 @@ export function planReply(
     };
   }
   const thread = comments.filter((c) => c.parentId === anchor.id).sort(byTime);
-  const newest = thread.at(-1);
-  const corrected =
-    newest !== undefined &&
-    decidedAt !== undefined &&
-    Date.parse(decidedAt) > Date.parse(newest.createdAt);
-  if (newest?.userId === foremanUserId && corrected) {
+  if (thread.at(-1)?.userId === foremanUserId) {
     return {
-      anchorId: anchor.id,
-      followUp: null,
-      lastReplyAt: newest.createdAt,
-      ok: true,
-    };
-  }
-  if (newest?.userId === foremanUserId) {
-    return {
-      alreadyReplied: true,
       error:
         "Foreman already replied and the requester has not answered since. Do not post again; put anything new in the investigation document.",
-      lastReplyAt: newest.createdAt,
       ok: false,
     };
   }
@@ -128,13 +96,7 @@ export function planReply(
           lastReply: thread[lastReply]?.body ?? "",
           replies: thread.slice(lastReply + 1).map((c) => c.body),
         };
-  const lastReplyAt = thread[lastReply]?.createdAt;
-  return {
-    anchorId: anchor.id,
-    followUp,
-    ...(lastReplyAt ? { lastReplyAt } : {}),
-    ok: true,
-  };
+  return { anchorId: anchor.id, followUp, ok: true };
 }
 
 /** What the tool tells Foreman when Jev says a follow-up needs no message. */
@@ -320,10 +282,7 @@ interface ReplyResponse {
 export type ReplyResult =
   | { commentId: string; posted: true; url: string }
   | {
-      /** skip: their reply needs nothing; already_replied: Foreman's answer is the newest message. */
-      outcome: "already_replied" | "skip";
-      /** When Foreman's standing answer was posted, so route_ticket can tell whether it answers the current decision. */
-      lastReplyAt?: string;
+      outcome: "skip";
       posted: false;
       reason: string;
     };
@@ -361,8 +320,7 @@ export interface ForemanUser {
 
 async function readThread(
   issue: string,
-  credentials: LinearChannelCredentials,
-  decidedAt?: string
+  credentials: LinearChannelCredentials
 ): Promise<{
   comments: ThreadComment[];
   foreman: ForemanUser;
@@ -397,7 +355,7 @@ async function readThread(
     comments,
     foreman: thread.viewer,
     issueId: thread.issue.id,
-    plan: planReply(comments, thread.viewer.id, decidedAt),
+    plan: planReply(comments, thread.viewer.id),
     widgetFeedback: thread.issue.project?.id === WIDGET_FEEDBACK_PROJECT_ID,
   };
 }
@@ -630,32 +588,17 @@ export async function replyToRequester(
   accessToken: string,
   signal?: AbortSignal,
   /** Rewords the message once Jev has said a reply is needed (ENG-15226). */
-  rewrite?: (message: string) => Promise<string>,
-  /** When the current triage decision was made (`planReply`). */
-  decidedAt?: string
+  rewrite?: (message: string) => Promise<string>
 ): Promise<ReplyResult> {
   const credentials = { accessToken };
-  const { issueId, plan } = await readThread(issue, credentials, decidedAt);
+  const { issueId, plan } = await readThread(issue, credentials);
   if (!plan.ok) {
-    if (plan.alreadyReplied) {
-      return {
-        ...(plan.lastReplyAt ? { lastReplyAt: plan.lastReplyAt } : {}),
-        outcome: "already_replied",
-        posted: false,
-        reason: plan.error,
-      };
-    }
     throw new Error(plan.error);
   }
   if (plan.followUp) {
     const outcome = await followUpOutcome(plan.followUp, signal);
     if (outcome === "skip") {
-      return {
-        ...(plan.lastReplyAt ? { lastReplyAt: plan.lastReplyAt } : {}),
-        outcome,
-        posted: false,
-        reason: SKIP_REASON,
-      };
+      return { outcome, posted: false, reason: SKIP_REASON };
     }
   }
   const created = await createThreadComment({

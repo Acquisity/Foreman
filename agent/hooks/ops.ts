@@ -15,7 +15,6 @@
  * the log. `outcome` is computed from framework-owned values only.
  */
 import { defineHook } from "eve/hooks";
-import { toolResultFrom } from "eve/tools";
 import { logOpsEvent } from "../lib/ops-log.js";
 import {
   applyCriticSettlement,
@@ -25,12 +24,9 @@ import {
   criticTaskPackets,
   criticVerdictFields,
   criticVerdictIssue,
-  deliveryKey,
-  requesterReplies,
   stampCriticPacket,
   triageDecisions,
 } from "../lib/triage-log.js";
-import replyToRequester from "../tools/reply_to_requester.js";
 
 /**
  * Names the connection behind a tool call from the `<connection>__<tool>`
@@ -52,19 +48,6 @@ export default defineHook({
       // calls, and carry no tool name.
       if (result.kind !== "tool-result") {
         return;
-      }
-      // An explanation closes only once its requester was told (route_ticket).
-      const reply = toolResultFrom(result, replyToRequester)?.output;
-      const issue = reply && "issue" in reply ? reply.issue : null;
-      const delivered =
-        reply && issue
-          ? deliveryKey(triageDecisions.get()[issue], reply)
-          : null;
-      if (issue && delivered) {
-        requesterReplies.update((replies) => ({
-          ...replies,
-          [issue]: delivered,
-        }));
       }
       logOpsEvent("action.result", {
         // Executor is the outer connection; provider diagnosis belongs in its

@@ -116,7 +116,7 @@ SAN sandbox tickets route to Aaron Fraga. No fitting area means James Keeble; re
 
 ### When the ticket is not engineering actionable
 
-`User Error`, `Platform Limitation`, `Feature Request`, `Resolved by triage`, `Duplicate`, `Backlog/low-impact`, and the `Support/` paths end here: call `route_ticket` once with the decision's `route` unchanged, after the critic settles when `review.required`. `route` names Aaron Fraga for an open follow-up, no one for a closed outcome. Nothing goes to engineering. `closureHeld: true` means the requester was not told yet: reply, then route again.
+`User Error`, `Platform Limitation`, `Feature Request`, `Resolved by triage`, `Duplicate`, `Backlog/low-impact`, and the `Support/` paths end here: call `route_ticket` once with the decision's `route` unchanged, after the critic settles when `review.required`. `route` names Aaron Fraga for an open follow-up, no one for a closed outcome. Nothing goes to engineering.
 
 A `Duplicate` passes `route`, adding the area owner as `assignee` only for a confirmed Bug whose `route` names none. `grouping: "needs-grouping"` means the match had no open master, so the report stays open for the grouping sweep; for a Bug you may run `engineering-handoff` "Create one master", parent the match under it, and route again.
 
