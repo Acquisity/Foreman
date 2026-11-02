@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { tool as readIssueTool } from "../../tools/read_triage_replay_issue.js";
-import { routeTicket } from "../linear-api.js";
+import { routeTicket } from "../route-ticket.js";
 import { memoryBackend, seedReplayStore, setReplayBackend } from "./backend.js";
 import {
   ARCHIVE_URL,

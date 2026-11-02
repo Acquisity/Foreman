@@ -3,9 +3,10 @@ import { z } from "zod";
 import { executorClient } from "#lib/executor/client.js";
 import { questionsOnlyPolicy } from "#lib/github/approval.js";
 import { LINEAR_ISSUE_ID_PATTERN } from "#lib/investigation-memory/scope.js";
-import { masterCreatedAfter, routeTicket } from "#lib/linear-api.js";
+import { masterCreatedAfter } from "#lib/linear-api.js";
 import { masterWindow } from "#lib/master-window.js";
 import { logOpsEvent } from "#lib/ops-log.js";
+import { routeTicket } from "#lib/route-ticket.js";
 import {
   closureHeld,
   criticRounds,

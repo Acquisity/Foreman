@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { routeTicket } from "./linear-api.js";
+import { routeTicket } from "./route-ticket.js";
 import { type FakeIssue, fakeLinear } from "./route-ticket-fixtures.js";
 
 const ANUJ = { id: "u-anuj", name: "Anuj Bhatt" };
