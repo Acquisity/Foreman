@@ -68,6 +68,7 @@ const fakeLinear = (
   options: {
     hidden?: boolean;
     fail?: string;
+    lookupFails?: boolean;
     teamLabels?: { id: string; name: string; team: { id: string } | null }[];
   } = {}
 ) => {
@@ -103,9 +104,25 @@ const fakeLinear = (
           };
         case "FixyHandoffComment": {
           const found = state.comments.find((c) => c.id === variables.id);
-          // Real Linear answers an unknown comment id with an error.
+          if (options.lookupFails) {
+            throw Object.assign(
+              new Error("Linear GraphQL failed with HTTP 500."),
+              {
+                body: null,
+              }
+            );
+          }
+          // Real Linear answers an unknown comment id with this error body.
           if (!found) {
-            throw new Error("Entity not found: Comment");
+            throw Object.assign(
+              new Error("Linear GraphQL failed with HTTP 200."),
+              {
+                body: {
+                  data: null,
+                  errors: [{ message: "Entity not found: Comment" }],
+                },
+              }
+            );
           }
           return { comment: found };
         }
@@ -204,6 +221,27 @@ describe("hand_to_fixy", () => {
     assert.equal(result.labelAdded, true);
     assert.ok(linear.names().includes("FixyHandoffComment"));
     assert.equal(linear.state.comments.length, 1);
+  });
+
+  it("never mistakes a failed paged lookup for a missing handoff", async () => {
+    const options = { hidden: true, lookupFails: false };
+    const linear = fakeLinear({}, options);
+    await handToFixy(
+      {
+        ...input,
+        reportedAt: "2026-10-31T09:15:00Z",
+        reportedAtSource: "Intercom first message",
+      },
+      root,
+      linear.linear,
+      ENV
+    );
+    const stored = linear.state.comments[0]?.body;
+    options.lookupFails = true;
+    await assert.rejects(
+      handToFixy({ ...input, notes: "New detail" }, root, linear.linear, ENV)
+    );
+    assert.equal(linear.state.comments[0]?.body, stored);
   });
 
   for (const hidden of [false, true]) {

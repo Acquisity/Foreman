@@ -77,6 +77,18 @@ export type HandoffSession = Pick<
   "auth" | "id" | "parent"
 >;
 
+/** Linear's answer to a lookup by an id that doesn't exist (measured 2 Nov 2026). */
+const isNotFound = (error: unknown): boolean => {
+  const errors = (error as { body?: { errors?: unknown } } | null)?.body
+    ?.errors;
+  return (
+    Array.isArray(errors) &&
+    errors.some((entry: { message?: unknown } | null) =>
+      String(entry?.message ?? "").startsWith("Entity not found")
+    )
+  );
+};
+
 const WORKSPACE_ID =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu;
 
@@ -285,10 +297,13 @@ export const handToFixy = async (
             COMMENT_QUERY,
             "FixyHandoffComment",
             { id: commentId }
-          ).catch(() => {
-            // Linear answers an unknown id with an error, and on a first
-            // hand-off the comment doesn't exist yet.
-            signal?.throwIfAborted();
+          ).catch((error: unknown) => {
+            // On a first hand-off the comment doesn't exist yet, which Linear
+            // answers with an error. Any other failure must not pass for
+            // absence, or the update would drop the stored report time.
+            if (!isNotFound(error)) {
+              throw error;
+            }
             return { comment: null };
           })
         ).comment
