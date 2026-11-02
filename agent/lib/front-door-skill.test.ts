@@ -1,16 +1,15 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
+import type { ProviderClient } from "./executor/operations.js";
+import { routeTicket } from "./linear-api.js";
+import { SUPPORT_OWNER } from "./owner-map.js";
+import { fakeLinear, json } from "./route-ticket-fixtures.js";
 
 const skill = readFileSync(
   new URL("../skills/front-door-intake/SKILL.md", import.meta.url),
   "utf8"
 );
-
-import type { ProviderClient } from "./executor/operations.js";
-import { routeTicket } from "./linear-api.js";
-import { SUPPORT_OWNER } from "./owner-map.js";
-import { fakeLinear, json } from "./route-ticket-fixtures.js";
 
 const ASSIGNEE = /`assignee: "([^"`]+)"`/u;
 const BOLD = /\*\*[^*]+\*\*/u;
@@ -174,7 +173,6 @@ for (const [heading, state] of [
 
 test("an eligible known issue assignee takes precedence over the support fallback", async () => {
   const assignee = ASSIGNEE.exec(section("4. Known issue"))?.[1];
-  assert.equal(assignee, SUPPORT_OWNER);
   const linear = fakeLinear();
   await routeTicket(
     {

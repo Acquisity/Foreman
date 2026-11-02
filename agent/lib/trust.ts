@@ -309,9 +309,9 @@ export function isStripeDisputeSession(
  * which is a narrower question with a different answer. A trusted GitHub
  * collaborator is exactly the caller the two must not agree on.
  *
- * Stamped only on operational surfaces that run triage: Linear Agent Sessions outside the front-door route,
- * every Slack surface the app is invited into, and the local dev TUI. Never on GitHub
- * sessions or schedules.
+ * Stamped only on operational surfaces that run triage: Linear Agent Sessions
+ * outside the front-door route, every Slack surface the app is invited into,
+ * and the local dev TUI. Never on GitHub sessions or schedules.
  */
 export const INVESTIGATION_MEMORY_ATTRIBUTE = "investigationMemory";
 

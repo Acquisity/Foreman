@@ -204,7 +204,7 @@ const writeHandoff = async (
   issueId: string,
   commentId: string,
   body: string,
-  existing: { body: string } | null | undefined
+  existing: { body: string } | null
 ): Promise<void> => {
   const update = async () => {
     const result = await linear<{ commentUpdate: { success: boolean } }>(

@@ -27,8 +27,8 @@ const ENV = { FIXY_TRIAGE_TEAMS: "SAN" };
 const ISSUE_ID = "6f1d2c3b-aaaa-4bbb-8ccc-123456789abc";
 const TEAM_ID = "team-san";
 const COMMENT_ID = fixyHandoffCommentId(ISSUE_ID);
-// Measured shape: SAN-124's 'Ask from' link into the receiver sandbox.
 const QUERY_NAME = /(?:query|mutation)\s+(\w+)/u;
+// Measured shape: SAN-124's 'Ask from' link into the receiver sandbox.
 const ASK_URL =
   "https://acquisityworkspace.slack.com/archives/C0BLFDUN6Q7/p1793556157524579";
 

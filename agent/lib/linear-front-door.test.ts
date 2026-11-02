@@ -9,7 +9,6 @@ import {
   LINEAR_FRONT_DOOR_ROUTE,
   LINEAR_TRIAGE_ROUTE,
 } from "./linear-context.js";
-
 import { composePrompt, GENERAL_PROMPT, MEMORY } from "./prompts.js";
 import { sessionLane } from "./session-lane.js";
 import { canUseInvestigationMemory } from "./trust.js";
