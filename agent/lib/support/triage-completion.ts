@@ -135,8 +135,11 @@ const closedUnseen = (
     return !issue.labels.includes(DECLINED_LABEL);
   }
   if (issue.status === "Done") {
+    // Declined wins: a request a person declined never finishes Done.
     return !(
-      issue.labels.includes("Approved") && handlingPath === "Resolved by triage"
+      issue.labels.includes("Approved") &&
+      !issue.labels.includes(DECLINED_LABEL) &&
+      handlingPath === "Resolved by triage"
     );
   }
   return true;
@@ -235,6 +238,11 @@ export function assertTriageOutputs(
       "Save the settled review before finishing triage, including after reclassification."
     );
   }
+  if (closedUnseen(issue, classification, handlingPath)) {
+    throw new SupportRefusal(
+      "A Feature Request closes only on a person's matching decision: Canceled with Declined, or Done with Approved (and not Declined) on Resolved by triage, never Duplicate. Route it to Backlog with Needs approval for James."
+    );
+  }
   if (
     !issue.priority ||
     ownerRecordMissing(issue, classification, handlingPath) ||
@@ -246,7 +254,6 @@ export function assertTriageOutputs(
       issue.labels.includes(label)
     ) ||
     missesTypeLabels(issue, classification, handlingPath) ||
-    closedUnseen(issue, classification, handlingPath) ||
     needsMaster(
       issue,
       classification,

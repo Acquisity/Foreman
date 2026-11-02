@@ -149,8 +149,14 @@ test("completion accepts a declined Feature Request Canceled without Needs appro
   assert.doesNotThrow(() => assertTriageOutputs(declined, content, comments));
 });
 
+const CLOSED_UNSEEN =
+  /A Feature Request closes only on a person's matching decision/u;
+
 test("completion matches a closed Feature Request's state to the person's decision", () => {
-  const closed = (status: string, decision: string, path: string) => ({
+  // Every fixture is valid apart from the closed-unseen rule: an Area label
+  // for the engineering path and a duplicate relation for Duplicate, so the
+  // refusal can only come from that rule.
+  const closed = (status: string, decisions: string[], path: string) => ({
     report: {
       ...report,
       assignee: null,
@@ -158,10 +164,12 @@ test("completion matches a closed Feature Request's state to the person's decisi
         "intercom-sourced",
         "Customer reported",
         "Feature Request",
-        decision,
+        "Area: AI SDR",
+        ...decisions,
       ],
       parentId: null,
       project: null,
+      relations: status === "Duplicate" ? { duplicateOf: "ENG-9" } : null,
       status,
     },
     written: {
@@ -169,27 +177,31 @@ test("completion matches a closed Feature Request's state to the person's decisi
       content: `# Triage investigation\n**Classification**: Feature Request\n**Handling path**: ${path}\n**Review**: Not required`,
     },
   });
-  for (const [status, decision, path] of [
-    ["Canceled", "Approved", "Resolved by triage"],
-    ["Done", "Declined", "Declined"],
-    ["Duplicate", "Approved", "Duplicate"],
-    ["Done", "Approved", "Engineering Todo"],
-  ]) {
-    const { report: issue, written } = closed(status, decision, path);
+  const refused: [string, string[], string][] = [
+    ["Canceled", ["Approved"], "Resolved by triage"],
+    ["Done", ["Declined"], "Declined"],
+    ["Duplicate", ["Approved"], "Duplicate"],
+    ["Done", ["Approved"], "Engineering Todo"],
+    ["Done", ["Approved", "Declined"], "Resolved by triage"],
+  ];
+  for (const [status, decisions, path] of refused) {
+    const { report: issue, written } = closed(status, decisions, path);
     assert.throws(
       () => assertTriageOutputs(issue, written, comments),
-      SupportRefusal,
-      `${status} with ${decision} on ${path}`
+      (error: unknown) =>
+        error instanceof SupportRefusal && CLOSED_UNSEEN.test(error.message),
+      `${status} with ${decisions.join("+")} on ${path}`
     );
   }
-  for (const [status, decision, path] of [
-    ["Canceled", "Declined", "Declined"],
-    ["Done", "Approved", "Resolved by triage"],
-  ]) {
-    const { report: issue, written } = closed(status, decision, path);
+  const accepted: [string, string[], string][] = [
+    ["Canceled", ["Declined"], "Declined"],
+    ["Done", ["Approved"], "Resolved by triage"],
+  ];
+  for (const [status, decisions, path] of accepted) {
+    const { report: issue, written } = closed(status, decisions, path);
     assert.doesNotThrow(
       () => assertTriageOutputs(issue, written, comments),
-      `${status} with ${decision} on ${path}`
+      `${status} with ${decisions.join("+")} on ${path}`
     );
   }
 });

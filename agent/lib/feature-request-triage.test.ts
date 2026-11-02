@@ -388,6 +388,7 @@ describe("CodeRabbit review of #259, decisions", () => {
       bugAnswers()
     );
     assert.ok(decision.outcome === "route");
+    assert.equal(decision.classification, "Bug");
     assert.equal(
       decision.route.removeLabels?.includes("Feature Request") ?? false,
       false
