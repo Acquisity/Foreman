@@ -240,7 +240,11 @@ export function assertTriageOutputs(
   }
   if (closedUnseen(issue, classification, handlingPath)) {
     throw new SupportRefusal(
-      "A Feature Request closes only on a person's matching decision: Canceled with Declined, or Done with Approved (and not Declined) on Resolved by triage, never Duplicate. Route it to Backlog with Needs approval for James."
+      `A Feature Request closes only on a person's matching decision: Canceled with Declined, or Done with Approved (and not Declined) on Resolved by triage, never Duplicate. ${
+        issue.labels.includes(DECLINED_LABEL)
+          ? "A person declined it, so route it to Canceled."
+          : "Route it to Backlog with Needs approval for James."
+      }`
     );
   }
   if (

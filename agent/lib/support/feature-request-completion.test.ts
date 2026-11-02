@@ -186,10 +186,15 @@ test("completion matches a closed Feature Request's state to the person's decisi
   ];
   for (const [status, decisions, path] of refused) {
     const { report: issue, written } = closed(status, decisions, path);
+    const next = decisions.includes("Declined")
+      ? /route it to Canceled/u
+      : /Route it to Backlog with Needs approval/u;
     assert.throws(
       () => assertTriageOutputs(issue, written, comments),
       (error: unknown) =>
-        error instanceof SupportRefusal && CLOSED_UNSEEN.test(error.message),
+        error instanceof SupportRefusal &&
+        CLOSED_UNSEEN.test(error.message) &&
+        next.test(error.message),
       `${status} with ${decisions.join("+")} on ${path}`
     );
   }
