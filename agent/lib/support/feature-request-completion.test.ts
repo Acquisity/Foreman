@@ -153,6 +153,7 @@ const CLOSED_UNSEEN =
   /A Feature Request closes only on a person's matching decision/u;
 const TO_CANCELED = /route it to Canceled/u;
 const TO_BACKLOG = /Route it to Backlog with Needs approval/u;
+const KEEP_APPROVED = /A person approved it, so keep its approved path/u;
 
 test("completion matches a closed Feature Request's state to the person's decision", () => {
   // Every fixture is valid apart from the closed-unseen rule: an Area label
@@ -188,7 +189,12 @@ test("completion matches a closed Feature Request's state to the person's decisi
   ];
   for (const [status, decisions, path] of refused) {
     const { report: issue, written } = closed(status, decisions, path);
-    const next = decisions.includes("Declined") ? TO_CANCELED : TO_BACKLOG;
+    let next = TO_BACKLOG;
+    if (decisions.includes("Declined")) {
+      next = TO_CANCELED;
+    } else if (decisions.includes("Approved")) {
+      next = KEEP_APPROVED;
+    }
     assert.throws(
       () => assertTriageOutputs(issue, written, comments),
       (error: unknown) =>

@@ -145,12 +145,18 @@ const closedUnseen = (
   return true;
 };
 
-const closedUnseenRefusal = (labels: string[]): string =>
-  `A Feature Request closes only on a person's matching decision: Canceled with Declined, or Done with Approved (and not Declined) on Resolved by triage, never Duplicate. ${
-    labels.includes(DECLINED_LABEL)
-      ? "A person declined it, so route it to Canceled."
-      : "Route it to Backlog with Needs approval for James."
-  }`;
+const CLOSED_UNSEEN_RULE =
+  "A Feature Request closes only on a person's matching decision: Canceled with Declined, or Done with Approved (and not Declined) on Resolved by triage, never Duplicate.";
+
+const closedUnseenRefusal = (labels: string[]): string => {
+  if (labels.includes(DECLINED_LABEL)) {
+    return `${CLOSED_UNSEEN_RULE} A person declined it, so route it to Canceled.`;
+  }
+  if (labels.includes("Approved")) {
+    return `${CLOSED_UNSEEN_RULE} A person approved it, so keep its approved path; do not route it to Backlog with Needs approval.`;
+  }
+  return `${CLOSED_UNSEEN_RULE} Route it to Backlog with Needs approval for James.`;
+};
 
 const missesTypeLabels = (
   issue: z.infer<typeof issueSchema>,
