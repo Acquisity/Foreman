@@ -2,6 +2,7 @@ import { generateText, type LanguageModel, Output } from "ai";
 import { z } from "zod";
 import { modelFor, resolveModel } from "../models.js";
 import { logOpsEvent, type OpsFields } from "../ops-log.js";
+import { VERDICT_OUTCOMES, type VerdictOutcome } from "./copy.js";
 
 export const WRITER_TIMEOUT_MS = 20_000;
 const MAX_INPUT_CHARS = 3000;
@@ -20,11 +21,13 @@ export type WriterTask =
       kind: "done" | "reason";
       staff: string[];
       title: string;
-    };
+    }
+  | { kind: "verdict"; reply: string; title: string };
 
 export interface WriterReply {
   asDesigned?: boolean | null;
   steps: string | null;
+  verdict?: VerdictOutcome | null;
   what: string | null;
 }
 
@@ -33,12 +36,16 @@ export type ReporterWriter = (task: WriterTask) => Promise<WriterReply>;
 export const NO_REPLY: WriterReply = {
   asDesigned: null,
   steps: null,
+  verdict: null,
   what: null,
 };
 
 const replySchema = z.object({
   asDesigned: z.boolean().nullable(),
   steps: z.string().max(400).nullable(),
+  verdict: z
+    .enum(VERDICT_OUTCOMES as [VerdictOutcome, ...VerdictOutcome[]])
+    .nullable(),
   what: z.string().max(300).nullable(),
 });
 
@@ -47,7 +54,7 @@ const RULES = [
   "Write in plain, friendly words a customer uses. Never mention developers, owners, names of staff, tickets, pull requests, code, merges, deploys, file paths, error codes or AI models.",
   "No markdown, no quotes, no links, no emoji and no em dashes.",
   "Say only what the text below supports. Never invent a change, a button or a page.",
-  "Return JSON with three fields, what, steps and asDesigned. Use null for a field you cannot write from the text, and for asDesigned unless the task asks for it.",
+  "Return JSON with four fields, what, steps, asDesigned and verdict. Use null for a field you cannot write from the text, and for asDesigned and verdict unless the task asks for them.",
 ].join("\n");
 
 const TASKS: Record<WriterTask["kind"], string> = {
@@ -78,6 +85,16 @@ const TASKS: Record<WriterTask["kind"], string> = {
     "Set what to a phrase of at most 15 words naming the problem or request, as it fits after 'We're looking into ', for example: why your email threads won't load.",
     "Set steps to null.",
   ].join("\n"),
+  verdict: [
+    "This report is still open. Our team investigated it, and below is their final note. Read it and pick what the customer should hear.",
+    "Set verdict to fix_in_review when the note says a fix was made and is open for review, even if it also raises internal follow-ups such as a failing check or a decision for staff.",
+    "Set verdict to not_a_bug when they found the product works the way it is meant to, it was a user mistake, or it is a current limit of the product.",
+    "Set verdict to already_fixed when the product as it is today already fixes it.",
+    "Set verdict to cannot_reproduce when they tried and could not make it happen.",
+    "Set verdict to none for anything else, including a blocked run with no fix, billing, a test reply, a note that is unclear, or a skip that needs a product decision. When in doubt, use none.",
+    "Only for not_a_bug, if the note gives a reason a customer would understand, set what to that reason in at most 10 words, as it fits after a colon at the end of a sentence, for example: exports only include the last 12 months. Otherwise set what to null.",
+    "Set steps and asDesigned to null.",
+  ].join("\n"),
 };
 
 const clip = (text: string): string => text.slice(0, MAX_INPUT_CHARS);
@@ -91,6 +108,10 @@ const commentBlock = (label: string, comments: readonly string[]): string => {
 
 const contextOf = (task: WriterTask): string => {
   const parts = [`Report title: ${clip(task.title)}`];
+  if ("reply" in task) {
+    parts.push(`Final note from our investigation:\n${clip(task.reply)}`);
+    return parts.join("\n\n");
+  }
   if ("staff" in task) {
     parts.push(commentBlock("Comments from our staff", task.staff));
     if (task.foreman.length > 0) {

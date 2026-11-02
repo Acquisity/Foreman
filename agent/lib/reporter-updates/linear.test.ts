@@ -1,5 +1,11 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
+import {
+  FIXY_LINEAR_USER_ID,
+  fixyTriageTeams,
+  renderFixyHandoff,
+} from "../fixy-handoff.js";
+import { ENGINEERING_TEAM_ID } from "../linear-api.js";
 import { commentIdFor } from "./comment-id.js";
 import { linearPort } from "./linear.js";
 
@@ -99,17 +105,23 @@ const issue = (over: Record<string, unknown> = {}) => ({
 });
 
 const portWith = (
-  respond: (query: string, variables: Record<string, unknown>) => Response
+  respond: (query: string, variables: Record<string, unknown>) => Response,
+  teams: ReadonlySet<string> = new Set()
 ) => {
   const requests: { query: string; variables: Record<string, unknown> }[] = [];
-  const port = linearPort("token", (_url, init) => {
-    const body = JSON.parse(String(init?.body)) as {
-      query: string;
-      variables: Record<string, unknown>;
-    };
-    requests.push(body);
-    return Promise.resolve(respond(body.query, body.variables));
-  });
+  const port = linearPort(
+    "token",
+    (_url, init) => {
+      const body = JSON.parse(String(init?.body)) as {
+        query: string;
+        variables: Record<string, unknown>;
+      };
+      requests.push(body);
+      return Promise.resolve(respond(body.query, body.variables));
+    },
+    undefined,
+    teams
+  );
   return { port, requests };
 };
 
@@ -196,6 +208,7 @@ describe("readTicket", () => {
       createdAt: "2026-10-10T09:00:00Z",
       description: "Exports stop at 500 rows.",
       duplicateOf: "ENG-2",
+      fixyVerdict: null,
       identifier: "ENG-1",
       labels: ["Bug", "Customer reported"],
       parent: { identifier: "ENG-9", stateType: "completed" },
@@ -627,6 +640,87 @@ describe("closing comments", () => {
   });
 });
 
+describe("Fixy's verdict and handoff", () => {
+  const fixy = (id: string, body: string, createdAt: string, parent?: string) =>
+    comment(id, body, { createdAt, parent, user: FIXY_LINEAR_USER_ID });
+  const read = async (nodes: ReturnType<typeof comment>[]) => {
+    const { port } = portWith(
+      ticketWith({
+        issue: issue({ comments: nodes }),
+        viewer: { id: "viewer" },
+      })
+    );
+    return (await port.readTicket("ENG-1"))?.facts;
+  };
+
+  it("takes Fixy's newest reply, never its run-finished note or anyone else's comment", async () => {
+    const facts = await read([
+      comment(
+        "l-1",
+        "This thread is for an agent session with fixymcfixerson.",
+        {
+          createdAt: "2026-11-01T15:23:50Z",
+          user: null,
+        }
+      ),
+      fixy("x-1", "OK. This is a test.", "2026-11-01T15:30:00Z"),
+      fixy("x-2", "I fixed and proved the bug.", "2026-11-01T16:12:53Z"),
+      fixy(
+        "x-3",
+        " This run finished. Its reply is on the ticket.\n",
+        "2026-11-01T16:12:54Z",
+        "x-2"
+      ),
+      comment("a-1", "Thanks Fixy.", {
+        createdAt: "2026-11-01T17:00:00Z",
+        user: "aaron",
+      }),
+    ]);
+    assert.deepEqual(facts?.fixyVerdict, {
+      body: "I fixed and proved the bug.",
+      createdAt: "2026-11-01T16:12:53Z",
+    });
+  });
+
+  it("has no verdict when Fixy has only said its run finished", async () => {
+    const facts = await read([
+      fixy(
+        "x-1",
+        "This run finished. Its reply is on the ticket.",
+        "2026-11-01T16:12:54Z"
+      ),
+    ]);
+    assert.equal(facts?.fixyVerdict, null);
+  });
+
+  it("leaves Foreman's Fixy handoff, which holds the workspace id, out of the closing comments", async () => {
+    const handoff = renderFixyHandoff({
+      expected: "The guide opens.",
+      notes: null,
+      reportedAt: "2026-10-29T10:00:00.000Z",
+      reportedAtSource: "Slack thread start",
+      steps: ["Open the webhook card.", "Click webhook guide."],
+      whatHappened: "The guide link opens a 404.",
+      workspaceId: "11111111-2222-4333-8444-555555555555",
+      workspaceUnknown: null,
+    });
+    const facts = await read([
+      comment("h-1", handoff, {
+        createdAt: "2026-10-29T10:05:00Z",
+        user: "viewer",
+      }),
+      comment("f-1", "Handed to Fixy.", {
+        createdAt: "2026-10-29T10:06:00Z",
+        user: "viewer",
+      }),
+    ]);
+    assert.deepEqual(
+      facts?.closingComments.map((c) => c.body),
+      ["Handed to Fixy."]
+    );
+  });
+});
+
 describe("readOriginal", () => {
   const original = (comments: ReturnType<typeof comment>[]) => ({
     issue: {
@@ -766,6 +860,56 @@ describe("discover", () => {
     const query = requests[0]?.query ?? "";
     assert.ok(query.includes("{ parent: { updatedAt: { gt: $since } } }"));
     assert.ok(query.includes("createdAt: { gt: $created }"));
+  });
+
+  it("asks exactly what it always has when no Fixy team is listed", async () => {
+    const { port, requests } = portWith(
+      () => page("ENG-1", null),
+      fixyTriageTeams({})
+    );
+    await port.discover(SINCE, CREATED, null);
+    assert.equal(
+      requests[0]?.query,
+      `query ReporterDiscover($team: ID!, $since: DateTimeOrDuration!, $created: DateTimeOrDuration!, $anchor: String!, $after: String) {
+  issues(first: 100, after: $after, orderBy: createdAt, filter: {
+    team: { id: { eq: $team } }
+    createdAt: { gt: $created }
+    comments: { some: { body: { startsWith: $anchor } } }
+    or: [{ updatedAt: { gt: $since } }, { parent: { updatedAt: { gt: $since } } }]
+  }) {
+    pageInfo { hasNextPage endCursor }
+    nodes { identifier updatedAt parent { updatedAt } }
+  }
+}`
+    );
+    assert.deepEqual(requests[0]?.variables, {
+      after: null,
+      anchor: "Slack thread connected in ",
+      created: CREATED,
+      since: SINCE,
+      team: ENGINEERING_TEAM_ID,
+    });
+  });
+
+  it("also asks for the listed Fixy teams' tickets", async () => {
+    const { port, requests } = portWith(
+      () => page("SAN-1", null),
+      fixyTriageTeams({ FIXY_TRIAGE_TEAMS: "san" })
+    );
+    const found = await port.discover(SINCE, CREATED, null);
+    assert.deepEqual(
+      found.tickets.map((t) => t.issue),
+      ["SAN-1"]
+    );
+    const query = requests[0]?.query ?? "";
+    assert.ok(
+      query.includes(
+        "team: { or: [{ id: { eq: $team } }, { key: { in: $teams } }] }"
+      )
+    );
+    assert.ok(query.includes("$teams: [String!]!"));
+    assert.deepEqual(requests[0]?.variables.teams, ["SAN"]);
+    assert.equal(requests[0]?.variables.team, ENGINEERING_TEAM_ID);
   });
 
   it("hands back the page cursor when there are more tickets than one run will list", async () => {

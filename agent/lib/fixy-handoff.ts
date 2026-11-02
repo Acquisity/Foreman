@@ -8,6 +8,9 @@ import { isAskFromTitle } from "./linear-context.js";
  * on teams in its own FIXY_LINEAR_TEAMS, so the two lists must agree.
  */
 
+/** Fixy's Linear app user, the author of each run's final reply on a ticket. */
+export const FIXY_LINEAR_USER_ID = "110978d6-72e7-4d4c-8d87-ffe3df9794cc";
+
 const TEAM_KEY = /^[A-Z][A-Z0-9]{1,9}$/u;
 const ISSUE_IDENTIFIER = /^([A-Z][A-Z0-9]{1,9})-\d{1,9}$/u;
 const TEAMS_MAX_CHARS = 1000;

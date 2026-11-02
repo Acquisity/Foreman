@@ -1,11 +1,30 @@
 import { ownerNames } from "../owner-map.js";
 import { commentIdFor } from "./comment-id.js";
 
-export type Stage = "received" | "fixed" | "not_fixed";
+export type Stage = "received" | "fixed" | "not_fixed" | "verdict";
 export type LedgerStage = Stage | "owner";
 export type NotFixedReason = "duplicate" | "not_a_bug" | "closed";
+/** What Fixy's finished run found, as the reporter hears it; `none` posts nothing. */
+export type VerdictOutcome =
+  | "fix_in_review"
+  | "not_a_bug"
+  | "already_fixed"
+  | "cannot_reproduce"
+  | "none";
 
-export const STAGES: readonly Stage[] = ["received", "fixed", "not_fixed"];
+export const STAGES: readonly Stage[] = [
+  "received",
+  "fixed",
+  "not_fixed",
+  "verdict",
+];
+export const VERDICT_OUTCOMES: readonly VerdictOutcome[] = [
+  "fix_in_review",
+  "not_a_bug",
+  "already_fixed",
+  "cannot_reproduce",
+  "none",
+];
 export const LEDGER_STAGES: readonly LedgerStage[] = [...STAGES, "owner"];
 
 export const MAX_UPDATE_WORDS = 40;
@@ -172,12 +191,47 @@ export const notFixedText = (
   return firstFitting([why ? build(why) : null]) ?? build(null);
 };
 
+const VERDICT_TEXTS: Record<
+  Exclude<VerdictOutcome, "none" | "not_a_bug">,
+  string
+> = {
+  already_fixed:
+    "We looked into this and it's already been sorted on our side. If you still see it, reply here with when it happened.",
+  cannot_reproduce:
+    "We tried this on a copy of your workspace and couldn't make it happen. If you see it again, reply here with when it happened and what you clicked.",
+  fix_in_review:
+    "We found what was causing this and a fix is being checked now. We'll write here again when it's working for you.",
+};
+
+const verdictNotABugText = (reason: string | null): string =>
+  `We looked into this and it's working the way it's meant to${withReason(reason)}. If something still looks wrong, reply here with what you expected to see.`;
+
+/** The fixed line for what Fixy's run found; null for `none`, which posts nothing. */
+export const verdictText = (
+  outcome: VerdictOutcome,
+  why: string | null = null
+): string | null => {
+  if (outcome === "none") {
+    return null;
+  }
+  if (outcome === "not_a_bug") {
+    return (
+      firstFitting([why ? verdictNotABugText(why) : null]) ??
+      verdictNotABugText(null)
+    );
+  }
+  return VERDICT_TEXTS[outcome];
+};
+
 /**
  * Exact texts the first version posted. Every v2 message is recognised by its
  * comment id instead, because its wording is model-written; these keep
  * threads that already hold a v1 message from getting a second one.
  */
-export const PAST_TEXTS: Record<LedgerStage, readonly string[]> = {
+export const PAST_TEXTS: Record<
+  Exclude<LedgerStage, "verdict">,
+  readonly string[]
+> = {
   fixed: [
     "Good news: this is fixed and live now. Please try it again. If it still doesn't work, reply here and we'll look straight away.",
   ],
@@ -205,7 +259,8 @@ const exactly = (texts: readonly string[]): RegExp =>
     "u"
   );
 
-const PAST_PATTERNS: Record<LedgerStage, RegExp> = {
+// No v1 text exists for the verdict stage; a pattern of no texts would match an empty body.
+const PAST_PATTERNS: Partial<Record<LedgerStage, RegExp>> = {
   fixed: exactly(PAST_TEXTS.fixed),
   not_fixed: exactly(PAST_TEXTS.not_fixed),
   owner: exactly(PAST_TEXTS.owner),
@@ -223,7 +278,7 @@ const normalized = (body: string): string =>
 export const coversOf = (body: string): LedgerStage[] => {
   const text = normalized(body);
   const stage = LEDGER_STAGES.find((candidate) =>
-    PAST_PATTERNS[candidate].test(text)
+    PAST_PATTERNS[candidate]?.test(text)
   );
   if (stage === "received" && RECEIVED_WITH_OWNER.test(text)) {
     return ["received", "owner"];

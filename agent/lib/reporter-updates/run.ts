@@ -5,6 +5,7 @@ import {
   composeDone,
   composeNotFixed,
   composeReceived,
+  composeVerdict,
 } from "./compose.js";
 import {
   coversOf,
@@ -18,6 +19,7 @@ import {
   closureOf,
   DEPLOY_REPOSITORY,
   deployVerdict,
+  finishedFixyVerdict,
   type Planned,
   type PullFacts,
   parsePullUrl,
@@ -452,6 +454,38 @@ const skipDone = (view: TicketView, deps: Deps): Outcome => {
   return skipped("no_evidence_of_change");
 };
 
+const skipVerdict = (view: TicketView, deps: Deps): Outcome => {
+  (deps.log ?? logOpsEvent)("reporter.update_skipped", {
+    code: "no_reporter_verdict",
+    issue: view.facts.identifier,
+    outcome: "skipped",
+  });
+  return skipped("no_reporter_verdict");
+};
+
+/**
+ * An open ticket hears received once, then what Fixy's finished bug run found,
+ * once. A ticket that closes first gets only its close message.
+ */
+const openMessage = async (
+  view: TicketView,
+  done: ReadonlySet<LedgerStage>,
+  deps: Deps
+): Promise<Planned | Outcome | null> => {
+  const { facts } = view;
+  if (!done.has("received")) {
+    return composeReceived(facts, deps.write);
+  }
+  const verdict = done.has("verdict") ? null : finishedFixyVerdict(facts);
+  if (!verdict) {
+    return null;
+  }
+  return (
+    (await composeVerdict(facts, verdict.body, deps.write)) ??
+    skipVerdict(view, deps)
+  );
+};
+
 const nextMessage = async (
   view: TicketView,
   done: ReadonlySet<LedgerStage>,
@@ -461,7 +495,7 @@ const nextMessage = async (
   const { facts } = view;
   const closure = closureOf(facts);
   if (closure.kind === "open") {
-    return done.has("received") ? null : composeReceived(facts, deps.write);
+    return openMessage(view, done, deps);
   }
   if (closure.kind === "not_fixed") {
     if (!done.has("not_fixed")) {
