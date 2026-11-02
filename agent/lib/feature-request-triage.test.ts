@@ -2,7 +2,12 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { JevAnswer } from "./jev.js";
 import { resolveTriage, triageQuestions } from "./jev-decisions.js";
-import { bugAnswers, pick, triageInput } from "./triage-fixtures.js";
+import {
+  bugAnswers,
+  pick,
+  RECORDED_CHANGE,
+  triageInput,
+} from "./triage-fixtures.js";
 
 const CLOSED = ["Canceled", "Done", "Duplicate"];
 const FEATURE_PRECEDENCE =
@@ -273,5 +278,27 @@ describe("person decisions come before classification (C2, C4)", () => {
     );
     assert.ok(decision.outcome === "route");
     assert.equal(decision.route.state, "Canceled");
+  });
+});
+
+describe("an approved request that can close still needs a clear path (R4)", () => {
+  it("leaves an Approved request resolved at 0.4 path confidence unproven instead of Done", () => {
+    const decision = resolveTriage(
+      triageInput({
+        changeMade: RECORDED_CHANGE,
+        ticketLabels: ["Approved", "Feature Request"],
+      }),
+      request({ path: pick("Resolved by triage", 0.4) })
+    );
+    assert.equal(decision.outcome, "unproven");
+  });
+
+  it("still parks an unapproved request at 0.4 path confidence, because it stays open", () => {
+    const decision = resolveTriage(
+      triageInput(),
+      request({ path: pick("Resolved by triage", 0.4) })
+    );
+    assert.ok(decision.outcome === "route");
+    assert.equal(decision.route.state, "Backlog");
   });
 });

@@ -488,13 +488,18 @@ export const requesterReplies = defineState<Record<string, string>>(
   () => ({})
 );
 
-/** What the requester is told: the classification, path and outcome, not the wording. */
+/**
+ * Which decision a reply answered: its outcome, classification and path, and
+ * when it was made, so every new decision, even one with the same class and
+ * path, needs its own delivered reply.
+ */
 export const decisionKey = (decision: LatestTriageDecision): string =>
   JSON.stringify([
     decision.outcome,
     decision.classification,
     decision.path,
     decision.fallback === true,
+    decision.decidedAt ?? null,
   ]);
 
 /**

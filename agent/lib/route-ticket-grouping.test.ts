@@ -348,3 +348,23 @@ describe("a failed update after the relation keeps the retry able to close (C5)"
     assert.doesNotMatch(message, WITHOUT_DUPLICATE);
   });
 });
+
+describe("a declined request stays closed when it cannot join a master (R1)", () => {
+  it("keeps a Declined feature request Canceled, related to its lone match and labelled Needs grouping", async () => {
+    const fake = linear({
+      ticketLabels: [
+        { id: "l-fr", name: "Feature Request" },
+        { id: "l-declined", name: "Declined" },
+      ],
+    });
+    const result = await routeTicket(
+      { issue: "ENG-1", relatedTo: "ENG-40", state: "Canceled" },
+      { client: fake.fetchStub }
+    );
+    assert.deepEqual(fake.relationTypes, ["related"]);
+    assert.equal(updateOf(fake)?.stateId, "s-canceled");
+    assert.equal(updateOf(fake)?.assigneeId, undefined);
+    assert.ok(labelIdsOf(fake).includes("l-grouping"));
+    assert.equal(result.grouping, "needs-grouping");
+  });
+});

@@ -379,9 +379,12 @@ export async function planRoute(
   }
   // A closing route with no open master is deferred to the grouping sweep: it
   // leaves Triage for Backlog with a person who sees it, not the match's owner.
+  // A person's Declined decision keeps its Canceled state: it is only related
+  // and labelled for grouping, never reopened.
   const deferred =
     plan.unjoined !== undefined &&
-    named(input.state, "canceled", "done", "duplicate");
+    named(input.state, "canceled", "done", "duplicate") &&
+    !finalLabels(issue, input).has(DECLINED_LABEL.toLowerCase());
   const keepsState = !(held || deferred);
   const parent = match ? plan.parent : input.parent;
   // A matched report takes its owner from the master it is parented under,

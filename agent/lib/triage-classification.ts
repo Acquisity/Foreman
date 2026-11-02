@@ -75,6 +75,27 @@ export const settleClassification = (
   return named;
 };
 
+/** What a handling path too unsure to act on still lacks. */
+export const PATH_GAP = {
+  missing: ["A deciding confirmation for the handling path."],
+  note: "The handling path was not clear enough to act on.",
+};
+
+/**
+ * Whether a feature request's handling path can close it and is too unsure to
+ * act on: only an Approved, undeclined request keeps Jev's Resolved by triage
+ * (Done); every other feature request is forced open, so its path needs no bar.
+ */
+export const closingFeaturePath = (
+  ticketLabels: readonly string[],
+  pathChoice: string,
+  pathConfidence: number
+): boolean =>
+  hasLabel(ticketLabels, APPROVED_LABEL) &&
+  !hasLabel(ticketLabels, DECLINED_LABEL) &&
+  pathChoice === "Resolved by triage" &&
+  pathConfidence < BARS.path;
+
 const CLOSING_STATES = ["Canceled", "Duplicate"];
 
 /** An explanation that closes carries the grouping label, so repeat confusion is counted. */

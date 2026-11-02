@@ -967,3 +967,25 @@ test("completion accepts a repeat report left open in Backlog for grouping (C6)"
     );
   }
 });
+
+test("completion accepts a declined Feature Request Canceled without Needs approval (R5)", () => {
+  const declined = {
+    ...report,
+    assignee: null,
+    labels: [
+      "intercom-sourced",
+      "Customer reported",
+      "Feature Request",
+      "Declined",
+    ],
+    parentId: null,
+    project: null,
+    status: "Canceled",
+  };
+  const content = {
+    ...document,
+    content:
+      "# Triage investigation\n**Classification**: Feature Request\n**Handling path**: Declined\n**Review**: Not required",
+  };
+  assert.doesNotThrow(() => assertTriageOutputs(declined, content, comments));
+});

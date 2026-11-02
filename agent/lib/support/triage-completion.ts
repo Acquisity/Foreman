@@ -139,6 +139,9 @@ const missesTypeLabels = (
   ) {
     return true;
   }
+  if (issue.labels.includes(DECLINED_LABEL)) {
+    return false;
+  }
   if (
     issue.labels.includes("Feature Request") &&
     !issue.labels.includes("Approved") &&

@@ -19,8 +19,10 @@ import {
 import { BARS } from "./triage-bars.js";
 import {
   classificationQuestion,
+  closingFeaturePath,
   groupingLabel,
   matchRoute,
+  PATH_GAP,
   settleClassification,
   splitMatch,
   type TriageClassification,
@@ -507,6 +509,7 @@ interface BarContext {
   classificationConfidence: number;
   duplicate: ReturnType<typeof findDuplicate>;
   input: TriageInput;
+  pathChoice: string;
   pathConfidence: number;
   /** A trusted regression record already set the path (ENG-16056). */
   pathFromRecord: boolean;
@@ -516,7 +519,13 @@ const barGap = (
   context: BarContext
 ): { missing: string[]; note: string } | null => {
   if (context.classification === "Feature Request") {
-    return null;
+    return closingFeaturePath(
+      context.input.ticketLabels ?? [],
+      context.pathChoice,
+      context.pathConfidence
+    )
+      ? PATH_GAP
+      : null;
   }
   if (context.classificationConfidence < BARS.classification) {
     return {
@@ -528,10 +537,7 @@ const barGap = (
     !(context.duplicate || context.pathFromRecord) &&
     context.pathConfidence < BARS.path
   ) {
-    return {
-      missing: ["A deciding confirmation for the handling path."],
-      note: "The handling path was not clear enough to act on.",
-    };
+    return PATH_GAP;
   }
   if (
     context.classification === "Bug" &&
@@ -627,6 +633,7 @@ export function resolveTriage(
     classificationConfidence: classificationPick.confidence,
     duplicate: match,
     input,
+    pathChoice: pathPick.choice,
     pathConfidence: pathPick.confidence,
     pathFromRecord: fixed !== undefined,
   });

@@ -63,7 +63,13 @@ export type ReplyPlan =
 
 export function planReply(
   comments: readonly ThreadComment[],
-  foremanUserId: string
+  foremanUserId: string,
+  /**
+   * When the current triage decision was made. A decision newer than
+   * Foreman's standing answer (a correction after the critic) may reply once,
+   * so the requester hears the decision that closes their ticket.
+   */
+  decidedAt?: string
 ): ReplyPlan {
   const byTime = (a: ThreadComment, b: ThreadComment) =>
     a.createdAt.localeCompare(b.createdAt);
@@ -93,6 +99,18 @@ export function planReply(
   }
   const thread = comments.filter((c) => c.parentId === anchor.id).sort(byTime);
   const newest = thread.at(-1);
+  const corrected =
+    newest !== undefined &&
+    decidedAt !== undefined &&
+    Date.parse(decidedAt) > Date.parse(newest.createdAt);
+  if (newest?.userId === foremanUserId && corrected) {
+    return {
+      anchorId: anchor.id,
+      followUp: null,
+      lastReplyAt: newest.createdAt,
+      ok: true,
+    };
+  }
   if (newest?.userId === foremanUserId) {
     return {
       alreadyReplied: true,
@@ -343,7 +361,8 @@ export interface ForemanUser {
 
 async function readThread(
   issue: string,
-  credentials: LinearChannelCredentials
+  credentials: LinearChannelCredentials,
+  decidedAt?: string
 ): Promise<{
   comments: ThreadComment[];
   foreman: ForemanUser;
@@ -378,7 +397,7 @@ async function readThread(
     comments,
     foreman: thread.viewer,
     issueId: thread.issue.id,
-    plan: planReply(comments, thread.viewer.id),
+    plan: planReply(comments, thread.viewer.id, decidedAt),
     widgetFeedback: thread.issue.project?.id === WIDGET_FEEDBACK_PROJECT_ID,
   };
 }
@@ -611,10 +630,12 @@ export async function replyToRequester(
   accessToken: string,
   signal?: AbortSignal,
   /** Rewords the message once Jev has said a reply is needed (ENG-15226). */
-  rewrite?: (message: string) => Promise<string>
+  rewrite?: (message: string) => Promise<string>,
+  /** When the current triage decision was made (`planReply`). */
+  decidedAt?: string
 ): Promise<ReplyResult> {
   const credentials = { accessToken };
-  const { issueId, plan } = await readThread(issue, credentials);
+  const { issueId, plan } = await readThread(issue, credentials, decidedAt);
   if (!plan.ok) {
     if (plan.alreadyReplied) {
       return {
