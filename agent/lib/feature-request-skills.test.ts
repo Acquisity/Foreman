@@ -277,3 +277,17 @@ test("the Intercom skill never asks the requester for a Linear identifier", () =
   );
   assert.ok(boundaries.includes("Never ask for a Linear identifier."));
 });
+
+test("the handling skill follows the returned decision instead of a 0.6 unproven rule (C4)", () => {
+  assert.equal(
+    triageHandlingSkill.includes(
+      "below 0.6 on the classification or path it is `unproven`"
+    ),
+    false
+  );
+  assert.ok(
+    triageHandlingSkill.includes(
+      "Follow the returned decision: `unproven` only when it says so"
+    )
+  );
+});

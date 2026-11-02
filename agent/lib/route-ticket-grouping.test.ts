@@ -21,6 +21,13 @@ const ISSUES: Record<string, FakeIssue> = {
     master: true,
     stateType: "completed",
   },
+  "ENG-81": {
+    assignee: ANUJ,
+    createdAt: FRESH,
+    master: true,
+    parent: "ENG-30",
+    stateType: "completed",
+  },
 };
 
 const GROUPING = { id: "l-grouping", name: "Needs grouping" };
@@ -51,6 +58,9 @@ const UNAPPROVED_CLOSE =
 const RELATED_LANDED =
   /related link to ENG-40 was recorded.*Call route_ticket again with the same input, duplicateOf ENG-40 included/su;
 const WITHOUT_DUPLICATE = /without duplicateOf/u;
+const RELATED_RETRY =
+  /Call route_ticket again with the same input, relatedTo ENG-40 included/u;
+const DUPLICATE_FIELD = /duplicateOf/u;
 const NOT_CONFIRMED = /could not be confirmed under ENG-30/u;
 const DUPLICATE_NEEDS_MASTER = /Duplicate only under an open master/u;
 
@@ -305,5 +315,51 @@ describe("a declined request stays closed when it cannot join a master (R1)", ()
     assert.equal(updateOf(fake)?.assigneeId, undefined);
     assert.ok(labelIdsOf(fake).includes("l-grouping"));
     assert.equal(result.grouping, "needs-grouping");
+  });
+});
+
+describe("a feature request's partial write keeps its match field (C1)", () => {
+  it("tells a feature request whose update failed after the related link to retry with relatedTo, not duplicateOf", async () => {
+    const fake = linear({
+      ticketLabels: CLASSIFIED["Feature Request"],
+      updateFailures: 1,
+    });
+    const message = await routeTicket(
+      {
+        assignee: "James Keeble",
+        issue: "ENG-1",
+        relatedTo: "ENG-40",
+        state: "Backlog",
+      },
+      { client: fake.fetchStub }
+    ).then(
+      () => "",
+      (error: Error) => error.message
+    );
+    assert.match(message, RELATED_RETRY);
+    assert.doesNotMatch(message, DUPLICATE_FIELD);
+    const retried = await routeTicket(
+      {
+        assignee: "James Keeble",
+        issue: "ENG-1",
+        relatedTo: "ENG-40",
+        state: "Backlog",
+      },
+      { client: fake.fetchStub }
+    );
+    assert.equal(retried.grouping, "needs-grouping");
+  });
+});
+
+describe("a closed master hands its reports to its open parent master (C2)", () => {
+  it("parents a duplicate of a closed master under that master's open parent and closes it there", async () => {
+    const fake = linear({ ticketLabels: CLASSIFIED["User Error"] });
+    const result = await routeTicket(
+      { duplicateOf: "ENG-81", issue: "ENG-1", state: "Duplicate" },
+      { client: fake.fetchStub }
+    );
+    assert.equal(updateOf(fake)?.parentId, "i-ENG-30");
+    assert.equal(updateOf(fake)?.stateId, "s-duplicate");
+    assert.equal(result.grouping, "joined");
   });
 });

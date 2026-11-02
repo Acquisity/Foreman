@@ -156,25 +156,28 @@ export async function masterFacts(
   };
 }
 
-/** The match itself when it is a master, else its parent when that is one. */
+/**
+ * The match itself when it is an open master, else its parent when that is
+ * one. A closed master that engineering-handoff moved under a new open master
+ * hands its reports to that parent; with none, the closed master is returned
+ * so the caller can say why nothing took the report.
+ */
 async function masterOf(
   gql: Gql,
   match: RouteIssue
 ): Promise<(MasterFacts & { identifier: string }) | null> {
   const own = await masterFacts(gql, match.identifier, match.id);
-  if (own !== null) {
+  if (own?.open) {
     return { ...own, identifier: match.identifier };
   }
   const parent = match.parent?.identifier;
-  if (!parent) {
-    return null;
+  const facts = parent
+    ? await masterFacts(gql, parent, (await requireIssue(gql, parent)).id)
+    : null;
+  if (parent && facts && (facts.open || own === null)) {
+    return { ...facts, identifier: parent };
   }
-  const facts = await masterFacts(
-    gql,
-    parent,
-    (await requireIssue(gql, parent)).id
-  );
-  return facts === null ? null : { ...facts, identifier: parent };
+  return own === null ? null : { ...own, identifier: match.identifier };
 }
 
 export const beforeCutoff = (createdAt: string, cutoff: string | null) =>

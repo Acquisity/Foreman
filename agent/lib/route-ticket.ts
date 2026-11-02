@@ -284,6 +284,8 @@ async function writeUpdate(
   after: {
     duplicateOf: string | null;
     parent?: string;
+    /** The input field that named the match, so the retry keeps it. */
+    matchField: "duplicateOf" | "relatedTo";
     relation: "duplicate" | "related";
     signal?: AbortSignal;
   }
@@ -304,7 +306,7 @@ async function writeUpdate(
     // Duplicate, so its retry keeps duplicateOf; a duplicate relation's does not.
     throw new Error(
       after.relation === "related"
-        ? `Only a related link to ${after.duplicateOf} was recorded, but the update failed (${reason(error)}). Call route_ticket again with the same input, duplicateOf ${after.duplicateOf} included, to apply the rest.`
+        ? `Only a related link to ${after.duplicateOf} was recorded, but the update failed (${reason(error)}). Call route_ticket again with the same input, ${after.matchField} ${after.duplicateOf} included, to apply the rest.`
         : `The duplicate relation to ${after.duplicateOf} was recorded, but the update failed (${reason(error)}). Call route_ticket again without duplicateOf${after.parent ? `, with parent ${after.parent} and inheritAssigneeFrom ${after.parent}` : ""}, to apply the rest.`,
       { cause: error }
     );
@@ -424,6 +426,7 @@ export async function routeTicket(
   if (Object.keys(built.update).length > 0) {
     await writeUpdate(gql, issue, built.update, {
       duplicateOf: related,
+      matchField: input.relatedTo === undefined ? "duplicateOf" : "relatedTo",
       parent,
       relation: routed.closes ? "duplicate" : "related",
       signal: opts?.signal,
