@@ -85,6 +85,31 @@ describe("Linear front door route (ENG-16061)", () => {
     assert.equal(composePrompt(sessionLane(triage.auth)), GENERAL_PROMPT);
   });
 
+  it("takes the memory part of the prompt from the current auth", async () => {
+    process.env.FIXY_TRIAGE_TEAMS = "SAN";
+    const front = await onAgentSession(
+      {} as LinearSessionContext,
+      created("SAN-145")
+    );
+    process.env.FIXY_TRIAGE_TEAMS = "";
+    const triage = await onAgentSession(
+      {} as LinearSessionContext,
+      created("SAN-145")
+    );
+    assert.ok(front && "auth" in front && front.auth);
+    assert.ok(triage && "auth" in triage && triage.auth);
+    // A session started on triage whose later event is routed to the front
+    // door, and the reverse after the setting is cleared.
+    assert.equal(
+      composePrompt(sessionLane(triage.auth, front.auth)),
+      GENERAL_PROMPT.replace(`${MEMORY}\n\n`, "")
+    );
+    assert.equal(
+      composePrompt(sessionLane(front.auth, triage.auth)),
+      GENERAL_PROMPT
+    );
+  });
+
   it("leaves every other team on today's triage", async () => {
     process.env.FIXY_TRIAGE_TEAMS = "SAN";
     assert.deepEqual(

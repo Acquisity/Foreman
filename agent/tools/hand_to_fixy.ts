@@ -285,7 +285,12 @@ export const handToFixy = async (
             COMMENT_QUERY,
             "FixyHandoffComment",
             { id: commentId }
-          )
+          ).catch(() => {
+            // Linear answers an unknown id with an error, and on a first
+            // hand-off the comment doesn't exist yet.
+            signal?.throwIfAborted();
+            return { comment: null };
+          })
         ).comment
       : null);
   const previous = existing ? parseFixyHandoff(existing.body) : null;

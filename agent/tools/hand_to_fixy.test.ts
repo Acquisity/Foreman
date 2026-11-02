@@ -101,10 +101,14 @@ const fakeLinear = (
               team: { id: TEAM_ID, key: state.teamKey },
             },
           };
-        case "FixyHandoffComment":
-          return {
-            comment: state.comments.find((c) => c.id === variables.id) ?? null,
-          };
+        case "FixyHandoffComment": {
+          const found = state.comments.find((c) => c.id === variables.id);
+          // Real Linear answers an unknown comment id with an error.
+          if (!found) {
+            throw new Error("Entity not found: Comment");
+          }
+          return { comment: found };
+        }
         case "FixyHandoffCreate": {
           const created = variables.input as { body: string; id: string };
           if (state.comments.some((c) => c.id === created.id)) {
@@ -191,6 +195,15 @@ describe("hand_to_fixy", () => {
     const stored = parseFixyHandoff(create.body);
     assert.equal(stored?.workspaceId, "0a1b2c3d-1111-2222-3333-444455556666");
     assert.deepEqual(stored?.steps, input.stepsToReproduce);
+  });
+
+  it("writes a first handoff on a ticket whose comments run past one page", async () => {
+    const linear = fakeLinear({}, { hidden: true });
+    const result = await handToFixy(input, root, linear.linear, ENV);
+    assert.equal(result.success, true);
+    assert.equal(result.labelAdded, true);
+    assert.ok(linear.names().includes("FixyHandoffComment"));
+    assert.equal(linear.state.comments.length, 1);
   });
 
   for (const hidden of [false, true]) {
