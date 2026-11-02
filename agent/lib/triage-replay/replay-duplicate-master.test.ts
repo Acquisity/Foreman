@@ -188,6 +188,6 @@ describe("replayed closed masters (C3)", () => {
     );
     assert.equal(routed.grouping, "needs-grouping");
     assert.equal(routed.duplicateOf, null);
-    assert.notEqual(state.issue.state, "Duplicate");
+    assert.equal(state.issue.state, "Backlog");
   });
 });

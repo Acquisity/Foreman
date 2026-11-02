@@ -220,7 +220,8 @@ export const ownershipRoute = (
       ...(ownership.approval === "needed" ? [NEEDS_APPROVAL_LABEL] : []),
     ]),
   ],
-  ...(ownership.approval === "approved"
+  // A person's decision, Approved or Declined, ends the wait for approval.
+  ...(ownership.approval === "approved" || ownership.path === "Declined"
     ? { removeLabels: [NEEDS_APPROVAL_LABEL] }
     : {}),
   ...(ownership.assignee ? { assignee: ownership.assignee } : {}),

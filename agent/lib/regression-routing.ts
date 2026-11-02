@@ -4,6 +4,7 @@ import type {
   TriageClassification,
   TriageInput,
 } from "./jev-decisions.js";
+import { DECLINED_LABEL, hasLabel } from "./owner-map.js";
 import type { RegressionKind } from "./regression-record.js";
 
 /**
@@ -130,6 +131,19 @@ export const isLinearCommentUrl = (url: string): boolean =>
 
 const NO_CHANGE = "Resolved by triage needs evidence of a change";
 
+/** Where a ticket with no change evidence goes: a feature request keeps a person's decision or stays open. */
+const noChangeNote = (
+  input: TriageInput,
+  classification: TriageClassification
+): string => {
+  if (classification !== "Feature Request") {
+    return `${NO_CHANGE}, and there is none: closed as ${classification}, Canceled.`;
+  }
+  return hasLabel(input.ticketLabels ?? [], DECLINED_LABEL)
+    ? `${NO_CHANGE}, and there is none: a person declined this Feature Request, so it stays Canceled.`
+    : `${NO_CHANGE}, and there is none: it stays open as a Feature Request.`;
+};
+
 /**
  * Whether the ticket's comments and documents would change this decision: a
  * change was named but not found among them. A live fix or any other path
@@ -174,11 +188,7 @@ export const resolvedPath = (
     notes.push(`${NO_CHANGE}, and this Bug has none.`);
     return { missing: [CHANGE_GAP] };
   }
-  notes.push(
-    classification === "Feature Request"
-      ? `${NO_CHANGE}, and there is none: it stays open as a Feature Request.`
-      : `${NO_CHANGE}, and there is none: closed as ${classification}, Canceled.`
-  );
+  notes.push(noChangeNote(input, classification));
   return { path: classification };
 };
 

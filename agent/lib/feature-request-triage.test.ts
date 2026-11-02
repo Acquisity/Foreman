@@ -322,3 +322,48 @@ describe("notes match where a feature request goes (C5)", () => {
     );
   });
 });
+
+describe("Cubic review of #259, decisions", () => {
+  it("keeps a ticket already labelled Feature Request a Feature Request on retriage, even on a clear explanation (P1)", () => {
+    const decision = resolveTriage(
+      triageInput({ ticketLabels: ["Feature Request", "Needs approval"] }),
+      bugAnswers({
+        classification: pick("platform_limitation", 0.95),
+        path: pick("Platform Limitation"),
+      })
+    );
+    assert.ok(decision.outcome === "route");
+    assert.equal(decision.classification, "Feature Request");
+    assert.equal(decision.route.state, "Backlog");
+  });
+
+  it("takes Needs approval off a declined request and never notes it stays open", () => {
+    const decision = resolveTriage(
+      triageInput({
+        ticketLabels: ["Declined", "Feature Request", "Needs approval"],
+      }),
+      request({ path: pick("Resolved by triage") })
+    );
+    assert.ok(decision.outcome === "route");
+    assert.equal(decision.route.state, "Canceled");
+    assert.ok(decision.route.removeLabels?.includes("Needs approval"));
+    assert.equal(decision.route.addLabels.includes("Needs approval"), false);
+    assert.equal(
+      decision.notes.some((note) => note.includes("stays open")),
+      false
+    );
+  });
+
+  it("labels an explanation resolved Done with a recorded change Needs grouping too", () => {
+    const decision = resolveTriage(
+      triageInput({ changeMade: RECORDED_CHANGE }),
+      bugAnswers({
+        classification: pick("user_error"),
+        path: pick("Resolved by triage"),
+      })
+    );
+    assert.ok(decision.outcome === "route");
+    assert.equal(decision.route.state, "Done");
+    assert.ok(decision.route.addLabels.includes("Needs grouping"));
+  });
+});

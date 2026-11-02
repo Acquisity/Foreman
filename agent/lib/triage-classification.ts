@@ -2,6 +2,7 @@ import type { JevQuestion } from "./jev.js";
 import {
   APPROVED_LABEL,
   DECLINED_LABEL,
+  FEATURE_REQUEST_LABEL,
   hasLabel,
   NEEDS_GROUPING_LABEL,
 } from "./owner-map.js";
@@ -60,6 +61,12 @@ export const settleClassification = (
   if (!EXPLANATIONS.has(pick.choice)) {
     return named;
   }
+  if (hasLabel(ticketLabels, FEATURE_REQUEST_LABEL)) {
+    notes.push(
+      `This ticket is already a ${FEATURE_REQUEST_LABEL}, so retriage keeps it one for James to decide instead of closing it as ${named}.`
+    );
+    return "Feature Request";
+  }
   if (hasLabel(ticketLabels, APPROVED_LABEL)) {
     notes.push(
       `A person approved this feature request (${APPROVED_LABEL}), so it keeps that decision instead of closing as ${named}.`
@@ -96,7 +103,7 @@ export const closingFeaturePath = (
   pathChoice === "Resolved by triage" &&
   pathConfidence < BARS.path;
 
-const CLOSING_STATES = ["Canceled", "Duplicate"];
+const CLOSING_STATES = ["Canceled", "Done", "Duplicate"];
 
 /** An explanation that closes carries the grouping label, so repeat confusion is counted. */
 export const groupingLabel = (

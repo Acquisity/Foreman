@@ -52,9 +52,17 @@ export const finalLabels = (
  * add never counts, and `refuseSelfDecline` refuses one.
  */
 const declinedByPerson = (issue: RouteIssue): boolean =>
+  carries(issue, DECLINED_LABEL);
+
+/** A label already on the ticket as read before this call, never one it adds. */
+const carries = (issue: RouteIssue, wanted: string): boolean =>
   issue.labels.nodes.some(
-    (label) => label.name.toLowerCase() === DECLINED_LABEL.toLowerCase()
+    (label) => label.name.toLowerCase() === wanted.toLowerCase()
   );
+
+/** A person's decision on a feature request, read from the ticket before this call. */
+const decidedByPerson = (issue: RouteIssue): boolean =>
+  carries(issue, APPROVED_LABEL) || declinedByPerson(issue);
 
 /** Only a person, or the approval flow's decision, writes Declined; Foreman never declines a request itself. */
 function refuseSelfDecline(input: RouteTicketInput): void {
@@ -84,15 +92,13 @@ export function refuseUnapprovedClose(
   issue: RouteIssue,
   input: RouteTicketInput
 ): void {
-  const labels = finalLabels(issue, input);
   if (
     named(input.state, "canceled", "done", "duplicate") &&
-    labels.has(FEATURE_REQUEST_LABEL.toLowerCase()) &&
-    !labels.has(APPROVED_LABEL.toLowerCase()) &&
-    !declinedByPerson(issue)
+    finalLabels(issue, input).has(FEATURE_REQUEST_LABEL.toLowerCase()) &&
+    !decidedByPerson(issue)
   ) {
     throw new Error(
-      `${issue.identifier} would be ${input.state}, but an unapproved Feature Request never closes unless a person declined it, so nothing was written. Route it to Backlog with ${NEEDS_APPROVAL_LABEL} and ${FALLBACK_OWNER}, using relatedTo for its match.`
+      `${issue.identifier} would be ${input.state}, but an unapproved Feature Request never closes unless a person declined it: the ticket must already carry Approved or Declined before this call, so nothing was written. Route it to Backlog with ${NEEDS_APPROVAL_LABEL} and ${FALLBACK_OWNER}, using relatedTo for its match.`
     );
   }
 }
@@ -156,28 +162,34 @@ export async function masterFacts(
   };
 }
 
+/** How far up a report's parents the master search climbs. */
+const MASTER_DEPTH = 4;
+
 /**
- * The match itself when it is an open master, else its parent when that is
- * one. A closed master that engineering-handoff moved under a new open master
- * hands its reports to that parent; with none, the closed master is returned
- * so the caller can say why nothing took the report.
+ * The first open master on the match's chain: the match itself, then its
+ * parent, then that parent's parent, so a closed master that
+ * engineering-handoff moved under a new open master hands its reports up.
+ * With no open one, the nearest closed master is returned so the caller can
+ * say why nothing took the report.
  */
 async function masterOf(
   gql: Gql,
   match: RouteIssue
 ): Promise<(MasterFacts & { identifier: string }) | null> {
-  const own = await masterFacts(gql, match.identifier, match.id);
-  if (own?.open) {
-    return { ...own, identifier: match.identifier };
+  let nearest: (MasterFacts & { identifier: string }) | null = null;
+  let current: RouteIssue | null = match;
+  for (let depth = 0; current && depth < MASTER_DEPTH; depth += 1) {
+    // biome-ignore lint/performance/noAwaitInLoops: each parent is read from the one before it.
+    const facts = await masterFacts(gql, current.identifier, current.id);
+    if (facts?.open) {
+      return { ...facts, identifier: current.identifier };
+    }
+    nearest =
+      nearest ?? (facts && { ...facts, identifier: current.identifier });
+    const parent: string | undefined = current.parent?.identifier;
+    current = parent ? await requireIssue(gql, parent) : null;
   }
-  const parent = match.parent?.identifier;
-  const facts = parent
-    ? await masterFacts(gql, parent, (await requireIssue(gql, parent)).id)
-    : null;
-  if (parent && facts && (facts.open || own === null)) {
-    return { ...facts, identifier: parent };
-  }
-  return own === null ? null : { ...own, identifier: match.identifier };
+  return nearest;
 }
 
 export const beforeCutoff = (createdAt: string, cutoff: string | null) =>
@@ -277,7 +289,8 @@ async function groupingOf(
 /** Without a match, Duplicate needs an open master passed as parent, as on a retry after the relation landed. */
 async function requireOpenMasterParent(
   gql: Gql,
-  parent: string | undefined
+  parent: string | undefined,
+  cutoff: string | null
 ): Promise<void> {
   const facts = parent
     ? await masterFacts(gql, parent, (await requireIssue(gql, parent)).id)
@@ -285,6 +298,11 @@ async function requireOpenMasterParent(
   if (!facts?.open) {
     throw new Error(
       "A ticket moves to Duplicate only under an open master, so nothing was written. Pass duplicateOf with the match, or parent with the open master it already joined."
+    );
+  }
+  if (beforeCutoff(facts.createdAt, cutoff)) {
+    throw new Error(
+      `${parent} was created before ${cutoff}, so it cannot take new reports and nothing was written.`
     );
   }
 }
@@ -322,7 +340,7 @@ export interface RoutePlan {
   warnings: string[];
 }
 
-function refuseMatchMisuse(input: RouteTicketInput): void {
+function refuseMatchMisuse(issue: RouteIssue, input: RouteTicketInput): void {
   if (input.duplicateOf !== undefined && input.relatedTo !== undefined) {
     throw new Error(
       "Pass duplicateOf to close on a match or relatedTo to stay open beside it, not both. Nothing was written."
@@ -331,6 +349,17 @@ function refuseMatchMisuse(input: RouteTicketInput): void {
   if (input.relatedTo !== undefined && named(input.state, "duplicate")) {
     throw new Error(
       "relatedTo keeps the report open, so it cannot move to Duplicate. Nothing was written."
+    );
+  }
+  // Only a request a person already approved (and resolved) or declined may
+  // close beside its match; anything else stays open.
+  if (
+    input.relatedTo !== undefined &&
+    named(input.state, "canceled", "done") &&
+    !decidedByPerson(issue)
+  ) {
+    throw new Error(
+      `relatedTo keeps the report open, so it cannot move to ${input.state} unless the ticket already carries Approved or Declined. Nothing was written.`
     );
   }
 }
@@ -343,7 +372,11 @@ async function matchPlanOf(
 ): Promise<MatchPlan> {
   if (!match) {
     if (named(input.state, "duplicate")) {
-      await requireOpenMasterParent(gql, input.parent);
+      await requireOpenMasterParent(
+        gql,
+        input.parent,
+        opts.mastersCreatedAfter ?? null
+      );
     }
     return {};
   }
@@ -365,7 +398,7 @@ export async function planRoute(
   input: RouteTicketInput,
   opts: DuplicateRouting
 ): Promise<RoutePlan> {
-  refuseMatchMisuse(input);
+  refuseMatchMisuse(issue, input);
   refuseSelfDecline(input);
   refuseUnapprovedClose(issue, input);
   // Resolve the match before the first write, so a bad identifier fails the

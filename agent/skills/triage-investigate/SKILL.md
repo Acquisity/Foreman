@@ -10,8 +10,8 @@ Goal: find the cause, preserve evidence, and hand engineering one master per roo
 
 Start skeptical. Rule out before any bug call: setup, configuration, permissions, billing or entitlements, provider or platform limits, expected behavior, duplicates, known issues. `Bug` is the last classification, only with direct evidence of internal failure (logs, failed jobs, schema mismatch, provider or API error, repeatable wrong behavior). Every finding carries proof of work and a quantified blast radius, not adjectives. Exactly one classification per finding:
 
-- `User Error`: settings, configuration, or anything support can explain or follow up on.
-- `Platform Limitation`: expected, provider, billing, entitlement, or plan limit, or known unsupported behavior, with nothing asked for.
+- `User Error`: settings, configuration, or anything support can explain, with nothing asked for.
+- `Platform Limitation`: expected behavior, or a provider, billing, entitlement or plan limit, with nothing asked for.
 - `Feature Request`: any ask for a new capability or a lifted limit, however infeasible.
 - `Bug`: internal failure that settings, configuration, and platform limits do not explain.
 

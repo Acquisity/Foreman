@@ -179,7 +179,7 @@ export const reviewOf = (
     return {
       kind: null,
       reason:
-        "a feature request stays open for James, or keeps the decision a person made",
+        "a feature request stays open for a person to decide, or keeps the decision a person made",
       required: false,
     };
   }

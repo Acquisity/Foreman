@@ -104,7 +104,10 @@ test("Stage 5 hands decide_triage the ticket's own labels so an approved request
     "utf8"
   );
   const start = tool.indexOf("ticketLabels: z");
-  const field = tool.slice(start, tool.indexOf("\n      ),\n", start));
+  assert.ok(start >= 0, "decide_triage declares ticketLabels");
+  const end = tool.indexOf("\n      ),\n", start);
+  assert.ok(end > start, "the ticketLabels field closes");
+  const field = tool.slice(start, end);
   assert.equal(field.includes(".optional()"), false);
 });
 

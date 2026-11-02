@@ -112,11 +112,11 @@ Take the product area from the evidence, never from the incoming project, title,
 
 A developer gets only a confirmed Bug or a feature request labelled `Approved`; an unapproved one waits in Backlog with `Needs approval` and James until a person adds `Approved` or `Declined`. Questions, user errors, platform limits, billing and support get none.
 
-SAN sandbox tickets route to Aaron Fraga. No fitting area means James Keeble; repeat the reason in the report. Never route to retired or legacy projects.
+No fitting area means James Keeble; repeat the reason in the report. Never route to retired or legacy projects.
 
 ### When the ticket is not engineering actionable
 
-`User Error`, `Platform Limitation`, `Feature Request`, `Resolved by triage`, `Duplicate`, `Backlog/low-impact`, and the `Support/` paths end here: call `route_ticket` once with the decision's `route` unchanged, after the critic settles when `review.required`. `route` names Aaron Fraga for an open follow-up, no one for a closed outcome. Nothing goes to engineering.
+`User Error`, `Platform Limitation`, an unapproved `Feature Request`, `Resolved by triage`, `Duplicate`, `Backlog/low-impact`, and the `Support/` paths end here: call `route_ticket` once with the decision's `route` unchanged, after the critic settles when `review.required`. `route` names Aaron Fraga for an open follow-up, no one for a closed outcome. Nothing goes to engineering.
 
 A `Duplicate` passes `route`, adding the area owner as `assignee` only for a confirmed Bug whose `route` names none. `grouping: "needs-grouping"` means the match had no open master, so the report stays open for the grouping sweep; for a Bug you may run `engineering-handoff` "Create one master", parent the match under it, and route again.
 

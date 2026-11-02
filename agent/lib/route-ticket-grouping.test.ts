@@ -28,6 +28,7 @@ const ISSUES: Record<string, FakeIssue> = {
     parent: "ENG-30",
     stateType: "completed",
   },
+  "ENG-82": { labels: ["Customer reported"], parent: "ENG-81" },
 };
 
 const GROUPING = { id: "l-grouping", name: "Needs grouping" };
@@ -61,6 +62,9 @@ const WITHOUT_DUPLICATE = /without duplicateOf/u;
 const RELATED_RETRY =
   /Call route_ticket again with the same input, relatedTo ENG-40 included/u;
 const DUPLICATE_FIELD = /duplicateOf/u;
+const SELF_APPROVE = /already carry Approved/u;
+const RELATED_CLOSE = /relatedTo keeps the report open/u;
+const STALE_PARENT = /was created before 2026-10-25T00:00:00.000Z/u;
 const NOT_CONFIRMED = /could not be confirmed under ENG-30/u;
 const DUPLICATE_NEEDS_MASTER = /Duplicate only under an open master/u;
 
@@ -204,6 +208,7 @@ describe("route_ticket never closes an unapproved feature request (ENG-15932)", 
       ),
       UNAPPROVED_CLOSE
     );
+    assert.deepEqual(fake.writes(), []);
   });
 
   it("lets a feature request a person already declined close", async () => {
@@ -361,5 +366,63 @@ describe("a closed master hands its reports to its open parent master (C2)", () 
     assert.equal(updateOf(fake)?.parentId, "i-ENG-30");
     assert.equal(updateOf(fake)?.stateId, "s-duplicate");
     assert.equal(result.grouping, "joined");
+  });
+});
+
+describe("Cubic review of #259", () => {
+  it("refuses to close a Feature Request whose Approved label is only being added in this call, before any write (P1)", async () => {
+    const fake = linear({
+      teamLabels: [GROUPING, { id: "l-ok", name: "Approved" }],
+      ticketLabels: CLASSIFIED["Feature Request"],
+    });
+    await assert.rejects(
+      routeTicket(
+        { addLabels: ["Approved"], issue: "ENG-1", state: "Done" },
+        { client: fake.fetchStub }
+      ),
+      SELF_APPROVE
+    );
+    assert.deepEqual(fake.writes(), []);
+  });
+
+  it("refuses relatedTo with a closing state unless a person already decided the request, before any write (P1)", async () => {
+    for (const state of ["Done", "Canceled"]) {
+      const fake = linear({ ticketLabels: CLASSIFIED["User Error"] });
+      // biome-ignore lint/performance/noAwaitInLoops: each case reads its own fake in turn.
+      await assert.rejects(
+        routeTicket(
+          { issue: "ENG-1", relatedTo: "ENG-40", state },
+          { client: fake.fetchStub }
+        ),
+        RELATED_CLOSE,
+        state
+      );
+      assert.deepEqual(fake.writes(), [], state);
+    }
+  });
+
+  it("joins the open master above a closed master the matched report sits under", async () => {
+    const fake = linear({ ticketLabels: CLASSIFIED["User Error"] });
+    const result = await routeTicket(
+      { duplicateOf: "ENG-82", issue: "ENG-1", state: "Duplicate" },
+      { client: fake.fetchStub }
+    );
+    assert.equal(updateOf(fake)?.parentId, "i-ENG-30");
+    assert.equal(result.grouping, "joined");
+  });
+
+  it("applies the session cutoff to a parent-only Duplicate retry, before any write", async () => {
+    const fake = linear({ ticketLabels: CLASSIFIED["User Error"] });
+    await assert.rejects(
+      routeTicket(
+        { issue: "ENG-1", parent: "ENG-30", state: "Duplicate" },
+        {
+          client: fake.fetchStub,
+          mastersCreatedAfter: "2026-10-25T00:00:00.000Z",
+        }
+      ),
+      STALE_PARENT
+    );
+    assert.deepEqual(fake.writes(), []);
   });
 });

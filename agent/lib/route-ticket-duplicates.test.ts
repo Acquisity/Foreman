@@ -392,7 +392,7 @@ describe("routeTicket duplicate masters, review fixes", () => {
     }
   });
 
-  it("applies the session cutoff to an explicit parent, and refuses one that is no master, for every classification (Devin 9)", async () => {
+  it("applies the session cutoff to an explicit parent, and refuses one that is no master, for a non-Bug duplicate (Devin 9)", async () => {
     const stale = linear({ ticketLabels: NOT_A_BUG });
     await assert.rejects(
       routeTicket(
