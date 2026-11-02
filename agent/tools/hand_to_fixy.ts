@@ -29,8 +29,11 @@ const ISSUE_QUERY = `query FixyHandoffIssue($id: String!) {
     team { id key }
     labels(first: 100) { nodes { id name } }
     attachments(first: 50) { nodes { title url } }
-    comments(first: 100) { nodes { id body } }
+    comments(first: 100) { nodes { id body } pageInfo { hasNextPage } }
   }
+}`;
+const COMMENT_QUERY = `query FixyHandoffComment($id: String!) {
+  comment(id: $id) { id body }
 }`;
 const LABEL_QUERY = `query FixyBugLabel($teamId: ID!, $name: String!) {
   issueLabels(first: 10, filter: { and: [{ name: { eq: $name } }, { or: [{ team: { id: { eq: $teamId } } }, { team: { null: true } }] }] }) {
@@ -50,7 +53,10 @@ const LABEL_ADD = `mutation FixyHandoffLabel($id: String!, $labelId: String!) {
 interface IssueRead {
   issue: {
     attachments: { nodes: { title: string; url: string }[] };
-    comments: { nodes: { body: string; id: string }[] };
+    comments: {
+      nodes: { body: string; id: string }[];
+      pageInfo: { hasNextPage: boolean };
+    };
     createdAt: string;
     id: string;
     identifier: string;
@@ -152,6 +158,7 @@ export type HandToFixyInput = z.infer<typeof handToFixyInputSchema>;
 export interface HandToFixyResult {
   alreadyHandedOff: boolean;
   commentId: string | null;
+  fixyNotified: boolean;
   issue: string;
   labelAdded: boolean;
   reason?: string;
@@ -168,6 +175,7 @@ const refusal = (
 ): HandToFixyResult => ({
   alreadyHandedOff: false,
   commentId: null,
+  fixyNotified: false,
   issue,
   labelAdded: false,
   reportedAt: null,
@@ -191,6 +199,46 @@ const sessionRefusal = (session: HandoffSession): string | null => {
   return null;
 };
 
+const writeHandoff = async (
+  linear: LinearCall,
+  issueId: string,
+  commentId: string,
+  body: string,
+  existing: { body: string } | null | undefined
+): Promise<void> => {
+  const update = async () => {
+    const result = await linear<{ commentUpdate: { success: boolean } }>(
+      COMMENT_UPDATE,
+      "FixyHandoffUpdate",
+      { id: commentId, input: { body } }
+    );
+    if (!result.commentUpdate.success) {
+      throw new Error("Linear did not update the handoff comment.");
+    }
+  };
+  if (existing) {
+    if (existing.body.trim() !== body) {
+      await update();
+    }
+  } else {
+    // A concurrent call may have created the fixed comment since the read.
+    let createError: unknown = null;
+    const created = await linear<{
+      commentCreate: { comment: { id: string } | null; success: boolean };
+    }>(COMMENT_CREATE, "FixyHandoffCreate", {
+      input: { body, id: commentId, issueId },
+    }).catch((error: unknown) => {
+      createError = error;
+      return null;
+    });
+    if (!created?.commentCreate.success) {
+      await update().catch((error: unknown) => {
+        throw createError ?? error;
+      });
+    }
+  }
+};
+
 /**
  * Writes the handoff comment, then the team's Bug label, which starts Fixy's
  * bug run. The comment goes first so Fixy finds it when the run starts, and
@@ -201,7 +249,8 @@ export const handToFixy = async (
   input: HandToFixyInput,
   session: HandoffSession,
   linear: LinearCall,
-  env: NodeJS.ProcessEnv = process.env
+  env: NodeJS.ProcessEnv = process.env,
+  signal?: AbortSignal
 ): Promise<HandToFixyResult> => {
   const { issue } = input;
   if (!isFixyTriageIssue(issue, env)) {
@@ -227,9 +276,27 @@ export const handToFixy = async (
       `${issue} is now on team ${ticket.team.key}, which is not in FIXY_TRIAGE_TEAMS. Use the triage-investigate skill instead.`
     );
   }
+  const commentId = fixyHandoffCommentId(ticket.id);
+  const existing =
+    ticket.comments.nodes.find((comment) => comment.id === commentId) ??
+    (ticket.comments.pageInfo.hasNextPage
+      ? (
+          await linear<{ comment: { id: string; body: string } | null }>(
+            COMMENT_QUERY,
+            "FixyHandoffComment",
+            { id: commentId }
+          )
+        ).comment
+      : null);
+  const previous = existing ? parseFixyHandoff(existing.body) : null;
   const reported = resolveReportedAt(
     ticket.attachments.nodes,
-    { at: input.reportedAt, source: input.reportedAtSource },
+    {
+      at: input.reportedAt ?? previous?.reportedAt,
+      source: input.reportedAt
+        ? input.reportedAtSource
+        : previous?.reportedAtSource,
+    },
     ticket.createdAt
   );
   const body = renderFixyHandoff({
@@ -257,43 +324,8 @@ export const handToFixy = async (
       "No original report time was found, so the handoff uses the ticket's creation time."
     );
   }
-  const commentId = fixyHandoffCommentId(ticket.id);
-  const existing = ticket.comments.nodes.find(
-    (comment) => comment.id === commentId
-  );
-  const update = async () => {
-    const result = await linear<{ commentUpdate: { success: boolean } }>(
-      COMMENT_UPDATE,
-      "FixyHandoffUpdate",
-      { id: commentId, input: { body } }
-    );
-    if (!result.commentUpdate.success) {
-      throw new Error("Linear did not update the handoff comment.");
-    }
-  };
-  if (existing) {
-    if (existing.body.trim() !== body) {
-      await update();
-    }
-  } else {
-    // Past the first page of comments the handoff may exist unseen; its fixed
-    // id makes the create fail, and the update then reaches it.
-    let createError: unknown = null;
-    const created = await linear<{
-      commentCreate: { comment: { id: string } | null; success: boolean };
-    }>(COMMENT_CREATE, "FixyHandoffCreate", {
-      input: { body, id: commentId, issueId: ticket.id },
-    }).catch((error: unknown) => {
-      createError = error;
-      return null;
-    });
-    if (!created?.commentCreate.success) {
-      await update().catch((error: unknown) => {
-        throw createError ?? error;
-      });
-    }
-  }
-  const done = { ...times, commentId, warnings };
+  await writeHandoff(linear, ticket.id, commentId, body, existing);
+  const done = { ...times, commentId, fixyNotified: false, warnings };
   if (ticket.labels.nodes.some((label) => label.name === BUG_LABEL)) {
     return {
       ...done,
@@ -303,44 +335,58 @@ export const handToFixy = async (
       success: true,
     };
   }
-  const labels = await linear<{
-    issueLabels: {
-      nodes: { id: string; name: string; team: { id: string } | null }[];
+  try {
+    const labels = await linear<{
+      issueLabels: {
+        nodes: { id: string; name: string; team: { id: string } | null }[];
+      };
+    }>(LABEL_QUERY, "FixyBugLabel", {
+      name: BUG_LABEL,
+      teamId: ticket.team.id,
+    });
+    const exact = labels.issueLabels.nodes.filter(
+      (label) => label.name === BUG_LABEL
+    );
+    // The team's own label first; a workspace label serves every team.
+    const bug =
+      exact.find((label) => label.team?.id === ticket.team.id) ??
+      exact.find((label) => !label.team);
+    if (!bug) {
+      return refusal(
+        ticket.identifier,
+        `Team ${ticket.team.key} has no label named ${BUG_LABEL}, so Fixy was not started. The handoff comment is written; ask a person to add the label to the team.`,
+        done
+      );
+    }
+    const added = await linear<{ issueAddLabel: { success: boolean } }>(
+      LABEL_ADD,
+      "FixyHandoffLabel",
+      { id: ticket.id, labelId: bug.id }
+    );
+    if (!added.issueAddLabel.success) {
+      return refusal(
+        ticket.identifier,
+        "Linear did not add the Bug label, so Fixy was not started. The handoff comment is written; call this again.",
+        done
+      );
+    }
+    return {
+      ...done,
+      alreadyHandedOff: false,
+      fixyNotified: true,
+      issue: ticket.identifier,
+      labelAdded: true,
+      success: true,
     };
-  }>(LABEL_QUERY, "FixyBugLabel", { name: BUG_LABEL, teamId: ticket.team.id });
-  const exact = labels.issueLabels.nodes.filter(
-    (label) => label.name === BUG_LABEL
-  );
-  // The team's own label first; a workspace label serves every team.
-  const bug =
-    exact.find((label) => label.team?.id === ticket.team.id) ??
-    exact.find((label) => !label.team);
-  if (!bug) {
+  } catch (error) {
+    signal?.throwIfAborted();
     return refusal(
       ticket.identifier,
-      `Team ${ticket.team.key} has no label named ${BUG_LABEL}, so Fixy was not started. The handoff comment is written; ask a person to add the label to the team.`,
+      "The handoff comment is written, but the Bug label could not be confirmed. Check the ticket before retrying. " +
+        errorReason(error),
       done
     );
   }
-  const added = await linear<{ issueAddLabel: { success: boolean } }>(
-    LABEL_ADD,
-    "FixyHandoffLabel",
-    { id: ticket.id, labelId: bug.id }
-  );
-  if (!added.issueAddLabel.success) {
-    return refusal(
-      ticket.identifier,
-      "Linear did not add the Bug label, so Fixy was not started. The handoff comment is written; call this again.",
-      done
-    );
-  }
-  return {
-    ...done,
-    alreadyHandedOff: false,
-    issue: ticket.identifier,
-    labelAdded: true,
-    success: true,
-  };
 };
 
 const errorReason = (error: unknown) =>
@@ -360,9 +406,9 @@ export const handoffOutcome = (result: HandToFixyResult): string => {
 export default defineTool({
   approval: questionsOnlyPolicy,
   description:
-    "Hand a customer report on a Fixy triage team to Fixy, which reproduces and investigates it. Writes one top-level '## Fixy handoff' comment with the workspace id, the original report time, what happened, what was expected and the steps to reproduce, then adds the team's Bug label, which starts Fixy's run. " +
-    "Only for teams in FIXY_TRIAGE_TEAMS; anywhere else it refuses and triage-investigate applies. The report time comes from the ticket's 'Ask from' Slack link when there is one, else from reportedAt, else from ticket creation. " +
-    "Calling it again updates the same comment and never adds a second one or another label; alreadyHandedOff true means the Bug label was already on. success false with a reason names what to fix. It posts nothing to the requester.",
+    "Hand this session's report ticket on a Fixy triage team to Fixy, which reproduces and investigates it. Writes one top-level '## Fixy handoff' comment with the workspace id, the original report time, what happened, what was expected and the steps to reproduce, then adds the team's Bug label, which starts Fixy's run. " +
+    "Only for teams in FIXY_TRIAGE_TEAMS; anywhere else it refuses and triage-investigate applies. The report time comes from the ticket's 'Ask from' Slack link when there is one, else from reportedAt, else from the existing handoff, else from ticket creation. " +
+    "Calling it again updates the same comment and never adds a second one or another label; alreadyHandedOff true means the Bug label was already on and fixyNotified false means no run was notified. success false with a reason names what to fix. It posts nothing to the requester.",
   async execute(input, ctx) {
     const linear: LinearCall = async (query, queryName, variables) => {
       const { token } = await ctx.getToken(linearAuth);
@@ -380,7 +426,13 @@ export default defineTool({
     };
     let result: HandToFixyResult;
     try {
-      result = await handToFixy(input, ctx.session, linear);
+      result = await handToFixy(
+        input,
+        ctx.session,
+        linear,
+        process.env,
+        ctx.abortSignal
+      );
     } catch (error) {
       if (ctx.abortSignal.aborted) {
         throw error;
@@ -398,6 +450,7 @@ export default defineTool({
   outputSchema: z.object({
     alreadyHandedOff: z.boolean(),
     commentId: z.string().nullable(),
+    fixyNotified: z.boolean(),
     issue: z.string(),
     labelAdded: z.boolean(),
     reason: z.string().optional(),

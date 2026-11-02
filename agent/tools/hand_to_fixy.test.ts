@@ -16,13 +16,19 @@ import type {
 
 // The tool module resolves Foreman's Linear connector as it loads.
 process.env.LINEAR_CONNECTOR ??= "stub/stub";
-const { handToFixy, handToFixyInputSchema } = await import("./hand_to_fixy.js");
+const {
+  default: tool,
+  handToFixy,
+  handToFixyInputSchema,
+  handoffOutcome,
+} = await import("./hand_to_fixy.js");
 
 const ENV = { FIXY_TRIAGE_TEAMS: "SAN" };
 const ISSUE_ID = "6f1d2c3b-aaaa-4bbb-8ccc-123456789abc";
 const TEAM_ID = "team-san";
 const COMMENT_ID = fixyHandoffCommentId(ISSUE_ID);
 // Measured shape: SAN-124's 'Ask from' link into the receiver sandbox.
+const QUERY_NAME = /(?:query|mutation)\s+(\w+)/u;
 const ASK_URL =
   "https://acquisityworkspace.slack.com/archives/C0BLFDUN6Q7/p1793556157524579";
 
@@ -60,6 +66,8 @@ interface Ticket {
 const fakeLinear = (
   ticket: Partial<Ticket> = {},
   options: {
+    hidden?: boolean;
+    fail?: string;
     teamLabels?: { id: string; name: string; team: { id: string } | null }[];
   } = {}
 ) => {
@@ -71,15 +79,21 @@ const fakeLinear = (
     ...ticket,
   };
   const calls: { name: string; variables: Record<string, unknown> }[] = [];
-  const linear: LinearCall = (_query, name, variables) => {
+  const linear: LinearCall = async (_query, name, variables) => {
     calls.push({ name, variables });
+    if (name === options.fail) {
+      throw new Error("provider unavailable");
+    }
     const reply = (() => {
       switch (name) {
         case "FixyHandoffIssue":
           return {
             issue: {
               attachments: { nodes: state.attachments },
-              comments: { nodes: state.comments },
+              comments: {
+                nodes: options.hidden ? [] : state.comments,
+                pageInfo: { hasNextPage: options.hidden ?? false },
+              },
               createdAt: "2026-11-01T18:02:40.000Z",
               id: ISSUE_ID,
               identifier: "SAN-145",
@@ -87,8 +101,15 @@ const fakeLinear = (
               team: { id: TEAM_ID, key: state.teamKey },
             },
           };
+        case "FixyHandoffComment":
+          return {
+            comment: state.comments.find((c) => c.id === variables.id) ?? null,
+          };
         case "FixyHandoffCreate": {
           const created = variables.input as { body: string; id: string };
+          if (state.comments.some((c) => c.id === created.id)) {
+            throw new Error("id already exists");
+          }
           state.comments.push({ body: created.body, id: created.id });
           return {
             commentCreate: { comment: { id: created.id }, success: true },
@@ -126,7 +147,7 @@ const fakeLinear = (
           throw new Error(`unexpected ${name}`);
       }
     })();
-    return Promise.resolve(reply as never);
+    return await Promise.resolve(reply as never);
   };
   return { calls, linear, names: () => calls.map((call) => call.name), state };
 };
@@ -159,6 +180,7 @@ describe("hand_to_fixy", () => {
     assert.deepEqual(result, {
       alreadyHandedOff: false,
       commentId: COMMENT_ID,
+      fixyNotified: true,
       issue: "SAN-145",
       labelAdded: true,
       reportedAt: "2026-11-01T18:02:37.524Z",
@@ -169,6 +191,142 @@ describe("hand_to_fixy", () => {
     const stored = parseFixyHandoff(create.body);
     assert.equal(stored?.workspaceId, "0a1b2c3d-1111-2222-3333-444455556666");
     assert.deepEqual(stored?.steps, input.stepsToReproduce);
+  });
+
+  for (const hidden of [false, true]) {
+    it(`preserves the original report time on ${hidden ? "paginated" : "visible"} follow-ups`, async () => {
+      const linear = fakeLinear({}, { hidden });
+      await handToFixy(
+        {
+          ...input,
+          reportedAt: "2026-10-31T09:15:00Z",
+          reportedAtSource: "Intercom first message",
+        },
+        root,
+        linear.linear,
+        ENV
+      );
+      const result = await handToFixy(
+        { ...input, notes: "Workspace confirmed" },
+        root,
+        linear.linear,
+        ENV
+      );
+      assert.equal(result.reportedAt, "2026-10-31T09:15:00.000Z");
+      assert.equal(result.reportedAtSource, "Intercom first message");
+      assert.equal(
+        parseFixyHandoff(linear.state.comments[0]?.body ?? "")?.reportedAt,
+        result.reportedAt
+      );
+      if (hidden) {
+        assert.ok(linear.names().includes("FixyHandoffComment"));
+      }
+      // Explicit replacement wins over the previous time.
+      const replaced = await handToFixy(
+        {
+          ...input,
+          reportedAt: "2026-10-30T00:00:00Z",
+          reportedAtSource: "Requester correction",
+        },
+        root,
+        linear.linear,
+        ENV
+      );
+      assert.equal(replaced.reportedAt, "2026-10-30T00:00:00.000Z");
+      linear.state.attachments.push({ title: "Ask from Jo", url: ASK_URL });
+      const slack = await handToFixy(input, root, linear.linear, ENV);
+      assert.equal(slack.reportedAtSource, SLACK_THREAD_START);
+    });
+  }
+
+  it("writes a missing handoff with Bug already present without notifying Fixy", async () => {
+    const linear = fakeLinear({
+      labels: [
+        { id: "bug", name: "Bug" },
+        { id: "blocked", name: "factory:needs-you" },
+      ],
+    });
+    const result = await handToFixy(input, root, linear.linear, ENV);
+    assert.equal(result.success, true);
+    assert.equal(result.fixyNotified, false);
+    assert.equal(result.commentId, COMMENT_ID);
+    assert.deepEqual(linear.names(), ["FixyHandoffIssue", "FixyHandoffCreate"]);
+  });
+
+  for (const fail of ["FixyBugLabel", "FixyHandoffLabel"]) {
+    it(`keeps confirmed comment progress when ${fail} throws`, async () => {
+      const linear = fakeLinear({}, { fail });
+      const result = await handToFixy(input, root, linear.linear, ENV);
+      assert.equal(result.success, false);
+      assert.equal(result.commentId, COMMENT_ID);
+      assert.equal(result.reportedAtSource, TICKET_CREATED);
+      assert.equal(result.reportedAt, "2026-11-01T18:02:40.000Z");
+      assert.equal(handoffOutcome(result), "comment_only");
+      assert.ok(result.reason?.includes("could not be confirmed"));
+    });
+  }
+
+  for (const fail of ["FixyBugLabel", "FixyHandoffLabel"]) {
+    it(`logs comment_only from execute when ${fail} throws after writing`, async () => {
+      const linear = fakeLinear({}, { fail });
+      const originalFetch = globalThis.fetch;
+      const originalInfo = console.info;
+      const teams = process.env.FIXY_TRIAGE_TEAMS;
+      const events: string[] = [];
+      process.env.FIXY_TRIAGE_TEAMS = "SAN";
+      console.info = (line: string) => {
+        events.push(line);
+      };
+      globalThis.fetch = async (_url, init) => {
+        const request = JSON.parse(String(init?.body));
+        const data = await linear.linear(
+          request.query,
+          request.operationName ?? QUERY_NAME.exec(request.query)?.[1],
+          request.variables
+        );
+        return Response.json({ data });
+      };
+      try {
+        assert.ok(tool.execute);
+        const ctx = {
+          abortSignal: new AbortController().signal,
+          getToken: () => Promise.resolve({ token: "synthetic" }),
+          session: root,
+        } as unknown as Parameters<typeof tool.execute>[1];
+        const result = await tool.execute(input, ctx);
+        assert.ok("success" in result);
+        assert.equal(result.success, false);
+        assert.equal(result.commentId, COMMENT_ID);
+        assert.equal(result.reportedAtSource, TICKET_CREATED);
+        assert.ok(
+          events.some((line) => line.includes('"outcome":"comment_only"'))
+        );
+      } finally {
+        globalThis.fetch = originalFetch;
+        console.info = originalInfo;
+        if (teams === undefined) {
+          Reflect.deleteProperty(process.env, "FIXY_TRIAGE_TEAMS");
+        } else {
+          process.env.FIXY_TRIAGE_TEAMS = teams;
+        }
+      }
+    });
+  }
+
+  it("still throws cancellation after the comment write", async () => {
+    const linear = fakeLinear({}, { fail: "FixyBugLabel" });
+    const controller = new AbortController();
+    controller.abort();
+    await assert.rejects(
+      handToFixy(input, root, linear.linear, ENV, controller.signal)
+    );
+  });
+
+  it("describes this session's report ticket and no notification for an existing Bug", () => {
+    assert.ok(tool.description?.includes("this session's report ticket"));
+    assert.ok(
+      tool.description?.includes("fixyNotified false means no run was notified")
+    );
   });
 
   it("uses a workspace-level Bug label when the team has none of its own", async () => {
@@ -236,6 +394,9 @@ describe("hand_to_fixy", () => {
         if (name === "FixyHandoffIssue") {
           const r = read as { issue: { comments: { nodes: unknown[] } } };
           r.issue.comments.nodes = [];
+          (r.issue.comments as { pageInfo?: unknown }).pageInfo = {
+            hasNextPage: true,
+          };
         }
         return read;
       });
