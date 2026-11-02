@@ -143,11 +143,6 @@ const widgetRoute = (
     : Promise.resolve(null);
 };
 
-/**
- * The route line that replaces triage: the widget-feedback playbook when its
- * read found one, else the Fixy front door for an issue on a team in
- * FIXY_TRIAGE_TEAMS (ENG-16061). Undefined keeps today's triage line.
- */
 export const sessionRoute = (
   event: LinearAgentSessionEvent,
   widget: string | null,

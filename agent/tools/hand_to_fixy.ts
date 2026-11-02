@@ -1,5 +1,5 @@
 import { callLinearGraphQL } from "eve/channels/linear";
-import type { SessionAuthContext } from "eve/context";
+import type { SessionContext } from "eve/context";
 import { defineTool } from "eve/tools";
 import { z } from "zod";
 import { linearAuth } from "#lib/constants.js";
@@ -66,14 +66,10 @@ export type LinearCall = <T>(
   variables: Record<string, string | Record<string, string>>
 ) => Promise<T>;
 
-export interface HandoffSession {
-  auth: {
-    current: SessionAuthContext | null;
-    initiator: SessionAuthContext | null;
-  };
-  id: string;
-  parent?: unknown;
-}
+export type HandoffSession = Pick<
+  SessionContext["session"],
+  "auth" | "id" | "parent"
+>;
 
 const WORKSPACE_ID =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu;
@@ -182,7 +178,6 @@ const refusal = (
   success: false,
 });
 
-/** Why this session may not hand off at all, or null. */
 const sessionRefusal = (session: HandoffSession): string | null => {
   if (isQuestionsOnlySession(session.auth)) {
     return "This session is questions-only and writes nothing to Linear.";
@@ -202,12 +197,12 @@ const sessionRefusal = (session: HandoffSession): string | null => {
  * it is top-level: everything under the requester's thread comment reaches
  * the requester.
  */
-export async function handToFixy(
+export const handToFixy = async (
   input: HandToFixyInput,
   session: HandoffSession,
   linear: LinearCall,
   env: NodeJS.ProcessEnv = process.env
-): Promise<HandToFixyResult> {
+): Promise<HandToFixyResult> => {
   const { issue } = input;
   if (!isFixyTriageIssue(issue, env)) {
     return refusal(
@@ -346,7 +341,7 @@ export async function handToFixy(
     labelAdded: true,
     success: true,
   };
-}
+};
 
 const errorReason = (error: unknown) =>
   error instanceof Error ? error.message : "Linear call failed.";

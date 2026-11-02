@@ -20,15 +20,14 @@ const WIDGET_LINE = "This issue is chat widget feedback. Load widget-feedback.";
  * reads (follow-up gate, 'Ask from', widget project), which need Linear, are
  * skipped and each resolves to nothing, as a slow read does.
  */
-const created = (identifier: string): LinearAgentSessionEvent =>
-  ({
-    action: "created",
-    agentSession: { id: "s1", issue: { id: "", identifier } },
-    delivery: { event: "AgentSessionEvent", id: "d1" },
-    kind: "agent_session",
-    previousComments: [],
-    raw: {},
-  }) as LinearAgentSessionEvent;
+const created = (identifier: string): LinearAgentSessionEvent => ({
+  action: "created",
+  agentSession: { id: "s1", issue: { id: "", identifier } },
+  delivery: { event: "AgentSessionEvent", id: "d1" },
+  kind: "agent_session",
+  previousComments: [],
+  raw: {},
+});
 
 const dispatched = async (identifier: string) => {
   const result = await onAgentSession(

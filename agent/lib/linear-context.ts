@@ -8,7 +8,6 @@ import {
 // Kept in its own module so linear-context.test.ts can import it without
 // pulling in @vercel/connect (channels/linear.ts wires the Connect channel).
 
-// The requester-thread rules both customer report routes carry.
 const REQUESTER_THREAD =
   "When the issue has a comment starting 'Slack thread connected in' or 'Support conversation connected in', the requester is in that thread (a Slack thread, or the support team's notes on an Acquisity inbox conversation, which never reach the customer): send them exactly one message with reply_to_requester, your answer, and never the investigation itself.";
 const FOLLOW_UP =
@@ -21,15 +20,10 @@ const THREAD_ONLY =
 /** Points a customer report at the same procedure the Slack intake channels load. */
 export const LINEAR_TRIAGE_ROUTE = `If this issue is a customer report or support ask (it usually carries an 'Ask from' Slack link or a 'Support conversation' link) rather than an implementation request, load the triage-investigate skill before investigating; its Stage 1 hands money asks to billing-triage. ${REQUESTER_THREAD} ${FOLLOW_UP}: read the ticket's Triage or Billing investigation document and their reply, and pass your answer to reply_to_requester. ${NO_REPLY_NEEDED} A result with an error is a failed delivery, not a decision: fix what it names or say in the document that the reply was not sent. ${THREAD_ONLY} On a follow-up, post no new ticket comment and update the document only if a finding changes. Do not restart the investigation. If the verdict was waiting on this answer, finish from there: the decision tool, the document, one route_ticket call. If their reply corrects your conclusion or changes the outcome they want, call classify_ask, decide_triage, or decide_billing again with the new evidence and apply its route.`;
 
-/**
- * Replaces the triage line on a team whose real reports Fixy investigates
- * (FIXY_TRIAGE_TEAMS, ENG-16061): Foreman takes the report in and hands it on.
- */
 export const LINEAR_FRONT_DOOR_ROUTE = `If this issue is a customer report or support ask (it usually carries an 'Ask from' Slack link or a 'Support conversation' link) rather than an implementation request, load the front-door-intake skill and follow it. This team's real reports are investigated by Fixy, so do not investigate: the skill answers how-to and expected-behaviour asks, joins a report to an open known issue, asks once for missing details, and otherwise hands the report to Fixy with hand_to_fixy. It hands money asks to billing-triage. ${REQUESTER_THREAD} ${FOLLOW_UP}: read their reply and continue the front-door-intake skill from where the ticket is. ${NO_REPLY_NEEDED} A result with an error is a failed delivery, not a decision: fix what it names, and if it still fails, say so in one ticket comment. ${THREAD_ONLY}`;
 
 const ASK_FROM = /^Ask from (.{1,100})$/;
 
-/** Whether an attachment title is an intake 'Ask from <name>' link. */
 export const isAskFromTitle = (title: string): boolean =>
   ASK_FROM.test(title.trim());
 

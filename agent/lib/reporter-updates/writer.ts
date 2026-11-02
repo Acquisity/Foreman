@@ -43,9 +43,7 @@ export const NO_REPLY: WriterReply = {
 const replySchema = z.object({
   asDesigned: z.boolean().nullable(),
   steps: z.string().max(400).nullable(),
-  verdict: z
-    .enum(VERDICT_OUTCOMES as [VerdictOutcome, ...VerdictOutcome[]])
-    .nullable(),
+  verdict: z.enum(VERDICT_OUTCOMES).nullable(),
   what: z.string().max(300).nullable(),
 });
 

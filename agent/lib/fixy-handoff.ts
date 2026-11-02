@@ -2,10 +2,8 @@ import { createHash } from "node:crypto";
 import { isAskFromTitle } from "./linear-context.js";
 
 /**
- * The Fixy front door (ENG-16061): on the Linear teams in FIXY_TRIAGE_TEAMS,
- * Foreman takes a customer report in and hands the real ones to Fixy with a
- * `## Fixy handoff` comment and the team's Bug label. Fixy only starts runs
- * on teams in its own FIXY_LINEAR_TEAMS, so the two lists must agree.
+ * FIXY_TRIAGE_TEAMS must match Fixy's FIXY_LINEAR_TEAMS, because Fixy only
+ * starts runs on teams it allows.
  */
 
 /** Fixy's Linear app user, the author of each run's final reply on a ticket. */
@@ -27,19 +25,16 @@ export const fixyTriageTeams = (
       .filter((key) => TEAM_KEY.test(key))
   );
 
-/** The team key of an issue identifier such as `SAN-145`, or null. */
 export const issueTeamKey = (identifier: string): string | null =>
   identifier.length <= 32
     ? (ISSUE_IDENTIFIER.exec(identifier.trim().toUpperCase())?.[1] ?? null)
     : null;
 
-/** Whether a Linear team key is one whose real reports go to Fixy. */
 export const isFixyTriageTeam = (
   key: string,
   env: NodeJS.ProcessEnv = process.env
 ): boolean => fixyTriageTeams(env).has(key.trim().toUpperCase());
 
-/** Whether an issue sits on a team whose real reports go to Fixy. */
 export const isFixyTriageIssue = (
   identifier: string,
   env: NodeJS.ProcessEnv = process.env
@@ -79,11 +74,11 @@ export const reportedAtFromSlackUrl = (url: string): string | null => {
   if (!match) {
     return null;
   }
-  const [, seconds = "", micros = ""] = match;
+  const [, seconds, micros] = match;
   const at = new Date(
     Number(seconds) * 1000 + Math.floor(Number(micros) / 1000)
   );
-  return Number.isNaN(at.getTime()) ? null : at.toISOString();
+  return at.toISOString();
 };
 
 export const HANDOFF_HEADING = "## Fixy handoff";
@@ -107,7 +102,6 @@ export const oneLine = (text: string, max: number): string =>
     .slice(0, max)
     .trim();
 
-/** Where a handoff's report time came from when the server derived it. */
 export const SLACK_THREAD_START = "Slack thread start";
 export const TICKET_CREATED = "ticket created; original report time not found";
 
@@ -200,7 +194,6 @@ const field = (lines: readonly string[], label: string): string | null => {
   return line === undefined ? null : line.slice(prefix.length);
 };
 
-/** Reads a handoff comment back; null when the body is not one. */
 export const parseFixyHandoff = (body: string): FixyHandoff | null => {
   if (body.length > BODY_MAX_CHARS) {
     return null;
@@ -223,7 +216,7 @@ export const parseFixyHandoff = (body: string): FixyHandoff | null => {
     if (!step || Number(step[1]) !== steps.length + 1) {
       break;
     }
-    steps.push(step[2] ?? "");
+    steps.push(step[2]);
   }
   const id = WORKSPACE_ID.exec(workspace)?.[1] ?? null;
   const unknown = id ? null : (WORKSPACE_UNKNOWN.exec(workspace)?.[1] ?? null);
@@ -233,8 +226,8 @@ export const parseFixyHandoff = (body: string): FixyHandoff | null => {
   return {
     expected,
     notes: field(lines.slice(start + 1 + steps.length), "Notes"),
-    reportedAt: reported[1] ?? "",
-    reportedAtSource: reported[2] ?? "",
+    reportedAt: reported[1],
+    reportedAtSource: reported[2],
     steps,
     whatHappened,
     workspaceId: id,

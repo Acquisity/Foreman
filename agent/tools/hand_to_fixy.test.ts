@@ -277,7 +277,15 @@ describe("hand_to_fixy", () => {
   it("refuses a delegated child and a questions-only session", async () => {
     const questions = stampQuestionsOnly(stampTrusted(linearAuthContext));
     for (const session of [
-      { ...root, parent: { id: "root" } },
+      {
+        ...root,
+        parent: {
+          callId: "call-1",
+          rootSessionId: "root",
+          sessionId: "root",
+          turn: { id: "turn-1", sequence: 1 },
+        },
+      },
       { ...root, auth: { current: questions, initiator: questions } },
       { ...root, auth: { current: root.auth.current, initiator: questions } },
     ]) {
