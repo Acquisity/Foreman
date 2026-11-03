@@ -108,7 +108,6 @@ const failureReason = (error: unknown) => {
     : "error";
 };
 
-/** The widget route's bug_details turn. A failure is logged here and rethrown, so the route answers 503. */
 export async function answerBugDetails(
   input: {
     conversationId: string;
