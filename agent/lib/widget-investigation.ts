@@ -3,6 +3,7 @@ import type { MessageStreamEvent } from "eve/client";
 import { z } from "zod";
 import { readRequestBody } from "./bounded-body.js";
 import { logOpsEvent } from "./ops-log.js";
+import { bugDetailsTurn } from "./widget-bug-details.js";
 import { answerFromGuide, chatGuideEnabled } from "./widget-chat.js";
 import { verifyWidgetContext } from "./widget-context.js";
 import {
@@ -171,8 +172,9 @@ const inputSchema = z.discriminatedUnion("action", [
       .max(3)
       .optional(),
     message_id: z.uuid(),
-    // The customer's explicit "Investigate my workspace" toggle.
-    mode: z.literal("investigate").optional(),
+    // The customer's explicit "Investigate my workspace" toggle, or Acquisity's
+    // "I found a bug" steps asking whether the report needs a follow-up.
+    mode: z.enum(["investigate", "bug_details"]).optional(),
     question: z.string().trim().min(1).max(4000),
     // The screen recording this turn follows up on, which the investigator
     // reads through widget_read_recording.
@@ -527,6 +529,8 @@ export const defaultWidgetDependencies = {
   answerChat: chatGuideEnabled() ? answerFromGuide : undefined,
   answerKb: answerFromHelpCenter,
   attach: attachWidgetRun,
+  /** The "I found a bug" follow-up check: one fixed question, or a pass. */
+  bugDetails: bugDetailsTurn,
   cancel: cancelWidgetRun,
   changeRequested: (conversation: string) => asksForChange(conversation),
   claim: claimWidgetRun,
@@ -555,6 +559,7 @@ export const defaultWidgetDependencies = {
 export type WidgetDependencies = Omit<
   typeof defaultWidgetDependencies,
   | "answerChat"
+  | "bugDetails"
   | "changeRequested"
   | "fileTicket"
   | "inboxHistory"
@@ -567,6 +572,7 @@ export type WidgetDependencies = Omit<
     Pick<
       typeof defaultWidgetDependencies,
       | "answerChat"
+      | "bugDetails"
       | "changeRequested"
       | "fileTicket"
       | "inboxHistory"
@@ -1681,6 +1687,54 @@ async function cancelRun(
   return widgetRunResponse(await deps.read(run.id));
 }
 
+/** A verified start: the "I found a bug" follow-up check, or this message's run. */
+async function startWidgetRun(
+  input: Extract<WidgetInput, { action: "start" }>,
+  scope: WidgetContext,
+  signal: AbortSignal,
+  args: Parameters<typeof answerFreshRun>[4],
+  responseWaitMs: number,
+  deps: WidgetDependencies
+) {
+  // A conversation keeps one verified identity; a changed user or role is refused, never continued.
+  const previous = await deps.latestScope(scope);
+  if (previous && !sameWidgetOwner(previous, scope)) {
+    return json({ error: "Conversation scope changed." }, 403);
+  }
+  // Acquisity's "I found a bug" steps ask only whether the report needs a follow-up question.
+  if (input.mode === "bug_details") {
+    return json(
+      await (deps.bugDetails ?? bugDetailsTurn)(
+        {
+          conversation: withHistory(
+            input.question,
+            input.history,
+            input.screenshots
+          ),
+          conversationId: scope.conversationId,
+        },
+        { signal }
+      )
+    );
+  }
+  const { busy, fresh, run } = await claimOpenRun(scope, input, deps);
+  if (busy) {
+    return json({ run_id: run.id, status: "busy" });
+  }
+  if (!fresh) {
+    return json(widgetRunResponse(run));
+  }
+  return await answerFreshRun(
+    run,
+    scope,
+    input,
+    signal,
+    args,
+    responseWaitMs,
+    deps
+  );
+}
+
 export async function receiveWidgetMessage(
   request: Request,
   {
@@ -1761,22 +1815,9 @@ export async function receiveWidgetMessage(
       }
       return json(widgetRunResponse(run));
     }
-    // A conversation keeps one verified identity; a changed user or role is refused, never continued.
-    const previous = await deps.latestScope(scope);
-    if (previous && !sameWidgetOwner(previous, scope)) {
-      return json({ error: "Conversation scope changed." }, 403);
-    }
-    const { busy, fresh, run } = await claimOpenRun(scope, input, deps);
-    if (busy) {
-      return json({ run_id: run.id, status: "busy" });
-    }
-    if (!fresh) {
-      return json(widgetRunResponse(run));
-    }
-    return await answerFreshRun(
-      run,
-      scope,
+    return await startWidgetRun(
       input,
+      scope,
       request.signal,
       { from, resolveSession, waitUntil },
       responseWaitMs,
