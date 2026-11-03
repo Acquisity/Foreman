@@ -1,86 +1,84 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { test } from "node:test";
 
-const triageSkill = readFileSync(
-  new URL("../skills/triage-investigate/SKILL.md", import.meta.url),
-  "utf8"
-);
-const triageToolCatalog = readFileSync(
-  new URL("../skills/triage-investigate/references/tools.md", import.meta.url),
-  "utf8"
-);
-const triageHandlingSkill = readFileSync(
-  new URL("../skills/triage-handling/SKILL.md", import.meta.url),
-  "utf8"
-);
-const triageReportingReference = readFileSync(
-  new URL("../skills/triage-handling/references/reporting.md", import.meta.url),
-  "utf8"
-);
-const criticReviewReference = readFileSync(
-  new URL(
-    "../skills/triage-handling/references/critic-review.md",
-    import.meta.url
-  ),
-  "utf8"
-);
-const intercomTriageSkill = readFileSync(
-  new URL("../skills/intercom-triage-investigate/SKILL.md", import.meta.url),
-  "utf8"
-);
-const handoffSkill = readFileSync(
-  new URL("../skills/engineering-handoff/SKILL.md", import.meta.url),
-  "utf8"
-);
-const hotlaneSkill = readFileSync(
-  new URL("../skills/incident-hotlane/SKILL.md", import.meta.url),
-  "utf8"
-);
-const billingSkill = readFileSync(
-  new URL("../skills/billing-triage/SKILL.md", import.meta.url),
-  "utf8"
-);
+const read = (path: string) =>
+  readFileSync(new URL(`../skills/${path}`, import.meta.url), "utf8");
+
+const triageSkill = read("triage/SKILL.md");
+const lanes = read("triage/references/lanes.md");
+const tools = read("triage/references/tools.md");
+const reporting = read("triage/references/reporting.md");
+const criticReview = read("triage/references/critic-review.md");
+const handoff = read("triage/references/engineering-handoff.md");
+const hotlane = read("triage/references/incident-hotlane.md");
+const billingSkill = read("billing-triage/SKILL.md");
+
 const extractInstruction = (skill: string, start: string, end: string) => {
   const startIndex = skill.indexOf(start);
   const endIndex = skill.indexOf(end, startIndex);
 
-  assert.ok(startIndex >= 0);
-  assert.ok(endIndex > startIndex);
+  assert.ok(startIndex >= 0, start);
+  assert.ok(endIndex > startIndex, end);
   return skill.slice(startIndex, endIndex);
 };
 
 const DESCRIPTION_PATTERN = /^description: "(.*)"$/mu;
 const BACKTICK_TOKEN_PATTERN = /`([^`]+)`/gu;
-const STAGE_4_CHECKPOINT = "STAGE 4 COMPLETE: evidence record ready";
+const STAGES = [
+  "Stage 1: Establish the case",
+  "Stage 2: Resolve customer identity once",
+  "Stage 3: Check existing work",
+  "Stage 4: Investigate",
+  "Stage 5: Decide",
+  "Stage 6: Persist and route",
+  "Stage 7: Reply and record",
+];
+const triageFiles = (): string[] => {
+  const root = new URL("../skills/triage/", import.meta.url);
+  return readdirSync(root, { recursive: true })
+    .filter((path): path is string => typeof path === "string")
+    .filter((path) => path.endsWith(".md"))
+    .map((path) => readFileSync(new URL(path, root), "utf8"));
+};
 
-test("triage intake hands off to the handling skill after Stage 4", () => {
-  assert.ok(triageSkill.includes("## Handoff to handling"));
-  assert.ok(
-    triageSkill.indexOf("## Handoff to handling") >
-      triageSkill.indexOf("## Stage 4: Investigate")
-  );
-  assert.equal(triageSkill.includes("## Stage 5"), false);
-  assert.equal(triageSkill.includes("[references/reporting.md]"), false);
-  assert.ok(triageHandlingSkill.includes("## Stage 5: Decide handling"));
-  assert.equal(triageHandlingSkill.includes("## Stage 1"), false);
-  assert.equal(triageHandlingSkill.includes("## Stage 4"), false);
-
-  const description = triageSkill.match(DESCRIPTION_PATTERN)?.[1] ?? "";
-  assert.ok(description.includes("Stages 1 through 4"));
-  assert.equal(description.includes("triage-handling"), false);
-  assert.ok(description.includes("never preload handling"));
-  for (const moved of [
-    "severity weighting and priority bands",
-    "area-routing roster",
-    "root-cause masters",
-    "unblocking the customer",
-  ]) {
-    assert.equal(description.includes(moved), false, moved);
+test("triage is one skill with seven ordered stages and no load checkpoint", () => {
+  let previous = -1;
+  for (const stage of STAGES) {
+    const index = triageSkill.indexOf(`## ${stage}`);
+    assert.ok(index > previous, stage);
+    previous = index;
   }
+  assert.equal(triageSkill.match(/^## Stage \d:/gmu)?.length, 7);
+  assert.equal(triageSkill.match(/^Completion:/gmu)?.length, 6);
+  for (const source of triageFiles()) {
+    assert.equal(source.includes("STAGE 4 COMPLETE"), false);
+    assert.equal(source.includes("Do not load this reference unless"), false);
+    assert.equal(source.includes("triage-handling"), false);
+    assert.equal(source.includes("triage-investigate"), false);
+  }
+  const description = triageSkill.match(DESCRIPTION_PATTERN)?.[1] ?? "";
+  assert.ok(description.includes("one Intercom conversation"));
+  assert.ok(description.includes("hands money asks to billing-triage"));
 });
 
-test("pre-evidence forward references name the handling skill", () => {
+test("the lane completion check is kept because no code enforces it", () => {
+  const completion = extractInstruction(
+    triageSkill,
+    "## Stage 4: Investigate",
+    "## Stage 5: Decide"
+  );
+  assert.ok(completion.includes("every lane has an entry"));
+  assert.ok(completion.includes("Nothing in code checks this"));
+  assert.ok(completion.includes("do not call `decide_triage` before it holds"));
+  assert.ok(
+    completion.includes(
+      "without reopening trusted intake, identity, or completed evidence unless new conflicting evidence appears"
+    )
+  );
+});
+
+test("pre-evidence forward references name the decision tool", () => {
   assert.ok(
     triageSkill.includes(
       "`decide_triage` chooses ownership from completed evidence"
@@ -91,101 +89,6 @@ test("pre-evidence forward references name the handling skill", () => {
       "a duplicate candidate that `decide_triage` settles in Stage 5"
     )
   );
-});
-
-test("handling stays behind the explicit Stage 4 checkpoint", () => {
-  const handoff = triageSkill.slice(
-    triageSkill.indexOf("## Handoff to handling")
-  );
-  const handlingDescription =
-    triageHandlingSkill.match(DESCRIPTION_PATTERN)?.[1] ?? "";
-  const entryGate = extractInstruction(
-    triageHandlingSkill,
-    "## Entry gate",
-    "## Stage 5: Decide handling"
-  );
-
-  assert.ok(handoff.includes(STAGE_4_CHECKPOINT));
-  assert.ok(
-    triageSkill.indexOf("## Handoff to handling") >
-      triageSkill.indexOf(
-        "Completion: every material conclusion has current evidence"
-      )
-  );
-  assert.ok(handoff.includes("Verify every Stage 4 completion condition"));
-  assert.ok(handoff.includes("Until it exists, do not load"));
-  assert.equal(handlingDescription.includes(STAGE_4_CHECKPOINT), false);
-  assert.ok(handlingDescription.includes("Stage 4 completion checkpoint"));
-  assert.ok(
-    handlingDescription.includes("Never load during Stages 1 through 4")
-  );
-  assert.ok(entryGate.includes(STAGE_4_CHECKPOINT));
-  assert.ok(entryGate.includes("Before this skill was loaded"));
-  assert.ok(entryGate.includes("If not, read no references"));
-  assert.ok(entryGate.includes("This load does not create the checkpoint"));
-
-  for (const reference of [triageReportingReference, criticReviewReference]) {
-    assert.ok(reference.includes(STAGE_4_CHECKPOINT));
-    assert.ok(reference.includes("existed before this file was opened"));
-    assert.ok(reference.includes("If either gate is absent, stop reading"));
-  }
-});
-
-test("Stage 5 names the Linear state for every handling path", () => {
-  assert.ok(
-    triageHandlingSkill.includes(
-      "`Engineering Todo` is `Todo` (the master owns the work; the report stays open under it), `Duplicate` is `Duplicate`, `Backlog/low-impact` and `Feature Request` are `Backlog`, `Support/Financial` and `Support/Product follow-up` are `Todo` (a person still acts), `Resolved by triage` is `Done`, and `User Error` and `Platform Limitation` are `Canceled`: nothing changed. `Resolved by triage` needs a live fix or `changeMade`, else it is refused."
-    )
-  );
-});
-
-test("priority bands are hierarchical and never inflate for customer tier", () => {
-  const priority = extractInstruction(
-    triageHandlingSkill,
-    "### Set Linear priority",
-    "### Label the ticket"
-  );
-  assert.ok(priority.includes("measured large share of active orgs"));
-  assert.ok(priority.includes("confirmed multi-org failure below `Urgent`"));
-  assert.ok(priority.includes("Customer tier"));
-  assert.ok(priority.includes("breaks ties only"));
-  assert.equal(priority.includes("enterprise customer blocked"), false);
-});
-
-test("shared triage exposes one seven-stage workflow across intake and handling", () => {
-  const intakeStages = [
-    "Stage 1: Establish the case",
-    "Stage 2: Resolve customer identity once",
-    "Stage 3: Check existing work and frame the investigation",
-    "Stage 4: Investigate",
-  ];
-  const handlingStages = [
-    "Stage 5: Decide handling",
-    "Stage 6: Persist and route",
-    "Stage 7: Finish the attended response and memory bookkeeping",
-  ];
-
-  let previousIndex = -1;
-  for (const stage of intakeStages) {
-    const stageIndex = triageSkill.indexOf(`## ${stage}`);
-    assert.ok(stageIndex > previousIndex);
-    previousIndex = stageIndex;
-  }
-  previousIndex = -1;
-  for (const stage of handlingStages) {
-    const stageIndex = triageHandlingSkill.indexOf(`## ${stage}`);
-    assert.ok(stageIndex > previousIndex);
-    previousIndex = stageIndex;
-  }
-
-  assert.equal(triageSkill.match(/^## Stage \d:/gmu)?.length, 4);
-  assert.equal(triageSkill.match(/^Purpose:/gmu)?.length, 4);
-  assert.equal(triageSkill.match(/^Inputs:/gmu)?.length, 4);
-  assert.equal(triageSkill.match(/^Completion:/gmu)?.length, 4);
-  assert.equal(triageHandlingSkill.match(/^## Stage \d:/gmu)?.length, 3);
-  assert.equal(triageHandlingSkill.match(/^Purpose:/gmu)?.length, 3);
-  assert.equal(triageHandlingSkill.match(/^Inputs:/gmu)?.length, 3);
-  assert.equal(triageHandlingSkill.match(/^Completion:/gmu)?.length, 3);
   assert.ok(triageSkill.includes("runtime's `intakeOnly` value as a fact"));
   assert.ok(triageSkill.includes("including `null`"));
   assert.ok(
@@ -193,15 +96,62 @@ test("shared triage exposes one seven-stage workflow across intake and handling"
       "Reopen it only when genuinely new evidence conflicts with that result"
     )
   );
-  assert.ok(
-    triageSkill.includes(
-      "without reopening trusted intake, identity, or completed evidence unless new conflicting evidence appears"
-    )
-  );
 });
 
-test("shared triage preserves every evidence lane and exact tool catalog", () => {
-  const evidenceLanes = [
+test("the classifications and the Bug bar agree with the code", () => {
+  for (const line of [
+    "- `User Error`: settings, configuration, or anything support can explain, with nothing asked for.",
+    "- `Platform Limitation`: expected behavior, or a provider, billing, entitlement or plan limit, with nothing asked for.",
+    "- `Feature Request`: any ask for a new capability or a lifted limit, however infeasible.",
+  ]) {
+    assert.ok(triageSkill.includes(line), line);
+  }
+  // One Platform Limitation meaning: nothing asked for. An ask is a Feature
+  // Request, whatever its feasibility.
+  assert.equal(triageSkill.includes("unless a lift is wanted"), false);
+  assert.equal(triageSkill.includes("nobody wants lifted"), false);
+  // The Bug bar is the four items decide_triage applies; the Intercom report
+  // is filed on the first three and the regression check completes it.
+  assert.ok(triageSkill.includes("the four-item Bug bar"));
+  assert.equal(triageSkill.includes("requires all three"), false);
+});
+
+test("nobody is asked for the workspace, and every unknown becomes the reopen condition", () => {
+  assert.ok(
+    triageSkill.includes(
+      "Never ask the requester for a fact: take the most likely reading"
+    )
+  );
+  assert.ok(
+    lanes.includes(
+      "name the missing workspace or email in the closing reply as what would reopen it, never requesting it"
+    )
+  );
+  for (const source of triageFiles()) {
+    assert.equal(source.includes("clarify-with-requester"), false);
+    assert.equal(source.includes("ask for the workspace"), false);
+  }
+  assert.ok(triageSkill.includes("ask for it once and stop"));
+});
+
+test("a customer ask never closes unseen and Approved or Declined come only from a person", () => {
+  assert.ok(
+    triageSkill.includes(
+      "A Feature Request waits in Backlog with `Needs approval` and James until a person adds `Approved` or `Declined`; Foreman never adds either."
+    )
+  );
+  assert.ok(
+    triageSkill.includes(
+      "A repeat joins its master or stays open, related to its match and labelled `Needs grouping`; there is no bare duplicate."
+    )
+  );
+  for (const source of triageFiles()) {
+    assert.equal(source.includes("@"), false, "no email addresses");
+  }
+});
+
+test("triage preserves every evidence lane and the exact tool catalog", () => {
+  for (const lane of [
     "Search investigation memory",
     "Locate it in the code",
     "Check the data",
@@ -213,11 +163,41 @@ test("shared triage preserves every evidence lane and exact tool catalog", () =>
     "What the user actually did",
     "Deployment or edge failures",
     "The conversation behind the report",
-  ];
-  // The full exact-name catalog, pinned against the reference booklet table so
-  // a dropped row or renamed tool fails here. Keys are the table's Surface
-  // labels.
+  ]) {
+    assert.ok(lanes.includes(lane), lane);
+  }
+  for (const laneRule of [
+    "follows Workspace Group pages up to a 100-page safety cap",
+    "returns only accepted subworkspaces",
+    "never a complete list",
+    "must resolve exactly once",
+    "fail closed",
+    "accepts a URL",
+    "`get_contact` returns the profile only and is not a step on this path",
+    "strip the prefix or the filter matches nothing",
+    "filters structured fields and has no free-text",
+    "Sentry `search_issues`, then the nested `get_issue_details` read",
+    "Prefer a bounded `COUNT` or narrow `SELECT`",
+  ]) {
+    assert.ok(lanes.includes(laneRule), laneRule);
+  }
+  assert.ok(
+    triageSkill.includes(
+      "title, description, attachments, links, comments, labels, priority, project, assignee, requester"
+    )
+  );
+
   const toolCatalog: Record<string, string[]> = {
+    Autumn: [
+      "getCustomer",
+      "getPlan",
+      "listPlans",
+      "listFeatures",
+      "getEntity",
+      "listEntities",
+      "listCustomers",
+      "getCurrentOrganization",
+    ],
     Axiom: [
       "queryDataset",
       "listDatasets",
@@ -234,6 +214,11 @@ test("shared triage preserves every evidence lane and exact tool catalog", () =>
       "getDashboard",
       "exportDashboard",
       "listNotifiers",
+    ],
+    "Billing records": [
+      "read_billing_account",
+      "read_autumn_billing",
+      "read_stripe_billing",
     ],
     "Customer identity": ["lookup_customer"],
     "Help center": ["find_help_article"],
@@ -391,6 +376,13 @@ test("shared triage preserves every evidence lane and exact tool catalog", () =>
       "get_issue_details",
       "search_issue_events",
     ],
+    Stripe: [
+      "stripe_api_read",
+      "stripe_api_search",
+      "stripe_api_details",
+      "search_stripe_documentation",
+      "list_available_accounts_or_orgs",
+    ],
     Vercel: [
       "getProject",
       "getProjects",
@@ -400,32 +392,10 @@ test("shared triage preserves every evidence lane and exact tool catalog", () =>
       "getRuntimeLogs",
     ],
   };
-
-  for (const lane of evidenceLanes) {
-    assert.ok(triageSkill.includes(lane), lane);
-  }
-  for (const laneRule of [
-    "follows Workspace Group pages up to a 100-page safety cap",
-    "returns only accepted subworkspaces",
-    "never a complete list",
-    "must resolve exactly once",
-    "fail closed",
-    "accepts a URL",
-    "`get_contact` returns the profile only and is not a step on this path",
-    "strip the prefix or the filter matches nothing",
-    "filters structured fields and has no free-text",
-    "title, description, attachments, links, comments, labels, priority, project, assignee, requester",
-    "Sentry `search_issues`, then the nested `get_issue_details` read",
-    "Prefer a bounded `COUNT` or narrow `SELECT`",
-  ]) {
-    assert.ok(triageSkill.includes(laneRule), laneRule);
-  }
-
-  // Parse each Markdown row of the reference booklet and deep-equal the
-  // surface, call prefix, and exact ordered token set, so a renamed tool, a
-  // wrong call kind, or an extra row or token fails here instead of passing
-  // on a substring.
-  const parsedRows = triageToolCatalog
+  // Parse each Markdown row and deep-equal the surface, call prefix, and exact
+  // ordered token set, so a renamed tool, a wrong call kind, or an extra row
+  // or token fails here instead of passing on a substring.
+  const parsedRows = tools
     .split("\n")
     .filter(
       (line) =>
@@ -454,6 +424,9 @@ test("shared triage preserves every evidence lane and exact tool catalog", () =>
     ["Customer identity", "root, bare"],
     ["PlanetScale data", "root, bare"],
     ["PlanetScale connection", "Executor: planetscale"],
+    ["Billing records", "root, bare"],
+    ["Autumn", "Executor: autumn"],
+    ["Stripe", "Executor: stripe"],
     ["Instantly", "root, bare"],
     ["Jev decisions", "root, bare"],
     ["Linear searches and routing writes", "root, bare"],
@@ -493,105 +466,96 @@ test("shared triage preserves every evidence lane and exact tool catalog", () =>
     "8eaf95ab-56ac-4490-8253-f6a96793dc40",
     "no write tool to reach even by accident",
   ]) {
-    assert.ok(triageToolCatalog.includes(note), note);
+    assert.ok(tools.includes(note), note);
   }
-  // The catalog moved out of the intake skill into the reference booklet;
-  // the skill links it and carries no inline table.
   assert.ok(triageSkill.includes("[references/tools.md](references/tools.md)"));
+  assert.ok(triageSkill.includes("[references/lanes.md](references/lanes.md)"));
   assert.equal(triageSkill.includes("| Surface | Call as |"), false);
-  assert.equal(
-    triageSkill.includes("Exact tool names, one row per surface"),
-    false
+  assert.ok(
+    triageSkill.includes("[references/reporting.md](references/reporting.md)")
+  );
+  assert.ok(reporting.includes("## Linear report template"));
+  assert.ok(reporting.includes("## Triage investigation document template"));
+  assert.ok(reporting.includes("## Master ticket template"));
+  assert.ok(
+    reporting.includes("[engineering-handoff.md](engineering-handoff.md)")
+  );
+  assert.ok(handoff.includes("## Master ticket template"));
+});
+
+test("the catalog keeps the billing reads read-only and in order", () => {
+  for (const rule of [
+    "## Billing records (read in this order)",
+    "takes `billingAccount.id`, never the organization id, which answers `customer_not_found`",
+    "A 404 is a wrong id",
+    "partner-governed organization, which is on Whop",
+    "`has_more: true` means incomplete history",
+    "Amounts are in the smallest currency unit (`7200` is $72.00)",
+    "`getOrCreateCustomer` creates on a miss, so it is excluded",
+    "never invent a `create_refund` tool",
+    "`labels` field replaces the whole set",
+    "never write those through `save_document`",
+  ]) {
+    assert.ok(tools.includes(rule), rule);
+  }
+  assert.ok(
+    tools.indexOf("`read_billing_account` takes") <
+      tools.indexOf("`read_autumn_billing` takes")
   );
   assert.ok(
-    triageHandlingSkill.includes(
-      "[references/reporting.md](references/reporting.md)"
-    )
+    tools.indexOf("`read_autumn_billing` takes") <
+      tools.indexOf("`read_stripe_billing`: `customer`")
   );
-  assert.ok(triageReportingReference.includes("## Linear report template"));
-  assert.ok(
-    triageReportingReference.includes(
-      "## Triage investigation document template"
-    )
-  );
-  assert.ok(triageReportingReference.includes("## Master ticket template"));
-  assert.ok(
-    triageReportingReference.includes("live in the `engineering-handoff` skill")
-  );
-  assert.ok(handoffSkill.includes("## Master ticket template"));
 });
 
 test("triage catalog preserves Instantly authorization failure semantics", () => {
-  assert.ok(triageToolCatalog.includes("For either Instantly tool"));
-  assert.ok(triageToolCatalog.includes("`available: false`"));
-  assert.ok(triageToolCatalog.includes("operator configuration"));
+  assert.ok(tools.includes("For either Instantly tool"));
+  assert.ok(tools.includes("`available: false`"));
+  assert.ok(tools.includes("operator configuration"));
   assert.ok(
-    triageToolCatalog.includes(
-      "never a reason to ask the requester to sign in or retry"
-    )
+    tools.includes("never a reason to ask the requester to sign in or retry")
   );
 });
 
-test("triage intake mandates loading the tool catalog before evidence collection", () => {
-  const stage4Index = triageSkill.indexOf("## Stage 4: Investigate");
-  const gateIndex = triageSkill.indexOf("### Load the tool catalog first");
-  const firstLaneIndex = triageSkill.indexOf("### Search investigation memory");
-
-  assert.ok(stage4Index >= 0);
-  assert.ok(gateIndex > stage4Index);
-  assert.ok(firstLaneIndex > gateIndex);
-
-  const gate = extractInstruction(
+test("Stage 4 mandates loading the catalog before evidence collection", () => {
+  const stage = extractInstruction(
     triageSkill,
-    "### Load the tool catalog first",
-    "### Search investigation memory"
+    "## Stage 4: Investigate",
+    "Completion:"
   );
-  assert.ok(gate.includes("[references/tools.md](references/tools.md)"));
-  assert.ok(gate.includes("before the first evidence lane runs"));
-  assert.ok(gate.includes("mandatory"));
+  assert.ok(stage.includes("[references/tools.md](references/tools.md)"));
+  assert.ok(stage.includes("before the first evidence lane runs"));
+  assert.ok(stage.includes("mandatory"));
   assert.ok(
-    gate.includes(
+    stage.includes(
       "do not continue into evidence collection until the catalog is loaded"
     )
   );
-});
-
-test("triage intake skill stays within its 15000-byte budget", () => {
-  const intakeBytes = Buffer.byteLength(triageSkill, "utf8");
   assert.ok(
-    intakeBytes <= 15_000,
-    `triage-investigate SKILL.md is ${intakeBytes} bytes, over the 15000-byte budget`
+    stage.indexOf("search investigation memory") <
+      stage.indexOf("locate it in the code")
   );
 });
 
-test("Intercom product skill stays within the 15000-byte intake budget", () => {
-  const intercomBytes = Buffer.byteLength(intercomTriageSkill, "utf8");
+test("triage skill stays within the 15000-byte intake budget", () => {
+  const bytes = Buffer.byteLength(triageSkill, "utf8");
   assert.ok(
-    intercomBytes <= 15_000,
-    `intercom-triage-investigate SKILL.md is ${intercomBytes} bytes, over the 15000-byte budget`
+    bytes <= 15_000,
+    `triage SKILL.md is ${bytes} bytes, over the 15000-byte budget`
   );
 });
 
-test("triage handling skill stays within its 20000-byte budget", () => {
-  const handlingBytes = Buffer.byteLength(triageHandlingSkill, "utf8");
-  assert.ok(
-    handlingBytes <= 20_000,
-    `triage-handling SKILL.md is ${handlingBytes} bytes, over the 20000-byte budget`
-  );
-});
-
-test("shared triage makes retrieval project-independent", () => {
+test("triage makes retrieval project-independent", () => {
   const establish = extractInstruction(
     triageSkill,
     "## Stage 1: Establish the case",
     "## Stage 2: Resolve customer identity once"
   );
-  const investigate = extractInstruction(
-    triageSkill,
-    "### Search investigation memory",
-    "### Locate it in the code"
+  const memory = extractInstruction(
+    lanes,
+    "## Search investigation memory",
+    "## Read the help center"
   );
-
   for (const oldInstruction of [
     "A ticket with no project has nothing to search",
     "Unavailable: no Linear project",
@@ -600,11 +564,7 @@ test("shared triage makes retrieval project-independent", () => {
     "route to Aaron Fraga as the triage skill already requires",
   ]) {
     assert.equal(triageSkill.includes(oldInstruction), false, oldInstruction);
-    assert.equal(
-      triageHandlingSkill.includes(oldInstruction),
-      false,
-      oldInstruction
-    );
+    assert.equal(lanes.includes(oldInstruction), false, oldInstruction);
   }
   assert.ok(establish.includes("ordinary intake metadata"));
   assert.ok(
@@ -612,17 +572,24 @@ test("shared triage makes retrieval project-independent", () => {
       "Do not establish, verify, infer, preserve, or route from a product project yet"
     )
   );
-  assert.ok(investigate.includes("accepts no Linear project id"));
-  assert.ok(investigate.includes("every authorized attended triage surface"));
-  assert.ok(investigate.includes("projectless Linear tickets"));
-  assert.ok(investigate.includes("tickets that arrive under `Support`"));
+  assert.ok(memory.includes("accepts no Linear project id"));
+  assert.ok(memory.includes("every authorized attended triage surface"));
+  assert.ok(memory.includes("projectless Linear tickets"));
+  assert.ok(memory.includes("tickets that arrive under `Support`"));
+  assert.ok(memory.includes("excludes the planned Acquisity Agent area"));
+  assert.ok(memory.includes("never added together"));
   assert.ok(
-    triageSkill.includes(
+    memory.includes(
+      "Historical affected counts are dated figures, never the current blast radius"
+    )
+  );
+  assert.ok(
+    lanes.includes(
       "PlanetScale is the production database and the only source of current production truth"
     )
   );
   assert.ok(
-    triageHandlingSkill.includes(
+    triageSkill.includes(
       "Historical memory is analogy only and cannot settle the verdict, duplicate, master, severity, or current blast radius"
     )
   );
@@ -631,283 +598,220 @@ test("shared triage makes retrieval project-independent", () => {
 test("ENG-13175-shaped thread correction is recorded, not argued", () => {
   for (const phrase of [
     "A colleague correcting you in the thread or on the ticket is later evidence",
-    "put your overturned conclusion in `ruledOut`",
-    "handle it as a correction under Stage 7",
+    "puts your overturned conclusion in `ruledOut`",
+    "New specifics from the requester reopen a closed ticket",
   ]) {
-    assert.ok(triageHandlingSkill.includes(phrase), phrase);
+    assert.ok(triageSkill.includes(phrase), phrase);
   }
 });
 
-test("ENG-12880-shaped projectless intake searches memory before choosing a project", () => {
-  const memorySearch = triageSkill.indexOf(
-    "including projectless Linear tickets"
-  );
-  const handoff = triageSkill.indexOf("## Handoff to handling");
-  const projectChoice = triageHandlingSkill.indexOf(
-    "### Choose the product project from completed evidence"
-  );
-
-  assert.ok(memorySearch >= 0);
-  assert.ok(handoff > memorySearch);
-  assert.ok(projectChoice >= 0);
-  assert.ok(
-    triageHandlingSkill.includes(
-      "Pass the evidence-backed project to the ticket's one `route_ticket` call"
-    )
+test("ENG-12880 and ENG-13108-shaped intake chooses the project only from evidence", () => {
+  const route = extractInstruction(
+    triageSkill,
+    "## Stage 6: Persist and route",
+    "## Stage 7"
   );
   assert.ok(
-    triageHandlingSkill.includes(
-      "pass that resulting project id to `record_investigation_case`"
+    route.includes(
+      "Pass `route` to the ticket's one `route_ticket` call unchanged"
     )
   );
+  assert.ok(route.includes("the evidence-backed project"));
+  assert.ok(
+    route.includes(
+      "A memory analogy, title, incoming `null` or `Support` project never chooses the project"
+    )
+  );
+  assert.ok(route.includes("when `route` has none, name the missing evidence"));
+  assert.ok(
+    route.includes(
+      "When Aaron explicitly asks for read-only validation in a manual test"
+    )
+  );
+  assert.ok(route.includes("apply no Linear mutation and record no memory"));
+  assert.ok(triageSkill.includes("`route_ticket`'s returned `projectId`"));
 });
 
-test("ENG-13108-shaped Support intake neither gates memory nor triggers fallback", () => {
-  assert.ok(
-    triageHandlingSkill.includes(
-      "incoming `Support` project cannot make this decision"
-    )
+test("triage stops unproven claims before classification or routing", () => {
+  const stage = extractInstruction(
+    triageSkill,
+    "## Stage 5: Decide",
+    "## Stage 6"
+  );
+  const unproven = extractInstruction(
+    stage,
+    "Unproven:",
+    "Review before routing:"
   );
   assert.ok(
-    triageHandlingSkill.includes(
-      "Missing or unmapped intake metadata by itself is never that gap"
-    )
+    unproven.includes("take the unproven branch and stop before classification")
   );
+  assert.ok(unproven.includes("Record any safe unblock"));
   assert.ok(
-    triageHandlingSkill.includes(
-      "When Aaron explicitly requests read-only validation during an attended manual test"
-    )
-  );
-  assert.ok(
-    triageHandlingSkill.includes(
-      "apply no Linear mutation and do not record investigation memory"
-    )
-  );
-  assert.ok(
-    triageHandlingSkill.includes(
-      "This is an operator instruction for that test, not a runtime authorization mode"
-    )
-  );
-  assert.ok(
-    triageHandlingSkill.includes(
-      "Do not require or invent a session marker for it"
-    )
-  );
-});
-
-test("shared triage stops unproven claims before classification or routing", () => {
-  assert.ok(
-    triageHandlingSkill.includes(
-      "When the deciding confirmation is still missing, take the unproven branch and stop before classification"
-    )
-  );
-  assert.ok(
-    triageHandlingSkill.includes(
-      "Preserve the source ticket's current state, priority, and labels"
-    )
-  );
-  assert.ok(
-    triageHandlingSkill.includes(
-      "Do not create or attach a master, route engineering work, or record investigation memory"
-    )
-  );
-  assert.ok(
-    triageHandlingSkill.includes(
-      "Before stopping, record any safe unblock supported by the completed evidence"
-    )
-  );
-  assert.ok(
-    triageHandlingSkill.includes(
-      "action, owner, current status, and confirmation that it costs the customer neither data nor money"
-    )
-  );
-  assert.ok(
-    triageHandlingSkill.includes(
-      "the unproven branch has stopped before classification with the unblock"
-    )
-  );
-  assert.ok(triageReportingReference.includes("## Unproven branch reporting"));
-  assert.ok(
-    triageReportingReference.includes("`**Classification**: Not settled`")
-  );
-  assert.ok(
-    triageReportingReference.includes(
-      "Never load `engineering-handoff` or create or attach a master for this branch"
-    )
-  );
-  const unprovenExit = extractInstruction(
-    triageHandlingSkill,
-    "### Comment on the ticket",
-    "### Choose the product project from completed evidence"
-  );
-  assert.ok(
-    unprovenExit.includes(
-      "For the unproven branch, save only this document and comment, then stop"
-    )
-  );
-  for (const forbidden of [
-    "choose or change the project",
-    "read the roster",
-    "call `route_ticket`",
-    "load `engineering-handoff`",
-  ]) {
-    assert.ok(unprovenExit.includes(forbidden), forbidden);
-  }
-  assert.ok(
-    unprovenExit.includes(
+    unproven.includes(
       "preserve state, priority, labels, project, parent, and assignee"
     )
   );
-});
-
-test("Slack product triage master searches enforce the 30-day cutoff", () => {
-  const skills = [
-    {
-      end: "\n2. In an intake-only Slack workflow",
-      skill: handoffSkill,
-      start: "1. Call `find_related_issues`",
-    },
-  ];
-
-  for (const { end, skill, start } of skills) {
-    const masterSearchInstruction = extractInstruction(skill, start, end);
-    assert.ok(masterSearchInstruction.includes("`find_related_issues`"));
-    assert.ok(masterSearchInstruction.includes('`scope: "masters"`'));
-    assert.ok(masterSearchInstruction.includes("30 days"));
-    assert.ok(masterSearchInstruction.includes("`createdAfter`"));
-    assert.ok(!masterSearchInstruction.includes("linear__list_issues"));
-    assert.ok(!masterSearchInstruction.includes("8eaf95ab"));
-    assert.ok(!masterSearchInstruction.includes("-P30D"));
-    assert.ok(!masterSearchInstruction.includes("hasNextPage"));
-    assert.ok(skill.includes("created exactly 30 days ago"));
-    assert.ok(skill.includes("even by one second"));
-    assert.ok(skill.includes("selecting a candidate as the current master"));
-    assert.ok(skill.includes("current-master selection and parent attachment"));
-    assert.ok(skill.includes("may be related for history"));
-    assert.ok(skill.includes("never reused as the parent"));
-    assert.ok(!skill.includes("before comparing or attaching anything"));
-    assert.ok(skill.includes("current") && skill.includes("blast-radius"));
-    assert.ok(skill.includes("similarity"));
-    assert.ok(skill.includes("evidence"));
-    assert.ok(skill.includes("product-area"));
-    assert.ok(skill.includes("duplicate"));
+  for (const forbidden of [
+    "choose a project",
+    "call `route_ticket`",
+    "create or attach a master",
+    "record investigation memory",
+  ]) {
+    assert.ok(unproven.includes(forbidden), forbidden);
   }
+  assert.ok(reporting.includes("## Unproven branch reporting"));
+  assert.ok(reporting.includes("`**Classification**: Not settled`"));
+  assert.ok(
+    reporting.includes(
+      "Never follow `engineering-handoff` or create or attach a master for this branch"
+    )
+  );
+  assert.ok(
+    stage.includes("confirm it costs the customer neither data nor money")
+  );
 });
 
-test("Intercom Bug path creates the report, then hands off to the shared stages", () => {
-  const bugHandoff = extractInstruction(
-    intercomTriageSkill,
-    "### A confirmed Bug: create the report, then hand off",
-    "## Step 7:"
+test("a decided: false answer is unproven and held by Aaron, with no skill fallback", () => {
+  const stage = extractInstruction(
+    triageSkill,
+    "## Stage 5: Decide",
+    "## Stage 6"
   );
-  const createReport = bugHandoff.indexOf("`save_issue`");
-  const checkpoint = bugHandoff.indexOf(STAGE_4_CHECKPOINT);
-  const handoff = bugHandoff.indexOf("load `triage-handling`");
+  assert.ok(
+    stage.includes(
+      "`decided: false` means Jev did not answer, so nothing is proven"
+    )
+  );
+  assert.ok(
+    stage.includes(
+      'call `route_ticket` with only `issue` and `assignee: "Aaron Fraga"`, who holds it'
+    )
+  );
+  for (const source of triageFiles()) {
+    assert.equal(source.includes("fallback decided"), false);
+    assert.equal(source.includes("Fallback: only when"), false);
+  }
+  assert.ok(
+    reporting.includes("`**Confidence**: Not available: Jev did not answer`")
+  );
+  const tool = readFileSync(
+    new URL("../tools/decide_triage.ts", import.meta.url),
+    "utf8"
+  );
+  assert.ok(
+    tool.includes(
+      "decided false means Jev could not answer: the claim is unproven"
+    )
+  );
+  assert.equal(tool.includes("decide by the skill's rules"), false);
+});
 
-  assert.ok(createReport >= 0);
-  assert.ok(checkpoint > createReport);
-  assert.ok(handoff > checkpoint);
-  assert.ok(bugHandoff.includes("The report must exist before the handoff"));
-  // Both `save_issue` sites inherit the title rule stated with the claim.
+test("master searches are windowed for Slack intake and Linear sessions, unbounded elsewhere", () => {
+  const search = extractInstruction(
+    handoff,
+    "1. Call `find_related_issues`",
+    "\n2. Match eligible candidates"
+  );
+  assert.ok(search.includes('`scope: "masters"`'));
   assert.ok(
-    intercomTriageSkill.includes(
-      "This sentence, minus customer identifiers, is the title of any issue this skill creates."
-    ),
-    "issue title rule is stated once, before both creation points"
+    search.includes("intake-only Slack workflow or a Linear Agent Session")
   );
-  const titleRule = intercomTriageSkill.indexOf(
-    "is the title of any issue this skill creates"
-  );
-  const issueCreationCalls = [...intercomTriageSkill.matchAll(/`save_issue`/g)];
-  assert.equal(issueCreationCalls.length, 2, "both issue-creation sites exist");
+  assert.ok(search.includes("30 days"));
+  assert.ok(search.includes("`createdAfter` is null"));
+  assert.ok(search.includes("regardless of creation date"));
   assert.ok(
-    issueCreationCalls.every(
-      ({ index }) => index !== undefined && titleRule < index
-    ),
-    "title rule precedes every issue-creation call"
-  );
-  assert.ok(bugHandoff.includes("the shared critic review"));
-  assert.ok(bugHandoff.includes("`engineering-handoff`"));
-  assert.equal(intercomTriageSkill.split(STAGE_4_CHECKPOINT).length, 2);
-  assert.equal(
-    intercomTriageSkill.split("load `triage-handling`").length,
-    2,
-    "only the Bug branch loads triage-handling"
+    search.includes(
+      "`route_ticket` refuses a parent created before that cutoff"
+    )
   );
   assert.ok(
-    intercomTriageSkill.indexOf("load `triage-handling`") <
-      intercomTriageSkill.indexOf("## Step 7:")
+    search.includes("may be related for history but never reused as the parent")
   );
+  assert.ok(search.includes("`## Regression seam`"));
+  for (const excluded of [
+    "linear__list_issues",
+    "8eaf95ab",
+    "-P30D",
+    "hasNextPage",
+  ]) {
+    assert.ok(!search.includes(excluded), excluded);
+  }
+  assert.ok(
+    handoff.includes(
+      "Match eligible candidates on root cause, never on symptom"
+    )
+  );
+});
 
-  // Rules the shared skills own no longer have a second copy here.
+test("the Intercom source files its report before the shared decision", () => {
+  const intercom = extractInstruction(
+    triageSkill,
+    "## Intercom source",
+    "## Examples"
+  );
+  for (const phrase of [
+    "there is no Linear issue at the start",
+    "Never create a placeholder issue and never ask for a Linear identifier",
+    "A money ask goes to billing-triage's Intercom source",
+    "titled with the claim minus customer identifiers",
+    '`labels: ["intercom-sourced", "Customer reported"]`',
+    '`links: [{ url: <canonical conversation URL>, title: "Intercom conversation" }]`',
+    "Then run Stages 5 to 7 on it",
+    "Otherwise do not manufacture engineering work",
+    "Record the case under `intercom:<conversation id>` with no project id",
+    "`primaryFeatureKey`",
+    "`**Intercom source**` and `**Conversation context**`",
+  ]) {
+    assert.ok(intercom.includes(phrase), phrase);
+  }
+  const file = intercom.indexOf("File the customer report before Stage 5");
+  const decide = intercom.indexOf("Then run Stages 5 to 7 on it");
+  assert.ok(file >= 0 && decide > file);
+  assert.equal(intercom.split("`save_issue`").length, 3, "both creation sites");
   for (const owned of [
     '`scope: "masters"`',
     "30 days",
-    "root-cause master, then",
-    "`parent`",
     "`inheritAssigneeFrom`",
     "Urgent for outage",
-    "area-routing roster",
-    "koppany.kondricz",
-    "anthony.adewale",
-    "ebubeker.rexha",
-    "anuj.bhatt",
-    "james.keeble",
   ]) {
-    assert.equal(intercomTriageSkill.includes(owned), false, owned);
+    assert.equal(intercom.includes(owned), false, owned);
   }
-  assert.ok(handoffSkill.includes('`scope: "masters"`'));
-  assert.ok(handoffSkill.includes("## Create one master"));
-  assert.ok(triageHandlingSkill.includes("### Set Linear priority"));
-  assert.ok(triageHandlingSkill.includes("### Area-routing roster"));
 });
 
-test("master lookup is windowed for Slack intake and Linear sessions, unbounded elsewhere", () => {
-  const masterSelection = extractInstruction(
-    handoffSkill,
-    "## Search for the current master",
-    "## Content boundary"
+test("Intercom replies close with a customer-ready block and the bare identifier", () => {
+  const intercom = extractInstruction(
+    triageSkill,
+    "## Intercom source",
+    "## Examples"
   );
-
-  assert.ok(
-    masterSelection.includes(
-      "intake-only Slack workflow or a Linear Agent Session"
-    )
-  );
-  assert.ok(masterSelection.includes("`createdAfter` is null"));
-  assert.ok(masterSelection.includes("no recency filter is applied"));
-  assert.ok(
-    masterSelection.includes(
-      "matching masters are considered regardless of creation date"
-    )
-  );
-  assert.ok(masterSelection.includes("Elsewhere, do not apply"));
-  assert.ok(masterSelection.includes("do not apply the recency cutoff"));
-  assert.ok(masterSelection.includes("In other contexts"));
-  assert.ok(masterSelection.includes("eligibility has no recency cutoff"));
+  for (const phrase of [
+    'a short block headed "Reply you can send"',
+    "no internal names and no system names",
+    'when the requester wrote "do not reply to the customer"',
+    "the answer is still with engineering",
+    "bare ticket identifier alone on the last line",
+    "never a URL",
+  ]) {
+    assert.ok(intercom.includes(phrase), phrase);
+  }
 });
 
-test("triage Stage 6 hands the actionable branch to engineering-handoff", () => {
-  const branch = extractInstruction(
-    triageHandlingSkill,
-    "### When the root cause warrants action",
-    "Internal notes"
+test("Stage 6 hands the actionable branch to the engineering hand-off", () => {
+  const route = extractInstruction(
+    triageSkill,
+    "## Stage 6: Persist and route",
+    "## Stage 7"
   );
   assert.ok(
-    triageHandlingSkill.indexOf("### Area-routing roster") <
-      triageHandlingSkill.indexOf(
-        "### When the ticket is not engineering actionable"
-      )
+    route.includes(
+      "[references/engineering-handoff.md](references/engineering-handoff.md)"
+    )
   );
   assert.ok(
-    triageHandlingSkill.indexOf("### Area-routing roster") <
-      triageHandlingSkill.indexOf("### When the root cause warrants action")
+    route.includes("The customer ticket never becomes the engineering ticket")
   );
-  assert.ok(branch.includes("area owner is now resolved: `route.assignee`"));
-  assert.ok(branch.includes("Load `engineering-handoff`"));
-  assert.ok(!branch.includes("linear__list_issues"));
   assert.ok(!triageSkill.includes("## Master ticket template"));
-  assert.ok(!triageHandlingSkill.includes("## Master ticket template"));
   for (const moved of [
     "## Preconditions",
     "## Match by cause, not symptom",
@@ -919,7 +823,7 @@ test("triage Stage 6 hands the actionable branch to engineering-handoff", () => 
     "`fast-lane`",
     "in the product project `route.project` carries (never the report's incoming intake project",
   ]) {
-    assert.ok(handoffSkill.includes(moved), moved);
+    assert.ok(handoff.includes(moved), moved);
   }
   for (const excluded of [
     "reserve_triage_master",
@@ -928,15 +832,14 @@ test("triage Stage 6 hands the actionable branch to engineering-handoff", () => 
     "approvalId",
     "Final communication",
   ]) {
-    assert.ok(!handoffSkill.includes(excluded), excluded);
+    assert.ok(!handoff.includes(excluded), excluded);
   }
 });
 
-test("incident-hotlane assesses and never writes", () => {
+test("the hotlane assessment adds the work decide_triage does not return, and never writes", () => {
   for (const kept of [
-    "Propose `HOTLANE`",
+    "`HOTLANE`",
     "`STANDARD_ENGINEERING`",
-    "`NOT_ENGINEERING`",
     "`NEEDS_HUMAN_URGENT`",
     "`fast-lane`",
     "`confirmed_affected`",
@@ -945,9 +848,14 @@ test("incident-hotlane assesses and never writes", () => {
     "Customer recovery",
     "Permanent prevention",
     "Observability",
-    "This skill performs no writes",
+    "`notification_recommendation`",
+    "This assessment performs no writes",
+    "This assessment does not set priority",
+    "For `HOTLANE` and `STANDARD_ENGINEERING`, Foreman includes the assessment in the critic review",
+    "`NEEDS_HUMAN_URGENT` instead routes directly to a person before any critic review or settled decision",
+    "from `decision.hotlane`",
   ]) {
-    assert.ok(hotlaneSkill.includes(kept), kept);
+    assert.ok(hotlane.includes(kept), kept);
   }
   for (const excluded of [
     "save_issue",
@@ -957,38 +865,29 @@ test("incident-hotlane assesses and never writes", () => {
     "triage-critic",
     "After approval:",
     "incident channel",
+    "decided: false",
   ]) {
-    assert.ok(!hotlaneSkill.includes(excluded), excluded);
+    assert.ok(!hotlane.includes(excluded), excluded);
   }
-  assert.ok(hotlaneSkill.includes("This skill does not set priority"));
-  assert.ok(
-    hotlaneSkill.includes(
-      "For `HOTLANE` and `STANDARD_ENGINEERING`, Foreman includes the assessment in the critic review"
-    )
-  );
-  assert.ok(
-    hotlaneSkill.includes(
-      "`NEEDS_HUMAN_URGENT` instead routes directly to a person before any critic review or settled decision"
-    )
-  );
 });
 
 test("triage reviews bugs and closures with the critic before routing them", () => {
   const review = extractInstruction(
-    triageHandlingSkill,
-    "### Review before routing",
-    "## Stage 6: Persist and route"
+    triageSkill,
+    "Review before routing:",
+    "Completion:"
   );
   for (const rule of [
-    "The review runs when `decide_triage` returns `review.required`",
-    "The critic reviews a ticket at most twice",
+    "`review.required`",
     "[references/critic-review.md](references/critic-review.md)",
+    "`route_ticket` refuses a closure or duplicate route until the critic settles",
+    "a second objection hands the ticket to Aaron",
   ]) {
     assert.ok(review.includes(rule), rule);
   }
   for (const rule of [
     "`**Review**: Pending critic`",
-    "Only when `review.kind` is `bug`, load `incident-hotlane`",
+    "Only when `review.kind` is `bug`, read [incident-hotlane.md](incident-hotlane.md)",
     "If the route is `NEEDS_HUMAN_URGENT`, do not call the critic",
     "Post nothing about the review to the attended thread",
     "the next message the thread receives is the final reply",
@@ -1012,13 +911,9 @@ test("triage reviews bugs and closures with the critic before routing them", () 
     "Do not touch the document",
     "Once the review settles a version, approved or adjudicated, nothing may change it until routing is done",
   ]) {
-    assert.ok(criticReviewReference.includes(rule), rule);
+    assert.ok(criticReview.includes(rule), rule);
   }
-  assert.equal(
-    criticReviewReference.includes("Post one progress line"),
-    false,
-    "the review posts no progress line to the thread"
-  );
+  assert.equal(criticReview.includes("Post one progress line"), false);
   for (const excluded of [
     "attempt 1",
     "attempt 2",
@@ -1026,76 +921,47 @@ test("triage reviews bugs and closures with the critic before routing them", () 
     "fresh reviewer",
   ]) {
     assert.ok(!review.includes(excluded), excluded);
-    assert.ok(!criticReviewReference.includes(excluded), excluded);
+    assert.ok(!criticReview.includes(excluded), excluded);
   }
+  const persist = extractInstruction(
+    triageSkill,
+    "## Stage 6: Persist and route",
+    "Pass `route`"
+  );
   assert.ok(
-    triageHandlingSkill.includes(
-      "save it once more with its final `**Review**` line (`Approved <the updatedAt the critic echoed> at <commit>`"
+    persist.includes(
+      "When the review ran, the document already exists at the settled version: do not save it again before routing"
+    )
+  );
+  assert.ok(persist.includes("`**Review**: Not required: <review.reason>`"));
+  assert.ok(
+    persist.includes(
+      "After routing reads back, save it once more with its final `**Review**` line"
+    )
+  );
+  assert.ok(reporting.includes("**Review**: <Pending critic"));
+  assert.ok(
+    reporting.includes(
+      "Approved <document updatedAt> at <commit> | Adjudicated <document updatedAt> at <commit>: <CHALLENGE | INSUFFICIENT_EVIDENCE | review failure>"
     )
   );
   assert.ok(
-    triageHandlingSkill.includes(
-      "`Adjudicated <the adjudicated-evidence updatedAt Stage 5 read back before the settling save> at <commit>: <CHALLENGE | INSUFFICIENT_EVIDENCE | review failure>`"
-    )
-  );
-  assert.ok(
-    triageHandlingSkill.includes(
-      "A document created here for an unreviewed outcome is written once with `**Review**: Not required: <review.reason>`"
-    )
-  );
-  assert.ok(
-    triageHandlingSkill.includes(
-      "A decision with `review.required` false is applied in Stage 6 without one"
-    )
-  );
-  assert.ok(
-    triageHandlingSkill.includes(
-      "Every decision above is provisional until the review below has settled the document"
-    )
-  );
-  assert.ok(
-    triageHandlingSkill.includes(
-      "a hotlane-stopped review never reaches this stage's writes"
-    )
-  );
-  assert.ok(
-    triageHandlingSkill.includes(
-      "A reviewed `Bug` is final once its review has settled, approved or adjudicated; a hotlane-stopped or blocked review records nothing. A `Duplicate` is final once its master link is saved"
-    )
-  );
-  assert.ok(
-    triageHandlingSkill.includes(
-      "When Stage 5 review ran, it settled the document version"
-    )
-  );
-  assert.ok(
-    triageHandlingSkill.includes(
-      "do not call `save_investigation_document` before routing, even when adjudication changed the final classification or handling path"
-    )
-  );
-  assert.ok(
-    triageHandlingSkill.includes(
-      "An outcome reclassified during adjudication still entered review and keeps its settled document unchanged"
-    )
-  );
-  assert.ok(triageReportingReference.includes("**Review**: <Pending critic"));
-  assert.ok(
-    triageReportingReference.includes(
-      "Adjudicated <document updatedAt> at <commit>: <CHALLENGE | INSUFFICIENT_EVIDENCE | review failure>"
-    )
-  );
-  assert.ok(
-    triageReportingReference.includes(
+    reporting.includes(
       "names each blocking finding or the failure reason in the `**Review**` line itself"
     )
   );
   assert.ok(
-    handoffSkill.includes(
+    triageSkill.includes(
+      "A reviewed `Bug` is final once its review has settled; a hotlane-stopped or blocked review records nothing; a `Duplicate` is final once its master link is saved"
+    )
+  );
+  assert.ok(
+    handoff.includes(
       "The critic reviews a ticket at most twice and Foreman adjudicates once"
     )
   );
   assert.ok(
-    handoffSkill.includes(
+    handoff.includes(
       "the `updatedAt` Stage 5 read back after its settling save"
     )
   );
@@ -1105,23 +971,19 @@ test("triage reviews bugs and closures with the critic before routing them", () 
     "approvalId",
     "linearProjectId",
   ]) {
-    assert.ok(!triageSkill.includes(excluded), excluded);
-    assert.ok(!triageHandlingSkill.includes(excluded), excluded);
-    assert.ok(!criticReviewReference.includes(excluded), excluded);
+    for (const source of triageFiles()) {
+      assert.ok(!source.includes(excluded), excluded);
+    }
   }
 });
 
 test("ENG-13397-shaped wrong-channel money ask is handled in place", () => {
-  // A refund ask posted in a product intake channel: no cancel, the billing
-  // procedure runs where it landed, and routing comes from the evidence.
   // Skills are prompts a model reads, and this repository runs no model, so
-  // this proves the skill text instructs all of that. It does not prove a live
-  // model followed the instruction; that is what the preview UAT checks.
+  // this proves the skill text instructs it, not that a model followed it.
   for (const skill of [triageSkill, billingSkill]) {
     assert.ok(!skill.includes('state: "Canceled"'));
     assert.ok(!skill.includes("acquisity-refunds-request"));
   }
-
   const mismatch = extractInstruction(
     triageSkill,
     "Channel mismatched to the ask:",
@@ -1131,7 +993,6 @@ test("ENG-13397-shaped wrong-channel money ask is handled in place", () => {
   assert.ok(mismatch.includes("continue with the procedure"));
   assert.ok(mismatch.includes("never cancel the ticket"));
   assert.ok(triageSkill.includes("Money ask: load the billing-triage skill."));
-
   assert.ok(
     billingSkill.includes(
       "handle it where it landed. Say in one line which kind of ask it is, then run the procedure for that kind."
@@ -1142,7 +1003,6 @@ test("ENG-13397-shaped wrong-channel money ask is handled in place", () => {
       "routing sets the project and labels from the evidence, so the channel it arrived in changes nothing"
     )
   );
-  // Routing is the skill's last section, so it runs to the end of the file.
   const routingIndex = billingSkill.indexOf("## Routing");
   assert.ok(routingIndex >= 0);
   const financialRouting = billingSkill.slice(routingIndex);
@@ -1163,12 +1023,25 @@ test("ENG-13397-shaped wrong-channel money ask is handled in place", () => {
     assert.ok(financialRouting.includes(label), label);
   }
   assert.ok(!financialRouting.includes("channel"));
+});
 
-  const labelRules = extractInstruction(
-    triageHandlingSkill,
-    "### Label the ticket",
-    "### Review before routing"
+test("triage carries worked examples for its hardest calls", () => {
+  const examples = triageSkill.slice(triageSkill.indexOf("## Examples"));
+  assert.equal(examples.match(/^\*\*Input:\*\*/gmu)?.length, 3);
+  assert.equal(examples.match(/^\*\*Good output:\*\*/gmu)?.length, 3);
+  assert.equal(examples.match(/^\*\*Why:\*\*/gmu)?.length, 3);
+  const feature = extractInstruction(
+    examples,
+    "### A feature ask that repeats a closed one",
+    "### A bug that repeats a closed ticket"
   );
-  assert.ok(labelRules.includes("One type label from the verdict"));
-  assert.ok(!labelRules.includes("channel"));
+  assert.ok(
+    feature.includes("`Feature Request`, Backlog, `Needs approval`, James")
+  );
+  assert.ok(
+    feature.includes("adds `Needs grouping`, and the ticket stays open")
+  );
+  assert.ok(feature.includes("**Not:** `Duplicate` of ENG-15932"));
+  const howTo = examples.slice(examples.indexOf("### A how-to that closes"));
+  assert.ok(howTo.includes("closes it Canceled with `Needs grouping`"));
 });

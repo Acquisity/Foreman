@@ -10,8 +10,8 @@ How to investigate a money ask and leave a proposal a human can act on. The agen
 
 Jev decides whether this ticket is a **money** ask or a **product** ask: after reading the issue text and comments (Step 1), call `classify_ask` once, or reuse its answer when triage already called it. It also returns the bucket and the source labels.
 
-- If it is a money ask, continue with this skill. It replaces triage-investigate and triage-handling for this ticket: their identity, classification, memory, and routing rules no longer apply. slack-wording still does.
-- If it is a product ask, hand it to triage-investigate instead, which then governs.
+- If it is a money ask, continue with this skill. It replaces the triage skill for this ticket: their identity, classification, memory, and routing rules no longer apply. slack-wording still does.
+- If it is a product ask, hand it to the triage skill instead, which then governs.
 - If the ask is money but the ticket landed in a product channel (or vice versa), handle it where it landed. Say in one line which kind of ask it is, then run the procedure for that kind. That line is a sentence inside the reply, never its own post, and a Linear session has no channel to mismatch. Never cancel the ticket and never ask the requester to refile it; routing sets the project and labels from the evidence, so the channel it arrived in changes nothing.
 - If it answers `unclear`, Jev is below its bar: follow its `leaning` (and its bucket when the leaning is money), write that assumption into the document, and continue. If the requester later volunteers an answer, call `classify_ask` again with the report and their answer, and use its new bucket and source labels.
 
@@ -203,7 +203,7 @@ The closing reply says what happened and what happens next, and by whom, in two 
 
 Pass `decide_billing`'s `route` to `route_ticket` unchanged with the ticket's `issue`; it already holds these values. Route financial tickets to Support/Financial in one `route_ticket` call: `project: "Support"`, `assignee: "Aaron Fraga"`, `state: "Todo"`, `priority` 2 (High) for an active billing/refund blocker and 3 (Medium) otherwise, and the money-kind labels as `addLabels`.
 
-Only on `decided: false`, apply the fewest labels that place the ask yourself, the same way `triage-handling` does; otherwise pass `route.addLabels` unchanged and add nothing. `route_ticket` adds them to the labels already on the ticket and refuses a name the team does not have, listing the valid ones, so never invent a label:
+Only on `decided: false`, apply the fewest labels that place the ask yourself; otherwise pass `route.addLabels` unchanged and add nothing. `route_ticket` adds them to the labels already on the ticket and refuses a name the team does not have, listing the valid ones, so never invent a label:
 
 - One bucket label from the taxonomy: `Refund` for `refund` or `overcharged`, `Credits` for `credits` or `stripe_credit`, `Discount` for `coupon_code`.
 - The source labels, because these tickets are not engineering-authored work: `intercom-sourced` when it came from an Intercom conversation, `Customer reported` when a customer raised it, `Internal reported` when AIA CS or another internal reporter did. More than one can be true.

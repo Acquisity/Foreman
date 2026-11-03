@@ -7,33 +7,40 @@ const read = (path: string) =>
 const triageCriticSkill = read(
   "../subagents/critic/skills/triage-critic/SKILL.md"
 );
-const triageHandlingSkill = read("../skills/triage-handling/SKILL.md");
+const triageSkill = read("../skills/triage/SKILL.md");
 const triageReportingReference = read(
-  "../skills/triage-handling/references/reporting.md"
+  "../skills/triage/references/reporting.md"
 );
 const criticReviewReference = read(
-  "../skills/triage-handling/references/critic-review.md"
+  "../skills/triage/references/critic-review.md"
 );
-const handoffSkill = read("../skills/engineering-handoff/SKILL.md");
-const reviewSection = triageHandlingSkill.slice(
-  triageHandlingSkill.indexOf("### Review before routing"),
-  triageHandlingSkill.indexOf("## Stage 6: Persist and route")
+const handoffSkill = read("../skills/triage/references/engineering-handoff.md");
+const reviewSection = triageSkill.slice(
+  triageSkill.indexOf("Review before routing:"),
+  triageSkill.indexOf("## Stage 6: Persist and route")
 );
 
 test("the review covers closures, records confidence, and reviews twice at most", () => {
+  // Which decisions need review is decided in code (review.required); the
+  // protocol names every kind it checks.
   for (const rule of [
-    "a `Duplicate`, a `Platform Limitation`",
-    "a `User Error` closing with a lane that could not run or a failure the customer saw",
-    "an inbox error set aside as billing",
-    "A second objection sends it to Aaron Fraga, unproven",
-    "run the `engineering-handoff` master search first so the critic can check the master",
+    "`duplicate`, `platform_limitation`, `user_error` (a closure with an evidence lane that could not run, or a failure the customer saw), or `billing_inbox` (an inbox error set aside as billing, not code)",
+    "The critic objected twice in a row",
   ]) {
-    assert.ok(reviewSection.includes(rule), rule);
+    assert.ok(criticReviewReference.includes(rule), rule);
   }
-  assert.ok(!reviewSection.includes("never parks the ticket on a person"));
-  assert.ok(!triageHandlingSkill.includes("so the evidence is complete"));
   assert.ok(
-    triageHandlingSkill.includes(
+    reviewSection.includes("a second objection hands the ticket to Aaron")
+  );
+  assert.ok(
+    reviewSection.includes(
+      "run the master search in [references/engineering-handoff.md](references/engineering-handoff.md) first so the critic can check the master"
+    )
+  );
+  assert.ok(!reviewSection.includes("never parks the ticket on a person"));
+  assert.ok(!triageSkill.includes("so the evidence is complete"));
+  assert.ok(
+    triageSkill.includes(
       "A `Could not run` lane is a gap, not evidence: name each in `unavailableLanes`"
     )
   );
@@ -67,14 +74,11 @@ test("the review covers closures, records confidence, and reviews twice at most"
 
 test("a sending-inbox report is billing-checked before it can be a bug or a duplicate", () => {
   const billingCheck = readFileSync(
-    new URL(
-      "../skills/triage-handling/references/billing-check.md",
-      import.meta.url
-    ),
+    new URL("../skills/triage/references/billing-check.md", import.meta.url),
     "utf8"
   );
   assert.ok(
-    triageHandlingSkill.includes(
+    triageSkill.includes(
       "[references/billing-check.md](references/billing-check.md)"
     )
   );
@@ -88,12 +92,14 @@ test("a sending-inbox report is billing-checked before it can be a bug or a dupl
     assert.ok(billingCheck.includes(rule), rule);
   }
   assert.ok(
-    triageHandlingSkill.includes(
+    triageSkill.includes(
       "if `unproven` lists the billing check as missing, run it and call again"
     )
   );
   assert.ok(
-    handoffSkill.includes("Stage 5 loads it only to run the master search")
+    handoffSkill.includes(
+      "from Stage 5 only to run the master search before the critic review"
+    )
   );
   assert.ok(
     triageCriticSkill.includes(
@@ -117,37 +123,23 @@ test("the critic judges closures and master matches, and is told how many review
   assert.ok(!triageCriticSkill.includes("exactly once per ticket"));
 });
 
-test("a Bug the fallback decides after Jev failed still gets the review and the hotlane", () => {
-  const gate = criticReviewReference.slice(
-    0,
-    criticReviewReference.indexOf("`review.kind` says")
-  );
-  for (const rule of [
-    "`decide_triage` returned `review.required: true`",
-    "or returned `decided: false` and the fallback decided anything but the unproven stop",
-    "`duplicate` for a `Duplicate`, `billing_inbox` for an inbox error set aside as billing",
-    "otherwise `bug`, `platform_limitation` or `user_error` by classification",
-  ]) {
-    assert.ok(gate.includes(rule), rule);
-  }
+test("a decision Jev could not make is not reviewed as a fallback: it is unproven", () => {
+  assert.equal(criticReviewReference.includes("fallback"), false);
   assert.ok(
-    reviewSection.includes(
-      "or the fallback decides anything but the unproven stop"
-    ),
-    "Stage 5 sends a fallback decision to review"
+    criticReviewReference.includes(
+      "Follow this when `decide_triage` returned `review.required: true`"
+    )
   );
   assert.ok(
     reviewSection.includes(
-      "or the decision is recorded and, if it needs review, a review has settled the document"
-    ),
-    "Stage 5 completes a reviewed fallback decision only once it has settled"
+      "or the decision is recorded and any required review has settled the document"
+    )
   );
 });
 
-test("the Intercom Bug branch defers to the shared review protocol", () => {
-  const intercom = read("../skills/intercom-triage-investigate/SKILL.md");
-  assert.ok(!intercom.includes("exactly one critic pass"));
-  assert.ok(intercom.includes("a confirmed Bug gets the shared critic review"));
+test("the Intercom source runs the same Stage 5 review as every ticket", () => {
+  assert.ok(!triageSkill.includes("exactly one critic pass"));
+  assert.ok(triageSkill.includes("Then run Stages 5 to 7 on it"));
 });
 
 test("the critic is sent the packet its echo is checked against", () => {
@@ -162,19 +154,17 @@ test("the critic is sent the packet its echo is checked against", () => {
 
 test("the final Review line is saved after routing on every path, not only after the handoff", () => {
   assert.ok(
-    triageHandlingSkill.includes(
-      "After routing reads back on any path, save it once more with its final `**Review**` line"
+    triageSkill.includes(
+      "After routing reads back, save it once more with its final `**Review**` line"
     )
   );
-  assert.ok(
-    !triageHandlingSkill.includes("After the handoff reads its writes back")
-  );
+  assert.ok(!triageSkill.includes("After the handoff reads its writes back"));
 });
 
 test("every Engineering Todo decision gets its master search before the review that checks it", () => {
   assert.ok(
     reviewSection.includes(
-      "For an `Engineering Todo` path, run the `engineering-handoff` master search first so the critic can check the master"
+      "For an `Engineering Todo` path, run the master search in [references/engineering-handoff.md](references/engineering-handoff.md) first"
     )
   );
   assert.ok(

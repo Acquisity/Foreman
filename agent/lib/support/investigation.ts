@@ -155,7 +155,7 @@ export async function openSupportInvestigation(ctx: ProviderContext) {
         humanTookOwnership: current.humanTookOwnership,
         initialIntake: !row.processed_version,
         instructions:
-          "Load intercom-triage-investigate or intercom-billing-triage. Reuse recorded operations and existing helpers. Finish through support_investigation; ordinary final text is not delivered.",
+          "Load triage or intercom-billing-triage. Reuse recorded operations and existing helpers. Finish through support_investigation; ordinary final text is not delivered.",
         investigate: true,
         linearChanges: current.linear.changes,
         previousOperations: operations,

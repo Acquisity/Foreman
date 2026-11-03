@@ -15,7 +15,7 @@ export interface SlackIntakeWorkflow {
 
 const PRODUCT_TRIAGE_WORKFLOW: SlackIntakeWorkflow = {
   mode: "existing-linear-issue",
-  skills: ["triage-investigate", "slack-wording"],
+  skills: ["triage", "slack-wording"],
 };
 
 const BILLING_TRIAGE_WORKFLOW: SlackIntakeWorkflow = {
@@ -25,7 +25,7 @@ const BILLING_TRIAGE_WORKFLOW: SlackIntakeWorkflow = {
 
 const INTERCOM_INTAKE_WORKFLOW: SlackIntakeWorkflow = {
   mode: "new-linear-issue",
-  skills: ["intercom-triage-investigate", "intercom-billing-triage"],
+  skills: ["triage", "intercom-billing-triage"],
 };
 
 const QUESTIONS_ONLY_WORKFLOW: SlackIntakeWorkflow = {

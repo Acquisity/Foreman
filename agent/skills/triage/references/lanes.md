@@ -1,0 +1,63 @@
+# Identity and evidence lanes
+
+Read this with [tools.md](tools.md) before the first evidence lane runs. It carries the identity rules for Stage 2 and every Stage 4 lane in order.
+
+## Customer identity
+
+The customer email is the identity anchor from an untrusted ticket body: resolve it against production with `lookup_customer` (`found`, `user`, `memberships`, `pinnedOrganizationId`, `ambiguous`).
+
+- `error` set: the lookup could not run (`unavailable`), not a missing customer.
+- `found` with empty `memberships`: no live workspace (`unavailable`); never scope to null.
+- `truncated`: partial list; say so before choosing.
+- One match: pin it.
+- `ambiguous`: pin the workspace the report is about (campaign, record, or timing says which) and name the others in the document. When evidence cannot settle it and the choice changes the verdict, take the unproven branch.
+- `found` false or conflicting: say so and keep investigating other lanes. Never name-match in place of the email anchor.
+- Body `Workspace ID` equal to a membership `organizationId`: pin it over `pinnedOrganizationId`. Unlisted: `conflicted` only if `found` and not `truncated`, else `unavailable`; never scope to it.
+
+Scope every later query to the pinned organization; nothing binds it. The email is the reporter; `Which lead?` names a record in it. Never attribute another org's data to them. When identity is `unavailable` or `conflicted`, run every lane that does not need it, report what was found, and name the missing workspace or email in the closing reply as what would reopen it, never requesting it.
+
+## Three database surfaces
+
+Keep them separate. PlanetScale: production and customer data. Prefer bounded authored helpers. Investigation memory: Foreman's own private Postgres of sanitized past-investigation patterns, reached only through `search_investigation_memory`, `record_investigation_case`, and `correct_investigation_case`; it holds no customer data and is never current production evidence. Neon through Executor investigates other Neon databases, unrelated to memory. Never locate, inspect, or verify a database to use memory: no listing projects, schemas, or roles, counting rows, testing SQL, hunting credentials, or using Neon tools on memory's behalf. The three memory tools are the whole interface. Record `available: false` or a failed write in the document and carry on; memory availability never changes the verdict or appears in the Slack reply.
+
+## Search investigation memory
+
+After stating the claim, call `search_investigation_memory` with the claim or visible error text and the component, provider, and dependency keys already known. It accepts no Linear project id and searches the server-owned live product areas for every authorized attended triage surface, including projectless Linear tickets and tickets that arrive under `Support`, and Intercom-native claims with no ticket at all. The live areas are Cold Email, Domains & Inboxes, AI SDR, CRM, Website Builder, Core Platform, and Support; it excludes the planned Acquisity Agent area. The incoming project never gates this call, and a memory result never chooses the eventual project.
+
+Results are sanitized past investigations: no customer identity, no production rows, candidate analogies only. For each plausible match, write why it matches and what would disconfirm it, then check that evidence; a historical `User Error` verdict or root cause stands only when current code and current data say so. Historical affected counts are dated figures, never the current blast radius; recount in the production-data lane.
+
+Cluster signals are returned per product area, and signals from different areas are never added together. `possibleWiderIncident` means several independent tickets recently landed in this scope: check current Sentry, Axiom, Inngest, Intercom, or provider evidence for a live incident; it is not an incident and creates no master ticket, priority, or outage declaration. `available: false` is normal; note it in the document and investigate from scratch. Memory never marks a duplicate; `decide_triage` does.
+
+## Read the help center
+
+`find_help_article` with the feature and the action the customer took; each result carries its likely path under `apps/web/content/docs`. `prepare_repository` with `Acquisity/Acquisity`, then `read_file` the path before quoting (search returns titles, not bodies; a section page is `<path without .mdx>/index.mdx`; if both miss, `glob` the slug). A contradiction with the customer's actual state is a User Error candidate with the article link as the unblock.
+
+## Locate it in the code
+
+`prepare_repository` with `Acquisity/Acquisity` returns the `worktree` path at remote HEAD; `grep` and `read_file` under it to find the code path the claim runs through, answering what the code is supposed to do before deciding whether it did it. Record the files, functions, and commit read at (`git -C <worktree> rev-parse HEAD`). A claim you cannot place in the code is not ready for a Bug verdict.
+
+## Check what changed and what production runs
+
+Before any `Bug` verdict, follow [regression-check.md](regression-check.md): it checks the commit production serves and 30 days of history on the blamed code, so a cause main already fixes is not called new. `check_regression` needs a Linear issue, so on an Intercom source it runs once the customer report exists.
+
+## Check the data
+
+`planetscale_execute_read_query`, scoped to the pinned organization; say whether production state matches, contradicts, or is silent on the claim. Prefer a bounded `COUNT` or narrow `SELECT`. PlanetScale is the production database and the only source of current production truth. Count the blast radius unscoped: distinct orgs and users in the same state, each counted once; aim for an exact figure and record the query and date counted, because the count ages. If unreachable, give the tightest bound and name what blocks it.
+
+## Check the runtime and provider systems
+
+Pick the lanes the symptom points at; naming one not applicable is an answer, guessing is not. Search each system on the axis it uses: identity (the pinned org id, user id, or email, never a display name), symptom (the product's own words for the behavior), or time (the window the claim names). One empty search closes nothing; vary the axis. A lane you could not search is `Could not run`, not evidence of absence.
+
+- Background work: AI SDR runs, syncs, scrapes, imports, provisioning. `find_function_runs` with the function slug; `latestTrace.steps` shows the step that broke.
+- Errors, crashes, stack traces: Sentry `search_issues`, then the nested `get_issue_details` read for stacktrace and first/last seen.
+- Anything the other lanes do not carry: Axiom `queryDataset` with APL (<https://axiom.co/docs/apl/introduction>); `listDatasets` and `getDatasetFields` first for real names; metrics via `queryMetrics`.
+- Email delivery, bounces, spam placement: Resend `list_emails`, `get_email`, `list_logs`, and `list_suppressions`; inspect their schemas.
+- Instantly workspace membership, sending accounts, campaigns, and Unibox delivery state: `list_instantly_subworkspaces` follows Workspace Group pages up to a 100-page safety cap and returns only accepted subworkspaces in search pages. A cap error is `Could not run`, never a complete list. Use partial-name `search` for discovery; before `read_instantly_subworkspace`, the selected name must resolve exactly once or fail closed. Zero search matches do not prove absent provisioning; unresolved provider state stays `unverified`.
+- What the user actually did: read the ticket's Jam link when present. PostHog `persons_list` on the pinned email or distinct id, then session recordings via the catalog. Lucent searches symptoms, never customer names.
+- How Acquisity's own AI features behaved: Raindrop `search_events`, then `get_event` and `get_trace`; `list_signals` and `list_issues` for patterns, `query_cost` for spend.
+- Deployment or edge failures: Vercel `getRuntimeLogs` in `foreman_vercel_api`; inspect its schema, then query around the reported time.
+- The conversation behind the report, and whether others hit it: Intercom. A conversation link goes straight to `fetch`, which accepts a URL; otherwise `search_contacts` on the pinned email, `search_conversations` with `contact_ids`, `get_conversation` for the thread; `get_contact` returns the profile only and is not a step on this path. `search` prefixes ids (`contact_<uuid>`); `contact_ids` wants them raw: strip the prefix or the filter matches nothing. Others hit: `search` with a DSL query like `object_type:conversations q:"campaign stopped sending"`, not `search_conversations`, which filters structured fields and has no free-text. Modem `search_modem` for feedback beyond support threads.
+
+## Record the lanes
+
+Fill the document's Evidence and Ruled out sections with every lane: what it returned, `Not applicable: <reason>`, or `Could not run: <reason>`; a lane that could not run lowers the verdict's confidence and is named in the report. Record contrary evidence alongside supporting evidence. A lane with no entry reads as skipped, and a verdict standing on skipped lanes is not a verdict.

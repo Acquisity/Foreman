@@ -8,12 +8,8 @@ const agentRoot = fileURLToPath(new URL("..", import.meta.url));
 const canonicalPath = fileURLToPath(
   new URL("./slack-intake.ts", import.meta.url)
 );
-const triageHandlingSkill = readFileSync(
-  new URL("../skills/triage-handling/SKILL.md", import.meta.url),
-  "utf8"
-);
-const intercomTriageSkill = readFileSync(
-  new URL("../skills/intercom-triage-investigate/SKILL.md", import.meta.url),
+const triageSkill = readFileSync(
+  new URL("../skills/triage/SKILL.md", import.meta.url),
   "utf8"
 );
 const slackWordingSkill = readFileSync(
@@ -78,15 +74,13 @@ test("a canonical pointer cannot hide a final-post policy restatement", () => {
 
 test("Slack-facing skills defer to the canonical channel stamp", () => {
   const reply = extractInstruction(
-    triageHandlingSkill,
-    "### Slack-facing reply",
-    "### Record the investigation in memory"
+    triageSkill,
+    "## Stage 7: Reply and record",
+    "Once the classification is final"
   );
-  assert.ok(reply.includes("check whose lane"));
+  assert.ok(reply.includes("only the next step in their lane"));
   assert.ok(reply.includes("`slack-intake.ts`"));
-  assert.ok(triageHandlingSkill.includes("canonical final-post stamp"));
-  assert.ok(intercomTriageSkill.includes("canonical final-post rule"));
-  assert.ok(intercomTriageSkill.includes("Slack channel boundary"));
+  assert.ok(reply.includes("canonical final-post stamp"));
   assert.ok(slackWordingSkill.includes("canonical final-post rule"));
   assert.ok(slackWordingSkill.includes("Slack channel boundary"));
   assert.ok(slackWordingSkill.includes("do not restate or replace it here"));

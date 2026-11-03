@@ -1,6 +1,6 @@
 # Billing check for an inbox error
 
-Do not load this reference unless `STAGE 4 COMPLETE: evidence record ready` existed before this file was opened and the report is about the customer's sending inboxes (disconnected, erroring, not sending). If either gate is absent, stop reading and return to the unfinished stage.
+Run this in Stage 5, before `decide_triage`, when the report is about the customer's sending inboxes (disconnected, erroring, not sending).
 
 An inbox error is billing until this check says otherwise. Unpaid, lapsed or expired inboxes error every inbox at once, so when every inbox errors together, suspect non-payment first.
 

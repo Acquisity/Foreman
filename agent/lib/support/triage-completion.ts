@@ -317,7 +317,7 @@ export async function requireCompletedSupportTriage(
   }
   if (matches.length !== 1) {
     throw new SupportRefusal(
-      "The customer report needs its one Triage investigation document. Continue triage-handling before finishing; use retry with the specific blocker if required work cannot complete."
+      "The customer report needs its one Triage investigation document. Continue the triage skill's Stages 5 to 7 before finishing; use retry with the specific blocker if required work cannot complete."
     );
   }
   const document = await readSupportLinear(ctx, "get_document", {

@@ -3,18 +3,19 @@ import { readFileSync } from "node:fs";
 import { test } from "node:test";
 
 const productSkill = readFileSync(
-  new URL("../skills/intercom-triage-investigate/SKILL.md", import.meta.url),
+  new URL("../skills/triage/SKILL.md", import.meta.url),
   "utf8"
+);
+const intercomSource = productSkill.slice(
+  productSkill.indexOf("## Intercom source"),
+  productSkill.indexOf("## Examples")
 );
 const billingSkill = readFileSync(
   new URL("../skills/intercom-billing-triage/SKILL.md", import.meta.url),
   "utf8"
 );
 const productTools = readFileSync(
-  new URL(
-    "../skills/intercom-triage-investigate/references/tools.md",
-    import.meta.url
-  ),
+  new URL("../skills/triage/references/tools.md", import.meta.url),
   "utf8"
 );
 const billingTools = readFileSync(
@@ -25,19 +26,13 @@ const billingTools = readFileSync(
   "utf8"
 );
 
-test("Intercom product skill uses global memory retrieval after the claim", () => {
-  const claim = productSkill.indexOf("## Step 3: State the claim");
-  const memory = productSkill.indexOf(
-    "## Step 3A: Search investigation memory"
+test("an Intercom claim searches the same global memory as a ticket", () => {
+  const lanes = readFileSync(
+    new URL("../skills/triage/references/lanes.md", import.meta.url),
+    "utf8"
   );
-  const identity = productSkill.indexOf(
-    "## Step 4: Pin identity and check existing evidence"
-  );
-
-  assert.ok(claim >= 0);
-  assert.ok(memory > claim);
-  assert.ok(identity > memory);
-  assert.ok(productSkill.includes("accepts no Linear project metadata"));
+  assert.ok(lanes.includes("accepts no Linear project id"));
+  assert.ok(lanes.includes("Intercom-native claims with no ticket at all"));
   for (const area of [
     "Cold Email",
     "Domains & Inboxes",
@@ -46,75 +41,37 @@ test("Intercom product skill uses global memory retrieval after the claim", () =
     "Website Builder",
     "Core Platform",
   ]) {
-    assert.ok(productSkill.includes(area), area);
+    assert.ok(lanes.includes(area), area);
   }
-  assert.ok(productSkill.includes("excludes the planned Acquisity Agent area"));
-  assert.ok(productSkill.includes("returned per product area"));
+  assert.ok(lanes.includes("excludes the planned Acquisity Agent area"));
+  assert.ok(lanes.includes("returned per product area"));
 });
 
-test("Intercom product skill records ticketless verdicts and thread corrections", () => {
+test("an Intercom source records ticketless verdicts and thread corrections", () => {
   for (const phrase of [
-    "## Step 8: Record the case",
-    "with or without a Linear issue",
     "`intercom:<conversation id>`",
     "no project id",
     "`primaryFeatureKey`",
-    "### Corrections from the thread",
-    "put your overturned conclusion in `ruledOut`",
   ]) {
-    assert.ok(productSkill.includes(phrase), phrase);
+    assert.ok(intercomSource.includes(phrase), phrase);
   }
-  assert.ok(!productSkill.includes("are not recorded in this scope"));
-  assert.ok(productTools.includes("`slack:<channel id>/<thread ts>`"));
+  assert.ok(
+    productSkill.includes("puts your overturned conclusion in `ruledOut`")
+  );
 });
 
-test("Intercom product skill creates engineering work only for a confirmed bug", () => {
+test("an Intercom source creates engineering work only for a confirmed bug or feature request", () => {
   for (const phrase of [
-    "There is no Linear issue at the start",
-    "Do not create a placeholder issue",
+    "there is no Linear issue at the start",
+    "Never create a placeholder issue",
     "do not manufacture engineering work",
-    "### A confirmed Bug: create the report, then hand off",
     "canonical conversation URL",
-    "subscription behavior with no financial remedy",
-    "never as a Bug or an engineering master",
+    "A Support/Product follow-up is filed only when a person must act",
+    '`state: "Todo"`, the `Support` project, Aaron Fraga',
   ]) {
-    assert.ok(productSkill.includes(phrase), phrase);
+    assert.ok(intercomSource.includes(phrase), phrase);
   }
-});
-
-test("Intercom non-Bug outcomes end in the skill without the shared stages", () => {
-  const nonBug = productSkill.slice(productSkill.indexOf("## Step 7:"));
-
-  assert.ok(
-    nonBug.includes("## Step 7: Decide whether a follow-up is warranted")
-  );
-  assert.ok(nonBug.includes("## Step 8: Record the case"));
-  assert.ok(nonBug.includes("## Step 9: Reply in Slack"));
-  for (const outcome of [
-    "User Error, a Platform Limitation, ordinary feedback, or an unproven claim",
-    "Support/Product follow-up",
-  ]) {
-    assert.ok(nonBug.includes(outcome), outcome);
-  }
-  assert.equal(nonBug.includes("load `triage-handling`"), false);
-  assert.equal(nonBug.includes("STAGE 4 COMPLETE"), false);
-  assert.equal(nonBug.includes("critic"), false);
-  assert.equal(nonBug.includes("engineering-handoff"), false);
-  assert.ok(
-    productSkill.includes(
-      "Steps 7 and 8 below are not for these; their Slack reply is Step 9"
-    )
-  );
-  assert.ok(
-    productSkill.includes(
-      "A Bug or feature request is recorded by `triage-handling` Stage 7 under its ticket identifier"
-    )
-  );
-  assert.ok(
-    productSkill.includes(
-      "Reply for every outcome, including the Bug reply required by `triage-handling` Stage 7."
-    )
-  );
+  assert.equal(intercomSource.includes("STAGE 4 COMPLETE"), false);
 });
 
 test("Intercom billing skill preserves evidence order and human-only action", () => {
@@ -145,27 +102,18 @@ test("Intercom skills attach the source conversation to customer tickets", () =>
   const linkAttachment =
     '`links: [{ url: <canonical conversation URL>, title: "Intercom conversation" }]`';
 
-  assert.ok(productSkill.includes(linkAttachment));
-  assert.ok(productSkill.includes("never the shared root-cause master"));
+  assert.ok(intercomSource.includes(linkAttachment));
   assert.ok(billingSkill.includes(linkAttachment));
 });
 
-test("Intercom ticket-link follow-ups stop before the investigation reply format", () => {
-  const step = productSkill.indexOf("## Step 9: Reply in Slack");
-  const exception = productSkill.indexOf(
-    "For ticket-link follow-ups, return the known link and stop. Skip investigation and the format below.",
-    step
+test("ticket-link follow-ups are answered from the general reply rule", async () => {
+  process.env.LINEAR_CONNECTOR ??= "linear/foreman-agent";
+  const { GENERAL_PROMPT } = await import("./prompts.js");
+  assert.ok(
+    GENERAL_PROMPT.includes(
+      "For a follow-up asking for an existing ticket link, use the ticket references already in context and return the requested link without restarting the investigation."
+    )
   );
-  const ordinaryReply = productSkill.indexOf("Reply for every outcome", step);
-  const customerReply = productSkill.indexOf(
-    'Then add a short block headed "Reply you can send"',
-    step
-  );
-
-  assert.ok(step >= 0);
-  assert.ok(exception > step);
-  assert.ok(ordinaryReply > exception);
-  assert.ok(customerReply > ordinaryReply);
 });
 
 test("Intercom skills close with a customer-ready reply and the identifier", () => {
@@ -181,16 +129,12 @@ test("Intercom skills close with a customer-ready reply and the identifier", () 
     assert.ok(end > start, followingHeading);
     return skill.slice(start, end);
   };
-  const productReply = closingReplySection(
-    productSkill,
-    "## Triage investigation document"
-  );
   const billingReply = closingReplySection(
     billingSkill,
     "## Billing investigation document"
   );
 
-  for (const skill of [productReply, billingReply]) {
+  for (const skill of [billingReply]) {
     for (const phrase of [
       'a short block headed "Reply you can send"',
       "no internal names and no system names",
@@ -237,9 +181,11 @@ test("Intercom skills close with a customer-ready reply and the identifier", () 
     )
   );
 
-  assert.ok(!productSkill.includes("Do not include Linear identifiers"));
+  assert.ok(!intercomSource.includes("Do not include Linear identifiers"));
   assert.ok(
-    productSkill.includes("Do not include assignees, internal routing")
+    intercomSource.includes(
+      "Leave out assignees, routing, code paths, SQL, raw logs, customer identifiers and memory status"
+    )
   );
   assert.ok(!billingSkill.includes("ticket identifiers"));
   assert.ok(
@@ -270,16 +216,7 @@ test("Intercom skills own their tool references", () => {
     billingSkill.includes("[references/tools.md](references/tools.md)")
   );
 
-  for (const phrase of [
-    "## Intercom (Executor: intercom)",
-    "search_investigation_memory",
-    "accepts no Linear project metadata",
-    "known conversation id",
-    "`triage-handling` Stage 7 owns the write",
-  ]) {
-    assert.ok(productTools.includes(phrase), phrase);
-  }
-  for (const restated of ["## Master", "Overview", "parent", "roster"]) {
+  for (const restated of ["## Master", "Overview", "roster"]) {
     assert.equal(productTools.includes(restated), false, restated);
   }
 

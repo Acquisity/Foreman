@@ -22,14 +22,9 @@ const sources: Record<string, string> = {
   "intercom billing skill": readSource(
     "../skills/intercom-billing-triage/references/tools.md"
   ),
-  "intercom triage skill": readSource(
-    "../skills/intercom-triage-investigate/references/tools.md"
-  ),
   "sla skill": readSource("../skills/sla-investigation/SKILL.md"),
   "stripe disputes skill": readSource("../skills/stripe-disputes/SKILL.md"),
-  "triage tools": readSource(
-    "../skills/triage-investigate/references/tools.md"
-  ),
+  "triage tools": readSource("../skills/triage/references/tools.md"),
 };
 
 const REMOVED_CONNECTION_CALL =

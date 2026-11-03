@@ -1,21 +1,15 @@
----
-description: "Turn a settled, engineering-actionable triage investigation into exactly one causal Linear master with the customer report parented to it: search, match by cause, reuse or create, apply the approved priority and fast-lane state, and read every write back. Load from triage Stage 6 only for that branch; Stage 5 loads it only to run the master search before the critic review."
----
-
 # Engineering handoff
 
-Create durable engineering work from a diagnosis settled by approval or adjudication without turning every customer report into its own investigation. The customer ticket never becomes the engineering ticket: a master owns the root cause, and the report attaches to it. One root cause gets one master, whatever the number of reports or implementation steps.
-
-`triage-investigate` still owns the investigation, and `triage-handling` owns classification, the non-engineering outcomes, the requester comment, the Slack reply, memory bookkeeping, the numeric priority, and the customer ticket's final state, labels, priority, and project. This skill owns finding or creating the master, the customer ticket's `parentId` and `assignee` that link it to the master, the content boundary between report and master, and proving the writes landed.
+Follow this from triage Stage 6 for an engineering-actionable decision, and from Stage 5 only to run the master search before the critic review. The customer ticket never becomes the engineering ticket: a master owns the root cause, and the report attaches to it. One root cause gets one master, whatever the number of reports or implementation steps. This reference owns finding or creating the master, the report's `parent` and `assignee`, the content boundary between report and master, and proving the writes landed; triage owns everything else.
 
 ## Preconditions
 
 All of these hold before anything is written:
 
-- Stage 5 settled the classification as `Bug` and the handling path as `Engineering Todo`, or settled a `Feature Request` labelled `Approved` on the `Engineering Todo` path; its master takes the `Feature Request` type label instead of `Bug`. The one other entry is a `Bug` on the `Duplicate` path that `route_ticket` left open with `grouping: "needs-grouping"` because its match had no open master: create one master for the shared cause (below), parent the match under it with `route_ticket` (`issue` the match, `parent` the master), then return to `triage-handling` to route this ticket with the decision's `route` unchanged; `route_ticket` parents it under the same master. Never create a master for an unapproved feature request or a closed explanation: the grouping sweep groups the ones labelled `Needs grouping`, and an unmatched unapproved request just waits in Backlog for James.
+- Stage 5 settled the classification as `Bug` and the handling path as `Engineering Todo`, or settled a `Feature Request` labelled `Approved` on the `Engineering Todo` path; its master takes the `Feature Request` type label instead of `Bug`. The one other entry is a `Bug` on the `Duplicate` path that `route_ticket` left open with `grouping: "needs-grouping"` because its match had no open master: create one master for the shared cause (below), parent the match under it with `route_ticket` (`issue` the match, `parent` the master), then return to triage Stage 6 to route this ticket with the decision's `route` unchanged; `route_ticket` parents it under the same master. Never create a master for an unapproved feature request or a closed explanation: the grouping sweep groups the ones labelled `Needs grouping`, and an unmatched unapproved request just waits in Backlog for James.
 - The `Triage investigation` document is attached to the customer ticket and current.
-- When the workflow ran the critic, the review settled this exact document version: on an approval the document id and `updatedAt` the critic echoed in `reviewed`, and on an adjudication the `updatedAt` Stage 5 read back after its settling save, still match what Linear returns now. A ticket the critic blocked (two objections in a row) never reaches this skill. The critic reviews a ticket at most twice and Foreman adjudicates once. A later change records its reason on the `**Review**` line and proceeds on the settled version; it never triggers a second review or a second adjudication.
-- When the workflow ran `incident-hotlane`, its route is `HOTLANE` or `STANDARD_ENGINEERING`; `NEEDS_HUMAN_URGENT` never reaches this skill. When the workflow did not run it, treat the route as `STANDARD_ENGINEERING`: proceed normally and apply no `fast-lane` label.
+- When the workflow ran the critic, the review settled this exact document version: on an approval the document id and `updatedAt` the critic echoed in `reviewed`, and on an adjudication the `updatedAt` Stage 5 read back after its settling save, still match what Linear returns now. A ticket the critic blocked (two objections in a row) never reaches this step. The critic reviews a ticket at most twice and Foreman adjudicates once. A later change records its reason on the `**Review**` line and proceeds on the settled version; it never triggers a second review or a second adjudication.
+- The hotlane route is `HOTLANE` or `STANDARD_ENGINEERING`; `NEEDS_HUMAN_URGENT` never gets here. Without a hotlane assessment, treat the route as `STANDARD_ENGINEERING` and apply no `fast-lane` label.
 - The master search below has been run in this pass, not carried over from an earlier one. Stage 5 runs it before the critic review and records the chosen master or `none eligible` in the document; that run counts while the cause and code path are unchanged, and it is repeated when adjudication changed either. The critic reviewed that master, so a different one needs a new search recorded on the `**Review**` line, never a silent switch.
 
 If any precondition fails, write nothing structural. Record the blocker in the investigation document and leave the report where Stage 5 put it.
@@ -39,14 +33,12 @@ Search on four axes: the cause, the Stage 4 code path, the provider failure, and
 
 1. Call `find_related_issues` with `scope: "masters"` and one phrasing per axis. The Engineering Team and full pagination are fixed inside the tool; `truncated` true means candidates were dropped, so narrow the phrasings.
 
-   In an intake-only Slack workflow or a Linear Agent Session the tool searches no further than 30 days back, and `createdAfter` in the result shows the cutoff it applied. Elsewhere it preserves the general triage behavior: `createdAfter` is null, no recency filter is applied, and matching masters are considered regardless of creation date.
+   In an intake-only Slack workflow or a Linear Agent Session the tool searches no further than 30 days back, and `createdAfter` in the result shows the cutoff it applied; elsewhere `createdAfter` is null and matching masters are considered regardless of creation date. `route_ticket` refuses a parent created before that cutoff however it was found, so an older match may be related for history but never reused as the parent.
 
-   Do not filter this search by label. A master carries no marker label, so a label filter would match nothing and every report would create another master. A master is recognised by what it is: an ENG issue owning this root cause, usually already parenting customer reports.
-2. In an intake-only Slack workflow or a Linear Agent Session, apply the 30-day cutoff before selecting a candidate as the current master or setting it as this report's parent. A candidate created exactly 30 days ago remains eligible; one created more than 30 days ago, even by one second, is stale and cannot become this report's parent. Reject an older candidate for current-master selection and parent attachment if it appears through another issue's relations, investigation memory, an unbounded search result, or prior knowledge. Elsewhere, do not apply the recency cutoff. In every context, match eligible candidates on root cause, never on symptom.
+   Do not filter this search by label. A master carries no marker label, so a label filter would match nothing and every report would create another master. A master is recognised by its `## Regression seam` section or by already parenting customer reports.
+2. Match eligible candidates on root cause, never on symptom.
 
-The Slack intake recency window exists so masters describe a current cluster of customer reports and preserve real-time blast-radius visibility. It narrows the candidate set only in that workflow. It never weakens the similarity, evidence, product-area, or duplicate safeguards above.
-
-A completed candidate needs the same cause and eligibility checks. Read its fix and deployment evidence against the current failure: Done alone proves neither that this customer is fixed nor that reopening is warranted. Reuse it only when it still owns this cause; otherwise relate it for history and create a master only for the distinct, proven actionable cause. If the deciding evidence is unavailable, record the precise blocker under the existing triage branch. The scheduled Slack recipient does not decide this in place of Foreman. `track-issue` only watches progress; apply and read back the actual Linear relation.
+A completed candidate needs the same cause and eligibility checks. Read its fix and deployment evidence against the current failure: Done alone proves neither that this customer is fixed nor that reopening is warranted. Reuse it only when it still owns this cause; otherwise relate it for history and create a master only for the distinct, proven actionable cause. If the deciding evidence is unavailable, record the precise blocker in the document. `track-issue` only watches progress; apply and read back the actual Linear relation.
 
 ## Reuse an existing master
 
@@ -59,7 +51,7 @@ If an eligible master already owns the cause:
 
 ## Create one master
 
-If no eligible master owns the cause, create one with the template below, on the ENG team, in the product project `route.project` carries (never the report's incoming intake project; when it has none, leave the master unprojected and say so in the document), labelled with the type (for an approved feature request, `Feature Request` and `Approved` together, so its developer passes the assignment gate), the `Area:` label that `route.addLabels` carries, priority per Stage 5, `fast-lane` when the approved route is `HOTLANE`, and assigned to `route.assignee`, the area owner. Then call `route_ticket` on this ticket once with the `decide_triage` `route` unchanged, plus `parent` set to the new master and `assignee` set to `route.assignee`. In an intake-only Slack workflow or a Linear Agent Session, eligibility includes the 30-day cutoff, and an older matching master may be related for history but never reused as the parent. In other contexts, eligibility has no recency cutoff.
+If no eligible master owns the cause, create one with the template below, on the ENG team, in the product project `route.project` carries (never the report's incoming intake project; when it has none, leave the master unprojected and say so in the document), labelled with the type (for an approved feature request, `Feature Request` and `Approved` together, so its developer passes the assignment gate), the `Area:` label that `route.addLabels` carries, priority per Stage 5, `fast-lane` when the approved route is `HOTLANE`, and assigned to `route.assignee`, the area owner. Then call `route_ticket` on this ticket once with the `decide_triage` `route` unchanged, plus `parent` set to the new master and `assignee` set to `route.assignee`.
 
 Do not create a master because a ticket has several acceptance criteria or several steps. One master per root cause.
 
@@ -79,7 +71,7 @@ Changing a diagnosis or moving a report between masters needs a new investigatio
 
 ## Return to Stage 6
 
-Hand back the master id, whether it was reused or created, the parent and assignee that were set, the priority and label state, and any implementation children filed. Stage 6 writes the requester comment and Stage 7 the Slack reply; this skill communicates with nobody.
+Hand back the master id, whether it was reused or created, the parent and assignee that were set, the priority and label state, and any implementation children filed. Stage 6 writes the requester comment and Stage 7 the Slack reply; this step communicates with nobody.
 
 ## Master ticket template
 
