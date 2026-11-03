@@ -13,7 +13,6 @@ import { askJev, jevKey, type SelectorOptions } from "./widget-next-action.js";
  */
 
 const BUG_DETAILS_JEV_MS = [3000, 3000];
-/** Below this, Jev does not read the detail as present in the report. */
 const PRESENT_SCORE = 0.5;
 
 const DETAILS = {
@@ -62,11 +61,6 @@ export interface BugDetailsResponse {
   status: "completed";
 }
 
-/**
- * One question for the first missing detail, or a pass when the report has
- * them all. `conversation` is the report with its earlier turns, as the router
- * reads it.
- */
 export async function bugDetailsTurn(
   input: { conversation: string; conversationId: string },
   opts: SelectorOptions & { signal?: AbortSignal } = {}

@@ -1687,7 +1687,6 @@ async function cancelRun(
   return widgetRunResponse(await deps.read(run.id));
 }
 
-/** A verified start: the "I found a bug" follow-up check, or this message's run. */
 async function startWidgetRun(
   input: Extract<WidgetInput, { action: "start" }>,
   scope: WidgetContext,
@@ -1701,7 +1700,6 @@ async function startWidgetRun(
   if (previous && !sameWidgetOwner(previous, scope)) {
     return json({ error: "Conversation scope changed." }, 403);
   }
-  // Acquisity's "I found a bug" steps ask only whether the report needs a follow-up question.
   if (input.mode === "bug_details") {
     return json(
       await (deps.bugDetails ?? bugDetailsTurn)(
