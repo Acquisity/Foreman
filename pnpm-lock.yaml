@@ -11,6 +11,9 @@ importers:
       '@ai-sdk/anthropic':
         specifier: 4.0.52
         version: 4.0.52(zod@4.4.3)
+      '@ai-sdk/openai':
+        specifier: 4.0.99
+        version: 4.0.99(zod@4.4.3)
       '@github-tools/eve-extension':
         specifier: 0.9.0
         version: 0.9.0(@vercel/connect@0.8.0(ai@7.0.148(zod@4.4.3))(eve@0.83.2(ai@7.0.148(zod@4.4.3))))(ai@7.0.148(zod@4.4.3))(eve@0.83.2(ai@7.0.148(zod@4.4.3)))
@@ -74,6 +77,12 @@ packages:
 
   '@ai-sdk/gateway@4.0.121':
     resolution: {integrity: sha512-cPNXvQ4B5OkmVAm98Dxe1fHdMthyqqqAG0HJx3D92NUa9FpcvkNxdAqiuZdeAhNAodFb9lBrslzzzEwxuVS53A==}
+    engines: {node: '>=22'}
+    peerDependencies:
+      zod: ^3.25.76 || ^4.1.8
+
+  '@ai-sdk/openai@4.0.99':
+    resolution: {integrity: sha512-XRHUiXgxhVEe0smSp537lzCqMsOVg6jvGTWDbTZeGMTc+iHeOwgHgZMFBvOiNWXZ8n125Jta72m+64PtU1WNJA==}
     engines: {node: '>=22'}
     peerDependencies:
       zod: ^3.25.76 || ^4.1.8
@@ -1311,6 +1320,12 @@ snapshots:
       '@ai-sdk/provider': 4.0.31
       '@ai-sdk/provider-utils': 5.0.65(zod@4.4.3)
       '@vercel/oidc': 3.2.0
+      zod: 4.4.3
+
+  '@ai-sdk/openai@4.0.99(zod@4.4.3)':
+    dependencies:
+      '@ai-sdk/provider': 4.0.31
+      '@ai-sdk/provider-utils': 5.0.65(zod@4.4.3)
       zod: 4.4.3
 
   '@ai-sdk/provider-utils@5.0.39(zod@4.4.3)':

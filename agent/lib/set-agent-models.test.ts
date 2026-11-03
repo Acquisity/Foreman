@@ -107,6 +107,7 @@ test("accepts a Claude override listed by its mapped proxy name and preserves ot
     context
   );
   assert.ok("success" in result);
+  assert.ok("success" in result);
   assert.equal(result.success, true);
   assert.equal(writes.length, 1);
   assert.equal(writes[0].key, "model-overrides/foreman.json");
@@ -140,6 +141,7 @@ test("validates a non-Claude override only against the gateway", async (t) => {
     { vision: "google/gemini-3.6-flash" },
     context
   );
+  assert.ok("success" in result);
   assert.ok("success" in result);
   assert.equal(result.success, true);
   assert.equal(writes.length, 1);
@@ -189,6 +191,7 @@ test("restores a default without reading either catalog", async (t) => {
   );
   const result = await tool.execute({ vision: null }, context);
   assert.ok("success" in result);
+  assert.ok("success" in result);
   assert.equal(result.success, true);
   assert.equal(writes.length, 1);
   assert.deepEqual(JSON.parse(writes[0].content), {});
@@ -203,9 +206,23 @@ test("requires the same proxy configuration for catalog reads and Claude calls",
   delete process.env.CLIPROXY_API_KEY;
   const missing = {
     message:
-      "Claude models need the CLI Proxy: set CLIPROXY_BASE_URL and CLIPROXY_API_KEY",
+      "Proxy models need the CLI Proxy: set CLIPROXY_BASE_URL and CLIPROXY_API_KEY",
   };
   assert.throws(() => modelFor("anthropic/claude-fable-5.1"), missing);
   await assert.rejects(listProxyModels, missing);
   assert.equal(reads.proxyRead.mock.callCount(), 0);
+});
+
+test("validates Sol against the proxy catalog rather than the gateway", async (t) => {
+  const reads = catalogs(t, async () =>
+    Response.json({ data: [{ id: "gpt-6.1-sol" }] })
+  );
+  const result = await tool.execute(
+    { orchestrator: "openai/gpt-6.1-sol" },
+    context
+  );
+  assert.ok("success" in result);
+  assert.equal(result.success, true);
+  assert.equal(reads.proxyRead.mock.callCount(), 1);
+  assert.equal(reads.gatewayRead.mock.callCount(), 0);
 });

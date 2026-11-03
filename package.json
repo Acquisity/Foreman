@@ -36,6 +36,7 @@
   },
   "dependencies": {
     "@ai-sdk/anthropic": "4.0.52",
+    "@ai-sdk/openai": "4.0.99",
     "@github-tools/eve-extension": "0.9.0",
     "@neondatabase/serverless": "^1.1.0",
     "@vercel/blob": "^2.8.0",

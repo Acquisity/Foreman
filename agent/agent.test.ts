@@ -167,9 +167,9 @@ describe("root effort", () => {
       rootCallOptions(OVERRIDE_ID).providerOptions
     );
     assert.ok(orchestrator.modelOptions.providerOptions.gateway?.order);
-    // The compiled Sonnet default gets the effort and no gateway order.
+    // The temporary Sol default gets OpenAI reasoning effort and no gateway order.
     assert.deepEqual(rootCallOptions(MODELS.orchestrator).providerOptions, {
-      anthropic: { effort: "medium" },
+      openai: { reasoningEffort: "medium" },
     });
 
     assert.equal(effortOf(await select(stampTriageIntake(auth))), "medium");
