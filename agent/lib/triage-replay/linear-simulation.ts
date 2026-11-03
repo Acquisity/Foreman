@@ -395,7 +395,7 @@ const STATE_TYPES: Record<string, string> = {
   backlog: "backlog",
   canceled: "canceled",
   done: "completed",
-  duplicate: "canceled",
+  duplicate: "duplicate",
   "in progress": "started",
   "in review": "started",
   todo: "unstarted",

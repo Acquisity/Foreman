@@ -141,7 +141,8 @@ export async function relatedOne(
   return issues.nodes[0];
 }
 
-const CLOSED_STATE_TYPES = new Set(["canceled", "completed"]);
+// Linear gives Duplicate its own terminal state type, apart from canceled.
+const CLOSED_STATE_TYPES = new Set(["canceled", "completed", "duplicate"]);
 
 interface MasterFacts {
   createdAt: string;
