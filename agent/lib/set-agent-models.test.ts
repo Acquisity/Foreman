@@ -203,23 +203,9 @@ test("requires the same proxy configuration for catalog reads and Claude calls",
   delete process.env.CLIPROXY_API_KEY;
   const missing = {
     message:
-      "Proxy models need the CLI Proxy: set CLIPROXY_BASE_URL and CLIPROXY_API_KEY",
+      "Claude models need the CLI Proxy: set CLIPROXY_BASE_URL and CLIPROXY_API_KEY",
   };
   assert.throws(() => modelFor("anthropic/claude-fable-5.1"), missing);
   await assert.rejects(listProxyModels, missing);
   assert.equal(reads.proxyRead.mock.callCount(), 0);
-});
-
-test("checks Sol overrides against the proxy catalog", async (t) => {
-  const reads = catalogs(t, async () =>
-    Response.json({ data: [{ id: "gpt-6.1-sol" }] })
-  );
-  const result = await tool.execute(
-    { orchestrator: "openai/gpt-6.1-sol" },
-    context
-  );
-  assert.ok("success" in result);
-  assert.equal(result.success, true);
-  assert.equal(reads.proxyRead.mock.callCount(), 1);
-  assert.equal(reads.gatewayRead.mock.callCount(), 0);
 });
