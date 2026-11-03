@@ -46,7 +46,7 @@ describe("root agent limits", () => {
 });
 
 describe("root model slot", () => {
-  it("puts triage intake on Opus and general sessions on GPT-6.1 Sol", async () => {
+  it("puts triage intake on Opus and leaves widget and other sessions alone", async () => {
     const [{ MODELS }, { stampTriageIntake }, { WIDGET_SUPPORT_ISSUER }] =
       await Promise.all([
         import("./lib/models.js"),
@@ -167,7 +167,7 @@ describe("root effort", () => {
       rootCallOptions(OVERRIDE_ID).providerOptions
     );
     assert.ok(orchestrator.modelOptions.providerOptions.gateway?.order);
-    // The temporary Sol default gets OpenAI reasoning effort and no gateway order.
+    // The temporary Sol default gets medium effort and no gateway order.
     assert.deepEqual(rootCallOptions(MODELS.orchestrator).providerOptions, {
       openai: { reasoningEffort: "medium" },
     });

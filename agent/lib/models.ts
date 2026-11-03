@@ -6,11 +6,11 @@ import { MODEL_OVERRIDES_PREFIX, readDocument, writeDocument } from "./blob.js";
 
 // One place to change every agent's model. Ids are Vercel AI Gateway strings (<provider>/<model>),
 // so routing, credentials, and fallbacks stay on the gateway, except that modelFor sends every
-// anthropic/ id and the temporary GPT-6.1 Sol model to the CLI Proxy.
+// anthropic/ id and the temporary GPT-6.1 Sol default to the CLI Proxy.
 // These are the compiled defaults; a live override saved by set_agent_models wins over them.
 // Each agent.ts resolves its model through resolveModel(<agent>) at session start.
 export const MODELS = {
-  // Independent triage reviewer; triage intake runs on Claude.
+  // Independent triage reviewer.
   critic: "openai/gpt-5.6-sol",
   // Support widget egress reviewer: never investigates, never composes. On 111
   // real cases, two calls each (ENG-14669), gpt-5.6-sol with the same prompt let
@@ -39,8 +39,7 @@ export const MODELS = {
   kbSelect: "google/gemini-3.5-flash-lite",
   // Root model for every other session: general Slack, intake-only and
   // questions-only channels, Linear outside triage intake, GitHub, local eve
-  // and schedules. Temporarily uses GPT-6.1 Sol on the CLI Proxy instead of
-  // Sonnet 5.5 on the CLI Proxy (ENG-16434); it reads images itself.
+  // and schedules. Temporarily GPT-6.1 Sol on the CLI Proxy; it reads images itself.
   orchestrator: "openai/gpt-6.1-sol",
   // Root model for every triage intake session (ENG-15226, ENG-16055): the two
   // Asks-receiver channels, the Intercom intake channels, Linear tickets from
@@ -148,31 +147,24 @@ const proxyConfig = () => {
   const apiKey = process.env.CLIPROXY_API_KEY;
   if (!(baseURL && apiKey)) {
     throw new Error(
-      "Proxy models need the CLI Proxy: set CLIPROXY_BASE_URL and CLIPROXY_API_KEY"
+      "Claude models need the CLI Proxy: set CLIPROXY_BASE_URL and CLIPROXY_API_KEY"
     );
   }
   return { apiKey, baseURL };
 };
 
-// Keep other OpenAI slots on the gateway; this temporary switch is only for Sol 6.1.
-export const usesProxy = (id: string): boolean =>
-  id.startsWith("anthropic/") || id === "openai/gpt-6.1-sol";
-
 export const proxyModelName = (id: string): string =>
-  id.startsWith("anthropic/")
-    ? id.slice("anthropic/".length).replaceAll(".", "-")
-    : id.slice("openai/".length);
+  id.slice("anthropic/".length).replaceAll(".", "-");
 
-// Claude uses Messages; GPT-6.1 Sol uses Responses, including its tool calls.
-// Both require proxy credentials and neither falls back to the gateway.
+// Claude ids use the CLI Proxy's dashed names and require its credentials.
+// Sol 6.1 uses Responses on the same proxy; other ids stay on the gateway.
 export const modelFor = (id: string): Exclude<LanguageModel, string> => {
-  if (id.startsWith("anthropic/")) {
-    return createAnthropic(proxyConfig())(proxyModelName(id));
+  if (id === "openai/gpt-6.1-sol") {
+    return createOpenAI(proxyConfig()).responses("gpt-6.1-sol");
   }
-  if (usesProxy(id)) {
-    return createOpenAI(proxyConfig()).responses(proxyModelName(id));
-  }
-  return gateway(id);
+  return id.startsWith("anthropic/")
+    ? createAnthropic(proxyConfig())(proxyModelName(id))
+    : gateway(id);
 };
 
 const proxyCatalogSchema = z.object({
@@ -225,8 +217,9 @@ export const gatewayRouting = (modelId: string) =>
       }
     : undefined;
 
-// Keep medium effort for the temporary Sol root and Claude triage roots.
-// Native delegates inherit it with the root's model.
+// The root's Anthropic effort on the orchestrator and triage slots: Aaron's decision
+// (ENG-16434). A gateway model ignores the anthropic option, so an override to a
+// non-Claude id stays safe. Native delegates inherit it with the root's model.
 export const ROOT_EFFORT = "medium";
 
 export const rootCallOptions = (modelId: string) => ({
@@ -251,7 +244,7 @@ export const fastCallOptions = (modelId: string) => ({
 });
 
 // The gateway catalog, through the same authenticated provider eve's model calls use.
-// set_agent_models checks non-proxy ids here; proxy ids use listProxyModels instead.
+// set_agent_models checks non-Claude ids here; Claude ids use listProxyModels instead.
 export const listGatewayModels = async (): Promise<
   { id: string; name: string }[]
 > => {
