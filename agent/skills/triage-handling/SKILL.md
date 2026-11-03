@@ -108,7 +108,7 @@ When Aaron explicitly requests read-only validation during an attended manual te
 
 ### Area-routing roster
 
-Take the product area from the evidence, never from the incoming project, title, symptom, repository name, or memory. `route` carries the `Area:` label and `assignee` from the owner map in [references/roster.md](references/roster.md); pass it unchanged.
+Take the product area from the evidence, never from the incoming project, title, symptom, repository name, or memory. `route` carries the `Area:` label and `assignee` from the owner map in code; pass it unchanged.
 
 A developer gets only a confirmed Bug or a feature request labelled `Approved`; an unapproved one waits in Backlog with `Needs approval` and James until a person adds `Approved` or `Declined`. Questions, user errors, platform limits, billing and support get none.
 
@@ -122,7 +122,7 @@ A `Duplicate` passes `route`, adding the area owner as `assignee` only for a con
 
 ### When the root cause warrants action
 
-The customer ticket never becomes the engineering ticket: a master owns the root cause and this ticket attaches to it. The area owner is now resolved from the roster. Load `engineering-handoff` and follow it; it hands back the master id, the parent and assignee it set, and the label state. The requester comment above and the Stage 7 reply stay here; the roster owns the fallback for an unassigned or new master.
+The customer ticket never becomes the engineering ticket: a master owns the root cause and this ticket attaches to it. The area owner is now resolved: `route.assignee`. Load `engineering-handoff` and follow it; it hands back the master id, the parent and assignee it set, and the label state. The requester comment above and the Stage 7 reply stay here; `route.assignee` owns an unassigned or new master.
 
 Internal notes (identity resolution, routing rationale, customer email addresses, queries) go in the Triage investigation document, never in the ticket comment; a customer-facing comment carries no `## Internal` section.
 

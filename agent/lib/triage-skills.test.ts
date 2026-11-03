@@ -124,17 +124,7 @@ test("handling stays behind the explicit Stage 4 checkpoint", () => {
   assert.ok(entryGate.includes("If not, read no references"));
   assert.ok(entryGate.includes("This load does not create the checkpoint"));
 
-  for (const reference of [
-    triageReportingReference,
-    criticReviewReference,
-    readFileSync(
-      new URL(
-        "../skills/triage-handling/references/roster.md",
-        import.meta.url
-      ),
-      "utf8"
-    ),
-  ]) {
+  for (const reference of [triageReportingReference, criticReviewReference]) {
     assert.ok(reference.includes(STAGE_4_CHECKPOINT));
     assert.ok(reference.includes("existed before this file was opened"));
     assert.ok(reference.includes("If either gate is absent, stop reading"));
@@ -913,7 +903,7 @@ test("triage Stage 6 hands the actionable branch to engineering-handoff", () => 
     triageHandlingSkill.indexOf("### Area-routing roster") <
       triageHandlingSkill.indexOf("### When the root cause warrants action")
   );
-  assert.ok(branch.includes("area owner is now resolved from the roster"));
+  assert.ok(branch.includes("area owner is now resolved: `route.assignee`"));
   assert.ok(branch.includes("Load `engineering-handoff`"));
   assert.ok(!branch.includes("linear__list_issues"));
   assert.ok(!triageSkill.includes("## Master ticket template"));
@@ -927,7 +917,6 @@ test("triage Stage 6 hands the actionable branch to engineering-handoff", () => 
     "## Read back before finishing",
     "One master per root cause",
     "`fast-lane`",
-    "area-routing roster in `triage-handling` Stage 6",
     "in the product project `route.project` carries (never the report's incoming intake project",
   ]) {
     assert.ok(handoffSkill.includes(moved), moved);
