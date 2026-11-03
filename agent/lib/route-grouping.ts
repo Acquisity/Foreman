@@ -94,10 +94,11 @@ export function refuseUnapprovedClose(
   bugDecided = false
 ): void {
   // A Feature Request label this call removes still counts, unless the
-  // recorded decision is a Bug clearing the stale label (`bugDecided`).
+  // recorded decision is a Bug clearing a stale label that no person decided on.
   const featureRequest =
     finalLabels(issue, input).has(FEATURE_REQUEST_LABEL.toLowerCase()) ||
-    (carries(issue, FEATURE_REQUEST_LABEL) && !bugDecided);
+    (carries(issue, FEATURE_REQUEST_LABEL) &&
+      !(bugDecided && !decidedByPerson(issue)));
   if (!featureRequest) {
     return;
   }

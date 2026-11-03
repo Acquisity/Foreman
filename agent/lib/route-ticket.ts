@@ -356,9 +356,11 @@ async function readBackRouted(
   signal?: AbortSignal
 ): Promise<RouteIssue | null> {
   let after: RouteIssue | null = null;
+  let readError: unknown;
   try {
     after = await requireIssue(gql, input.issue);
   } catch (error) {
+    readError = error;
     if (confirmsParent === undefined) {
       warn(
         error,
@@ -372,7 +374,10 @@ async function readBackRouted(
     confirmsParent !== undefined &&
     after?.parent?.identifier !== confirmsParent
   ) {
-    await restoreState(gql, prior, input.issue, confirmsParent);
+    await restoreState(gql, prior, input.issue, confirmsParent, {
+      readError,
+      signal,
+    });
   }
   return after;
 }
@@ -386,9 +391,14 @@ async function restoreState(
   gql: Gql,
   prior: RouteIssue,
   identifier: string,
-  master: string
+  master: string,
+  context: { readError?: unknown; signal?: AbortSignal }
 ): Promise<never> {
   const retry = `Call route_ticket again with parent ${master} and state Duplicate.`;
+  const readNote =
+    context.readError === undefined
+      ? ""
+      : ` The read-back failed: ${reason(context.readError)}.`;
   try {
     const { workflowStates } = await gql<{
       workflowStates: { nodes: Named[] };
@@ -406,13 +416,17 @@ async function restoreState(
       throw new Error("Linear did not confirm the issue update.");
     }
   } catch (error) {
+    if (context.signal?.aborted) {
+      throw error;
+    }
     throw new Error(
-      `${identifier} was written but could not be confirmed under ${master}, and moving it back to ${prior.state.name} failed (${reason(error)}), so it may show Duplicate without its master. ${retry}`,
+      `${identifier} was written but could not be confirmed under ${master}, and moving it back to ${prior.state.name} failed (${reason(error)}), so it may show Duplicate without its master.${readNote} ${retry}`,
       { cause: error }
     );
   }
   throw new Error(
-    `${identifier} could not be confirmed under ${master} by the read-back, so it was moved back to ${prior.state.name}. ${retry}`
+    `${identifier} could not be confirmed under ${master} by the read-back, so it was moved back to ${prior.state.name}.${readNote} ${retry}`,
+    context.readError === undefined ? undefined : { cause: context.readError }
   );
 }
 

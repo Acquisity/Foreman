@@ -526,6 +526,29 @@ describe("CodeRabbit outside-diff review of #259", () => {
     assert.equal(updateOf(bug)?.stateId, "s-duplicate");
   });
 
+  it("keeps the guard for a Bug reclassification when a person already declined the request", async () => {
+    const declined = linear({
+      ticketLabels: [
+        ...CLASSIFIED["Feature Request"],
+        { id: "l-declined", name: "Declined" },
+        { id: "l-bug", name: "Bug" },
+      ],
+    });
+    await assert.rejects(
+      routeTicket(
+        {
+          duplicateOf: "ENG-20",
+          issue: "ENG-1",
+          removeLabels: ["Feature Request", "Needs approval"],
+          state: "Duplicate",
+        },
+        { bugDecided: true, client: declined.fetchStub }
+      ),
+      NO_FEATURE_DUPLICATE
+    );
+    assert.deepEqual(declined.writes(), []);
+  });
+
   it("moves a report back to its prior state when the read-back does not confirm the master", async () => {
     const fake = linear({ dropParent: true, ticketLabels: CLASSIFIED.Bug });
     await assert.rejects(
