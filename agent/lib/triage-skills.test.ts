@@ -490,8 +490,8 @@ test("shared triage preserves every evidence lane and exact tool catalog", () =>
     }))
   );
   for (const note of [
-    "Never guess paths",
-    "with a query that starts with `<connection>__`",
+    "never guess paths",
+    "this session's Executor discovery instructions",
     "Authored Foreman helpers keep their bare names",
     "constrained by the active Executor toolkit allowlist",
     "Resend currently publishes snake_case names",

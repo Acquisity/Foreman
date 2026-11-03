@@ -5,6 +5,7 @@ import { test } from "node:test";
 process.env.LINEAR_CONNECTOR = "linear/foreman-agent";
 
 const { GENERAL_PROMPT } = await import("./prompts.js");
+const { EXECUTOR_DISCOVERY } = await import("./executor/instructions.js");
 
 const readSource = (path: string) =>
   readFileSync(new URL(path, import.meta.url), "utf8");
@@ -25,6 +26,7 @@ const sources: Record<string, string> = {
     "../skills/intercom-triage-investigate/references/tools.md"
   ),
   "sla skill": readSource("../skills/sla-investigation/SKILL.md"),
+  "stripe disputes skill": readSource("../skills/stripe-disputes/SKILL.md"),
   "triage tools": readSource(
     "../skills/triage-investigate/references/tools.md"
   ),
@@ -34,17 +36,33 @@ const REMOVED_CONNECTION_CALL =
   /\b(?:autumn|stripe|neon|instantly|axiom|intercom|inngest|jam|linear|lucent|modem|openrouter|planetscale|posthog|raindrop|resend|sentry|vercel)__/u;
 
 test("active instructions route company discovery through the shared Executor connection", () => {
+  // The how-to lives once, in the discovery text every root and critic turn
+  // carries; skills point at it instead of restating it.
+  for (const rule of [
+    "eve__search",
+    "searches only",
+    "eve__tool",
+    "tools.search({ namespace, query })",
+    "tools.describe.tool({ path })",
+    "tools[path](input)",
+  ]) {
+    assert.ok(EXECUTOR_DISCOVERY.includes(rule), rule);
+    assert.ok(GENERAL_PROMPT.includes(rule), rule);
+  }
   for (const [name, source] of Object.entries(sources)) {
     assert.doesNotMatch(source, REMOVED_CONNECTION_CALL, name);
-    if (name === "critic skill") {
+    if (name === "critic skill" || name === "general prompt") {
       continue;
     }
-    assert.ok(source.includes("eve__search"), name);
-    assert.ok(source.includes("searches only"), name);
-    assert.ok(source.includes("eve__tool"), name);
-    assert.ok(source.includes("tools.search({ namespace, query })"), name);
-    assert.ok(source.includes("tools.describe.tool({ path })"), name);
-    assert.ok(source.includes("tools[path](input)"), name);
+    assert.ok(
+      source.includes("this session's Executor discovery instructions"),
+      name
+    );
+    assert.equal(
+      source.includes("tools.search({ namespace, query })"),
+      false,
+      name
+    );
   }
 });
 test("root prompts keep authored helpers separate from provider discovery", () => {
