@@ -147,14 +147,19 @@ const proxyConfig = () => {
   const apiKey = process.env.CLIPROXY_API_KEY;
   if (!(baseURL && apiKey)) {
     throw new Error(
-      "Claude models need the CLI Proxy: set CLIPROXY_BASE_URL and CLIPROXY_API_KEY"
+      "Proxy models need the CLI Proxy: set CLIPROXY_BASE_URL and CLIPROXY_API_KEY"
     );
   }
   return { apiKey, baseURL };
 };
 
+export const usesProxy = (id: string): boolean =>
+  id.startsWith("anthropic/") || id === "openai/gpt-6.1-sol";
+
 export const proxyModelName = (id: string): string =>
-  id.slice("anthropic/".length).replaceAll(".", "-");
+  id === "openai/gpt-6.1-sol"
+    ? "gpt-6.1-sol"
+    : id.slice("anthropic/".length).replaceAll(".", "-");
 
 // Claude ids use the CLI Proxy's dashed names and require its credentials.
 // Sol 6.1 uses Responses on the same proxy; other ids stay on the gateway.

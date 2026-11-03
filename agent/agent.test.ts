@@ -46,7 +46,7 @@ describe("root agent limits", () => {
 });
 
 describe("root model slot", () => {
-  it("puts triage intake on Opus and leaves widget and other sessions alone", async () => {
+  it("puts triage intake on Opus and general sessions on GPT-6.1 Sol", async () => {
     const [{ MODELS }, { stampTriageIntake }, { WIDGET_SUPPORT_ISSUER }] =
       await Promise.all([
         import("./lib/models.js"),
