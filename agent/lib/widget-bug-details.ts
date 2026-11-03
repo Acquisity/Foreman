@@ -102,9 +102,11 @@ const failureReason = (error: unknown) => {
   if (error instanceof z.ZodError) {
     return "malformed";
   }
-  return error instanceof Error &&
-    (error.name === "TimeoutError" || error.name === "AbortError")
-    ? "timeout"
+  if (error instanceof Error && error.name === "TimeoutError") {
+    return "timeout";
+  }
+  return error instanceof Error && error.name === "AbortError"
+    ? "cancelled"
     : "error";
 };
 

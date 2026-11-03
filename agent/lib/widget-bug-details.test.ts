@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
+import { z } from "zod";
 import { answerBugDetails, bugDetailsTurn } from "./widget-bug-details.js";
 
 const scores = (goal: number, problem: number, where: number) => ({
@@ -93,7 +94,8 @@ describe("bugDetailsTurn", () => {
               status: 200,
             }),
         }
-      )
+      ),
+      z.ZodError
     );
   });
 });
@@ -123,6 +125,21 @@ describe("answerBugDetails", () => {
       }
     );
     assert.deepEqual(seen, [["What were you trying to do?"]]);
+  });
+
+  it("logs a caller's abort as cancelled, not a timeout", async (t) => {
+    const lines: string[] = [];
+    t.mock.method(console, "warn", (line: string) => lines.push(line));
+    const abort = new Error("aborted");
+    abort.name = "AbortError";
+    await assert.rejects(
+      answerBugDetails(
+        { conversationId: "conv-2", question: "q" },
+        new AbortController().signal,
+        () => Promise.reject(abort)
+      )
+    );
+    assert.equal(JSON.parse(lines[0] ?? "{}").message, "cancelled");
   });
 
   it("logs a failure with its reason under its own event, then rethrows", async (t) => {

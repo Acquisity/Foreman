@@ -115,18 +115,22 @@ test("a failed follow-up check answers 503, which Acquisity treats as a pass", a
   assert.equal(warned.length, 2);
 });
 
-test("a bug_details turn from a changed user or role is refused before the follow-up check", async (t) => {
-  enabled(t);
-  const response = await receiveWidgetMessage(
-    request({}),
-    noWork(),
-    1,
-    verify,
-    only({
-      bugDetails: () => assert.fail("must not run the follow-up check"),
-      latestScope: () =>
-        Promise.resolve({ ...scope, userId: crypto.randomUUID() }),
-    })
-  );
-  assert.equal(response.status, 403);
-});
+for (const [changed, latest] of [
+  ["user", { ...scope, userId: crypto.randomUUID() }],
+  ["role", { ...scope, role: "member" as const }],
+] as const) {
+  test(`a bug_details turn from a changed ${changed} is refused before the follow-up check`, async (t) => {
+    enabled(t);
+    const response = await receiveWidgetMessage(
+      request({}),
+      noWork(),
+      1,
+      verify,
+      only({
+        bugDetails: () => assert.fail("must not run the follow-up check"),
+        latestScope: () => Promise.resolve(latest),
+      })
+    );
+    assert.equal(response.status, 403);
+  });
+}
