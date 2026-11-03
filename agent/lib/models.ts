@@ -1,16 +1,15 @@
 import { createAnthropic } from "@ai-sdk/anthropic";
-import { createOpenAI } from "@ai-sdk/openai";
 import { gateway, type LanguageModel } from "ai";
 import { z } from "zod";
 import { MODEL_OVERRIDES_PREFIX, readDocument, writeDocument } from "./blob.js";
 
 // One place to change every agent's model. Ids are Vercel AI Gateway strings (<provider>/<model>),
 // so routing, credentials, and fallbacks stay on the gateway, except that modelFor sends every
-// anthropic/ id and the temporary GPT-6.1 Sol default to the CLI Proxy.
+// anthropic/ id to the CLI Proxy (ENG-15082).
 // These are the compiled defaults; a live override saved by set_agent_models wins over them.
 // Each agent.ts resolves its model through resolveModel(<agent>) at session start.
 export const MODELS = {
-  // Independent triage reviewer.
+  // Independent triage reviewer: a different vendor from the orchestrator on purpose.
   critic: "openai/gpt-5.6-sol",
   // Support widget egress reviewer: never investigates, never composes. On 111
   // real cases, two calls each (ENG-14669), gpt-5.6-sol with the same prompt let
@@ -39,8 +38,9 @@ export const MODELS = {
   kbSelect: "google/gemini-3.5-flash-lite",
   // Root model for every other session: general Slack, intake-only and
   // questions-only channels, Linear outside triage intake, GitHub, local eve
-  // and schedules. Temporarily GPT-6.1 Sol on the CLI Proxy; it reads images itself.
-  orchestrator: "openai/gpt-6.1-sol",
+  // and schedules. Moved off DeepSeek to Sonnet 5.5 on the CLI Proxy
+  // (ENG-16434); it reads images itself.
+  orchestrator: "anthropic/claude-sonnet-5.5",
   // Root model for every triage intake session (ENG-15226, ENG-16055): the two
   // Asks-receiver channels, the Intercom intake channels, Linear tickets from
   // a migration form channel or from the widget.
@@ -147,30 +147,21 @@ const proxyConfig = () => {
   const apiKey = process.env.CLIPROXY_API_KEY;
   if (!(baseURL && apiKey)) {
     throw new Error(
-      "Proxy models need the CLI Proxy: set CLIPROXY_BASE_URL and CLIPROXY_API_KEY"
+      "Claude models need the CLI Proxy: set CLIPROXY_BASE_URL and CLIPROXY_API_KEY"
     );
   }
   return { apiKey, baseURL };
 };
 
-export const usesProxy = (id: string): boolean =>
-  id.startsWith("anthropic/") || id === "openai/gpt-6.1-sol";
-
 export const proxyModelName = (id: string): string =>
-  id === "openai/gpt-6.1-sol"
-    ? "gpt-6.1-sol"
-    : id.slice("anthropic/".length).replaceAll(".", "-");
+  id.slice("anthropic/".length).replaceAll(".", "-");
 
 // Claude ids use the CLI Proxy's dashed names and require its credentials.
-// Sol 6.1 uses Responses on the same proxy; other ids stay on the gateway.
-export const modelFor = (id: string): Exclude<LanguageModel, string> => {
-  if (id === "openai/gpt-6.1-sol") {
-    return createOpenAI(proxyConfig()).responses("gpt-6.1-sol");
-  }
-  return id.startsWith("anthropic/")
+// Every other id stays on the gateway; a failed proxy call has no gateway fallback.
+export const modelFor = (id: string): Exclude<LanguageModel, string> =>
+  id.startsWith("anthropic/")
     ? createAnthropic(proxyConfig())(proxyModelName(id))
     : gateway(id);
-};
 
 const proxyCatalogSchema = z.object({
   data: z.array(z.object({ id: z.string().min(1) })),
@@ -230,9 +221,7 @@ export const ROOT_EFFORT = "medium";
 export const rootCallOptions = (modelId: string) => ({
   providerOptions: {
     ...gatewayRouting(modelId)?.providerOptions,
-    ...(modelId === "openai/gpt-6.1-sol"
-      ? { openai: { reasoningEffort: ROOT_EFFORT } }
-      : { anthropic: { effort: ROOT_EFFORT } }),
+    anthropic: { effort: ROOT_EFFORT },
   },
 });
 

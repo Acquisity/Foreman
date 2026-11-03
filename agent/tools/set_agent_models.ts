@@ -10,7 +10,6 @@ import {
   MODELS,
   type ModelOverrides,
   proxyModelName,
-  usesProxy,
   writeModelOverrides,
 } from "#lib/models.js";
 
@@ -40,13 +39,13 @@ export default defineTool({
     }
     const catalogs = [
       {
-        ids: requested.filter(({ id }) => usesProxy(id)),
+        ids: requested.filter(({ id }) => id.startsWith("anthropic/")),
         label: "CLI Proxy",
         modelName: proxyModelName,
         read: listProxyModels,
       },
       {
-        ids: requested.filter(({ id }) => !usesProxy(id)),
+        ids: requested.filter(({ id }) => !id.startsWith("anthropic/")),
         label: "gateway",
         modelName: (id: string) => id,
         read: async () =>
