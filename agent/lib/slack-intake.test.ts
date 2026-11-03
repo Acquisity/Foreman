@@ -72,7 +72,7 @@ describe("intake-only channels", () => {
     const sandbox = resolveSlackIntakeWorkflow("C0BNCL031AQ");
     assert.deepEqual(production, sandbox);
     assert.equal(production?.mode, "new-linear-issue");
-    assert.deepEqual(production?.skills, ["triage", "intercom-billing-triage"]);
+    assert.deepEqual(production?.skills, ["triage", "billing-triage"]);
   });
 
   it("requires restricted wording only in the two named intake channels", () => {
@@ -136,11 +136,8 @@ describe("intake-only channels", () => {
       context.includes("Both lanes are valid in this channel"),
       true
     );
-    assert.equal(
-      context.includes("channel: triage, intercom-billing-triage"),
-      true
-    );
-    assert.equal(context.includes("intercom-billing-triage"), true);
+    assert.equal(context.includes("channel: triage, billing-triage"), true);
+    assert.equal(context.includes("billing-triage"), true);
     assert.equal(
       context.includes("Create exactly one unassigned Linear issue"),
       false

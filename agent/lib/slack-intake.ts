@@ -25,7 +25,7 @@ const BILLING_TRIAGE_WORKFLOW: SlackIntakeWorkflow = {
 
 const INTERCOM_INTAKE_WORKFLOW: SlackIntakeWorkflow = {
   mode: "new-linear-issue",
-  skills: ["triage", "intercom-billing-triage"],
+  skills: ["triage", "billing-triage"],
 };
 
 const QUESTIONS_ONLY_WORKFLOW: SlackIntakeWorkflow = {

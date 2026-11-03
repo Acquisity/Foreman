@@ -11,21 +11,16 @@ const intercomSource = productSkill.slice(
   productSkill.indexOf("## Examples")
 );
 const billingSkill = readFileSync(
-  new URL("../skills/intercom-billing-triage/SKILL.md", import.meta.url),
+  new URL("../skills/billing-triage/SKILL.md", import.meta.url),
   "utf8"
+);
+const billingIntercom = billingSkill.slice(
+  billingSkill.indexOf("## Intercom source")
 );
 const productTools = readFileSync(
   new URL("../skills/triage/references/tools.md", import.meta.url),
   "utf8"
 );
-const billingTools = readFileSync(
-  new URL(
-    "../skills/intercom-billing-triage/references/tools.md",
-    import.meta.url
-  ),
-  "utf8"
-);
-
 test("an Intercom claim searches the same global memory as a ticket", () => {
   const lanes = readFileSync(
     new URL("../skills/triage/references/lanes.md", import.meta.url),
@@ -74,28 +69,34 @@ test("an Intercom source creates engineering work only for a confirmed bug or fe
   assert.equal(intercomSource.includes("STAGE 4 COMPLETE"), false);
 });
 
-test("Intercom billing skill preserves evidence order and human-only action", () => {
-  const planetscale = billingSkill.indexOf("1. PlanetScale");
-  const autumn = billingSkill.indexOf("2. Autumn");
-  const stripe = billingSkill.indexOf("3. Stripe");
+test("the Intercom billing source keeps the evidence order and human-only action", () => {
+  const planetscale = billingSkill.indexOf("1. PlanetScale, first and always");
+  const autumn = billingSkill.indexOf("2. Autumn, second");
+  const stripe = billingSkill.indexOf("3. Stripe, last");
 
   assert.ok(planetscale >= 0);
   assert.ok(autumn > planetscale);
   assert.ok(stripe > autumn);
+  assert.ok(billingIntercom.includes("The procedure above applies"));
   for (const phrase of [
-    "There is no Linear issue",
+    "there is no Linear issue",
     "never issues, schedules, grants, or promises",
     "one Support/Financial ticket",
     "project Support",
     "canonical conversation URL",
     "Subscription and invoice are request subjects",
     "expected future subscription or one-off invoice",
-    "read_autumn_billing",
-    "read_stripe_billing",
     "shared app-scoped Executor connection",
+    "An unattended scheduled run asks nobody",
+    "name the missing workspace or billing email as what would reopen it",
   ]) {
-    assert.ok(billingSkill.includes(phrase), phrase);
+    assert.ok(billingIntercom.includes(phrase), phrase);
   }
+  // Partner governance comes from the code-computed flag on every source.
+  assert.ok(
+    billingSkill.includes("Route on `partnerGoverned`, which the code computes")
+  );
+  assert.equal(billingSkill.includes("partner_id"), false);
 });
 
 test("Intercom skills attach the source conversation to customer tickets", () => {
@@ -103,7 +104,7 @@ test("Intercom skills attach the source conversation to customer tickets", () =>
     '`links: [{ url: <canonical conversation URL>, title: "Intercom conversation" }]`';
 
   assert.ok(intercomSource.includes(linkAttachment));
-  assert.ok(billingSkill.includes(linkAttachment));
+  assert.ok(billingIntercom.includes(linkAttachment));
 });
 
 test("ticket-link follow-ups are answered from the general reply rule", async () => {
@@ -122,17 +123,13 @@ test("Intercom skills close with a customer-ready reply and the identifier", () 
     "utf8"
   );
   const closingReplySection = (skill: string, followingHeading: string) => {
-    const start = skill.indexOf("## Step 9: Reply in Slack");
+    const start = skill.indexOf("### Intercom reply in Slack");
     const end = skill.indexOf(followingHeading, start);
 
-    assert.ok(start >= 0, "Step 9");
-    assert.ok(end > start, followingHeading);
-    return skill.slice(start, end);
+    assert.ok(start >= 0, "Intercom reply");
+    return end > start ? skill.slice(start, end) : skill.slice(start);
   };
-  const billingReply = closingReplySection(
-    billingSkill,
-    "## Billing investigation document"
-  );
+  const billingReply = closingReplySection(billingSkill, "\n## ");
 
   for (const skill of [billingReply]) {
     for (const phrase of [
@@ -177,7 +174,7 @@ test("Intercom skills close with a customer-ready reply and the identifier", () 
 
   assert.ok(
     billingReply.includes(
-      "One closing status reply after the investigation and any required Linear writes are complete."
+      "The thread gets one closing status reply after the investigation and any required Linear writes are complete."
     )
   );
 
@@ -208,28 +205,25 @@ test("Intercom skills close with a customer-ready reply and the identifier", () 
   );
 });
 
-test("Intercom skills own their tool references", () => {
+test("the Intercom sources share the one triage tool catalog", () => {
   assert.ok(
     productSkill.includes("[references/tools.md](references/tools.md)")
   );
   assert.ok(
-    billingSkill.includes("[references/tools.md](references/tools.md)")
+    billingSkill.includes(
+      "[../triage/references/tools.md](../triage/references/tools.md)"
+    )
   );
-
   for (const restated of ["## Master", "Overview", "roster"]) {
     assert.equal(productTools.includes(restated), false, restated);
   }
-
   for (const phrase of [
-    "## Intercom (Executor: intercom)",
-    "`fetch`, `get_conversation`",
-    "planetscale_execute_read_query",
-    "## Autumn (root tool)",
+    "| Intercom | Executor: intercom |",
     "`read_autumn_billing`",
-    "## Stripe (root tool)",
     "`read_stripe_billing`",
     "`list_issue_labels`",
+    "planetscale_execute_read_query",
   ]) {
-    assert.ok(billingTools.includes(phrase), phrase);
+    assert.ok(productTools.includes(phrase), phrase);
   }
 });

@@ -11,7 +11,6 @@ const readSource = (path: string) =>
   readFileSync(new URL(path, import.meta.url), "utf8");
 
 const sources: Record<string, string> = {
-  "billing skill": readSource("../skills/billing-triage/references/tools.md"),
   "critic skill": readSource(
     "../subagents/critic/skills/triage-critic/SKILL.md"
   ),
@@ -19,9 +18,6 @@ const sources: Record<string, string> = {
     "../subagents/critic/skills/triage-critic/references/tools.md"
   ),
   "general prompt": GENERAL_PROMPT,
-  "intercom billing skill": readSource(
-    "../skills/intercom-billing-triage/references/tools.md"
-  ),
   "sla skill": readSource("../skills/sla-investigation/SKILL.md"),
   "stripe disputes skill": readSource("../skills/stripe-disputes/SKILL.md"),
   "triage tools": readSource("../skills/triage/references/tools.md"),
