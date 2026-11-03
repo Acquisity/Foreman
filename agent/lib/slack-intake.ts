@@ -225,8 +225,8 @@ const intercomIssueTask = (skills: readonly string[]): string =>
   [
     `Use the Intercom-native investigation workflow. Before investigating, load every required skill for this channel: ${skills.join(", ")}.`,
     "Require exactly one live Intercom conversation URL or reference from the Slack request and treat that conversation as the source. No Linear issue is expected at the start. If the conversation reference is missing or ambiguous, ask for it, then stop.",
-    "Classify the predominant ask as product/feedback or billing. Both lanes are valid in this channel: follow the matching Intercom skill without redirecting the requester to another Slack channel.",
-    "Investigate before creating Linear work. Non-bug product findings do not create engineering work. Confirmed bugs and actionable billing findings create the records and investigation documents required by their loaded procedures, retaining the Intercom conversation URL and bounded context.",
+    "Classify the predominant ask as product/feedback or billing. Both lanes are valid in this channel: follow the Intercom source section of the matching skill, triage or billing-triage, without redirecting the requester to another Slack channel.",
+    "Investigate before creating Linear work. Other product findings do not create engineering work. Confirmed bugs, feature requests and actionable billing findings create the records and investigation documents required by their loaded procedures, retaining the Intercom conversation URL and bounded context.",
     "Answer in the Slack thread only after the required Linear operations, honoring the final-post rule above, then stop before implementation.",
   ].join("\n\n");
 

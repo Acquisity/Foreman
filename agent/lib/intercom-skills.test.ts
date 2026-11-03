@@ -181,7 +181,7 @@ test("Intercom skills close with a customer-ready reply and the identifier", () 
   assert.ok(!intercomSource.includes("Do not include Linear identifiers"));
   assert.ok(
     intercomSource.includes(
-      "Leave out assignees, routing, code paths, SQL, raw logs, customer identifiers and memory status"
+      "Leave out assignees, routing, code paths, SQL, raw logs, system names, customer identifiers and memory status"
     )
   );
   assert.ok(!billingSkill.includes("ticket identifiers"));

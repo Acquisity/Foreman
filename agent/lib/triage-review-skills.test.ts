@@ -30,7 +30,7 @@ test("the review covers closures, records confidence, and reviews twice at most"
     assert.ok(criticReviewReference.includes(rule), rule);
   }
   assert.ok(
-    reviewSection.includes("a second objection hands the ticket to Aaron")
+    reviewSection.includes("A second objection hands the ticket to Aaron")
   );
   assert.ok(
     reviewSection.includes(

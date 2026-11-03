@@ -600,6 +600,7 @@ test("ENG-13175-shaped thread correction is recorded, not argued", () => {
     "A colleague correcting you in the thread or on the ticket is later evidence",
     "puts your overturned conclusion in `ruledOut`",
     "New specifics from the requester reopen a closed ticket",
+    "Every close and unproven stop names the fact that would reopen it",
   ]) {
     assert.ok(triageSkill.includes(phrase), phrase);
   }
@@ -629,6 +630,7 @@ test("ENG-12880 and ENG-13108-shaped intake chooses the project only from eviden
     )
   );
   assert.ok(route.includes("apply no Linear mutation and record no memory"));
+  assert.ok(route.includes("never a session marker to require or invent"));
   assert.ok(triageSkill.includes("`route_ticket`'s returned `projectId`"));
 });
 
@@ -791,6 +793,7 @@ test("Intercom replies close with a customer-ready block and the bare identifier
     'when the requester wrote "do not reply to the customer"',
     "the answer is still with engineering",
     "bare ticket identifier alone on the last line",
+    "Leave out assignees, routing, code paths, SQL, raw logs, system names, customer identifiers and memory status",
     "never a URL",
   ]) {
     assert.ok(intercom.includes(phrase), phrase);
@@ -881,7 +884,10 @@ test("triage reviews bugs and closures with the critic before routing them", () 
     "`review.required`",
     "[references/critic-review.md](references/critic-review.md)",
     "`route_ticket` refuses a closure or duplicate route until the critic settles",
-    "a second objection hands the ticket to Aaron",
+    "A second objection hands the ticket to Aaron",
+    // closureReview holds closures only (triage-log.ts decisionFields), so
+    // the skill holds a Bug route until its review settles.
+    "nothing in code holds a `Bug`, so route it only after its review settles too",
   ]) {
     assert.ok(review.includes(rule), rule);
   }
