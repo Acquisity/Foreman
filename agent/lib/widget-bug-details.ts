@@ -76,8 +76,6 @@ export async function bugDetailsTurn(
       timeoutMs: BUG_DETAILS_JEV_MS,
     })
   );
-  // A question already asked is never repeated: a second thin answer moves on
-  // to the next missing detail, or passes.
   const missing = ASK_ORDER.find(
     (detail) =>
       answers[detail].noul < PRESENT_SCORE &&
