@@ -195,3 +195,83 @@ test("an abort during the receipt save propagates instead of becoming a ticket e
     )
   );
 });
+
+// ENG-17031: Acquisity's "I found a bug" steps file the conversation's ticket in
+// code, with the conversation id in its description. A later investigation with
+// no receipt of its own must find and reuse it.
+const acquisityBugTicket = (stateType: string) => ({
+  assignee: "Aaron Fraga",
+  createdAt: "2026-11-03T18:00:00.000Z",
+  identifier: "ENG-900",
+  labels: ["Bug", "fixy"],
+  matchedPhrases: [scope.conversationId],
+  parentIdentifier: null,
+  state: stateType === "canceled" ? "Canceled" : "Triage",
+  stateType,
+  title: "Bug report: my campaign isn't working",
+  url: "https://linear.app/acquisity/issue/ENG-900/bug-report",
+});
+
+const reuseDeps = (stateType: string) => {
+  const calls = { creates: 0, phrases: [] as string[][] };
+  const deps = {
+    create: () => {
+      calls.creates += 1;
+      return Promise.resolve({
+        data: {
+          id: "ENG-901",
+          url: "https://linear.app/acquisity/issue/ENG-901/support",
+        },
+        ok: true as const,
+      });
+    },
+    readReceipt: () => Promise.resolve(null),
+    refund: () => Promise.resolve(false),
+    saveReceipt: () => Promise.resolve(),
+    search: (input: { phrases: string[] }) => {
+      calls.phrases.push(input.phrases);
+      return Promise.resolve({
+        createdAfter: null,
+        issues: [acquisityBugTicket(stateType)],
+        truncated: false,
+      });
+    },
+  };
+  return { calls, deps };
+};
+
+test("an investigation with no receipt reuses the bug ticket Acquisity filed for the conversation", async (t) => {
+  t.mock.method(globalThis, "fetch", () =>
+    Promise.reject(new Error("unexpected transport"))
+  );
+  const { calls, deps } = reuseDeps("triage");
+  const { signal } = new AbortController();
+  const result = await fileWidgetTicket(
+    appTicketContext(scope, signal, "cccccccc-cccc-4ccc-8ccc-cccccccccccc"),
+    { summary: "Campaign stopped sending.", title: "Campaign" },
+    deps
+  );
+  assert.deepEqual(result, {
+    existing: true,
+    identifier: "ENG-900",
+    refund: false,
+    url: "https://linear.app/acquisity/issue/ENG-900/bug-report",
+  });
+  assert.deepEqual(calls.phrases, [[scope.conversationId]]);
+  assert.equal(calls.creates, 0);
+});
+
+test("a canceled Acquisity bug ticket no longer covers the conversation", async (t) => {
+  t.mock.method(globalThis, "fetch", () =>
+    Promise.reject(new Error("unexpected transport"))
+  );
+  const { calls, deps } = reuseDeps("canceled");
+  const { signal } = new AbortController();
+  const result = await fileWidgetTicket(
+    appTicketContext(scope, signal, "dddddddd-dddd-4ddd-8ddd-dddddddddddd"),
+    { summary: "Campaign stopped sending.", title: "Campaign" },
+    deps
+  );
+  assert.equal(calls.creates, 1);
+  assert.equal("identifier" in result && result.identifier, "ENG-901");
+});

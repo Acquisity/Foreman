@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { logOpsEvent } from "./ops-log.js";
 import { askJev, jevKey, type SelectorOptions } from "./widget-next-action.js";
+import { DECISION_CONTEXT, renderConversation } from "./widget-router.js";
 
 /**
  * The "I found a bug" path in Acquisity's support chat (ENG-17031). Acquisity
@@ -62,7 +63,7 @@ export interface BugDetailsResponse {
 }
 
 export async function bugDetailsTurn(
-  input: { conversation: string; conversationId: string },
+  input: { asked: string[]; conversation: string; conversationId: string },
   opts: SelectorOptions & { signal?: AbortSignal } = {}
 ): Promise<BugDetailsResponse> {
   const apiKey = opts.apiKey ?? jevKey();
@@ -75,8 +76,12 @@ export async function bugDetailsTurn(
       timeoutMs: BUG_DETAILS_JEV_MS,
     })
   );
+  // A question already asked is never repeated: a second thin answer moves on
+  // to the next missing detail, or passes.
   const missing = ASK_ORDER.find(
-    (detail) => answers[detail].noul < PRESENT_SCORE
+    (detail) =>
+      answers[detail].noul < PRESENT_SCORE &&
+      !input.asked.includes(BUG_DETAIL_QUESTIONS[detail])
   );
   logOpsEvent("widget.bug_details.decided", {
     conversationId: input.conversationId,
@@ -89,4 +94,58 @@ export async function bugDetailsTurn(
     run_id: randomUUID(),
     status: "completed",
   };
+}
+
+const failureReason = (error: unknown) => {
+  const message = error instanceof Error ? error.message : "";
+  if (message === "no_key" || message.startsWith("http_")) {
+    return message;
+  }
+  if (error instanceof z.ZodError) {
+    return "malformed";
+  }
+  return error instanceof Error &&
+    (error.name === "TimeoutError" || error.name === "AbortError")
+    ? "timeout"
+    : "error";
+};
+
+/** The widget route's bug_details turn. A failure is logged here and rethrown, so the route answers 503. */
+export async function answerBugDetails(
+  input: {
+    conversationId: string;
+    history?: { role: "assistant" | "customer"; text: string }[];
+    question: string;
+    screenshots?: string[];
+  },
+  signal: AbortSignal,
+  turn: typeof bugDetailsTurn = bugDetailsTurn
+): Promise<BugDetailsResponse> {
+  try {
+    return await turn(
+      {
+        asked: (input.history ?? [])
+          .filter((entry) => entry.role === "assistant")
+          .map((entry) => entry.text.trim()),
+        conversation: renderConversation(
+          input.question,
+          input.history,
+          DECISION_CONTEXT,
+          input.screenshots
+        ),
+        conversationId: input.conversationId,
+      },
+      { signal }
+    );
+  } catch (error) {
+    logOpsEvent(
+      "widget.bug_details.failed",
+      {
+        conversationId: input.conversationId,
+        message: failureReason(error),
+      },
+      console.warn
+    );
+    throw error;
+  }
 }

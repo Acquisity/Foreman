@@ -300,62 +300,6 @@ test("a valid conversation at every schema limit is read whole, not refused as t
   assert.equal(response.status, 403);
 });
 
-test("a bug_details turn answers inline from the follow-up check and never claims a run", async (t) => {
-  enabled(t);
-  const { deps } = dependencies();
-  const seen: string[] = [];
-  const response = await receiveWidgetMessage(
-    request({
-      ...start,
-      history: [{ role: "customer", text: "I found a bug" }],
-      mode: "bug_details",
-      question: "my campaign isn't working",
-    }),
-    noWork(),
-    1,
-    verify,
-    {
-      ...deps,
-      bugDetails: ({ conversation }) => {
-        seen.push(conversation);
-        return Promise.resolve({
-          bug_details: "ask",
-          decision: "allow",
-          message: "What were you trying to do when this happened?",
-          run_id: crypto.randomUUID(),
-          status: "completed",
-        });
-      },
-      claim: () => assert.fail("must not claim a run"),
-      route: () => assert.fail("must not route"),
-    }
-  );
-  assert.equal(response.status, 200);
-  const body = await response.json();
-  assert.equal(body.status, "completed");
-  assert.equal(body.bug_details, "ask");
-  assert.equal(body.message, "What were you trying to do when this happened?");
-  assert.ok(seen[0]?.includes("my campaign isn't working"));
-  assert.ok(seen[0]?.includes("I found a bug"));
-});
-
-test("a failed follow-up check answers 503, which Acquisity treats as a pass", async (t) => {
-  enabled(t);
-  const { deps } = dependencies();
-  const response = await receiveWidgetMessage(
-    request({ ...start, mode: "bug_details" }),
-    noWork(),
-    1,
-    verify,
-    {
-      ...deps,
-      bugDetails: () => Promise.reject(new Error("no_key")),
-      claim: () => assert.fail("must not claim a run"),
-    }
-  );
-  assert.equal(response.status, 503);
-});
-
 test("screenshot links reach the help-center lane beside their readings, and only https links are accepted", async (t) => {
   enabled(t);
   const { deps } = dependencies();

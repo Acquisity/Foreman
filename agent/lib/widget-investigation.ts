@@ -3,7 +3,7 @@ import type { MessageStreamEvent } from "eve/client";
 import { z } from "zod";
 import { readRequestBody } from "./bounded-body.js";
 import { logOpsEvent } from "./ops-log.js";
-import { bugDetailsTurn } from "./widget-bug-details.js";
+import { answerBugDetails, bugDetailsTurn } from "./widget-bug-details.js";
 import { answerFromGuide, chatGuideEnabled } from "./widget-chat.js";
 import { verifyWidgetContext } from "./widget-context.js";
 import {
@@ -529,7 +529,6 @@ export const defaultWidgetDependencies = {
   answerChat: chatGuideEnabled() ? answerFromGuide : undefined,
   answerKb: answerFromHelpCenter,
   attach: attachWidgetRun,
-  /** The "I found a bug" follow-up check: one fixed question, or a pass. */
   bugDetails: bugDetailsTurn,
   cancel: cancelWidgetRun,
   changeRequested: (conversation: string) => asksForChange(conversation),
@@ -1701,19 +1700,8 @@ async function startWidgetRun(
     return json({ error: "Conversation scope changed." }, 403);
   }
   if (input.mode === "bug_details") {
-    return json(
-      await (deps.bugDetails ?? bugDetailsTurn)(
-        {
-          conversation: withHistory(
-            input.question,
-            input.history,
-            input.screenshots
-          ),
-          conversationId: scope.conversationId,
-        },
-        { signal }
-      )
-    );
+    const turn = { ...input, conversationId: scope.conversationId };
+    return json(await answerBugDetails(turn, signal, deps.bugDetails));
   }
   const { busy, fresh, run } = await claimOpenRun(scope, input, deps);
   if (busy) {
