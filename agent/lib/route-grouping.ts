@@ -90,13 +90,29 @@ export const carriesBug = (
  */
 export function refuseUnapprovedClose(
   issue: RouteIssue,
-  input: RouteTicketInput
+  input: RouteTicketInput,
+  bugDecided = false
 ): void {
-  if (
-    named(input.state, "canceled", "done", "duplicate") &&
-    finalLabels(issue, input).has(FEATURE_REQUEST_LABEL.toLowerCase()) &&
-    !decidedByPerson(issue)
-  ) {
+  // A Feature Request label this call removes still counts, unless the
+  // recorded decision is a Bug clearing the stale label (`bugDecided`).
+  const featureRequest =
+    finalLabels(issue, input).has(FEATURE_REQUEST_LABEL.toLowerCase()) ||
+    (carries(issue, FEATURE_REQUEST_LABEL) && !bugDecided);
+  if (!featureRequest) {
+    return;
+  }
+  // The same rules support completion's closedUnseen checks afterwards.
+  if (named(input.state, "duplicate")) {
+    throw new Error(
+      `${issue.identifier} is a Feature Request, which never moves to Duplicate, so nothing was written. Keep it open with relatedTo for its match.`
+    );
+  }
+  if (named(input.state, "canceled") && !declinedByPerson(issue)) {
+    throw new Error(
+      `${issue.identifier} is a Feature Request, which moves to Canceled only once a person declined it (Declined already on the ticket), so nothing was written. Route it to Backlog with ${NEEDS_APPROVAL_LABEL} and ${FALLBACK_OWNER}, using relatedTo for its match.`
+    );
+  }
+  if (named(input.state, "done") && !decidedByPerson(issue)) {
     throw new Error(
       `${issue.identifier} would be ${input.state}, but an unapproved Feature Request never closes unless a person declined it: the ticket must already carry Approved or Declined before this call, so nothing was written. Route it to Backlog with ${NEEDS_APPROVAL_LABEL} and ${FALLBACK_OWNER}, using relatedTo for its match.`
     );
@@ -104,6 +120,8 @@ export function refuseUnapprovedClose(
 }
 
 export interface DuplicateRouting {
+  /** The latest recorded triage decision for this issue is a Bug, so removing a stale Feature Request label is allowed. */
+  bugDecided?: boolean;
   /** The master search cutoff for this session (`masterCreatedAfter`). */
   mastersCreatedAfter?: string | null;
 }
@@ -402,7 +420,7 @@ export async function planRoute(
 ): Promise<RoutePlan> {
   refuseMatchMisuse(issue, input);
   refuseSelfDecline(input);
-  refuseUnapprovedClose(issue, input);
+  refuseUnapprovedClose(issue, input, opts.bugDecided === true);
   // Resolve the match before the first write, so a bad identifier fails the
   // whole call rather than leaving a routed ticket with no relation.
   const matchId = input.duplicateOf ?? input.relatedTo;

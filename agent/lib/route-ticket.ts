@@ -350,6 +350,7 @@ async function writeLinks(
 async function readBackRouted(
   gql: Gql,
   input: RouteTicketInput,
+  prior: RouteIssue,
   confirmsParent: string | undefined,
   warn: (error: unknown, message: string) => void,
   signal?: AbortSignal
@@ -371,11 +372,48 @@ async function readBackRouted(
     confirmsParent !== undefined &&
     after?.parent?.identifier !== confirmsParent
   ) {
-    throw new Error(
-      `${input.issue} was written but could not be confirmed under ${confirmsParent} by the read-back. Read ${input.issue} and call route_ticket again with parent ${confirmsParent} and state ${input.state}.`
-    );
+    await restoreState(gql, prior, input.issue, confirmsParent);
   }
   return after;
+}
+
+/**
+ * A Duplicate whose parent the read-back cannot confirm must not stay
+ * closed: the report goes back to its state from before the call, through
+ * the same update, and the call fails with the retry to make.
+ */
+async function restoreState(
+  gql: Gql,
+  prior: RouteIssue,
+  identifier: string,
+  master: string
+): Promise<never> {
+  const retry = `Call route_ticket again with parent ${master} and state Duplicate.`;
+  try {
+    const { workflowStates } = await gql<{
+      workflowStates: { nodes: Named[] };
+    }>("WorkflowStates", { name: prior.state.name, teamId: prior.team.id });
+    const { issueUpdate } = await gql<{ issueUpdate: { success: boolean } }>(
+      "RouteIssueUpdate",
+      {
+        id: prior.id,
+        input: {
+          stateId: exactlyOne("state", prior.state.name, workflowStates.nodes),
+        },
+      }
+    );
+    if (!issueUpdate.success) {
+      throw new Error("Linear did not confirm the issue update.");
+    }
+  } catch (error) {
+    throw new Error(
+      `${identifier} was written but could not be confirmed under ${master}, and moving it back to ${prior.state.name} failed (${reason(error)}), so it may show Duplicate without its master. ${retry}`,
+      { cause: error }
+    );
+  }
+  throw new Error(
+    `${identifier} could not be confirmed under ${master} by the read-back, so it was moved back to ${prior.state.name}. ${retry}`
+  );
 }
 
 /**
@@ -442,6 +480,7 @@ export async function routeTicket(
   const after = await readBackRouted(
     gql,
     input,
+    issue,
     routed.keepsState && named(input.state, "duplicate") ? parent : undefined,
     warn,
     opts?.signal

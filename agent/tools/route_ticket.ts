@@ -61,6 +61,9 @@ export default defineTool({
         ? await masterWindow(ctx.session.auth)
         : { windowed: false };
       const ticket = await routeTicket(input, {
+        // A recorded Bug decision may clear a stale Feature Request label.
+        bugDecided:
+          triageDecisions.get()[input.issue]?.classification === "Bug",
         client: executorClient(ctx),
         mastersCreatedAfter: masterCreatedAfter(
           mastersWindow.windowed,

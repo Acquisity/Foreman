@@ -54,8 +54,9 @@ const labelIdsOf = (fake: ReturnType<typeof fakeLinear>) =>
   (updateOf(fake)?.labelIds ?? []) as string[];
 
 const SELF_DECLINE = /Only a person adds Declined/u;
+/** Any of the Feature Request close guard's refusals: Done, Canceled or Duplicate. */
 const UNAPPROVED_CLOSE =
-  /an unapproved Feature Request never closes unless a person declined it/u;
+  /an unapproved Feature Request never closes unless a person declined it|which never moves to Duplicate|moves to Canceled only once a person declined it/u;
 const RELATED_LANDED =
   /related link to ENG-40 was recorded.*Call route_ticket again with the same input, duplicateOf ENG-40 included/su;
 const WITHOUT_DUPLICATE = /without duplicateOf/u;
@@ -66,6 +67,9 @@ const SELF_APPROVE = /already carry Approved/u;
 const RELATED_CLOSE = /relatedTo keeps the report open/u;
 const STALE_PARENT = /was created before 2026-10-25T00:00:00.000Z/u;
 const BECAME_BACKLOG = /closing state became Backlog/u;
+const CANCELED_NEEDS_DECLINED = /Canceled only once a person declined it/u;
+const NO_FEATURE_DUPLICATE = /never moves to Duplicate/u;
+const RESTORED = /moved back to Triage/u;
 const NOT_CONFIRMED = /could not be confirmed under ENG-30/u;
 const DUPLICATE_NEEDS_MASTER = /Duplicate only under an open master/u;
 
@@ -265,7 +269,7 @@ describe("a report left for grouping leaves Triage (C6)", () => {
     }
   });
 
-  it("moves an approved feature request with no open master to Backlog with James", async () => {
+  it("moves an approved feature request closing Done beside a match with no open master to Backlog with James", async () => {
     const fake = linear({
       ticketLabels: [
         { id: "l-fr", name: "Feature Request" },
@@ -273,7 +277,7 @@ describe("a report left for grouping leaves Triage (C6)", () => {
       ],
     });
     await routeTicket(
-      { duplicateOf: "ENG-40", issue: "ENG-1", state: "Duplicate" },
+      { issue: "ENG-1", relatedTo: "ENG-40", state: "Done" },
       { client: fake.fetchStub }
     );
     assert.equal(updateOf(fake)?.stateId, "s-backlog");
@@ -448,5 +452,93 @@ describe("CodeRabbit review of #259, routes", () => {
       { client: closing.fetchStub }
     );
     assert.match(deferred.warnings.join(" "), BECAME_BACKLOG);
+  });
+});
+
+describe("CodeRabbit outside-diff review of #259", () => {
+  const APPROVED_FR = [
+    { id: "l-fr", name: "Feature Request" },
+    { id: "l-ok", name: "Approved" },
+  ];
+
+  it("refuses Canceled for an Approved Feature Request that no person declined, before any write", async () => {
+    const fake = linear({ ticketLabels: APPROVED_FR });
+    await assert.rejects(
+      routeTicket(
+        { issue: "ENG-1", state: "Canceled" },
+        { client: fake.fetchStub }
+      ),
+      CANCELED_NEEDS_DECLINED
+    );
+    assert.deepEqual(fake.writes(), []);
+  });
+
+  it("never moves a Feature Request to Duplicate, even under an open master, before any write", async () => {
+    const fake = linear({ ticketLabels: APPROVED_FR });
+    await assert.rejects(
+      routeTicket(
+        { issue: "ENG-1", parent: "ENG-30", state: "Duplicate" },
+        { client: fake.fetchStub }
+      ),
+      NO_FEATURE_DUPLICATE
+    );
+    assert.deepEqual(fake.writes(), []);
+  });
+
+  it("still lets an Approved Feature Request finish Done", async () => {
+    const fake = linear({ ticketLabels: APPROVED_FR });
+    await routeTicket(
+      { issue: "ENG-1", state: "Done" },
+      { client: fake.fetchStub }
+    );
+    assert.equal(updateOf(fake)?.stateId, "s-done");
+  });
+
+  it("does not let removing Feature Request in the same call bypass the guard, unless the recorded decision is a Bug", async () => {
+    const refused = linear({ ticketLabels: CLASSIFIED["Feature Request"] });
+    await assert.rejects(
+      routeTicket(
+        {
+          issue: "ENG-1",
+          removeLabels: ["Feature Request"],
+          state: "Canceled",
+        },
+        { client: refused.fetchStub }
+      ),
+      UNAPPROVED_CLOSE
+    );
+    assert.deepEqual(refused.writes(), []);
+    const bug = linear({
+      ticketLabels: [
+        ...CLASSIFIED["Feature Request"],
+        { id: "l-bug", name: "Bug" },
+      ],
+    });
+    await routeTicket(
+      {
+        duplicateOf: "ENG-20",
+        issue: "ENG-1",
+        removeLabels: ["Feature Request", "Needs approval"],
+        state: "Duplicate",
+      },
+      { bugDecided: true, client: bug.fetchStub }
+    );
+    assert.equal(updateOf(bug)?.stateId, "s-duplicate");
+  });
+
+  it("moves a report back to its prior state when the read-back does not confirm the master", async () => {
+    const fake = linear({ dropParent: true, ticketLabels: CLASSIFIED.Bug });
+    await assert.rejects(
+      routeTicket(
+        { duplicateOf: "ENG-20", issue: "ENG-1", state: "Duplicate" },
+        { client: fake.fetchStub }
+      ),
+      RESTORED
+    );
+    const restore = fake.updates().at(-1)?.variables.input as Record<
+      string,
+      unknown
+    >;
+    assert.deepEqual(restore, { stateId: "s-triage" });
   });
 });
