@@ -179,13 +179,13 @@ const inputSchema = z.discriminatedUnion("action", [
       .enum(["investigate", "bug_report", "bug_report_addition"])
       .optional(),
     question: z.string().trim().min(1).max(4000),
-    // When the customer tapped "I found a bug", for the ticket's first-reported time.
-    reported_at: z.iso.datetime({ offset: true }).optional(),
     // The screen recording this turn follows up on, which the investigator
     // reads through widget_read_recording.
     recording: z
       .strictObject({ id: z.string().regex(/^[A-Za-z0-9_-]{1,200}$/) })
       .optional(),
+    // When the customer tapped "I found a bug", for the ticket's first-reported time.
+    reported_at: z.iso.datetime({ offset: true }).optional(),
     // What /internal/widget/image read from each screenshot sent with this
     // message. The front door and the investigator read them beside the
     // question; the stored run keeps them joined onto it for later stages.

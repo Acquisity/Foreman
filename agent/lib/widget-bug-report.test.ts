@@ -128,6 +128,8 @@ const linear = (existing: boolean) => {
   return { calls, file };
 };
 
+const FIRST_REPORTED = /- First reported: 3 November 2026 at 14:05 UTC/u;
+
 const fixed = {
   draft: () => Promise.resolve(fallbackDraft(turn)),
   evidence: () => Promise.resolve(evidence),
@@ -340,6 +342,40 @@ test("the ticket's Evidence section names each source's result", () => {
   );
 });
 
+test("the largest report still fits Linear's 16,000-character description", () => {
+  const long = "x".repeat(2000);
+  const many = {
+    items: Array.from({ length: 8 }, (_, i) => ({
+      text: long,
+      url: `https://acquisity.sentry.io/issues/${i}${"9".repeat(150)}/`,
+    })),
+    status: "found" as const,
+  };
+  const { description } = bugReportTicket({
+    draft: fallbackDraft({ ...turn, question: long }),
+    evidence: {
+      Axiom: many,
+      Inngest: many,
+      Jam: many,
+      PostHog: many,
+      Sentry: many,
+    },
+    reportedAt: new Date("2026-11-04T10:30:00.000Z"),
+    scope: verifiedWidgetContext,
+    turn: {
+      ...turn,
+      history: Array.from({ length: 20 }, () => ({
+        role: "customer" as const,
+        text: long,
+      })),
+      question: long,
+      screenshots: [long, long, long],
+    },
+  });
+  assert.ok(description.length <= 16_000, `${description.length}`);
+  assert.ok(description.includes("- …and"));
+});
+
 test("a recording's Jam link is on the ticket", () => {
   const { description } = bugReportTicket({
     draft: fallbackDraft(turn),
@@ -398,7 +434,7 @@ test("the ticket's first-reported time is when the customer tapped I found a bug
     new AbortController().signal,
     { ...fixed, file }
   );
-  assert.match(calls.creates[0].report, /- First reported: 3 November 2026 at 14:05 UTC/u);
+  assert.match(calls.creates[0].report, FIRST_REPORTED);
 });
 
 test("a second bug_report for the same conversation returns the existing ticket and creates nothing", async () => {
@@ -539,7 +575,7 @@ const answer = (t: TestContext, data: unknown) => {
   return paths;
 };
 
-test("Sentry lists each issue line with its link, and nothing found when there is none", async (t) => {
+test("Sentry lists each issue by its title with its link, and nothing found when there is none", async (t) => {
   withEnv(t, "WIDGET_SENTRY_ORG_SLUG", "acquisity");
   const paths = answer(t, {
     content: [
@@ -554,7 +590,7 @@ test("Sentry lists each issue line with its link, and nothing found when there i
     {
       items: [
         {
-          text: "- URL: https://acquisity.sentry.io/issues/123/",
+          text: "TypeError: schedule is undefined",
           url: "https://acquisity.sentry.io/issues/123/",
         },
       ],

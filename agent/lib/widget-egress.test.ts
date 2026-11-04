@@ -484,6 +484,16 @@ test("redaction can only delete: sentences, facts and the needed change, never r
   assert.equal(removeItems(base, [1, 2, 3, 4]), null);
 });
 
+test("the ownership query requires owner or admin unless any member may pass", () => {
+  const none = { emails: [], slugs: [], uuids: [] };
+  const ownersOnly = buildOwnershipQuery(scope, none);
+  const anyMember = buildOwnershipQuery(scope, none, true);
+  assert.ok(ownersOnly.includes("and m.role in ('owner', 'admin')"));
+  assert.ok(!anyMember.includes("m.role in"));
+  assert.ok(anyMember.includes("m.deleted_at is null"));
+  assert.ok(anyMember.includes(`m.user_id = '${scope.userId}'::uuid`));
+});
+
 test("the ownership query binds the verified scope and only validated literals", () => {
   const query = buildOwnershipQuery(scope, {
     emails: ["Someone@Example.com"],

@@ -96,10 +96,11 @@ const WORDS = /\s+/u;
 const CAPITALISED = /^[A-Z][a-z]/u;
 const TRAILING_PERIOD = /\.$/u;
 const MARKDOWN = /[#*`]/gu;
+const ISSUE_NUMBER = /^\d+\.\s*/u;
 const SENTRY_ISSUE_URL =
   /https:\/\/[\w.-]*sentry\.io\/[^\s)\]]*issues\/[^\s)\]]+/u;
 
-/** Sentry answers search_issues in markdown; each line naming an issue link is one item. */
+/** Sentry answers search_issues in markdown: an issue's title heading, then its link. Each link is one item, named by the heading above it. */
 const sentry: Lookup = async (ctx, scope) => {
   const organizationSlug = process.env.WIDGET_SENTRY_ORG_SLUG;
   if (!organizationSlug) {
@@ -116,12 +117,27 @@ const sentry: Lookup = async (ctx, scope) => {
     .flatMap((part) => (typeof part.text === "string" ? [part.text] : []))
     .join("\n")
     .split("\n");
+  let heading = "";
   return found(
     lines.flatMap((line) => {
       const url = SENTRY_ISSUE_URL.exec(line)?.[0];
-      return url
-        ? [{ text: clip(line.replace(MARKDOWN, "").trim(), ITEM_CHARS), url }]
-        : [];
+      if (!url) {
+        if (line.startsWith("#")) {
+          heading = line;
+        }
+        return [];
+      }
+      const named = heading || line;
+      heading = "";
+      return [
+        {
+          text: clip(
+            named.replace(MARKDOWN, "").trim().replace(ISSUE_NUMBER, ""),
+            ITEM_CHARS
+          ),
+          url,
+        },
+      ];
     })
   );
 };
@@ -375,6 +391,10 @@ const conversationLink = (conversationId: string) => {
   }
 };
 
+/** The verbatim conversation and each evidence source are cut to fit, so the ticket stays inside the 16,000-character description bound. */
+const SAID_CHARS = 6000;
+const EVIDENCE_CHARS = 1200;
+
 const evidenceLines = (evidence: Evidence) => {
   if (evidence.status === "empty") {
     return ["Nothing found."];
@@ -382,16 +402,20 @@ const evidenceLines = (evidence: Evidence) => {
   if (evidence.status === "unchecked") {
     return [`Not checked: ${evidence.reason}.`];
   }
-  return evidence.items.map(({ text, url }) =>
-    url ? `- [${inert(text).replaceAll("]", ")")}](${url})` : `- ${inert(text)}`
-  );
+  let budget = EVIDENCE_CHARS;
+  const lines = evidence.items.flatMap(({ text, url }) => {
+    const line = url
+      ? `- [${inert(text).replaceAll("]", ")")}](${url})`
+      : `- ${inert(text)}`;
+    budget -= line.length;
+    return budget >= 0 ? [line] : [];
+  });
+  const left = evidence.items.length - lines.length;
+  return left ? [...lines, `- …and ${left} more`] : lines;
 };
 
 const lowerFirstWord = (text: string) =>
   CAPITALISED.test(text) ? text.charAt(0).toLowerCase() + text.slice(1) : text;
-
-/** The verbatim conversation is cut to fit, so the ticket stays inside Linear's description bound. */
-const SAID_CHARS = 6000;
 
 /** The team's bug format, ported from Acquisity's bug-report-ticket.ts, with an Evidence section. */
 export function bugReportTicket(input: {
