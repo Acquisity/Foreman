@@ -15,14 +15,40 @@ const store = createReporterStore(
   async (text, values) => (await pool.query(text, values)).rows
 );
 
-const migration = await readFile(
-  join(import.meta.dirname, "..", "migrations", "0013_reporter_updates.sql"),
-  "utf8"
-);
+const migration = (name: string) =>
+  readFile(join(import.meta.dirname, "..", "migrations", name), "utf8");
 await pool.query(
   "DROP TABLE IF EXISTS reporter_updates, reporter_pending, reporter_cursor"
 );
-await pool.query(migration);
+await pool.query(await migration("0013_reporter_updates.sql"));
+await assert.rejects(
+  store.claim("ENG-30", "verdict", "We found what was causing this.", null),
+  "a verdict claim fails closed until 0014 runs"
+);
+await pool.query(await migration("0014_reporter_verdict_stage.sql"));
+const verdict = await store.claim(
+  "ENG-30",
+  "verdict",
+  "We found what was causing this.",
+  null
+);
+assert.ok(verdict.ok, "0014 accepts the verdict stage");
+assert.equal(
+  await store.complete(
+    "ENG-30",
+    "verdict",
+    ["verdict"],
+    "We found what was causing this.",
+    null,
+    "comment-30",
+    verdict.token
+  ),
+  true
+);
+assert.deepEqual(
+  (await store.rows("ENG-30")).map((row) => [row.stage, row.status]),
+  [["verdict", "sent"]]
+);
 
 const queued = async (issue: string): Promise<PendingTicket> => {
   const [row] = await pool

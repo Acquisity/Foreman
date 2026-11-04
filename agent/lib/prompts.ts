@@ -54,6 +54,7 @@ export interface PromptOptions {
   customer?: boolean;
   discovery?: string;
   instructions?: string;
+  memory?: boolean;
 }
 export function composePrompt(options: PromptOptions = {}): string {
   if (options.customer) {
@@ -72,7 +73,7 @@ export function composePrompt(options: PromptOptions = {}): string {
     ...(isTriageReplay() ? [TRIAGE_REPLAY] : []),
     connections(options.discovery ?? EXECUTOR_DISCOVERY),
     DELEGATION,
-    MEMORY,
+    ...(options.memory === false ? [] : [MEMORY]),
     MODEL_SWAPS,
     REPLIES,
     NOTES,

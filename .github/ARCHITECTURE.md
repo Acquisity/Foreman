@@ -34,6 +34,7 @@ The root owns feature-branch and pull-request delivery. There is no station prot
 
 - GitHub verifies Connect-forwarded webhooks. Mentions dispatch only for owners, members, and collaborators. Signed repository context is stamped before any model step.
 - Linear Agent Sessions are trusted by workspace membership. A `created` event with an issue adds only requester attribution; `prompted` continues the existing session.
+- A Linear session's route line is the widget-feedback playbook for a chat widget feedback issue, else the Fixy front door (`LINEAR_FRONT_DOOR_ROUTE`, the `front-door-intake` skill and `hand_to_fixy`) for an issue on a team in `FIXY_TRIAGE_TEAMS`, else today's triage line. The setting is empty by default, so every team keeps triage until Fixy allows it.
 - Slack mentions are trusted by channel membership.
 - The Eve HTTP channel uses local dev or Vercel OIDC auth, and stamps a single URL-named repository from the delivered message like the other interactive channels.
 

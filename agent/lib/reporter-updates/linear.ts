@@ -1,5 +1,11 @@
 import { callLinearGraphQL } from "eve/channels/linear";
 import { z } from "zod";
+import {
+  FIXY_LINEAR_USER_ID,
+  fixyHandoffCommentId,
+  fixyTriageTeams,
+  parseFixyHandoff,
+} from "../fixy-handoff.js";
 import { ENGINEERING_TEAM_ID } from "../linear-api.js";
 import { mappedOwner } from "../owner-map.js";
 import {
@@ -29,6 +35,7 @@ interface CommentNode {
   createdAt: string;
   id: string;
   parent: { id: string } | null;
+  updatedAt?: string;
   user: { id: string; name: string } | null;
 }
 
@@ -37,8 +44,8 @@ interface CommentNode {
  * including the Slack thread: the newest staff comments (authors in the owner
  * map) and, separately, the newest of Foreman's own, each group capped. Only
  * staff count as evidence of a change; bots, external users, reporters and
- * anyone else outside the owner map never do. Foreman's reporter updates are
- * left out.
+ * anyone else outside the owner map never do. Foreman's reporter updates and
+ * its Fixy handoff, which holds the workspace id, are left out.
  */
 export const closingCommentsOf = (
   comments: readonly CommentNode[],
@@ -51,7 +58,9 @@ export const closingCommentsOf = (
   const foreman = sorted
     .filter(
       (comment) =>
-        comment.user?.id === viewerId && !isReporterUpdate(identifier, comment)
+        comment.user?.id === viewerId &&
+        !isReporterUpdate(identifier, comment) &&
+        parseFixyHandoff(comment.body) === null
     )
     .slice(-CLOSING_COMMENTS)
     .map((comment) => ({ ...comment, author: "foreman" as const }));
@@ -67,6 +76,23 @@ export const closingCommentsOf = (
   return [...staff, ...foreman]
     .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
     .map(({ author, body, createdAt }) => ({ author, body, createdAt }));
+};
+
+const FIXY_RUN_FINISHED = "This run finished. Its reply is on the ticket.";
+
+/** Fixy's newest comment that is not its run-finished note: the run's reply. */
+export const fixyVerdictOf = (
+  comments: readonly CommentNode[]
+): TicketFacts["fixyVerdict"] => {
+  const newest = comments
+    .filter(
+      (comment) =>
+        comment.user?.id === FIXY_LINEAR_USER_ID &&
+        comment.body.trim() !== FIXY_RUN_FINISHED
+    )
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+    .at(0);
+  return newest ? { body: newest.body, createdAt: newest.createdAt } : null;
 };
 
 export interface LinearPort {
@@ -107,6 +133,7 @@ const TICKET_QUERY = `query ReporterTicket($id: String!) {
     title
     description
     createdAt
+    team { key }
     canceledAt
     completedAt
     state { name type }
@@ -139,9 +166,15 @@ const COMMENT_QUERY = `query ReporterComment($id: String!) {
   comment(id: $id) { id parent { id } }
 }`;
 
-const DISCOVER_QUERY = `query ReporterDiscover($team: ID!, $since: DateTimeOrDuration!, $created: DateTimeOrDuration!, $anchor: String!, $after: String) {
+/**
+ * Engineering tickets, plus those on the teams in FIXY_TRIAGE_TEAMS when any
+ * are listed, so a front-door ticket hears from the schedule too.
+ */
+const discoverQuery = (
+  withTeams: boolean
+) => `query ReporterDiscover($team: ID!${withTeams ? ", $teams: [String!]!" : ""}, $since: DateTimeOrDuration!, $created: DateTimeOrDuration!, $anchor: String!, $after: String) {
   issues(first: 100, after: $after, orderBy: createdAt, filter: {
-    team: { id: { eq: $team } }
+    team: ${withTeams ? "{ or: [{ id: { eq: $team } }, { key: { in: $teams } }] }" : "{ id: { eq: $team } }"}
     createdAt: { gt: $created }
     comments: { some: { body: { startsWith: $anchor } } }
     or: [{ updatedAt: { gt: $since } }, { parent: { updatedAt: { gt: $since } } }]
@@ -188,6 +221,7 @@ const ticketSchema = z.object({
         ),
       }),
       state: z.object({ name: z.string(), type: z.string() }),
+      team: z.object({ key: z.string() }),
       title: z.string(),
     })
     .nullable(),
@@ -310,8 +344,10 @@ const REQUEST_TIMEOUT_MS = 20_000;
 export const linearPort = (
   accessToken: string,
   fetchImpl: Fetch = fetch,
-  timeoutMs: number = REQUEST_TIMEOUT_MS
+  timeoutMs: number = REQUEST_TIMEOUT_MS,
+  extraTeams: ReadonlySet<string> = fixyTriageTeams()
 ): LinearPort => {
+  const teams = [...extraTeams];
   const timed: Fetch = (input, init) =>
     fetchImpl(input, { ...init, signal: AbortSignal.timeout(timeoutMs) });
   const call = <T>(query: string, queryName: string, variables: Variables) =>
@@ -330,12 +366,13 @@ export const linearPort = (
         remaining: number
       ): Promise<string | null> => {
         const data = recentSchema.parse(
-          await call(DISCOVER_QUERY, "ReporterDiscover", {
+          await call(discoverQuery(teams.length > 0), "ReporterDiscover", {
             after: cursor,
             anchor: ANCHOR_PREFIX,
             created: createdAfter,
             since: updatedSince,
             team: ENGINEERING_TEAM_ID,
+            ...(teams.length > 0 ? { teams } : {}),
           })
         );
         tickets.push(
@@ -392,6 +429,8 @@ export const linearPort = (
             createdAt: "",
             description: issue.description ?? "",
             duplicateOf: null,
+            fixyHandoffUpdatedAt: null,
+            fixyVerdict: null,
             identifier: issue.identifier,
             labels: issue.labels.nodes.map((label) => label.name),
             parent: issue.parent
@@ -406,6 +445,7 @@ export const linearPort = (
             ]),
             stateName: issue.state.name,
             stateType: issue.state.type,
+            teamKey: "",
             title: issue.title,
           }
         : null;
@@ -425,6 +465,7 @@ export const linearPort = (
         createdAt: comment.createdAt,
         id: comment.id,
         parent: comment.parentId ? { id: comment.parentId } : null,
+        updatedAt: comment.updatedAt,
         user: comment.userId
           ? { id: comment.userId, name: comment.userName ?? "" }
           : null,
@@ -448,6 +489,11 @@ export const linearPort = (
         data.viewer.id,
         issue.identifier
       );
+      const handoff = comments.find(
+        (comment) =>
+          comment.id === fixyHandoffCommentId(issue.id) &&
+          comment.user?.id === data.viewer.id
+      );
       return {
         anchorId: anchor ? delivery.anchorId : null,
         facts: {
@@ -461,6 +507,8 @@ export const linearPort = (
             issue.relations.nodes.find(
               (relation) => relation.type === "duplicate"
             )?.relatedIssue?.identifier ?? null,
+          fixyHandoffUpdatedAt: handoff?.updatedAt ?? null,
+          fixyVerdict: fixyVerdictOf(comments),
           identifier: issue.identifier,
           labels: issue.labels.nodes.map((label) => label.name),
           parent: issue.parent
@@ -472,6 +520,7 @@ export const linearPort = (
           pullUrls: [...new Set(pullUrls)],
           stateName: issue.state.name,
           stateType: issue.state.type,
+          teamKey: issue.team.key,
           title: issue.title,
         },
         foremanComments: comments

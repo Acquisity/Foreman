@@ -129,7 +129,7 @@ const COMMENTS_QUERY = `query IssueComments($id: String!, $after: String) {
   issue(id: $id) {
     comments(first: 100, after: $after) {
       pageInfo { hasNextPage endCursor }
-      nodes { id body createdAt parent { id } user { id name } }
+      nodes { id body createdAt updatedAt parent { id } user { id name } }
     }
   }
 }`;
@@ -145,6 +145,7 @@ export type LinearRequest = <T>(
 ) => Promise<T>;
 
 export interface IssueComment extends ThreadComment {
+  updatedAt?: string;
   userName: string | null;
 }
 
@@ -158,6 +159,7 @@ const commentsResponseSchema = z.object({
             createdAt: z.string(),
             id: z.string(),
             parent: z.object({ id: z.string() }).nullable(),
+            updatedAt: z.string().optional(),
             user: z.object({ id: z.string(), name: z.string() }).nullable(),
           })
         ),
@@ -196,6 +198,7 @@ export function readAllComments(
     const comments = nodes.map((c) => ({
       body: c.body,
       createdAt: c.createdAt,
+      ...(c.updatedAt ? { updatedAt: c.updatedAt } : {}),
       id: c.id,
       parentId: c.parent?.id ?? null,
       userId: c.user?.id ?? null,
