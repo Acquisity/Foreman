@@ -37,6 +37,39 @@ describe("aiSdrWeeklyReportQueries", () => {
     assert.ok(bookingQuery.includes("select distinct on (t.appointment_id)"));
     assert.ok(!bookingQuery.includes("scheduling_external_booking"));
   });
+
+  test("falls back to the nearest same-organization attendee email thread when the link is lost", () => {
+    const bookingQuery =
+      aiSdrWeeklyReportQueries(aiSdrReportWindows(NOW))[1] ?? "";
+    assert.ok(
+      bookingQuery.includes(
+        "join crm_message_thread t on t.appointment_id = a.id and t.organization_id = a.organization_id"
+      )
+    );
+    assert.ok(
+      bookingQuery.includes(
+        "where t.organization_id = a.organization_id and lower(t.prospect_email) = lower(attendee->>'email')"
+      )
+    );
+    assert.equal(
+      bookingQuery.match(
+        /c\.id = t\.campaign_id and c\.organization_id = t\.organization_id/g
+      )?.length,
+      2
+    );
+    assert.ok(
+      bookingQuery.includes(
+        "coalesce((attendee->>'isOrganizer')::boolean, false) = false"
+      )
+    );
+    assert.ok(
+      bookingQuery.includes(
+        "and not exists (select 1 from linked_campaign l where l.appointment_id = a.id)"
+      )
+    );
+    assert.ok(bookingQuery.includes("order by distance, t.id\n    limit 1"));
+    assert.ok(bookingQuery.includes("select distinct on (a.id)"));
+  });
 });
 
 describe("readAiSdrWeeklyReport", () => {
