@@ -10,7 +10,7 @@ import {
   migrationScopeBlock,
   slackThreadPermalink,
 } from "../migration-ticket-scope.js";
-import { FALLBACK_OWNER, SUPPORT_OWNER } from "../owner-map.js";
+import { BUG_LABEL, FALLBACK_OWNER, SUPPORT_OWNER } from "../owner-map.js";
 import { supportOperationPolicy } from "../support/policy.js";
 import { isTriageReplay } from "../triage-replay/mode.js";
 import { isQuestionsOnly } from "../trust.js";
@@ -137,6 +137,10 @@ const widgetLinearTicketInput = z.union([
     ...widgetTicketShape,
     labels: z.tuple([z.literal(REFUND_TICKET.labels[0])]),
     project: z.literal(REFUND_TICKET.project),
+  }),
+  z.strictObject({
+    ...widgetTicketShape,
+    labels: z.tuple([z.literal(BUG_LABEL)]),
   }),
 ]);
 
@@ -321,7 +325,7 @@ export async function describeProvider(ctx: ProviderContext, path: string) {
 /** The widget lane's one provider write. Team, state and scope come only from the session initiator. */
 export async function createWidgetTicket(
   ctx: ProviderContext,
-  input: { refund?: boolean; report: string; title: string }
+  input: { bug?: boolean; refund?: boolean; report: string; title: string }
 ): Promise<ExecutorOutcome> {
   const scope = requireWidgetContext(ctx.session?.auth.initiator);
   return await invokeProvider(
@@ -331,6 +335,7 @@ export async function createWidgetTicket(
       ...(input.refund
         ? { ...REFUND_TICKET, labels: [...REFUND_TICKET.labels] }
         : {}),
+      ...(input.bug ? { labels: [BUG_LABEL] } : {}),
       ...WIDGET_TICKET_OWNER,
       description: `${input.report}\n\n${widgetScopeBlock(scope)}`,
       state: "Triage",

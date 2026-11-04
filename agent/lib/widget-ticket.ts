@@ -99,13 +99,41 @@ const ticketDependencies = {
 };
 
 /**
+ * One ticket per conversation: every widget ticket carries the conversation id
+ * in its server-written scope block, so an earlier one is found by it. A ticket
+ * someone cancelled no longer covers this conversation.
+ */
+export async function conversationTicket(
+  ctx: ProviderContext,
+  search: typeof findRelatedIssues = findRelatedIssues
+): Promise<RelatedIssue | undefined> {
+  const scope = requireWidgetContext(ctx.session?.auth.initiator);
+  const earlier = await search(
+    {
+      phrases: [scope.conversationId],
+      scope: "duplicates",
+      windowed: false,
+    },
+    { client: executorClient(ctx), signal: ctx.abortSignal }
+  );
+  return earlier.issues.find((issue) => issue.stateType !== "canceled");
+}
+
+/** `bug` is a whole description in the bug format, filed with the Bug label instead of the customer-report block. */
+export interface WidgetTicketInput {
+  bug?: string;
+  summary: string;
+  title: string;
+}
+
+/**
  * File this verified conversation's one ticket, or return the one it already
  * has. widget_file_ticket runs it in the investigator session; the after-hours
- * front door runs it with `appTicketContext` instead.
+ * front door and the bug report run it with `appTicketContext` instead.
  */
 export async function fileWidgetTicket(
   ctx: ProviderContext,
-  input: { summary: string; title: string },
+  input: WidgetTicketInput,
   overrides: Partial<typeof ticketDependencies> = {}
 ): Promise<WidgetTicketResult> {
   const deps = { ...ticketDependencies, ...overrides };
@@ -149,21 +177,10 @@ export async function fileWidgetTicket(
     if (isReplayActive() || isLiveActive()) {
       return await confirm(isReplayActive() ? REPLAY_TICKET : LIVE_TICKET);
     }
-    const refund = await deps.refund(input, ctx.abortSignal);
-    // One ticket per conversation: every widget ticket carries the conversation
-    // id in its server-written scope block, so an earlier one is found by it.
-    const earlier = await deps.search(
-      {
-        phrases: [scope.conversationId],
-        scope: "duplicates",
-        windowed: false,
-      },
-      { client: executorClient(ctx), signal: ctx.abortSignal }
-    );
-    // A ticket someone cancelled no longer covers this conversation.
-    const [existing] = earlier.issues.filter(
-      (issue) => issue.stateType !== "canceled"
-    );
+    const refund = input.bug
+      ? false
+      : await deps.refund(input, ctx.abortSignal);
+    const existing = await conversationTicket(ctx, deps.search);
     if (existing) {
       const opts = { client: executorClient(ctx), signal: ctx.abortSignal };
       return await confirm(
@@ -174,8 +191,9 @@ export async function fileWidgetTicket(
       );
     }
     const result = await deps.create(ctx, {
+      bug: Boolean(input.bug),
       refund,
-      report: formatCustomerReport(input.summary),
+      report: input.bug ?? formatCustomerReport(input.summary),
       title: input.title,
     });
     if (!result.ok) {
@@ -233,7 +251,7 @@ export const appTicketContext = (
 /** Filed from code, outside a session: replay and live re-runs file nothing, as their ticket tool does. */
 export const fileTicketFor = (
   scope: WidgetContext,
-  input: { summary: string; title: string },
+  input: WidgetTicketInput,
   signal: AbortSignal,
   runId?: string,
   deps: Partial<typeof ticketDependencies> = {}
