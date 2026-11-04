@@ -203,7 +203,7 @@ export function aiSdrWeeklyReportQueries(
     // quarter of AI SDR appointments (ENG-17605), so an appointment with no
     // linked campaign thread falls back to the campaign thread whose prospect
     // email matches an attendee in the same organization who is not the
-    // organiser, the appointment owner or a workspace member, nearest by
+    // organiser, the appointment owner or an active workspace member, nearest by
     // last_message_at.
     [
       "with appointments as (",
@@ -236,7 +236,7 @@ export function aiSdrWeeklyReportQueries(
       "  ) nearest",
       "  where coalesce((attendee->>'isOrganizer')::boolean, false) = false",
       "    and not exists (select 1 from \"user\" u where u.id = a.user_id and lower(u.email) = lower(attendee->>'email'))",
-      "    and not exists (select 1 from member m join \"user\" u on u.id = m.user_id where m.organization_id = a.organization_id and lower(u.email) = lower(attendee->>'email'))",
+      "    and not exists (select 1 from member m join \"user\" u on u.id = m.user_id where m.organization_id = a.organization_id and m.deleted_at is null and lower(u.email) = lower(attendee->>'email'))",
       "    and not exists (select 1 from linked_campaign l where l.appointment_id = a.id)",
       "  order by a.id, nearest.distance, nearest.id",
       "), appointment_campaign as (",

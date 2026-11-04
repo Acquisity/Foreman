@@ -74,7 +74,7 @@ describe("aiSdrWeeklyReportQueries", () => {
     );
     assert.ok(
       bookingQuery.includes(
-        "and not exists (select 1 from member m join \"user\" u on u.id = m.user_id where m.organization_id = a.organization_id and lower(u.email) = lower(attendee->>'email'))"
+        "and not exists (select 1 from member m join \"user\" u on u.id = m.user_id where m.organization_id = a.organization_id and m.deleted_at is null and lower(u.email) = lower(attendee->>'email'))"
       )
     );
     assert.ok(bookingQuery.includes("order by distance, t.id\n    limit 1"));
