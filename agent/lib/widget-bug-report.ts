@@ -40,6 +40,7 @@ export interface BugReportTurn {
   messageId: string;
   question: string;
   recording?: { id: string };
+  reportedAt?: string;
   screenshots?: string[];
 }
 
@@ -511,7 +512,7 @@ export async function fileBugReport(
   const { description, title } = bugReportTicket({
     draft,
     evidence,
-    reportedAt: deps.now(),
+    reportedAt: turn.reportedAt ? new Date(turn.reportedAt) : deps.now(),
     scope,
     turn,
   });

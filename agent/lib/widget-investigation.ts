@@ -179,6 +179,8 @@ const inputSchema = z.discriminatedUnion("action", [
       .enum(["investigate", "bug_report", "bug_report_addition"])
       .optional(),
     question: z.string().trim().min(1).max(4000),
+    // When the customer tapped "I found a bug", for the ticket's first-reported time.
+    reported_at: z.iso.datetime({ offset: true }).optional(),
     // The screen recording this turn follows up on, which the investigator
     // reads through widget_read_recording.
     recording: z
@@ -1636,6 +1638,7 @@ async function answerBugReport(
       messageId: input.message_id,
       question: input.question,
       recording: input.recording,
+      reportedAt: input.reported_at,
       screenshots: input.screenshots,
     },
     AbortSignal.timeout(BUG_REPORT_MS)

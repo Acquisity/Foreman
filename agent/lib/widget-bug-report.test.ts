@@ -389,6 +389,18 @@ test("filing still happens when every evidence lookup throws", async () => {
   );
 });
 
+test("the ticket's first-reported time is when the customer tapped I found a bug, not when it was filed", async () => {
+  const { calls, file } = linear(false);
+  await fileBugReport(
+    verifiedWidgetContext,
+    RUN_ID,
+    { ...turn, reportedAt: "2026-11-03T14:05:09.000Z" },
+    new AbortController().signal,
+    { ...fixed, file }
+  );
+  assert.match(calls.creates[0].report, /- First reported: 3 November 2026 at 14:05 UTC/u);
+});
+
 test("a second bug_report for the same conversation returns the existing ticket and creates nothing", async () => {
   const { calls, file } = linear(true);
   const outcome = await fileBugReport(
