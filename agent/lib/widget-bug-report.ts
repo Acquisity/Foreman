@@ -1,10 +1,8 @@
 import { createHash } from "node:crypto";
-
 import { getToken as getConnectToken } from "@vercel/connect";
 import { generateObject } from "ai";
 import { callLinearGraphQL } from "eve/channels/linear";
 import { z } from "zod";
-
 import {
   collectRows,
   DATASET_NAME,
@@ -17,7 +15,7 @@ import { findFunctionRuns } from "./inngest-api.js";
 import { fastCallOptions, modelFor, resolveModel } from "./models.js";
 import { logOpsEvent } from "./ops-log.js";
 import { providerData } from "./support/conversation.js";
-import { parseFindings, type WidgetFindings } from "./widget-findings.js";
+import type { WidgetFindings } from "./widget-findings.js";
 import { isLiveActive, isReplayActive } from "./widget-replay.js";
 import type { WidgetContext } from "./widget-scope.js";
 import {
@@ -205,10 +203,7 @@ const jam: Lookup = async (ctx, _scope, turn) => {
   if (!turn.recording) {
     return { reason: "the customer sent no recording", status: "unchecked" };
   }
-  const recording = (await readRecording(ctx, turn.recording.id)) as Record<
-    string,
-    unknown
-  >;
+  const recording = await readRecording(ctx, turn.recording.id);
   if ("error" in recording) {
     throw new Error("Recording unreadable.");
   }
@@ -475,20 +470,14 @@ const evidenceSummary = (evidence: Record<EvidenceSource, Evidence>) =>
 const ticketFindings = (
   ticket: { identifier: string; url: string },
   report: string
-): WidgetFindings => {
-  const findings = parseFindings({
-    confidence: "high",
-    facts: [],
-    needsHuman: false,
-    recommendation: "",
-    report: clip(report, 1000),
-    ticket: { id: ticket.identifier, url: ticket.url },
-  });
-  if (!findings) {
-    throw new Error("The filed ticket is not a valid finding.");
-  }
-  return findings;
-};
+): WidgetFindings => ({
+  confidence: "high",
+  facts: [],
+  needsHuman: false,
+  recommendation: "",
+  report: clip(report, 1000),
+  ticket: { id: ticket.identifier, url: ticket.url },
+});
 
 export const bugReportDependencies = {
   comment: commentOnTicket,
