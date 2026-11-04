@@ -264,16 +264,25 @@ test("an inbox error classed as a user error is not held for the billing facts",
   assert.equal(decision.billingCheck, undefined);
 });
 
-test("a 0.4-confidence user error ends unproven, not Done", () => {
+test("a 0.4-confidence user error stays open as a Feature Request, not Done (C7)", () => {
   const decision = resolveTriage(
     triageInput({ unavailableLanes: ["Sentry"] }),
     userErrorAnswers({ classification: pick("user_error", 0.4) })
   );
-  assert.equal(decision.outcome, "unproven");
-  assert.ok(decision.outcome === "unproven");
-  assert.match(decision.missing.join(" "), CLASSIFICATION_MISSING);
+  assert.ok(decision.outcome === "route");
+  assert.equal(decision.classification, "Feature Request");
+  assert.equal(decision.route.state, "Backlog");
   assert.equal(decision.confidence.classification, 0.4);
   assert.equal(decision.review.required, false);
+});
+
+test("a 0.4-confidence Bug still ends unproven on the classification bar", () => {
+  const decision = resolveTriage(
+    triageInput(),
+    userErrorAnswers({ classification: pick("bug", 0.4) })
+  );
+  assert.ok(decision.outcome === "unproven");
+  assert.match(decision.missing.join(" "), CLASSIFICATION_MISSING);
 });
 
 test("a 0.4-confidence path ends unproven, but a found duplicate does not need one", () => {
@@ -382,10 +391,10 @@ test("the billing gate returns a disposition and the owner map builds the billin
   assert.ok(!REVIEW_SOURCE.includes(SUPPORT_OWNER));
 });
 
-test("a billed inbox error stays a support follow-up even when a lifted limit is wanted", () => {
+test("a billed inbox error stays a support follow-up and never waits for feature approval", () => {
   const decision = resolveTriage(
     inboxInput({ billingFacts: billingFacts({ domainsLive: false }) }),
-    inboxAnswers({ wants_limit_lifted: yes() }),
+    inboxAnswers(),
     NOW
   );
   assert.ok(decision.outcome === "route");

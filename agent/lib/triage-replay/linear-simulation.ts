@@ -146,10 +146,10 @@ function childrenBeyondSnapshot(state: ReplayState, filter: Filter) {
       ({ fields }) =>
         fields.parent !== null && issueIdOf(fields.parent) === parentId
     )
-    .map(({ identifier }) => ({
+    .map(({ fields, identifier }) => ({
       ...routeIssue(state, identifier),
       createdAt: state.case.createdAt,
-      state: { name: "Todo", type: "unknown" },
+      state: { name: fields.state, type: stateTypeOf(fields.state) },
       title: identifier,
     }));
 }
@@ -175,7 +175,10 @@ function relatedIssues(state: ReplayState, variables: Filter) {
           {
             ...routeIssue(state, created.identifier),
             createdAt: state.case.createdAt,
-            state: { name: created.fields.state, type: "unknown" },
+            state: {
+              name: created.fields.state,
+              type: stateTypeOf(created.fields.state),
+            },
             title: created.identifier,
           },
         ],
@@ -203,7 +206,7 @@ function relatedIssues(state: ReplayState, variables: Filter) {
         identifier: r.id,
         labels: { nodes: asOfList(r.labels).map((name) => ({ name })) },
         parent: parent ? { identifier: parent } : null,
-        state: { name: r.state, type: "unknown" },
+        state: { name: r.state, type: stateTypeOf(r.state) },
         title: r.title,
         url: urlOf(r.id),
       };
@@ -383,6 +386,23 @@ const HANDLERS: Record<LinearOperation, Handler> = {
     workflowStates: { nodes: byName(asOfCase(state, "states"), v.name) },
   }),
 };
+
+/**
+ * Linear's state type for a workflow state the replay knows only by name, so
+ * a Done or Canceled master reads as closed as it does in production.
+ */
+const STATE_TYPES: Record<string, string> = {
+  backlog: "backlog",
+  canceled: "canceled",
+  done: "completed",
+  duplicate: "duplicate",
+  "in progress": "started",
+  "in review": "started",
+  todo: "unstarted",
+  triage: "triage",
+};
+const stateTypeOf = (name: string): string =>
+  STATE_TYPES[name.trim().toLowerCase()] ?? "unknown";
 
 export function answerLinear(
   state: ReplayState,

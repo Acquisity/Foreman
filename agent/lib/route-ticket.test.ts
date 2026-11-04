@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { ProviderClient } from "./executor/operations.js";
-import { routeTicket } from "./linear-api.js";
+import { routeTicket } from "./route-ticket.js";
 import { type Call, fakeLinear } from "./route-ticket-fixtures.js";
 
 process.env.LINEAR_CONNECTOR ??= "linear/test";
@@ -418,7 +418,8 @@ describe("routeTicket owner map", () => {
             duplicateOf: "ENG-9",
             inheritAssigneeFrom: "ENG-9",
             issue: "ENG-1",
-            state: "Done",
+            // Open, because an unapproved Feature Request may not close.
+            state: "Todo",
           },
           { client: linear.fetchStub }
         );

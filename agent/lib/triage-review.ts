@@ -175,6 +175,14 @@ export const reviewOf = (
       required: true,
     };
   }
+  if (classification === "Feature Request") {
+    return {
+      kind: null,
+      reason:
+        "a feature request stays open for a person to decide, or keeps the decision a person made",
+      required: false,
+    };
+  }
   if (classification === "Bug") {
     return {
       kind: "bug",

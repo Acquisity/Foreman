@@ -69,7 +69,6 @@ const answers = (over: Record<string, JevAnswer> = {}) => ({
   path: pick("Engineering Todo"),
   project: pick("undetermined"),
   verdict: pick("supported"),
-  wants_limit_lifted: no(),
   ...over,
 });
 
@@ -275,11 +274,10 @@ describe("routing a sample of each area", () => {
 });
 
 describe("who may be assigned to a developer", () => {
-  const platformLimit = (over: Record<string, JevAnswer> = {}) =>
+  const featureRequest = (over: Record<string, JevAnswer> = {}) =>
     answers({
-      classification: pick("platform_limitation"),
+      classification: pick("feature_request"),
       path: pick("Platform Limitation"),
-      wants_limit_lifted: yes(),
       ...over,
     });
 
@@ -295,7 +293,7 @@ describe("who may be assigned to a developer", () => {
     const decision = route(
       resolveTriage(
         input({ ticketLabels: ["Approved", "Feature Request"] }),
-        platformLimit({ area: pick("ai_sdr") })
+        featureRequest({ area: pick("ai_sdr") })
       )
     );
     assert.equal(decision.approval, "approved");
@@ -307,7 +305,7 @@ describe("who may be assigned to a developer", () => {
 
   it("parks an unapproved feature request in Backlog with James, who approves it", () => {
     const decision = route(
-      resolveTriage(input(), platformLimit({ area: pick("ai_sdr") }))
+      resolveTriage(input(), featureRequest({ area: pick("ai_sdr") }))
     );
     assert.equal(decision.approval, "needed");
     assert.equal(decision.assignee, "James Keeble");
@@ -342,7 +340,11 @@ describe("who may be assigned to a developer", () => {
     const decision = route(
       resolveTriage(
         input(),
-        platformLimit({ area: pick("ai_sdr"), wants_limit_lifted: no() })
+        answers({
+          area: pick("ai_sdr"),
+          classification: pick("platform_limitation"),
+          path: pick("Platform Limitation"),
+        })
       )
     );
     assert.equal(decision.assignee, null);

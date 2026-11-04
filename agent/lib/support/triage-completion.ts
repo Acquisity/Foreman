@@ -2,7 +2,9 @@ import { z } from "zod";
 import type { ProviderContext } from "../executor/dispatch.js";
 import {
   areaLabels,
+  DECLINED_LABEL,
   FALLBACK_OWNER,
+  FEATURE_REQUEST_LABEL,
   NEEDS_APPROVAL_LABEL,
   SUPPORT_OWNER,
 } from "../owner-map.js";
@@ -113,6 +115,49 @@ const needsMaster = (
   return classification === "Bug" && !isSupportFollowUp(issue, handlingPath);
 };
 
+/**
+ * A feature request closes only on a person's matching decision (ENG-15932):
+ * Canceled when they declined it, Done when they approved it and triage
+ * resolved it, and never Duplicate.
+ */
+const closedUnseen = (
+  issue: z.infer<typeof issueSchema>,
+  classification: string | undefined,
+  handlingPath: string | undefined
+): boolean => {
+  if (
+    classification !== FEATURE_REQUEST_LABEL ||
+    !CLOSED_STATES.includes(issue.status)
+  ) {
+    return false;
+  }
+  if (issue.status === "Canceled") {
+    return !issue.labels.includes(DECLINED_LABEL);
+  }
+  if (issue.status === "Done") {
+    // Declined wins: a request a person declined never finishes Done.
+    return !(
+      issue.labels.includes("Approved") &&
+      !issue.labels.includes(DECLINED_LABEL) &&
+      handlingPath === "Resolved by triage"
+    );
+  }
+  return true;
+};
+
+const CLOSED_UNSEEN_RULE =
+  "A Feature Request closes only on a person's matching decision: Canceled with Declined, or Done with Approved (and not Declined) on Resolved by triage, never Duplicate.";
+
+const closedUnseenRefusal = (labels: string[]): string => {
+  if (labels.includes(DECLINED_LABEL)) {
+    return `${CLOSED_UNSEEN_RULE} A person declined it, so route it to Canceled.`;
+  }
+  if (labels.includes("Approved")) {
+    return `${CLOSED_UNSEEN_RULE} A person approved it, so keep its approved path; do not route it to Backlog with Needs approval.`;
+  }
+  return `${CLOSED_UNSEEN_RULE} Route it to Backlog with Needs approval for James.`;
+};
+
 const missesTypeLabels = (
   issue: z.infer<typeof issueSchema>,
   classification: string | undefined,
@@ -120,6 +165,15 @@ const missesTypeLabels = (
 ): boolean => {
   if (classification === "Bug") {
     return !issue.labels.includes("Bug");
+  }
+  if (
+    classification === FEATURE_REQUEST_LABEL &&
+    !issue.labels.includes(FEATURE_REQUEST_LABEL)
+  ) {
+    return true;
+  }
+  if (issue.labels.includes(DECLINED_LABEL)) {
+    return false;
   }
   if (
     issue.labels.includes("Feature Request") &&
@@ -175,7 +229,12 @@ export function assertTriageOutputs(
     return;
   }
   if (
-    !["Bug", "User Error", "Platform Limitation"].includes(classification ?? "")
+    ![
+      "Bug",
+      FEATURE_REQUEST_LABEL,
+      "User Error",
+      "Platform Limitation",
+    ].includes(classification ?? "")
   ) {
     throw new SupportRefusal(
       "Record the settled classification or the documented unproven/urgent-human branch."
@@ -191,6 +250,9 @@ export function assertTriageOutputs(
     throw new SupportRefusal(
       "Save the settled review before finishing triage, including after reclassification."
     );
+  }
+  if (closedUnseen(issue, classification, handlingPath)) {
+    throw new SupportRefusal(closedUnseenRefusal(issue.labels));
   }
   if (
     !issue.priority ||

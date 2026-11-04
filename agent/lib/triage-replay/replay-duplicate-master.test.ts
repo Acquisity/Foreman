@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { tool as readIssueTool } from "../../tools/read_triage_replay_issue.js";
-import { routeTicket } from "../linear-api.js";
+import { routeTicket } from "../route-ticket.js";
 import { memoryBackend, seedReplayStore, setReplayBackend } from "./backend.js";
 import {
   ARCHIVE_URL,
@@ -78,7 +78,6 @@ describe("replayed duplicate masters (R2, R3)", () => {
       { duplicateOf: "ENG-91", issue: "ENG-100", state: "Duplicate" },
       {
         client,
-        masterRequired: true,
         mastersCreatedAfter: "2026-09-01T00:00:00.000Z",
       }
     );
@@ -140,5 +139,106 @@ describe("replayed hand-made masters (Devin 10)", () => {
     const client = replayClient(state);
     await routeTicket({ issue: "ENG-100", parent: "ENG-90" }, { client });
     assert.deepEqual(childrenOf(state, "ENG-90"), ["ENG-100"]);
+  });
+});
+
+describe("replayed closed masters (C3)", () => {
+  for (const closed of ["Done", "Duplicate"]) {
+    it(`does not close a duplicate under a master the replay knows is ${closed}`, async () => {
+      const state = seedReplayState(triageCase, {
+        archiveUrl: ARCHIVE_URL,
+        caseKey: KEY,
+        lists: {
+          ...lists,
+          labels: [
+            ...lists.labels,
+            {
+              createdAt: "2026-01-01T00:00:00.000Z",
+              id: "l-grouping",
+              name: "Needs grouping",
+            },
+          ],
+          states: [
+            ...lists.states,
+            {
+              createdAt: "2026-01-01T00:00:00.000Z",
+              id: "s-backlog",
+              name: "Backlog",
+            },
+          ],
+        },
+        stamp: { foremanCommit: "f".repeat(40), startedAt: "2026-10-28" },
+      });
+      state.created.push({
+        description:
+          "## Root cause\n\nThe token refresh drops the inbox session.\n\n## Regression seam\n\nReconnect after a send.",
+        fields: {
+          assignee: null,
+          labels: ["Bug"],
+          parent: null,
+          priority: 2,
+          project: null,
+          state: closed,
+        },
+        identifier: "ENG-201",
+        title: "Master: shipped inbox reconnect fix",
+      });
+      const routed = await routeTicket(
+        { duplicateOf: "ENG-201", issue: "ENG-100", state: "Duplicate" },
+        { client: replayClient(state) }
+      );
+      assert.equal(routed.grouping, "needs-grouping");
+      assert.equal(routed.duplicateOf, null);
+      assert.equal(state.issue.state, "Backlog");
+    });
+  }
+});
+
+describe("replayed masters in an unknown state", () => {
+  it("does not close a duplicate under a master whose state the replay cannot type", async () => {
+    const state = seedReplayState(triageCase, {
+      archiveUrl: ARCHIVE_URL,
+      caseKey: KEY,
+      lists: {
+        ...lists,
+        labels: [
+          ...lists.labels,
+          {
+            createdAt: "2026-01-01T00:00:00.000Z",
+            id: "l-grouping",
+            name: "Needs grouping",
+          },
+        ],
+        states: [
+          ...lists.states,
+          {
+            createdAt: "2026-01-01T00:00:00.000Z",
+            id: "s-backlog",
+            name: "Backlog",
+          },
+        ],
+      },
+      stamp: { foremanCommit: "f".repeat(40), startedAt: "2026-10-28" },
+    });
+    state.created.push({
+      description:
+        "## Root cause\n\nThe token refresh drops the inbox session.\n\n## Regression seam\n\nReconnect after a send.",
+      fields: {
+        assignee: null,
+        labels: ["Bug"],
+        parent: null,
+        priority: 2,
+        project: null,
+        state: "Shipped to customers",
+      },
+      identifier: "ENG-202",
+      title: "Master: in a custom state",
+    });
+    const routed = await routeTicket(
+      { duplicateOf: "ENG-202", issue: "ENG-100", state: "Duplicate" },
+      { client: replayClient(state) }
+    );
+    assert.equal(routed.grouping, "needs-grouping");
+    assert.equal(state.issue.state, "Backlog");
   });
 });
