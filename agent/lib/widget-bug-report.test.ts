@@ -614,6 +614,31 @@ test("Sentry is not checked when its organization is not configured", async (t) 
   );
 });
 
+test("Axiom reads the workspace and user from the app logs' fields map", async (t) => {
+  withEnv(t, "WIDGET_AXIOM_APP_DATASET", "acquisity-app");
+  withEnv(t, "EXECUTOR_MCP_CONNECTOR", "executor/test");
+  const apls: string[] = [];
+  t.mock.method(
+    executorTransport,
+    "call",
+    (_wire: unknown, _path: string, input: { apl: string }) => {
+      apls.push(input.apl);
+      return Promise.resolve({
+        data: { structuredContent: { matches: [] } },
+        http: { status: 200 },
+        ok: true,
+      });
+    }
+  );
+  await EVIDENCE_SOURCES.Axiom(providerCtx(), verifiedWidgetContext, turn);
+  assert.ok(
+    apls[0]?.includes(
+      `tostring(['fields']['organizationId']) == '${verifiedWidgetContext.organizationId}'`
+    )
+  );
+  assert.ok(!apls[0]?.includes("['fields.organizationId']"));
+});
+
 test("Axiom lists each error message with its count", async (t) => {
   withEnv(t, "WIDGET_AXIOM_APP_DATASET", "acquisity-app");
   answer(t, {

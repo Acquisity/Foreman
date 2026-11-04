@@ -154,7 +154,7 @@ const axiom: Lookup = async (ctx, scope) => {
   const apl = [
     `['${dataset}']`,
     "| where _time > ago(24h)",
-    `| where ['fields.organizationId'] == '${scope.organizationId}' or ['fields.userId'] == '${scope.userId}'`,
+    `| where tostring(['fields']['organizationId']) == '${scope.organizationId}' or tostring(['fields']['userId']) == '${scope.userId}'`,
     "| where level == 'error'",
     "| summarize count = count(), lastSeen = max(_time) by message",
     "| sort by lastSeen desc",
