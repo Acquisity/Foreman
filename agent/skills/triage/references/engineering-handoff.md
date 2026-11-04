@@ -33,7 +33,7 @@ Search on four axes: the cause, the Stage 4 code path, the provider failure, and
 
 1. Call `find_related_issues` with `scope: "masters"` and one phrasing per axis. The Engineering Team and full pagination are fixed inside the tool; `truncated` true means candidates were dropped, so narrow the phrasings.
 
-   In an intake-only Slack workflow or a Linear Agent Session the tool searches no further than 30 days back, and `createdAfter` in the result shows the cutoff it applied; elsewhere `createdAfter` is null and matching masters are considered regardless of creation date. `route_ticket` refuses a parent created before that cutoff however it was found, so an older match may be related for history but never reused as the parent.
+   In an intake-only Slack workflow or a Linear Agent Session the tool searches no further than 30 days back, and `createdAfter` in the result shows the cutoff it applied; elsewhere `createdAfter` is null and matching masters are considered regardless of creation date. `route_ticket` refuses a parent created before that cutoff however it was found, so an older match may be related for history but never reused as the parent. A candidate created exactly at the cutoff is still eligible. Never select an older one as the current master either, even when it surfaces through another issue's relations, investigation memory, an unbounded search, or prior knowledge.
 
    Do not filter this search by label. A master carries no marker label, so a label filter would match nothing and every report would create another master. A master is recognised by its `## Regression seam` section or by already parenting customer reports.
 2. Match eligible candidates on root cause, never on symptom.

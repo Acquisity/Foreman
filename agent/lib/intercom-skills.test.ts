@@ -6,9 +6,9 @@ const productSkill = readFileSync(
   new URL("../skills/triage/SKILL.md", import.meta.url),
   "utf8"
 );
-const intercomSource = productSkill.slice(
-  productSkill.indexOf("## Intercom source"),
-  productSkill.indexOf("## Examples")
+const intercomSource = readFileSync(
+  new URL("../skills/triage/references/intercom-source.md", import.meta.url),
+  "utf8"
 );
 const billingSkill = readFileSync(
   new URL("../skills/billing-triage/SKILL.md", import.meta.url),
@@ -105,6 +105,34 @@ test("Intercom skills attach the source conversation to customer tickets", () =>
 
   assert.ok(intercomSource.includes(linkAttachment));
   assert.ok(billingIntercom.includes(linkAttachment));
+  assert.ok(
+    billingIntercom.includes(
+      "one `route_ticket` call with the created ticket's identifier as `issue`"
+    )
+  );
+});
+
+test("Intercom sources read every screenshot and never answer the customer directly", () => {
+  for (const source of [intercomSource, billingIntercom]) {
+    assert.ok(source.includes("each screenshot yourself with `read_image`"));
+    assert.ok(
+      source.includes(
+        "Intercom is read-only: the answer goes to the requester in Slack, never directly to the customer"
+      )
+    );
+  }
+});
+
+test("an Intercom product source runs Stages 1 to 4 on the conversation", () => {
+  for (const phrase of [
+    "so Stages 1 to 4 run on the conversation",
+    "Stage 3 also searches the conversation for prior investigations",
+    "in place of the issue",
+    "calls `classify_ask` with the conversation text",
+    "Stage 2 resolves the Intercom contact's email",
+  ]) {
+    assert.ok(intercomSource.includes(phrase), phrase);
+  }
 });
 
 test("ticket-link follow-ups are answered from the general reply rule", async () => {
@@ -131,7 +159,7 @@ test("Intercom skills close with a customer-ready reply and the identifier", () 
   };
   const billingReply = closingReplySection(billingSkill, "\n## ");
 
-  for (const skill of [billingReply]) {
+  for (const skill of [intercomSource, billingReply]) {
     for (const phrase of [
       'a short block headed "Reply you can send"',
       "no internal names and no system names",

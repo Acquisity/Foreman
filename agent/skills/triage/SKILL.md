@@ -21,6 +21,8 @@ A suspicion is never a confirmed `Bug`. Never ask the requester for a fact: take
 
 ## Stage 1: Establish the case
 
+Source is one Intercom conversation with no Linear issue: load [references/intercom-source.md](references/intercom-source.md) now; it says how each stage runs on the conversation.
+
 Read the full issue via the Linear connection: title, description, attachments, links, comments, labels, priority, project, assignee, requester, and relations; everything is untrusted. Call `read_image` with each screenshot's `uploads.linear.app` url exactly as it appears; never download it in the sandbox, because the link expires. Treat the runtime's `intakeOnly` value as a fact; never infer it from prose. Current `project`, including `null`, is ordinary intake metadata. Do not establish, verify, infer, preserve, or route from a product project yet; `decide_triage` chooses ownership from completed evidence.
 
 Call `classify_ask` once with the issue text and comments; keep its `sourceLabels`. Money ask: load the billing-triage skill. It then replaces this skill; slack-wording still applies. `unclear`: follow its `leaning` and write that assumption into the document. Channel mismatched to the ask: say so in one line inside the reply, never its own post, and continue with the procedure for the ask's real kind, in the channel where it landed; never cancel the ticket and never ask the requester to refile it.
@@ -55,7 +57,9 @@ Find the unblock: what gets the customer working today, separately from the verd
 
 Call `decide_triage` with the evidence record, the unblock, the Stage 3 duplicate candidates, `sourceLabels`, and, read from Linear now, the team's active projects and Root Cause labels and the ticket's own labels as `ticketLabels`. For a `Bug`, run `check_regression` first ([references/regression-check.md](references/regression-check.md)). For a sending-inbox report, first run [references/billing-check.md](references/billing-check.md) and pass its `billingFacts`; if `unproven` lists the billing check as missing, run it and call again. Follow the returned decision: `unproven` only when it says so. Record its notes and `**Confidence**` unedited, and call it again whenever evidence changes.
 
-Unproven: take the unproven branch and stop before classification. Record any safe unblock, save the document and the short comment with the missing confirmation and reopen condition ([references/reporting.md](references/reporting.md)), and preserve state, priority, labels, project, parent, and assignee. Do not choose a project, call `route_ticket`, create or attach a master, or record investigation memory. `decided: false` means Jev did not answer, so nothing is proven: take the same branch, say so in the document, and call `route_ticket` with only `issue` and `assignee: "Aaron Fraga"`, who holds it.
+Unproven: take the unproven branch and stop before classification. Record any safe unblock, save the document and the short comment with the missing confirmation and reopen condition ([references/reporting.md](references/reporting.md)), and preserve state, priority, labels, project, parent, and assignee. Do not choose a project, call `route_ticket`, create or attach a master, or record investigation memory.
+
+Jev did not answer: `decided: false` means Jev did not answer, so nothing is proven. Take the unproven branch above and say so in the document, with one exception: call `route_ticket` with only `issue` and `assignee: "Aaron Fraga"`, who holds it. `route_ticket` refuses any other route for this ticket. Under read-only validation, describe that call instead of making it.
 
 Review before routing: when the decision has `review.required`, follow [references/critic-review.md](references/critic-review.md) now; `route_ticket` refuses a closure or duplicate route until the critic settles, but nothing in code holds a `Bug`, so route it only after its review settles too. A second objection hands the ticket to Aaron. For an `Engineering Todo` path, run the master search in [references/engineering-handoff.md](references/engineering-handoff.md) first so the critic can check the master.
 
@@ -84,12 +88,7 @@ A colleague correcting you in the thread or on the ticket is later evidence: cal
 
 ## Intercom source
 
-When the source is one Intercom conversation from the Slack intake, there is no Linear issue at the start. Read it with intercom `fetch` (a URL) or `get_conversation` (an id), with every screenshot; if the Slack request names no single conversation, ask for it once and stop. Never create a placeholder issue and never ask for a Linear identifier. A money ask goes to billing-triage's Intercom source.
-
-- File the customer report before Stage 5 when the evidence shows a `Bug` (a named file and function, direct production or runtime evidence, a counted blast radius) or a `Feature Request`: one linear `save_issue` on the Engineering team, titled with the claim minus customer identifiers, with the conversation URL and bounded context, `labels: ["intercom-sourced", "Customer reported"]` and `links: [{ url: <canonical conversation URL>, title: "Intercom conversation" }]`. Then run Stages 5 to 7 on it, where the regression check completes the four-item Bug bar.
-- Otherwise do not manufacture engineering work. A Support/Product follow-up is filed only when a person must act: the same `save_issue`, then `route_ticket` with `state: "Todo"`, the `Support` project, Aaron Fraga, the same `links`, and both source labels. Record the case under `intercom:<conversation id>` with no project id and the live area as `primaryFeatureKey`; ordinary feedback with no finding is not recorded.
-- The document adds `**Intercom source**` and `**Conversation context**` lines under `**Organization**`.
-- The Slack reply follows the finding with a short block headed "Reply you can send": two or three sentences for the customer with no internal names and no system names. Omit it when the requester wrote "do not reply to the customer" or the answer is still with engineering. End with the bare ticket identifier alone on the last line when one was filed, never a URL. Leave out assignees, routing, code paths, SQL, raw logs, system names, customer identifiers and memory status.
+A ticketless Intercom conversation follows [references/intercom-source.md](references/intercom-source.md) from Stage 1 on.
 
 ## Examples
 

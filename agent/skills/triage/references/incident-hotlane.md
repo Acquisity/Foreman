@@ -6,7 +6,7 @@ Read this in the critic review, only for `review.kind` `bug`. It turns the `hotl
 
 Jev decides the route: take `route` (`HOTLANE`, `STANDARD_ENGINEERING`, or `NEEDS_HUMAN_URGENT`), `impact`, and `proposedLabel` from `decision.hotlane`, and put its notes in `rationale`. A re-run of `decide_triage` replaces them. Route by user and business impact, never by complaint volume: one workspace is enough when a core function is blocked.
 
-`NEEDS_HUMAN_URGENT` means a high-risk condition could not be confirmed because a critical lane was unavailable: Foreman stops before any settled classification, priority, label, master, or announcement, and hands the case to a person with a provisional note. A `HOTLANE` proposal maps to the existing `fast-lane` label, which `engineering-handoff` applies to the master only, never to the customer ticket. This assessment does not set priority; `decide_triage` does.
+`NEEDS_HUMAN_URGENT` means a high-risk condition could not be confirmed, either because a critical lane was unavailable or because a likely hotlane call fell below the confirmation bar. Do not downgrade it to routine work. Foreman stops before any settled classification, priority, label, master, or announcement, and hands the case to a person with a provisional note. A `HOTLANE` proposal maps to the existing `fast-lane` label, which `engineering-handoff` applies to the master only, never to the customer ticket. This assessment does not set priority; `decide_triage` does.
 
 ## Separate the four workstreams
 

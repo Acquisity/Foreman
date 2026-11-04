@@ -83,6 +83,7 @@ test("a sending-inbox report is billing-checked before it can be a bug or a dupl
     )
   );
   for (const rule of [
+    "Run this in Stage 5, after Stage 4's completion holds and before `decide_triage`",
     "An inbox error is billing until this check says otherwise",
     "whether the subscription is paid, and whether payments are failing",
     "No read here reaches the domain supplier",
@@ -139,7 +140,11 @@ test("a decision Jev could not make is not reviewed as a fallback: it is unprove
 
 test("the Intercom source runs the same Stage 5 review as every ticket", () => {
   assert.ok(!triageSkill.includes("exactly one critic pass"));
-  assert.ok(triageSkill.includes("Then run Stages 5 to 7 on it"));
+  const intercom = readFileSync(
+    new URL("../skills/triage/references/intercom-source.md", import.meta.url),
+    "utf8"
+  );
+  assert.ok(intercom.includes("Then run Stages 5 to 7 on it"));
 });
 
 test("the critic is sent the packet its echo is checked against", () => {

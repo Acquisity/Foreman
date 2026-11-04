@@ -77,7 +77,7 @@ export default defineTool({
     "For a Bug that is not a Duplicate, hotlane carries the incident-hotlane route, impact, and proposed label. " +
     "outcome route carries the exact state, priority, addLabels (including the Area label), project, assignee, and duplicate fields for route_ticket; pass them unchanged. decision.assignee is the mapped owner of the area it chose, James Keeble when no area fits or a feature request waits for him, and null when the ticket may not go to a developer; decision.area names the Area label the route already carries. approval needed means a Feature Request waits in Backlog for James whatever path was picked (a SAN sandbox one is held by Aaron Fraga); it never closes unless the ticket already carries a person's Declined label, and a match only puts relatedTo on its route. Approved keeps it on the engineering path, except that an approved request may keep Resolved by triage with change evidence or a Support follow-up path. " +
     "Put every note in the Triage investigation document. " +
-    "decided false means Jev could not answer: the claim is unproven. Say so in the document and hand the ticket to Aaron Fraga with a route_ticket call carrying only issue and assignee; route_ticket holds any other route for it.",
+    "decided false means Jev could not answer: the claim is unproven. Say so in the document and hand the ticket to Aaron Fraga with a route_ticket call carrying only issue and assignee (under read-only validation, describe that call instead of making it); route_ticket holds any other route for it.",
   async execute(input, ctx) {
     try {
       const record = recordFor(

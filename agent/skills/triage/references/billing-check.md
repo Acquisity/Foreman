@@ -1,6 +1,6 @@
 # Billing check for an inbox error
 
-Run this in Stage 5, before `decide_triage`, when the report is about the customer's sending inboxes (disconnected, erroring, not sending).
+Run this in Stage 5, after Stage 4's completion holds and before `decide_triage`, when the report is about the customer's sending inboxes (disconnected, erroring, not sending).
 
 An inbox error is billing until this check says otherwise. Unpaid, lapsed or expired inboxes error every inbox at once, so when every inbox errors together, suspect non-payment first.
 

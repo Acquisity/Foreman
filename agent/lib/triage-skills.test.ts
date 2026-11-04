@@ -12,6 +12,7 @@ const reporting = read("triage/references/reporting.md");
 const criticReview = read("triage/references/critic-review.md");
 const handoff = read("triage/references/engineering-handoff.md");
 const hotlane = read("triage/references/incident-hotlane.md");
+const intercomReference = read("triage/references/intercom-source.md");
 const billingSkill = read("billing-triage/SKILL.md");
 
 const extractInstruction = (skill: string, start: string, end: string) => {
@@ -112,7 +113,7 @@ test("the classifications and the Bug bar agree with the code", () => {
   assert.equal(triageSkill.includes("nobody wants lifted"), false);
   // The Bug bar is the four items decide_triage applies; the Intercom report
   // is filed on the first three and the regression check completes it.
-  assert.ok(triageSkill.includes("the four-item Bug bar"));
+  assert.ok(intercomReference.includes("the four-item Bug bar"));
   assert.equal(triageSkill.includes("requires all three"), false);
 });
 
@@ -131,7 +132,7 @@ test("nobody is asked for the workspace, and every unknown becomes the reopen co
     assert.equal(source.includes("clarify-with-requester"), false);
     assert.equal(source.includes("ask for the workspace"), false);
   }
-  assert.ok(triageSkill.includes("ask for it once and stop"));
+  assert.ok(intercomReference.includes("ask for it once and stop"));
 });
 
 test("a customer ask never closes unseen and Approved or Declined come only from a person", () => {
@@ -643,8 +644,9 @@ test("triage stops unproven claims before classification or routing", () => {
   const unproven = extractInstruction(
     stage,
     "Unproven:",
-    "Review before routing:"
+    "Jev did not answer:"
   );
+  assert.equal(unproven.includes("Aaron Fraga"), false);
   assert.ok(
     unproven.includes("take the unproven branch and stop before classification")
   );
@@ -685,9 +687,19 @@ test("a decided: false answer is unproven and held by Aaron, with no skill fallb
       "`decided: false` means Jev did not answer, so nothing is proven"
     )
   );
+  const noAnswer = extractInstruction(
+    stage,
+    "Jev did not answer:",
+    "Review before routing:"
+  );
   assert.ok(
-    stage.includes(
+    noAnswer.includes(
       'call `route_ticket` with only `issue` and `assignee: "Aaron Fraga"`, who holds it'
+    )
+  );
+  assert.ok(
+    noAnswer.includes(
+      "Under read-only validation, describe that call instead of making it"
     )
   );
   for (const source of triageFiles()) {
@@ -730,6 +742,16 @@ test("master searches are windowed for Slack intake and Linear sessions, unbound
   assert.ok(
     search.includes("may be related for history but never reused as the parent")
   );
+  assert.ok(
+    search.includes(
+      "A candidate created exactly at the cutoff is still eligible"
+    )
+  );
+  assert.ok(
+    search.includes(
+      "Never select an older one as the current master either, even when it surfaces through another issue's relations, investigation memory, an unbounded search, or prior knowledge"
+    )
+  );
   assert.ok(search.includes("`## Regression seam`"));
   for (const excluded of [
     "linear__list_issues",
@@ -747,11 +769,17 @@ test("master searches are windowed for Slack intake and Linear sessions, unbound
 });
 
 test("the Intercom source files its report before the shared decision", () => {
-  const intercom = extractInstruction(
+  const establish = extractInstruction(
     triageSkill,
-    "## Intercom source",
-    "## Examples"
+    "## Stage 1: Establish the case",
+    "## Stage 2"
   );
+  assert.ok(
+    establish.includes(
+      "Source is one Intercom conversation with no Linear issue: load [references/intercom-source.md](references/intercom-source.md) now"
+    )
+  );
+  const intercom = intercomReference;
   for (const phrase of [
     "there is no Linear issue at the start",
     "Never create a placeholder issue and never ask for a Linear identifier",
@@ -782,17 +810,16 @@ test("the Intercom source files its report before the shared decision", () => {
 });
 
 test("Intercom replies close with a customer-ready block and the bare identifier", () => {
-  const intercom = extractInstruction(
-    triageSkill,
-    "## Intercom source",
-    "## Examples"
-  );
+  const intercom = intercomReference;
   for (const phrase of [
     'a short block headed "Reply you can send"',
     "no internal names and no system names",
-    'when the requester wrote "do not reply to the customer"',
-    "the answer is still with engineering",
-    "bare ticket identifier alone on the last line",
+    "Omit it when the reply asks the requester for missing information",
+    'when the requester wrote "do not reply to the customer" or anything equivalent',
+    "when the verdict routes to engineering with no customer-facing answer yet",
+    "end the reply with that bare identifier alone on the last line",
+    "when it created none, say nothing about a ticket",
+    "Intercom is read-only: the answer goes to the requester in Slack, never directly to the customer",
     "Leave out assignees, routing, code paths, SQL, raw logs, system names, customer identifiers and memory status",
     "never a URL",
   ]) {
@@ -857,6 +884,8 @@ test("the hotlane assessment adds the work decide_triage does not return, and ne
     "For `HOTLANE` and `STANDARD_ENGINEERING`, Foreman includes the assessment in the critic review",
     "`NEEDS_HUMAN_URGENT` instead routes directly to a person before any critic review or settled decision",
     "from `decision.hotlane`",
+    "either because a critical lane was unavailable or because a likely hotlane call fell below the confirmation bar",
+    "Do not downgrade it to routine work",
   ]) {
     assert.ok(hotlane.includes(kept), kept);
   }

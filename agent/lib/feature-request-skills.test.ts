@@ -144,10 +144,9 @@ test("the investigation document template records the handling path completion r
 });
 
 test("an Intercom feature request is filed and runs the shared decision", () => {
-  const intercom = extractInstruction(
-    triageSkill,
-    "## Intercom source",
-    "## Examples"
+  const intercom = readFileSync(
+    new URL("../skills/triage/references/intercom-source.md", import.meta.url),
+    "utf8"
   );
   assert.ok(
     intercom.includes(
@@ -169,13 +168,32 @@ test("an Intercom feature request is filed and runs the shared decision", () => 
 });
 
 test("a correction to a feature request supersedes its case because both use the source id", () => {
+  const correction = extractInstruction(
+    triageSkill,
+    "A colleague correcting you",
+    "## Intercom source"
+  );
+  const lookup = correction.indexOf(
+    "look up the source's case with `search_investigation_memory` and its `sourceIssueId` (the ticket identifier, or `intercom:<conversation id>` for a ticketless Intercom case)"
+  );
+  const correct = correction.indexOf(
+    "then `correct_investigation_case` on the active case"
+  );
+  assert.ok(lookup >= 0, "source-scoped lookup");
+  assert.ok(correct > lookup, "corrects the active case after the lookup");
   assert.ok(
-    triageSkill.includes(
-      "its `sourceIssueId` (the ticket identifier, or `intercom:<conversation id>` for a ticketless Intercom case)"
+    correction.includes(
+      "or a new case that puts your overturned conclusion in `ruledOut`"
     )
   );
   assert.ok(
-    triageSkill.includes(
+    readFileSync(
+      new URL(
+        "../skills/triage/references/intercom-source.md",
+        import.meta.url
+      ),
+      "utf8"
+    ).includes(
       "Never create a placeholder issue and never ask for a Linear identifier."
     )
   );
