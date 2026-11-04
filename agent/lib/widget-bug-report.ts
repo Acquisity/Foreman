@@ -96,11 +96,11 @@ const WORDS = /\s+/u;
 const CAPITALISED = /^[A-Z][a-z]/u;
 const TRAILING_PERIOD = /\.$/u;
 const MARKDOWN = /[#*`]/gu;
-const ISSUE_NUMBER = /^\d+\.\s*/u;
+const SENTRY_ISSUE_ID = /\[([^\]]+)\]/u;
 const SENTRY_ISSUE_URL =
   /https:\/\/[\w.-]*sentry\.io\/[^\s)\]]*issues\/[^\s)\]]+/u;
 
-/** Sentry answers search_issues in markdown: an issue's title heading, then its link. Each link is one item, named by the heading above it. */
+/** Sentry answers search_issues in markdown: each issue is a `## n. [ID](link)` heading, then its title in bold. */
 const sentry: Lookup = async (ctx, scope) => {
   const organizationSlug = process.env.WIDGET_SENTRY_ORG_SLUG;
   if (!organizationSlug) {
@@ -109,36 +109,34 @@ const sentry: Lookup = async (ctx, scope) => {
   const data = (await read(ctx, "sentry.user.personalSentry.search_issues", {
     limit: ITEMS_MAX,
     organizationSlug,
-    period: "24h",
-    query: `organizationId:${scope.organizationId}`,
+    query: `tags[organizationId]:${scope.organizationId} lastSeen:-24h`,
     sort: "date",
   })) as { content?: { text?: unknown }[] } | null;
   const lines = (data?.content ?? [])
     .flatMap((part) => (typeof part.text === "string" ? [part.text] : []))
     .join("\n")
     .split("\n");
-  let heading = "";
-  return found(
-    lines.flatMap((line) => {
-      const url = SENTRY_ISSUE_URL.exec(line)?.[0];
-      if (!url) {
-        if (line.startsWith("#")) {
-          heading = line;
-        }
-        return [];
+  const issues: { id: string; title?: string; url: string }[] = [];
+  for (const line of lines) {
+    const url = line.startsWith("#") ? SENTRY_ISSUE_URL.exec(line)?.[0] : null;
+    if (url) {
+      issues.push({ id: SENTRY_ISSUE_ID.exec(line)?.[1] ?? "", url });
+    } else if (
+      line.startsWith("**") &&
+      issues.at(-1) &&
+      !issues.at(-1)?.title
+    ) {
+      const last = issues.at(-1);
+      if (last) {
+        last.title = line.replace(MARKDOWN, "").trim();
       }
-      const named = heading || line;
-      heading = "";
-      return [
-        {
-          text: clip(
-            named.replace(MARKDOWN, "").trim().replace(ISSUE_NUMBER, ""),
-            ITEM_CHARS
-          ),
-          url,
-        },
-      ];
-    })
+    }
+  }
+  return found(
+    issues.map(({ id, title, url }) => ({
+      text: clip([id, title].filter(Boolean).join(": ") || url, ITEM_CHARS),
+      url,
+    }))
   );
 };
 

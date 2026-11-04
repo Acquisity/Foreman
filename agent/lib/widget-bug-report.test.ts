@@ -575,12 +575,39 @@ const answer = (t: TestContext, data: unknown) => {
   return paths;
 };
 
+test("Sentry searches by the workspace tag, which its search keeps, not a bare key it drops", async (t) => {
+  withEnv(t, "WIDGET_SENTRY_ORG_SLUG", "acquisity-ai");
+  withEnv(t, "EXECUTOR_MCP_CONNECTOR", "executor/test");
+  const inputs: Record<string, unknown>[] = [];
+  t.mock.method(
+    executorTransport,
+    "call",
+    (_wire: unknown, _path: string, input: Record<string, unknown>) => {
+      inputs.push(input);
+      return Promise.resolve({
+        data: { content: [{ text: "No issues found.", type: "text" }] },
+        http: { status: 200 },
+        ok: true,
+      });
+    }
+  );
+  await EVIDENCE_SOURCES.Sentry(providerCtx(), verifiedWidgetContext, turn);
+  assert.deepEqual(inputs, [
+    {
+      limit: 8,
+      organizationSlug: "acquisity-ai",
+      query: `tags[organizationId]:${verifiedWidgetContext.organizationId} lastSeen:-24h`,
+      sort: "date",
+    },
+  ]);
+});
+
 test("Sentry lists each issue by its title with its link, and nothing found when there is none", async (t) => {
   withEnv(t, "WIDGET_SENTRY_ORG_SLUG", "acquisity");
   const paths = answer(t, {
     content: [
       {
-        text: "# Issues\n\n## 1. **TypeError: schedule is undefined**\n- URL: https://acquisity.sentry.io/issues/123/\n",
+        text: '# Search Results for "tags[organizationId]:x"\n\n**View these results in Sentry**:\nhttps://acquisity-ai.sentry.io/issues/?query=x\n\nFound **1** issues:\n\n## 1. [ACQUISITY-67W](https://acquisity-ai.sentry.io/issues/ACQUISITY-67W)\n\n**TypeError: schedule is undefined**\n\n- **Status**: unresolved\n- **Culprit**: `POST /api/inngest`\n',
         type: "text",
       },
     ],
@@ -590,8 +617,8 @@ test("Sentry lists each issue by its title with its link, and nothing found when
     {
       items: [
         {
-          text: "TypeError: schedule is undefined",
-          url: "https://acquisity.sentry.io/issues/123/",
+          text: "ACQUISITY-67W: TypeError: schedule is undefined",
+          url: "https://acquisity-ai.sentry.io/issues/ACQUISITY-67W",
         },
       ],
       status: "found",
