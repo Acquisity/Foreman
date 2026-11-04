@@ -1235,6 +1235,24 @@ test("internal-artifact blocks request a retry without disclosing the artifact",
   }
 });
 
+test("an unfiled bug report asks the app for a resend, not a teammate", () => {
+  const { run } = dependencies();
+  run.outcome = {
+    decision: "block",
+    message: null,
+    reason: "bug_report_unfiled",
+    status: "completed",
+  };
+  assert.deepEqual(widgetRunResponse(run), {
+    decision: "block",
+    findings: null,
+    message: null,
+    retry: true,
+    run_id: runId,
+    status: "completed",
+  });
+});
+
 test("a finished investigation is finished by one caller: the other reports pending, and an unreadable claim still finishes", async (t) => {
   enabled(t);
   const poll = (deps: WidgetDependencies) =>
