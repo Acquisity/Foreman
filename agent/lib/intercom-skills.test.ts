@@ -106,6 +106,11 @@ test("Intercom skills attach the source conversation to customer tickets", () =>
   assert.ok(intercomSource.includes(linkAttachment));
   assert.ok(billingIntercom.includes(linkAttachment));
   assert.ok(
+    intercomSource.includes(
+      "`route_ticket` with the created ticket's identifier as `issue`"
+    )
+  );
+  assert.ok(
     billingIntercom.includes(
       "one `route_ticket` call with the created ticket's identifier as `issue`"
     )
@@ -114,7 +119,12 @@ test("Intercom skills attach the source conversation to customer tickets", () =>
 
 test("Intercom sources read every screenshot and never answer the customer directly", () => {
   for (const source of [intercomSource, billingIntercom]) {
-    assert.ok(source.includes("each screenshot yourself with `read_image`"));
+    assert.ok(source.includes("each screenshot yourself"));
+    assert.ok(
+      source.includes(
+        "`read_image` reads only a sandbox path or an `uploads.linear.app` url"
+      )
+    );
     assert.ok(
       source.includes(
         "Intercom is read-only: the answer goes to the requester in Slack, never directly to the customer"
