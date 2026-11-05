@@ -1,17 +1,17 @@
 ---
-description: "Refund, overcharge, coupon, lead-credit, and website-credit investigation: classify the predominant ask, verify against the systems of record, check the justification before any verdict, and leave a proposal on Linear. Never moves money. Load for any ticket about refunds, credits, coupons, charges, subscriptions, invoices, or plans."
+description: "Refund, overcharge, coupon, credit, subscription and invoice asks, from a Linear ticket or one Intercom conversation: verify against the systems of record, check the justification, and leave a proposal for a person. Never moves money."
 ---
 
 # Billing triage
 
 How to investigate a money ask and leave a proposal a human can act on. The agent never moves money: every outcome is a recommendation, and the report makes that explicit.
 
-## Step 0 — Classify the predominant ask
+## Step 0: Classify the predominant ask
 
 Jev decides whether this ticket is a **money** ask or a **product** ask: after reading the issue text and comments (Step 1), call `classify_ask` once, or reuse its answer when triage already called it. It also returns the bucket and the source labels.
 
-- If it is a money ask, continue with this skill. It replaces triage-investigate and triage-handling for this ticket: their identity, classification, memory, and routing rules no longer apply. slack-wording still does.
-- If it is a product ask, hand it to triage-investigate instead, which then governs.
+- If it is a money ask, continue with this skill. It replaces the triage skill for this ticket: their identity, classification, memory, and routing rules no longer apply. slack-wording still does.
+- If it is a product ask, hand it to the triage skill instead, which then governs.
 - If the ask is money but the ticket landed in a product channel (or vice versa), handle it where it landed. Say in one line which kind of ask it is, then run the procedure for that kind. That line is a sentence inside the reply, never its own post, and a Linear session has no channel to mismatch. Never cancel the ticket and never ask the requester to refile it; routing sets the project and labels from the evidence, so the channel it arrived in changes nothing.
 - If it answers `unclear`, Jev is below its bar: follow its `leaning` (and its bucket when the leaning is money), write that assumption into the document, and continue. If the requester later volunteers an answer, call `classify_ask` again with the report and their answer, and use its new bucket and source labels.
 
@@ -58,15 +58,13 @@ There is one credit pool. Autumn may surface lead credits and website credits un
 
 Billing flows in one direction. A subscription starts in the customer's workspace, lands in their Autumn account, and Autumn feeds it to Stripe for the actual charge. Read them in that order. Reading Stripe first tells you money moved without telling you what the customer thinks they bought.
 
-1. **PlanetScale**, first and always. Call `read_billing_account` with the organization pinned in step 3: `pinnedOrganizationId`, or the membership `organizationId` chosen there when it is null. It returns the organization with `partnerId`, the billing account with provider, subscription status and plan, and every wallet, plus the credit balance rows and the last 20 credit transactions and manual credits; a `truncated` flag names a history list that hit its cap. Read `organization.partnerGoverned` before anything else; when it is true the partner rule below applies. This is the workspace, which is what the customer actually sees, so it is where their account of events is grounded. Order and invoice rows beyond that still come from `planetscale_execute_read_query`, scoped to the same organization. This is the only database this skill reads.
-2. **Autumn**, second. Call the root tool `read_autumn_billing` with `billingAccount.id` from `read_billing_account`. Acquisity keys Autumn customers by billing account id, so `pinnedOrganizationId` is the wrong key and answers `customer_not_found`. It returns the customer's subscriptions, expanded plans and add-ons, feature balances, and `stripe_id` through a fixed read route. If it answers `available: false` because it could not run (not reached, HTTP 5xx, not authorized), use Autumn `getCustomer` through Executor with the same id, plus Autumn `getPlan` through Executor or Autumn `listPlans` through Executor when the catalog is needed. Both paths are read-only. A 404 or `customer_not_found` is an answer about the id, not about Autumn: re-resolve the id from `read_billing_account` before writing "unavailable", "no plan", or "unverified". The one expected 404 is a partner-governed organization, `organization.partnerGoverned` true, which is what puts an account on Whop; it has no customer in Acquisity's own Autumn, so that 404 is the partner rule, not an id problem. When `billingAccount` is null the organization has no billing account, which is a finding, not an Autumn outage.
-3. **Stripe**, last. The Stripe customer id is the `stripe_id` on the Autumn record; PlanetScale does not store it, so Stripe cannot be read before Autumn. Call the root tool `read_stripe_billing`: use `customer` with that `cus_` id for bounded history; `charge`, `refund`, or `dispute` for a known Stripe object; `promotion_code` for a customer-facing code; or `coupon` for a known coupon id. If a customer section says `has_more: true`, that history is incomplete. Withhold the amount or refund verdict until an exact object id is identified and read. If it answers `available: false` because it could not run, use Stripe `stripe_api_read` through Executor, Stripe `stripe_api_search` through Executor, and Stripe `stripe_api_details` through Executor. Both paths are read-only, so no tool here can move money even if asked to.
+1. PlanetScale, first and always: `read_billing_account` on the organization pinned in step 3 (`pinnedOrganizationId`, or the membership `organizationId` chosen there). Read `organization.partnerGoverned` before anything else; when it is true the partner rule below applies. This is the workspace the customer actually sees, so their account of events is grounded here. Order and invoice rows beyond it come from `planetscale_execute_read_query`, scoped to the same organization. A null `billingAccount` is a finding, not an Autumn outage.
+2. Autumn, second: `read_autumn_billing` with `billingAccount.id`. A 404 is an answer about the id, not about Autumn: re-resolve it before writing "unavailable", "no plan", or "unverified", except for a partner-governed organization, which has no customer in Acquisity's own Autumn.
+3. Stripe, last: `read_stripe_billing` with the `stripe_id` from Autumn, since PlanetScale does not store it. Withhold the amount or refund verdict until the exact object is read.
 
-Amounts always come from Stripe, never from the ticket text and never from the workspace alone. Everything else is read in flow order.
+Amounts always come from Stripe, never from the ticket text and never from the workspace alone. When the ask turns on Instantly provisioning or live provider state, read Instantly after the three records; it is operational evidence only and never replaces them.
 
-When the financial ask turns on Instantly provisioning or live provider state, call the root `list_instantly_subworkspaces` tool after the three mandatory billing systems. Use its result alone for membership evidence. Only if it returns the relevant accepted subworkspace and the ask needs account, campaign, or email evidence, select that workspace and call `read_instantly_subworkspace`, passing each returned `nextStartingAfter` value back as `startingAfter` until it is null. Instantly is operational provider evidence only: it cannot prove payment, entitlement, or refund amount and never replaces any of the three records above.
-
-Exact tool names, per-system traps, and vendor docs are in [references/tools.md](references/tools.md). Read it before composing a call. Discover company tools within the shared Executor toolkit, describe the returned path, and invoke that exact path; root tools such as `read_autumn_billing`, `read_stripe_billing`, `list_instantly_subworkspaces`, `read_instantly_subworkspace`, and `planetscale_execute_read_query` are called bare. Never invent a tool name from a service's REST API or CLI; an invented call fails in a way that looks like the customer has no data.
+Exact tool names, fallbacks, amount units and traps are in the shared catalog, [../triage/references/tools.md](../triage/references/tools.md). Read it before composing a call.
 
 ### Where the chain breaks
 
@@ -99,9 +97,9 @@ Do not open the repository when the three systems agree. There the question is d
 
 This stays an explanation, never a fix. Billing triage proposes money decisions, not patches. When the divergence turns out to be a product defect, record it under Observations and flag it to Aaron in the document; never run product triage or create engineering tickets from here. Say so in the document rather than diagnosing it further here.
 
-## Provider governance — Autumn vs Whop
+## Provider governance: Autumn or Whop
 
-`read_billing_account` returns `organization.partnerId`, `organization.partnerGoverned`, and `billingAccount.provider`. Route on `partnerGoverned`, never on the provider alone and never on `partnerId` being non-null: native Acquisity organizations carry the default partner id `00000000-0000-0000-0000-000000000001`, which is not a partner. `partnerGoverned` true means a partner owns the account, whatever the provider says.
+`read_billing_account` returns `organization.partnerId`, `organization.partnerGoverned`, and `billingAccount.provider`. Route on `partnerGoverned`, which the code computes, never on the provider alone and never on reading `partnerId` yourself: native Acquisity organizations carry a default partner id that is not a partner. `partnerGoverned` true means a partner owns the account (Whop), whatever the provider says.
 
 ## Justification checklist (7 items)
 
@@ -119,9 +117,9 @@ This stays an explanation, never a fix. Billing triage proposes money decisions,
 
 `decide_billing` returns one of these; only on `decided: false` decide it yourself from these definitions, and say so in the document:
 
-- **justified** — the evidence supports the refund/credit.
-- **not justified** — the evidence does not support it.
-- **needs-human** — the deciding fact is only available to a person, and it has not landed.
+- `justified`: the evidence supports the refund/credit.
+- `not justified`: the evidence does not support it.
+- `needs-human`: the deciding fact is only available to a person, and it has not landed.
 
 ## Attach the Billing investigation document
 
@@ -203,7 +201,23 @@ The closing reply says what happened and what happens next, and by whom, in two 
 
 Pass `decide_billing`'s `route` to `route_ticket` unchanged with the ticket's `issue`; it already holds these values. Route financial tickets to Support/Financial in one `route_ticket` call: `project: "Support"`, `assignee: "Aaron Fraga"`, `state: "Todo"`, `priority` 2 (High) for an active billing/refund blocker and 3 (Medium) otherwise, and the money-kind labels as `addLabels`.
 
-Only on `decided: false`, apply the fewest labels that place the ask yourself, the same way `triage-handling` does; otherwise pass `route.addLabels` unchanged and add nothing. `route_ticket` adds them to the labels already on the ticket and refuses a name the team does not have, listing the valid ones, so never invent a label:
+Only on `decided: false`, apply the fewest labels that place the ask yourself; otherwise pass `route.addLabels` unchanged and add nothing. `route_ticket` adds them to the labels already on the ticket and refuses a name the team does not have, listing the valid ones, so never invent a label:
 
 - One bucket label from the taxonomy: `Refund` for `refund` or `overcharged`, `Credits` for `credits` or `stripe_credit`, `Discount` for `coupon_code`.
 - The source labels, because these tickets are not engineering-authored work: `intercom-sourced` when it came from an Intercom conversation, `Customer reported` when a customer raised it, `Internal reported` when AIA CS or another internal reporter did. More than one can be true.
+
+## Intercom source
+
+When the source is one Intercom conversation from the Slack intake, there is no Linear issue or Linear comment history at the start. Read it with intercom `fetch` (a URL) or `get_conversation` (an id), and read each screenshot yourself, since Intercom lists attachments without interpreting them (`read_image` reads only a sandbox path or an `uploads.linear.app` url, so read an Intercom attachment that is already in the sandbox by its path, and record an unreadable one as a limitation); if the Slack request names no single conversation, ask for it once and stop. Intercom is read-only: the answer goes to the requester in Slack, never directly to the customer. An unattended scheduled run asks nobody: it reports the missing detail once for Aaron and decides with the evidence in hand. The procedure above applies with these changes.
+
+- Taxonomy: Subscription and invoice are request subjects, not extra buckets. Unwanted money back is `refund`, a wrong amount or continued charge is `overcharged`, a failed promised discount is `coupon_code`, and money for an expected future subscription or one-off invoice is `stripe_credit`. A subscription question with no financial remedy goes to the triage skill.
+- Approval trail: the Slack context plus the live conversation. A promise in the Intercom conversation predates the Slack request and is passed as `approvalQuote`; one found only in the Slack thread is quoted but passed as null.
+- No live workspace for the contact's email: run no customer-scoped read, skip `decide_billing`, and name the missing workspace or billing email as what would reopen it.
+- The Linear record: only once the evidence, proposal and open human decision let someone act, never a placeholder. One linear `save_issue` on the Engineering team creates one Support/Financial ticket with the canonical conversation URL, bounded context, bucket, finding, exposure and proposed action. Then one `route_ticket` call with the created ticket's identifier as `issue` and `decide_billing`'s `route` unchanged (project Support, Aaron Fraga, Todo) plus `links: [{ url: <canonical conversation URL>, title: "Intercom conversation" }]`, which is what shows the ticket in Intercom. Then the one `Billing investigation` document, with `Intercom source` and `Conversation context` lines under `Ticket`.
+- These billing tools use the shared app-scoped Executor connection, so the requester never signs in, and the procedure never issues, schedules, grants, or promises a refund, credit, balance, plan or subscription change.
+
+### Intercom reply in Slack
+
+Load `slack-wording` only in C0BBPVC3N2X or C0BC011NAQL. The thread gets one closing status reply after the investigation and any required Linear writes are complete. State what happened, what needs a human decision, and who must act. Never mention Stripe, Autumn, internal system readouts, assignee names, raw customer identifiers, or a promise to move money.
+
+Then add a short block headed "Reply you can send", two or three sentences written for the customer with no internal names and no system names. Omit it when the reply asks the requester for missing information, when the requester wrote "do not reply to the customer" or anything equivalent, or when the verdict routes to engineering with no customer-facing answer yet. When this investigation created a Linear ticket, end the reply with that bare identifier alone on the last line, for example ENG-13384, never a URL; when it created none, say nothing about a ticket.

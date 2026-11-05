@@ -7,19 +7,17 @@ import { lineFor } from "./regression-lane.js";
 const read = (path: string) =>
   readFileSync(new URL(`../${path}`, import.meta.url), "utf8");
 
-const reference = read(
-  "skills/triage-investigate/references/regression-check.md"
-);
-const investigate = read("skills/triage-investigate/SKILL.md");
-const handling = read("skills/triage-handling/SKILL.md");
-const reporting = read("skills/triage-handling/references/reporting.md");
-const criticReview = read("skills/triage-handling/references/critic-review.md");
-const handoff = read("skills/engineering-handoff/SKILL.md");
+const reference = read("skills/triage/references/regression-check.md");
+const triage = read("skills/triage/SKILL.md");
+const lanes = read("skills/triage/references/lanes.md");
+const reporting = read("skills/triage/references/reporting.md");
+const criticReview = read("skills/triage/references/critic-review.md");
+const handoff = read("skills/triage/references/engineering-handoff.md");
 const criticSkill = read("subagents/critic/skills/triage-critic/SKILL.md");
 const criticTools = read(
   "subagents/critic/skills/triage-critic/references/tools.md"
 );
-const rootTools = read("skills/triage-investigate/references/tools.md");
+const rootTools = read("skills/triage/references/tools.md");
 
 const SHA = "<sha>";
 const MOUNT = /tools\/check_regression\.js/u;
@@ -69,21 +67,23 @@ describe("the regression lane in the triage skills", () => {
 
   it("is loaded from Stage 4 and from Stage 5", () => {
     assert.ok(
-      investigate.includes("references/regression-check.md") &&
-        investigate.indexOf("### Check what changed and what production runs") >
-          investigate.indexOf("### Locate it in the code") &&
-        investigate.indexOf("### Check what changed and what production runs") <
-          investigate.indexOf("### Check the data")
+      lanes.includes("[regression-check.md](regression-check.md)") &&
+        lanes.indexOf("## Check what changed and what production runs") >
+          lanes.indexOf("## Locate it in the code") &&
+        lanes.indexOf("## Check what changed and what production runs") <
+          lanes.indexOf("## Check the data")
     );
     assert.ok(
-      handling.includes("../triage-investigate/references/regression-check.md")
+      triage.includes(
+        "[references/regression-check.md](references/regression-check.md)"
+      )
     );
-    assert.ok(handling.includes("`check_regression`"));
-    assert.ok(!handling.includes("assignOwner"));
+    assert.ok(triage.includes("For a `Bug`, run `check_regression` first"));
+    assert.ok(!triage.includes("assignOwner"));
     assert.ok(
       existsSync(
         new URL(
-          "../skills/triage-investigate/references/regression-check.md",
+          "../skills/triage/references/regression-check.md",
           import.meta.url
         )
       )

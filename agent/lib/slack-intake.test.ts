@@ -53,10 +53,7 @@ describe("intake-only channels", () => {
       skills: production?.skills.filter((skill) => skill !== "slack-wording"),
     });
     assert.equal(production?.mode, "existing-linear-issue");
-    assert.deepEqual(production?.skills, [
-      "triage-investigate",
-      "slack-wording",
-    ]);
+    assert.deepEqual(production?.skills, ["triage", "slack-wording"]);
   });
 
   it("maps billing triage and its sandbox to the same workflow", () => {
@@ -75,10 +72,7 @@ describe("intake-only channels", () => {
     const sandbox = resolveSlackIntakeWorkflow("C0BNCL031AQ");
     assert.deepEqual(production, sandbox);
     assert.equal(production?.mode, "new-linear-issue");
-    assert.deepEqual(production?.skills, [
-      "intercom-triage-investigate",
-      "intercom-billing-triage",
-    ]);
+    assert.deepEqual(production?.skills, ["triage", "billing-triage"]);
   });
 
   it("requires restricted wording only in the two named intake channels", () => {
@@ -107,7 +101,10 @@ describe("intake-only channels", () => {
     );
     assert.equal(context.includes("exactly one existing Linear issue"), true);
     assert.equal(context.includes("a link to exactly one Linear issue"), true);
-    assert.equal(context.includes("triage-investigate"), true);
+    assert.equal(
+      context.includes("required skill for this channel: triage,"),
+      true
+    );
     assert.equal(context.includes("The final post in the Slack thread"), true);
     assert.equal(context.includes("eve__task_wait"), true);
     assert.equal(context.includes("<eve-empty-delivery/>"), false);
@@ -139,8 +136,8 @@ describe("intake-only channels", () => {
       context.includes("Both lanes are valid in this channel"),
       true
     );
-    assert.equal(context.includes("intercom-triage-investigate"), true);
-    assert.equal(context.includes("intercom-billing-triage"), true);
+    assert.equal(context.includes("channel: triage, billing-triage"), true);
+    assert.equal(context.includes("billing-triage"), true);
     assert.equal(
       context.includes("Create exactly one unassigned Linear issue"),
       false

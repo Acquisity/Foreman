@@ -344,8 +344,8 @@ test("support instructions replace the ordinary discovery path without dropping 
   const prompt = composePrompt(sessionLane(auth));
   assert.ok(prompt.includes(SUPPORT_DISCOVERY));
   assert.ok(prompt.includes("# Identity"));
-  assert.ok(prompt.includes("intercom-triage-investigate"));
-  assert.ok(prompt.includes("intercom-billing-triage"));
+  assert.ok(prompt.includes("load the existing triage or"));
+  assert.ok(prompt.includes("triage or billing-triage skill"));
   assert.ok(!prompt.includes(EXECUTOR_DISCOVERY));
 });
 

@@ -229,7 +229,7 @@ const staleMaster = (
   refused = true
 ) =>
   new Error(
-    `${identifier} was created before ${cutoff}, so it cannot take new reports${refused ? " and nothing was written" : ""}. Create a new master through engineering-handoff from this investigation (aggregate evidence only: no organization id, email or customer rows), relate ${identifier} for history, call route_ticket with issue ${match} and parent set to the new master, then call this again with duplicateOf ${match}, parent the new master and inheritAssigneeFrom the new master.`
+    `${identifier} was created before ${cutoff}, so it cannot take new reports${refused ? " and nothing was written" : ""}. Create a new master through the triage skill's engineering-handoff reference from this investigation (aggregate evidence only: no organization id, email or customer rows), relate ${identifier} for history, call route_ticket with issue ${match} and parent set to the new master, then call this again with duplicateOf ${match}, parent the new master and inheritAssigneeFrom the new master.`
   );
 
 /**
@@ -247,7 +247,7 @@ async function checkedParent(
   const facts = await masterFacts(gql, parent, id);
   if (facts === null) {
     throw new Error(
-      `${parent} is not a master, so nothing was written. Pass the master as parent, or create one through engineering-handoff first.`
+      `${parent} is not a master, so nothing was written. Pass the master as parent, or create one through the triage skill's engineering-handoff reference first.`
     );
   }
   if (match.parent?.identifier !== parent) {
@@ -347,7 +347,7 @@ const groupingWarning = (
 ) =>
   `${issue.identifier} is not closed on ${match} because ${why.replace(TRAILING_STOP, "")}. It is related to ${match} and labelled ${NEEDS_GROUPING_LABEL}${flags.deferred ? ", and its closing state became Backlog" : ""}, so the grouping sweep puts it under a master.${
     flags.bug
-      ? ` To close it now as a Bug duplicate, create the master through engineering-handoff (aggregate evidence only), call route_ticket with issue ${match} and parent set to the new master, then call this again.`
+      ? ` To close it now as a Bug duplicate, create the master through the triage skill's engineering-handoff reference (aggregate evidence only), call route_ticket with issue ${match} and parent set to the new master, then call this again.`
       : ""
   }`;
 

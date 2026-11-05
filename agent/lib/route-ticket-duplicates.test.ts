@@ -68,7 +68,8 @@ const updateOf = (fake: ReturnType<typeof fakeLinear>) =>
   fake.updates()[0]?.variables.input as Record<string, unknown> | undefined;
 
 const NO_MASTER = /ENG-40 is not a master and is not under one/u;
-const MAKE_MASTER = /create the master through engineering-handoff/u;
+const MAKE_MASTER =
+  /create the master through the triage skill's engineering-handoff reference/u;
 const WRONG_PARENT =
   /ENG-20 belongs under its master ENG-30, not ENG-77, so nothing was written/u;
 const RELATION_NOT_RECORDED =

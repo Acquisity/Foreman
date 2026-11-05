@@ -2,20 +2,19 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
 
-const triageHandlingSkill = readFileSync(
-  new URL("../skills/triage-handling/SKILL.md", import.meta.url),
+const triageSkill = readFileSync(
+  new URL("../skills/triage/SKILL.md", import.meta.url),
   "utf8"
 );
 const triageReportingReference = readFileSync(
-  new URL("../skills/triage-handling/references/reporting.md", import.meta.url),
-  "utf8"
-);
-const intercomTriageSkill = readFileSync(
-  new URL("../skills/intercom-triage-investigate/SKILL.md", import.meta.url),
+  new URL("../skills/triage/references/reporting.md", import.meta.url),
   "utf8"
 );
 const handoffSkill = readFileSync(
-  new URL("../skills/engineering-handoff/SKILL.md", import.meta.url),
+  new URL(
+    "../skills/triage/references/engineering-handoff.md",
+    import.meta.url
+  ),
   "utf8"
 );
 const extractInstruction = (skill: string, start: string, end: string) => {
@@ -26,8 +25,6 @@ const extractInstruction = (skill: string, start: string, end: string) => {
   assert.ok(endIndex > startIndex);
   return skill.slice(startIndex, endIndex);
 };
-
-const DESCRIPTION_PATTERN = /^description: "(.*)"$/mu;
 
 test("the engineering hand-off admits an approved feature request", () => {
   const preconditions = extractInstruction(
@@ -48,7 +45,7 @@ test("the engineering hand-off admits an approved feature request", () => {
 test("the engineering hand-off stops when the master's owner is outside the roster", () => {
   assert.ok(
     handoffSkill.includes(
-      "When the tool refuses because the master's owner is not in the roster, write nothing else"
+      "When the tool refuses because the master's owner is not in the owner map, write nothing else"
     )
   );
 });
@@ -94,9 +91,9 @@ test("a master built for an approved feature request carries Feature Request and
 
 test("Stage 5 hands decide_triage the ticket's own labels so an approved request is seen", () => {
   const stage = extractInstruction(
-    triageHandlingSkill,
-    "### Jev decides, Foreman acts",
-    "### Fallback: only when `decided: false`"
+    triageSkill,
+    "Call `decide_triage` with",
+    "Unproven:"
   );
   assert.ok(stage.includes("the ticket's own labels as `ticketLabels`"));
   const tool = readFileSync(
@@ -112,20 +109,15 @@ test("Stage 5 hands decide_triage the ticket's own labels so an approved request
 });
 
 test("the not-engineering branch covers an unapproved feature request waiting in Backlog", () => {
-  const roster = extractInstruction(
-    triageHandlingSkill,
-    "### Area-routing roster",
-    "### When the ticket is not engineering actionable"
-  );
   assert.ok(
-    roster.includes(
+    triageSkill.includes(
       "waits in Backlog with `Needs approval` and James until a person adds `Approved` or `Declined`"
     )
   );
   const branch = extractInstruction(
-    triageHandlingSkill,
-    "### When the ticket is not engineering actionable",
-    "### When the root cause warrants action"
+    triageSkill,
+    "- Not engineering actionable",
+    "- A `Bug` on `Engineering Todo`"
   );
   assert.ok(branch.includes("`Backlog/low-impact`"));
   assert.ok(branch.includes("`Feature Request`"));
@@ -136,9 +128,9 @@ test("the not-engineering branch covers an unapproved feature request waiting in
 
 test("the unblock never replaces the root cause or the master ticket", () => {
   const unblock = extractInstruction(
-    triageHandlingSkill,
-    "### Find the unblock",
-    "### Jev decides, Foreman acts"
+    triageSkill,
+    "Find the unblock:",
+    "Call `decide_triage` with"
   );
   assert.ok(
     unblock.includes(
@@ -151,154 +143,72 @@ test("the investigation document template records the handling path completion r
   assert.ok(triageReportingReference.includes("**Handling path**:"));
 });
 
-test("the Intercom skill sends a feature request through the report and hand-off branch", () => {
-  const opening = intercomTriageSkill.slice(
-    intercomTriageSkill.indexOf("Only a confirmed `Bug`"),
-    intercomTriageSkill.indexOf("## Boundaries")
-  );
-  assert.ok(
-    opening.includes(
-      "Only a confirmed `Bug` or a feature request leaves this skill"
-    )
-  );
-  const handoff = extractInstruction(
-    intercomTriageSkill,
-    "### A confirmed Bug: create the report, then hand off",
-    "## Step 7:"
-  );
-  assert.ok(
-    handoff.includes(
-      "a Bug or an approved feature request (`Feature Request` plus `Approved`) then gets documentation, routing and `engineering-handoff`"
-    )
-  );
-  assert.ok(
-    handoff.includes(
-      "an unapproved one stops at `triage-handling`'s Backlog with `Needs approval` for James"
-    )
-  );
-  const followUp = extractInstruction(
-    intercomTriageSkill,
-    "## Step 7:",
-    "## Step 8:"
-  );
-  assert.ok(followUp.includes("For User Error, a Platform Limitation,"));
-  assert.equal(followUp.includes("nobody wants lifted"), false);
-  assert.ok(
-    intercomTriageSkill.includes(
-      "- `Feature Request`: any ask for a new capability or a lifted limit, however infeasible."
-    )
-  );
-  const record = extractInstruction(
-    intercomTriageSkill,
-    "## Step 8:",
-    "Store only the sanitized pattern"
-  );
-  assert.ok(
-    record.includes(
-      "A Bug or feature request is recorded by `triage-handling` Stage 7"
-    )
-  );
-});
-
-test("the Intercom skill keeps historical counts from being reported as today's impact", () => {
-  const memory = extractInstruction(
-    intercomTriageSkill,
-    "## Step 3A: Search investigation memory",
-    "## Step 4:"
-  );
-  assert.ok(
-    memory.includes(
-      "Historical affected counts are dated figures, never the current blast radius."
-    )
-  );
-});
-
-test("the Intercom skill agrees with triage-handling on the document and the description", () => {
-  const documentRule = intercomTriageSkill.slice(
-    intercomTriageSkill.indexOf("## Triage investigation document")
-  );
-  assert.ok(
-    documentRule.includes(
-      "A Bug's or feature request's document is written by `triage-handling`"
-    )
-  );
-  assert.ok(documentRule.includes("Other outcomes write none."));
-  const description = intercomTriageSkill.match(DESCRIPTION_PATTERN)?.[1] ?? "";
-  assert.ok(description.includes("confirmed bug or feature request"));
-});
-
-test("a correction to a feature request supersedes its case because both use the ticket identifier", () => {
-  const record = extractInstruction(
-    intercomTriageSkill,
-    "## Step 8:",
-    "Store only the sanitized pattern"
-  );
-  assert.ok(
-    record.includes(
-      "A Bug or feature request is recorded by `triage-handling` Stage 7 under its ticket identifier"
-    )
-  );
-  assert.ok(
-    record.includes(
-      "For a User Error, a Platform Limitation, or an unproven verdict"
-    )
-  );
-  const correction = extractInstruction(
-    intercomTriageSkill,
-    "### Corrections from the thread",
-    "## Step 9:"
-  );
-  assert.ok(
-    correction.includes(
-      "the ticket identifier for a Bug or feature request, `intercom:<conversation id>` otherwise"
-    )
-  );
-  const tools = readFileSync(
-    new URL(
-      "../skills/intercom-triage-investigate/references/tools.md",
-      import.meta.url
-    ),
+test("an Intercom feature request is filed and runs the shared decision", () => {
+  const intercom = readFileSync(
+    new URL("../skills/triage/references/intercom-source.md", import.meta.url),
     "utf8"
   );
   assert.ok(
-    tools.includes(
-      "For a Bug or feature request, `triage-handling` Stage 7 owns the write under the report's ticket identifier"
+    intercom.includes(
+      "File the customer report before Stage 5 when the evidence shows a `Bug`"
+    )
+  );
+  assert.ok(intercom.includes("or a `Feature Request`"));
+  assert.ok(intercom.includes("Then run Stages 5 to 7 on it"));
+  assert.ok(
+    triageSkill.includes(
+      "- A `Bug` on `Engineering Todo`, or a `Feature Request` labelled `Approved`: follow [references/engineering-handoff.md]"
     )
   );
   assert.ok(
-    tools.includes(
-      "Step 8 records a User Error, a Platform Limitation, or an unproven claim"
+    triageSkill.includes(
+      "- `Feature Request`: any ask for a new capability or a lifted limit, however infeasible."
     )
   );
 });
 
-test("the Intercom skill never asks the requester for a Linear identifier", () => {
-  const boundaries = extractInstruction(
-    intercomTriageSkill,
-    "## Boundaries",
-    "## Step 1:"
+test("a correction to a feature request supersedes its case because both use the source id", () => {
+  const correction = extractInstruction(
+    triageSkill,
+    "A colleague correcting you",
+    "## Intercom source"
   );
-  assert.ok(boundaries.includes("Never ask for a Linear identifier."));
+  const lookup = correction.indexOf(
+    "look up the source's case with `search_investigation_memory` and its `sourceIssueId` (the ticket identifier, or `intercom:<conversation id>` for a ticketless Intercom case)"
+  );
+  const correct = correction.indexOf(
+    "then `correct_investigation_case` on the active case"
+  );
+  assert.ok(lookup >= 0, "source-scoped lookup");
+  assert.ok(correct > lookup, "corrects the active case after the lookup");
+  assert.ok(
+    correction.includes(
+      "or a new case that puts your overturned conclusion in `ruledOut`"
+    )
+  );
+  assert.ok(
+    readFileSync(
+      new URL(
+        "../skills/triage/references/intercom-source.md",
+        import.meta.url
+      ),
+      "utf8"
+    ).includes(
+      "Never create a placeholder issue and never ask for a Linear identifier."
+    )
+  );
 });
 
 test("the handling skill follows the returned decision instead of a 0.6 unproven rule (C4)", () => {
   assert.equal(
-    triageHandlingSkill.includes(
+    triageSkill.includes(
       "below 0.6 on the classification or path it is `unproven`"
     ),
     false
   );
   assert.ok(
-    triageHandlingSkill.includes(
+    triageSkill.includes(
       "Follow the returned decision: `unproven` only when it says so"
-    )
-  );
-});
-
-test("the roster keeps the SAN sandbox exception after the approval decision", () => {
-  assert.ok(
-    triageHandlingSkill.includes(
-      "SAN sandbox tickets go to Aaron Fraga, a feature request once its approval state is settled."
     )
   );
 });

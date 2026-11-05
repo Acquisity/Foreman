@@ -1,6 +1,6 @@
 # Triage reporting
 
-Do not load this reference unless `STAGE 4 COMPLETE: evidence record ready` existed before this file was opened and `triage-handling` reached a reporting step that links here. If either gate is absent, stop reading and return to the unfinished stage. Use these exact output constraints and templates when linked.
+Read this in Stage 5 or 6 before composing the triage document or comment.
 
 ## Linear report template
 
@@ -116,16 +116,16 @@ What action the root cause warrants.
 
 The three regression lines are copied from the `check_regression` record, and the save refuses a Bug document whose lines differ from it. Under them note what the critic needs to rerun it: the file and line range, the failure time and its source, and the fixing or introducing commit's subject; for a fix not yet live, add the deploy note.
 
-The `**Confidence**` numbers are `decision.confidence` copied as returned. A decision that fell back to the skill because Jev failed writes `**Confidence**: Not available: Jev did not answer`. The `**Review**` line is never blank: a reviewed ticket shows the critic's result, and an unreviewed one shows `Not required:` with the decision's reason.
+The `**Confidence**` numbers are `decision.confidence` copied as returned. A `decided: false` result, which takes the unproven branch, writes `**Confidence**: Not available: Jev did not answer`. The `**Review**` line is never blank: a reviewed ticket shows the critic's result, and an unreviewed one shows `Not required:` with the decision's reason.
 
 An `Adjudicated` review names each blocking finding or the failure reason in the `**Review**` line itself, one short clause per finding with what settled it, so the next person starts from the findings rather than from nothing. A `Blocked` review names each finding still open after the second review.
 
 ## Master ticket template
 
-The master ticket template and the rules for filling it live in the `engineering-handoff` skill, which Stage 6 loads for the engineering-actionable branch. Nothing in this reference creates or edits a master.
+The master ticket template and the rules for filling it live in [engineering-handoff.md](engineering-handoff.md), which Stage 6 follows for the engineering-actionable branch. Nothing in this reference creates or edits a master.
 
 ## Unproven branch reporting
 
 When Stage 5 takes the unproven terminal branch, do not force the ordinary templates to claim a classification or root cause. Keep the `## Triage investigation` title and document link in the short comment, lead with the unblock or `None found: <reason>`, then state the known facts, the missing confirmation and who can supply it, and the condition that will reopen the investigation. Do not present a classification, root cause, or blast radius as settled.
 
-Keep the full evidence record in the investigation document. Set `**Classification**: Not settled`, `**Confidence**` from the decision (the verdict confidence is always known), and `**Review**: Not required: the ticket stays open as unproven`, and write `Not settled: <missing confirmation and who can supply it>` under Root cause. Preserve Evidence, Prior cases, Blast radius, Code path, Unblock, and Ruled out with the ordinary `Not applicable` and `Not settled` rules, and put the reopen condition under Next steps. Never load `engineering-handoff` or create or attach a master for this branch.
+Keep the full evidence record in the investigation document. Set `**Classification**: Not settled`, `**Confidence**` from the decision (the verdict confidence is always known), and `**Review**: Not required: the ticket stays open as unproven`, and write `Not settled: <missing confirmation and who can supply it>` under Root cause. Preserve Evidence, Prior cases, Blast radius, Code path, Unblock, and Ruled out with the ordinary `Not applicable` and `Not settled` rules, and put the reopen condition under Next steps. Never follow `engineering-handoff` or create or attach a master for this branch.
