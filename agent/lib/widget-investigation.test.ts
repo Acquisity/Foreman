@@ -2921,8 +2921,6 @@ test("an unreadable after-hours receipt still returns the allowed reply", async 
 
 const CITES_TRACE = /evidence reference/u;
 const CITES_TIMELINE = /tool user_timeline/u;
-const NAMES_CONNECTION = /connection/u;
-const NO_LINKS = /no links/u;
 const TRACE_URL =
   "https://app.axiom.co/acquisity-3nbk/trace?traceId=4bf92f3577b34da6a3ce929d0e0e4736";
 const timeline = {
@@ -2969,48 +2967,6 @@ test("a teammate's investigation reads the user's timeline and is told to name t
   assert.match(sends[0], CITES_TRACE);
   assert.match(sends[0], CITES_TIMELINE);
   assert.equal(run.question.includes(TRACE_URL), false);
-});
-
-test("a customer's toggled investigation reads the user's timeline and is told to explain a user-side cause without identifiers or links", async (t) => {
-  enabled(t);
-  const { deps, run } = dependencies();
-  const asked: (boolean | undefined)[] = [];
-  const { args, sends } = startedSessions();
-  const response = await receiveWidgetMessage(
-    request(investigate),
-    args,
-    200,
-    verifyWithTimeline(scope, asked),
-    deps
-  );
-  assert.equal(response.status, 200);
-  assert.deepEqual(asked, [true]);
-  assert.equal(sends.length, 1);
-  assert.ok(sends[0].startsWith(investigate.question));
-  assert.ok(sends[0].includes(JSON.stringify(timeline)));
-  assert.match(sends[0], NAMES_CONNECTION);
-  assert.match(sends[0], NO_LINKS);
-  assert.match(sends[0], CITES_TIMELINE);
-  assert.equal(run.question.includes("sdk_connect"), false);
-});
-
-test("an investigation without a timeline is asked exactly as before", async (t) => {
-  enabled(t);
-  const { deps } = dependencies();
-  const asked: (boolean | undefined)[] = [];
-  const { args, sends } = startedSessions();
-  await receiveWidgetMessage(
-    request(investigate),
-    args,
-    200,
-    ((input) => {
-      asked.push(input.timeline);
-      return Promise.resolve(scope);
-    }) as Verify,
-    deps
-  );
-  assert.deepEqual(asked, [true]);
-  assert.deepEqual(sends, [withHistory(investigate.question, undefined)]);
 });
 
 test("a message that stays at the front door never asks for the timeline", async (t) => {

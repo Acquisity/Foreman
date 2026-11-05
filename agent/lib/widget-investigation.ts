@@ -80,7 +80,7 @@ import {
 } from "./widget-scope.js";
 import { serviceSecretRefusal } from "./widget-service-secret.js";
 import { fileTicketFor } from "./widget-ticket.js";
-import { withTimeline } from "./widget-timeline.js";
+import { readsTimeline, withTimeline } from "./widget-timeline.js";
 
 const bearer = /^Bearer ([A-Za-z0-9_.-]{1,4096})$/;
 const scopeFields = {
@@ -1686,10 +1686,6 @@ async function cancelRun(
   }
   return widgetRunResponse(await deps.read(run.id));
 }
-
-const readsTimeline = (input: WidgetInput) =>
-  input.action === "start" &&
-  Boolean(input.staff || input.recording || input.mode === "investigate");
 
 export async function receiveWidgetMessage(
   request: Request,
