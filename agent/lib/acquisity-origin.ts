@@ -24,8 +24,12 @@ export function acquisityOrigin(): string {
 }
 
 /** Keep the deadline active while consuming a streamed HTTP response. */
-export async function readContextBody(response: Response, signal: AbortSignal) {
-  if (Number(response.headers.get("content-length")) > MAX_CONTEXT_BYTES) {
+export async function readContextBody(
+  response: Response,
+  signal: AbortSignal,
+  maxBytes = MAX_CONTEXT_BYTES
+) {
+  if (Number(response.headers.get("content-length")) > maxBytes) {
     response.body?.cancel().catch(() => undefined);
     throw new Error("Invalid verified workspace context.");
   }
@@ -47,7 +51,7 @@ export async function readContextBody(response: Response, signal: AbortSignal) {
         break;
       }
       bytes += value.byteLength;
-      if (bytes > MAX_CONTEXT_BYTES) {
+      if (bytes > maxBytes) {
         throw new Error("Invalid verified workspace context.");
       }
       chunks.push(value);
