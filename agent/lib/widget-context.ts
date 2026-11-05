@@ -24,9 +24,9 @@ const appContextSchema = z.looseObject({
   organizationSlug: z.string().regex(ORGANIZATION_SLUG),
   partnerId: z.literal(DEFAULT_PARTNER_ID),
   role: z.enum(["owner", "admin", "member", "client"]),
+  timeline: z.record(z.string(), z.unknown()).optional().catch(undefined),
   userId: z.uuid(),
   verifiedAt: z.iso.datetime(),
-  timeline: z.record(z.string(), z.unknown()).optional().catch(undefined),
 });
 
 const TIMELINE_MAX_BYTES = 32 * 1024;

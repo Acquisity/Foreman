@@ -2918,3 +2918,110 @@ test("an unreadable after-hours receipt still returns the allowed reply", async 
   assert.equal(run.outcome?.decision, allowed.decision);
   assert.equal(run.outcome?.message, allowed.message);
 });
+
+const CITES_TRACE = /evidence reference/u;
+const NAMES_CONNECTION = /connection/u;
+const NO_LINKS = /no links/u;
+const TRACE_URL =
+  "https://app.axiom.co/acquisity-3nbk/trace?traceId=4bf92f3577b34da6a3ce929d0e0e4736";
+const timeline = {
+  callSteps: [{ elapsedMs: 6100, step: "sdk_connect", stepMs: 4200 }],
+  networkTypes: ["3g"],
+};
+type Verify = NonNullable<Parameters<typeof receiveWidgetMessage>[3]>;
+const verifyWithTimeline = (
+  verified: Awaited<ReturnType<Verify>>,
+  asked: (boolean | undefined)[],
+  summary: Record<string, unknown> = timeline
+): Verify =>
+  ((input) => {
+    asked.push(input.timeline);
+    if (input.timeline) {
+      input.onTimeline?.(summary);
+    }
+    return Promise.resolve(verified);
+  }) as Verify;
+
+test("a teammate's investigation reads the user's timeline and is told to name the slow step and cite its trace", async (t) => {
+  enabled(t);
+  const { deps, run } = dependencies();
+  const inbox = { ...scope, source: "inbox" as const };
+  run.scope = inbox;
+  const asked: (boolean | undefined)[] = [];
+  const { args, sends } = startedSessions();
+  const staffTimeline = {
+    ...timeline,
+    callSteps: [{ ...timeline.callSteps[0], traceUrl: TRACE_URL }],
+  };
+  const response = await receiveWidgetMessage(
+    request({ ...start, question: "why was this call slow?", staff: true }),
+    args,
+    200,
+    verifyWithTimeline(inbox, asked, staffTimeline),
+    deps
+  );
+  assert.equal(response.status, 200);
+  assert.deepEqual(asked, [true]);
+  assert.equal(sends.length, 1);
+  assert.ok(sends[0].startsWith("why was this call slow?"));
+  assert.ok(sends[0].includes(JSON.stringify(staffTimeline)));
+  assert.match(sends[0], CITES_TRACE);
+  assert.equal(run.question.includes(TRACE_URL), false);
+});
+
+test("a customer's toggled investigation reads the user's timeline and is told to explain a user-side cause without identifiers or links", async (t) => {
+  enabled(t);
+  const { deps, run } = dependencies();
+  const asked: (boolean | undefined)[] = [];
+  const { args, sends } = startedSessions();
+  const response = await receiveWidgetMessage(
+    request(investigate),
+    args,
+    200,
+    verifyWithTimeline(scope, asked),
+    deps
+  );
+  assert.equal(response.status, 200);
+  assert.deepEqual(asked, [true]);
+  assert.equal(sends.length, 1);
+  assert.ok(sends[0].startsWith(investigate.question));
+  assert.ok(sends[0].includes(JSON.stringify(timeline)));
+  assert.match(sends[0], NAMES_CONNECTION);
+  assert.match(sends[0], NO_LINKS);
+  assert.equal(run.question.includes("sdk_connect"), false);
+});
+
+test("an investigation without a timeline is asked exactly as before", async (t) => {
+  enabled(t);
+  const { deps } = dependencies();
+  const asked: (boolean | undefined)[] = [];
+  const { args, sends } = startedSessions();
+  await receiveWidgetMessage(
+    request(investigate),
+    args,
+    200,
+    ((input) => {
+      asked.push(input.timeline);
+      return Promise.resolve(scope);
+    }) as Verify,
+    deps
+  );
+  assert.deepEqual(asked, [true]);
+  assert.deepEqual(sends, [withHistory(investigate.question, undefined)]);
+});
+
+test("a message that stays at the front door never asks for the timeline", async (t) => {
+  enabled(t);
+  const { deps } = dependencies();
+  deps.route = () => Promise.resolve({ asksForHuman: 0, source: "jev" });
+  deps.answerKb = () => Promise.resolve(kbAnswer);
+  const asked: (boolean | undefined)[] = [];
+  await receiveWidgetMessage(
+    request(start),
+    noWork(),
+    200,
+    verifyWithTimeline({ ...scope, role: "member" }, asked),
+    deps
+  );
+  assert.deepEqual(asked, [false]);
+});

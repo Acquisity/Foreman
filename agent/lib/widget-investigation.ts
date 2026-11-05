@@ -80,6 +80,7 @@ import {
 } from "./widget-scope.js";
 import { serviceSecretRefusal } from "./widget-service-secret.js";
 import { fileTicketFor } from "./widget-ticket.js";
+import { withTimeline } from "./widget-timeline.js";
 
 const bearer = /^Bearer ([A-Za-z0-9_.-]{1,4096})$/;
 const scopeFields = {
@@ -1589,7 +1590,8 @@ async function answerFreshRun(
   > &
     Partial<Pick<RouteHandlerArgs, "resolveSession">>,
   responseWaitMs: number,
-  deps: WidgetDependencies
+  deps: WidgetDependencies,
+  timeline?: Record<string, unknown>
 ): Promise<Response> {
   const message = withHistory(input.question, input.history, input.screenshots);
   const ask = toWidgetAsk(
@@ -1650,12 +1652,16 @@ async function answerFreshRun(
       await startInvestigation(
         run,
         input.recording ? { ...scope, recordingId: input.recording.id } : scope,
-        input.staff
-          ? withTeamThread(
-              message,
-              (await deps.inboxHistory?.(run).catch(() => [])) ?? []
-            )
-          : `${message}${personNote}`,
+        withTimeline(
+          input.staff
+            ? withTeamThread(
+                message,
+                (await deps.inboxHistory?.(run).catch(() => [])) ?? []
+              )
+            : `${message}${personNote}`,
+          timeline,
+          Boolean(input.staff)
+        ),
         handlers,
         responseWaitMs,
         deps
@@ -1680,6 +1686,11 @@ async function cancelRun(
   }
   return widgetRunResponse(await deps.read(run.id));
 }
+
+/** Only a start that reaches the investigator asks the app for the user's timeline. */
+const readsTimeline = (input: WidgetInput) =>
+  input.action === "start" &&
+  Boolean(input.staff || input.recording || input.mode === "investigate");
 
 export async function receiveWidgetMessage(
   request: Request,
@@ -1720,13 +1731,18 @@ export async function receiveWidgetMessage(
     return json({ error: "Invalid support request." }, 400);
   }
   let scope: WidgetContext;
+  let timeline: Record<string, unknown> | undefined;
   try {
     scope = await verifyContext({
       conversationId: input.conversation_id,
+      onTimeline: (summary) => {
+        timeline = summary;
+      },
       organizationId: input.organization_id,
       replayCaseId: request.headers.get("x-widget-replay-case"),
       signal: request.signal,
       staff: input.staff,
+      timeline: readsTimeline(input),
       userToken,
     });
   } catch {
@@ -1780,7 +1796,8 @@ export async function receiveWidgetMessage(
       request.signal,
       { from, resolveSession, waitUntil },
       responseWaitMs,
-      deps
+      deps,
+      timeline
     );
   } catch {
     logOpsEvent(

@@ -144,9 +144,9 @@ const fileStem = (match: string): string | null => {
 const WORKSPACE_PATH = /\/dashboard\/([^/\s?#]+)/g;
 const STACK_TRACE = /\n\s+at\s+\S.*:\d+(?::\d+)?\)?/;
 const LINEAR_REF = /\bENG-\d+\b/g;
-/** Inngest run ids are ULIDs; Vercel, Stripe and Sentry ids carry stable prefixes. */
+/** Inngest run ids are ULIDs; trace ids are 32 lowercase hex; Vercel, Stripe and Sentry ids carry stable prefixes. */
 const OPS_IDS =
-  /\b(?:01[0-9A-HJKMNP-TV-Z]{24}|dpl_[A-Za-z0-9]{8,}|(?:cus|sub|in|ch|pi|re|dp|evt|prod|price)_[A-Za-z0-9]{8,})\b/g;
+  /\b(?:01[0-9A-HJKMNP-TV-Z]{24}|[0-9a-f]{32}|dpl_[A-Za-z0-9]{8,}|(?:cus|sub|in|ch|pi|re|dp|evt|prod|price)_[A-Za-z0-9]{8,})\b/g;
 
 const uniqueLower = (matches: RegExpMatchArray | string[] | null) =>
   Array.from(new Set((matches ?? []).map((value) => value.toLowerCase())));
