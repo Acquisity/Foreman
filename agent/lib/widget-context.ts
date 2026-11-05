@@ -26,7 +26,10 @@ const appContextSchema = z.looseObject({
   role: z.enum(["owner", "admin", "member", "client"]),
   userId: z.uuid(),
   verifiedAt: z.iso.datetime(),
+  timeline: z.record(z.string(), z.unknown()).optional().catch(undefined),
 });
+
+const TIMELINE_MAX_BYTES = 32 * 1024;
 
 const inputSchema = z.object({
   conversationId: z.uuid(),
@@ -49,6 +52,8 @@ export async function verifyWidgetContext(
     // checks the teammate and returns the conversation's customer as the scope.
     staff?: boolean;
     replayCaseId?: string | null;
+    timeline?: boolean;
+    onTimeline?: (timeline: Record<string, unknown>) => void;
   },
   request: typeof fetch = fetch
 ): Promise<WidgetContext> {
@@ -80,6 +85,7 @@ export async function verifyWidgetContext(
       authorization: `Bearer ${parsed.userToken}`,
       "content-type": "application/json",
       "x-partner-id": DEFAULT_PARTNER_ID,
+      ...(input.timeline ? { "x-foreman-timeline": "1" } : {}),
     },
     method: "POST",
     redirect: "error",
@@ -90,10 +96,17 @@ export async function verifyWidgetContext(
     throw new Error("Workspace support access could not be verified.");
   }
   const verified = appContextSchema.parse(
-    await readContextBody(response, signal)
+    await readContextBody(
+      response,
+      signal,
+      input.timeline ? TIMELINE_MAX_BYTES : undefined
+    )
   );
   if (verified.organizationId !== parsed.organizationId) {
     throw new Error("The verified workspace does not match this conversation.");
+  }
+  if (input.timeline && verified.timeline) {
+    input.onTimeline?.(verified.timeline);
   }
   return Object.freeze(
     widgetContextSchema.parse({
