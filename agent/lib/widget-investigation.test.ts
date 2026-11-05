@@ -2920,6 +2920,7 @@ test("an unreadable after-hours receipt still returns the allowed reply", async 
 });
 
 const CITES_TRACE = /evidence reference/u;
+const CITES_TIMELINE = /tool user_timeline/u;
 const NAMES_CONNECTION = /connection/u;
 const NO_LINKS = /no links/u;
 const TRACE_URL =
@@ -2966,6 +2967,7 @@ test("a teammate's investigation reads the user's timeline and is told to name t
   assert.ok(sends[0].startsWith("why was this call slow?"));
   assert.ok(sends[0].includes(JSON.stringify(staffTimeline)));
   assert.match(sends[0], CITES_TRACE);
+  assert.match(sends[0], CITES_TIMELINE);
   assert.equal(run.question.includes(TRACE_URL), false);
 });
 
@@ -2988,6 +2990,7 @@ test("a customer's toggled investigation reads the user's timeline and is told t
   assert.ok(sends[0].includes(JSON.stringify(timeline)));
   assert.match(sends[0], NAMES_CONNECTION);
   assert.match(sends[0], NO_LINKS);
+  assert.match(sends[0], CITES_TIMELINE);
   assert.equal(run.question.includes("sdk_connect"), false);
 });
 
