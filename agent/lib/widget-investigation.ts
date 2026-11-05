@@ -1687,7 +1687,6 @@ async function cancelRun(
   return widgetRunResponse(await deps.read(run.id));
 }
 
-/** Only a start that reaches the investigator asks the app for the user's timeline. */
 const readsTimeline = (input: WidgetInput) =>
   input.action === "start" &&
   Boolean(input.staff || input.recording || input.mode === "investigate");
