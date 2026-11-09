@@ -3,6 +3,7 @@ import type { MessageStreamEvent } from "eve/client";
 import { z } from "zod";
 import { readRequestBody } from "./bounded-body.js";
 import { logOpsEvent } from "./ops-log.js";
+import { addToBugReport, fileBugReport } from "./widget-bug-report.js";
 import { answerFromGuide, chatGuideEnabled } from "./widget-chat.js";
 import { verifyWidgetContext } from "./widget-context.js";
 import {
@@ -171,14 +172,20 @@ const inputSchema = z.discriminatedUnion("action", [
       .max(3)
       .optional(),
     message_id: z.uuid(),
-    // The customer's explicit "Investigate my workspace" toggle.
-    mode: z.literal("investigate").optional(),
+    // The customer's explicit "Investigate my workspace" toggle, or Acquisity's
+    // "I found a bug" steps: the finished report, then the customer's reply to
+    // its follow-up.
+    mode: z
+      .enum(["investigate", "bug_report", "bug_report_addition"])
+      .optional(),
     question: z.string().trim().min(1).max(4000),
     // The screen recording this turn follows up on, which the investigator
     // reads through widget_read_recording.
     recording: z
       .strictObject({ id: z.string().regex(/^[A-Za-z0-9_-]{1,200}$/) })
       .optional(),
+    // When the customer tapped "I found a bug", for the ticket's first-reported time.
+    reported_at: z.iso.datetime({ offset: true }).optional(),
     // What /internal/widget/image read from each screenshot sent with this
     // message. The front door and the investigator read them beside the
     // question; the stored run keeps them joined onto it for later stages.
@@ -527,6 +534,8 @@ export const defaultWidgetDependencies = {
   answerChat: chatGuideEnabled() ? answerFromGuide : undefined,
   answerKb: answerFromHelpCenter,
   attach: attachWidgetRun,
+  bugReport: fileBugReport,
+  bugReportAddition: addToBugReport,
   cancel: cancelWidgetRun,
   changeRequested: (conversation: string) => asksForChange(conversation),
   claim: claimWidgetRun,
@@ -551,10 +560,20 @@ export const defaultWidgetDependencies = {
   /** Throws unless the scoped user is a current owner or admin of the scoped workspace. */
   verifyAccess: (scope: WidgetContext) =>
     resolveOwnedIdentifiers(scope, { emails: [], slugs: [], uuids: [] }),
+  /** Throws unless the scoped user is a current member of the scoped workspace, in any role. */
+  verifyMember: (scope: WidgetContext) =>
+    resolveOwnedIdentifiers(
+      scope,
+      { emails: [], slugs: [], uuids: [] },
+      undefined,
+      true
+    ),
 };
 export type WidgetDependencies = Omit<
   typeof defaultWidgetDependencies,
   | "answerChat"
+  | "bugReport"
+  | "bugReportAddition"
   | "changeRequested"
   | "fileTicket"
   | "inboxHistory"
@@ -562,11 +581,14 @@ export type WidgetDependencies = Omit<
   | "progress"
   | "requestRecording"
   | "readTicket"
+  | "verifyMember"
 > &
   Partial<
     Pick<
       typeof defaultWidgetDependencies,
       | "answerChat"
+      | "bugReport"
+      | "bugReportAddition"
       | "changeRequested"
       | "fileTicket"
       | "inboxHistory"
@@ -574,6 +596,7 @@ export type WidgetDependencies = Omit<
       | "progress"
       | "requestRecording"
       | "readTicket"
+      | "verifyMember"
     >
   >;
 
@@ -591,7 +614,7 @@ const disclose = (outcome: WidgetOutcome, findings: unknown) =>
 // send the message again instead of promising a teammate. The reason itself can
 // name an identifier, so only this flag crosses to the app.
 const RETRYABLE_BLOCK =
-  /^(?:deadline$|gate_unavailable$|(?:composed:)?(?:foreign_identifier|internal_artifact):)/u;
+  /^(?:deadline$|gate_unavailable$|bug_report_unfiled$|(?:composed:)?(?:foreign_identifier|internal_artifact):)/u;
 
 export function widgetRunResponse(run: WidgetRun) {
   if (!run.outcome) {
@@ -1572,6 +1595,96 @@ async function toggledPersonAsk(
     : ((await requestedHumanHandoff(run, route, deps)) ?? null);
 }
 
+/** The whole filing or comment: well inside the deadline after which a run with no session is handed to a person. */
+const BUG_REPORT_MS = 120_000;
+
+/**
+ * Acquisity's "I found a bug" steps hand the finished report here. Every role
+ * gets it: the evidence lookups go only on the internal ticket, so only
+ * membership is checked, never the owner or admin role an investigation needs.
+ * The ticket is filed in the background and the app polls the run as usual.
+ */
+async function answerBugReport(
+  run: WidgetRun,
+  scope: WidgetContext,
+  input: Extract<WidgetInput, { action: "start" }>,
+  mode: "bug_report" | "bug_report_addition",
+  waitUntil: RouteHandlerArgs["waitUntil"],
+  responseWaitMs: number,
+  deps: WidgetDependencies
+): Promise<Response> {
+  try {
+    await (deps.verifyMember ?? defaultWidgetDependencies.verifyMember)(scope);
+  } catch {
+    await deps
+      .complete(
+        run.id,
+        blockedOutcome("workspace_access_denied", "failed"),
+        null,
+        run.id
+      )
+      .catch(() => undefined);
+    return json({ error: "Workspace could not be verified." }, 403);
+  }
+  const report =
+    mode === "bug_report"
+      ? (deps.bugReport ?? fileBugReport)
+      : (deps.bugReportAddition ?? addToBugReport);
+  const settled = report(
+    scope,
+    run.id,
+    {
+      history: input.history,
+      messageId: input.message_id,
+      question: input.question,
+      recording: input.recording,
+      reportedAt: input.reported_at,
+      screenshots: input.screenshots,
+    },
+    AbortSignal.timeout(BUG_REPORT_MS)
+  ).then(
+    ({ findings, message }) =>
+      deps.complete(
+        run.id,
+        {
+          citations: [],
+          decision: "allow",
+          message,
+          reason: mode,
+          status: "completed",
+        },
+        findings,
+        run.id
+      ),
+    () => {
+      logOpsEvent("widget.bug_report.unfiled", {
+        conversationId: scope.conversationId,
+        decision: mode,
+        runId: run.id,
+      });
+      return deps.complete(
+        run.id,
+        blockedOutcome("bug_report_unfiled", "completed"),
+        null,
+        run.id
+      );
+    }
+  );
+  waitUntil(settled.catch(() => null));
+  let timeout: ReturnType<typeof setTimeout> | undefined;
+  try {
+    const finished = await Promise.race([
+      settled,
+      new Promise<null>((resolve) => {
+        timeout = setTimeout(() => resolve(null), responseWaitMs);
+      }),
+    ]);
+    return json(widgetRunResponse(finished ?? (await deps.read(run.id))));
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 /**
  * A fresh run. Only an explicit investigation reaches the investigator: a
  * teammate's, or an owner or admin's toggle (`mode: "investigate"`) or the
@@ -1591,6 +1704,17 @@ async function answerFreshRun(
   responseWaitMs: number,
   deps: WidgetDependencies
 ): Promise<Response> {
+  if (input.mode === "bug_report" || input.mode === "bug_report_addition") {
+    return await answerBugReport(
+      run,
+      scope,
+      input,
+      input.mode,
+      handlers.waitUntil,
+      responseWaitMs,
+      deps
+    );
+  }
   const message = withHistory(input.question, input.history, input.screenshots);
   const ask = toWidgetAsk(
     input.question,
