@@ -299,6 +299,8 @@ const lifecycleValues = (
   sameWeekLastMonth: row?.month ?? 0,
 });
 
+const TIMEOUT_ERROR = /timed? ?out|timeout|canceling statement/i;
+
 /** Runs the fixed reads sequentially and calculates the complete typed report. */
 export async function readAiSdrWeeklyReport(
   now: Date,
@@ -388,11 +390,12 @@ export async function readAiSdrWeeklyReport(
       windows,
     };
   } catch (error) {
+    console.error("AI SDR weekly report read failed.", error);
+    const message = error instanceof Error ? error.message : "";
     return {
-      error:
-        error instanceof Error
-          ? error.message
-          : "The AI SDR report could not be generated.",
+      error: TIMEOUT_ERROR.test(message)
+        ? "a production query timed out"
+        : "a production read failed",
       success: false,
     };
   }
