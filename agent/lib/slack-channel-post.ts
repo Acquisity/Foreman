@@ -7,6 +7,13 @@ export interface SlackChannelMessage {
   text: string;
 }
 
+const appSlackBotToken = (): Promise<string> =>
+  resolveSlackBotToken(
+    connectSlackCredentials(
+      process.env.SLACK_CONNECTOR ?? "slack/acquisity-foreman"
+    ).botToken
+  );
+
 /**
  * Posts one message into a channel as the app's Slack bot, with no model
  * turn. Throws a fixed error, never the Slack response body, so a caller's
@@ -14,13 +21,10 @@ export interface SlackChannelMessage {
  */
 export const postSlackChannelMessage = async (
   channel: string,
-  message: SlackChannelMessage
+  message: SlackChannelMessage,
+  botToken: () => Promise<string> = appSlackBotToken
 ): Promise<void> => {
-  const token = await resolveSlackBotToken(
-    connectSlackCredentials(
-      process.env.SLACK_CONNECTOR ?? "slack/acquisity-foreman"
-    ).botToken
-  );
+  const token = await botToken();
   const response = await fetch("https://slack.com/api/chat.postMessage", {
     body: new URLSearchParams({
       ...(message.blocks ? { blocks: JSON.stringify(message.blocks) } : {}),
@@ -38,11 +42,15 @@ export const postSlackChannelMessage = async (
     signal: AbortSignal.timeout(20_000),
   });
   const body = await response.text();
-  if (
-    !response.ok ||
-    body.length > 1_000_000 ||
-    (JSON.parse(body) as { ok?: unknown }).ok !== true
-  ) {
+  if (!(response.ok && body.length <= 1_000_000 && slackAccepted(body))) {
     throw new Error("Slack refused the channel message.");
+  }
+};
+
+const slackAccepted = (body: string): boolean => {
+  try {
+    return (JSON.parse(body) as { ok?: unknown } | null)?.ok === true;
+  } catch {
+    return false;
   }
 };

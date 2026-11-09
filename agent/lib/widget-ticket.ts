@@ -1,12 +1,11 @@
-import { getToken as getConnectToken } from "@vercel/connect";
 import { z } from "zod";
+import { appProviderContext } from "./executor/app-context.js";
 import { executorClient } from "./executor/client.js";
 import {
   createWidgetTicket,
   type ProviderContext,
   REFUND_TICKET,
 } from "./executor/dispatch.js";
-import { ExecutorError } from "./executor/transport.js";
 import {
   findRelatedIssues,
   type LinearGraphqlOptions,
@@ -215,16 +214,7 @@ export const appTicketContext = (
 ): ProviderContext => {
   const initiator = widgetAuth(scope, runId);
   return {
-    abortSignal: signal,
-    getToken: async () => {
-      const connector = process.env.EXECUTOR_MCP_CONNECTOR;
-      if (!connector) {
-        throw new ExecutorError("executor_not_configured");
-      }
-      return {
-        token: await getConnectToken(connector, { subject: { type: "app" } }),
-      };
-    },
+    ...appProviderContext(signal),
     // Providers read only the session's auth; there is no session id or turn here.
     session: { auth: { current: initiator, initiator } },
   } as unknown as ProviderContext;
