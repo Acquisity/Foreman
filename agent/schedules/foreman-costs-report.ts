@@ -1,10 +1,8 @@
-import { getToken as getConnectToken } from "@vercel/connect";
-import { connectSlackCredentials } from "@vercel/connect/eve";
-import { resolveSlackBotToken } from "eve/channels/slack";
 import { defineSchedule } from "eve/schedules";
+import { appProviderContext } from "../lib/executor/app-context.js";
 import { executorClient } from "../lib/executor/client.js";
-import { ExecutorError } from "../lib/executor/transport.js";
 import { readCostReport, renderCostBlocks } from "../lib/foreman-costs.js";
+import { postSlackChannelMessage } from "../lib/slack-channel-post.js";
 
 /** The override exists only so the Preview bot can post into its sandbox channel for UAT. */
 const FOREMAN_COSTS_CHANNEL =
@@ -17,50 +15,13 @@ const REPORT_TIMEOUT_MS = 120_000;
 const postCostReport = async (): Promise<void> => {
   const signal = AbortSignal.timeout(REPORT_TIMEOUT_MS);
   const report = await readCostReport(
-    executorClient({
-      abortSignal: signal,
-      getToken: async () => {
-        const connector = process.env.EXECUTOR_MCP_CONNECTOR;
-        if (!connector) {
-          throw new ExecutorError("executor_not_configured");
-        }
-        return {
-          token: await getConnectToken(connector, { subject: { type: "app" } }),
-        };
-      },
-    }),
+    executorClient(appProviderContext(signal)),
     signal
   );
-  const { blocks, text } = renderCostBlocks(report);
-  const token = await resolveSlackBotToken(
-    connectSlackCredentials(
-      process.env.SLACK_CONNECTOR ?? "slack/acquisity-foreman"
-    ).botToken
+  await postSlackChannelMessage(
+    FOREMAN_COSTS_CHANNEL,
+    renderCostBlocks(report)
   );
-  const response = await fetch("https://slack.com/api/chat.postMessage", {
-    body: new URLSearchParams({
-      blocks: JSON.stringify(blocks),
-      channel: FOREMAN_COSTS_CHANNEL,
-      text,
-      unfurl_links: "false",
-      unfurl_media: "false",
-    }),
-    headers: {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/x-www-form-urlencoded",
-    },
-    method: "POST",
-    redirect: "error",
-    signal: AbortSignal.timeout(20_000),
-  });
-  const body = await response.text();
-  if (
-    !response.ok ||
-    body.length > 1_000_000 ||
-    (JSON.parse(body) as { ok?: unknown }).ok !== true
-  ) {
-    throw new Error("Slack refused the cost report.");
-  }
 };
 
 /**

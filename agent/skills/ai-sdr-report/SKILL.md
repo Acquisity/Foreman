@@ -1,5 +1,5 @@
 ---
-description: "Weekly AI SDR performance report: call the fixed report tool once and render its deterministic metrics as Slack-native tables plus a short summary. Load for every ai-sdr-report schedule dispatch."
+description: "Weekly AI SDR performance report: render the deterministic metrics the schedule passes in as Slack-native tables plus a short summary. Load for every ai-sdr-report schedule dispatch."
 ---
 
 # AI SDR weekly report
@@ -8,9 +8,7 @@ Produce the weekly AI SDR performance report for the channel the schedule dispat
 
 ## Get the report
 
-Call `read_ai_sdr_weekly_report` exactly once with no input. It owns the report windows, fixed production queries, AI SDR booking boundary, arithmetic, and deltas. Do not call another data tool and do not recalculate the returned values.
-
-If it returns `success: false`, post exactly `The weekly AI SDR report could not be generated: <error>` with the returned `error`, which is always a fixed, safe phrase, and nothing else. Do not call the tool again, describe your steps, or invent a partial report.
+The schedule reads the report before dispatching and puts it, as JSON, at the end of the dispatch message. It owns the report windows, fixed production queries, AI SDR booking boundary, arithmetic, and deltas. Render only that JSON. Do not call any tool and do not recalculate the returned values. A failed read never reaches this skill, because the schedule posts the failure line itself.
 
 ## Render the report
 
