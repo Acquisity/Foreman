@@ -4,6 +4,7 @@ import {
   aiSdrReportWindows,
   type ReportWindow,
 } from "./ai-sdr-report-window.js";
+import { ExecutorError } from "./executor/transport.js";
 import { parseReadQueryResult } from "./planetscale.js";
 
 const TOTAL = "__total__";
@@ -299,8 +300,6 @@ const lifecycleValues = (
   sameWeekLastMonth: row?.month ?? 0,
 });
 
-const TIMEOUT_ERROR = /timed? ?out|timeout|canceling statement/i;
-
 /** Runs the fixed reads sequentially and calculates the complete typed report. */
 export async function readAiSdrWeeklyReport(
   now: Date,
@@ -390,13 +389,10 @@ export async function readAiSdrWeeklyReport(
       windows,
     };
   } catch (error) {
-    console.error("AI SDR weekly report read failed.", error);
-    const message = error instanceof Error ? error.message : "";
-    return {
-      error: TIMEOUT_ERROR.test(message)
-        ? "a production query timed out"
-        : "a production read failed",
-      success: false,
-    };
+    console.error("AI SDR weekly report read failed.", {
+      code: error instanceof ExecutorError ? error.code : "unexpected_error",
+      status: error instanceof ExecutorError ? error.status : undefined,
+    });
+    return { error: "a production read failed", success: false };
   }
 }

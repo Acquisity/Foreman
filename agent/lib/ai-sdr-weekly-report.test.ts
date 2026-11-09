@@ -244,16 +244,4 @@ describe("readAiSdrWeeklyReport", () => {
       success: false,
     });
   });
-
-  test("names a timeout without echoing the provider error", async () => {
-    const result = await readAiSdrWeeklyReport(NOW, () =>
-      Promise.reject(
-        new Error("canceling statement due to statement timeout (50s)")
-      )
-    );
-    assert.deepEqual(result, {
-      error: "a production query timed out",
-      success: false,
-    });
-  });
 });
