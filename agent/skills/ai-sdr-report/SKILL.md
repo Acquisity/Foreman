@@ -10,7 +10,7 @@ Produce the weekly AI SDR performance report for the channel the schedule dispat
 
 Call `read_ai_sdr_weekly_report` exactly once with no input. It owns the report windows, fixed production queries, AI SDR booking boundary, arithmetic, and deltas. Do not call another data tool and do not recalculate the returned values.
 
-If it returns `success: false`, post one short line saying the weekly report could not be generated and include the safe error. Do not invent a partial report.
+If it returns `success: false`, post exactly `The weekly AI SDR report could not be generated: <error>` with the returned `error` and nothing else. Do not call the tool again, describe your steps, or invent a partial report.
 
 ## Render the report
 

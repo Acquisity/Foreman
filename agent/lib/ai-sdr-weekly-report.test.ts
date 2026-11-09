@@ -80,6 +80,19 @@ describe("aiSdrWeeklyReportQueries", () => {
     assert.ok(bookingQuery.includes("order by distance, t.id\n    limit 1"));
     assert.ok(bookingQuery.includes("select distinct on (a.id)"));
   });
+
+  test("takes each thread's first arrival per stage inside the thread, never grouping by thread id", () => {
+    const lifecycleQuery =
+      aiSdrWeeklyReportQueries(aiSdrReportWindows(NOW))[2] ?? "";
+    assert.ok(
+      lifecycleQuery.includes(
+        "  select event->>'to' as stage, min((event->>'timestamp')::timestamptz) as reached_at\n  from jsonb_array_elements(t.lifecycle_history) event"
+      )
+    );
+    assert.ok(lifecycleQuery.includes("  group by 1\n) f"));
+    assert.ok(!lifecycleQuery.includes("thread_id"));
+    assert.ok(lifecycleQuery.includes("group by f.stage"));
+  });
 });
 
 describe("readAiSdrWeeklyReport", () => {
