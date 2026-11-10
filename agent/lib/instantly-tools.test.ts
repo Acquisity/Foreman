@@ -27,7 +27,7 @@ describe("Instantly tool authorization", () => {
     process.env.EXECUTOR_OPERATION_BINDINGS = JSON.stringify({
       "instantly.workspace-group-members": {
         arguments: {},
-        path: "instantly.org.test.listMembers",
+        path: "instantly.listMembers",
       },
     });
     let requestedToken = 0;

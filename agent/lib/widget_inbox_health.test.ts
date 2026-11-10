@@ -21,12 +21,10 @@ import definition, {
 } from "../tools/widget_inbox_health.js";
 
 const scope = verifiedWidgetContext;
-const DB_PATH =
-  "planetscale.org.foremanPlanetscale.planetscale_execute_read_query";
+const DB_PATH = "planetscale-org.planetscale_execute_read_query";
 const MEMBERS_PATH =
-  "foreman_instantly_api.org.foremanInstantlyApi.workspaceGroupMembers.listWorkspaceGroupMembers";
-const ACCOUNTS_PATH =
-  "foreman_instantly_api.org.foremanInstantlyApi.accounts.listAccounts";
+  "foreman-instantly-api.workspaceGroupMembers.listWorkspaceGroupMembers";
+const ACCOUNTS_PATH = "foreman-instantly-api.accounts.listAccounts";
 
 const originalConnector = process.env.EXECUTOR_MCP_CONNECTOR;
 const originalBindings = process.env.EXECUTOR_OPERATION_BINDINGS;

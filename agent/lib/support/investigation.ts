@@ -44,11 +44,9 @@ export async function currentConversation(
   ctx: ProviderContext,
   claim: SupportClaim
 ) {
-  const result = await invokeProvider(
-    ctx,
-    "intercom.org.foremanIntercom.get_conversation",
-    { id: claim.conversation }
-  );
+  const result = await invokeProvider(ctx, "intercom.get_conversation", {
+    id: claim.conversation,
+  });
   if (!result.ok) {
     throw new Error("Intercom conversation access failed.");
   }

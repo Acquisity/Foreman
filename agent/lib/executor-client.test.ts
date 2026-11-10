@@ -62,7 +62,10 @@ const rpcFetch =
         id: request.id,
         jsonrpc: "2.0",
         result: {
-          structuredContent: { result: outcome(), status: "completed" },
+          structuredContent: {
+            execution: { ok: true, value: outcome() },
+            status: "completed",
+          },
         },
       })
     );
@@ -96,7 +99,7 @@ test("typed client preserves numbers, booleans, special identifiers and canonica
     operation: "linear.Document",
   });
   const inputs = seen.map((code) =>
-    JSON.parse(code.slice(code.indexOf("](") + 2, -2))
+    JSON.parse(code.slice("const input = ".length, code.indexOf(";\n")))
   );
   assert.deepEqual(inputs[0], {
     latest_of_thread: false,

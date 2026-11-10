@@ -624,7 +624,7 @@ test("Sentry lists each issue by its title with its link, and nothing found when
       status: "found",
     }
   );
-  assert.deepEqual(paths, ["sentry.user.personalSentry.search_issues"]);
+  assert.deepEqual(paths, ["sentry.search_issues"]);
   t.mock.restoreAll();
   answer(t, { content: [{ text: "No issues found.", type: "text" }] });
   assert.deepEqual(

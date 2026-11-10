@@ -18,10 +18,9 @@ import definition, {
 const scope = verifiedWidgetContext;
 const foreignOrg = "99999999-9999-4999-8999-999999999999";
 const threadId = "44444444-4444-4444-8444-444444444444";
-const PLANETSCALE_PATH =
-  "planetscale.org.foremanPlanetscale.planetscale_execute_read_query";
-const SENTRY_PATH = "sentry.user.personalSentry.search_issues";
-const AXIOM_PATH = "axiom.user.personalAxiom.querydataset";
+const PLANETSCALE_PATH = "planetscale-org.planetscale_execute_read_query";
+const SENTRY_PATH = "sentry.search_issues";
+const AXIOM_PATH = "axiom.querydataset";
 
 const saved = {
   axiom: process.env.WIDGET_AXIOM_APP_DATASET,

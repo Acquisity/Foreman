@@ -5,7 +5,7 @@ process.env.EXECUTOR_MCP_CONNECTOR = "executor/test";
 process.env.EXECUTOR_OPERATION_BINDINGS = JSON.stringify({
   "inngest.runs": {
     arguments: { query: "query" },
-    path: "inngest.org.app.runs",
+    path: "inngest.runs",
   },
 });
 process.env.LINEAR_CONNECTOR ??= "linear/test";

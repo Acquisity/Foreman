@@ -4,10 +4,7 @@ import { describe, it, type TestContext } from "node:test";
 import type { SessionAuthContext } from "eve/context";
 import type { ApprovalContext } from "eve/tools/approval";
 import type { ExecutorOutcome } from "#lib/executor/dispatch.js";
-import {
-  DISPUTE_WRITE_CONNECTION,
-  invokeProvider,
-} from "#lib/executor/dispatch.js";
+import { invokeProvider } from "#lib/executor/dispatch.js";
 import {
   disputeWireArgs,
   type OperationRequest,
@@ -806,7 +803,10 @@ describe("dispute write dispatch", () => {
           jsonrpc: "2.0",
           result: {
             structuredContent: {
-              result: { data: { id: ID, status: "under_review" }, ok: true },
+              execution: {
+                ok: true,
+                value: { data: { id: ID, status: "under_review" }, ok: true },
+              },
               status: "completed",
             },
           },
@@ -817,7 +817,7 @@ describe("dispute write dispatch", () => {
       abortSignal: new AbortController().signal,
       getToken: () => Promise.resolve({ token: "synthetic-executor-token" }),
     };
-    const path = `${DISPUTE_WRITE_CONNECTION}org.workspaceForemanStripeDisputeWrite.disputes.updateDisputeEvidence`;
+    const path = "foreman-stripe-dispute-write.disputes.updateDisputeEvidence";
     const input = {
       dispute_id: ID,
       "Idempotency-Key": `foreman-dispute-submit-${ID}-abc`,
@@ -825,7 +825,7 @@ describe("dispute write dispatch", () => {
     };
     await invokeProvider(ctx as never, path, input);
     assert.equal(bodies.length, 1);
-    assert.ok(bodies[0]?.url.includes("/mcp/toolkits/foreman-disputes"));
+    assert.ok(bodies[0]?.url.endsWith("/mcp?connection=foreman-disputes"));
     assert.ok(
       JSON.stringify(bodies[0]?.request).includes(input["Idempotency-Key"])
     );

@@ -11,7 +11,7 @@ const originalBindings = process.env.EXECUTOR_OPERATION_BINDINGS;
 process.env.EXECUTOR_MCP_CONNECTOR = "executor.test/widget";
 process.env.EXECUTOR_OPERATION_BINDINGS = JSON.stringify({
   "planetscale.readQuery": {
-    path: "planetscale.org.foremanPlanetscale.planetscale_execute_read_query",
+    path: "planetscale-org.planetscale_execute_read_query",
   },
 });
 after(() => {

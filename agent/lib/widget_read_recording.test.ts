@@ -48,7 +48,7 @@ test("reads every part of the bound recording and bounds what comes back", async
   for (const [, path, input] of call.mock.calls.map(
     (c) => c.arguments as unknown as [unknown, string, { jamId: string }]
   )) {
-    assert.ok(path.startsWith("jam.user.personalJam."));
+    assert.ok(path.startsWith("jam."));
     assert.equal(input.jamId, jamId);
   }
   assert.ok(String(result.consoleErrors).length <= 3001);
@@ -84,23 +84,16 @@ test("no other recording can be read, and none without a bound one", async (t) =
     ok: true,
   }));
   await assert.rejects(
-    invokeProvider(ctx, "jam.user.personalJam.getdetails", { jamId: "other" }),
+    invokeProvider(ctx, "jam.getdetails", { jamId: "other" }),
     OWN_ONLY
   );
   await assert.rejects(
-    invokeProvider(
-      context(verifiedWidgetContext),
-      "jam.user.personalJam.getdetails",
-      {
-        jamId,
-      }
-    ),
+    invokeProvider(context(verifiedWidgetContext), "jam.getdetails", {
+      jamId,
+    }),
     OWN_ONLY
   );
   // Jam listing and search stay outside the lane entirely.
-  await assert.rejects(
-    invokeProvider(ctx, "jam.user.personalJam.listjams", {}),
-    OUTSIDE
-  );
+  await assert.rejects(invokeProvider(ctx, "jam.listjams", {}), OUTSIDE);
   assert.equal(call.mock.callCount(), 0);
 });

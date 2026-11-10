@@ -5,7 +5,7 @@ import type { SessionAuthContext, SessionContext } from "eve/context";
 import type { ApprovalContext } from "eve/tools/approval";
 import { operationPath } from "./executor/bindings.js";
 import { executorConnection } from "./executor/connection.js";
-import { DISPUTE_WRITE_CONNECTION } from "./executor/dispatch.js";
+import { DISPUTE_WRITE_APP } from "./executor/dispatch.js";
 import {
   DISPUTES_TOOLKIT,
   FOREMAN_TOOLKIT_SLUG,
@@ -28,13 +28,16 @@ const auth: SessionAuthContext = {
 };
 const internal = stampInvestigationMemory(auth);
 const completed = (data: unknown) => ({
-  structuredContent: { result: { data, ok: true }, status: "completed" },
+  structuredContent: {
+    execution: { ok: true, value: { data, ok: true } },
+    status: "completed",
+  },
 });
 const json = (body: unknown, headers: Record<string, string> = {}) =>
   new Response(JSON.stringify(body), {
     headers: { "content-type": "application/json", ...headers },
   });
-const OPERATION = "stripe.org.foreman.customer";
+const OPERATION = "stripe.customer";
 test("only failures before the execute request are confirmed undispatched", async () => {
   for (const failedMethod of [
     "initialize",
@@ -184,6 +187,12 @@ test("deployment bindings select paths and cannot modify typed arguments", async
     for (const invalid of [
       "{",
       JSON.stringify({ read: { path: "invalid" } }),
+      // A v1 path: underscores never survive into a v2 app slug.
+      JSON.stringify({
+        read: {
+          path: "foreman_stripe_api.org.foremanStripeApi.customers.readCustomer",
+        },
+      }),
     ]) {
       process.env.EXECUTOR_OPERATION_BINDINGS = invalid;
       assert.throws(
@@ -220,7 +229,7 @@ test("Executor uses a fresh toolkit session, follows JSON-RPC ids, and returns t
   );
   assert.deepEqual(result, { data: { id: "cus_1" }, ok: true });
   assert.equal(seen.length, 3);
-  assert.ok(seen.every((call) => call.url.includes("/foreman?")));
+  assert.ok(seen.every((call) => call.url.endsWith("/mcp?connection=foreman")));
   assert.ok(
     seen.every(
       (call) =>
@@ -232,6 +241,11 @@ test("Executor uses a fresh toolkit session, follows JSON-RPC ids, and returns t
   const invocation = JSON.parse(String(seen[2].init.body));
   assert.equal(invocation.params.name, "execute");
   assert.ok(!invocation.params.arguments.code.includes("executor-secret"));
+  assert.ok(
+    invocation.params.arguments.code.includes(
+      'tools["stripe"]["customer"](input)'
+    )
+  );
   assert.ok(
     invocation.params.arguments.code.includes(
       JSON.stringify('value"; throw new Error("injection"); //')
@@ -248,13 +262,16 @@ test("SSE responses and provider HTTP failures are handled without exposing prov
       fetch: rpc(
         {
           structuredContent: {
-            result: {
-              error: {
-                code: "not_found",
-                message: "private-provider-body",
-                status: 404,
+            execution: {
+              ok: true,
+              value: {
+                error: {
+                  code: "not_found",
+                  message: "private-provider-body",
+                  status: 404,
+                },
+                ok: false,
               },
-              ok: false,
             },
             status: "completed",
           },
@@ -273,6 +290,12 @@ test("SSE responses and provider HTTP failures are handled without exposing prov
 test("paused, malformed, and management calls fail without resuming or retrying", async () => {
   for (const result of [
     { structuredContent: { resumePayload: {}, status: "paused" } },
+    {
+      structuredContent: {
+        execution: { error: {}, ok: false },
+        status: "completed",
+      },
+    },
     completed(undefined),
     { isError: true },
   ]) {
@@ -471,18 +494,18 @@ test("the Stripe dispute write lives only in the foreman-disputes toolkit", () =
     (operation) => bindings[operation]?.path
   );
   // Production binds the live writes; Preview binds the same two operations
-  // on the sandbox connection, which is also mounted here.
+  // on the sandbox app, which is also mounted here.
   for (const path of writes) {
     assert.ok(disputes.toolkit.paths.includes(path), path);
   }
   assert.equal(disputes.toolkit.paths.length, writes.length * 2);
   for (const path of disputes.toolkit.paths) {
-    assert.ok(path.startsWith(DISPUTE_WRITE_CONNECTION), path);
+    assert.match(path, DISPUTE_WRITE_APP, path);
   }
   // The raw execute gateway runs any shared path, so no shared path may
   // update a dispute, upload a file, or reach the write connection.
   for (const path of shared.toolkit.paths) {
-    assert.ok(!path.startsWith(DISPUTE_WRITE_CONNECTION), path);
+    assert.doesNotMatch(path, DISPUTE_WRITE_APP, path);
     assert.doesNotMatch(path, DISPUTE_WRITE_PATH, path);
   }
   assert.ok(

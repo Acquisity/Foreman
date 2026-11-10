@@ -15,7 +15,7 @@ Foreman runs on four channels, with a GitHub extension and one shared company-se
 
 The GitHub extension adds an API surface (reads, triage, PR authoring; no merge) running inside the sandbox.
 
-Foreman reaches company services through Executor, using shared company accounts for authorized investigations. Existing bounded helpers still perform customer lookup, billing, Instantly investigation, run searches, Linear routing, Stripe dispute evidence, and help-center searches; their provider calls go through Executor. Root, native delegates, critic, and scheduled work use one shared Foreman toolkit. Company-service credentials stay in Executor; Vercel Connect brokers Foreman's Executor credential and the retained channel and personal connections. See [.github/EXECUTOR-CONTRACT.md](.github/EXECUTOR-CONTRACT.md) for the shared toolkit, exact helper bindings, and the preview-first cutover. This revision requires that setup before provider traffic is enabled.
+Foreman reaches company services through Executor, using shared company accounts for authorized investigations. Existing bounded helpers still perform customer lookup, billing, Instantly investigation, run searches, Linear routing, Stripe dispute evidence, and help-center searches; their provider calls go through Executor. Root, native delegates, critic, and scheduled work use one shared Foreman Executor v2 scoped connection. Company-service credentials stay in Executor; Vercel Connect brokers Foreman's Executor credential and the retained channel and personal connections. See [.github/EXECUTOR-CONTRACT.md](.github/EXECUTOR-CONTRACT.md) for the shared connection, exact helper bindings, and the preview-first cutover. This revision requires that setup before provider traffic is enabled.
 
 ## Skills
 
@@ -66,7 +66,9 @@ Settled investigations, including ticketless Intercom and Slack ones and conclus
 | --- | --- |
 | `EXECUTOR_MCP_CONNECTOR` | App-scoped Vercel Connect UID for the Executor bearer credential |
 | `EXECUTOR_BASE_URL` | HTTPS origin; defaults to `https://executor.acquisity.ai` |
-| `EXECUTOR_OPERATION_BINDINGS` | Verified operation paths only; argument schemas live in source; no provider tokens |
+| `EXECUTOR_CONNECTION_FOREMAN`, `EXECUTOR_CONNECTION_SUPPORT`, `EXECUTOR_CONNECTION_DISPUTES` | Executor v2 scoped connection IDs per lane; each defaults to its lane name |
+| `EXECUTOR_OPERATION_BINDINGS` | Verified `<app slug>.<tool>` paths only; argument schemas live in source; no provider tokens |
+| `EXECUTOR_API_TOKEN`, `EXECUTOR_ORGANIZATION` | Only for `pnpm executor:readiness --live`: a v2 personal access token and the organization it reads |
 
 
 | Variable | Default | Purpose |

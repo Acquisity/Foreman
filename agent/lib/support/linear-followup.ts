@@ -15,7 +15,7 @@ import {
   trackSupportIssue,
 } from "./store.js";
 
-const PATH = "linear.org.workspaceLinear.";
+const PATH = "linear.";
 export async function readSupportLinear(
   ctx: ProviderContext,
   operation: string,

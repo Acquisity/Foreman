@@ -1,9 +1,7 @@
 import { readFile } from "node:fs/promises";
-import { homedir } from "node:os";
-import { join } from "node:path";
 import { z } from "zod";
+import { executorOrigin } from "../agent/lib/executor/endpoint.js";
 import { REQUIRED_HELPER_OPERATIONS } from "../agent/lib/executor/operations.js";
-import { toolkitPolicyMatches } from "../agent/lib/executor/toolkit-policy.js";
 
 const root = new URL("../.github/executor/", import.meta.url);
 const flagged = ["widget", "support"].find((flag) =>
@@ -11,9 +9,6 @@ const flagged = ["widget", "support"].find((flag) =>
 );
 const manifestSchema = z.object({
   toolkit: z.object({
-    connectionPolicies: z
-      .array(z.object({ blocked: z.array(z.string()), pattern: z.string() }))
-      .default([]),
     missing: z.record(z.string(), z.array(z.string())),
     paths: z.array(z.string()),
     slug: z.string(),
@@ -77,62 +72,29 @@ for (const operation of REQUIRED_HELPER_OPERATIONS) {
   }
 }
 
-const policiesSchema = z.object({
-  policies: z.array(
-    z.object({ action: z.string(), pattern: z.string(), position: z.string() })
-  ),
+const inventorySchema = z.object({
+  apps: z.array(z.object({ id: z.string(), slug: z.string() })),
 });
-const connectionsSchema = z.object({
-  connections: z.array(z.object({ pattern: z.string() })),
-});
-const toolkitListSchema = z.object({
-  toolkits: z.array(
-    z.object({ id: z.string(), owner: z.string(), slug: z.string() })
-  ),
+const toolPageSchema = z.object({
+  items: z.array(z.object({ name: z.string() })),
+  next: z.string().optional(),
 });
 
+// Executor v2 scoped connections are readable only from a signed-in browser,
+// so this checks that every selected path names an installed app and tool;
+// each connection's app, account and tool selection is checked in the dashboard.
 if (process.argv.includes("--live")) {
-  const profileName = process.env.EXECUTOR_SETUP_PROFILE;
-  if (!profileName) {
+  const token = process.env.EXECUTOR_API_TOKEN;
+  const organization = process.env.EXECUTOR_ORGANIZATION;
+  if (!(token && organization)) {
     throw new Error(
-      "Set EXECUTOR_SETUP_PROFILE to an authenticated official Executor CLI profile."
+      "Set EXECUTOR_API_TOKEN to an Executor personal access token and EXECUTOR_ORGANIZATION to the organization ID or slug."
     );
   }
-  const storeSchema = z.object({
-    profiles: z.array(
-      z.object({
-        connection: z.unknown(),
-        name: z.string(),
-      })
-    ),
-  });
-  const store = storeSchema.parse(
-    JSON.parse(
-      await readFile(
-        join(
-          process.env.EXECUTOR_DATA_DIR ?? join(homedir(), ".executor"),
-          "server-connections.json"
-        ),
-        "utf8"
-      )
-    )
-  );
-  const selected = store.profiles.find((item) => item.name === profileName);
-  const parsed = z
-    .object({
-      apiBaseUrl: z.literal("https://executor.acquisity.ai/api"),
-      auth: z.object({ accessToken: z.string().min(1) }),
-    })
-    .safeParse(selected?.connection);
-  if (!parsed.success) {
-    throw new Error("Expected the Acquisity Executor account profile.");
-  }
-  const setupConnection = parsed.data;
+  const base = `${executorOrigin()}/api/organizations/${encodeURIComponent(organization)}`;
   const api = async (path: string): Promise<unknown> => {
-    const response = await fetch(`${setupConnection.apiBaseUrl}${path}`, {
-      headers: {
-        Authorization: `Bearer ${setupConnection.auth.accessToken}`,
-      },
+    const response = await fetch(`${base}${path}`, {
+      headers: { Authorization: `Bearer ${token}` },
       redirect: "error",
       signal: AbortSignal.timeout(20_000),
     });
@@ -143,29 +105,45 @@ if (process.argv.includes("--live")) {
     }
     return response.json();
   };
-  const installed = toolkitListSchema.parse(await api("/toolkits")).toolkits;
-  for (const expected of [manifest.toolkit]) {
-    const actual = installed.find((item) => item.slug === expected.slug);
-    if (actual?.owner !== "user") {
-      console.log(
-        `FAIL ${expected.slug}: expected the shared-account personal toolkit`
-      );
+  const { apps } = inventorySchema.parse(await api("/inventory"));
+  const expected = new Map<string, Set<string>>();
+  for (const path of manifest.toolkit.paths) {
+    const dot = path.indexOf(".");
+    const tools = expected.get(path.slice(0, dot)) ?? new Set<string>();
+    tools.add(path.slice(dot + 1));
+    expected.set(path.slice(0, dot), tools);
+  }
+  for (const [slug, tools] of expected) {
+    const app = apps.find((item) => item.slug === slug);
+    if (!app) {
+      console.log(`MISSING ${manifest.toolkit.slug}: app ${slug}`);
       failures += 1;
       continue;
     }
-    // These are independent metadata reads; no operations or credentials are returned.
-    // biome-ignore lint/performance/noAwaitInLoops: bound operator API load to two concurrent requests.
-    const [policyData, connectionData] = await Promise.all([
-      api(`/toolkits/${actual.id}/policies`),
-      api(`/toolkits/${actual.id}/connections`),
-    ]);
-    const { policies } = policiesSchema.parse(policyData);
-    const { connections } = connectionsSchema.parse(connectionData);
-    const valid = toolkitPolicyMatches(expected, policies, connections);
+    const installed = new Set<string>();
+    const readPage = async (cursor?: string): Promise<void> => {
+      const page = toolPageSchema.parse(
+        await api(
+          `/apps/${encodeURIComponent(app.id)}/tools${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ""}`
+        )
+      );
+      for (const item of page.items) {
+        installed.add(item.name);
+      }
+      if (page.next) {
+        await readPage(page.next);
+      }
+    };
+    // biome-ignore lint/performance/noAwaitInLoops: one app at a time bounds operator API load.
+    await readPage();
+    const absent = [...tools].filter((tool) => !installed.has(tool));
     console.log(
-      `${valid ? "PASS" : "FAIL"} ${expected.slug}: selected catalog, declared connection policies and default deny`
+      `${absent.length ? "FAIL" : "PASS"} ${manifest.toolkit.slug}: ${slug} (${tools.size - absent.length}/${tools.size} tools)`
     );
-    if (!valid) {
+    for (const tool of absent) {
+      console.log(`  missing ${slug}.${tool}`);
+    }
+    if (absent.length) {
       failures += 1;
     }
   }

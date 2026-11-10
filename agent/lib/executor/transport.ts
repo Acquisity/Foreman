@@ -8,7 +8,13 @@ const envelopeSchema = z.object({
     .object({
       isError: z.boolean().optional(),
       structuredContent: z
-        .object({ result: z.unknown().optional(), status: z.string() })
+        .object({
+          execution: z
+            .object({ ok: z.boolean(), value: z.unknown().optional() })
+            .passthrough()
+            .optional(),
+          status: z.string(),
+        })
         .optional(),
     })
     .passthrough()
@@ -63,7 +69,9 @@ export class ExecutorError extends Error {
 }
 const SSE_BLOCK = /\r?\n\r?\n/u;
 const SSE_LINE = /\r?\n/u;
-const OPERATION_PATH = /^[A-Za-z0-9_-]+(?:\.[A-Za-z0-9_-]+){3,}$/u;
+/** Executor v2 path: an app slug (a DNS label), then the tool's path inside the app. */
+export const OPERATION_PATH =
+  /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[A-Za-z0-9_-]+)+$/u;
 
 /** Body parsing stays under the caller's deadline, including stalled streams. */
 async function readBody(
@@ -147,9 +155,15 @@ async function invokeExecutor(
   if (!OPERATION_PATH.test(path) || path.startsWith("executor.")) {
     throw new ExecutorError("invalid_operation_binding");
   }
+  // v2 tools return the provider's data and throw on failure; the program
+  // rebuilds the { ok, data } / { ok: false, error } outcome callers branch on.
+  // shortcut: v2 keeps no response headers, so Retry-After and a success status
+  // other than 200 never reach Foreman; restore them if v2 exposes them again.
+  const dot = path.indexOf(".");
+  const tool = `tools[${JSON.stringify(path.slice(0, dot))}][${JSON.stringify(path.slice(dot + 1))}]`;
   const result = await executeExecutor(
     ctx,
-    `return await tools[${JSON.stringify(path)}](${JSON.stringify(input)});`,
+    `const input = ${JSON.stringify(input)};\ntry { return { ok: true, data: (await ${tool}(input)) ?? null }; } catch (error) { return { ok: false, error: { code: String(error?.code ?? error?.name ?? "tool_error"), ...(typeof error?.status === "number" ? { status: error.status } : {}) } }; }`,
     options
   );
   const parsed = outcomeSchema.safeParse(result);
@@ -266,10 +280,15 @@ async function executeExecutorRequest(
     },
     2
   );
-  if (result?.isError || result?.structuredContent?.status !== "completed") {
+  const outcome = result?.structuredContent;
+  if (
+    result?.isError ||
+    outcome?.status !== "completed" ||
+    outcome.execution?.ok !== true
+  ) {
     throw new ExecutorError("execution_unavailable");
   }
-  return result.structuredContent.result;
+  return outcome.execution.value;
 }
 
 function describeExecutorOperation(ctx: ExecutorRequestContext, path: string) {
@@ -278,7 +297,7 @@ function describeExecutorOperation(ctx: ExecutorRequestContext, path: string) {
   }
   return executeExecutor(
     ctx,
-    `return await tools.describe.tool({path:${JSON.stringify(path)}});`
+    `return await tools.search.describe({paths:[${JSON.stringify(path)}]});`
   );
 }
 

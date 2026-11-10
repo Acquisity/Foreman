@@ -21,7 +21,7 @@ const originalBindings = process.env.EXECUTOR_OPERATION_BINDINGS;
 process.env.EXECUTOR_MCP_CONNECTOR = "executor.test/widget";
 process.env.EXECUTOR_OPERATION_BINDINGS = JSON.stringify({
   "planetscale.readQuery": {
-    path: "planetscale.org.foremanPlanetscale.planetscale_execute_read_query",
+    path: "planetscale-org.planetscale_execute_read_query",
   },
 });
 after(() => {
@@ -304,10 +304,7 @@ test("dispatch sends the org-scoped query through the widget toolkit", async (t)
     { query: string; use_replica: boolean },
   ];
   assert.equal(wire.toolkit, WIDGET_TOOLKIT);
-  assert.equal(
-    path,
-    "planetscale.org.foremanPlanetscale.planetscale_execute_read_query"
-  );
+  assert.equal(path, "planetscale-org.planetscale_execute_read_query");
   assert.ok(input.query.includes(scope.organizationId));
   assert.ok(input.query.includes(scope.userId));
   assert.equal(input.use_replica, false);
@@ -393,9 +390,8 @@ test("Sentry signals aggregate to sanitized counts, and any unexpected shape rea
   });
 });
 
-const SENTRY_PATH = "sentry.user.personalSentry.search_issues";
-const PLANETSCALE_PATH =
-  "planetscale.org.foremanPlanetscale.planetscale_execute_read_query";
+const SENTRY_PATH = "sentry.search_issues";
+const PLANETSCALE_PATH = "planetscale-org.planetscale_execute_read_query";
 /** Bind Sentry and set the org slug for one test, then restore both. */
 function withSentry(t: TestContext, slug: string | null = "acquisity") {
   const bindings = process.env.EXECUTOR_OPERATION_BINDINGS;

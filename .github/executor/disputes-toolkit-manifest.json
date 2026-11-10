@@ -1,15 +1,15 @@
 {
   "version": 2,
-  "executorVersion": "1.6.8",
+  "executorVersion": "2.0.0-beta.39",
   "toolkit": {
     "slug": "foreman-disputes",
     "name": "Foreman Stripe disputes",
     "owner": "user",
     "paths": [
-      "foreman_stripe_dispute_write.org.workspaceForemanStripeDisputeWrite.disputes.updateDisputeEvidence",
-      "foreman_stripe_dispute_write.org.workspaceForemanStripeDisputeWrite.files.createDisputeEvidenceFile",
-      "foreman_stripe_dispute_write.org.foremanStripeDisputeWriteSandbox.disputes.updateDisputeEvidence",
-      "foreman_stripe_dispute_write.org.foremanStripeDisputeWriteSandbox.files.createDisputeEvidenceFile"
+      "foreman-stripe-dispute-write.disputes.updateDisputeEvidence",
+      "foreman-stripe-dispute-write.files.createDisputeEvidenceFile",
+      "foreman-stripe-dispute-write-sandbox.disputes.updateDisputeEvidence",
+      "foreman-stripe-dispute-write-sandbox.files.createDisputeEvidenceFile"
     ],
     "missing": {},
     "connectionPolicies": []

@@ -36,7 +36,7 @@ export type ExecutorOutcome = Awaited<
   ReturnType<typeof executorTransport.call>
 >;
 
-const LINEAR_TICKET_PATH = "linear.org.workspaceLinear.save_issue";
+const LINEAR_TICKET_PATH = "linear.save_issue";
 const LINEAR_TICKET_MAX_BYTES = 64 * 1024;
 
 /**
@@ -144,8 +144,9 @@ const widgetLinearTicketInput = z.union([
   }),
 ]);
 
-/** Every path the foreman-disputes toolkit binds starts with its connection. */
-export const DISPUTE_WRITE_CONNECTION = "foreman_stripe_dispute_write.";
+/** The dispute write apps, live and sandbox; only the foreman-disputes connection holds them. */
+export const DISPUTE_WRITE_APP =
+  /^foreman-stripe-dispute-write(?:-sandbox)?\./u;
 
 type OperationPolicy =
   | ReturnType<typeof supportOperationPolicy>
@@ -165,7 +166,7 @@ const toolkitFor = (
   path: string
 ): ExecutorToolkit | undefined =>
   policy?.toolkit ??
-  (path.startsWith(DISPUTE_WRITE_CONNECTION) ? DISPUTES_TOOLKIT : undefined);
+  (DISPUTE_WRITE_APP.test(path) ? DISPUTES_TOOLKIT : undefined);
 
 /** The widget egress gate runs outside any eve session: one fixed read under the app principal. */
 export async function readWidgetOwnership(
@@ -180,9 +181,7 @@ export async function readWidgetOwnership(
   // Defense in depth: this app-principal read runs outside any eve session and
   // its policy/allowlist, so assert the binding still resolves to the expected
   // planetscale read before dispatching.
-  if (
-    path !== "planetscale.org.foremanPlanetscale.planetscale_execute_read_query"
-  ) {
+  if (path !== "planetscale-org.planetscale_execute_read_query") {
     throw new Error("Unexpected ownership operation binding.");
   }
   signal.throwIfAborted();
@@ -218,7 +217,7 @@ export const widgetScopeBlock = (scope: WidgetContext) =>
 
 // A Linear MCP tool that changes something, or the authored GraphQL write API.
 const LINEAR_WRITE_PATH =
-  /^(?:foreman_linear_write_api\.|linear\.[^.]+\.[^.]+\.(?:save|create|delete|update|archive|unarchive)_)/u;
+  /^(?:foreman-linear-write-api\.|linear\.(?:save|create|delete|update|archive|unarchive)_)/u;
 
 function assertLaneOperation(
   ctx: ProviderContext,

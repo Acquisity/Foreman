@@ -31,15 +31,26 @@ export type ExecutorToolkit =
   | typeof FOREMAN_TOOLKIT_SLUG
   | typeof SUPPORT_TOOLKIT
   | typeof DISPUTES_TOOLKIT;
+// Each lane is one Executor v2 scoped connection. Its ID is chosen when the
+// connection is created; IDs are unique per Executor instance, so Preview and
+// Production can set their own. Unset or empty uses the lane name.
+const CONNECTION_ENV = {
+  [DISPUTES_TOOLKIT]: "EXECUTOR_CONNECTION_DISPUTES",
+  [FOREMAN_TOOLKIT_SLUG]: "EXECUTOR_CONNECTION_FOREMAN",
+  [SUPPORT_TOOLKIT]: "EXECUTOR_CONNECTION_SUPPORT",
+} as const;
+const CONNECTION_ID = /^[A-Za-z0-9_-]{1,64}$/u;
 export const toolkitUrl = (
   slug: ExecutorToolkit = FOREMAN_TOOLKIT_SLUG
 ): string => {
-  if (
-    slug !== FOREMAN_TOOLKIT_SLUG &&
-    slug !== SUPPORT_TOOLKIT &&
-    slug !== DISPUTES_TOOLKIT
-  ) {
+  if (!Object.hasOwn(CONNECTION_ENV, slug)) {
     throw new Error("Unknown Foreman toolkit.");
   }
-  return `${executorOrigin()}/mcp/toolkits/${slug}?artifacts=false`;
+  const id = process.env[CONNECTION_ENV[slug]] || slug;
+  if (!CONNECTION_ID.test(id)) {
+    throw new Error(
+      `${CONNECTION_ENV[slug]} must be an Executor connection ID.`
+    );
+  }
+  return `${executorOrigin()}/mcp?connection=${id}`;
 };

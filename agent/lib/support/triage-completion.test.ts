@@ -90,7 +90,7 @@ function provider(t: TestContext, issue: Record<string, unknown> = report) {
     }
     const code: string = request.params.arguments.code;
     const operation = Object.keys(responses).find((name) =>
-      code.includes(`.${name}`)
+      code.includes(`["${name}"]`)
     );
     assert.ok(operation, `Unexpected provider call: ${code}`);
     seen.push(operation);
@@ -100,13 +100,19 @@ function provider(t: TestContext, issue: Record<string, unknown> = report) {
         jsonrpc: "2.0",
         result: {
           structuredContent: {
-            result: {
-              data: {
-                content: [
-                  { text: JSON.stringify(responses[operation]), type: "text" },
-                ],
-              },
+            execution: {
               ok: true,
+              value: {
+                data: {
+                  content: [
+                    {
+                      text: JSON.stringify(responses[operation]),
+                      type: "text",
+                    },
+                  ],
+                },
+                ok: true,
+              },
             },
             status: "completed",
           },
@@ -485,7 +491,7 @@ test("finish refuses omitted or failed writes; a blocker retry stays unprocessed
   api.responses.get_issue = report;
   const failure = {
     ...operations[0],
-    operation_key: "linear.org.workspaceLinear.save_comment:failed",
+    operation_key: "linear.save_comment:failed",
     state: "failed",
   };
   journal.push(failure);

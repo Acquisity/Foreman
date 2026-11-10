@@ -210,7 +210,7 @@ test("live tool boundary enforces historical date windows and preserves explicit
     EXECUTOR_MCP_CONNECTOR: "executor.test/widget",
     EXECUTOR_OPERATION_BINDINGS: JSON.stringify({
       "planetscale.readQuery": {
-        path: "planetscale.org.foremanPlanetscale.planetscale_execute_read_query",
+        path: "planetscale-org.planetscale_execute_read_query",
       },
     }),
   })) {
