@@ -4,6 +4,7 @@ import {
   aiSdrReportWindows,
   type ReportWindow,
 } from "./ai-sdr-report-window.js";
+import { ExecutorError } from "./executor/transport.js";
 import { parseReadQueryResult } from "./planetscale.js";
 
 const TOTAL = "__total__";
@@ -254,24 +255,20 @@ export function aiSdrWeeklyReportQueries(
       "order by method",
     ].join("\n"),
     [
-      "with transitions as (",
-      "  select t.id as thread_id, event->>'to' as stage, (event->>'timestamp')::timestamptz as reached_at",
-      "  from crm_message_thread t",
-      "  cross join lateral jsonb_array_elements(t.lifecycle_history) event",
-      "  where t.lifecycle_history is not null",
-      "), first_arrival as (",
-      "  select thread_id, stage, min(reached_at) as reached_at",
-      "  from transitions",
-      "  where stage in ('replied', 'slots_sent', 'booked', 'completed', 'declined', 'no_response')",
-      "  group by thread_id, stage",
-      ")",
-      "select stage,",
-      `  ${windowCounts("reached_at", report, "report")},`,
-      `  ${windowCounts("reached_at", previous, "previous")},`,
-      `  ${windowCounts("reached_at", month, "month")}`,
-      "from first_arrival",
-      "group by stage",
-      "order by stage",
+      "select f.stage,",
+      `  ${windowCounts("f.reached_at", report, "report")},`,
+      `  ${windowCounts("f.reached_at", previous, "previous")},`,
+      `  ${windowCounts("f.reached_at", month, "month")}`,
+      "from crm_message_thread t",
+      "cross join lateral (",
+      "  select event->>'to' as stage, min((event->>'timestamp')::timestamptz) as reached_at",
+      "  from jsonb_array_elements(t.lifecycle_history) event",
+      "  where event->>'to' in ('replied', 'slots_sent', 'booked', 'completed', 'declined', 'no_response')",
+      "  group by 1",
+      ") f",
+      "where t.lifecycle_history is not null",
+      "group by f.stage",
+      "order by f.stage",
     ].join("\n"),
   ];
 }
@@ -392,12 +389,10 @@ export async function readAiSdrWeeklyReport(
       windows,
     };
   } catch (error) {
-    return {
-      error:
-        error instanceof Error
-          ? error.message
-          : "The AI SDR report could not be generated.",
-      success: false,
-    };
+    console.error("AI SDR weekly report read failed.", {
+      code: error instanceof ExecutorError ? error.code : "unexpected_error",
+      status: error instanceof ExecutorError ? error.status : undefined,
+    });
+    return { error: "a production read failed", success: false };
   }
 }
