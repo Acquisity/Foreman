@@ -141,7 +141,7 @@ const context = (current: SessionAuthContext | null = internal) => ({
   token: "executor-secret",
 });
 
-process.env.EXECUTOR_MCP_CONNECTOR = "executor/test";
+process.env.EXECUTOR_MCP_CONNECTOR_FOREMAN = "executor/test";
 
 test("every execution context shares company auth and the same toolkit", () => {
   const connection = executorConnection();
@@ -231,7 +231,7 @@ test("Executor uses a fresh toolkit session, follows JSON-RPC ids, and returns t
   );
   assert.deepEqual(result, { data: { id: "cus_1" }, ok: true });
   assert.equal(seen.length, 3);
-  assert.ok(seen.every((call) => call.url.endsWith("/mcp?connection=foreman")));
+  assert.ok(seen.every((call) => call.url.endsWith("/mcp")));
   assert.ok(
     seen.every(
       (call) =>

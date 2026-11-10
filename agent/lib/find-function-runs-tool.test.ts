@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-process.env.EXECUTOR_MCP_CONNECTOR = "executor/test";
+process.env.EXECUTOR_MCP_CONNECTOR_FOREMAN = "executor/test";
 process.env.EXECUTOR_OPERATION_BINDINGS = JSON.stringify({
   "inngest.runs": {
     arguments: { query: "query" },

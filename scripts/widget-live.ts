@@ -35,9 +35,9 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
 import { parseArgs } from "node:util";
-import { getToken as getConnectToken } from "@vercel/connect";
 import type { ToolContext } from "eve/tools";
 import { z } from "zod";
+import { appProviderContext } from "../agent/lib/executor/app-context.js";
 import { privateDatabase } from "../agent/lib/private-postgres.js";
 import {
   candidateRowSchema,
@@ -226,15 +226,11 @@ async function reread(
   if (!TOOL_NAME.test(tool)) {
     throw new Error(`Unexpected tool ${tool}.`);
   }
-  const connector = process.env.EXECUTOR_MCP_CONNECTOR ?? "";
   const auth = widgetAuth(scope);
   const ctx = {
-    abortSignal: AbortSignal.timeout(READ_DEADLINE_MS),
-    // Outside a session there is no ctx.getToken, so the Executor app token is
-    // read the way the widget egress gate reads it.
-    getToken: async () => ({
-      token: await getConnectToken(connector, { subject: { type: "app" } }),
-    }),
+    // Outside a session there is no ctx.getToken; the schedule context reads
+    // the app token of the lane each call asks for.
+    ...appProviderContext(AbortSignal.timeout(READ_DEADLINE_MS)),
     session: { auth: { current: auth, initiator: auth } },
   } as unknown as ToolContext;
   try {

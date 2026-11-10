@@ -26,9 +26,9 @@ const MEMBERS_PATH =
   "foreman-instantly-api.workspaceGroupMembers.listWorkspaceGroupMembers";
 const ACCOUNTS_PATH = "foreman-instantly-api.accounts.listAccounts";
 
-const originalConnector = process.env.EXECUTOR_MCP_CONNECTOR;
+const originalConnector = process.env.EXECUTOR_MCP_CONNECTOR_SUPPORT;
 const originalBindings = process.env.EXECUTOR_OPERATION_BINDINGS;
-process.env.EXECUTOR_MCP_CONNECTOR = "executor.test/widget";
+process.env.EXECUTOR_MCP_CONNECTOR_SUPPORT = "executor.test/widget";
 process.env.EXECUTOR_OPERATION_BINDINGS = JSON.stringify({
   "instantly.accounts": { path: ACCOUNTS_PATH },
   "instantly.workspace-group-members": { path: MEMBERS_PATH },
@@ -41,9 +41,9 @@ after(() => {
     process.env.EXECUTOR_OPERATION_BINDINGS = originalBindings;
   }
   if (originalConnector === undefined) {
-    delete process.env.EXECUTOR_MCP_CONNECTOR;
+    delete process.env.EXECUTOR_MCP_CONNECTOR_SUPPORT;
   } else {
-    process.env.EXECUTOR_MCP_CONNECTOR = originalConnector;
+    process.env.EXECUTOR_MCP_CONNECTOR_SUPPORT = originalConnector;
   }
 });
 

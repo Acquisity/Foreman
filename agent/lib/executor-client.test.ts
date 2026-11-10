@@ -27,9 +27,9 @@ const ctx = {
 function configure(t: TestContext) {
   const prior = {
     bindings: process.env.EXECUTOR_OPERATION_BINDINGS,
-    connector: process.env.EXECUTOR_MCP_CONNECTOR,
+    connector: process.env.EXECUTOR_MCP_CONNECTOR_FOREMAN,
   };
-  process.env.EXECUTOR_MCP_CONNECTOR = "placeholder/executor-test";
+  process.env.EXECUTOR_MCP_CONNECTOR_FOREMAN = "placeholder/executor-test";
   process.env.EXECUTOR_OPERATION_BINDINGS = readFileSync(
     new URL("../../.github/executor/operation-bindings.json", import.meta.url),
     "utf8"
@@ -41,9 +41,9 @@ function configure(t: TestContext) {
       process.env.EXECUTOR_OPERATION_BINDINGS = prior.bindings;
     }
     if (prior.connector === undefined) {
-      delete process.env.EXECUTOR_MCP_CONNECTOR;
+      delete process.env.EXECUTOR_MCP_CONNECTOR_FOREMAN;
     } else {
-      process.env.EXECUTOR_MCP_CONNECTOR = prior.connector;
+      process.env.EXECUTOR_MCP_CONNECTOR_FOREMAN = prior.connector;
     }
   });
 }

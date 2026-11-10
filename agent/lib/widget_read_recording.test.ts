@@ -9,13 +9,13 @@ import { verifiedWidgetContext } from "#lib/widget.fixture.js";
 import { widgetAuth } from "#lib/widget-scope.js";
 import definition, { readRecording } from "../tools/widget_read_recording.js";
 
-const originalConnector = process.env.EXECUTOR_MCP_CONNECTOR;
-process.env.EXECUTOR_MCP_CONNECTOR = "executor.test/widget";
+const originalConnector = process.env.EXECUTOR_MCP_CONNECTOR_SUPPORT;
+process.env.EXECUTOR_MCP_CONNECTOR_SUPPORT = "executor.test/widget";
 after(() => {
   if (originalConnector === undefined) {
-    delete process.env.EXECUTOR_MCP_CONNECTOR;
+    delete process.env.EXECUTOR_MCP_CONNECTOR_SUPPORT;
   } else {
-    process.env.EXECUTOR_MCP_CONNECTOR = originalConnector;
+    process.env.EXECUTOR_MCP_CONNECTOR_SUPPORT = originalConnector;
   }
 });
 

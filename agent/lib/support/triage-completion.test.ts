@@ -51,13 +51,13 @@ const ctx = {
 
 /** Exercise actual provider reads with synthetic responses; no Linear or customer writes. */
 function provider(t: TestContext, issue: Record<string, unknown> = report) {
-  const prior = process.env.EXECUTOR_MCP_CONNECTOR;
-  process.env.EXECUTOR_MCP_CONNECTOR = "placeholder/triage-test";
+  const prior = process.env.EXECUTOR_MCP_CONNECTOR_SUPPORT;
+  process.env.EXECUTOR_MCP_CONNECTOR_SUPPORT = "placeholder/triage-test";
   t.after(() => {
     if (prior === undefined) {
-      delete process.env.EXECUTOR_MCP_CONNECTOR;
+      delete process.env.EXECUTOR_MCP_CONNECTOR_SUPPORT;
     } else {
-      process.env.EXECUTOR_MCP_CONNECTOR = prior;
+      process.env.EXECUTOR_MCP_CONNECTOR_SUPPORT = prior;
     }
   });
   const seen: string[] = [];

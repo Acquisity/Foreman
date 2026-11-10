@@ -83,6 +83,28 @@ const toolPageSchema = z.object({
 // Executor v2 scoped connections are readable only from a signed-in browser,
 // so this checks that every selected path names an installed app and tool;
 // each connection's app, account and tool selection is checked in the dashboard.
+/** One metadata read as the token's owner; never provider credentials or tool calls. */
+const readApi = async (
+  token: string,
+  organization: string,
+  path: string
+): Promise<unknown> => {
+  const response = await fetch(
+    `${executorOrigin()}/api/organizations/${encodeURIComponent(organization)}${path}`,
+    {
+      headers: { Authorization: `Bearer ${token}` },
+      redirect: "error",
+      signal: AbortSignal.timeout(20_000),
+    }
+  );
+  if (!response.ok) {
+    throw new Error(
+      `Executor configuration read failed: HTTP ${response.status}`
+    );
+  }
+  return response.json();
+};
+
 if (process.argv.includes("--live")) {
   const token = process.env.EXECUTOR_API_TOKEN;
   const organization = process.env.EXECUTOR_ORGANIZATION;
@@ -91,20 +113,7 @@ if (process.argv.includes("--live")) {
       "Set EXECUTOR_API_TOKEN to an Executor personal access token and EXECUTOR_ORGANIZATION to the organization ID or slug."
     );
   }
-  const base = `${executorOrigin()}/api/organizations/${encodeURIComponent(organization)}`;
-  const api = async (path: string): Promise<unknown> => {
-    const response = await fetch(`${base}${path}`, {
-      headers: { Authorization: `Bearer ${token}` },
-      redirect: "error",
-      signal: AbortSignal.timeout(20_000),
-    });
-    if (!response.ok) {
-      throw new Error(
-        `Executor configuration read failed: HTTP ${response.status}`
-      );
-    }
-    return response.json();
-  };
+  const api = (path: string) => readApi(token, organization, path);
   const { apps } = inventorySchema.parse(await api("/inventory"));
   const expected = new Map<string, Set<string>>();
   for (const path of manifest.toolkit.paths) {
@@ -148,6 +157,60 @@ if (process.argv.includes("--live")) {
     }
   }
 }
+
+// Each lane's bot must reach exactly the apps its manifest selects: the
+// dispute-write apps only for disputes. Run on an operator machine only; the
+// lane tokens are the bots' personal access tokens, never deployment config.
+if (process.argv.includes("--isolation")) {
+  const organization = process.env.EXECUTOR_ORGANIZATION;
+  const lanes = [
+    ["foreman", "", process.env.EXECUTOR_LANE_TOKEN_FOREMAN],
+    ["foreman-support", "support-", process.env.EXECUTOR_LANE_TOKEN_SUPPORT],
+    ["foreman-disputes", "disputes-", process.env.EXECUTOR_LANE_TOKEN_DISPUTES],
+  ] as const;
+  if (!(organization && lanes.every(([, , token]) => token))) {
+    throw new Error(
+      "Set EXECUTOR_ORGANIZATION and EXECUTOR_LANE_TOKEN_FOREMAN, _SUPPORT and _DISPUTES to the lane bots' tokens."
+    );
+  }
+  // Three lanes, read together; each result is printed in lane order.
+  const results = await Promise.all(
+    lanes.map(async ([lane, prefix, token]) => {
+      const expected = new Set(
+        (await readManifest(prefix)).toolkit.paths.map((path) =>
+          path.slice(0, path.indexOf("."))
+        )
+      );
+      const { apps } = inventorySchema.parse(
+        await readApi(token as string, organization, "/inventory")
+      );
+      // Executor's own app is visible to every member and is never called.
+      const actual = new Set(
+        apps.map((app) => app.slug).filter((slug) => slug !== "executor")
+      );
+      return {
+        absent: [...expected].filter((slug) => !actual.has(slug)),
+        extra: [...actual].filter((slug) => !expected.has(slug)),
+        lane,
+      };
+    })
+  );
+  for (const { absent, extra, lane } of results) {
+    console.log(
+      `${extra.length || absent.length ? "FAIL" : "PASS"} ${lane} bot reaches exactly its apps`
+    );
+    for (const slug of extra) {
+      console.log(`  unexpected ${slug}`);
+    }
+    for (const slug of absent) {
+      console.log(`  missing ${slug}`);
+    }
+    if (extra.length || absent.length) {
+      failures += 1;
+    }
+  }
+}
+
 console.log(
   `Configuration audit: ${failures} unresolved checks. Live helper, role, requester and attachment acceptance tests are also required.`
 );

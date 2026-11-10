@@ -5,7 +5,7 @@ import { describe, it } from "node:test";
 import { PRODUCTION_READ_QUERY_ARGS } from "./lookup-customer.js";
 
 process.env.LINEAR_CONNECTOR ??= "linear/test";
-process.env.EXECUTOR_MCP_CONNECTOR = "executor/test";
+process.env.EXECUTOR_MCP_CONNECTOR_FOREMAN = "executor/test";
 process.env.EXECUTOR_OPERATION_BINDINGS = JSON.stringify({
   "planetscale.readQuery": {
     arguments: {

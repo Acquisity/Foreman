@@ -115,7 +115,7 @@ describe("critic evidence surface", () => {
       assert.equal(typeof child.auth, "function", name);
       assert.equal(typeof root.auth, "function", name);
       assert.equal(child.url, root.url, name);
-      assert.ok(String(child.url).endsWith("/mcp?connection=foreman"), name);
+      assert.ok(String(child.url).endsWith("/mcp"), name);
       assert.deepEqual(child.tools, { allow: ["execute", "skills"] });
     }
   });

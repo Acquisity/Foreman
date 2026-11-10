@@ -7,19 +7,19 @@ import provider from "./support_provider.js";
 
 test("support_provider describe then call preserves canonical v2 path, query and headers", async (t) => {
   const prior = {
-    connector: process.env.EXECUTOR_MCP_CONNECTOR,
+    connector: process.env.EXECUTOR_MCP_CONNECTOR_SUPPORT,
     database: process.env.FOREMAN_MEMORY_DATABASE_URL,
     enabled: process.env.FOREMAN_SUPPORT_ENABLED,
     fetch: neonConfig.fetchFunction,
   };
-  process.env.EXECUTOR_MCP_CONNECTOR = "placeholder/support-test";
+  process.env.EXECUTOR_MCP_CONNECTOR_SUPPORT = "placeholder/support-test";
   process.env.FOREMAN_SUPPORT_ENABLED = "true";
   process.env.FOREMAN_MEMORY_DATABASE_URL =
     "postgresql://test@support.invalid/test";
   t.after(() => {
     neonConfig.fetchFunction = prior.fetch;
     for (const [key, value] of [
-      ["EXECUTOR_MCP_CONNECTOR", prior.connector],
+      ["EXECUTOR_MCP_CONNECTOR_SUPPORT", prior.connector],
       ["FOREMAN_MEMORY_DATABASE_URL", prior.database],
       ["FOREMAN_SUPPORT_ENABLED", prior.enabled],
     ] as const) {

@@ -566,7 +566,7 @@ const providerCtx = (): ProviderContext => {
 };
 
 const answer = (t: TestContext, data: unknown) => {
-  withEnv(t, "EXECUTOR_MCP_CONNECTOR", "executor/test");
+  withEnv(t, "EXECUTOR_MCP_CONNECTOR_SUPPORT", "executor/test");
   const paths: string[] = [];
   t.mock.method(executorTransport, "call", (_wire: unknown, path: string) => {
     paths.push(path);
@@ -577,7 +577,7 @@ const answer = (t: TestContext, data: unknown) => {
 
 test("Sentry searches by the workspace tag, which its search keeps, not a bare key it drops", async (t) => {
   withEnv(t, "WIDGET_SENTRY_ORG_SLUG", "acquisity-ai");
-  withEnv(t, "EXECUTOR_MCP_CONNECTOR", "executor/test");
+  withEnv(t, "EXECUTOR_MCP_CONNECTOR_SUPPORT", "executor/test");
   const inputs: Record<string, unknown>[] = [];
   t.mock.method(
     executorTransport,
@@ -643,7 +643,7 @@ test("Sentry is not checked when its organization is not configured", async (t) 
 
 test("Axiom reads the workspace and user from the app logs' fields map", async (t) => {
   withEnv(t, "WIDGET_AXIOM_APP_DATASET", "acquisity-app");
-  withEnv(t, "EXECUTOR_MCP_CONNECTOR", "executor/test");
+  withEnv(t, "EXECUTOR_MCP_CONNECTOR_SUPPORT", "executor/test");
   const apls: string[] = [];
   t.mock.method(
     executorTransport,

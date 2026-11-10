@@ -14,9 +14,9 @@ import definition, {
 } from "../tools/widget_sdr_thread_status.js";
 
 const scope = verifiedWidgetContext;
-const originalConnector = process.env.EXECUTOR_MCP_CONNECTOR;
+const originalConnector = process.env.EXECUTOR_MCP_CONNECTOR_SUPPORT;
 const originalBindings = process.env.EXECUTOR_OPERATION_BINDINGS;
-process.env.EXECUTOR_MCP_CONNECTOR = "executor.test/widget";
+process.env.EXECUTOR_MCP_CONNECTOR_SUPPORT = "executor.test/widget";
 process.env.EXECUTOR_OPERATION_BINDINGS = JSON.stringify({
   "planetscale.readQuery": {
     path: "planetscale-org.planetscale_execute_read_query",
@@ -29,9 +29,9 @@ after(() => {
     process.env.EXECUTOR_OPERATION_BINDINGS = originalBindings;
   }
   if (originalConnector === undefined) {
-    delete process.env.EXECUTOR_MCP_CONNECTOR;
+    delete process.env.EXECUTOR_MCP_CONNECTOR_SUPPORT;
   } else {
-    process.env.EXECUTOR_MCP_CONNECTOR = originalConnector;
+    process.env.EXECUTOR_MCP_CONNECTOR_SUPPORT = originalConnector;
   }
 });
 

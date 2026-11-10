@@ -25,10 +25,10 @@ const AXIOM_PATH = "axiom.queryDataset";
 const saved = {
   axiom: process.env.WIDGET_AXIOM_APP_DATASET,
   bindings: process.env.EXECUTOR_OPERATION_BINDINGS,
-  connector: process.env.EXECUTOR_MCP_CONNECTOR,
+  connector: process.env.EXECUTOR_MCP_CONNECTOR_SUPPORT,
   sentry: process.env.WIDGET_SENTRY_ORG_SLUG,
 };
-process.env.EXECUTOR_MCP_CONNECTOR = "executor.test/widget";
+process.env.EXECUTOR_MCP_CONNECTOR_SUPPORT = "executor.test/widget";
 process.env.EXECUTOR_OPERATION_BINDINGS = JSON.stringify({
   "planetscale.readQuery": { path: PLANETSCALE_PATH },
 });
@@ -42,7 +42,7 @@ const restore = (key: keyof typeof saved, name: string) => {
   }
 };
 after(() => {
-  restore("connector", "EXECUTOR_MCP_CONNECTOR");
+  restore("connector", "EXECUTOR_MCP_CONNECTOR_SUPPORT");
   restore("bindings", "EXECUTOR_OPERATION_BINDINGS");
   restore("sentry", "WIDGET_SENTRY_ORG_SLUG");
   restore("axiom", "WIDGET_AXIOM_APP_DATASET");

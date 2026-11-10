@@ -21,11 +21,12 @@ import {
   type WidgetContext,
 } from "../widget-scope.js";
 import { WIDGET_SCOPE_NOTICE } from "../widget-ticket-marker.js";
-import { executorAuth } from "./auth.js";
+import { executorAuth, laneConnector } from "./auth.js";
 import { operationPath } from "./bindings.js";
 import {
   DISPUTES_TOOLKIT,
   type ExecutorToolkit,
+  FOREMAN_TOOLKIT_SLUG,
   WIDGET_TOOLKIT,
 } from "./endpoint.js";
 import { ExecutorError, executorTransport } from "./transport.js";
@@ -173,7 +174,7 @@ export async function readWidgetOwnership(
   query: string,
   signal: AbortSignal
 ): Promise<unknown> {
-  const connector = process.env.EXECUTOR_MCP_CONNECTOR;
+  const connector = laneConnector(WIDGET_TOOLKIT);
   if (!connector) {
     throw new Error("Support identifier resolution is unavailable.");
   }
@@ -204,11 +205,15 @@ async function connection(
   policy: OperationPolicy,
   path: string
 ) {
-  const { token } = await ctx.getToken(executorAuth());
+  const toolkit = toolkitFor(policy, path);
+  // The token comes from this lane's own connector, never the shared one.
+  const { token } = await ctx.getToken(
+    executorAuth(toolkit ?? FOREMAN_TOOLKIT_SLUG)
+  );
   const authorization = policy ? { version: await policy.authorize() } : null;
   return {
     authorization,
-    wire: { signal: ctx.abortSignal, token, toolkit: toolkitFor(policy, path) },
+    wire: { signal: ctx.abortSignal, token, toolkit },
   };
 }
 

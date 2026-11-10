@@ -462,7 +462,7 @@ try {
       })
     );
   };
-  process.env.EXECUTOR_MCP_CONNECTOR = "executor/support-test";
+  process.env.EXECUTOR_MCP_CONNECTOR_SUPPORT = "executor/support-test";
   const auth = supportAuth(
     {
       attributes: {},
@@ -1285,8 +1285,7 @@ try {
   assert.ok(
     urls.every(
       (url) =>
-        url ===
-          "https://executor.acquisity.ai/mcp?connection=foreman-support" ||
+        url === "https://executor.acquisity.ai/mcp" ||
         url === "https://slack.com/api/chat.postMessage" ||
         url === "https://slack.com/api/conversations.history" ||
         url === "https://slack.com/api/conversations.replies" ||

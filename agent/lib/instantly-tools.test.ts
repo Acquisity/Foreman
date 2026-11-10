@@ -3,7 +3,8 @@ import { describe, it } from "node:test";
 import { z } from "zod";
 import { InstantlyApiError } from "./instantly-api.js";
 
-process.env.EXECUTOR_MCP_CONNECTOR ??= "api.instantly.ai/acquisity-foreman";
+process.env.EXECUTOR_MCP_CONNECTOR_FOREMAN ??=
+  "api.instantly.ai/acquisity-foreman";
 process.env.LINEAR_CONNECTOR ??= "linear/test";
 
 const [
