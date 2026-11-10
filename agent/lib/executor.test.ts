@@ -245,7 +245,7 @@ test("Executor uses a fresh toolkit session, follows JSON-RPC ids, and returns t
   assert.ok(!invocation.params.arguments.code.includes("executor-secret"));
   assert.ok(
     invocation.params.arguments.code.includes(
-      'tools["stripe"]["customer"](input)'
+      'tools["stripe"]["customer"](call)'
     )
   );
   assert.ok(

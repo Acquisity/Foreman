@@ -396,6 +396,8 @@ test("v2 generated program preserves upstream 404 and 429 through real helper ca
     "foreman-instantly-api": {
       "workspaceGroupMembers.listWorkspaceGroupMembers": fail,
     },
+    // These apps link no account, so each call keeps its input unchanged.
+    search: { describe: () => ({ items: [], missing: [], namespaces: [] }) },
   };
   t.mock.method(
     globalThis,

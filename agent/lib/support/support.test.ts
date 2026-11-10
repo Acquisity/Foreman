@@ -296,12 +296,12 @@ test("support transport stays on its selected toolkit and quotes inputs as data"
     { fetch: fetcher }
   );
   assert.ok(urls.every((url) => url === toolkitUrl("foreman-support")));
-  const [declaration, call] = code[0].split("\n");
+  const [declaration] = code[0].split("\n");
   assert.equal(
     declaration,
     `const input = ${JSON.stringify({ id: malicious })};`
   );
-  assert.ok(call.includes('tools["intercom"]["get_conversation"](input)'));
+  assert.ok(code[0].includes('tools["intercom"]["get_conversation"](call)'));
   assert.throws(() => toolkitUrl("arbitrary-toolkit" as never));
 });
 

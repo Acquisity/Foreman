@@ -152,6 +152,36 @@ function rpcMessage(body: string, id: number) {
   throw new ExecutorError("invalid_rpc_response");
 }
 
+/**
+ * Program lines that choose the account a typed helper runs as. v2 asks an app
+ * whose requirement has linked accounts for `{ accountId, input }`, one branch
+ * per usable account, and lists them in the described input type only. The
+ * account always comes from that description, never from caller input: one
+ * account wraps the input, none sends it as is, more than one is refused.
+ * Input a caller already shaped as `{ accountId, input }` after describing
+ * the tool passes through only when it names that same account.
+ */
+// The described input type renders one account as `accountId: "acc_…"` and
+// several as `"acc_a" | "acc_b"`; v2 account ids always start with `acc_`.
+const ACCOUNT_FIELD =
+  /accountId\??: *"acc_[^"\n]{1,200}"(?: *\| *"acc_[^"\n]{1,200}")*/gu;
+const ACCOUNT_ID = /acc_[^"\n]{1,200}/gu;
+const ACCOUNT_SELECTION = (path: string) =>
+  `const described = await tools.search.describe({ paths: [${JSON.stringify(path)}] });
+  const signature = String(described?.items?.[0]?.signature ?? "").slice(0, 200000);
+  const inputType = signature.split("): Promise<")[0];
+  const accounts = [];
+  for (const field of inputType.match(${ACCOUNT_FIELD}) ?? []) {
+    for (const id of field.match(${ACCOUNT_ID}) ?? []) {
+      if (!accounts.includes(id)) accounts.push(id);
+    }
+  }
+  if (accounts.length > 1) return { ok: false, error: { code: "executor_account_ambiguous" } };
+  const keys = Object.keys(input);
+  const canonical = accounts.length === 1 && keys.length === 2 && keys.includes("accountId") && keys.includes("input");
+  if (canonical && input.accountId !== accounts[0]) return { ok: false, error: { code: "executor_account_mismatch" } };
+  const call = accounts.length === 1 && !canonical ? { accountId: accounts[0], input } : input;`;
+
 /** Fresh MCP session per helper call. No session cache or approval resume. */
 async function invokeExecutor(
   ctx: ExecutorRequestContext,
@@ -169,7 +199,10 @@ async function invokeExecutor(
   const result = await executeExecutor(
     ctx,
     `const input = ${JSON.stringify(input)};
-try { return { ok: true, data: (await ${tool}(input)) ?? null }; }
+try {
+  ${ACCOUNT_SELECTION(path)}
+  return { ok: true, data: (await ${tool}(call)) ?? null };
+}
 catch (error) {
   let diagnostic;
   try { diagnostic = JSON.parse(error.message); } catch {}
