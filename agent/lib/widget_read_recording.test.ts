@@ -6,6 +6,7 @@ import {
 } from "#lib/executor/dispatch.js";
 import { executorTransport } from "#lib/executor/transport.js";
 import { verifiedWidgetContext } from "#lib/widget.fixture.js";
+import { RECORDING_READS } from "#lib/widget-policy.js";
 import { widgetAuth } from "#lib/widget-scope.js";
 import definition, { readRecording } from "../tools/widget_read_recording.js";
 
@@ -48,7 +49,10 @@ test("reads every part of the bound recording and bounds what comes back", async
   for (const [, path, input] of call.mock.calls.map(
     (c) => c.arguments as unknown as [unknown, string, { jamId: string }]
   )) {
-    assert.ok(path.startsWith("jam."));
+    assert.ok(
+      Object.values(RECORDING_READS).some((read) => read.path === path),
+      path
+    );
     assert.equal(input.jamId, jamId);
   }
   assert.ok(String(result.consoleErrors).length <= 3001);
