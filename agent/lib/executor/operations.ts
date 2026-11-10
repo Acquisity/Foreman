@@ -26,36 +26,61 @@ const runs = {
   limit,
   status: z.string().optional(),
 };
+/** Typed helper schemas own their provider parameter placement; generic calls already use v2 input. */
+const queryInput = <T extends z.ZodType>(schema: T) =>
+  schema.transform((query) => ({ query }));
+const workspaceQuery = <T extends { "x-as-workspace": string }>(input: T) => {
+  const { "x-as-workspace": workspace, ...query } = input;
+  return { headers: { "x-as-workspace": workspace }, query };
+};
 export const operationInputs = {
-  "autumn.customer": z.object({
-    body: z.object({ customer_id: id, expand: z.array(z.string()) }),
-    "x-api-version": z.literal("2.3.0"),
-  }),
-  "help.search": z.object({ query: z.string().max(2000) }),
-  "inngest.apps": z.object({ cursor: z.string().optional(), limit }),
-  "inngest.functionRuns": z.object({ ...runs, appId: id, functionId: id }),
-  "inngest.runs": z.object(runs),
-  "inngest.trace": z.object({
-    includeOutput: z.boolean().optional(),
-    runId: id,
-  }),
-  "instantly.accounts": z.object({
-    ...resource,
-    provider_code: z.number().int().optional(),
-  }),
-  "instantly.campaigns": z.object(resource),
-  "instantly.emails": z.object({
-    ...resource,
-    campaign_id: z.string().optional(),
-    eaccount: z.string().optional(),
-    email_type: z.enum(["received", "sent", "manual"]).optional(),
-    latest_of_thread: z.boolean().optional(),
-    lead: z.string().optional(),
-    max_timestamp_created: z.string().optional(),
-    min_timestamp_created: z.string().optional(),
-    preview_only: z.literal(true),
-  }),
-  "instantly.workspace-group-members": z.object(page),
+  "autumn.customer": z
+    .object({
+      body: z.object({ customer_id: id, expand: z.array(z.string()) }),
+      "x-api-version": z.literal("2.3.0"),
+    })
+    .transform(({ body, "x-api-version": version }) => ({
+      body,
+      headers: { "x-api-version": version },
+    })),
+  "help.search": queryInput(z.object({ query: z.string().max(2000) })),
+  "inngest.apps": queryInput(
+    z.object({ cursor: z.string().optional(), limit })
+  ),
+  "inngest.functionRuns": z
+    .object({ ...runs, appId: id, functionId: id })
+    .transform(({ appId, functionId, ...query }) => ({
+      path: { appId, functionId },
+      query,
+    })),
+  "inngest.runs": queryInput(z.object(runs)),
+  "inngest.trace": z
+    .object({
+      includeOutput: z.boolean().optional(),
+      runId: id,
+    })
+    .transform(({ runId, ...query }) => ({ path: { runId }, query })),
+  "instantly.accounts": z
+    .object({
+      ...resource,
+      provider_code: z.number().int().optional(),
+    })
+    .transform(workspaceQuery),
+  "instantly.campaigns": z.object(resource).transform(workspaceQuery),
+  "instantly.emails": z
+    .object({
+      ...resource,
+      campaign_id: z.string().optional(),
+      eaccount: z.string().optional(),
+      email_type: z.enum(["received", "sent", "manual"]).optional(),
+      latest_of_thread: z.boolean().optional(),
+      lead: z.string().optional(),
+      max_timestamp_created: z.string().optional(),
+      min_timestamp_created: z.string().optional(),
+      preview_only: z.literal(true),
+    })
+    .transform(workspaceQuery),
+  "instantly.workspace-group-members": queryInput(z.object(page)),
   "planetscale.readQuery": z.object({
     branch: id,
     database: id,
@@ -72,50 +97,77 @@ export const operationInputs = {
     period: z.string(),
     query: z.string(),
   }),
-  "slack.aia.channels": z.object({
-    cursor: z.string().optional(),
-    exclude_archived: z.boolean().optional(),
-    limit: slackLimit.optional(),
-    types: z.literal("private_channel"),
-  }),
-  "slack.aia.history": z.object({
-    channel: slackChannel,
-    cursor: z.string().optional(),
-    inclusive: z.boolean().optional(),
-    latest: z.string().optional(),
-    limit: slackLimit.optional(),
-    oldest: z.string().optional(),
-  }),
-  "slack.aia.replies": z.object({
-    channel: slackChannel,
-    cursor: z.string().optional(),
-    latest: z.string().optional(),
-    limit: slackLimit.optional(),
-    oldest: z.string().optional(),
-    ts: z.string().regex(/^\d{1,12}\.\d{1,8}$/u),
-  }),
-  "slack.aia.user": z.object({
-    user: z.string().regex(/^[UW][A-Z0-9]{2,30}$/u),
-  }),
-  "stripe.charges.get": z.object({
-    charge_id: id,
-    "expand[]": z.literal("refunds"),
-  }),
-  "stripe.charges.list": history,
-  "stripe.coupons.get": z.object({ coupon_id: id }),
-  "stripe.credit_notes.list": history,
-  "stripe.customers.balance_transactions": z.object({ customer_id: id, limit }),
-  "stripe.customers.get": z.object({ customer_id: id }),
-  "stripe.disputes.get": z.object({ dispute_id: id }),
-  "stripe.invoices.list": history,
-  "stripe.promotion_codes.list": z.object({ code: id, limit }),
-  "stripe.refunds.get": z.object({ refund_id: id }),
-  "stripe.subscriptions.list": history.extend({ status: z.literal("all") }),
-  "vercel.billingCharges": z.object({
-    from: z.iso.datetime(),
-    teamId: id,
-    to: z.iso.datetime(),
-  }),
+  "slack.aia.channels": queryInput(
+    z.object({
+      cursor: z.string().optional(),
+      exclude_archived: z.boolean().optional(),
+      limit: slackLimit.optional(),
+      types: z.literal("private_channel"),
+    })
+  ),
+  "slack.aia.history": queryInput(
+    z.object({
+      channel: slackChannel,
+      cursor: z.string().optional(),
+      inclusive: z.boolean().optional(),
+      latest: z.string().optional(),
+      limit: slackLimit.optional(),
+      oldest: z.string().optional(),
+    })
+  ),
+  "slack.aia.replies": queryInput(
+    z.object({
+      channel: slackChannel,
+      cursor: z.string().optional(),
+      latest: z.string().optional(),
+      limit: slackLimit.optional(),
+      oldest: z.string().optional(),
+      ts: z.string().regex(/^\d{1,12}\.\d{1,8}$/u),
+    })
+  ),
+  "slack.aia.user": queryInput(
+    z.object({
+      user: z.string().regex(/^[UW][A-Z0-9]{2,30}$/u),
+    })
+  ),
+  "stripe.charges.get": z
+    .object({
+      charge_id: id,
+      "expand[]": z.literal("refunds"),
+    })
+    .transform(({ charge_id, ...query }) => ({ path: { charge_id }, query })),
+  "stripe.charges.list": queryInput(history),
+  "stripe.coupons.get": z
+    .object({ coupon_id: id })
+    .transform((path) => ({ path })),
+  "stripe.credit_notes.list": queryInput(history),
+  "stripe.customers.balance_transactions": z
+    .object({ customer_id: id, limit })
+    .transform(({ customer_id, ...query }) => ({
+      path: { customer_id },
+      query,
+    })),
+  "stripe.customers.get": z
+    .object({ customer_id: id })
+    .transform((path) => ({ path })),
+  "stripe.disputes.get": z
+    .object({ dispute_id: id })
+    .transform((path) => ({ path })),
+  "stripe.invoices.list": queryInput(history),
+  "stripe.promotion_codes.list": queryInput(z.object({ code: id, limit })),
+  "stripe.refunds.get": z
+    .object({ refund_id: id })
+    .transform((path) => ({ path })),
+  "stripe.subscriptions.list": queryInput(
+    history.extend({ status: z.literal("all") })
+  ),
+  "vercel.billingCharges": queryInput(
+    z.object({
+      from: z.iso.datetime(),
+      teamId: id,
+      to: z.iso.datetime(),
+    })
+  ),
 };
 
 /** Stripe dispute evidence text fields Foreman may fill. */
@@ -175,7 +227,7 @@ export const disputeOperationInputs = {
 
 /**
  * The arguments Executor's dispute-write operations take, from validated
- * input: path and header parameters at the top, the request fields under
+ * input: grouped path and header parameters, the request fields under
  * `body`, and the PDF as a `ToolFile` Executor sends as multipart.
  */
 export const disputeWireArgs = (
@@ -206,15 +258,17 @@ export const disputeWireArgs = (
   } = disputeOperationInputs["stripe.disputes.update"].parse(input);
   return {
     body,
-    dispute_id,
-    ...(idempotencyKey ? { "Idempotency-Key": idempotencyKey } : {}),
+    path: { dispute_id },
+    ...(idempotencyKey
+      ? { headers: { "Idempotency-Key": idempotencyKey } }
+      : {}),
   };
 };
 
 type ApiRequest = {
   [K in keyof typeof operationInputs]: {
     operation: K;
-    input: z.infer<(typeof operationInputs)[K]>;
+    input: z.input<(typeof operationInputs)[K]>;
   };
 }[keyof typeof operationInputs];
 export type OperationRequest =

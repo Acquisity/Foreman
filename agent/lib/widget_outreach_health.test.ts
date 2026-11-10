@@ -395,7 +395,7 @@ test("targeted live read matches owned provider ID and keeps saved limits distin
       if (path.includes("workspaceGroupMembers")) {
         return { data: { items: [member()] }, ok: true };
       }
-      assert.equal(input["x-as-workspace"], WORKSPACE_ID);
+      assert.deepEqual(input.headers, { "x-as-workspace": WORKSPACE_ID });
       return {
         data: {
           items: [
@@ -460,9 +460,10 @@ test("a multi-page live scan resolves the workspace group once", async (t) => {
         groupWalks += 1;
         return { data: { items: [member()] }, ok: true };
       }
-      assert.equal(input["x-as-workspace"], WORKSPACE_ID);
-      campaignPages.push(input.starting_after);
-      return input.starting_after === "page-3"
+      assert.deepEqual(input.headers, { "x-as-workspace": WORKSPACE_ID });
+      const query = input.query as { starting_after?: string };
+      campaignPages.push(query.starting_after);
+      return query.starting_after === "page-3"
         ? { data: { items: [{ id: campaignId, status: 1 }] }, ok: true }
         : {
             data: {

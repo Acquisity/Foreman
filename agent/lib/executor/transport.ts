@@ -74,58 +74,6 @@ const SSE_LINE = /\r?\n/u;
 export const OPERATION_PATH =
   /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[A-Za-z0-9_-]+)+$/u;
 
-// Path parameters of the OpenAPI tools Foreman binds, by tool path inside the
-// app (sandbox apps share their live app's tools). From the specs in
-// .github/executor/specs and the v1 Stripe and Vercel parameter names.
-const OPENAPI_PATH_PARAMS: Record<string, readonly string[]> = {
-  "apps.listFunctionRuns": ["appId", "functionId"],
-  "charges.readCharge": ["charge_id"],
-  "coupons.readCoupon": ["coupon_id"],
-  "customers.listCustomerBalanceTransactions": ["customer_id"],
-  "customers.readCustomer": ["customer_id"],
-  "disputes.readDispute": ["dispute_id"],
-  "disputes.updateDisputeEvidence": ["dispute_id"],
-  "refunds.readRefund": ["refund_id"],
-  "runs.getRunTrace": ["runId"],
-};
-const OPENAPI_HEADERS = new Set([
-  "Idempotency-Key",
-  "x-api-version",
-  "x-as-workspace",
-]);
-
-/**
- * v2 OpenAPI tools take { path, query, headers, body } where v1 took one flat
- * object. Every foreman-* app is an OpenAPI app; MCP tools keep flat input.
- * `body` stays the body, listed path and header names move to their group,
- * and every other field is a query parameter.
- */
-export function wireInput(
-  path: string,
-  input: Record<string, unknown>
-): Record<string, unknown> {
-  if (!path.startsWith("foreman-")) {
-    return input;
-  }
-  const pathParams = OPENAPI_PATH_PARAMS[path.slice(path.indexOf(".") + 1)];
-  const groups: Record<string, Record<string, unknown>> = {};
-  let body: unknown;
-  for (const [name, value] of Object.entries(input)) {
-    if (name === "body") {
-      body = value;
-      continue;
-    }
-    let group = "query";
-    if (pathParams?.includes(name)) {
-      group = "path";
-    } else if (OPENAPI_HEADERS.has(name)) {
-      group = "headers";
-    }
-    groups[group] = { ...groups[group], [name]: value };
-  }
-  return body === undefined ? groups : { ...groups, body };
-}
-
 // beta.39: apps/src/implementation/failure-detail.ts:323-341 and sdk/src/contracts/tools.ts:1360-1446.
 const OPENAPI_FAILURE =
   /^The app's API call failed: (?:The API request|(?:GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS) \/[^\s]{1,500}) responded with HTTP ([345]\d{2})(?: \([^()\r\n]{1,200}\))?, which matches no error with a message in the API's OpenAPI document\.$/u;
@@ -220,7 +168,7 @@ async function invokeExecutor(
   // Only machine fields leave the program; provider text and recovery stay inside Executor.
   const result = await executeExecutor(
     ctx,
-    `const input = ${JSON.stringify(wireInput(path, input))};
+    `const input = ${JSON.stringify(input)};
 try { return { ok: true, data: (await ${tool}(input)) ?? null }; }
 catch (error) {
   let diagnostic;

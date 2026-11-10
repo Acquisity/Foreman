@@ -751,8 +751,8 @@ describe("dispute write dispatch", () => {
           evidence: { uncategorized_text: "Signed in daily." },
           submit: false,
         },
-        dispute_id: ID,
-        "Idempotency-Key": "foreman-dispute-stage-abc",
+        headers: { "Idempotency-Key": "foreman-dispute-stage-abc" },
+        path: { dispute_id: ID },
       }
     );
     const pdf = Buffer.from("%PDF-1.7 proof").toString("base64");
