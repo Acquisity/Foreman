@@ -236,6 +236,39 @@ test("typed client preserves provider errors and enforces helper payload bounds"
   );
 });
 
+test("PlanetScale reads rows from structuredContent when content is empty, and from text otherwise", async (t) => {
+  configure(t);
+  // The exact v2 beta.39 shape seen on Preview: rows only in structuredContent.
+  const structured = {
+    columns: ["one"],
+    row_count: 1,
+    rows: [{ one: 1 }],
+    success: true,
+  };
+  let outcome: unknown = {
+    data: { content: [], structuredContent: structured },
+    ok: true,
+  };
+  t.mock.method(
+    globalThis,
+    "fetch",
+    rpcFetch(() => outcome, [])
+  );
+  const args = {
+    branch: "main",
+    database: "test",
+    organization: "test",
+    query: "SELECT 1 AS one",
+  };
+  assert.deepEqual(JSON.parse(await executorReadQuery(ctx, args)), structured);
+  const text = '{"success":true,"rows":[{"one":1}]}';
+  outcome = {
+    data: { content: [{ text, type: "text" }] },
+    ok: true,
+  };
+  assert.equal(await executorReadQuery(ctx, args), text);
+});
+
 test("PlanetScale rejects failed and malformed results and preserves rate-limit metadata", async (t) => {
   configure(t);
   const outcomes = [

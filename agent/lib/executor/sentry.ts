@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { operationPath } from "./bindings.js";
 import { invokeProvider, type ProviderContext } from "./dispatch.js";
+import { mcpResultText } from "./mcp-result.js";
 import { ExecutorError } from "./transport.js";
 
 export const sentryIssueInput = z.strictObject({
@@ -46,18 +47,17 @@ export async function readSentryIssue(input: unknown, ctx: ProviderContext) {
   }
   const result = z
     .object({
-      content: z.array(
-        z.object({ text: z.string().optional(), type: z.string() })
-      ),
+      content: z
+        .array(z.object({ text: z.string().optional(), type: z.string() }))
+        .optional(),
       isError: z.boolean().optional(),
+      structuredContent: z.unknown().optional(),
     })
+    .refine((value) => value.content || value.structuredContent)
     .parse(outcome.data);
   if (result.isError) {
     throw new ExecutorError("sentry_read_failed");
   }
-  const text = result.content
-    .filter((part) => part.type === "text")
-    .map((part) => part.text ?? "")
-    .join("\n");
+  const text = mcpResultText(result) ?? "";
   return { text: text.slice(0, 100_000), truncated: text.length > 100_000 };
 }

@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { z } from "zod";
 import { INTERCOM_WORKSPACE } from "../acquisity-constants.js";
+import { mcpResultText } from "../executor/mcp-result.js";
 import { conversationId } from "./config.js";
 import type { SupportSlackMessage } from "./slack.js";
 
@@ -74,11 +75,7 @@ export function providerData(data: unknown): unknown {
     return envelope.structuredContent;
   }
   if (envelope.content) {
-    const text = envelope.content
-      .filter((part) => part.type === "text")
-      .map((part) => part.text ?? "")
-      .join("\n");
-    return JSON.parse(text);
+    return JSON.parse(mcpResultText(envelope) ?? "");
   }
   return envelope;
 }
