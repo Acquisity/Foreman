@@ -53,7 +53,12 @@ export async function readSentryIssue(input: unknown, ctx: ProviderContext) {
       isError: z.boolean().optional(),
       structuredContent: z.unknown().optional(),
     })
-    .refine((value) => value.content || value.structuredContent)
+    .refine(
+      (value) =>
+        value.content !== undefined ||
+        (value.structuredContent !== undefined &&
+          value.structuredContent !== null)
+    )
     .parse(outcome.data);
   if (result.isError) {
     throw new ExecutorError("sentry_read_failed");
