@@ -662,6 +662,43 @@ test("Sentry reads v2's structured issues when the text content is empty", async
     }
   );
   t.mock.restoreAll();
+  answer(t, {
+    content: [],
+    structuredContent: {
+      issues: [
+        {
+          shortId: "X".repeat(200),
+          url: "https://acquisity-ai.sentry.io/issues/X",
+        },
+        {
+          shortId: "ACQUISITY-1",
+          url: "https://acquisity-ai.sentry.io/issues/ACQUISITY-1",
+        },
+      ],
+    },
+  });
+  assert.deepEqual(
+    await EVIDENCE_SOURCES.Sentry(providerCtx(), verifiedWidgetContext, turn),
+    {
+      items: [
+        {
+          text: "ACQUISITY-1",
+          url: "https://acquisity-ai.sentry.io/issues/ACQUISITY-1",
+        },
+      ],
+      status: "found",
+    }
+  );
+  t.mock.restoreAll();
+  answer(t, { content: [], structuredContent: { results: "changed" } });
+  assert.deepEqual(
+    await EVIDENCE_SOURCES.Sentry(providerCtx(), verifiedWidgetContext, turn),
+    {
+      reason: "Sentry returned an unexpected result shape",
+      status: "unchecked",
+    }
+  );
+  t.mock.restoreAll();
   answer(t, { content: [], structuredContent: { issues: [] } });
   assert.deepEqual(
     await EVIDENCE_SOURCES.Sentry(providerCtx(), verifiedWidgetContext, turn),

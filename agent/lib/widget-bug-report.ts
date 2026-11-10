@@ -101,14 +101,12 @@ const SENTRY_ISSUE_ID = /\[([^\]]+)\]/u;
 const SENTRY_ISSUE_URL =
   /https:\/\/[\w.-]*sentry\.io\/[^\s)\]]*issues\/[^\s)\]]+/u;
 
-const sentryIssues = z.object({
-  issues: z.array(
-    z.object({
-      shortId: z.string().max(100),
-      title: z.string().max(2000).optional(),
-      url: z.string().max(2000),
-    })
-  ),
+const sentryIssues = z.object({ issues: z.array(z.unknown()) });
+// Each issue is checked on its own, so one oversized field drops only that issue.
+const sentryIssue = z.object({
+  shortId: z.string().max(100),
+  title: z.string().max(2000).optional(),
+  url: z.string().max(2000),
 });
 
 /** Sentry answers search_issues as structured issues, or in markdown: each issue a `## n. [ID](link)` heading, then its title in bold. */
@@ -124,10 +122,20 @@ const sentry: Lookup = async (ctx, scope) => {
     sort: "date",
   })) as { structuredContent?: unknown } | null;
   // v2 Sentry returns the issues as structured data with empty content.
-  const structured = sentryIssues.safeParse(data?.structuredContent);
-  if (structured.success) {
+  if (data?.structuredContent != null) {
+    const structured = sentryIssues.safeParse(data.structuredContent);
+    if (!structured.success) {
+      return {
+        reason: "Sentry returned an unexpected result shape",
+        status: "unchecked",
+      };
+    }
     return found(
       structured.data.issues
+        .flatMap((issue) => {
+          const parsed = sentryIssue.safeParse(issue);
+          return parsed.success ? [parsed.data] : [];
+        })
         .filter(({ url }) => SENTRY_ISSUE_URL.test(url))
         .map(({ shortId, title, url }) => ({
           text: clip([shortId, title].filter(Boolean).join(": "), ITEM_CHARS),
