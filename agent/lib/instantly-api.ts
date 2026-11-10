@@ -263,7 +263,10 @@ const retryDelayMs = (
 ): number | null => {
   const retryAfter = retryAfterSeconds(response);
   // Older Executor versions discard failure headers. Never guess a short wait after 429.
-  if (response.status === 429 && retryAfter === null) {
+  if (
+    response.retryable === false ||
+    (response.status === 429 && retryAfter === null)
+  ) {
     return null;
   }
   const delay = retryAfter === null ? 500 * 2 ** attempt : retryAfter * 1000;

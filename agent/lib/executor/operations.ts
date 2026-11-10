@@ -226,6 +226,7 @@ export type OperationRequest =
 export interface ProviderResult {
   data: unknown;
   retryAfter?: string;
+  retryable?: boolean;
   status: number;
 }
 export type ProviderClient = (

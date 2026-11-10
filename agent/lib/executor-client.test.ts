@@ -1,17 +1,24 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { type TestContext, test } from "node:test";
+import { runInNewContext } from "node:vm";
 import { ConnectionAuthorizationFailedError } from "eve/connections";
+import { readAutumnCustomer } from "./billing-api.js";
 import { executorClient, executorReadQuery } from "./executor/client.js";
+import { invokeProvider } from "./executor/dispatch.js";
 import { operationInputs } from "./executor/operations.js";
 import { readSentryIssue } from "./executor/sentry.js";
 import { ExecutorError } from "./executor/transport.js";
+import { findFunctionRuns } from "./inngest-api.js";
 import {
   InstantlyApiError,
   listInstantlySubworkspaces,
 } from "./instantly-api.js";
 import { member } from "./instantly-fixtures.js";
 import { LINEAR_OPERATIONS } from "./linear-operations.js";
+
+const PRIVATE_DIAGNOSTIC = /private|limiting requests|responded with HTTP/;
+const AUTUMN_NOT_FOUND = /Autumn has no customer.*HTTP 404/;
 
 const ctx = {
   abortSignal: new AbortController().signal,
@@ -354,4 +361,130 @@ test("provider retry headers are case insensitive", async (t) => {
     assert.equal(result.retryAfter, "60");
     assert.equal(result.status, 429);
   }
+});
+
+// beta.39 templates: packages/apps/src/implementation/failure-detail.ts:323-341; packages/sdk/src/contracts/tools.ts:1360-1446; packages/mcp/src/implementation/diagnostics.ts:47-65.
+test("v2 generated program preserves upstream 404 and 429 through real helper callers without exposing diagnostic text", async (t) => {
+  configure(t);
+  const waits: number[] = [];
+  let calls = 0;
+  const diagnostic = {
+    code: "AppProviderFailed",
+    message:
+      "Instantly is limiting requests for account “Foreman” (HTTP 429) while calling a tool.",
+    recovery: {
+      action: "private action",
+      instructions: "private instructions",
+    },
+    retryable: true,
+    status: 502,
+  };
+  const fail = () => {
+    throw new Error(JSON.stringify(diagnostic));
+  };
+  const tools = {
+    "foreman-autumn-api": { "customersGet.readAutumnCustomer": fail },
+    "foreman-inngest-api": {
+      "apps.listApps": () => ({ data: [{ id: "other" }, { id: "owner" }] }),
+      "apps.listFunctionRuns": (input: { path: { appId: string } }) => {
+        if (input.path.appId === "other") {
+          return fail();
+        }
+        return { data: [] };
+      },
+    },
+    "foreman-instantly-api": {
+      "workspaceGroupMembers.listWorkspaceGroupMembers": fail,
+    },
+  };
+  t.mock.method(
+    globalThis,
+    "fetch",
+    async (_url: unknown, init?: RequestInit) => {
+      const request = JSON.parse(String(init?.body));
+      if (request.method === "notifications/initialized") {
+        return new Response(null, { status: 202 });
+      }
+      if (request.method === "initialize") {
+        return Response.json({
+          id: request.id,
+          jsonrpc: "2.0",
+          result: { protocolVersion: "2025-06-18" },
+        });
+      }
+      calls += 1;
+      const value = await runInNewContext(
+        `(async () => { ${request.params.arguments.code} })()`,
+        { tools }
+      );
+      assert.doesNotMatch(JSON.stringify(value), PRIVATE_DIAGNOSTIC);
+      return Response.json({
+        id: request.id,
+        jsonrpc: "2.0",
+        result: {
+          structuredContent: {
+            execution: { ok: true, value },
+            status: "completed",
+          },
+        },
+      });
+    }
+  );
+  const client = executorClient(ctx);
+  await assert.rejects(
+    listInstantlySubworkspaces({
+      client,
+      sleep: (ms) => {
+        waits.push(ms);
+        return Promise.resolve();
+      },
+    }),
+    (error) =>
+      error instanceof InstantlyApiError && error.kind === "rate-limited"
+  );
+  assert.equal(calls, 1);
+  assert.deepEqual(waits, []);
+  diagnostic.code = "ToolCallFailed";
+  diagnostic.message =
+    "The app's API call failed: GET /apps/{appId}/functions/{functionId}/runs responded with HTTP 404 (application/json, 123 bytes), which matches no error with a message in the API's OpenAPI document.";
+  diagnostic.retryable = false;
+  const runs = await findFunctionRuns(
+    { functionId: "test.function", sinceHours: 1, status: "Failed" },
+    { client }
+  );
+  assert.equal(runs.error, undefined);
+  assert.deepEqual(runs.runs, []);
+  assert.equal(calls, 4);
+  diagnostic.message =
+    "The app's API call failed: POST /v1/customers.get responded with HTTP 404, which matches no error with a message in the API's OpenAPI document.";
+  await assert.rejects(
+    readAutumnCustomer("customer", { client }),
+    AUTUMN_NOT_FOUND
+  );
+  diagnostic.code = "not_found";
+  diagnostic.status = 404;
+  diagnostic.message = "private provider body";
+  assert.deepEqual(
+    await invokeProvider(
+      ctx,
+      "foreman-autumn-api.customersGet.readAutumnCustomer",
+      {}
+    ),
+    { error: { code: "not_found", retryable: false, status: 404 }, ok: false }
+  );
+  diagnostic.code = "ToolCallFailed";
+  diagnostic.status = 502;
+  // A near miss must not turn arbitrary text into a provider status.
+  diagnostic.message = "private HTTP 429";
+  assert.deepEqual(
+    await invokeProvider(
+      ctx,
+      "foreman-autumn-api.customersGet.readAutumnCustomer",
+      {}
+    ),
+    {
+      error: { code: "ToolCallFailed", retryable: false, status: 502 },
+      ok: false,
+    }
+  );
 });

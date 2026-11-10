@@ -33,8 +33,9 @@ const outcomeSchema = z.discriminatedUnion("ok", [
   }),
   z.object({
     error: z.object({
-      code: z.string(),
+      code: z.string().max(100),
       retryAfter: z.string().max(200).optional(),
+      retryable: z.boolean().optional(),
       status: z.number().optional(),
     }),
     ok: z.literal(false),
@@ -125,6 +126,12 @@ export function wireInput(
   return body === undefined ? groups : { ...groups, body };
 }
 
+// beta.39: apps/src/implementation/failure-detail.ts:323-341 and sdk/src/contracts/tools.ts:1360-1446.
+const OPENAPI_FAILURE =
+  /^The app's API call failed: (?:The API request|(?:GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS) \/[^\s]{1,500}) responded with HTTP ([345]\d{2})(?: \([^()\r\n]{1,200}\))?, which matches no error with a message in the API's OpenAPI document\.$/u;
+const PROVIDER_FAILURE =
+  /^[^\r\n]{1,100} (?:returned a server error|rejected the credentials|reported insufficient permission|is limiting requests|refused the request)(?: for account “[^”\r\n]{1,200}”)? \(HTTP ([345]\d{2})\)(?: while (?:connecting|calling a tool|listing its tools))?\.(?: The service reported [A-Za-z0-9_.-]{1,100}(?:: "(?:[^"\\\r\n]|\\[^\r\n]){0,2000}")?\.| We could not identify the cause from the available error details\.)?$/u;
+
 /** Body parsing stays under the caller's deadline, including stalled streams. */
 async function readBody(
   response: Response,
@@ -207,15 +214,26 @@ async function invokeExecutor(
   if (!OPERATION_PATH.test(path) || path.startsWith("executor.")) {
     throw new ExecutorError("invalid_operation_binding");
   }
-  // v2 tools return the provider's data and throw on failure; the program
-  // rebuilds the { ok, data } / { ok: false, error } outcome callers branch on.
-  // shortcut: v2 keeps no response headers, so Retry-After and a success status
-  // other than 200 never reach Foreman; restore them if v2 exposes them again.
   const dot = path.indexOf(".");
   const tool = `tools[${JSON.stringify(path.slice(0, dot))}][${JSON.stringify(path.slice(dot + 1))}]`;
+  // shortcut: parses beta.39 message text for upstream status, replace when v2 exposes a machine field.
+  // Only machine fields leave the program; provider text and recovery stay inside Executor.
   const result = await executeExecutor(
     ctx,
-    `const input = ${JSON.stringify(wireInput(path, input))};\ntry { return { ok: true, data: (await ${tool}(input)) ?? null }; } catch (error) { return { ok: false, error: { code: String(error?.code ?? error?.name ?? "tool_error"), ...(typeof error?.status === "number" ? { status: error.status } : {}) } }; }`,
+    `const input = ${JSON.stringify(wireInput(path, input))};
+try { return { ok: true, data: (await ${tool}(input)) ?? null }; }
+catch (error) {
+  let diagnostic;
+  try { diagnostic = JSON.parse(error.message); } catch {}
+  if (!diagnostic || typeof diagnostic !== "object") return { ok: false, error: { code: "tool_error" } };
+  const code = typeof diagnostic.code === "string" && /^[A-Za-z0-9_.-]{1,100}$/.test(diagnostic.code) ? diagnostic.code : "tool_error";
+  let status = Number.isInteger(diagnostic.status) && diagnostic.status >= 300 && diagnostic.status <= 599 ? diagnostic.status : undefined;
+  const message = typeof diagnostic.message === "string" && diagnostic.message.length <= 4096 ? diagnostic.message : "";
+  const openapi = code === "ToolCallFailed" && status === 502 ? ${OPENAPI_FAILURE}.exec(message) : null;
+  const provider = code === "AppProviderFailed" && status === 502 ? ${PROVIDER_FAILURE}.exec(message) : null;
+  if (openapi || provider) status = Number((openapi || provider)[1]);
+  return { ok: false, error: { code, ...(status === undefined ? {} : { status }), ...(typeof diagnostic.retryable === "boolean" ? { retryable: diagnostic.retryable } : {}) } };
+}`,
     options
   );
   const parsed = outcomeSchema.safeParse(result);

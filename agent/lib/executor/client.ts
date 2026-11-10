@@ -117,7 +117,14 @@ function providerResult(outcome: ExecutorOutcome): ProviderResult {
       )?.[1]
     : outcome.error.retryAfter;
   const data = outcome.ok ? outcome.data : null;
-  return { data, status, ...(retryAfter ? { retryAfter } : {}) };
+  return {
+    data,
+    status,
+    ...(!outcome.ok && outcome.error.retryable !== undefined
+      ? { retryable: outcome.error.retryable }
+      : {}),
+    ...(retryAfter ? { retryAfter } : {}),
+  };
 }
 
 export async function executorReadQuery(
