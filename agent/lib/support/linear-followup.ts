@@ -16,6 +16,8 @@ import {
 } from "./store.js";
 
 const PATH = "linear.";
+// shortcut: v1 journaled support writes under this path; drop once pre-v2 journal rows have aged out.
+const LEGACY_SAVE_ISSUE = "linear.org.workspaceLinear.save_issue:";
 export async function readSupportLinear(
   ctx: ProviderContext,
   operation: string,
@@ -127,7 +129,11 @@ export async function recoverSupportIssues(
     const key = String(operation.operation_key);
     if (
       operation.state !== "done" ||
-      !(key.startsWith("create-issue:") || key.startsWith(`${PATH}save_issue:`))
+      !(
+        key.startsWith("create-issue:") ||
+        key.startsWith(`${PATH}save_issue:`) ||
+        key.startsWith(LEGACY_SAVE_ISSUE)
+      )
     ) {
       continue;
     }
