@@ -20,14 +20,17 @@ Every table uses these columns in this order:
 
 Render count deltas from `wowPercent` and `momPercent` with a `%` suffix. Render `null` count deltas as `n/a` because a zero baseline has no meaningful percentage change. Render rate deltas from `wowPercentagePoints` and `momPercentagePoints` with a `pp` suffix. Rates and deltas use one decimal place, except reply rate and its deltas use two decimal places. Counts can use compact `k` or `M` notation when helpful.
 
-Use these five sections in order:
+Use these six sections in order:
 
 1. `Volume and booked meetings`: Emails sent, Replies, Positive replies (Instantly), Booked meetings.
 2. `Conversion rates`: Reply rate, Positive reply rate, Booked meeting rate. Add one plain line that booked meeting rate uses AI SDR booked meetings divided by Instantly positive replies.
 3. `Booked meeting rate by campaign type`: podcast, direct, interview, lead-magnet. The primary value is each method's `bookedMeetingRate`; do not combine methods. Add one plain line that remaining types are too small to read a trend from.
 4. `AI SDR lifecycle, every stage`: Replied, Slots sent, Booked, Completed, Declined, No response.
 5. `Lifecycle step conversion`: Slots sent / replied, Booked / slots sent, Completed / booked.
+6. `Meeting recovery`, from `meetingRecovery`: Rebook messages sent, Rebooked meetings, Rebook rate, Reconfirmed meetings, Attendance known, Took place, Show-up rate.
 
 After the lifecycle tables, add this exact meaning in one plain line: Completed lags because a meeting only completes after its date, so recent weeks fill in late.
+
+After the meeting recovery table, add one plain line: rebook rate is rebooked meetings divided by rebook messages sent after a prospect cancelled or declined, and show-up rate is meetings that took place divided by reconfirmed meetings whose attendance was recorded. When a count is 0, its rate is 0.0% because there is no data yet, not because nothing worked.
 
 End with `Summary` and exactly three short, plain-language lines labeled `Trend:`, `Improvement:`, and `Watch:`. Base them only on the returned values. No em dashes and no bold for emphasis.

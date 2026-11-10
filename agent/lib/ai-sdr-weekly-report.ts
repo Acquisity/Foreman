@@ -47,6 +47,23 @@ const bookingRowSchema = z.object({
   previous_booked: finiteNumber,
   report_booked: finiteNumber,
 });
+const meetingRecoveryRowSchema = z.object({
+  month_attendance_known: finiteNumber,
+  month_rebook_sent: finiteNumber,
+  month_rebooked: finiteNumber,
+  month_reconfirmed: finiteNumber,
+  month_took_place: finiteNumber,
+  previous_attendance_known: finiteNumber,
+  previous_rebook_sent: finiteNumber,
+  previous_rebooked: finiteNumber,
+  previous_reconfirmed: finiteNumber,
+  previous_took_place: finiteNumber,
+  report_attendance_known: finiteNumber,
+  report_rebook_sent: finiteNumber,
+  report_rebooked: finiteNumber,
+  report_reconfirmed: finiteNumber,
+  report_took_place: finiteNumber,
+});
 const lifecycleRowSchema = z.looseObject({
   month: finiteNumber.optional().default(0),
   previous: finiteNumber.optional().default(0),
@@ -98,6 +115,15 @@ export const aiSdrWeeklyReportResultSchema = z.discriminatedUnion("success", [
       bookedPerSlotsSent: rateComparisonSchema,
       completedPerBooked: rateComparisonSchema,
       slotsSentPerReplied: rateComparisonSchema,
+    }),
+    meetingRecovery: z.object({
+      attendanceKnown: countComparisonSchema,
+      rebookedMeetings: countComparisonSchema,
+      rebookMessagesSent: countComparisonSchema,
+      rebookRate: rateComparisonSchema,
+      reconfirmedMeetings: countComparisonSchema,
+      showUpRate: rateComparisonSchema,
+      tookPlace: countComparisonSchema,
     }),
     success: z.literal(true),
     volume: z.object({
@@ -163,9 +189,31 @@ const timestampLiteral = (date: string): string =>
 const windowCounts = (
   field: string,
   window: ReportWindow,
-  alias: string
+  alias: string,
+  condition?: string
 ): string =>
-  `count(*) filter (where ${field} >= ${timestampLiteral(window.start)} and ${field} < ${timestampLiteral(window.endExclusive)}) as ${alias}`;
+  `count(*) filter (where ${field} >= ${timestampLiteral(window.start)} and ${field} < ${timestampLiteral(window.endExclusive)}${condition ? ` and ${condition}` : ""}) as ${alias}`;
+
+const ATTENDANCE_KNOWN =
+  "attendance in ('took_place', 'host_no_show', 'prospect_no_show')";
+
+const recoveryWindowCounts = (
+  field: string,
+  alias: string,
+  windows: AiSdrReportWindows,
+  condition?: string
+): string =>
+  (
+    [
+      ["report", windows.report],
+      ["previous", windows.previous],
+      ["month", windows.sameWeekLastMonth],
+    ] as const
+  )
+    .map(([prefix, window]) =>
+      windowCounts(field, window, `${prefix}_${alias}`, condition)
+    )
+    .join(",\n  ");
 
 const windowSums = (
   field: string,
@@ -175,7 +223,7 @@ const windowSums = (
 ): string =>
   `coalesce(sum(${field}) filter (where ${dateField} >= ${sqlLiteral(window.start)} and ${dateField} < ${sqlLiteral(window.endExclusive)}), 0) as ${alias}`;
 
-/** The three fixed production queries used by the report tool. */
+/** The four fixed production queries used by the report tool. */
 export function aiSdrWeeklyReportQueries(
   windows: AiSdrReportWindows
 ): string[] {
@@ -270,6 +318,46 @@ export function aiSdrWeeklyReportQueries(
       "group by f.stage",
       "order by f.stage",
     ].join("\n"),
+    [
+      "with rebooks as (",
+      "  select f.executed_at, exists (",
+      "    select 1 from scheduling_appointment a",
+      "    where a.organization_id = f.organization_id",
+      "      and a.id <> split_part(f.plan_key, ':', 2)::uuid",
+      "      and a.deleted_at is null",
+      "      and a.created_at > f.executed_at",
+      "      and (",
+      "        exists (select 1 from crm_message_thread t where t.id = f.thread_id and t.appointment_id = a.id)",
+      "        or exists (select 1 from scheduling_external_booking b where b.appointment_id = a.id and b.thread_id = f.thread_id)",
+      "      )",
+      "  ) as rebooked",
+      "  from scheduled_followup f",
+      "  where f.plan_key like 'meeting-lost:%'",
+      "    and f.status = 'sent'",
+      `    and f.executed_at >= ${timestampLiteral(month.start)} and f.executed_at < ${timestampLiteral(report.endExclusive)}`,
+      "), reconfirmed as (",
+      "  select distinct on (a.id) a.date, a.attendance",
+      "  from scheduled_followup f",
+      "  join scheduling_appointment a on a.id = split_part(f.plan_key, ':', 2)::uuid and a.organization_id = f.organization_id",
+      "  where f.plan_key like 'meeting-reconfirm:%'",
+      "    and f.status = 'sent'",
+      "    and a.deleted_at is null",
+      `    and a.date >= ${timestampLiteral(month.start)} and a.date < ${timestampLiteral(report.endExclusive)}`,
+      "  order by a.id",
+      "), rebook_counts as (",
+      "  select",
+      `  ${recoveryWindowCounts("executed_at", "rebook_sent", windows)},`,
+      `  ${recoveryWindowCounts("executed_at", "rebooked", windows, "rebooked")}`,
+      "  from rebooks",
+      "), reconfirm_counts as (",
+      "  select",
+      `  ${recoveryWindowCounts("date", "reconfirmed", windows)},`,
+      `  ${recoveryWindowCounts("date", "attendance_known", windows, ATTENDANCE_KNOWN)},`,
+      `  ${recoveryWindowCounts("date", "took_place", windows, "attendance = 'took_place'")}`,
+      "  from reconfirmed",
+      ")",
+      "select * from rebook_counts cross join reconfirm_counts",
+    ].join("\n"),
   ];
 }
 
@@ -300,6 +388,22 @@ const lifecycleValues = (
   sameWeekLastMonth: row?.month ?? 0,
 });
 
+type MeetingRecoveryRow = z.infer<typeof meetingRecoveryRowSchema>;
+
+const recoveryValues = (
+  row: MeetingRecoveryRow,
+  metric:
+    | "attendance_known"
+    | "rebook_sent"
+    | "rebooked"
+    | "reconfirmed"
+    | "took_place"
+): ThreeValues => ({
+  previous: row[`previous_${metric}`],
+  report: row[`report_${metric}`],
+  sameWeekLastMonth: row[`month_${metric}`],
+});
+
 /** Runs the fixed reads sequentially and calculates the complete typed report. */
 export async function readAiSdrWeeklyReport(
   now: Date,
@@ -307,14 +411,14 @@ export async function readAiSdrWeeklyReport(
 ): Promise<AiSdrWeeklyReportResult> {
   try {
     const windows = aiSdrReportWindows(now);
-    const [metricsQuery, bookingsQuery, lifecycleQuery] =
+    const [metricsQuery, bookingsQuery, lifecycleQuery, recoveryQuery] =
       aiSdrWeeklyReportQueries(windows);
-    if (!(metricsQuery && bookingsQuery && lifecycleQuery)) {
+    if (!(metricsQuery && bookingsQuery && lifecycleQuery && recoveryQuery)) {
       throw new Error("AI SDR report query construction failed.");
     }
 
     // PlanetScale MCP sessions are opened per query and reject overlapping
-    // handshakes intermittently, so these three independent reads stay serial.
+    // handshakes intermittently, so these four independent reads stay serial.
     const metricsRows = parseReadQueryResult(await run(metricsQuery)).rows.map(
       (row) => metricsRowSchema.parse(row)
     );
@@ -324,6 +428,9 @@ export async function readAiSdrWeeklyReport(
     const lifecycleRows = parseReadQueryResult(
       await run(lifecycleQuery)
     ).rows.map((row) => lifecycleRowSchema.parse(row));
+    const [recoveryRow] = parseReadQueryResult(
+      await run(recoveryQuery)
+    ).rows.map((row) => meetingRecoveryRowSchema.parse(row));
 
     const metricsByMethod = new Map(
       metricsRows.map((row) => [row.method, row])
@@ -336,7 +443,7 @@ export async function readAiSdrWeeklyReport(
     );
     const totalMetrics = metricsByMethod.get(TOTAL);
     const totalBookings = bookingsByMethod.get(TOTAL);
-    if (!(totalMetrics && totalBookings)) {
+    if (!(totalMetrics && totalBookings && recoveryRow)) {
       throw new Error("AI SDR aggregate queries returned no total row.");
     }
 
@@ -344,6 +451,11 @@ export async function readAiSdrWeeklyReport(
     const replies = metricValues(totalMetrics, "replies");
     const positive = metricValues(totalMetrics, "positive");
     const booked = bookingValues(totalBookings);
+    const rebookSent = recoveryValues(recoveryRow, "rebook_sent");
+    const rebooked = recoveryValues(recoveryRow, "rebooked");
+    const reconfirmed = recoveryValues(recoveryRow, "reconfirmed");
+    const attendanceKnown = recoveryValues(recoveryRow, "attendance_known");
+    const tookPlace = recoveryValues(recoveryRow, "took_place");
     const stages = Object.fromEntries(
       LIFECYCLE_STAGES.map((stage) => [
         stage,
@@ -378,6 +490,15 @@ export async function readAiSdrWeeklyReport(
         bookedPerSlotsSent: rateComparison(stages.booked, stages.slots_sent),
         completedPerBooked: rateComparison(stages.completed, stages.booked),
         slotsSentPerReplied: rateComparison(stages.slots_sent, stages.replied),
+      },
+      meetingRecovery: {
+        attendanceKnown: countComparison(attendanceKnown),
+        rebookedMeetings: countComparison(rebooked),
+        rebookMessagesSent: countComparison(rebookSent),
+        rebookRate: rateComparison(rebooked, rebookSent),
+        reconfirmedMeetings: countComparison(reconfirmed),
+        showUpRate: rateComparison(tookPlace, attendanceKnown),
+        tookPlace: countComparison(tookPlace),
       },
       success: true,
       volume: {

@@ -11,8 +11,8 @@ import { stampUnattended } from "../lib/trust.js";
 /** The AI SDR feature channel this report posts into. */
 const AI_SDR_CHANNEL = "C0BC0H4GA9J";
 
-/** Bounds the three serial reads; each takes up to 50 s under Executor. */
-const REPORT_TIMEOUT_MS = 180_000;
+/** Bounds the four serial reads; each takes up to 50 s under Executor. */
+const REPORT_TIMEOUT_MS = 240_000;
 
 /**
  * 13:00 UTC every Monday, matching the daily reports' 09:00 America/New_York
