@@ -14,7 +14,7 @@ const CONNECTOR_ENV = {
   [DISPUTES_TOOLKIT]: "EXECUTOR_MCP_CONNECTOR_DISPUTES",
   [FOREMAN_TOOLKIT_SLUG]: "EXECUTOR_MCP_CONNECTOR_FOREMAN",
   [SUPPORT_TOOLKIT]: "EXECUTOR_MCP_CONNECTOR_SUPPORT",
-} as const;
+} as const satisfies Record<ExecutorToolkit, string>;
 const lanes = new WeakMap<object, ExecutorToolkit>();
 
 /** The lane's own connector UID, or undefined when it is not configured. */
