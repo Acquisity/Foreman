@@ -27,11 +27,10 @@ Every source a triage investigation can cite, and how the critic reaches it. Aut
 | Raindrop AI feature events, traces, signals, issues, cost | Executor: raindrop | app, shared | root allowlist, reads only |
 | Sentry issues and events | Executor: sentry | app, shared | shared catalog; use issue details and event reads as required by critic instructions |
 | Axiom datasets, metrics, monitors | Executor: axiom | app, shared | root allowlist, reads only |
-| Vercel projects, deployments and logs | Executor: foreman_vercel_api | app, shared | Foreman-scoped credential; shared catalog; use reads only |
+| Vercel projects, deployments and logs | Executor: foreman-vercel-api | app, shared | Foreman-scoped credential; shared catalog; use reads only |
 | PostHog persons, recordings, errors, queries | Executor: posthog | app, shared | individual operations discovered through Executor; use reads only |
 | Resend emails, logs, domains | Executor: resend | app, shared | root allowlist, reads only |
 | Jam recordings, console, network | Executor: jam | app, shared | root allowlist, reads only |
-| Modem customer feedback and run reads | Executor: modem | app, shared | shared catalog; discover `search_modem` and `modem_agent_get_run` |
 | Neon, only when the code path uses a Neon database | Executor: neon | app, shared | shared catalog; use reads only for review, never as production customer evidence or a substitute for investigation-memory tools |
 | Autumn provisioning | Executor: autumn | app, shared | root allowlist, reads only |
 | Stripe billing | Executor: stripe | app, shared | root allowlist, reads only |
@@ -43,7 +42,7 @@ Every source a triage investigation can cite, and how the critic reaches it. Aut
 - Inngest: `find_function_runs` with the function id from the code path covers the runs and the newest trace; the connection tools stay for a specific event's runs or an older run's trace.
 - Sentry: `get_issue_details` returns the stacktrace for one issue id; the natural-language search tools can be unavailable while the rest works.
 - Axiom: `queryDataset` takes APL (`Dataset | where ... | summarize ...`); call `listDatasets` and `getDatasetFields` first for real names. Metrics go through `queryMetrics`, not APL.
-- PostHog: discover individual operations such as `persons_list`, `query_trends`, and `execute_sql`, then inspect the selected schema. Resolve a person before reading recordings.
+- PostHog: discover individual operations such as `persons-list`, `query-trends`, and `execute-sql`, then inspect the selected schema. Resolve a person before reading recordings.
 - Resend: discover snake_case operations such as `list_emails`, `get_email`, and `list_logs`.
 - Jam: only useful when the ticket carries a Jam link; `getConsoleLogs` and `getNetworkRequests` beat the video.
 - Vercel: query around the time the claim names; discover `getDeployments` for a deployment just before the reported window.

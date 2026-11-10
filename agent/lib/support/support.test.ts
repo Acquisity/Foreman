@@ -253,11 +253,7 @@ test("support catalog preserves the required evidence providers and only selecte
   ]) {
     assert.throws(() => assertSupportOperation(path, {}));
   }
-  assert.throws(() =>
-    assertSupportOperation("sentry.execute_sentry_tool", {
-      name: "update_issue",
-    })
-  );
+  assert.throws(() => assertSupportOperation("sentry.update_issue", {}));
 });
 
 test("support transport stays on its selected toolkit and quotes inputs as data", async () => {

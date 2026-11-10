@@ -16,46 +16,16 @@ import {
 
 const paths: ReadonlySet<string> = new Set(SUPPORT_PATHS);
 const mutationNames = new Set(["save_issue", "save_document", "save_comment"]);
-/** Read semantics inspected in the live Sentry catalog on 2026-09-09. */
-const SENTRY_READS = new Set([
-  "find_releases",
-  "get_release_details",
-  "get_event_attachment",
-  "get_issue_tag_values",
-  "get_issue_details",
-  "search_issue_events",
-  "get_issue_breadcrumbs",
-  "get_doc",
-  "get_event_stacktrace",
-  "get_profile_details",
-  "get_span_details",
-  "search_docs",
-  "get_trace_details",
-  "get_agent_conversation_details",
-  "get_ai_conversation_details",
-  "get_replay_details",
-  "get_dashboard_details",
-  "get_monitor_details",
-  "search_events",
-  "search_issues",
-]);
 export const supportMutation = (path: string) =>
   mutationNames.has(path.split(".").at(-1) ?? "") ||
-  path.startsWith("foreman_linear_write_api.");
+  path.startsWith("foreman-linear-write-api.");
 
+// Sentry v2 lists each read as its own tool, so the path allowlist covers it.
 export function assertSupportOperation(
   path: string,
-  input: Record<string, unknown>
+  _input: Record<string, unknown>
 ) {
   assertSupportPath(path);
-  if (
-    path.endsWith(".execute_sentry_tool") &&
-    !SENTRY_READS.has(String(input.name))
-  ) {
-    throw new SupportRefusal(
-      "This nested Sentry operation has not been audited for support reads. Use the existing search, issue, trace, event, replay or release reads."
-    );
-  }
 }
 
 export function assertSupportPath(path: string) {
@@ -78,7 +48,7 @@ export function supportWriteKey(
       throw new SupportRefusal("A support comment requires its issue id.");
     }
     identity = { issue, version };
-  } else if (path.startsWith("foreman_linear_write_api.")) {
+  } else if (path.startsWith("foreman-linear-write-api.")) {
     const body = z
       .object({
         query: z.string(),

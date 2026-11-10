@@ -544,7 +544,7 @@ test("one toolkit contains platform operations and every helper binding", () => 
     }
     assert.ok(toolkit.paths.includes(binding.path), binding.path);
   }
-  for (const suffix of [".save_issue", ".send_message", ".get_conversation"]) {
+  for (const suffix of [".save_issue", ".send-message", ".get_conversation"]) {
     assert.ok(
       toolkit.paths.some((path) => path.endsWith(suffix)),
       suffix

@@ -21,15 +21,15 @@ export function assertWidgetPath(path: string) {
 export const RECORDING_READS = {
   consoleErrors: {
     input: { limit: 30, logLevel: ["error", "warn"] },
-    path: "jam.getconsolelogs",
+    path: "jam.getConsoleLogs",
   },
-  details: { input: {}, path: "jam.getdetails" },
+  details: { input: {}, path: "jam.getDetails" },
   failedRequests: {
     input: { limit: 20, statusCode: ["4xx", "5xx"] },
-    path: "jam.getnetworkrequests",
+    path: "jam.getNetworkRequests",
   },
-  steps: { input: { limit: 60 }, path: "jam.getuserevents" },
-  transcript: { input: {}, path: "jam.getvideotranscript" },
+  steps: { input: { limit: 60 }, path: "jam.getUserEvents" },
+  transcript: { input: {}, path: "jam.getVideoTranscript" },
 } as const;
 const recordingPaths: ReadonlySet<string> = new Set(
   Object.values(RECORDING_READS).map(({ path }) => path)

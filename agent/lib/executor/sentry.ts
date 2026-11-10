@@ -20,7 +20,7 @@ export const sentryIssueInput = z.strictObject({
   query: z.string().max(2000).optional(),
 });
 
-/** Only these two catalog reads can cross the Sentry dispatcher boundary. */
+/** Only these two Sentry reads are bound to the helper. */
 export async function readSentryIssue(input: unknown, ctx: ProviderContext) {
   const parsed = sentryIssueInput.parse(input);
   const args =
@@ -33,9 +33,12 @@ export async function readSentryIssue(input: unknown, ctx: ProviderContext) {
           period: parsed.period ?? "24h",
           query: parsed.query ?? "",
         };
-  const path = operationPath("sentry.issueRead");
-  const inputArgs = { arguments: args, name: parsed.operation };
-  const outcome = await invokeProvider(ctx, path, inputArgs);
+  const path = operationPath(
+    parsed.operation === "get_issue_details"
+      ? "sentry.issueDetails"
+      : "sentry.issueEvents"
+  );
+  const outcome = await invokeProvider(ctx, path, args);
   if (!outcome.ok) {
     throw new ExecutorError("sentry_read_failed", outcome.error.status, {
       retryAfter: outcome.error.retryAfter,

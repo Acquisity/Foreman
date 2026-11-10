@@ -69,7 +69,7 @@ test("a part that fails is listed as unavailable", async (t) => {
     executorTransport,
     "call",
     async (_wire: unknown, path: string) =>
-      path.endsWith("getvideotranscript")
+      path.endsWith("getVideoTranscript")
         ? { error: { code: "not_found", status: 404 }, ok: false }
         : { data: { content: [{ text: "ok", type: "text" }] }, ok: true }
   );
@@ -84,16 +84,16 @@ test("no other recording can be read, and none without a bound one", async (t) =
     ok: true,
   }));
   await assert.rejects(
-    invokeProvider(ctx, "jam.getdetails", { jamId: "other" }),
+    invokeProvider(ctx, "jam.getDetails", { jamId: "other" }),
     OWN_ONLY
   );
   await assert.rejects(
-    invokeProvider(context(verifiedWidgetContext), "jam.getdetails", {
+    invokeProvider(context(verifiedWidgetContext), "jam.getDetails", {
       jamId,
     }),
     OWN_ONLY
   );
   // Jam listing and search stay outside the lane entirely.
-  await assert.rejects(invokeProvider(ctx, "jam.listjams", {}), OUTSIDE);
+  await assert.rejects(invokeProvider(ctx, "jam.listJams", {}), OUTSIDE);
   assert.equal(call.mock.callCount(), 0);
 });

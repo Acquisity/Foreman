@@ -159,7 +159,7 @@ const axiom: Lookup = async (ctx, scope) => {
     `| limit ${ITEMS_MAX}`,
   ].join("\n");
   const rows = collectRows(
-    providerData(await read(ctx, "axiom.querydataset", { apl }))
+    providerData(await read(ctx, "axiom.queryDataset", { apl }))
   );
   if (!rows) {
     throw new Error("Unrecognized Axiom response.");

@@ -6,10 +6,10 @@
     "name": "Foreman Stripe disputes",
     "owner": "user",
     "paths": [
-      "foreman-stripe-dispute-write.disputes.updateDisputeEvidence",
-      "foreman-stripe-dispute-write.files.createDisputeEvidenceFile",
       "foreman-stripe-dispute-write-sandbox.disputes.updateDisputeEvidence",
-      "foreman-stripe-dispute-write-sandbox.files.createDisputeEvidenceFile"
+      "foreman-stripe-dispute-write-sandbox.files.createDisputeEvidenceFile",
+      "foreman-stripe-dispute-write.disputes.updateDisputeEvidence",
+      "foreman-stripe-dispute-write.files.createDisputeEvidenceFile"
     ],
     "missing": {},
     "connectionPolicies": []

@@ -119,8 +119,11 @@
   "linear.RouteAttachment": {
     "path": "foreman-linear-write-api.graphql.executeForemanWrite"
   },
-  "sentry.issueRead": {
-    "path": "sentry.execute_sentry_tool"
+  "sentry.issueDetails": {
+    "path": "sentry.get_issue_details"
+  },
+  "sentry.issueEvents": {
+    "path": "sentry.search_issue_events"
   },
   "vercel.billingCharges": {
     "path": "foreman-vercel-billing-api.billing.listBillingCharges"

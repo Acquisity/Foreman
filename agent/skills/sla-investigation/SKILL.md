@@ -126,9 +126,9 @@ What it's for: blast radius for anything a user experiences but that throws no e
 
 How to use it: discover the individual PostHog read through Executor, inspect its installed schema, then invoke that exact path. The current catalog does not use the old PostHog `exec` dispatcher or CLI command strings.
 
-Confirm the data exists before counting it. Discover `read_data_schema` and inspect its schema to list the events and event properties this project actually records. Event names vary per project, so never query a name taken from a ticket or assumed from convention, `$pageview` included. If the event is not there, the count cannot be made and the report says so.
+Confirm the data exists before counting it. Discover `read-data-schema` and inspect its schema to list the events and event properties this project actually records. Event names vary per project, so never query a name taken from a ticket or assumed from convention, `$pageview` included. If the event is not there, the count cannot be made and the report says so.
 
-Then count with the tool that fits: `query_trends` for how many distinct persons or sessions hit the affected surface in a window, with a breakdown when the bug only affects some of them; `query_web_stats` for per-page visitor and device numbers; `execute_sql` for anything those cannot express. `query_session_recordings_list` finds real sessions when a number alone is not convincing.
+Then count with the tool that fits: `query-trends` for how many distinct persons or sessions hit the affected surface in a window, with a breakdown when the bug only affects some of them; `query-web-stats` for per-page visitor and device numbers; `execute-sql` for anything those cannot express. `query-session-recordings-list` finds real sessions when a number alone is not convincing.
 
 ### Inngest (inngest `*` )
 
@@ -144,7 +144,7 @@ What it is: error tracking. Docs: <https://mcp.sentry.dev/>
 
 What it's for: error volume and affected users. The user count on a matched issue is the fastest blast-radius signal, and it applies only when the bug actually throws.
 
-How to use it: sentry `find_organizations` and sentry `find_projects` first when you do not already know which project holds the error, then sentry `search_issues` for the signature from the ticket and sentry `search_events` for event and affected-user counts. Discover the nested `get_issue_details` read with `search_sentry_tools`, inspect its schema, and invoke it through `execute_sentry_tool` to open one issue. Both search tools take natural language and translate it to Sentry's query syntax, so describe the error rather than hand-writing a query. This connection was consented read-only; Seer, triage, and project management were declined, so do not plan on them.
+How to use it: sentry `find_organizations` and sentry `find_projects` first when you do not already know which project holds the error, then sentry `search_issues` for the signature from the ticket and sentry `search_errors` for event and affected-user counts, then sentry `get_issue_details` to open one issue. Both search tools take natural language and translate it to Sentry's query syntax, so describe the error rather than hand-writing a query. This connection was consented read-only; Seer, triage, and project management were declined, so do not plan on them.
 
 ### Axiom (axiom `*` )
 

@@ -64,9 +64,13 @@ export const operationInputs = {
     query: z.string(),
     use_replica: z.boolean().optional(),
   }),
-  "sentry.issueRead": z.object({
-    arguments: z.record(z.string(), z.unknown()),
-    name: z.enum(["get_issue_details", "search_issue_events"]),
+  "sentry.issueDetails": z.object({ issueId: id, organizationSlug: id }),
+  "sentry.issueEvents": z.object({
+    issueId: id,
+    limit,
+    organizationSlug: id,
+    period: z.string(),
+    query: z.string(),
   }),
   "slack.aia.channels": z.object({
     cursor: z.string().optional(),
