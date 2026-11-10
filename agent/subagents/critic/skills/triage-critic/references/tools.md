@@ -31,7 +31,7 @@ Every source a triage investigation can cite, and how the critic reaches it. Aut
 | PostHog persons, recordings, errors, queries | Executor: posthog | app, shared | individual operations discovered through Executor; use reads only |
 | Resend emails, logs, domains | Executor: resend | app, shared | root allowlist, reads only |
 | Jam recordings, console, network | Executor: jam | app, shared | root allowlist, reads only |
-| Neon, only when the code path uses a Neon database | Executor: neon | app, shared | shared catalog; use reads only for review, never as production customer evidence or a substitute for investigation-memory tools |
+| Neon, only when the code path uses a Neon database | Executor: neon-readonly | app, shared | shared catalog; use reads only for review, never as production customer evidence or a substitute for investigation-memory tools |
 | Autumn provisioning | Executor: autumn | app, shared | root allowlist, reads only |
 | Stripe billing | Executor: stripe | app, shared | root allowlist, reads only |
 
