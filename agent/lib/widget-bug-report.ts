@@ -122,7 +122,10 @@ const sentry: Lookup = async (ctx, scope) => {
     sort: "date",
   })) as { structuredContent?: unknown } | null;
   // v2 Sentry returns the issues as structured data with empty content.
-  if (data?.structuredContent != null) {
+  if (
+    data?.structuredContent !== undefined &&
+    data.structuredContent !== null
+  ) {
     const structured = sentryIssues.safeParse(data.structuredContent);
     if (!structured.success) {
       return {
