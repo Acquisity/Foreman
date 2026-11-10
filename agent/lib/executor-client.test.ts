@@ -102,13 +102,15 @@ test("typed client preserves numbers, booleans, special identifiers and canonica
     JSON.parse(code.slice("const input = ".length, code.indexOf(";\n")))
   );
   assert.deepEqual(inputs[0], {
-    latest_of_thread: false,
-    lead: "a+b@example.com",
-    limit: 20,
-    preview_only: true,
-    "x-as-workspace": "workspace",
+    headers: { "x-as-workspace": "workspace" },
+    query: {
+      latest_of_thread: false,
+      lead: "a+b@example.com",
+      limit: 20,
+      preview_only: true,
+    },
   });
-  assert.deepEqual(inputs[1], { coupon_id: "coupon / 20% & more" });
+  assert.deepEqual(inputs[1], { path: { coupon_id: "coupon / 20% & more" } });
   assert.deepEqual(inputs[2], {
     body: {
       query: LINEAR_OPERATIONS.Document.document,

@@ -16,7 +16,11 @@ import {
   REQUIRED_HELPER_OPERATIONS,
 } from "./executor/operations.js";
 import { readSentryIssue, sentryIssueInput } from "./executor/sentry.js";
-import { ExecutorError, executorTransport } from "./executor/transport.js";
+import {
+  ExecutorError,
+  executorTransport,
+  wireInput,
+} from "./executor/transport.js";
 import { stampInvestigationMemory, stampUnattended } from "./trust.js";
 
 const auth: SessionAuthContext = {
@@ -551,5 +555,50 @@ test("one toolkit contains platform operations and every helper binding", () => 
       (path) =>
         !(path.startsWith("supermemory.") || path.startsWith("executor."))
     )
+  );
+});
+
+test("OpenAPI tools receive grouped v2 input; MCP tools keep flat input", () => {
+  assert.deepEqual(
+    wireInput("foreman-stripe-api-sandbox.charges.readCharge", {
+      charge_id: "ch_1",
+      "expand[]": "refunds",
+    }),
+    { path: { charge_id: "ch_1" }, query: { "expand[]": "refunds" } }
+  );
+  assert.deepEqual(
+    wireInput("foreman-inngest-api.apps.listFunctionRuns", {
+      appId: "a",
+      functionId: "f",
+      limit: 5,
+    }),
+    { path: { appId: "a", functionId: "f" }, query: { limit: 5 } }
+  );
+  assert.deepEqual(
+    wireInput("foreman-autumn-api.customersGet.readAutumnCustomer", {
+      body: { customer_id: "c", expand: [] },
+      "x-api-version": "2.3.0",
+    }),
+    {
+      body: { customer_id: "c", expand: [] },
+      headers: { "x-api-version": "2.3.0" },
+    }
+  );
+  assert.deepEqual(
+    wireInput("foreman-stripe-dispute-write.disputes.updateDisputeEvidence", {
+      body: { submit: false },
+      dispute_id: "du_1",
+      "Idempotency-Key": "k",
+    }),
+    {
+      body: { submit: false },
+      headers: { "Idempotency-Key": "k" },
+      path: { dispute_id: "du_1" },
+    }
+  );
+  const flat = { query: "select 1", use_replica: false };
+  assert.equal(
+    wireInput("planetscale-org.planetscale_execute_read_query", flat),
+    flat
   );
 });
