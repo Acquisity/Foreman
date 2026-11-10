@@ -642,7 +642,6 @@
       "neon-readonly.list_storage_objects",
       "neon-readonly.query_logs",
       "neon-readonly.run_sql",
-      "neon-readonly.run_sql_transaction",
       "neon-readonly.search",
       "neon-readonly.search_docs",
       "openrouter.generate-image",
