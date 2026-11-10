@@ -130,7 +130,15 @@ if (process.argv.includes("--live")) {
       continue;
     }
     const installed = new Set<string>();
+    const seen = new Set<string>();
     const readPage = async (cursor?: string): Promise<void> => {
+      // A repeated cursor would page forever; stop and report the app instead.
+      if (cursor !== undefined) {
+        if (seen.has(cursor)) {
+          throw new Error(`Executor repeated a tool page cursor for ${slug}.`);
+        }
+        seen.add(cursor);
+      }
       const page = toolPageSchema.parse(
         await api(
           `/apps/${encodeURIComponent(app.id)}/tools${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ""}`
