@@ -219,3 +219,98 @@ test("the app's schedule fields ride on the office hours; a malformed one reads 
     assert.equal(verified?.[key], undefined);
   }
 });
+
+const timeline = {
+  callSteps: [
+    {
+      at: "2026-11-05T09:30:00.000Z",
+      elapsedMs: 6100,
+      step: "sdk_connect",
+      stepMs: 4200,
+      traceUrl:
+        "https://app.axiom.co/acquisity-3nbk/trace?traceId=0af7651916cd43dd8448eb211c80319c",
+    },
+  ],
+  networkTypes: ["3g"],
+  padding: "p".repeat(15_000),
+};
+
+test("the user timeline is asked for only when wanted, read past the scope's size limit, and kept out of the scope", async (context) => {
+  configure(context);
+  const seen: Record<string, unknown>[] = [];
+  const asked = requester(Response.json({ ...appContext, timeline }));
+  const scope = await verifyWidgetContext(
+    {
+      conversationId,
+      onTimeline: (value) => seen.push(value),
+      organizationId,
+      timeline: true,
+      userToken,
+    },
+    asked.request
+  );
+  assert.equal(
+    new Headers(asked.requests[0].init?.headers).get("x-foreman-timeline"),
+    "1"
+  );
+  assert.deepEqual(seen, [timeline]);
+  assert.deepEqual(scope, verifiedWidgetContext);
+  assert.equal("timeline" in scope, false);
+
+  const plain = requester(Response.json(appContext));
+  await verifyWidgetContext(
+    { conversationId, organizationId, userToken },
+    plain.request
+  );
+  assert.equal(
+    new Headers(plain.requests[0].init?.headers).has("x-foreman-timeline"),
+    false
+  );
+
+  await assert.rejects(
+    verifyWidgetContext(
+      { conversationId, organizationId, userToken },
+      requester(Response.json({ ...appContext, timeline })).request
+    )
+  );
+});
+
+test("an app without the timeline, or a malformed one, still verifies with no timeline", async (context) => {
+  configure(context);
+  for (const body of [
+    appContext,
+    { ...appContext, timeline: "slow" },
+    { ...appContext, timeline: [1, 2] },
+    { ...appContext, timeline: null },
+  ]) {
+    const seen: unknown[] = [];
+    // biome-ignore lint/performance/noAwaitInLoops: each body is one case.
+    const scope = await verifyWidgetContext(
+      {
+        conversationId,
+        onTimeline: (value) => seen.push(value),
+        organizationId,
+        timeline: true,
+        userToken,
+      },
+      requester(Response.json(body)).request
+    );
+    assert.deepEqual(scope, verifiedWidgetContext);
+    assert.deepEqual(seen, []);
+  }
+});
+
+test("a timeline response past the larger limit is refused", async (context) => {
+  configure(context);
+  await assert.rejects(
+    verifyWidgetContext(
+      { conversationId, organizationId, timeline: true, userToken },
+      requester(
+        Response.json({
+          ...appContext,
+          timeline: { padding: "p".repeat(40_000) },
+        })
+      ).request
+    )
+  );
+});

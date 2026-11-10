@@ -141,6 +141,11 @@ for (const [label, text] of [
   ],
   ["an Inngest run id", "Run 01J8ZQ3K4M5N6P7Q8R9S0T1V2W failed twice."],
   ["a bare internal host", "The failure is visible on sentry.io."],
+  ["a trace id", "Trace 0af7651916cd43dd8448eb211c80319c shows the delay."],
+  [
+    "a trace link",
+    "See https://app.axiom.co/acquisity-3nbk/trace?traceId=0af7651916cd43dd8448eb211c80319c for the delay.",
+  ],
 ] as const) {
   test(`${label} is deleted with its item and the rest is answered; alone it blocks`, async () => {
     const { calls, deps: d } = deps();
