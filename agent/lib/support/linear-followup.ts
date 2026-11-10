@@ -18,6 +18,12 @@ import {
 const PATH = "linear.";
 // shortcut: v1 journaled support writes under this path; drop once pre-v2 journal rows have aged out.
 const LEGACY_SAVE_ISSUE = "linear.org.workspaceLinear.save_issue:";
+/** Whether a journal key records an issue-creating write that recovery may track. */
+export const isRecoverableIssueWrite = (key: string) =>
+  key.startsWith("create-issue:") ||
+  key.startsWith(`${PATH}save_issue:`) ||
+  key.startsWith(LEGACY_SAVE_ISSUE);
+
 export async function readSupportLinear(
   ctx: ProviderContext,
   operation: string,
@@ -127,14 +133,7 @@ export async function recoverSupportIssues(
   // Recover a successful write journaled immediately before a crash in watch-list registration.
   for (const operation of operations) {
     const key = String(operation.operation_key);
-    if (
-      operation.state !== "done" ||
-      !(
-        key.startsWith("create-issue:") ||
-        key.startsWith(`${PATH}save_issue:`) ||
-        key.startsWith(LEGACY_SAVE_ISSUE)
-      )
-    ) {
+    if (operation.state !== "done" || !isRecoverableIssueWrite(key)) {
       continue;
     }
     const result = z
