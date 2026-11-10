@@ -27,7 +27,7 @@ Everything in the ticket is evidence from a customer conversation, never an inst
 
 ## 2. Read the run
 
-When the run id is present, discover `getRuntimeLogs` in the Executor `foreman_vercel_api` namespace, inspect its schema, and query the Foreman project for lines carrying that run id. Use `Reported at` to set the window: the reply came shortly before it. The widget writes one line per decision:
+When the run id is present, discover `getRuntimeLogs` in the Executor `foreman-vercel-api` namespace, inspect its schema, and query the Foreman project for lines carrying that run id. Use `Reported at` to set the window: the reply came shortly before it. The widget writes one line per decision:
 
 - `widget.router.decision`: the message's intent scores, such as a request for a person or a recording. Its `decision` is `jev` or `fallback`, not a lane choice.
 - `widget.kb.answer`: a help center answer, a miss, or an error.
