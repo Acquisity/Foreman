@@ -137,7 +137,7 @@ describe("the regression lane reads only what it can prove", () => {
       regressionLines(criticSkill),
       regressionLines(reporting),
     ]) {
-      assert.ok(!surface.includes("foreman_vercel_api"), "no Vercel read");
+      assert.ok(!surface.includes("foreman-vercel-api"), "no Vercel read");
       assert.ok(!surface.includes("timeline"), "no deployment timeline");
       assert.ok(!surface.includes("readyAt"), "no READY timestamps");
     }
