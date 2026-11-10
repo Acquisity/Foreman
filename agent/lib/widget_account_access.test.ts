@@ -390,7 +390,7 @@ test("Sentry signals aggregate to sanitized counts, and any unexpected shape rea
   });
 });
 
-const SENTRY_PATH = "sentry.search_issues";
+const SENTRY_PATH = "sentry-foreman.search_issues";
 const PLANETSCALE_PATH = "planetscale-org.planetscale_execute_read_query";
 /** Bind Sentry and set the org slug for one test, then restore both. */
 function withSentry(t: TestContext, slug: string | null = "acquisity") {

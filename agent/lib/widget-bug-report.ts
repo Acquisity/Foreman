@@ -115,7 +115,7 @@ const sentry: Lookup = async (ctx, scope) => {
   if (!organizationSlug) {
     return { reason: "WIDGET_SENTRY_ORG_SLUG is not set", status: "unchecked" };
   }
-  const data = (await read(ctx, "sentry.search_issues", {
+  const data = (await read(ctx, "sentry-foreman.search_issues", {
     limit: ITEMS_MAX,
     organizationSlug,
     query: `tags[organizationId]:${scope.organizationId} lastSeen:-24h`,
@@ -190,7 +190,7 @@ const axiom: Lookup = async (ctx, scope) => {
     `| limit ${ITEMS_MAX}`,
   ].join("\n");
   const rows = collectRows(
-    providerData(await read(ctx, "axiom.queryDataset", { apl }))
+    providerData(await read(ctx, "axiom-foreman.queryDataset", { apl }))
   );
   if (!rows) {
     throw new Error("Unrecognized Axiom response.");

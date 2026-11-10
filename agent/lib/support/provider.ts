@@ -15,7 +15,9 @@ export async function matchSupportIssue(
   role: CreationRole
 ) {
   const claim = requireSupportContext(ctx);
-  const result = await invokeProvider(ctx, "linear.get_issue", { id: issueId });
+  const result = await invokeProvider(ctx, "linear-foreman.get_issue", {
+    id: issueId,
+  });
   if (!result.ok) {
     throw new Error("Could not read the existing Linear record.");
   }

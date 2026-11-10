@@ -88,16 +88,19 @@ test("no other recording can be read, and none without a bound one", async (t) =
     ok: true,
   }));
   await assert.rejects(
-    invokeProvider(ctx, "jam.getDetails", { jamId: "other" }),
+    invokeProvider(ctx, "jam-foreman.getDetails", { jamId: "other" }),
     OWN_ONLY
   );
   await assert.rejects(
-    invokeProvider(context(verifiedWidgetContext), "jam.getDetails", {
+    invokeProvider(context(verifiedWidgetContext), "jam-foreman.getDetails", {
       jamId,
     }),
     OWN_ONLY
   );
   // Jam listing and search stay outside the lane entirely.
-  await assert.rejects(invokeProvider(ctx, "jam.listJams", {}), OUTSIDE);
+  await assert.rejects(
+    invokeProvider(ctx, "jam-foreman.listJams", {}),
+    OUTSIDE
+  );
   assert.equal(call.mock.callCount(), 0);
 });

@@ -120,10 +120,10 @@
     "path": "foreman-linear-write-api.graphql.executeForemanWrite"
   },
   "sentry.issueDetails": {
-    "path": "sentry.get_issue_details"
+    "path": "sentry-foreman.get_issue_details"
   },
   "sentry.issueEvents": {
-    "path": "sentry.search_issue_events"
+    "path": "sentry-foreman.search_issue_events"
   },
   "vercel.billingCharges": {
     "path": "foreman-vercel-billing-api.billing.listBillingCharges"

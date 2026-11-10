@@ -118,7 +118,9 @@ test("calls take the token of their lane; only dispute writes use disputes", asy
       return Promise.resolve({ token: "t" });
     },
   };
-  await invokeProvider(ctx as never, "linear.get_issue", { id: "ENG-1" });
+  await invokeProvider(ctx as never, "linear-foreman.get_issue", {
+    id: "ENG-1",
+  });
   await invokeProvider(
     ctx as never,
     "foreman-stripe-dispute-write-sandbox.disputes.updateDisputeEvidence",

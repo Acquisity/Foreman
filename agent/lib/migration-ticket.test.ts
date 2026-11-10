@@ -902,7 +902,7 @@ describe("file_migration_ticket channel gating", () => {
   it("refuses a hand-built Linear ticket write from a questions-only session before dispatch", async () => {
     const ctx = ctxFor(slackAuth(MIGRATION));
     await assert.rejects(
-      invokeProvider(ctx, "linear.save_issue", {
+      invokeProvider(ctx, "linear-foreman.save_issue", {
         description: "anything",
         state: "Todo",
         team: "Engineering Team",
@@ -915,7 +915,7 @@ describe("file_migration_ticket channel gating", () => {
     );
     // An update to an existing issue is refused the same way.
     await assert.rejects(
-      invokeProvider(ctx, "linear.save_issue", {
+      invokeProvider(ctx, "linear-foreman.save_issue", {
         id: "ENG-1",
         state: "Done",
       }),
@@ -924,10 +924,14 @@ describe("file_migration_ticket channel gating", () => {
     );
     // App Publishing's questions-only session cannot file at all.
     await assert.rejects(
-      invokeProvider(ctxFor(slackAuth(APP_PUBLISHING)), "linear.save_comment", {
-        body: "x",
-        issueId: "ENG-1",
-      }),
+      invokeProvider(
+        ctxFor(slackAuth(APP_PUBLISHING)),
+        "linear-foreman.save_comment",
+        {
+          body: "x",
+          issueId: "ENG-1",
+        }
+      ),
       (error: unknown) =>
         error instanceof ExecutorError && error.code === "questions_only"
     );
@@ -985,7 +989,7 @@ describe("the real ticket write passes the questions-only gate", () => {
       const result = await fileMigrationTicket(ctx, complete, deps);
       assert.ok("identifier" in result && result.existing === false);
       assert.equal(calls.length, 1);
-      assert.equal(calls[0]?.[1], "linear.save_issue");
+      assert.equal(calls[0]?.[1], "linear-foreman.save_issue");
       const sent = calls[0]?.[2] as Record<string, unknown>;
       assert.equal(sent.team, "Engineering Team");
       assert.equal(sent.state, "Triage");

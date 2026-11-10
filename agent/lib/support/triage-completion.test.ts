@@ -491,7 +491,7 @@ test("finish refuses omitted or failed writes; a blocker retry stays unprocessed
   api.responses.get_issue = report;
   const failure = {
     ...operations[0],
-    operation_key: "linear.save_comment:failed",
+    operation_key: "linear-foreman.save_comment:failed",
     state: "failed",
   };
   journal.push(failure);

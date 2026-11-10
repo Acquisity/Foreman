@@ -23,8 +23,8 @@ const AGENT_LIMIT = 20;
 const SIGNAL_LIMIT = 20;
 const CANDIDATE_LIMIT = 200;
 const COPY_REVIEW_AGENT = "copy-review";
-const SENTRY_ISSUES_PATH = "sentry.search_issues";
-const AXIOM_QUERY_PATH = "axiom.queryDataset";
+const SENTRY_ISSUES_PATH = "sentry-foreman.search_issues";
+const AXIOM_QUERY_PATH = "axiom-foreman.queryDataset";
 /** agent_executions records the AI SDR workflow's own agent runs, one row per decision. */
 const AGENT_NAME = /^[a-z][a-z0-9-]{0,40}$/;
 export const DATASET_NAME = /^[A-Za-z0-9._-]{1,120}$/;

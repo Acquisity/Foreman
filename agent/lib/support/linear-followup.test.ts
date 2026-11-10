@@ -165,12 +165,15 @@ test("snoozed conversations remain eligible for linked Linear follow-up", () => 
 });
 
 test("recovery matches issue writes journaled under the v2 and the legacy v1 path", () => {
-  assert.equal(isRecoverableIssueWrite("linear.save_issue:abc"), true);
+  assert.equal(isRecoverableIssueWrite("linear-foreman.save_issue:abc"), true);
   assert.equal(
     isRecoverableIssueWrite("linear.org.workspaceLinear.save_issue:abc"),
     true
   );
   assert.equal(isRecoverableIssueWrite("create-issue:billing"), true);
-  assert.equal(isRecoverableIssueWrite("linear.save_comment:abc"), false);
+  assert.equal(
+    isRecoverableIssueWrite("linear-foreman.save_comment:abc"),
+    false
+  );
   assert.equal(isRecoverableIssueWrite("intercom.get_conversation:abc"), false);
 });

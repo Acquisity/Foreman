@@ -37,7 +37,7 @@ export type ExecutorOutcome = Awaited<
   ReturnType<typeof executorTransport.call>
 >;
 
-const LINEAR_TICKET_PATH = "linear.save_issue";
+const LINEAR_TICKET_PATH = "linear-foreman.save_issue";
 const LINEAR_TICKET_MAX_BYTES = 64 * 1024;
 
 /**
@@ -222,7 +222,7 @@ export const widgetScopeBlock = (scope: WidgetContext) =>
 
 // A Linear MCP tool that changes something, or the authored GraphQL write API.
 const LINEAR_WRITE_PATH =
-  /^(?:foreman-linear-write-api\.|linear\.(?:save|create|delete|update|archive|unarchive)_)/u;
+  /^(?:foreman-linear-write-api\.|linear-foreman\.(?:save|create|delete|update|archive|unarchive)_)/u;
 
 function assertLaneOperation(
   ctx: ProviderContext,

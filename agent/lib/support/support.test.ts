@@ -46,7 +46,7 @@ const app: SessionAuthContext = {
 };
 const auth = supportAuth(app, claim);
 test("creation retries keep their journal identity when wording changes", () => {
-  const path = "linear.save_document";
+  const path = "linear-foreman.save_document";
   assert.equal(
     supportWriteKey(
       path,
@@ -59,7 +59,7 @@ test("creation retries keep their journal identity when wording changes", () => 
       "v1"
     )
   );
-  const comment = "linear.save_comment";
+  const comment = "linear-foreman.save_comment";
   assert.equal(
     supportWriteKey(comment, { body: "before", issueId: "ENG-1" }, "v1"),
     supportWriteKey(comment, { body: "after", issueId: "ENG-1" }, "v1")
@@ -232,11 +232,11 @@ test("support catalog preserves the required evidence providers and only selecte
     "foreman-autumn-api",
     "foreman-stripe-api",
     "planetscale-org",
-    "sentry",
+    "sentry-foreman",
     "inngest",
-    "axiom",
+    "axiom-foreman",
     "intercom",
-    "linear",
+    "linear-foreman",
   ]) {
     assert.ok(
       SUPPORT_PATHS.some((path) => path.startsWith(`${provider}.`)),
@@ -245,15 +245,17 @@ test("support catalog preserves the required evidence providers and only selecte
   }
   assertSupportOperation("intercom.get_conversation", {});
   for (const path of [
-    "linear.merge_diff",
-    "linear.delete_comment",
+    "linear-foreman.merge_diff",
+    "linear-foreman.delete_comment",
     "intercom.add_internal_note",
     "executor.toolkits.update",
-    "stripe.stripe_api_write",
+    "stripe-foreman.stripe_api_write",
   ]) {
     assert.throws(() => assertSupportOperation(path, {}));
   }
-  assert.throws(() => assertSupportOperation("sentry.update_issue", {}));
+  assert.throws(() =>
+    assertSupportOperation("sentry-foreman.update_issue", {})
+  );
 });
 
 test("support transport stays on its selected toolkit and quotes inputs as data", async () => {

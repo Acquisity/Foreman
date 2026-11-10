@@ -15,7 +15,7 @@ import {
   trackSupportIssue,
 } from "./store.js";
 
-const PATH = "linear.";
+const PATH = "linear-foreman.";
 // shortcut: v1 journaled support writes under this path; drop once pre-v2 journal rows have aged out.
 const LEGACY_SAVE_ISSUE = "linear.org.workspaceLinear.save_issue:";
 /** Whether a journal key records an issue-creating write that recovery may track. */

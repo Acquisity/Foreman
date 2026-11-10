@@ -552,12 +552,12 @@ try {
       id: retry.conversation,
     });
     await assert.rejects(() =>
-      invokeProvider(child, "linear.save_issue", {
+      invokeProvider(child, "linear-foreman.save_issue", {
         title: "Should never dispatch",
       })
     );
     assert.equal(urls.length, 6);
-    const writePath = "linear.save_comment";
+    const writePath = "linear-foreman.save_comment";
     const writeInput = { body: "Synthetic comment", issueId: issue.id };
     wireFailure = "initialize";
     await assert.rejects(() =>

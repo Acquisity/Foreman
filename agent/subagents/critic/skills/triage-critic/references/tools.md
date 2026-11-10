@@ -20,20 +20,20 @@ Every source a triage investigation can cite, and how the critic reaches it. Aut
 
 | Source | Connection | Auth class | Read boundary |
 | --- | --- | --- | --- |
-| Linear issues, comments, labels, documents | Executor: linear | app, shared | same Linear access as root; use reads only as required by the critic instructions |
+| Linear issues, comments, labels, documents | Executor: linear-foreman | app, shared | same Linear access as root; use reads only as required by the critic instructions |
 | Intercom conversations and contacts | Executor: intercom | app, shared | root allowlist, reads only |
 | Inngest runs, traces, functions | Executor: inngest | app, shared | root allowlist, reads only |
 | Lucent issues and insights | Executor: lucent | app, shared | root allowlist, reads only |
 | Raindrop AI feature events, traces, signals, issues, cost | Executor: raindrop | app, shared | root allowlist, reads only |
-| Sentry issues and events | Executor: sentry | app, shared | shared catalog; use issue details and event reads as required by critic instructions |
-| Axiom datasets, metrics, monitors | Executor: axiom | app, shared | root allowlist, reads only |
+| Sentry issues and events | Executor: sentry-foreman | app, shared | shared catalog; use issue details and event reads as required by critic instructions |
+| Axiom datasets, metrics, monitors | Executor: axiom-foreman | app, shared | root allowlist, reads only |
 | Vercel projects, deployments and logs | Executor: foreman-vercel-api | app, shared | Foreman-scoped credential; shared catalog; use reads only |
-| PostHog persons, recordings, errors, queries | Executor: posthog | app, shared | individual operations discovered through Executor; use reads only |
+| PostHog persons, recordings, errors, queries | Executor: posthog-foreman | app, shared | individual operations discovered through Executor; use reads only |
 | Resend emails, logs, domains | Executor: resend | app, shared | root allowlist, reads only |
-| Jam recordings, console, network | Executor: jam | app, shared | root allowlist, reads only |
+| Jam recordings, console, network | Executor: jam-foreman | app, shared | root allowlist, reads only |
 | Neon, only when the code path uses a Neon database | Executor: neon-readonly | app, shared | shared catalog; use reads only for review, never as production customer evidence or a substitute for investigation-memory tools |
-| Autumn provisioning | Executor: autumn | app, shared | root allowlist, reads only |
-| Stripe billing | Executor: stripe | app, shared | root allowlist, reads only |
+| Autumn provisioning | Executor: autumn-foreman | app, shared | root allowlist, reads only |
+| Stripe billing | Executor: stripe-foreman | app, shared | root allowlist, reads only |
 
 ## Call notes for the connections
 
