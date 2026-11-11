@@ -551,10 +551,12 @@ try {
     await invokeProvider(child, "intercom.get_conversation", {
       id: retry.conversation,
     });
-    await assert.rejects(() =>
-      invokeProvider(child, "linear-foreman.save_issue", {
-        title: "Should never dispatch",
-      })
+    await assert.rejects(
+      () =>
+        invokeProvider(child, "linear-foreman.save_issue", {
+          title: "Should never dispatch",
+        }),
+      SupportRefusal
     );
     assert.equal(urls.length, 6);
     const writePath = "linear-foreman.save_comment";
