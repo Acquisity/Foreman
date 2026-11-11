@@ -17,6 +17,7 @@ import { fastCallOptions, modelFor, resolveModel } from "./models.js";
 import { logOpsEvent } from "./ops-log.js";
 import { providerData } from "./support/conversation.js";
 import type { WidgetFindings } from "./widget-findings.js";
+import { POSTHOG_READ, posthogQuery } from "./widget-policy.js";
 import { isLiveActive, isReplayActive } from "./widget-replay.js";
 import type { WidgetContext } from "./widget-scope.js";
 import {
@@ -29,7 +30,7 @@ import {
  * Acquisity's "I found a bug" steps (ENG-17031). The app asks for the details
  * and a screen recording, then hands the conversation here: Foreman files the
  * conversation's one Bug ticket in code, with what it found in Sentry, Axiom,
- * Inngest and the recording, and the customer gets a fixed reply. No model
+ * Inngest, PostHog and the recording, and the customer gets a fixed reply. No model
  * decides whether to file, and nothing from the evidence reaches the customer.
  */
 export const BUG_REPORT_LOGGED =
@@ -235,11 +236,72 @@ const inngest: Lookup = async (ctx) => {
   );
 };
 
-const posthog: Lookup = () =>
-  Promise.resolve({
-    reason: "PostHog is not in the support widget toolkit",
-    status: "unchecked",
-  });
+const TAXONOMY_WARNINGS = /<taxonomy_warnings>[\s\S]*?<\/taxonomy_warnings>/u;
+const POSTHOG_COLUMNS = "timestamp|event|errorCode|$pathname";
+const POSTHOG_NULL = "(null)";
+
+/** PostHog answers execute-sql with a pipe-separated table: a header line, then one line per row. */
+const posthogRows = (data: unknown) => {
+  const result = data as { content?: { text?: unknown }[] } | null;
+  const text = result?.content?.[0]?.text;
+  const lines =
+    typeof text === "string"
+      ? text.replace(TAXONOMY_WARNINGS, "").trim().split("\n")
+      : [];
+  if (lines[0]?.trim() !== POSTHOG_COLUMNS) {
+    throw new Error("Unrecognized PostHog response.");
+  }
+  return lines
+    .filter((line) => line.trim())
+    .slice(1, ITEMS_MAX + 1)
+    .map((line) => {
+      const [timestamp, event, errorCode, ...rest] = line
+        .split("|")
+        .map((cell) => cell.trim());
+      if (
+        !rest.length ||
+        (event !== "$pageview" && event !== "crm.error_toast_shown") ||
+        !Number.isFinite(Date.parse(timestamp))
+      ) {
+        throw new Error("Unrecognized PostHog response.");
+      }
+      const path = rest.join("|");
+      return {
+        errorCode: errorCode === POSTHOG_NULL ? "" : errorCode,
+        event,
+        path: path === POSTHOG_NULL ? "" : path,
+        timestamp,
+      };
+    });
+};
+
+/** The reporting user's page views and error toasts in the 30 minutes before the report, and their PostHog person. */
+const posthog: Lookup = async (ctx, scope, turn) => {
+  if (!turn.reportedAt) {
+    throw new Error("No report time.");
+  }
+  const rows = posthogRows(
+    await read(ctx, POSTHOG_READ.path, {
+      query: posthogQuery(scope.userId, new Date(turn.reportedAt)),
+    })
+  );
+  const project = process.env.WIDGET_POSTHOG_PROJECT_ID;
+  const activity = rows.map(({ errorCode, event, path, timestamp }) => ({
+    text: clip(
+      `${event === "crm.error_toast_shown" ? `Error toast ${errorCode || "without a code"} on` : "Viewed"} ${path || "an unknown page"} at ${timestamp}`,
+      ITEM_CHARS
+    ),
+  }));
+  return activity.length && project
+    ? found([
+        {
+          text: "PostHog person",
+          url: `https://us.posthog.com/project/${encodeURIComponent(project)}/person/${encodeURIComponent(scope.userId)}`,
+        },
+        ...activity,
+      ])
+    : found(activity);
+};
 
 export const jamLink = (id: string) => `https://jam.dev/c/${id}`;
 
@@ -288,7 +350,13 @@ export async function gatherEvidence(
 ): Promise<Record<EvidenceSource, Evidence>> {
   const signal = AbortSignal.timeout(EVIDENCE_MS);
   const ctx = appTicketContext(
-    turn.recording ? { ...scope, recordingId: turn.recording.id } : scope,
+    {
+      ...scope,
+      ...(turn.recording ? { recordingId: turn.recording.id } : {}),
+      ...(turn.reportedAt
+        ? { bugReportedAt: new Date(turn.reportedAt).toISOString() }
+        : {}),
+    },
     signal,
     runId
   );
@@ -556,14 +624,19 @@ export async function fileBugReport(
   overrides: Partial<BugReportDependencies> = {}
 ): Promise<BugReportOutcome> {
   const deps = { ...bugReportDependencies, ...overrides };
+  const reportedAt = turn.reportedAt ? new Date(turn.reportedAt) : deps.now();
   const [evidence, draft] = await Promise.all([
-    deps.evidence(scope, turn, runId),
+    deps.evidence(
+      scope,
+      { ...turn, reportedAt: reportedAt.toISOString() },
+      runId
+    ),
     deps.draft(turn),
   ]);
   const { description, title } = bugReportTicket({
     draft,
     evidence,
-    reportedAt: turn.reportedAt ? new Date(turn.reportedAt) : deps.now(),
+    reportedAt,
     scope,
     turn,
   });
