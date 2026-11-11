@@ -18,6 +18,7 @@ import { stampRepository } from "../repository.js";
 import { repositoryCapabilitiesAvailable } from "../repository-lane.js";
 import { sessionLane } from "../session-lane.js";
 import { isIntakeOnly, isUnattended } from "../trust.js";
+import { POSTHOG_READ } from "../widget-policy.js";
 import { claimFromContext, supportAuth } from "./auth.js";
 import { SUPPORT_PATHS } from "./catalog.js";
 import { supportConfig, supportScheduleEnabled } from "./config.js";
@@ -226,7 +227,12 @@ test("support catalog preserves the required evidence providers and only selecte
       "utf8"
     )
   );
-  assert.deepEqual([...SUPPORT_PATHS].sort(), manifest.toolkit.paths.sort());
+  // The bug report's PostHog read shares the toolkit but never the support catalog.
+  assert.ok(!(SUPPORT_PATHS as readonly string[]).includes(POSTHOG_READ.path));
+  assert.deepEqual(
+    [...SUPPORT_PATHS, POSTHOG_READ.path].sort(),
+    manifest.toolkit.paths.sort()
+  );
   for (const provider of [
     "foreman-instantly-api",
     "foreman-autumn-api",

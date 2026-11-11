@@ -215,6 +215,7 @@
       "planetscale-org.planetscale_list_regions_for_organization",
       "planetscale-org.planetscale_list_schema_recommendations",
       "planetscale-org.planetscale_search_documentation",
+      "posthog-widget.execute-sql",
       "raindrop.get_application_overview",
       "raindrop.get_conversation",
       "raindrop.get_dashboard",

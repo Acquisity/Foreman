@@ -70,10 +70,7 @@ const evidence: Record<EvidenceSource, Evidence> = {
   Axiom: { status: "empty" },
   Inngest: { reason: "the lookup failed", status: "unchecked" },
   Jam: { reason: "the customer sent no recording", status: "unchecked" },
-  PostHog: {
-    reason: "PostHog is not in the support widget toolkit",
-    status: "unchecked",
-  },
+  PostHog: { reason: "the lookup failed", status: "unchecked" },
   Sentry: {
     items: [
       {
@@ -326,7 +323,7 @@ test("the ticket's Evidence section names each source's result", () => {
     description.includes(
       [
         "## Evidence",
-        "### Sentry\n- [TypeError: cannot read schedule](https://acquisity.sentry.io/issues/123/)\n\n### Axiom\nNothing found.\n\n### Inngest\nNot checked: the lookup failed.\n\n### PostHog\nNot checked: PostHog is not in the support widget toolkit.\n\n### Jam\nNot checked: the customer sent no recording.",
+        "### Sentry\n- [TypeError: cannot read schedule](https://acquisity.sentry.io/issues/123/)\n\n### Axiom\nNothing found.\n\n### Inngest\nNot checked: the lookup failed.\n\n### PostHog\nNot checked: the lookup failed.\n\n### Jam\nNot checked: the customer sent no recording.",
       ].join("\n\n")
     )
   );
@@ -763,4 +760,143 @@ test("Axiom lists each error message with its count", async (t) => {
       status: "found",
     }
   );
+});
+
+/** The shape posthog-widget.execute-sql returned live on Executor v2: one text block, an optional warnings block, then a pipe table. */
+const posthogTable = (rows: string[]) => ({
+  content: [
+    {
+      text: `<taxonomy_warnings>\nYour query references names that don't exist in this project's taxonomy.\n- Event '$exception' was not found in this project taxonomy.\n</taxonomy_warnings>\n\n${["timestamp|event|errorCode|$pathname", ...rows].join("\n")}`,
+      type: "text",
+    },
+  ],
+});
+const UNRECOGNIZED_POSTHOG = /Unrecognized PostHog response/;
+const reportedTurn = { ...turn, reportedAt: "2026-11-11T18:55:00.000Z" };
+const reportedCtx = (): ProviderContext => {
+  const auth = widgetAuth(
+    { ...verifiedWidgetContext, bugReportedAt: reportedTurn.reportedAt },
+    RUN_ID
+  );
+  return {
+    abortSignal: new AbortController().signal,
+    getToken: () => Promise.resolve({ token: "executor-token" }),
+    session: { auth: { current: auth, initiator: auth } },
+  } as unknown as ProviderContext;
+};
+
+test("PostHog reads this user's activity in the 30 minutes before the report", async (t) => {
+  withEnv(t, "EXECUTOR_MCP_CONNECTOR_SUPPORT", "executor/test");
+  const calls: { input: Record<string, unknown>; path: string }[] = [];
+  t.mock.method(
+    executorTransport,
+    "call",
+    (_wire: unknown, path: string, input: Record<string, unknown>) => {
+      calls.push({ input, path });
+      return Promise.resolve({
+        data: posthogTable([]),
+        http: { status: 200 },
+        ok: true,
+      });
+    }
+  );
+  assert.deepEqual(
+    await EVIDENCE_SOURCES.PostHog(
+      reportedCtx(),
+      verifiedWidgetContext,
+      reportedTurn
+    ),
+    { status: "empty" }
+  );
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0]?.path, "posthog-widget.execute-sql");
+  assert.deepEqual(Object.keys(calls[0]?.input ?? {}), ["query"]);
+  const query = String(calls[0]?.input.query);
+  assert.ok(query.includes(verifiedWidgetContext.userId));
+  assert.ok(query.includes("2026-11-11T18:25:00.000Z"));
+  assert.ok(query.includes("2026-11-11T18:55:00.000Z"));
+});
+
+test("PostHog lists page views and error toasts by path, with the person link", async (t) => {
+  withEnv(t, "WIDGET_POSTHOG_PROJECT_ID", "12345");
+  answer(
+    t,
+    posthogTable([
+      "2026-11-11T18:53:07.841000Z|$pageview|(null)|/dashboard",
+      `2026-11-11T18:52:50.802000Z|crm.error_toast_shown|CAMPAIGN_SEND_FAILED|/campaigns/${"x".repeat(400)}`,
+    ])
+  );
+  const result = await EVIDENCE_SOURCES.PostHog(
+    reportedCtx(),
+    verifiedWidgetContext,
+    reportedTurn
+  );
+  assert.equal(result.status, "found");
+  const items = result.status === "found" ? result.items : [];
+  assert.deepEqual(items[0], {
+    text: "PostHog person",
+    url: `https://us.posthog.com/project/12345/person/${verifiedWidgetContext.userId}`,
+  });
+  assert.deepEqual(items[1], {
+    text: "Viewed /dashboard at 2026-11-11T18:53:07.841000Z",
+  });
+  assert.ok(
+    items[2]?.text.startsWith("Error toast CAMPAIGN_SEND_FAILED on /campaigns/")
+  );
+  assert.equal(items[2]?.text.length, 300);
+  assert.ok(!items.some(({ text }) => text.includes("?")));
+});
+
+test("PostHog leaves out the person link when its project is not configured", async (t) => {
+  withEnv(t, "WIDGET_POSTHOG_PROJECT_ID", undefined);
+  answer(
+    t,
+    posthogTable(["2026-11-11T18:53:07.841000Z|$pageview|(null)|/dashboard"])
+  );
+  assert.deepEqual(
+    await EVIDENCE_SOURCES.PostHog(
+      reportedCtx(),
+      verifiedWidgetContext,
+      reportedTurn
+    ),
+    {
+      items: [{ text: "Viewed /dashboard at 2026-11-11T18:53:07.841000Z" }],
+      status: "found",
+    }
+  );
+});
+
+test("an unrecognized PostHog response is reported as not checked", async (t) => {
+  withEnv(t, "EXECUTOR_MCP_CONNECTOR_SUPPORT", "executor/test");
+  t.mock.method(executorTransport, "call", () =>
+    Promise.resolve({
+      data: { content: [{ text: '{"results": []}', type: "text" }] },
+      http: { status: 200 },
+      ok: true,
+    })
+  );
+  await assert.rejects(
+    EVIDENCE_SOURCES.PostHog(
+      reportedCtx(),
+      verifiedWidgetContext,
+      reportedTurn
+    ),
+    UNRECOGNIZED_POSTHOG
+  );
+  const result = await gatherEvidence(
+    verifiedWidgetContext,
+    reportedTurn,
+    RUN_ID,
+    {
+      ...EVIDENCE_SOURCES,
+      Axiom: () => Promise.resolve({ status: "empty" }),
+      Inngest: () => Promise.resolve({ status: "empty" }),
+      Jam: () => Promise.resolve({ status: "empty" }),
+      Sentry: () => Promise.resolve({ status: "empty" }),
+    }
+  );
+  assert.deepEqual(result.PostHog, {
+    reason: "the lookup failed",
+    status: "unchecked",
+  });
 });
