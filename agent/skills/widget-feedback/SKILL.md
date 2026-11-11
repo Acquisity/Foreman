@@ -38,7 +38,7 @@ When the run id is `none` or the logs return nothing, search by the conversation
 
 ## 3. Read the browser evidence
 
-When the ticket has a Sentry replay or Sentry error ids, read them through the Executor `sentry` namespace: use `search_replays`, `get_replay_details` and `get_issue_details`, inspect their schemas with describe, then read the replay around `Reported at` and each listed error event. Read the console errors and failed network calls in the Browser section alongside them, and line the failures up against the run's log lines by time. A failed call to the widget's own routes, or a client error while the reply rendered, points at the widget; a clean replay that shows the reply as the customer saw it rules the UI out. When Sentry has nothing for the ids, say so and go on.
+When the ticket has a Sentry replay or Sentry error ids, read them through the Executor `sentry-foreman` namespace: use `search_replays`, `get_replay_details` and `get_issue_details`, inspect their schemas with describe, then read the replay around `Reported at` and each listed error event. Read the console errors and failed network calls in the Browser section alongside them, and line the failures up against the run's log lines by time. A failed call to the widget's own routes, or a client error while the reply rendered, points at the widget; a clean replay that shows the reply as the customer saw it rules the UI out. When Sentry has nothing for the ids, say so and go on.
 
 ## 4. Check the help articles
 
