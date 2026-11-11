@@ -900,3 +900,38 @@ test("an unrecognized PostHog response is reported as not checked", async (t) =>
     status: "unchecked",
   });
 });
+
+for (const [name, row] of [
+  ["garbage", "garbage|garbage"],
+  ["one-cell", "garbage"],
+  ["unknown event", "2026-11-11T18:53:07.841000Z|unknown|(null)|/dashboard"],
+  ["invalid timestamp", "garbage|$pageview|(null)|/dashboard"],
+]) {
+  test(`a PostHog ${name} row is reported as not checked`, async (t) => {
+    answer(t, posthogTable([row]));
+    await assert.rejects(
+      EVIDENCE_SOURCES.PostHog(
+        reportedCtx(),
+        verifiedWidgetContext,
+        reportedTurn
+      ),
+      UNRECOGNIZED_POSTHOG
+    );
+    const result = await gatherEvidence(
+      verifiedWidgetContext,
+      reportedTurn,
+      RUN_ID,
+      {
+        ...EVIDENCE_SOURCES,
+        Axiom: () => Promise.resolve({ status: "empty" }),
+        Inngest: () => Promise.resolve({ status: "empty" }),
+        Jam: () => Promise.resolve({ status: "empty" }),
+        Sentry: () => Promise.resolve({ status: "empty" }),
+      }
+    );
+    assert.deepEqual(result.PostHog, {
+      reason: "the lookup failed",
+      status: "unchecked",
+    });
+  });
+}

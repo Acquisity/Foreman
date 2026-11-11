@@ -50,7 +50,7 @@ export function posthogQuery(userId: string, reportedAt: Date): string {
   const from = new Date(reportedAt.getTime() - POSTHOG_WINDOW_MS).toISOString();
   return [
     // The path is free text, so it comes last and the table parser keeps any pipe in it.
-    "SELECT timestamp, event, properties.errorCode, properties.$pathname",
+    "SELECT timestamp, event, replaceAll(toString(properties.errorCode), '|', ' ') AS errorCode, properties.$pathname",
     "FROM events",
     `WHERE distinct_id = '${id}'`,
     "AND event IN ('$pageview', 'crm.error_toast_shown')",

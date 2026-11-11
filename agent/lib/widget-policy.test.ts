@@ -88,3 +88,11 @@ test("the policy allows only the exact query built for this user and report", as
   assert.equal(call.mock.callCount(), 1);
   assert.throws(() => assertWidgetPath(POSTHOG_READ.path), OUTSIDE);
 });
+
+test("the PostHog query replaces error-code pipes before the path column", () => {
+  assert.ok(
+    query.includes(
+      "replaceAll(toString(properties.errorCode), '|', ' ') AS errorCode"
+    )
+  );
+});

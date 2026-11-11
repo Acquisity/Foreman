@@ -251,22 +251,28 @@ const posthogRows = (data: unknown) => {
   if (lines[0]?.trim() !== POSTHOG_COLUMNS) {
     throw new Error("Unrecognized PostHog response.");
   }
-  return lines.slice(1, ITEMS_MAX + 1).flatMap((line) => {
-    const [timestamp, event, errorCode, ...rest] = line
-      .split("|")
-      .map((cell) => cell.trim());
-    const path = rest.join("|");
-    return timestamp && event
-      ? [
-          {
-            errorCode: errorCode === POSTHOG_NULL ? "" : errorCode,
-            event,
-            path: path === POSTHOG_NULL ? "" : path,
-            timestamp,
-          },
-        ]
-      : [];
-  });
+  return lines
+    .filter((line) => line.trim())
+    .slice(1, ITEMS_MAX + 1)
+    .map((line) => {
+      const [timestamp, event, errorCode, ...rest] = line
+        .split("|")
+        .map((cell) => cell.trim());
+      if (
+        !rest.length ||
+        (event !== "$pageview" && event !== "crm.error_toast_shown") ||
+        !Number.isFinite(Date.parse(timestamp))
+      ) {
+        throw new Error("Unrecognized PostHog response.");
+      }
+      const path = rest.join("|");
+      return {
+        errorCode: errorCode === POSTHOG_NULL ? "" : errorCode,
+        event,
+        path: path === POSTHOG_NULL ? "" : path,
+        timestamp,
+      };
+    });
 };
 
 /** The reporting user's page views and error toasts in the 30 minutes before the report, and their PostHog person. */
