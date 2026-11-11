@@ -266,6 +266,8 @@ for (const role of ["member", "client"] as const) {
   });
 }
 
+const UNRECOGNIZED_SENTRY = /Unrecognized Sentry response/u;
+
 test("a bug_report from someone no longer in the workspace is refused and files nothing", async (t) => {
   enabled(t);
   const response = await receiveWidgetMessage(
@@ -585,7 +587,7 @@ test("Sentry searches by the workspace tag, which its search keeps, not a bare k
     (_wire: unknown, _path: string, input: Record<string, unknown>) => {
       inputs.push(input);
       return Promise.resolve({
-        data: { content: [{ text: "No issues found.", type: "text" }] },
+        data: { structuredContent: { issues: [] } },
         http: { status: 200 },
         ok: true,
       });
@@ -602,15 +604,19 @@ test("Sentry searches by the workspace tag, which its search keeps, not a bare k
   ]);
 });
 
-test("Sentry lists each issue by its title with its link, and nothing found when there is none", async (t) => {
+test("Sentry lists each issue by its title with its link, nothing found when there is none, and fails on an unknown shape", async (t) => {
   withEnv(t, "WIDGET_SENTRY_ORG_SLUG", "acquisity");
   const paths = answer(t, {
-    content: [
-      {
-        text: '# Search Results for "tags[organizationId]:x"\n\n**View these results in Sentry**:\nhttps://acquisity-ai.sentry.io/issues/?query=x\n\nFound **1** issues:\n\n## 1. [ACQUISITY-67W](https://acquisity-ai.sentry.io/issues/ACQUISITY-67W)\n\n**TypeError: schedule is undefined**\n\n- **Status**: unresolved\n- **Culprit**: `POST /api/inngest`\n',
-        type: "text",
-      },
-    ],
+    content: [{ text: "{}", type: "text" }],
+    structuredContent: {
+      issues: [
+        {
+          shortId: "ACQUISITY-67W",
+          title: "TypeError: schedule is undefined",
+          url: "https://acquisity-ai.sentry.io/issues/ACQUISITY-67W",
+        },
+      ],
+    },
   });
   assert.deepEqual(
     await EVIDENCE_SOURCES.Sentry(providerCtx(), verifiedWidgetContext, turn),
@@ -626,10 +632,16 @@ test("Sentry lists each issue by its title with its link, and nothing found when
   );
   assert.deepEqual(paths, ["sentry.user.personalSentry.search_issues"]);
   t.mock.restoreAll();
-  answer(t, { content: [{ text: "No issues found.", type: "text" }] });
+  answer(t, { structuredContent: { issues: [] } });
   assert.deepEqual(
     await EVIDENCE_SOURCES.Sentry(providerCtx(), verifiedWidgetContext, turn),
     { status: "empty" }
+  );
+  t.mock.restoreAll();
+  answer(t, { content: [{ text: "No issues found.", type: "text" }] });
+  await assert.rejects(
+    EVIDENCE_SOURCES.Sentry(providerCtx(), verifiedWidgetContext, turn),
+    UNRECOGNIZED_SENTRY
   );
 });
 
