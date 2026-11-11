@@ -133,7 +133,7 @@ All eight read and five write Linear documents match the installed Executor enum
 
 No Executor server code or server deployment was changed. The unapplied server-owner patch and its remaining verification are recorded in [EXECUTOR-RETRY-AFTER.md](./EXECUTOR-RETRY-AFTER.md). Foreman stops after one rate-limited invocation when the currently deployed server supplies no retry interval. Fresh deployed-preview results for this follow-up are recorded on PR #118; earlier acceptance above is not evidence for this refactor.
 
-## Vercel REST preview acceptance (2026-09-07)
+## Vercel REST preview acceptance (2026-09-07, v1 toolkit, historical)
 
 The owner reported successful read-only Foreman preview execution through `foreman_vercel_api`: discovery, `getProject` for Foreman, `getDeployments` returning three READY deployments, and `getDeploymentEvents` reporting a successful 52-second build. All calls succeeded; nothing was changed. The browser health check also passed for the Foreman project. No additional trace submission is required for this reported smoke-test acceptance.
 
