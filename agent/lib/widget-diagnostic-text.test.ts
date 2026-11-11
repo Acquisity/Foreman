@@ -6,17 +6,17 @@ import { widgetAuth } from "#lib/widget-scope.js";
 import { readWidgetInboxHealth } from "../tools/widget_inbox_health.js";
 import { parseWidgetOutreachHealthEvidence } from "../tools/widget_outreach_health.js";
 
-const originalConnector = process.env.EXECUTOR_MCP_CONNECTOR;
+const originalConnector = process.env.EXECUTOR_MCP_CONNECTOR_SUPPORT;
 const originalBindings = process.env.EXECUTOR_OPERATION_BINDINGS;
-process.env.EXECUTOR_MCP_CONNECTOR = "executor.test/widget";
+process.env.EXECUTOR_MCP_CONNECTOR_SUPPORT = "executor.test/widget";
 process.env.EXECUTOR_OPERATION_BINDINGS = JSON.stringify({
   "planetscale.readQuery": {
-    path: "planetscale.org.foremanPlanetscale.planetscale_execute_read_query",
+    path: "planetscale-org.planetscale_execute_read_query",
   },
 });
 after(() => {
   for (const [key, value] of [
-    ["EXECUTOR_MCP_CONNECTOR", originalConnector],
+    ["EXECUTOR_MCP_CONNECTOR_SUPPORT", originalConnector],
     ["EXECUTOR_OPERATION_BINDINGS", originalBindings],
   ]) {
     if (value === undefined) {

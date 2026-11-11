@@ -16,12 +16,12 @@ import definition, {
 } from "../tools/widget_provisioning_status.js";
 
 const scope = verifiedWidgetContext;
-const originalConnector = process.env.EXECUTOR_MCP_CONNECTOR;
+const originalConnector = process.env.EXECUTOR_MCP_CONNECTOR_SUPPORT;
 const originalBindings = process.env.EXECUTOR_OPERATION_BINDINGS;
-process.env.EXECUTOR_MCP_CONNECTOR = "executor.test/widget";
+process.env.EXECUTOR_MCP_CONNECTOR_SUPPORT = "executor.test/widget";
 process.env.EXECUTOR_OPERATION_BINDINGS = JSON.stringify({
   "planetscale.readQuery": {
-    path: "planetscale.org.foremanPlanetscale.planetscale_execute_read_query",
+    path: "planetscale-org.planetscale_execute_read_query",
   },
 });
 after(() => {
@@ -31,9 +31,9 @@ after(() => {
     process.env.EXECUTOR_OPERATION_BINDINGS = originalBindings;
   }
   if (originalConnector === undefined) {
-    delete process.env.EXECUTOR_MCP_CONNECTOR;
+    delete process.env.EXECUTOR_MCP_CONNECTOR_SUPPORT;
   } else {
-    process.env.EXECUTOR_MCP_CONNECTOR = originalConnector;
+    process.env.EXECUTOR_MCP_CONNECTOR_SUPPORT = originalConnector;
   }
 });
 
@@ -262,10 +262,7 @@ test("dispatch sends the org-scoped query through the widget toolkit", async (t)
     { query: string; use_replica: boolean },
   ];
   assert.equal(wire.toolkit, WIDGET_TOOLKIT);
-  assert.equal(
-    path,
-    "planetscale.org.foremanPlanetscale.planetscale_execute_read_query"
-  );
+  assert.equal(path, "planetscale-org.planetscale_execute_read_query");
   assert.ok(input.query.includes(scope.organizationId));
   assert.equal(input.use_replica, false);
 });

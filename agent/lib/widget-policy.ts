@@ -5,7 +5,7 @@ import { isWidgetSupport, widgetContext } from "./widget-scope.js";
 
 const paths: ReadonlySet<string> = new Set(WIDGET_PATHS);
 /** The lane's one write. dispatch.ts checks its input against the verified scope before this policy is reached. */
-export const WIDGET_TICKET_PATH = "linear.org.workspaceLinear.save_issue";
+export const WIDGET_TICKET_PATH = "linear-foreman.save_issue";
 
 export function assertWidgetPath(path: string) {
   if (!paths.has(path)) {
@@ -21,15 +21,15 @@ export function assertWidgetPath(path: string) {
 export const RECORDING_READS = {
   consoleErrors: {
     input: { limit: 30, logLevel: ["error", "warn"] },
-    path: "jam.user.personalJam.getconsolelogs",
+    path: "jam-foreman.getConsoleLogs",
   },
-  details: { input: {}, path: "jam.user.personalJam.getdetails" },
+  details: { input: {}, path: "jam-foreman.getDetails" },
   failedRequests: {
     input: { limit: 20, statusCode: ["4xx", "5xx"] },
-    path: "jam.user.personalJam.getnetworkrequests",
+    path: "jam-foreman.getNetworkRequests",
   },
-  steps: { input: { limit: 60 }, path: "jam.user.personalJam.getuserevents" },
-  transcript: { input: {}, path: "jam.user.personalJam.getvideotranscript" },
+  steps: { input: { limit: 60 }, path: "jam-foreman.getUserEvents" },
+  transcript: { input: {}, path: "jam-foreman.getVideoTranscript" },
 } as const;
 const recordingPaths: ReadonlySet<string> = new Set(
   Object.values(RECORDING_READS).map(({ path }) => path)

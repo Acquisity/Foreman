@@ -46,7 +46,7 @@ const app: SessionAuthContext = {
 };
 const auth = supportAuth(app, claim);
 test("creation retries keep their journal identity when wording changes", () => {
-  const path = "linear.org.workspaceLinear.save_document";
+  const path = "linear-foreman.save_document";
   assert.equal(
     supportWriteKey(
       path,
@@ -59,7 +59,7 @@ test("creation retries keep their journal identity when wording changes", () => 
       "v1"
     )
   );
-  const comment = "linear.org.workspaceLinear.save_comment";
+  const comment = "linear-foreman.save_comment";
   assert.equal(
     supportWriteKey(comment, { body: "before", issueId: "ENG-1" }, "v1"),
     supportWriteKey(comment, { body: "after", issueId: "ENG-1" }, "v1")
@@ -228,35 +228,33 @@ test("support catalog preserves the required evidence providers and only selecte
   );
   assert.deepEqual([...SUPPORT_PATHS].sort(), manifest.toolkit.paths.sort());
   for (const provider of [
-    "foreman_instantly_api",
-    "foreman_autumn_api",
-    "foreman_stripe_api",
-    "planetscale",
-    "sentry",
+    "foreman-instantly-api",
+    "foreman-autumn-api",
+    "foreman-stripe-api",
+    "planetscale-org",
+    "sentry-foreman",
     "inngest",
-    "axiom",
+    "axiom-foreman",
     "intercom",
-    "linear",
+    "linear-foreman",
   ]) {
     assert.ok(
       SUPPORT_PATHS.some((path) => path.startsWith(`${provider}.`)),
       provider
     );
   }
-  assertSupportOperation("intercom.org.foremanIntercom.get_conversation", {});
+  assertSupportOperation("intercom.get_conversation", {});
   for (const path of [
-    "linear.org.workspaceLinear.merge_diff",
-    "linear.org.workspaceLinear.delete_comment",
-    "intercom.org.foremanIntercom.add_internal_note",
+    "linear-foreman.merge_diff",
+    "linear-foreman.delete_comment",
+    "intercom.add_internal_note",
     "executor.toolkits.update",
-    "stripe.user.personalStripe.stripe_api_write",
+    "stripe-foreman.stripe_api_write",
   ]) {
     assert.throws(() => assertSupportOperation(path, {}));
   }
   assert.throws(() =>
-    assertSupportOperation("sentry.user.personalSentry.execute_sentry_tool", {
-      name: "update_issue",
-    })
+    assertSupportOperation("sentry-foreman.update_issue", {})
   );
 });
 
@@ -281,7 +279,7 @@ test("support transport stays on its selected toolkit and quotes inputs as data"
             ? { protocolVersion: "2025-06-18" }
             : {
                 structuredContent: {
-                  result: { data: {}, ok: true },
+                  execution: { ok: true, value: { data: {}, ok: true } },
                   status: "completed",
                 },
               },
@@ -295,15 +293,17 @@ test("support transport stays on its selected toolkit and quotes inputs as data"
       token: "test-only",
       toolkit: "foreman-support",
     },
-    "intercom.org.foremanIntercom.get_conversation",
+    "intercom.get_conversation",
     { id: malicious },
     { fetch: fetcher }
   );
   assert.ok(urls.every((url) => url === toolkitUrl("foreman-support")));
+  const [declaration] = code[0].split("\n");
   assert.equal(
-    code[0],
-    `return await tools["intercom.org.foremanIntercom.get_conversation"](${JSON.stringify({ id: malicious })});`
+    declaration,
+    `const input = ${JSON.stringify({ id: malicious })};`
   );
+  assert.ok(code[0].includes('tools["intercom"]["get_conversation"](call)'));
   assert.throws(() => toolkitUrl("arbitrary-toolkit" as never));
 });
 

@@ -11,6 +11,7 @@ import { readRecording } from "../tools/widget_read_recording.js";
 import { acquisityOrigin } from "./acquisity-origin.js";
 import { executorClient } from "./executor/client.js";
 import { invokeProvider, type ProviderContext } from "./executor/dispatch.js";
+import { mcpResultText } from "./executor/mcp-result.js";
 import { findFunctionRuns } from "./inngest-api.js";
 import { fastCallOptions, modelFor, resolveModel } from "./models.js";
 import { logOpsEvent } from "./ops-log.js";
@@ -100,22 +101,52 @@ const SENTRY_ISSUE_ID = /\[([^\]]+)\]/u;
 const SENTRY_ISSUE_URL =
   /https:\/\/[\w.-]*sentry\.io\/[^\s)\]]*issues\/[^\s)\]]+/u;
 
-/** Sentry answers search_issues in markdown: each issue is a `## n. [ID](link)` heading, then its title in bold. */
+const sentryIssues = z.object({ issues: z.array(z.unknown()) });
+// Each issue is checked on its own, so one oversized field drops only that issue.
+const sentryIssue = z.object({
+  shortId: z.string().max(100),
+  title: z.string().max(2000).optional(),
+  url: z.string().max(2000),
+});
+
+/** Sentry answers search_issues as structured issues, or in markdown: each issue a `## n. [ID](link)` heading, then its title in bold. */
 const sentry: Lookup = async (ctx, scope) => {
   const organizationSlug = process.env.WIDGET_SENTRY_ORG_SLUG;
   if (!organizationSlug) {
     return { reason: "WIDGET_SENTRY_ORG_SLUG is not set", status: "unchecked" };
   }
-  const data = (await read(ctx, "sentry.user.personalSentry.search_issues", {
+  const data = (await read(ctx, "sentry-foreman.search_issues", {
     limit: ITEMS_MAX,
     organizationSlug,
     query: `tags[organizationId]:${scope.organizationId} lastSeen:-24h`,
     sort: "date",
-  })) as { content?: { text?: unknown }[] } | null;
-  const lines = (data?.content ?? [])
-    .flatMap((part) => (typeof part.text === "string" ? [part.text] : []))
-    .join("\n")
-    .split("\n");
+  })) as { structuredContent?: unknown } | null;
+  // v2 Sentry returns the issues as structured data with empty content.
+  if (
+    data?.structuredContent !== undefined &&
+    data.structuredContent !== null
+  ) {
+    const structured = sentryIssues.safeParse(data.structuredContent);
+    if (!structured.success) {
+      return {
+        reason: "Sentry returned an unexpected result shape",
+        status: "unchecked",
+      };
+    }
+    return found(
+      structured.data.issues
+        .flatMap((issue) => {
+          const parsed = sentryIssue.safeParse(issue);
+          return parsed.success ? [parsed.data] : [];
+        })
+        .filter(({ url }) => SENTRY_ISSUE_URL.test(url))
+        .map(({ shortId, title, url }) => ({
+          text: clip([shortId, title].filter(Boolean).join(": "), ITEM_CHARS),
+          url,
+        }))
+    );
+  }
+  const lines = (mcpResultText(data) ?? "").split("\n");
   const issues: { id: string; title?: string; url: string }[] = [];
   for (const line of lines) {
     const url = line.startsWith("#") ? SENTRY_ISSUE_URL.exec(line)?.[0] : null;
@@ -159,9 +190,7 @@ const axiom: Lookup = async (ctx, scope) => {
     `| limit ${ITEMS_MAX}`,
   ].join("\n");
   const rows = collectRows(
-    providerData(
-      await read(ctx, "axiom.user.personalAxiom.querydataset", { apl })
-    )
+    providerData(await read(ctx, "axiom-foreman.queryDataset", { apl }))
   );
   if (!rows) {
     throw new Error("Unrecognized Axiom response.");

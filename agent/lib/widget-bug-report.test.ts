@@ -566,7 +566,7 @@ const providerCtx = (): ProviderContext => {
 };
 
 const answer = (t: TestContext, data: unknown) => {
-  withEnv(t, "EXECUTOR_MCP_CONNECTOR", "executor/test");
+  withEnv(t, "EXECUTOR_MCP_CONNECTOR_SUPPORT", "executor/test");
   const paths: string[] = [];
   t.mock.method(executorTransport, "call", (_wire: unknown, path: string) => {
     paths.push(path);
@@ -577,7 +577,7 @@ const answer = (t: TestContext, data: unknown) => {
 
 test("Sentry searches by the workspace tag, which its search keeps, not a bare key it drops", async (t) => {
   withEnv(t, "WIDGET_SENTRY_ORG_SLUG", "acquisity-ai");
-  withEnv(t, "EXECUTOR_MCP_CONNECTOR", "executor/test");
+  withEnv(t, "EXECUTOR_MCP_CONNECTOR_SUPPORT", "executor/test");
   const inputs: Record<string, unknown>[] = [];
   t.mock.method(
     executorTransport,
@@ -624,9 +624,82 @@ test("Sentry lists each issue by its title with its link, and nothing found when
       status: "found",
     }
   );
-  assert.deepEqual(paths, ["sentry.user.personalSentry.search_issues"]);
+  assert.deepEqual(paths, ["sentry-foreman.search_issues"]);
   t.mock.restoreAll();
   answer(t, { content: [{ text: "No issues found.", type: "text" }] });
+  assert.deepEqual(
+    await EVIDENCE_SOURCES.Sentry(providerCtx(), verifiedWidgetContext, turn),
+    { status: "empty" }
+  );
+});
+
+test("Sentry reads v2's structured issues when the text content is empty", async (t) => {
+  withEnv(t, "WIDGET_SENTRY_ORG_SLUG", "acquisity");
+  answer(t, {
+    content: [],
+    structuredContent: {
+      issues: [
+        {
+          shortId: "ACQUISITY-67W",
+          title: "TypeError: schedule is undefined",
+          url: "https://acquisity-ai.sentry.io/issues/ACQUISITY-67W",
+        },
+        { shortId: "X-1", title: "elsewhere", url: "https://example.com/x" },
+      ],
+      query: "x",
+    },
+  });
+  assert.deepEqual(
+    await EVIDENCE_SOURCES.Sentry(providerCtx(), verifiedWidgetContext, turn),
+    {
+      items: [
+        {
+          text: "ACQUISITY-67W: TypeError: schedule is undefined",
+          url: "https://acquisity-ai.sentry.io/issues/ACQUISITY-67W",
+        },
+      ],
+      status: "found",
+    }
+  );
+  t.mock.restoreAll();
+  answer(t, {
+    content: [],
+    structuredContent: {
+      issues: [
+        {
+          shortId: "X".repeat(200),
+          url: "https://acquisity-ai.sentry.io/issues/X",
+        },
+        {
+          shortId: "ACQUISITY-1",
+          url: "https://acquisity-ai.sentry.io/issues/ACQUISITY-1",
+        },
+      ],
+    },
+  });
+  assert.deepEqual(
+    await EVIDENCE_SOURCES.Sentry(providerCtx(), verifiedWidgetContext, turn),
+    {
+      items: [
+        {
+          text: "ACQUISITY-1",
+          url: "https://acquisity-ai.sentry.io/issues/ACQUISITY-1",
+        },
+      ],
+      status: "found",
+    }
+  );
+  t.mock.restoreAll();
+  answer(t, { content: [], structuredContent: { results: "changed" } });
+  assert.deepEqual(
+    await EVIDENCE_SOURCES.Sentry(providerCtx(), verifiedWidgetContext, turn),
+    {
+      reason: "Sentry returned an unexpected result shape",
+      status: "unchecked",
+    }
+  );
+  t.mock.restoreAll();
+  answer(t, { content: [], structuredContent: { issues: [] } });
   assert.deepEqual(
     await EVIDENCE_SOURCES.Sentry(providerCtx(), verifiedWidgetContext, turn),
     { status: "empty" }
@@ -643,7 +716,7 @@ test("Sentry is not checked when its organization is not configured", async (t) 
 
 test("Axiom reads the workspace and user from the app logs' fields map", async (t) => {
   withEnv(t, "WIDGET_AXIOM_APP_DATASET", "acquisity-app");
-  withEnv(t, "EXECUTOR_MCP_CONNECTOR", "executor/test");
+  withEnv(t, "EXECUTOR_MCP_CONNECTOR_SUPPORT", "executor/test");
   const apls: string[] = [];
   t.mock.method(
     executorTransport,

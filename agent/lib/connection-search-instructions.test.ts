@@ -34,8 +34,8 @@ test("active instructions route company discovery through the shared Executor co
     "searches only",
     "eve__tool",
     "tools.search({ namespace, query })",
-    "tools.describe.tool({ path })",
-    "tools[path](input)",
+    "tools.search.describe({ paths: [path] })",
+    "wrap each call in try/catch",
   ]) {
     assert.ok(EXECUTOR_DISCOVERY.includes(rule), rule);
     assert.ok(GENERAL_PROMPT.includes(rule), rule);

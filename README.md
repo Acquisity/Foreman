@@ -6,7 +6,7 @@ Foreman is Acquisity's general-purpose agent, built on [eve](https://eve.dev). I
 
 ## Surfaces
 
-Foreman runs on four channels, with a GitHub extension and one shared company-service Executor connection:
+Foreman runs on four channels, with a GitHub extension and company services through Executor, one connector per lane:
 
 - **GitHub** — trusted mentions (owners, members, collaborators) dispatch interactive sessions. Labels, PR opens, CI changes, reviews, and synchronizations do not launch work or automatic summaries.
 - **Linear** — Agent Sessions trusted by workspace membership. Assigned issues use the same general agent.
@@ -15,7 +15,7 @@ Foreman runs on four channels, with a GitHub extension and one shared company-se
 
 The GitHub extension adds an API surface (reads, triage, PR authoring; no merge) running inside the sandbox.
 
-Foreman reaches company services through Executor, using shared company accounts for authorized investigations. Existing bounded helpers still perform customer lookup, billing, Instantly investigation, run searches, Linear routing, Stripe dispute evidence, and help-center searches; their provider calls go through Executor. Root, native delegates, critic, and scheduled work use one shared Foreman toolkit. Company-service credentials stay in Executor; Vercel Connect brokers Foreman's Executor credential and the retained channel and personal connections. See [.github/EXECUTOR-CONTRACT.md](.github/EXECUTOR-CONTRACT.md) for the shared toolkit, exact helper bindings, and the preview-first cutover. This revision requires that setup before provider traffic is enabled.
+Foreman reaches company services through Executor, using shared company accounts for authorized investigations. Existing bounded helpers still perform customer lookup, billing, Instantly investigation, run searches, Linear routing, Stripe dispute evidence, and help-center searches; their provider calls go through Executor. Root, native delegates, critic, and scheduled work use the Foreman lane's Executor v2 bot. Company-service credentials stay in Executor; Vercel Connect brokers Foreman's Executor credential and the retained channel and personal connections. See [.github/EXECUTOR-CONTRACT.md](.github/EXECUTOR-CONTRACT.md) for the lane bots, exact helper bindings, and the preview-first cutover. This revision requires that setup before provider traffic is enabled.
 
 ## Skills
 
@@ -64,9 +64,10 @@ Settled investigations, including ticketless Intercom and Slack ones and conclus
 
 | Executor setting | Purpose |
 | --- | --- |
-| `EXECUTOR_MCP_CONNECTOR` | App-scoped Vercel Connect UID for the Executor bearer credential |
+| `EXECUTOR_MCP_CONNECTOR_FOREMAN`, `EXECUTOR_MCP_CONNECTOR_SUPPORT`, `EXECUTOR_MCP_CONNECTOR_DISPUTES` | App-scoped Vercel Connect API-key connector UIDs, one per lane, each holding that lane's Executor bot token; no lane falls back to another's |
 | `EXECUTOR_BASE_URL` | HTTPS origin; defaults to `https://executor.acquisity.ai` |
-| `EXECUTOR_OPERATION_BINDINGS` | Verified operation paths only; argument schemas live in source; no provider tokens |
+| `EXECUTOR_OPERATION_BINDINGS` | Verified `<app slug>.<tool>` paths only; argument schemas live in source; no provider tokens |
+| `EXECUTOR_API_TOKEN`, `EXECUTOR_LANE_TOKEN_*`, `EXECUTOR_ORGANIZATION` | Operator machine only, never on a deployment: `pnpm executor:readiness --live` and `--isolation` |
 
 
 | Variable | Default | Purpose |

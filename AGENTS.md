@@ -105,7 +105,7 @@ The report covers `slack`, `slack-intake-only`, and `repository-interactive`. `a
 
 ## Preview and release verification
 
-For each PR, point the Foreman Preview Slack connector trigger at that PR branch and remove its previous Preview trigger branch. Verify the actual connector identities and target path in Vercel; historical IDs in docs are evidence, not deployment configuration. Set branch-scoped Preview `EXECUTOR_MCP_CONNECTOR`, `EXECUTOR_BASE_URL`, and the verified compact `EXECUTOR_OPERATION_BINDINGS` JSON. Redeploy after configuration changes, verify the active SHA, then prove a real provider read through the deployed bot. `{}` bindings intentionally disable helpers.
+For each PR, point the Foreman Preview Slack connector trigger at that PR branch and remove its previous Preview trigger branch. Verify the actual connector identities and target path in Vercel; historical IDs in docs are evidence, not deployment configuration. Set branch-scoped Preview `EXECUTOR_MCP_CONNECTOR_FOREMAN`, `EXECUTOR_MCP_CONNECTOR_SUPPORT`, `EXECUTOR_MCP_CONNECTOR_DISPUTES` (one API-key connector per lane bot), `EXECUTOR_BASE_URL`, and the verified compact `EXECUTOR_OPERATION_BINDINGS` JSON. Redeploy after configuration changes, verify the active SHA, then prove a real provider read through the deployed bot. `{}` bindings intentionally disable helpers.
 
 Preview support uses a separate private Postgres database and queue. Keep `FOREMAN_SUPPORT_ENABLED` and `FOREMAN_SUPPORT_FOLLOWUPS_ENABLED` off except for controlled scheduled tests. The scheduled support Slack destination is fixed in source; retargeting the Preview bot does not isolate that destination. Follow `.github/EXECUTOR-PREVIEW.md` and `.github/INTERCOM-SUPPORT-CRON.md` before enabling it.
 

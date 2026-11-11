@@ -78,7 +78,7 @@ Initial rollout: intake only. Intake claims new handoffs and retries unfinished 
 - `FOREMAN_SUPPORT_HANDOFF_APP_ID`: verified Slack app ID producing Intercom handoff notifications. Do not substitute a user ID, channel ID or Foreman's app ID.
 - `FOREMAN_SUPPORT_SINCE`: explicit ISO timestamp for the first deployment watermark. Later deploys retain the persisted watermark.
 - `FOREMAN_SUPPORT_TEST_CONVERSATIONS`: optional comma-separated conversation IDs, at most ten, to limit both notification discovery and tracked-case claims during controlled tests. Set the initial watermark before the selected notifications for those tests. Do not reuse an old test watermark to enable a broad production backlog.
-- Existing `EXECUTOR_MCP_CONNECTOR`, `EXECUTOR_OPERATION_BINDINGS`, `SLACK_CONNECTOR`, repository credentials and private database configuration are reused. Authentication ownership remains with the existing authorized company Executor account and Foreman app connection. Do not expand scopes automatically.
+- `EXECUTOR_MCP_CONNECTOR_SUPPORT`, the support lane bot's API-key connector, is new with ENG-18244 and must be provisioned and verified for this lane before activation. The existing `EXECUTOR_OPERATION_BINDINGS`, `SLACK_CONNECTOR`, repository credentials and private database configuration are reused. Authentication ownership remains with the existing authorized company Executor account and Foreman app connection. Do not expand scopes automatically.
 
 Use a separate private Postgres database for Preview tests; the cursor and operational queue are deployment-independent within a database. Never point an enabled Preview at the production queue.
 

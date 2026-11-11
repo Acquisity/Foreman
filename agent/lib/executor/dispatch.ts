@@ -21,11 +21,12 @@ import {
   type WidgetContext,
 } from "../widget-scope.js";
 import { WIDGET_SCOPE_NOTICE } from "../widget-ticket-marker.js";
-import { executorAuth } from "./auth.js";
+import { executorAuth, laneConnector } from "./auth.js";
 import { operationPath } from "./bindings.js";
 import {
   DISPUTES_TOOLKIT,
   type ExecutorToolkit,
+  FOREMAN_TOOLKIT_SLUG,
   WIDGET_TOOLKIT,
 } from "./endpoint.js";
 import { ExecutorError, executorTransport } from "./transport.js";
@@ -36,7 +37,7 @@ export type ExecutorOutcome = Awaited<
   ReturnType<typeof executorTransport.call>
 >;
 
-const LINEAR_TICKET_PATH = "linear.org.workspaceLinear.save_issue";
+const LINEAR_TICKET_PATH = "linear-foreman.save_issue";
 const LINEAR_TICKET_MAX_BYTES = 64 * 1024;
 
 /**
@@ -144,8 +145,9 @@ const widgetLinearTicketInput = z.union([
   }),
 ]);
 
-/** Every path the foreman-disputes toolkit binds starts with its connection. */
-export const DISPUTE_WRITE_CONNECTION = "foreman_stripe_dispute_write.";
+/** The dispute write apps, live and sandbox; only the foreman-disputes connection holds them. */
+export const DISPUTE_WRITE_APP =
+  /^foreman-stripe-dispute-write(?:-sandbox)?\./u;
 
 type OperationPolicy =
   | ReturnType<typeof supportOperationPolicy>
@@ -165,14 +167,14 @@ const toolkitFor = (
   path: string
 ): ExecutorToolkit | undefined =>
   policy?.toolkit ??
-  (path.startsWith(DISPUTE_WRITE_CONNECTION) ? DISPUTES_TOOLKIT : undefined);
+  (DISPUTE_WRITE_APP.test(path) ? DISPUTES_TOOLKIT : undefined);
 
 /** The widget egress gate runs outside any eve session: one fixed read under the app principal. */
 export async function readWidgetOwnership(
   query: string,
   signal: AbortSignal
 ): Promise<unknown> {
-  const connector = process.env.EXECUTOR_MCP_CONNECTOR;
+  const connector = laneConnector(WIDGET_TOOLKIT);
   if (!connector) {
     throw new Error("Support identifier resolution is unavailable.");
   }
@@ -180,9 +182,7 @@ export async function readWidgetOwnership(
   // Defense in depth: this app-principal read runs outside any eve session and
   // its policy/allowlist, so assert the binding still resolves to the expected
   // planetscale read before dispatching.
-  if (
-    path !== "planetscale.org.foremanPlanetscale.planetscale_execute_read_query"
-  ) {
+  if (path !== "planetscale-org.planetscale_execute_read_query") {
     throw new Error("Unexpected ownership operation binding.");
   }
   signal.throwIfAborted();
@@ -205,11 +205,15 @@ async function connection(
   policy: OperationPolicy,
   path: string
 ) {
-  const { token } = await ctx.getToken(executorAuth());
+  const toolkit = toolkitFor(policy, path);
+  // The token comes from this lane's own connector, never the shared one.
+  const { token } = await ctx.getToken(
+    executorAuth(toolkit ?? FOREMAN_TOOLKIT_SLUG)
+  );
   const authorization = policy ? { version: await policy.authorize() } : null;
   return {
     authorization,
-    wire: { signal: ctx.abortSignal, token, toolkit: toolkitFor(policy, path) },
+    wire: { signal: ctx.abortSignal, token, toolkit },
   };
 }
 
@@ -218,7 +222,7 @@ export const widgetScopeBlock = (scope: WidgetContext) =>
 
 // A Linear MCP tool that changes something, or the authored GraphQL write API.
 const LINEAR_WRITE_PATH =
-  /^(?:foreman_linear_write_api\.|linear\.[^.]+\.[^.]+\.(?:save|create|delete|update|archive|unarchive)_)/u;
+  /^(?:foreman-linear-write-api\.|linear-foreman\.(?:save|create|delete|update|archive|unarchive)_)/u;
 
 function assertLaneOperation(
   ctx: ProviderContext,

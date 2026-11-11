@@ -18,18 +18,17 @@ import definition, {
 const scope = verifiedWidgetContext;
 const foreignOrg = "99999999-9999-4999-8999-999999999999";
 const threadId = "44444444-4444-4444-8444-444444444444";
-const PLANETSCALE_PATH =
-  "planetscale.org.foremanPlanetscale.planetscale_execute_read_query";
-const SENTRY_PATH = "sentry.user.personalSentry.search_issues";
-const AXIOM_PATH = "axiom.user.personalAxiom.querydataset";
+const PLANETSCALE_PATH = "planetscale-org.planetscale_execute_read_query";
+const SENTRY_PATH = "sentry-foreman.search_issues";
+const AXIOM_PATH = "axiom-foreman.queryDataset";
 
 const saved = {
   axiom: process.env.WIDGET_AXIOM_APP_DATASET,
   bindings: process.env.EXECUTOR_OPERATION_BINDINGS,
-  connector: process.env.EXECUTOR_MCP_CONNECTOR,
+  connector: process.env.EXECUTOR_MCP_CONNECTOR_SUPPORT,
   sentry: process.env.WIDGET_SENTRY_ORG_SLUG,
 };
-process.env.EXECUTOR_MCP_CONNECTOR = "executor.test/widget";
+process.env.EXECUTOR_MCP_CONNECTOR_SUPPORT = "executor.test/widget";
 process.env.EXECUTOR_OPERATION_BINDINGS = JSON.stringify({
   "planetscale.readQuery": { path: PLANETSCALE_PATH },
 });
@@ -43,7 +42,7 @@ const restore = (key: keyof typeof saved, name: string) => {
   }
 };
 after(() => {
-  restore("connector", "EXECUTOR_MCP_CONNECTOR");
+  restore("connector", "EXECUTOR_MCP_CONNECTOR_SUPPORT");
   restore("bindings", "EXECUTOR_OPERATION_BINDINGS");
   restore("sentry", "WIDGET_SENTRY_ORG_SLUG");
   restore("axiom", "WIDGET_AXIOM_APP_DATASET");

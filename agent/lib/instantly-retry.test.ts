@@ -80,6 +80,25 @@ describe("Instantly typed transport and retries", () => {
       assert.deepEqual(delays, [500, 1000]);
     }
   });
+  it("does not retry a transient status Executor marks non-retryable", async () => {
+    let calls = 0;
+    const delays: number[] = [];
+    await assert.rejects(
+      listInstantlySubworkspaces({
+        client: () => {
+          calls += 1;
+          return Promise.resolve({ data: null, retryable: false, status: 503 });
+        },
+        sleep: (ms) => {
+          delays.push(ms);
+          return Promise.resolve();
+        },
+      }),
+      InstantlyApiError
+    );
+    assert.equal(calls, 1);
+    assert.deepEqual(delays, []);
+  });
   it("distinguishes authorization, not-found, and rate limits without exposing provider bodies", async () => {
     for (const [status, kind] of [
       [401, "authorization"],

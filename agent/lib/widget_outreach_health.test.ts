@@ -19,18 +19,18 @@ import definition, {
 
 const scope = verifiedWidgetContext;
 const WAITING_LEADS = /12 leads have not had a first email yet/;
-const originalConnector = process.env.EXECUTOR_MCP_CONNECTOR;
+const originalConnector = process.env.EXECUTOR_MCP_CONNECTOR_SUPPORT;
 const originalBindings = process.env.EXECUTOR_OPERATION_BINDINGS;
-process.env.EXECUTOR_MCP_CONNECTOR = "executor.test/widget";
+process.env.EXECUTOR_MCP_CONNECTOR_SUPPORT = "executor.test/widget";
 process.env.EXECUTOR_OPERATION_BINDINGS = JSON.stringify({
   "instantly.campaigns": {
-    path: "foreman_instantly_api.org.foremanInstantlyApi.campaigns.listCampaigns",
+    path: "foreman-instantly-api.campaigns.listCampaigns",
   },
   "instantly.workspace-group-members": {
-    path: "foreman_instantly_api.org.foremanInstantlyApi.workspaceGroupMembers.listWorkspaceGroupMembers",
+    path: "foreman-instantly-api.workspaceGroupMembers.listWorkspaceGroupMembers",
   },
   "planetscale.readQuery": {
-    path: "planetscale.org.foremanPlanetscale.planetscale_execute_read_query",
+    path: "planetscale-org.planetscale_execute_read_query",
   },
 });
 after(() => {
@@ -40,9 +40,9 @@ after(() => {
     process.env.EXECUTOR_OPERATION_BINDINGS = originalBindings;
   }
   if (originalConnector === undefined) {
-    delete process.env.EXECUTOR_MCP_CONNECTOR;
+    delete process.env.EXECUTOR_MCP_CONNECTOR_SUPPORT;
   } else {
-    process.env.EXECUTOR_MCP_CONNECTOR = originalConnector;
+    process.env.EXECUTOR_MCP_CONNECTOR_SUPPORT = originalConnector;
   }
 });
 
@@ -227,10 +227,7 @@ test("dispatch sends the org-scoped query through the widget toolkit", async (t)
     { query: string; use_replica: boolean },
   ];
   assert.equal(wire.toolkit, WIDGET_TOOLKIT);
-  assert.equal(
-    path,
-    "planetscale.org.foremanPlanetscale.planetscale_execute_read_query"
-  );
+  assert.equal(path, "planetscale-org.planetscale_execute_read_query");
   assert.ok(input.query.includes(scope.organizationId));
   assert.equal(input.use_replica, false);
 });
@@ -398,7 +395,7 @@ test("targeted live read matches owned provider ID and keeps saved limits distin
       if (path.includes("workspaceGroupMembers")) {
         return { data: { items: [member()] }, ok: true };
       }
-      assert.equal(input["x-as-workspace"], WORKSPACE_ID);
+      assert.deepEqual(input.headers, { "x-as-workspace": WORKSPACE_ID });
       return {
         data: {
           items: [
@@ -463,9 +460,10 @@ test("a multi-page live scan resolves the workspace group once", async (t) => {
         groupWalks += 1;
         return { data: { items: [member()] }, ok: true };
       }
-      assert.equal(input["x-as-workspace"], WORKSPACE_ID);
-      campaignPages.push(input.starting_after);
-      return input.starting_after === "page-3"
+      assert.deepEqual(input.headers, { "x-as-workspace": WORKSPACE_ID });
+      const query = input.query as { starting_after?: string };
+      campaignPages.push(query.starting_after);
+      return query.starting_after === "page-3"
         ? { data: { items: [{ id: campaignId, status: 1 }] }, ok: true }
         : {
             data: {

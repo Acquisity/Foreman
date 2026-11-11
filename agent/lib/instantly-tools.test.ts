@@ -3,7 +3,8 @@ import { describe, it } from "node:test";
 import { z } from "zod";
 import { InstantlyApiError } from "./instantly-api.js";
 
-process.env.EXECUTOR_MCP_CONNECTOR ??= "api.instantly.ai/acquisity-foreman";
+process.env.EXECUTOR_MCP_CONNECTOR_FOREMAN ??=
+  "api.instantly.ai/acquisity-foreman";
 process.env.LINEAR_CONNECTOR ??= "linear/test";
 
 const [
@@ -27,7 +28,7 @@ describe("Instantly tool authorization", () => {
     process.env.EXECUTOR_OPERATION_BINDINGS = JSON.stringify({
       "instantly.workspace-group-members": {
         arguments: {},
-        path: "instantly.org.test.listMembers",
+        path: "instantly.listMembers",
       },
     });
     let requestedToken = 0;

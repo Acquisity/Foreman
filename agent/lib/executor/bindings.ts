@@ -1,13 +1,10 @@
 import { z } from "zod";
-import { ExecutorError } from "./transport.js";
+import { ExecutorError, OPERATION_PATH } from "./transport.js";
 
 const bindingsSchema = z.record(
   z.string(),
   z.object({
-    path: z
-      .string()
-      .max(500)
-      .regex(/^[A-Za-z0-9_-]+(?:\.[A-Za-z0-9_-]+){3,}$/u),
+    path: z.string().max(500).regex(OPERATION_PATH),
   })
 );
 

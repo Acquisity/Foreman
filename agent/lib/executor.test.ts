@@ -5,7 +5,7 @@ import type { SessionAuthContext, SessionContext } from "eve/context";
 import type { ApprovalContext } from "eve/tools/approval";
 import { operationPath } from "./executor/bindings.js";
 import { executorConnection } from "./executor/connection.js";
-import { DISPUTE_WRITE_CONNECTION } from "./executor/dispatch.js";
+import { DISPUTE_WRITE_APP } from "./executor/dispatch.js";
 import {
   DISPUTES_TOOLKIT,
   FOREMAN_TOOLKIT_SLUG,
@@ -13,6 +13,8 @@ import {
 } from "./executor/endpoint.js";
 import {
   disputeOperationInputs,
+  disputeWireArgs,
+  operationInputs,
   REQUIRED_HELPER_OPERATIONS,
 } from "./executor/operations.js";
 import { readSentryIssue, sentryIssueInput } from "./executor/sentry.js";
@@ -28,13 +30,16 @@ const auth: SessionAuthContext = {
 };
 const internal = stampInvestigationMemory(auth);
 const completed = (data: unknown) => ({
-  structuredContent: { result: { data, ok: true }, status: "completed" },
+  structuredContent: {
+    execution: { ok: true, value: { data, ok: true } },
+    status: "completed",
+  },
 });
 const json = (body: unknown, headers: Record<string, string> = {}) =>
   new Response(JSON.stringify(body), {
     headers: { "content-type": "application/json", ...headers },
   });
-const OPERATION = "stripe.org.foreman.customer";
+const OPERATION = "stripe.customer";
 test("only failures before the execute request are confirmed undispatched", async () => {
   for (const failedMethod of [
     "initialize",
@@ -136,7 +141,7 @@ const context = (current: SessionAuthContext | null = internal) => ({
   token: "executor-secret",
 });
 
-process.env.EXECUTOR_MCP_CONNECTOR = "executor/test";
+process.env.EXECUTOR_MCP_CONNECTOR_FOREMAN = "executor/test";
 
 test("every execution context shares company auth and the same toolkit", () => {
   const connection = executorConnection();
@@ -184,6 +189,12 @@ test("deployment bindings select paths and cannot modify typed arguments", async
     for (const invalid of [
       "{",
       JSON.stringify({ read: { path: "invalid" } }),
+      // A v1 path: underscores never survive into a v2 app slug.
+      JSON.stringify({
+        read: {
+          path: "foreman_stripe_api.org.foremanStripeApi.customers.readCustomer",
+        },
+      }),
     ]) {
       process.env.EXECUTOR_OPERATION_BINDINGS = invalid;
       assert.throws(
@@ -220,7 +231,7 @@ test("Executor uses a fresh toolkit session, follows JSON-RPC ids, and returns t
   );
   assert.deepEqual(result, { data: { id: "cus_1" }, ok: true });
   assert.equal(seen.length, 3);
-  assert.ok(seen.every((call) => call.url.includes("/foreman?")));
+  assert.ok(seen.every((call) => call.url.endsWith("/mcp")));
   assert.ok(
     seen.every(
       (call) =>
@@ -232,6 +243,11 @@ test("Executor uses a fresh toolkit session, follows JSON-RPC ids, and returns t
   const invocation = JSON.parse(String(seen[2].init.body));
   assert.equal(invocation.params.name, "execute");
   assert.ok(!invocation.params.arguments.code.includes("executor-secret"));
+  assert.ok(
+    invocation.params.arguments.code.includes(
+      'tools["stripe"]["customer"](call)'
+    )
+  );
   assert.ok(
     invocation.params.arguments.code.includes(
       JSON.stringify('value"; throw new Error("injection"); //')
@@ -248,13 +264,16 @@ test("SSE responses and provider HTTP failures are handled without exposing prov
       fetch: rpc(
         {
           structuredContent: {
-            result: {
-              error: {
-                code: "not_found",
-                message: "private-provider-body",
-                status: 404,
+            execution: {
+              ok: true,
+              value: {
+                error: {
+                  code: "not_found",
+                  message: "private-provider-body",
+                  status: 404,
+                },
+                ok: false,
               },
-              ok: false,
             },
             status: "completed",
           },
@@ -273,6 +292,12 @@ test("SSE responses and provider HTTP failures are handled without exposing prov
 test("paused, malformed, and management calls fail without resuming or retrying", async () => {
   for (const result of [
     { structuredContent: { resumePayload: {}, status: "paused" } },
+    {
+      structuredContent: {
+        execution: { error: {}, ok: false },
+        status: "completed",
+      },
+    },
     completed(undefined),
     { isError: true },
   ]) {
@@ -471,18 +496,18 @@ test("the Stripe dispute write lives only in the foreman-disputes toolkit", () =
     (operation) => bindings[operation]?.path
   );
   // Production binds the live writes; Preview binds the same two operations
-  // on the sandbox connection, which is also mounted here.
+  // on the sandbox app, which is also mounted here.
   for (const path of writes) {
     assert.ok(disputes.toolkit.paths.includes(path), path);
   }
   assert.equal(disputes.toolkit.paths.length, writes.length * 2);
   for (const path of disputes.toolkit.paths) {
-    assert.ok(path.startsWith(DISPUTE_WRITE_CONNECTION), path);
+    assert.match(path, DISPUTE_WRITE_APP, path);
   }
   // The raw execute gateway runs any shared path, so no shared path may
   // update a dispute, upload a file, or reach the write connection.
   for (const path of shared.toolkit.paths) {
-    assert.ok(!path.startsWith(DISPUTE_WRITE_CONNECTION), path);
+    assert.doesNotMatch(path, DISPUTE_WRITE_APP, path);
     assert.doesNotMatch(path, DISPUTE_WRITE_PATH, path);
   }
   assert.ok(
@@ -517,7 +542,7 @@ test("one toolkit contains platform operations and every helper binding", () => 
     }
     assert.ok(toolkit.paths.includes(binding.path), binding.path);
   }
-  for (const suffix of [".save_issue", ".send_message", ".get_conversation"]) {
+  for (const suffix of [".save_issue", ".send-message", ".get_conversation"]) {
     assert.ok(
       toolkit.paths.some((path) => path.endsWith(suffix)),
       suffix
@@ -528,5 +553,55 @@ test("one toolkit contains platform operations and every helper binding", () => 
       (path) =>
         !(path.startsWith("supermemory.") || path.startsWith("executor."))
     )
+  );
+});
+
+test("OpenAPI tools receive grouped v2 input; MCP tools keep flat input", () => {
+  assert.deepEqual(
+    operationInputs["stripe.charges.get"].parse({
+      charge_id: "ch_1",
+      "expand[]": "refunds",
+    }),
+    { path: { charge_id: "ch_1" }, query: { "expand[]": "refunds" } }
+  );
+  assert.deepEqual(
+    operationInputs["inngest.functionRuns"].parse({
+      appId: "a",
+      functionId: "f",
+      limit: 5,
+    }),
+    { path: { appId: "a", functionId: "f" }, query: { limit: 5 } }
+  );
+  assert.deepEqual(
+    operationInputs["autumn.customer"].parse({
+      body: { customer_id: "c", expand: [] },
+      "x-api-version": "2.3.0",
+    }),
+    {
+      body: { customer_id: "c", expand: [] },
+      headers: { "x-api-version": "2.3.0" },
+    }
+  );
+  assert.deepEqual(
+    disputeWireArgs("stripe.disputes.update", {
+      dispute_id: "du_1",
+      "Idempotency-Key": "k",
+      submit: false,
+    }),
+    {
+      body: { submit: false },
+      headers: { "Idempotency-Key": "k" },
+      path: { dispute_id: "du_1" },
+    }
+  );
+  const flat = { query: "select 1", use_replica: false };
+  assert.deepEqual(
+    operationInputs["planetscale.readQuery"].parse({
+      ...flat,
+      branch: "main",
+      database: "db",
+      organization: "org",
+    }),
+    { ...flat, branch: "main", database: "db", organization: "org" }
   );
 });
