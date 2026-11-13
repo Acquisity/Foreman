@@ -29,6 +29,7 @@ test("billing triage reads the complete Linear issue contract", () => {
 test("a ticket Fixy owns is handed off, never re-routed, and a closed one is not reopened", () => {
   for (const rule of [
     'When `decide_billing` returns `handTo: "fixy"`',
+    "then call `hand_to_fixy` with the ticket's `issue`",
     "`lanes` including `billing`",
     "never call `decide_billing` or `route_ticket` again on new facts",
     "On a Done or Canceled ticket, answer the follow-up and change no state.",
