@@ -10,6 +10,7 @@ import {
   type FollowUpOutcome,
   RELAY_HEADER,
   SLACK_PROMPT,
+  saidReplies,
 } from "./follow-up-decisions.js";
 import { askFromName, isTriageIntakeAsk } from "./linear-context.js";
 import { migrationFiledReport } from "./migration-ticket-scope.js";
@@ -410,7 +411,14 @@ export async function judgeFollowUp(
   }
   // Before Foreman has spoken there is nothing a reply could leave settled,
   // so only a status move is acted on; anything else runs as before.
-  return followUp.lastReply === "" && outcome === "skip" ? null : outcome;
+  if (followUp.lastReply === "" && outcome === "skip") {
+    return null;
+  }
+  // A restatement needs an answer to restate, and a widget-feedback playbook
+  // never replies to the requester.
+  return outcome === "restate" && (followUp.lastReply === "" || widgetFeedback)
+    ? "respond"
+    : outcome;
 }
 
 /**
@@ -582,27 +590,50 @@ export async function createThreadComment(
   return comment;
 }
 
+/** Asked after a restated answer, so the requester says what is still wrong (ENG-18836). */
+export const RESTATE_QUESTION =
+  "If this doesn't solve it, tell me what's still wrong.";
+
+/** The posted text: the writer's rewording, then the restate question in code so no rewrite can drop it. */
+export async function replyBody(
+  message: string,
+  outcome: FollowUpOutcome,
+  rewrite?: (message: string) => Promise<string>
+): Promise<string> {
+  const body = rewrite ? await rewrite(message) : message;
+  return outcome === "restate" && !body.trimEnd().endsWith(RESTATE_QUESTION)
+    ? `${body.trimEnd()}\n\n${RESTATE_QUESTION}`
+    : body;
+}
+
 export async function replyToRequester(
   issue: string,
   message: string,
   accessToken: string,
   signal?: AbortSignal,
   /** Rewords the message once Jev has said a reply is needed (ENG-15226). */
-  rewrite?: (message: string) => Promise<string>
+  rewrite?: (message: string) => Promise<string>,
+  restateFollowUp = false
 ): Promise<ReplyResult> {
   const credentials = { accessToken };
   const { issueId, plan } = await readThread(issue, credentials);
   if (!plan.ok) {
     throw new Error(plan.error);
   }
-  if (plan.followUp) {
-    const outcome = await followUpOutcome(plan.followUp, signal);
-    if (outcome === "skip") {
-      return { outcome, posted: false, reason: SKIP_REASON };
-    }
+  // A stamped turn was already judged a bare bump by the channel; judging it
+  // again could drop the restatement the turn was dispatched to send. A reply
+  // that arrived since then is judged afresh with the rest.
+  let outcome: FollowUpOutcome = "respond";
+  if (restateFollowUp && saidReplies(plan.followUp?.replies).length === 1) {
+    outcome = "restate";
+  } else if (plan.followUp) {
+    outcome = await followUpOutcome(plan.followUp, signal);
+  }
+  if (outcome === "skip") {
+    return { outcome, posted: false, reason: SKIP_REASON };
   }
   const created = await createThreadComment({
-    body: rewrite ? await rewrite(message) : message,
+    body: await replyBody(message, outcome, rewrite),
     credentials,
     issueId,
     parentId: plan.anchorId,

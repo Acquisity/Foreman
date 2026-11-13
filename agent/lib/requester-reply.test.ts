@@ -8,8 +8,10 @@ import {
   judgeFollowUp,
   planReply,
   promptedFollowUp,
+  RESTATE_QUESTION,
   readAllComments,
   relayedFollowUp,
+  replyBody,
   replyToRequester,
   type ThreadComment,
   ThreadIncompleteError,
@@ -537,6 +539,177 @@ test("acts on a person's direct status request on an ordinary ticket, and on not
     ),
     "skip"
   );
+});
+
+test("passes a restate through only where a reply follows an answer", async () => {
+  const answer = (outcome: FollowUpOutcome) => () => Promise.resolve(outcome);
+  const relay = said(
+    "b1",
+    "aaron",
+    "2026-10-02T20:09:00Z",
+    "**Gary** replied in Slack:\n\nany update?",
+    "anchor"
+  );
+  const answered = [
+    anchor,
+    said("f2", FOREMAN, "2026-10-02T20:08:00Z", "It was a typo.", "anchor"),
+    relay,
+  ];
+  const ticket = (comments: ThreadComment[], widgetFeedback = false) => ({
+    comments,
+    foreman: foremanUser,
+    plan: planReply(comments, FOREMAN),
+    widgetFeedback,
+  });
+  const trigger = { commentId: "b1", prompted: false };
+  assert.equal(
+    await judgeFollowUp(ticket(answered), trigger, answer("restate")),
+    "restate"
+  );
+  assert.equal(
+    await judgeFollowUp(ticket([anchor, relay]), trigger, answer("restate")),
+    "respond",
+    "nothing to restate before Foreman spoke"
+  );
+  assert.equal(
+    await judgeFollowUp(ticket(answered, true), trigger, answer("restate")),
+    "respond"
+  );
+  const direct = said("d2", "aaron", "2026-10-02T20:09:00Z", "any update?");
+  assert.equal(
+    await judgeFollowUp(
+      ticket([...sessionThread, direct]),
+      { commentId: "d2", prompted: true },
+      answer("restate")
+    ),
+    null
+  );
+});
+
+test("asks what is still wrong after a restated answer, even after a rewrite", async () => {
+  const asked = `It was a typo, fixed now.\n\n${RESTATE_QUESTION}`;
+  assert.equal(await replyBody("It was a typo, fixed now.", "restate"), asked);
+  assert.equal(
+    await replyBody("raw", "restate", () =>
+      Promise.resolve("It was a typo, fixed now. ")
+    ),
+    asked
+  );
+  assert.equal(await replyBody(asked, "restate"), asked);
+  assert.equal(await replyBody("Done.", "respond"), "Done.");
+});
+
+test("a stamped restate is not judged again and closes with the fixed question", async (t) => {
+  const previousKey = process.env.AI_GATEWAY_API_KEY;
+  process.env.AI_GATEWAY_API_KEY = "test-key";
+  t.after(() => {
+    if (previousKey === undefined) {
+      delete process.env.AI_GATEWAY_API_KEY;
+    } else {
+      process.env.AI_GATEWAY_API_KEY = previousKey;
+    }
+  });
+  const bodies: string[] = [];
+  let judged = 0;
+  const comments = [
+    anchor,
+    { ...reply("f1", FOREMAN, "2026-09-26T10:00:00Z"), body: "It was a typo." },
+    { ...reply("r0", "aaron", "2026-09-26T10:00:30Z"), body: "<@U0BQ5QMHM7D>" },
+    { ...reply("r1", "aaron", "2026-09-26T10:01:00Z"), body: "any update?" },
+  ];
+  t.mock.method(globalThis, "fetch", (_url: unknown, init?: RequestInit) => {
+    const request = JSON.parse(String(init?.body));
+    if (request.questions) {
+      judged += 1;
+      return Promise.resolve(
+        Response.json({
+          answers: {
+            bare_bump: { probability: 0.1, type: "boolean" },
+            follow_up: {
+              choice: "skip",
+              probabilities: { respond: 0.1, skip: 0.9 },
+              type: "choice",
+            },
+            status_only: { probability: 0.1, type: "boolean" },
+          },
+          model: "m",
+        })
+      );
+    }
+    if (request.query.includes("IssueComments")) {
+      return Promise.resolve(
+        Response.json({
+          data: {
+            issue: {
+              comments: {
+                nodes: comments.map((comment) => ({
+                  ...comment,
+                  parent: comment.parentId ? { id: comment.parentId } : null,
+                  user: { id: comment.userId, name: "Tester" },
+                })),
+                pageInfo: { endCursor: null, hasNextPage: false },
+              },
+            },
+          },
+        })
+      );
+    }
+    if (request.query.includes("mutation RequesterReply")) {
+      bodies.push(request.variables.input.body);
+      return Promise.resolve(
+        Response.json({
+          data: {
+            commentCreate: {
+              comment: { id: "created", url: "https://linear.app/comment" },
+              success: true,
+            },
+          },
+        })
+      );
+    }
+    return Promise.resolve(
+      Response.json({
+        data: {
+          issue: { id: "issue", identifier: "ENG-1", project: null },
+          viewer: foremanUser,
+        },
+      })
+    );
+  });
+  const message = "It was a typo, fixed now.";
+  const results = await Promise.all(
+    [undefined, () => Promise.resolve(message)].map((rewrite) =>
+      replyToRequester(
+        "ENG-1",
+        rewrite ? "raw draft" : message,
+        "test-token",
+        undefined,
+        rewrite,
+        true
+      )
+    )
+  );
+  assert.ok(results.every((result) => result.posted));
+  assert.equal(judged, 0, "a second judgment could have skipped the reply");
+  assert.deepEqual(bodies, [
+    `${message}\n\n${RESTATE_QUESTION}`,
+    `${message}\n\n${RESTATE_QUESTION}`,
+  ]);
+  // A reply that landed during the turn is judged afresh with the bump.
+  comments.push({
+    ...reply("r2", "aaron", "2026-09-26T10:02:00Z"),
+    body: "it still fails on the billing page",
+  });
+  const late = await replyToRequester(
+    "ENG-1",
+    message,
+    "test-token",
+    undefined,
+    undefined,
+    true
+  );
+  assert.equal(late.posted, false, "the fresh judgment said skip");
+  assert.equal(judged, 1);
 });
 
 test("refuses an incomplete comment page without a continuation cursor", async () => {

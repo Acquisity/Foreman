@@ -422,6 +422,104 @@ test("a clear status-only follow-up is moved without re-checking", () => {
   );
 });
 
+test("a clear bare bump restates the answer, even over a confident skip", () => {
+  assert.equal(
+    resolveFollowUp({ bare_bump: yes(0.9), follow_up: pick("respond") }),
+    "restate"
+  );
+  assert.equal(
+    resolveFollowUp({ bare_bump: yes(0.6), follow_up: pick("respond") }),
+    "respond"
+  );
+  assert.equal(
+    resolveFollowUp({ bare_bump: yes(0.9), follow_up: pick("skip") }),
+    "restate",
+    "a bump Jev reads as a confident skip is still answered"
+  );
+  for (const [follow_up, outcome] of [
+    [pick("skip"), "skip"],
+    [pick("respond"), "respond"],
+  ] as const) {
+    assert.equal(
+      resolveFollowUp(
+        { bare_bump: yes(0.9), follow_up },
+        { restateEligible: false }
+      ),
+      outcome,
+      "a nudge to a teammate is not a bump for Foreman"
+    );
+  }
+});
+
+test("only a newest reply naming a teammate without Foreman is a teammate nudge", async () => {
+  const bump = (text: string) =>
+    decideFollowUp(
+      {
+        lastReply: "It was a typo.",
+        replies: [`**Gary** replied in Slack:\n\n${text}`],
+      },
+      {
+        fetch: () =>
+          reply({
+            answers: {
+              bare_bump: { probability: 0.9, type: "boolean" },
+              follow_up: {
+                choice: "skip",
+                probabilities: { respond: 0.1, skip: 0.9 },
+                type: "choice",
+              },
+              status_only: { probability: 0.1, type: "boolean" },
+            },
+            model: "m",
+          }),
+        token: "t",
+      }
+    );
+  assert.equal(await bump("<@U06M69EP1UG> any update?"), "skip");
+  assert.equal(
+    await bump("<@U06M69EP1UG> <@U0BQ5QMHM7D> any update?"),
+    "restate"
+  );
+  assert.equal(await bump("any update?"), "restate");
+});
+
+test("restates only a single fresh reply, excluding handled replies and bare mentions", async () => {
+  const judge = (replies: string[], earlier?: string[]) =>
+    decideFollowUp(
+      { earlier, lastReply: "This is fixed.", replies },
+      {
+        fetch: () =>
+          reply({
+            answers: {
+              bare_bump: { probability: 0.95, type: "boolean" },
+              follow_up: {
+                choice: "respond",
+                probabilities: { respond: 0.99, skip: 0.01 },
+                type: "choice",
+              },
+              status_only: { probability: 0.01, type: "boolean" },
+            },
+            model: "m",
+          }),
+        token: "t",
+      }
+    );
+  assert.deepEqual(
+    await Promise.all(
+      [
+        "It still fails on the same page; here is the recording.",
+        "How do I enable it for my team?",
+      ].map((outstanding) => judge([outstanding, "any update?"]))
+    ),
+    ["respond", "respond"]
+  );
+  assert.equal(
+    await judge(["any update?"], ["It still fails on the same page."]),
+    "restate"
+  );
+  assert.equal(await judge(["<@U0BQ5QMHM7D>", "any update?"]), "restate");
+});
+
 test("a follow-up that is only mentions is skipped without asking Jev", async () => {
   const outcome = await decideFollowUp(
     {
