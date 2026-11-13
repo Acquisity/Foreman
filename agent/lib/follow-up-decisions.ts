@@ -35,7 +35,7 @@ export interface FollowUpInput {
 export const followUpQuestions = (): Record<string, JevQuestion> => ({
   bare_bump: {
     instructions:
-      "Do the replies only nudge Foreman for an answer or an update (following up, any update, bump, checking in), addressed to Foreman or to no one, with no new fact, no question beyond asking for an update, no correction, and nothing said about what is wrong with lastReply? A nudge to @teammate is not one.",
+      "Is the newest reply only a chase for an update, said to @Foreman or to no one (any update, any news, following up, bump, checking in, heard nothing back, a timeline)? Naming what the update is about (the ticket, the customer's question, the affected inboxes), urgency or impatience, mentioning @teammate alongside @Foreman, and repeating or quoting what lastReply already said all still count as only a chase. It is not only a chase if it mentions @teammate and not @Foreman, gives a new fact about the issue, asks a new question of its own (such as whether something is approved, why something happened, or what to tell the customer about a new message), corrects lastReply, or says what is still wrong.",
     type: "boolean",
   },
   follow_up: {
@@ -56,20 +56,26 @@ export const followUpQuestions = (): Record<string, JevQuestion> => ({
  * A clear status-only ask is answered without re-checking the work, and a
  * clear bare bump gets the last answer restated.
  */
-export function resolveFollowUp(answers: Answers): FollowUpOutcome {
-  const { choice, confidence } = choiceOf(answers.follow_up);
-  if (choice === "skip" && confidence >= BARS.followUp) {
-    return "skip";
-  }
+export function resolveFollowUp(
+  answers: Answers,
+  { teammateNudge = false }: { teammateNudge?: boolean } = {}
+): FollowUpOutcome {
   if (
     answers.status_only &&
     probabilityOf(answers.status_only) >= BARS.statusOnly
   ) {
     return "status";
   }
-  return answers.bare_bump && probabilityOf(answers.bare_bump) >= BARS.bareBump
-    ? "restate"
-    : "respond";
+  // Checked before skip: Jev scored real bumps a confident skip (ENG-18836 replay RB09).
+  if (
+    !teammateNudge &&
+    answers.bare_bump &&
+    probabilityOf(answers.bare_bump) >= BARS.bareBump
+  ) {
+    return "restate";
+  }
+  const { choice, confidence } = choiceOf(answers.follow_up);
+  return choice === "skip" && confidence >= BARS.followUp ? "skip" : "respond";
 }
 
 /**
@@ -127,6 +133,10 @@ export async function decideFollowUp(
     return "skip";
   }
   const earlier = said(input.earlier);
+  // Jev ignores the @teammate exclusion in bare_bump, so code checks the newest reply.
+  const newest = replies.at(-1) ?? "";
+  const teammateNudge =
+    newest.includes("@teammate") && !newest.includes("@Foreman");
   return resolveFollowUp(
     await askJev(
       followUpQuestions(),
@@ -136,6 +146,7 @@ export async function decideFollowUp(
         ...(earlier.length > 0 ? { earlier } : {}),
       },
       opts
-    )
+    ),
+    { teammateNudge }
   );
 }

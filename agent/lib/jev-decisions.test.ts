@@ -418,11 +418,11 @@ test("a clear status-only follow-up is moved without re-checking", () => {
   );
   assert.equal(
     resolveFollowUp({ follow_up: pick("skip"), status_only: yes(0.9) }),
-    "skip"
+    "status"
   );
 });
 
-test("a clear bare bump restates the answer, after skip and status", () => {
+test("a clear bare bump restates the answer, before skip and after status", () => {
   assert.equal(
     resolveFollowUp({ bare_bump: yes(0.9), follow_up: pick("respond") }),
     "restate"
@@ -433,7 +433,8 @@ test("a clear bare bump restates the answer, after skip and status", () => {
   );
   assert.equal(
     resolveFollowUp({ bare_bump: yes(0.9), follow_up: pick("skip") }),
-    "skip"
+    "restate",
+    "a bump Jev reads as a confident skip is still answered"
   );
   assert.equal(
     resolveFollowUp({
@@ -443,6 +444,51 @@ test("a clear bare bump restates the answer, after skip and status", () => {
     }),
     "status"
   );
+  for (const [follow_up, outcome] of [
+    [pick("skip"), "skip"],
+    [pick("respond"), "respond"],
+  ] as const) {
+    assert.equal(
+      resolveFollowUp(
+        { bare_bump: yes(0.9), follow_up },
+        { teammateNudge: true }
+      ),
+      outcome,
+      "a nudge to a teammate is not a bump for Foreman"
+    );
+  }
+});
+
+test("only a newest reply naming a teammate without Foreman is a teammate nudge", async () => {
+  const bump = (text: string) =>
+    decideFollowUp(
+      {
+        lastReply: "It was a typo.",
+        replies: [`**Gary** replied in Slack:\n\n${text}`],
+      },
+      {
+        fetch: () =>
+          reply({
+            answers: {
+              bare_bump: { probability: 0.9, type: "boolean" },
+              follow_up: {
+                choice: "skip",
+                probabilities: { respond: 0.1, skip: 0.9 },
+                type: "choice",
+              },
+              status_only: { probability: 0.1, type: "boolean" },
+            },
+            model: "m",
+          }),
+        token: "t",
+      }
+    );
+  assert.equal(await bump("<@U06M69EP1UG> any update?"), "skip");
+  assert.equal(
+    await bump("<@U06M69EP1UG> <@U0BQ5QMHM7D> any update?"),
+    "restate"
+  );
+  assert.equal(await bump("any update?"), "restate");
 });
 
 test("a follow-up that is only mentions is skipped without asking Jev", async () => {
