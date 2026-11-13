@@ -60,12 +60,6 @@ export function resolveFollowUp(
   answers: Answers,
   { teammateNudge = false }: { teammateNudge?: boolean } = {}
 ): FollowUpOutcome {
-  if (
-    answers.status_only &&
-    probabilityOf(answers.status_only) >= BARS.statusOnly
-  ) {
-    return "status";
-  }
   // Checked before skip: Jev scored real bumps a confident skip (ENG-18836 replay RB09).
   if (
     !teammateNudge &&
@@ -75,7 +69,13 @@ export function resolveFollowUp(
     return "restate";
   }
   const { choice, confidence } = choiceOf(answers.follow_up);
-  return choice === "skip" && confidence >= BARS.followUp ? "skip" : "respond";
+  if (choice === "skip" && confidence >= BARS.followUp) {
+    return "skip";
+  }
+  return answers.status_only &&
+    probabilityOf(answers.status_only) >= BARS.statusOnly
+    ? "status"
+    : "respond";
 }
 
 /**

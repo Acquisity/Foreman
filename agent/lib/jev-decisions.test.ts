@@ -418,11 +418,11 @@ test("a clear status-only follow-up is moved without re-checking", () => {
   );
   assert.equal(
     resolveFollowUp({ follow_up: pick("skip"), status_only: yes(0.9) }),
-    "status"
+    "skip"
   );
 });
 
-test("a clear bare bump restates the answer, before skip and after status", () => {
+test("a clear bare bump restates the answer, even over a confident skip", () => {
   assert.equal(
     resolveFollowUp({ bare_bump: yes(0.9), follow_up: pick("respond") }),
     "restate"
@@ -435,14 +435,6 @@ test("a clear bare bump restates the answer, before skip and after status", () =
     resolveFollowUp({ bare_bump: yes(0.9), follow_up: pick("skip") }),
     "restate",
     "a bump Jev reads as a confident skip is still answered"
-  );
-  assert.equal(
-    resolveFollowUp({
-      bare_bump: yes(0.9),
-      follow_up: pick("respond"),
-      status_only: yes(0.9),
-    }),
-    "status"
   );
   for (const [follow_up, outcome] of [
     [pick("skip"), "skip"],
