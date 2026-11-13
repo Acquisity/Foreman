@@ -91,7 +91,20 @@ test("money asks go to billing, and errors are real reports for Fixy", () => {
   const howTo = section("3. How-to or expected behaviour");
   assert.ok(howTo.includes("isn't working"));
   assert.ok(howTo.includes("Fixy decides that"));
-  assert.ok(howTo.includes("state `Canceled`"));
+  // Fixy closes question-lane tickets; Foreman writes no state.
+  assert.ok(howTo.includes('`lanes: ["question"]`'));
+  assert.ok(howTo.includes("Do not change its state or assignee."));
+  assert.ok(!howTo.includes("Canceled"));
+});
+
+test("the handoff carries lanes and the fixy label, never Bug or a card", () => {
+  const handoff = section("6. Hand the report to Fixy");
+  for (const lane of ["`billing`", "`unblock`", "`eng`", "`question`"]) {
+    assert.ok(handoff.includes(lane), lane);
+  }
+  assert.ok(handoff.includes("adds the `fixy` label"));
+  assert.ok(handoff.includes("No `card`"));
+  assert.ok(!skill.includes("Bug` label"));
 });
 
 test("a known issue joins only when open, and a refusal hands off", () => {
@@ -119,10 +132,7 @@ test("the skill follows the agent-facing text rules", () => {
   assert.ok(!BOLD.test(skill), "no bold");
 });
 
-for (const [heading, state] of [
-  ["3. How-to or expected behaviour", "Canceled"],
-  ["4. Known issue", "Duplicate"],
-] as const) {
+for (const [heading, state] of [["4. Known issue", "Duplicate"]] as const) {
   test(`the prescribed ${state} route succeeds for a James-held report without Bug`, async () => {
     const step = section(heading);
     const assignee = ASSIGNEE.exec(step)?.[1];
@@ -141,16 +151,12 @@ for (const [heading, state] of [
         : linear.fetchStub(request);
     const result = await routeTicket(
       {
-        addLabels:
-          state === "Canceled"
-            ? ["Customer reported", "User Error"]
-            : ["Customer reported"],
+        addLabels: ["Customer reported"],
         assignee,
+        duplicateOf: "ENG-9",
+        inheritAssigneeFrom: "ENG-9",
         issue: "ENG-1",
         state,
-        ...(state === "Duplicate"
-          ? { duplicateOf: "ENG-9", inheritAssigneeFrom: "ENG-9" }
-          : {}),
       },
       { client }
     );
@@ -162,12 +168,10 @@ for (const [heading, state] of [
       "support"
     );
     assert.ok(!result.labels.includes("Bug"));
-    assert.equal(linear.relations.length, state === "Duplicate" ? 1 : 0);
-    if (state === "Duplicate") {
-      assert.ok(
-        result.warnings.some((warning) => warning.includes("not inherited"))
-      );
-    }
+    assert.equal(linear.relations.length, 1);
+    assert.ok(
+      result.warnings.some((warning) => warning.includes("not inherited"))
+    );
   });
 }
 
@@ -192,7 +196,7 @@ test("an eligible known issue assignee takes precedence over the support fallbac
   );
 });
 
-test("a handoff comment marks follow-ups, and Bug without it still gets intake", () => {
+test("a handoff comment marks follow-ups, and fixy without it still gets intake", () => {
   assert.ok(
     section("1. Read the ticket").includes(
       "already has the `## Fixy handoff` comment"
@@ -203,12 +207,12 @@ test("a handoff comment marks follow-ups, and Bug without it still gets intake",
   );
 });
 
-test("new details after a finished run get a top-level escalation without automatic retry", () => {
+test("new details only update the handoff, with no state or label change", () => {
   const follow = section("8. Follow-ups after the hand-off");
-  assert.ok(follow.includes("`factory:needs-you` or `factory:failed`"));
-  assert.ok(follow.includes("top-level ticket comment"));
-  assert.ok(follow.includes("a person should decide whether to re-run Fixy"));
-  assert.ok(follow.includes("do not remove or re-add labels automatically"));
+  assert.ok(!follow.includes("factory:"));
+  assert.ok(follow.includes("call `hand_to_fixy` again"));
+  assert.ok(follow.includes("Do not change the ticket's state or assignee"));
+  assert.ok(follow.includes("do not remove or re-add labels"));
 });
 
 test("a duplicate retries only missing optional labels once", () => {

@@ -50,10 +50,28 @@ const root: HandoffSession = {
 const input: HandToFixyInput = {
   expected: "The campaign sends its follow-up step",
   issue: "SAN-145",
+  lanes: ["eng"],
   stepsToReproduce: ["Open the Q4 campaign", "Check step 2's sent count"],
   whatHappened: "Step 2 sent nothing since Friday",
   workspaceId: "0A1B2C3D-1111-2222-3333-444455556666",
 };
+
+interface LabelRow {
+  id: string;
+  name: string;
+  team: { id: string } | null;
+}
+// fixy is a workspace label in Linear; the lane labels are not created yet.
+const LABELS: LabelRow[] = [
+  { id: "bug-workspace", name: "Bug", team: null },
+  { id: "fixy-other", name: "fixy", team: { id: "team-eng" } },
+  { id: "fixy-workspace", name: "fixy", team: null },
+  ...["billing", "unblock", "eng", "question"].map((lane) => ({
+    id: `lane-${lane}`,
+    name: `lane:${lane}`,
+    team: { id: TEAM_ID },
+  })),
+];
 
 interface Ticket {
   attachments: { title: string; url: string }[];
@@ -69,7 +87,7 @@ const fakeLinear = (
     hidden?: boolean;
     fail?: string;
     lookupFails?: boolean;
-    teamLabels?: { id: string; name: string; team: { id: string } | null }[];
+    teamLabels?: LabelRow[];
   } = {}
 ) => {
   const state: Ticket = {
@@ -144,25 +162,26 @@ const fakeLinear = (
           comment.body = (variables.input as { body: string }).body;
           return { commentUpdate: { success: true } };
         }
-        case "FixyBugLabel":
+        case "FixyLabels": {
+          const names = variables.names as string[];
           return {
             issueLabels: {
-              nodes: options.teamLabels ?? [
-                { id: "bug-other", name: "Bug", team: { id: "team-eng" } },
-                { id: "bug-workspace", name: "Bug", team: null },
-                { id: "bug-san", name: "Bug", team: { id: TEAM_ID } },
-              ],
+              nodes: (options.teamLabels ?? LABELS).filter((l) =>
+                names.includes(l.name)
+              ),
             },
           };
-        case "FixyHandoffLabel": {
-          const label = (options.teamLabels ?? []).find(
-            (l) => l.id === variables.labelId
-          );
-          state.labels.push({
-            id: String(variables.labelId),
-            name: label?.name ?? "Bug",
-          });
-          return { issueAddLabel: { success: true } };
+        }
+        case "FixyHandoffLabels": {
+          const ids = (variables.input as { addedLabelIds: string[] })
+            .addedLabelIds;
+          for (const id of ids) {
+            const label = (options.teamLabels ?? LABELS).find(
+              (l) => l.id === id
+            );
+            state.labels.push({ id, name: label?.name ?? id });
+          }
+          return { issueUpdate: { success: true } };
         }
         default:
           throw new Error(`unexpected ${name}`);
@@ -174,7 +193,7 @@ const fakeLinear = (
 };
 
 describe("hand_to_fixy", () => {
-  it("writes the handoff comment, then the issue team's own Bug label", async () => {
+  it("writes the handoff comment, then the fixy and lane labels, never Bug", async () => {
     const linear = fakeLinear({
       attachments: [{ title: "Ask from Jo Rep", url: ASK_URL }],
     });
@@ -182,8 +201,8 @@ describe("hand_to_fixy", () => {
     assert.deepEqual(linear.names(), [
       "FixyHandoffIssue",
       "FixyHandoffCreate",
-      "FixyBugLabel",
-      "FixyHandoffLabel",
+      "FixyLabels",
+      "FixyHandoffLabels",
     ]);
     const create = linear.calls[1]?.variables.input as Record<string, string>;
     // Top-level, never under the requester's thread comment.
@@ -191,12 +210,12 @@ describe("hand_to_fixy", () => {
     assert.equal(create.id, COMMENT_ID);
     assert.equal(create.issueId, ISSUE_ID);
     assert.deepEqual(linear.calls[2]?.variables, {
-      name: "Bug",
+      names: ["fixy", "lane:eng"],
       teamId: TEAM_ID,
     });
     assert.deepEqual(linear.calls[3]?.variables, {
       id: ISSUE_ID,
-      labelId: "bug-san",
+      input: { addedLabelIds: ["fixy-workspace", "lane-eng"] },
     });
     assert.deepEqual(result, {
       alreadyHandedOff: false,
@@ -212,6 +231,103 @@ describe("hand_to_fixy", () => {
     const stored = parseFixyHandoff(create.body);
     assert.equal(stored?.workspaceId, "0a1b2c3d-1111-2222-3333-444455556666");
     assert.deepEqual(stored?.steps, input.stepsToReproduce);
+    assert.deepEqual(stored?.lanes, ["eng"]);
+    assert.ok(create.body.includes("\nLanes: eng\nCard: none\n"));
+  });
+
+  it("hands a billing and question ask over with no steps and both lane labels", async () => {
+    const linear = fakeLinear();
+    const result = await handToFixy(
+      { ...input, lanes: ["billing", "question"], stepsToReproduce: [] },
+      root,
+      linear.linear,
+      ENV
+    );
+    assert.equal(result.success, true);
+    assert.equal(result.fixyNotified, true);
+    assert.deepEqual(
+      linear.state.labels.map((label) => label.name),
+      ["fixy", "lane:billing", "lane:question"]
+    );
+    const stored = parseFixyHandoff(linear.state.comments[0]?.body ?? "");
+    assert.deepEqual(stored?.lanes, ["billing", "question"]);
+    assert.deepEqual(stored?.steps, []);
+  });
+
+  it("still parses a handoff written before lanes, and needs steps there and for eng", () => {
+    const old = [
+      "## Fixy handoff",
+      "",
+      "Workspace ID: 0a1b2c3d-1111-2222-3333-444455556666",
+      "Reported at: 2026-11-01T18:02:37.524Z (Slack thread start)",
+      "What happened: Step 2 sent nothing",
+      "Expected: The step sends",
+      "",
+      "Steps to reproduce:",
+      "1. Open the campaign",
+    ].join("\n");
+    assert.deepEqual(parseFixyHandoff(old)?.lanes, []);
+    assert.equal(
+      parseFixyHandoff(old.replace("\n1. Open the campaign", "")),
+      null
+    );
+    const eng = old.replace(
+      "Expected: The step sends",
+      "Expected: The step sends\nLanes: eng\nCard: none"
+    );
+    assert.deepEqual(parseFixyHandoff(eng)?.lanes, ["eng"]);
+    assert.equal(
+      parseFixyHandoff(eng.replace("\n1. Open the campaign", "")),
+      null
+    );
+    assert.equal(
+      parseFixyHandoff(eng.replace("Lanes: eng", "Lanes: sales")),
+      null
+    );
+  });
+
+  it("adds only missing lane labels on a ticket that already carries fixy", async () => {
+    const linear = fakeLinear({
+      labels: [
+        { id: "fixy-workspace", name: "fixy" },
+        { id: "lane-billing", name: "lane:billing" },
+      ],
+    });
+    const result = await handToFixy(
+      { ...input, lanes: ["billing", "eng"] },
+      root,
+      linear.linear,
+      ENV
+    );
+    assert.deepEqual(linear.calls[2]?.variables.names, ["lane:eng"]);
+    assert.equal(result.success, true);
+    assert.equal(result.alreadyHandedOff, true);
+    assert.equal(result.fixyNotified, false);
+    assert.equal(handoffOutcome(result), "updated");
+  });
+
+  it("adds nothing when fixy or a lane label is missing, naming each one", async () => {
+    for (const [missing, names] of [
+      ["fixy", ["fixy"]],
+      ["lane:billing", ["lane:billing"]],
+    ] as const) {
+      const linear = fakeLinear(
+        {},
+        { teamLabels: LABELS.filter((label) => label.name !== missing) }
+      );
+      // biome-ignore lint/performance/noAwaitInLoops: one fake Linear per case, in order so a failure names its case.
+      const result = await handToFixy(
+        { ...input, lanes: ["eng", "billing"] },
+        root,
+        linear.linear,
+        ENV
+      );
+      assert.equal(result.success, false);
+      assert.equal(result.commentId, COMMENT_ID);
+      assert.ok(result.reason?.includes(`no label named ${names.join(", ")}`));
+      assert.ok(!linear.names().includes("FixyHandoffLabels"));
+      assert.deepEqual(linear.state.labels, []);
+    }
   });
 
   it("writes a first handoff on a ticket whose comments run past one page", async () => {
@@ -290,11 +406,11 @@ describe("hand_to_fixy", () => {
     });
   }
 
-  it("writes a missing handoff with Bug already present without notifying Fixy", async () => {
+  it("writes a missing handoff with fixy already present without notifying Fixy", async () => {
     const linear = fakeLinear({
       labels: [
-        { id: "bug", name: "Bug" },
-        { id: "blocked", name: "factory:needs-you" },
+        { id: "fixy-workspace", name: "fixy" },
+        { id: "lane-eng", name: "lane:eng" },
       ],
     });
     const result = await handToFixy(input, root, linear.linear, ENV);
@@ -304,7 +420,7 @@ describe("hand_to_fixy", () => {
     assert.deepEqual(linear.names(), ["FixyHandoffIssue", "FixyHandoffCreate"]);
   });
 
-  for (const fail of ["FixyBugLabel", "FixyHandoffLabel"]) {
+  for (const fail of ["FixyLabels", "FixyHandoffLabels"]) {
     it(`keeps confirmed comment progress when ${fail} throws`, async () => {
       const linear = fakeLinear({}, { fail });
       const result = await handToFixy(input, root, linear.linear, ENV);
@@ -317,7 +433,7 @@ describe("hand_to_fixy", () => {
     });
   }
 
-  for (const fail of ["FixyBugLabel", "FixyHandoffLabel"]) {
+  for (const fail of ["FixyLabels", "FixyHandoffLabels"]) {
     it(`logs comment_only from execute when ${fail} throws after writing`, async () => {
       const linear = fakeLinear({}, { fail });
       const originalFetch = globalThis.fetch;
@@ -365,7 +481,7 @@ describe("hand_to_fixy", () => {
   }
 
   it("still throws cancellation after the comment write", async () => {
-    const linear = fakeLinear({}, { fail: "FixyBugLabel" });
+    const linear = fakeLinear({}, { fail: "FixyLabels" });
     const controller = new AbortController();
     controller.abort();
     await assert.rejects(
@@ -373,25 +489,27 @@ describe("hand_to_fixy", () => {
     );
   });
 
-  it("describes this session's report ticket and no notification for an existing Bug", () => {
+  it("describes this session's report ticket and no notification for an existing fixy label", () => {
     assert.ok(tool.description?.includes("this session's report ticket"));
     assert.ok(
       tool.description?.includes("fixyNotified false means no run was notified")
     );
   });
 
-  it("uses a workspace-level Bug label when the team has none of its own", async () => {
+  it("prefers the team's own label over a workspace label", async () => {
     const linear = fakeLinear(
       {},
       {
         teamLabels: [
-          { id: "bug-other", name: "Bug", team: { id: "team-eng" } },
-          { id: "bug-workspace", name: "Bug", team: null },
+          ...LABELS,
+          { id: "fixy-san", name: "fixy", team: { id: TEAM_ID } },
         ],
       }
     );
     await handToFixy(input, root, linear.linear, ENV);
-    assert.equal(linear.calls.at(-1)?.variables.labelId, "bug-workspace");
+    assert.deepEqual(linear.calls.at(-1)?.variables.input, {
+      addedLabelIds: ["fixy-san", "lane-eng"],
+    });
   });
 
   it("is idempotent: a second call updates the comment and writes no label", async () => {
@@ -409,7 +527,7 @@ describe("hand_to_fixy", () => {
       "FixyHandoffUpdate",
     ]);
     assert.equal(linear.state.comments.length, 1);
-    assert.equal(linear.state.labels.length, 1);
+    assert.equal(linear.state.labels.length, 2);
     assert.equal(result.alreadyHandedOff, true);
     assert.equal(result.labelAdded, false);
     assert.equal(result.success, true);
@@ -582,16 +700,16 @@ describe("hand_to_fixy", () => {
     assert.deepEqual(empty.names(), ["FixyHandoffIssue"]);
   });
 
-  it("reports a team with no Bug label after writing the comment", async () => {
+  it("reports a team with none of the labels after writing the comment", async () => {
     const linear = fakeLinear({}, { teamLabels: [] });
     const result = await handToFixy(input, root, linear.linear, ENV);
     assert.equal(result.success, false);
     assert.equal(result.commentId, COMMENT_ID);
-    assert.ok(result.reason?.includes("no label named Bug"));
+    assert.ok(result.reason?.includes("no label named fixy, lane:eng"));
     assert.deepEqual(linear.names(), [
       "FixyHandoffIssue",
       "FixyHandoffCreate",
-      "FixyBugLabel",
+      "FixyLabels",
     ]);
   });
 
@@ -618,6 +736,22 @@ describe("hand_to_fixy", () => {
     assert.equal(
       handToFixyInputSchema.safeParse({ ...input, stepsToReproduce: [] })
         .success,
+      false
+    );
+    const { stepsToReproduce: _steps, ...noSteps } = input;
+    assert.equal(
+      handToFixyInputSchema.safeParse({ ...noSteps, lanes: ["billing"] })
+        .success,
+      true
+    );
+    for (const lanes of [[], ["eng", "eng"], ["sales"]]) {
+      assert.equal(
+        handToFixyInputSchema.safeParse({ ...input, lanes }).success,
+        false
+      );
+    }
+    assert.equal(
+      handToFixyInputSchema.safeParse({ ...input, card: "refund" }).success,
       false
     );
   });

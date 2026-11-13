@@ -4,9 +4,12 @@ import { defineTool } from "eve/tools";
 import { z } from "zod";
 import { linearAuth } from "#lib/constants.js";
 import {
+  FIXY_LABEL,
+  FIXY_LANES,
   fixyHandoffCommentId,
   isFixyTriageIssue,
   isFixyTriageTeam,
+  laneLabel,
   parseFixyHandoff,
   renderFixyHandoff,
   resolveReportedAt,
@@ -21,7 +24,6 @@ import { logOpsEvent } from "#lib/ops-log.js";
 import { isTriageReplay } from "#lib/triage-replay/mode.js";
 
 const LINEAR_TIMEOUT_MS = 15_000;
-const BUG_LABEL = "Bug";
 
 const ISSUE_QUERY = `query FixyHandoffIssue($id: String!) {
   issue(id: $id) {
@@ -35,8 +37,8 @@ const ISSUE_QUERY = `query FixyHandoffIssue($id: String!) {
 const COMMENT_QUERY = `query FixyHandoffComment($id: String!) {
   comment(id: $id) { id body }
 }`;
-const LABEL_QUERY = `query FixyBugLabel($teamId: ID!, $name: String!) {
-  issueLabels(first: 10, filter: { and: [{ name: { eq: $name } }, { or: [{ team: { id: { eq: $teamId } } }, { team: { null: true } }] }] }) {
+const LABEL_QUERY = `query FixyLabels($teamId: ID!, $names: [String!]!) {
+  issueLabels(first: 50, filter: { and: [{ name: { in: $names } }, { or: [{ team: { id: { eq: $teamId } } }, { team: { null: true } }] }] }) {
     nodes { id name team { id } }
   }
 }`;
@@ -46,8 +48,8 @@ const COMMENT_CREATE = `mutation FixyHandoffCreate($input: CommentCreateInput!) 
 const COMMENT_UPDATE = `mutation FixyHandoffUpdate($id: String!, $input: CommentUpdateInput!) {
   commentUpdate(id: $id, input: $input) { success }
 }`;
-const LABEL_ADD = `mutation FixyHandoffLabel($id: String!, $labelId: String!) {
-  issueAddLabel(id: $id, labelId: $labelId) { success }
+const LABELS_ADD = `mutation FixyHandoffLabels($id: String!, $input: IssueUpdateInput!) {
+  issueUpdate(id: $id, input: $input) { success }
 }`;
 
 interface IssueRead {
@@ -69,7 +71,10 @@ interface IssueRead {
 export type LinearCall = <T>(
   query: string,
   queryName: string,
-  variables: Record<string, string | Record<string, string>>
+  variables: Record<
+    string,
+    string | string[] | Record<string, string | string[]>
+  >
 ) => Promise<T>;
 
 export type HandoffSession = Pick<
@@ -94,17 +99,33 @@ const WORKSPACE_ID =
 
 export const handToFixyInputSchema = z
   .object({
+    card: z
+      .null()
+      .optional()
+      .describe("No playbook cards exist yet; leave it out."),
     expected: z
       .string()
       .trim()
       .min(1)
       .max(500)
-      .describe("What the requester expected to happen, one line."),
+      .describe(
+        "What the requester expected to happen, one line. For billing, the outcome they want."
+      ),
     issue: z
       .string()
       .trim()
       .regex(LINEAR_ISSUE_ID_PATTERN)
       .describe("The report ticket, such as SAN-145."),
+    lanes: z
+      .array(z.enum(FIXY_LANES))
+      .min(1)
+      .max(4)
+      .refine((lanes) => new Set(lanes).size === lanes.length, {
+        message: "Name each lane once.",
+      })
+      .describe(
+        "Every lane the ask carries: billing (money), unblock (a stuck account or record), eng (a fix in the code), question (answered how-to)."
+      ),
     notes: z
       .string()
       .trim()
@@ -134,15 +155,17 @@ export const handToFixyInputSchema = z
       ),
     stepsToReproduce: z
       .array(z.string().trim().min(1).max(300))
-      .min(1)
       .max(10)
-      .describe("Short steps a person could follow to see the problem."),
+      .default([])
+      .describe(
+        "Short steps a person could follow to see the problem. Needed when lanes includes eng."
+      ),
     whatHappened: z
       .string()
       .trim()
       .min(1)
       .max(500)
-      .describe("What went wrong, one line."),
+      .describe("What went wrong, one line. For billing, the ask itself."),
     workspaceId: z
       .string()
       .trim()
@@ -163,7 +186,12 @@ export const handToFixyInputSchema = z
   )
   .refine((input) => !input.reportedAt || Boolean(input.reportedAtSource), {
     message: "reportedAt needs reportedAtSource.",
-  });
+  })
+  .refine(
+    (input) =>
+      !input.lanes.includes("eng") || input.stepsToReproduce.length > 0,
+    { message: "An eng handoff needs stepsToReproduce." }
+  );
 
 export type HandToFixyInput = z.infer<typeof handToFixyInputSchema>;
 
@@ -252,8 +280,8 @@ const writeHandoff = async (
 };
 
 /**
- * Writes the handoff comment, then the team's Bug label, which starts Fixy's
- * bug run. The comment goes first so Fixy finds it when the run starts, and
+ * Writes the handoff comment, then the fixy label, which starts Fixy's run,
+ * with a `lane:<name>` label for each lane. The comment goes first so Fixy finds it when the run starts, and
  * it is top-level: everything under the requester's thread comment reaches
  * the requester.
  */
@@ -321,6 +349,7 @@ export const handToFixy = async (
   );
   const body = renderFixyHandoff({
     expected: input.expected,
+    lanes: input.lanes,
     notes: input.notes ?? null,
     reportedAt: reported.at,
     reportedAtSource: reported.source,
@@ -346,55 +375,59 @@ export const handToFixy = async (
   }
   await writeHandoff(linear, ticket.id, commentId, body, existing);
   const done = { ...times, commentId, fixyNotified: false, warnings };
-  if (ticket.labels.nodes.some((label) => label.name === BUG_LABEL)) {
-    return {
-      ...done,
-      alreadyHandedOff: true,
-      issue: ticket.identifier,
-      labelAdded: false,
-      success: true,
-    };
+  const present = new Set(ticket.labels.nodes.map((label) => label.name));
+  // The fixy label is what starts Fixy, so carrying it means handed off.
+  const alreadyHandedOff = present.has(FIXY_LABEL);
+  const wanted = [FIXY_LABEL, ...input.lanes.map(laneLabel)].filter(
+    (name) => !present.has(name)
+  );
+  const settled = { ...done, alreadyHandedOff, issue: ticket.identifier };
+  if (wanted.length === 0) {
+    return { ...settled, labelAdded: false, success: true };
   }
   try {
     const labels = await linear<{
       issueLabels: {
         nodes: { id: string; name: string; team: { id: string } | null }[];
       };
-    }>(LABEL_QUERY, "FixyBugLabel", {
-      name: BUG_LABEL,
-      teamId: ticket.team.id,
-    });
-    const exact = labels.issueLabels.nodes.filter(
-      (label) => label.name === BUG_LABEL
-    );
+    }>(LABEL_QUERY, "FixyLabels", { names: wanted, teamId: ticket.team.id });
     // The team's own label first; a workspace label serves every team.
-    const bug =
-      exact.find((label) => label.team?.id === ticket.team.id) ??
-      exact.find((label) => !label.team);
-    if (!bug) {
+    const found = wanted.map((name) => {
+      const exact = labels.issueLabels.nodes.filter(
+        (label) => label.name === name
+      );
+      return (
+        exact.find((label) => label.team?.id === ticket.team.id) ??
+        exact.find((label) => !label.team)
+      );
+    });
+    const missing = wanted.filter((_, index) => !found[index]);
+    if (missing.length > 0) {
+      // Nothing is added, so a lane label never lands without the trigger.
       return refusal(
         ticket.identifier,
-        `Team ${ticket.team.key} has no label named ${BUG_LABEL}, so Fixy was not started. The handoff comment is written; ask a person to add the label to the team.`,
-        done
+        `Team ${ticket.team.key} has no label named ${missing.join(", ")}, so no label was added${alreadyHandedOff ? "" : " and Fixy was not started"}. The handoff comment is written; ask a person to create the label, then call this again.`,
+        settled
       );
     }
-    const added = await linear<{ issueAddLabel: { success: boolean } }>(
-      LABEL_ADD,
-      "FixyHandoffLabel",
-      { id: ticket.id, labelId: bug.id }
+    const added = await linear<{ issueUpdate: { success: boolean } }>(
+      LABELS_ADD,
+      "FixyHandoffLabels",
+      {
+        id: ticket.id,
+        input: { addedLabelIds: found.map((label) => label?.id ?? "") },
+      }
     );
-    if (!added.issueAddLabel.success) {
+    if (!added.issueUpdate.success) {
       return refusal(
         ticket.identifier,
-        "Linear did not add the Bug label, so Fixy was not started. The handoff comment is written; call this again.",
-        done
+        "Linear did not add the labels, so Fixy may not have started. The handoff comment is written; call this again.",
+        settled
       );
     }
     return {
-      ...done,
-      alreadyHandedOff: false,
-      fixyNotified: true,
-      issue: ticket.identifier,
+      ...settled,
+      fixyNotified: !alreadyHandedOff,
       labelAdded: true,
       success: true,
     };
@@ -402,9 +435,9 @@ export const handToFixy = async (
     signal?.throwIfAborted();
     return refusal(
       ticket.identifier,
-      "The handoff comment is written, but the Bug label could not be confirmed. Check the ticket before retrying. " +
+      "The handoff comment is written, but the labels could not be confirmed. Check the ticket before retrying. " +
         errorReason(error),
-      done
+      settled
     );
   }
 };
@@ -414,7 +447,7 @@ const errorReason = (error: unknown) =>
 
 /** The one ops-log outcome for a call: never the reason text, which may carry provider detail. */
 export const handoffOutcome = (result: HandToFixyResult): string => {
-  if (result.labelAdded) {
+  if (result.fixyNotified) {
     return "handed_off";
   }
   if (result.success) {
@@ -426,9 +459,9 @@ export const handoffOutcome = (result: HandToFixyResult): string => {
 export default defineTool({
   approval: questionsOnlyPolicy,
   description:
-    "Hand this session's report ticket on a Fixy triage team to Fixy, which reproduces and investigates it. Writes one top-level '## Fixy handoff' comment with the workspace id, the original report time, what happened, what was expected and the steps to reproduce, then adds the team's Bug label, which starts Fixy's run. " +
+    "Hand this session's report ticket on a Fixy triage team to Fixy, which owns its status from then on. Writes one top-level '## Fixy handoff' comment with the workspace id, the original report time, what happened, what was expected, the lanes, the card (always none for now) and any steps to reproduce, then adds the fixy label, which starts Fixy's run, and a lane:<name> label for each lane. " +
     "Only for teams in FIXY_TRIAGE_TEAMS; anywhere else it refuses and triage-investigate applies. The report time comes from the ticket's 'Ask from' Slack link when there is one, else from reportedAt, else from the existing handoff, else from ticket creation. " +
-    "Calling it again updates the same comment and never adds a second one or another label; alreadyHandedOff true means the Bug label was already on and fixyNotified false means no run was notified. success false with a reason names what to fix. It posts nothing to the requester.",
+    "Calling it again updates the same comment and never adds a second one; it adds only lane labels the ticket lacks. alreadyHandedOff true means the fixy label was already on and fixyNotified false means no run was notified. success false with a reason names what to fix, including any label missing from Linear. It posts nothing to the requester.",
   async execute(input, ctx) {
     const linear: LinearCall = async (query, queryName, variables) => {
       const { token } = await ctx.getToken(linearAuth);
