@@ -112,6 +112,13 @@ export const followUpText = (reply: string): string => {
   return `${name}: ${text}`;
 };
 
+/** The replies that say something; a reply that is only a mention says nothing. */
+export const saidReplies = (list: string[] = []): string[] =>
+  list.filter(
+    (reply) =>
+      reply.replace(RELAY_HEADER, "").replace(SLACK_MENTION, "").trim() !== ""
+  );
+
 /**
  * A reply that is only a mention is what wakes Foreman, not something said,
  * so code skips it without asking Jev.
@@ -120,14 +127,7 @@ export async function decideFollowUp(
   input: FollowUpInput,
   opts?: JevOptions
 ): Promise<FollowUpOutcome> {
-  const said = (list: string[] = []) =>
-    list
-      .filter(
-        (reply) =>
-          reply.replace(RELAY_HEADER, "").replace(SLACK_MENTION, "").trim() !==
-          ""
-      )
-      .map(followUpText);
+  const said = (list: string[] = []) => saidReplies(list).map(followUpText);
   const replies = said(input.replies);
   if (replies.length === 0) {
     return "skip";

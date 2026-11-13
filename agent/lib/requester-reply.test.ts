@@ -614,6 +614,7 @@ test("a stamped restate is not judged again and closes with the fixed question",
   const comments = [
     anchor,
     { ...reply("f1", FOREMAN, "2026-09-26T10:00:00Z"), body: "It was a typo." },
+    { ...reply("r0", "aaron", "2026-09-26T10:00:30Z"), body: "<@U0BQ5QMHM7D>" },
     { ...reply("r1", "aaron", "2026-09-26T10:01:00Z"), body: "any update?" },
   ];
   t.mock.method(globalThis, "fetch", (_url: unknown, init?: RequestInit) => {

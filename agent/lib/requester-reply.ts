@@ -10,6 +10,7 @@ import {
   type FollowUpOutcome,
   RELAY_HEADER,
   SLACK_PROMPT,
+  saidReplies,
 } from "./follow-up-decisions.js";
 import { askFromName, isTriageIntakeAsk } from "./linear-context.js";
 import { migrationFiledReport } from "./migration-ticket-scope.js";
@@ -623,7 +624,7 @@ export async function replyToRequester(
   // again could drop the restatement the turn was dispatched to send. A reply
   // that arrived since then is judged afresh with the rest.
   let outcome: FollowUpOutcome = "respond";
-  if (restateFollowUp && plan.followUp?.replies.length === 1) {
+  if (restateFollowUp && saidReplies(plan.followUp?.replies).length === 1) {
     outcome = "restate";
   } else if (plan.followUp) {
     outcome = await followUpOutcome(plan.followUp, signal);
