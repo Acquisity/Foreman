@@ -26,6 +26,7 @@ const OPS_FIELD_KEYS = [
   "duplicateOf",
   "failedCriteria",
   "issue",
+  "labels",
   "message",
   "outcome",
   "path",

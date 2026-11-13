@@ -244,6 +244,26 @@ describe("issue-bound decisions", () => {
     assert.equal(changed.code, "skill_fallback");
   });
 
+  it("logs a Fixy ticket's billing route, which has no assignee, as billing", () => {
+    const decisions = {
+      "SAN-9": billingDecisionFields("SAN-9", { project: "Support" }),
+    };
+    const own = routeDecisionEvent(decisions, {
+      issue: "SAN-9",
+      project: "Support",
+    });
+    assert.deepEqual(
+      [own.outcome, own.code, own.path, own.assigneeKind],
+      ["route", "billing", BILLING_PATH, "none"]
+    );
+    const assigned = routeDecisionEvent(decisions, {
+      assignee: "Aaron Fraga",
+      issue: "SAN-9",
+      project: "Support",
+    });
+    assert.equal(assigned.code, "skill_fallback");
+  });
+
   it("lets the later of a triage and a billing decision for one issue win, in either order", () => {
     const billing = { assignee: "Aaron Fraga", project: "Support" };
     const route = { ...billing, issue: "ENG-2" };

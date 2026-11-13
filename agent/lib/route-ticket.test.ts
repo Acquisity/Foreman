@@ -2,11 +2,13 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { ProviderClient } from "./executor/operations.js";
 import { routeTicket } from "./linear-api.js";
+import { type LinearRead, reopenRefusal } from "./route-gates.js";
 import { type Call, fakeLinear } from "./route-ticket-fixtures.js";
 
 process.env.LINEAR_CONNECTOR ??= "linear/test";
 
 const { default: tool } = await import("../tools/route_ticket.js");
+const { criticRounds, triageDecisions } = await import("./triage-log.js");
 
 const UNABLE_TO_FETCH = /Unable to fetch url information/u;
 const NO_ISSUE = /No issue ENG-999999/u;
@@ -210,6 +212,80 @@ describe("routeTicket", () => {
       UNKNOWN_LABEL
     );
     assert.equal(linear.updates().length, 0);
+  });
+});
+
+const FIXY_LABEL_REFUSED = /Only hand_to_fixy adds the fixy label/u;
+const FIXY_OWNED = /carries the fixy label, so Fixy owns its status/u;
+
+describe("routeTicket on a Fixy ticket", () => {
+  const fixyLabels = [
+    { id: "l-fixy", name: "fixy" },
+    { id: "l-bug", name: "Bug" },
+  ];
+
+  it("refuses a state or assignee change before any write", async () => {
+    for (const change of [
+      { state: "Done" },
+      { assignee: "Aaron Fraga" },
+      { inheritAssigneeFrom: "ENG-9" },
+      { releaseDeveloper: true },
+    ]) {
+      const linear = fakeLinear({ ticketLabels: fixyLabels });
+      // biome-ignore lint/performance/noAwaitInLoops: one fake Linear per case, in order so a failure names its case.
+      await assert.rejects(
+        routeTicket(
+          { ...change, addLabels: ["Customer reported"], issue: "ENG-1" },
+          { client: linear.fetchStub }
+        ),
+        FIXY_OWNED
+      );
+      assert.deepEqual(linear.writes(), []);
+    }
+  });
+
+  it("refuses adding or removing fixy in any case before any write", async () => {
+    for (const field of ["addLabels", "removeLabels"] as const) {
+      for (const label of ["fixy", " FIXY "]) {
+        const linear = fakeLinear({ ticketLabels: fixyLabels });
+        // biome-ignore lint/performance/noAwaitInLoops: each refusal has its own provider fixture.
+        await assert.rejects(
+          routeTicket(
+            { issue: "ENG-1", [field]: [label] },
+            { client: linear.fetchStub }
+          ),
+          FIXY_LABEL_REFUSED
+        );
+        assert.deepEqual(linear.writes(), []);
+      }
+    }
+    const linear = fakeLinear();
+    await assert.rejects(
+      routeTicket(
+        { addLabels: ["fixy"], issue: "ENG-1" },
+        { client: linear.fetchStub }
+      ),
+      FIXY_LABEL_REFUSED
+    );
+    assert.deepEqual(linear.writes(), []);
+  });
+
+  it("still writes labels, priority and project", async () => {
+    const linear = fakeLinear({ ticketLabels: fixyLabels });
+    await routeTicket(
+      {
+        addLabels: ["Customer reported"],
+        issue: "ENG-1",
+        priority: 2,
+        project: "Support",
+      },
+      { client: linear.fetchStub }
+    );
+    assert.deepEqual(linear.updates()[0]?.variables.input, {
+      labelIds: ["l-fixy", "l-bug", "l-cr"],
+      priority: 2,
+      projectId: "p-support",
+    });
   });
 });
 
@@ -685,7 +761,118 @@ describe("routeTicket owner map", () => {
   });
 });
 
+const COULD_NOT_READ = /Could not read ENG-1/u;
+const RECEIVER_ASK = {
+  title: "Ask from Jo Rep",
+  url: "https://acquisityworkspace.slack.com/archives/C0BBPVC3N2X/p1793556157524579",
+};
+const MIGRATION_ASK = {
+  title: "Ask from Jo Rep",
+  url: "https://acquisityworkspace.slack.com/archives/C0OTHER123/p1793556157524579",
+};
+
+/** A Linear read of the issue's state type, attachments and the target state's type. */
+const reopenRead =
+  (
+    current: string,
+    target: string[],
+    attachments: { title: string; url: string }[],
+    hasNextPage = false
+  ): LinearRead =>
+  <T>() =>
+    Promise.resolve({
+      issue: {
+        attachments: { nodes: attachments, pageInfo: { hasNextPage } },
+        state: { type: current },
+        team: { states: { nodes: target.map((type) => ({ type })) } },
+      },
+    } as T);
+
+describe("reopenRefusal", () => {
+  it("refuses moving a closed receiver ask back to an open state", async () => {
+    for (const current of ["completed", "canceled"]) {
+      // biome-ignore lint/performance/noAwaitInLoops: cases run in order so a failure names its case.
+      const refused = await reopenRefusal(
+        "ENG-1",
+        "Todo",
+        reopenRead(current, ["unstarted"], [RECEIVER_ASK])
+      );
+      assert.equal(refused?.code, "closed_reopen");
+    }
+  });
+
+  it("allows closed to closed, open tickets, other channels and unknown states", async () => {
+    for (const [current, target, attachments] of [
+      ["completed", ["canceled"], [RECEIVER_ASK]],
+      ["canceled", ["completed"], [RECEIVER_ASK]],
+      ["unstarted", ["completed"], [RECEIVER_ASK]],
+      ["completed", ["unstarted"], [MIGRATION_ASK]],
+      ["completed", ["unstarted"], []],
+      ["completed", [], [RECEIVER_ASK]],
+    ] as const) {
+      // biome-ignore lint/performance/noAwaitInLoops: cases run in order so a failure names its case.
+      const refused = await reopenRefusal(
+        "ENG-1",
+        "Done",
+        reopenRead(current, [...target], [...attachments])
+      );
+      assert.equal(refused, null, `${current} to ${target.join()}`);
+    }
+  });
+
+  it("fails closed when a later attachment page may carry the receiver link", async () => {
+    const refused = await reopenRefusal(
+      "ENG-1",
+      "Todo",
+      reopenRead("completed", ["unstarted"], [MIGRATION_ASK], true)
+    );
+    assert.equal(refused?.code, "reopen_unchecked");
+    const closedToClosed = await reopenRefusal(
+      "ENG-1",
+      "Canceled",
+      reopenRead("completed", ["canceled"], [MIGRATION_ASK], true)
+    );
+    assert.equal(closedToClosed, null);
+  });
+
+  it("refuses when the read fails or finds no issue", async () => {
+    const failed = await reopenRefusal("ENG-1", "Todo", () =>
+      Promise.reject(new Error("Linear is busy"))
+    );
+    assert.equal(failed?.code, "reopen_unchecked");
+    const missing = await reopenRefusal("ENG-1", "Todo", <T>() =>
+      Promise.resolve({ issue: null } as T)
+    );
+    assert.equal(missing?.code, "reopen_unchecked");
+  });
+});
+
 describe("route_ticket tool", () => {
+  it("reads the state only when a state is given, and a failed read writes nothing", async (t) => {
+    t.mock.method(triageDecisions, "get", () => ({}));
+    t.mock.method(criticRounds, "get", () => ({}));
+    const run = async (input: { issue: string; state?: string }) => {
+      let tokens = 0;
+      const ctx = {
+        abortSignal: new AbortController().signal,
+        getToken: () => {
+          tokens += 1;
+          return Promise.reject(new Error("no token"));
+        },
+        session: { auth: { current: undefined }, id: "s-1" },
+      } as unknown as Parameters<NonNullable<typeof tool.execute>>[1];
+      assert.ok(tool.execute);
+      const result = await tool.execute(input, ctx);
+      return { result: result as { error?: string; routed: boolean }, tokens };
+    };
+    const stated = await run({ issue: "ENG-1", state: "Todo" });
+    assert.equal(stated.tokens, 1);
+    assert.equal(stated.result.routed, false);
+    assert.match(stated.result.error ?? "", COULD_NOT_READ);
+    const stateless = await run({ issue: "ENG-1" });
+    assert.equal(stateless.tokens, 0);
+  });
+
   it("never requires an approval card, and denies questions-only sessions", async () => {
     const { approval } = tool;
     const approve = approval as (ctx: unknown) => unknown;

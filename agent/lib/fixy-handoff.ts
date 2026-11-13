@@ -81,6 +81,21 @@ export const reportedAtFromSlackUrl = (url: string): string | null => {
   return at.toISOString();
 };
 
+/** The label whose addition starts a Fixy run; Bug starts nothing. */
+export const FIXY_LABEL = "fixy";
+
+/** The work lanes a handoff can carry; each is the Linear label `lane:<name>`. */
+export const FIXY_LANES = ["billing", "unblock", "eng", "question"] as const;
+export type FixyLane = (typeof FIXY_LANES)[number];
+export const laneLabel = (lane: FixyLane): string => `lane:${lane}`;
+
+/** What a billing decision on a Fixy ticket carries; no playbook cards exist yet (ENG-18834). */
+export const FIXY_BILLING_HANDOFF = {
+  card: null,
+  handTo: "fixy",
+  lane: "billing",
+} as const;
+
 export const HANDOFF_HEADING = "## Fixy handoff";
 export const FIELD_MAX_CHARS = 500;
 export const STEP_MAX_CHARS = 300;
@@ -148,6 +163,8 @@ export const fixyHandoffCommentId = (issueId: string): string => {
 /** What the handoff comment records; exactly one of workspaceId and workspaceUnknown. */
 export interface FixyHandoff {
   expected: string;
+  /** Empty only on a handoff written before lanes existed. */
+  lanes: FixyLane[];
   notes: string | null;
   reportedAt: string;
   reportedAtSource: string;
@@ -174,6 +191,9 @@ export const renderFixyHandoff = (handoff: FixyHandoff): string => {
     `Reported at: ${handoff.reportedAt} (${oneLine(handoff.reportedAtSource, SOURCE_MAX_CHARS)})`,
     `What happened: ${oneLine(handoff.whatHappened, FIELD_MAX_CHARS)}`,
     `Expected: ${oneLine(handoff.expected, FIELD_MAX_CHARS)}`,
+    `Lanes: ${handoff.lanes.join(", ")}`,
+    // No playbook cards exist yet (ENG-18834).
+    "Card: none",
     "",
     "Steps to reproduce:",
     ...steps.map((step, index) => `${index + 1}. ${step}`),
@@ -187,6 +207,26 @@ const WORKSPACE_UNKNOWN = /^unknown \((.{0,200})\)$/u;
 const REPORTED_AT =
   /^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z) \((.{1,120})\)$/u;
 const STEP = /^(\d{1,2})\. (.{1,300})$/u;
+
+const isLane = (value: string): value is FixyLane =>
+  (FIXY_LANES as readonly string[]).includes(value);
+
+/** Steps are needed for an eng fix, and on a handoff written before lanes. */
+export const needsSteps = (lanes: readonly FixyLane[]): boolean =>
+  lanes.length === 0 || lanes.includes("eng");
+
+/** Keep earlier lanes and steps when a follow-up adds work without new steps. */
+export const mergeHandoffWork = (
+  previous: FixyHandoff | null,
+  lanes: FixyLane[],
+  steps: string[]
+): Pick<FixyHandoff, "lanes" | "steps"> => {
+  const merged = [...new Set([...lanes, ...(previous?.lanes ?? [])])];
+  return {
+    lanes: merged,
+    steps: steps.length > 0 ? steps : (previous?.steps ?? []),
+  };
+};
 
 const field = (lines: readonly string[], label: string): string | null => {
   const prefix = `${label}: `;
@@ -210,6 +250,11 @@ export const parseFixyHandoff = (body: string): FixyHandoff | null => {
   if (!(workspace && reported && whatHappened && expected) || start < 0) {
     return null;
   }
+  const laneLine = field(lines, "Lanes");
+  const lanes = laneLine ? laneLine.split(", ") : [];
+  if (laneLine === "" || !lanes.every(isLane)) {
+    return null;
+  }
   const steps: string[] = [];
   for (const line of lines.slice(start + 1)) {
     const step = STEP.exec(line);
@@ -220,11 +265,12 @@ export const parseFixyHandoff = (body: string): FixyHandoff | null => {
   }
   const id = WORKSPACE_ID.exec(workspace)?.[1] ?? null;
   const unknown = id ? null : (WORKSPACE_UNKNOWN.exec(workspace)?.[1] ?? null);
-  if (!(id || unknown !== null) || steps.length === 0) {
+  if (!(id || unknown !== null) || (steps.length === 0 && needsSteps(lanes))) {
     return null;
   }
   return {
     expected,
+    lanes,
     notes: field(lines.slice(start + 1 + steps.length), "Notes"),
     reportedAt: reported[1],
     reportedAtSource: reported[2],

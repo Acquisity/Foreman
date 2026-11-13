@@ -1,3 +1,4 @@
+import { FIXY_BILLING_HANDOFF } from "./fixy-handoff.js";
 import {
   askJev,
   choiceOf,
@@ -888,18 +889,19 @@ export interface BillingInput {
   approvalQuote: string | null;
   bucket: BillingBucket;
   evidence: string;
+  fixy?: boolean;
   sourceLabels: string[];
 }
 
-export interface BillingDecision {
+export interface BillingDecision extends Partial<typeof FIXY_BILLING_HANDOFF> {
   discretion: "justified" | "needs-human" | "not justified";
   notes: string[];
   route: {
     addLabels: string[];
-    assignee: typeof SUPPORT_OWNER;
+    assignee?: typeof SUPPORT_OWNER;
     priority: number;
     project: typeof SUPPORT_PROJECT;
-    state: "Todo";
+    state?: "Todo";
   };
   unconfirmed: string[];
 }
@@ -963,19 +965,19 @@ export function resolveBilling(
     notes.push("No prior approval or promise was found in the trail.");
   }
   return {
+    ...(input.fixy ? FIXY_BILLING_HANDOFF : {}),
     discretion,
     notes,
     route: {
       addLabels: [
         ...new Set([BUCKET_LABELS[input.bucket], ...input.sourceLabels]),
       ],
-      assignee: SUPPORT_OWNER,
+      ...(!input.fixy && { assignee: SUPPORT_OWNER, state: "Todo" as const }),
       priority:
         probabilityOf(answers.active_blocker) >= BARS.signal
           ? PRIORITY.high
           : PRIORITY.medium,
       project: SUPPORT_PROJECT,
-      state: "Todo",
     },
     unconfirmed,
   };

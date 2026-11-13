@@ -735,6 +735,7 @@ describe("Fixy's verdict and handoff", () => {
   it("leaves Foreman's Fixy handoff, which holds the workspace id, out of the closing comments", async () => {
     const handoff = renderFixyHandoff({
       expected: "The guide opens.",
+      lanes: ["eng"],
       notes: null,
       reportedAt: "2026-10-29T10:00:00.000Z",
       reportedAtSource: "Slack thread start",

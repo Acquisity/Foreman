@@ -24,7 +24,7 @@ Read the full issue through the Linear connection: title, description, attachmen
 
 Call `classify_ask` once with the issue text and comments, and keep its `sourceLabels`. A money ask: load the billing-triage skill, which replaces this one. Otherwise continue here.
 
-When the ticket already has the `## Fixy handoff` comment, go to step 8. The `Bug` label alone does not mean a handoff was written. When Bug is present without that comment, continue here and write the handoff in step 6; note that Fixy may already have started.
+When the ticket already has the `## Fixy handoff` comment, go to step 8. The `fixy` label alone does not mean a handoff was written. When `fixy` is present without that comment, continue here and write the handoff in step 6; note that Fixy may already have started.
 
 ## 2. Find the workspace
 
@@ -37,7 +37,7 @@ When the report asks how to do something, or whether something is meant to work 
 1. `find_help_article` with the feature and the action in the product's own words, then read the article body: `prepare_repository` with `Acquisity/Acquisity` and `read_file` at the path it returns.
 2. Only when the article does not explain how the feature works, a few targeted `grep` and `read_file` reads of the product code.
 3. Send the answer with `reply_to_requester`.
-4. Close the ticket with one `route_ticket` call: state `Canceled`, `assignee: "Aaron Fraga"` (the support owner), the `sourceLabels`, and the label `User Error` when the requester can do it themselves, or `Platform Limitation` when the product does not do it. When the team has no such label, the tool lists the valid names: close it `Canceled` without it.
+4. Hand the ticket to Fixy as in step 6 with `lanes: ["question"]`, `whatHappened` the question, `expected` what they wanted to do, no steps, and your answer in one line in `notes`. Fixy closes it. Do not change its state or assignee.
 
 A report that says something went wrong is not a how-to: an error, missing or wrong data, a send or sync that did not happen, or "isn't working". It is a real report even when it may turn out to be user error. Fixy decides that, so go on to step 4.
 
@@ -67,12 +67,14 @@ Call `hand_to_fixy` once with:
 
 - `issue`: this ticket.
 - `workspaceId`, or `workspaceUnknown` with a short reason.
+- `lanes`: every lane the ask carries, each once: `billing` for money, `unblock` for a stuck account, record or send a person must free by hand, `eng` for something the product does wrong (every real report from step 3 on), `question` for an answered how-to.
 - `whatHappened` and `expected`: one line each, in plain words.
-- `stepsToReproduce`: 1 to 10 short steps a person could follow, from the report and its screenshots.
+- `stepsToReproduce`: 1 to 10 short steps a person could follow, from the report and its screenshots. Needed when `lanes` includes `eng`.
+- No `card`: playbook cards do not exist yet.
 - `reportedAt` and `reportedAtSource` only when the ticket has no 'Ask from' Slack link and the report says when it was first raised. The tool takes the time from the Slack link itself.
 - `notes`: one line, only when there is something Fixy needs, such as a known issue `route_ticket` refused to join.
 
-The tool writes the handoff comment first and then adds the team's `Bug` label, which starts Fixy's run. `success` false with a reason names what to fix; fix it and call again. Calling again updates the same comment.
+The tool writes the handoff comment first and then adds the `fixy` label, which starts Fixy's run, and a `lane:` label for each lane. From then on Fixy owns the ticket's state and assignee. `success` false with a reason names what to fix; fix it and call again. When it names a label missing from Linear, a person must create it: end the session saying so in one line, without retrying. Calling again updates the same comment.
 
 Post nothing to the requester on a plain hand-off: the received message they get is the acknowledgement.
 
@@ -85,5 +87,5 @@ End with one short line saying what you did: answered, joined a known issue, ask
 The `## Fixy handoff` comment marks an earlier handoff. Do not restart anything.
 
 - A question from the requester: answer briefly with `reply_to_requester`, from what the ticket already says.
-- A new detail Fixy needs, such as the workspace, a step, or when it started: call `hand_to_fixy` again with everything known, so it updates the handoff comment. If the ticket carries `factory:needs-you` or `factory:failed`, then post one short top-level ticket comment saying the handoff has the new detail and a person should decide whether to re-run Fixy. Updating the handoff does not notify a run when Bug was already present (`fixyNotified: false`). Fixy retries a blocked claim when Bug is removed and added again; do not remove or re-add labels automatically.
+- A new detail Fixy needs, such as the workspace, a step, or when it started: call `hand_to_fixy` again with everything known, so it updates the handoff comment. Do not change the ticket's state or assignee, and do not remove or re-add labels.
 - Nothing new: end the session with one short line.
