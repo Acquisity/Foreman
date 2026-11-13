@@ -237,6 +237,25 @@ test("a fully confirmed, approved refund is justified and routes to Support", ()
   });
 });
 
+test("a Fixy ticket's billing route hands to Fixy with no state or assignee", () => {
+  const decision = resolveBilling(
+    billingInput({ fixy: true }),
+    billingAnswers()
+  );
+  assert.equal(decision.discretion, "justified");
+  assert.equal(decision.handTo, "fixy");
+  assert.equal(decision.lane, "billing");
+  assert.equal(decision.card, null);
+  assert.deepEqual(decision.route, {
+    addLabels: ["Refund", "Internal reported"],
+    priority: 2,
+    project: "Support",
+  });
+  const other = resolveBilling(billingInput({ fixy: false }), billingAnswers());
+  assert.equal(other.handTo, undefined);
+  assert.equal(other.route.state, "Todo");
+});
+
 test("billing is needs-human without approval, with a gap, or when unsure", () => {
   assert.equal(
     resolveBilling(billingInput({ approvalQuote: null }), billingAnswers())

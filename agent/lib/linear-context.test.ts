@@ -64,6 +64,9 @@ describe("buildLinearContext", () => {
       "On a follow-up, post no new ticket comment",
       "A result with an error is a failed delivery",
       "Never comment under that thread comment any other way",
+      "except on a ticket Fixy owns",
+      "call hand_to_fixy again so the handoff carries the new facts",
+      "On a Done or Canceled ticket, answer and change no state.",
     ]) {
       assert.ok(LINEAR_TRIAGE_ROUTE.includes(rule), rule);
     }

@@ -1,5 +1,6 @@
 import { defineTool } from "eve/tools";
 import { z } from "zod";
+import { isFixyTriageIssue } from "#lib/fixy-handoff.js";
 import { LINEAR_ISSUE_ID_PATTERN } from "#lib/investigation-memory/scope.js";
 import { BILLING_BUCKETS, decideBilling } from "#lib/jev-decisions.js";
 import {
@@ -15,13 +16,15 @@ export default defineTool({
     "Jev decides a money ask's verdict from the completed investigation: the discretion note, the seven-item justification checklist, and whether it is an active blocker. " +
     "Code makes a missing approval trail or any unconfirmed checklist item needs-human, and builds the Support/Financial routing. " +
     "Use discretion and unconfirmed in the document, pass the ticket's issue id here, and pass route to route_ticket unchanged with the same issue id. " +
+    "handTo fixy means the ticket is on a Fixy triage team: its route carries no state or assignee because Fixy owns both, so after route_ticket call hand_to_fixy with lanes including billing and the verdict in notes. " +
     "decided false means Jev could not answer: decide by the skill's rules and say so in the document.",
   async execute(input, ctx) {
     try {
       const { issue, ...billing } = input;
-      const decision = await decideBilling(billing, {
-        signal: ctx.abortSignal,
-      });
+      const decision = await decideBilling(
+        { ...billing, fixy: issue ? isFixyTriageIssue(issue) : false },
+        { signal: ctx.abortSignal }
+      );
       if (issue) {
         const settled = recordDecision(
           triageDecisions.get(),
