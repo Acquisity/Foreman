@@ -213,6 +213,53 @@ describe("routeTicket", () => {
   });
 });
 
+const FIXY_OWNED = /carries the fixy label, so Fixy owns its status/u;
+
+describe("routeTicket on a Fixy ticket", () => {
+  const fixyLabels = [
+    { id: "l-fixy", name: "fixy" },
+    { id: "l-bug", name: "Bug" },
+  ];
+
+  it("refuses a state or assignee change before any write", async () => {
+    for (const change of [
+      { state: "Done" },
+      { assignee: "Aaron Fraga" },
+      { inheritAssigneeFrom: "ENG-9" },
+      { releaseDeveloper: true },
+    ]) {
+      const linear = fakeLinear({ ticketLabels: fixyLabels });
+      // biome-ignore lint/performance/noAwaitInLoops: one fake Linear per case, in order so a failure names its case.
+      await assert.rejects(
+        routeTicket(
+          { ...change, addLabels: ["Customer reported"], issue: "ENG-1" },
+          { client: linear.fetchStub }
+        ),
+        FIXY_OWNED
+      );
+      assert.deepEqual(linear.writes(), []);
+    }
+  });
+
+  it("still writes labels, priority and project", async () => {
+    const linear = fakeLinear({ ticketLabels: fixyLabels });
+    await routeTicket(
+      {
+        addLabels: ["Customer reported"],
+        issue: "ENG-1",
+        priority: 2,
+        project: "Support",
+      },
+      { client: linear.fetchStub }
+    );
+    assert.deepEqual(linear.updates()[0]?.variables.input, {
+      labelIds: ["l-fixy", "l-bug", "l-cr"],
+      priority: 2,
+      projectId: "p-support",
+    });
+  });
+});
+
 const FEATURE_LABELS = [
   { id: "l-fr", name: "Feature Request" },
   { id: "l-ok", name: "Approved" },

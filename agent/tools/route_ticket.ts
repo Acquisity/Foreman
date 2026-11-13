@@ -3,7 +3,11 @@ import { z } from "zod";
 import { executorClient } from "#lib/executor/client.js";
 import { questionsOnlyPolicy } from "#lib/github/approval.js";
 import { LINEAR_ISSUE_ID_PATTERN } from "#lib/investigation-memory/scope.js";
-import { masterCreatedAfter, routeTicket } from "#lib/linear-api.js";
+import {
+  masterCreatedAfter,
+  RouteGateError,
+  routeTicket,
+} from "#lib/linear-api.js";
 import { masterWindow } from "#lib/master-window.js";
 import { logOpsEvent } from "#lib/ops-log.js";
 import {
@@ -28,6 +32,7 @@ export default defineTool({
     "A duplicate is parented under its master for you: the match when it is a master (its description has the master template's Regression seam section, or it already parents an issue), else the match's parent when that is one. A parent that differs fails before any write. A master past the master search's recency cutoff is not eligible. A Bug duplicate (by decision or Bug label) with no eligible master fails before any write: make the master through engineering-handoff, parent the match under it, then call again; a parent passed for a Bug duplicate must be a master the match is already under. A parent held outside the owner map fails before any write. " +
     "The duplicate relation is written before the update, because Linear will not move a ticket to Duplicate without it; when the relation fails nothing is written. " +
     "links attach urls as resources on the ticket. Use the returned projectId for memory recording. " +
+    "On a ticket carrying the fixy label, Fixy owns state and assignee: a call that sets either fails before any write. " +
     "routed true with warnings means the ticket was updated but a link or the read-back after it failed; read the warning before retrying only that part.",
   async execute(input, ctx) {
     const refusal = routeRefusal(
@@ -66,6 +71,13 @@ export default defineTool({
     } catch (error) {
       if (ctx.abortSignal.aborted) {
         throw error;
+      }
+      if (error instanceof RouteGateError) {
+        logOpsEvent("triage.route_refused", {
+          code: error.code,
+          issue: input.issue,
+          sessionId: ctx.session.id,
+        });
       }
       return {
         error: error instanceof Error ? error.message : "Routing failed.",

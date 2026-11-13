@@ -1,4 +1,5 @@
 import { type ProviderClient, requiredClient } from "./executor/operations.js";
+import { FIXY_LABEL } from "./fixy-handoff.js";
 import type { LinearOperation } from "./linear-operations.js";
 import { parseLinearResponse } from "./linear-response.js";
 import {
@@ -890,6 +891,15 @@ async function writeUpdate(
   }
 }
 
+/** A routing gate that refused before any write; `code` is safe to log. */
+export class RouteGateError extends Error {
+  readonly code: string;
+  constructor(code: string, message: string) {
+    super(message);
+    this.code = code;
+  }
+}
+
 /**
  * One routing write. Reads the ticket, resolves every name to an id, unions
  * the labels to add with the labels already on the ticket, takes the assignee
@@ -910,6 +920,18 @@ export async function routeTicket(
   const gql: Gql = (query, variables) => linearGraphql(query, variables, opts);
 
   const issue = await requireIssue(gql, input.issue);
+  if (
+    issue.labels.nodes.some((label) => label.name === FIXY_LABEL) &&
+    (input.state !== undefined ||
+      input.assignee !== undefined ||
+      input.inheritAssigneeFrom !== undefined ||
+      input.releaseDeveloper)
+  ) {
+    throw new RouteGateError(
+      "fixy_owned",
+      `${issue.identifier} carries the ${FIXY_LABEL} label, so Fixy owns its status and assignee and nothing was written. Leave state and assignee out; labels, priority and project still apply. To give Fixy new facts, call hand_to_fixy again.`
+    );
+  }
   // Resolve the duplicate target before the first write, so a bad identifier
   // fails the whole call rather than leaving a routed ticket with no relation.
   const match =
