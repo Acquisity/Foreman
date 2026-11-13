@@ -597,10 +597,12 @@ export const RESTATE_QUESTION =
 export async function replyBody(
   message: string,
   outcome: FollowUpOutcome,
-  rewrite?: (message: string) => Promise<string>
+  rewrite?: (message: string) => Promise<string>,
+  restateFollowUp = false
 ): Promise<string> {
   const body = rewrite ? await rewrite(message) : message;
-  return outcome === "restate" && !body.trimEnd().endsWith(RESTATE_QUESTION)
+  return (restateFollowUp || outcome === "restate") &&
+    !body.trimEnd().endsWith(RESTATE_QUESTION)
     ? `${body.trimEnd()}\n\n${RESTATE_QUESTION}`
     : body;
 }
@@ -611,7 +613,8 @@ export async function replyToRequester(
   accessToken: string,
   signal?: AbortSignal,
   /** Rewords the message once Jev has said a reply is needed (ENG-15226). */
-  rewrite?: (message: string) => Promise<string>
+  rewrite?: (message: string) => Promise<string>,
+  restateFollowUp = false
 ): Promise<ReplyResult> {
   const credentials = { accessToken };
   const { issueId, plan } = await readThread(issue, credentials);
@@ -625,7 +628,7 @@ export async function replyToRequester(
     return { outcome, posted: false, reason: SKIP_REASON };
   }
   const created = await createThreadComment({
-    body: await replyBody(message, outcome, rewrite),
+    body: await replyBody(message, outcome, rewrite, restateFollowUp),
     credentials,
     issueId,
     parentId: plan.anchorId,

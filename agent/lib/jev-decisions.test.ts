@@ -443,7 +443,7 @@ test("a clear bare bump restates the answer, even over a confident skip", () => 
     assert.equal(
       resolveFollowUp(
         { bare_bump: yes(0.9), follow_up },
-        { teammateNudge: true }
+        { restateEligible: false }
       ),
       outcome,
       "a nudge to a teammate is not a bump for Foreman"
@@ -481,6 +481,43 @@ test("only a newest reply naming a teammate without Foreman is a teammate nudge"
     "restate"
   );
   assert.equal(await bump("any update?"), "restate");
+});
+
+test("restates only a single fresh reply, excluding handled replies and bare mentions", async () => {
+  const judge = (replies: string[], earlier?: string[]) =>
+    decideFollowUp(
+      { earlier, lastReply: "This is fixed.", replies },
+      {
+        fetch: () =>
+          reply({
+            answers: {
+              bare_bump: { probability: 0.95, type: "boolean" },
+              follow_up: {
+                choice: "respond",
+                probabilities: { respond: 0.99, skip: 0.01 },
+                type: "choice",
+              },
+              status_only: { probability: 0.01, type: "boolean" },
+            },
+            model: "m",
+          }),
+        token: "t",
+      }
+    );
+  assert.deepEqual(
+    await Promise.all(
+      [
+        "It still fails on the same page; here is the recording.",
+        "How do I enable it for my team?",
+      ].map((outstanding) => judge([outstanding, "any update?"]))
+    ),
+    ["respond", "respond"]
+  );
+  assert.equal(
+    await judge(["any update?"], ["It still fails on the same page."]),
+    "restate"
+  );
+  assert.equal(await judge(["<@U0BQ5QMHM7D>", "any update?"]), "restate");
 });
 
 test("a follow-up that is only mentions is skipped without asking Jev", async () => {

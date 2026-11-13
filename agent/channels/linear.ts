@@ -19,6 +19,7 @@ import { extractRepositoryUrls, stampRepository } from "../lib/repository.js";
 import { readAskFrom, relayedFollowUpOutcome } from "../lib/requester-reply.js";
 import {
   stampInvestigationMemory,
+  stampRestateFollowUp,
   stampStatusFollowUp,
   stampTriageIntake,
   stampTrusted,
@@ -38,7 +39,7 @@ export const STATUS_ONLY_FOLLOW_UP =
 
 /** Tells the model a follow-up only nudges for an answer (ENG-18836). */
 export const RESTATE_FOLLOW_UP =
-  "Jev read this follow-up as the requester only nudging for an answer. Send exactly one reply_to_requester message whose text is your last answer restated in one sentence, leading with the answer and the next step, then end the session. Do not re-investigate, call a decision tool, call route_ticket, change the document, or run the critic.";
+  "Jev read this follow-up as the requester only nudging for an answer. Send exactly one reply_to_requester message whose text is your last answer restated in one sentence, leading with the answer and the next step. Ask no question of your own: code adds the closing question about what is still wrong. Then end the session. Do not re-investigate, call a decision tool, call route_ticket, change the document, or run the critic.";
 
 const FOLLOW_UP_CONTEXT: Partial<Record<FollowUpOutcome, string>> = {
   restate: RESTATE_FOLLOW_UP,
@@ -71,13 +72,14 @@ export const followUpDispatch = (
   widgetFeedback: boolean
 ): { auth: SessionAuthContext; context: string[] } => {
   const instructed = withFollowUpOutcome(context, outcome, widgetFeedback);
-  return {
-    auth:
-      outcome === "status" && instructed !== context
+  let stamped = auth;
+  if (instructed !== context) {
+    stamped =
+      outcome === "status"
         ? stampStatusFollowUp(auth)
-        : auth,
-    context: instructed,
-  };
+        : stampRestateFollowUp(auth);
+  }
+  return { auth: stamped, context: instructed };
 };
 
 /**

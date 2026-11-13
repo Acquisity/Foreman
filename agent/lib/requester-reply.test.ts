@@ -599,6 +599,103 @@ test("asks what is still wrong after a restated answer, even after a rewrite", a
   assert.equal(await replyBody("Done.", "respond"), "Done.");
 });
 
+test("a stamped restate closes with the fixed question when delivery judges respond", async (t) => {
+  const previousKey = process.env.AI_GATEWAY_API_KEY;
+  process.env.AI_GATEWAY_API_KEY = "test-key";
+  t.after(() => {
+    if (previousKey === undefined) {
+      delete process.env.AI_GATEWAY_API_KEY;
+    } else {
+      process.env.AI_GATEWAY_API_KEY = previousKey;
+    }
+  });
+  const bodies: string[] = [];
+  let judged = 0;
+  const comments = [
+    anchor,
+    { ...reply("f1", FOREMAN, "2026-09-26T10:00:00Z"), body: "It was a typo." },
+    { ...reply("r1", "aaron", "2026-09-26T10:01:00Z"), body: "any update?" },
+  ];
+  t.mock.method(globalThis, "fetch", (_url: unknown, init?: RequestInit) => {
+    const request = JSON.parse(String(init?.body));
+    if (request.questions) {
+      judged += 1;
+      return Promise.resolve(
+        Response.json({
+          answers: {
+            bare_bump: { probability: 0.1, type: "boolean" },
+            follow_up: {
+              choice: "respond",
+              probabilities: { respond: 0.9, skip: 0.1 },
+              type: "choice",
+            },
+            status_only: { probability: 0.1, type: "boolean" },
+          },
+          model: "m",
+        })
+      );
+    }
+    if (request.query.includes("IssueComments")) {
+      return Promise.resolve(
+        Response.json({
+          data: {
+            issue: {
+              comments: {
+                nodes: comments.map((comment) => ({
+                  ...comment,
+                  parent: comment.parentId ? { id: comment.parentId } : null,
+                  user: { id: comment.userId, name: "Tester" },
+                })),
+                pageInfo: { endCursor: null, hasNextPage: false },
+              },
+            },
+          },
+        })
+      );
+    }
+    if (request.query.includes("mutation RequesterReply")) {
+      bodies.push(request.variables.input.body);
+      return Promise.resolve(
+        Response.json({
+          data: {
+            commentCreate: {
+              comment: { id: "created", url: "https://linear.app/comment" },
+              success: true,
+            },
+          },
+        })
+      );
+    }
+    return Promise.resolve(
+      Response.json({
+        data: {
+          issue: { id: "issue", identifier: "ENG-1", project: null },
+          viewer: foremanUser,
+        },
+      })
+    );
+  });
+  const message = "It was a typo, fixed now.";
+  const results = await Promise.all(
+    [undefined, () => Promise.resolve(message)].map((rewrite) =>
+      replyToRequester(
+        "ENG-1",
+        rewrite ? "raw draft" : message,
+        "test-token",
+        undefined,
+        rewrite,
+        true
+      )
+    )
+  );
+  assert.ok(results.every((result) => result.posted));
+  assert.equal(judged, 2);
+  assert.deepEqual(bodies, [
+    `${message}\n\n${RESTATE_QUESTION}`,
+    `${message}\n\n${RESTATE_QUESTION}`,
+  ]);
+});
+
 test("refuses an incomplete comment page without a continuation cursor", async () => {
   await assert.rejects(
     readAllComments(

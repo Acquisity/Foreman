@@ -22,7 +22,7 @@ import {
   settleCriticRound,
   stampCriticPacket,
 } from "./triage-log.js";
-import { isStatusFollowUp } from "./trust.js";
+import { isRestateFollowUp, isStatusFollowUp } from "./trust.js";
 
 const FIRST_LINE_RULE = /Source issue: ENG-1/u;
 const TWICE_RULE = /objected to ENG-1 twice/u;
@@ -298,10 +298,16 @@ describe("the review cycle", () => {
       ["status", true, false],
       ["respond", false, false],
       ["restate", false, false],
+      ["restate", true, false],
       [null, false, false],
     ] as const) {
       const dispatched = followUpDispatch(auth, ["ticket"], outcome, widget);
       assert.equal(isStatusFollowUp(dispatched.auth), stamped, `${outcome}`);
+      assert.equal(
+        isRestateFollowUp(dispatched.auth),
+        outcome === "restate" && !widget,
+        `${outcome}`
+      );
       assert.equal(
         dispatched.context.includes(STATUS_ONLY_FOLLOW_UP),
         stamped,
@@ -314,5 +320,7 @@ describe("the review cycle", () => {
     );
     assert.equal(isStatusFollowUp(auth), false);
     assert.equal(isStatusFollowUp(null), false);
+    assert.equal(isRestateFollowUp(auth), false);
+    assert.equal(isRestateFollowUp(null), false);
   });
 });

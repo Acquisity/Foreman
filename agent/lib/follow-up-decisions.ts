@@ -58,11 +58,11 @@ export const followUpQuestions = (): Record<string, JevQuestion> => ({
  */
 export function resolveFollowUp(
   answers: Answers,
-  { teammateNudge = false }: { teammateNudge?: boolean } = {}
+  { restateEligible = true }: { restateEligible?: boolean } = {}
 ): FollowUpOutcome {
   // Checked before skip: Jev scored real bumps a confident skip (ENG-18836 replay RB09).
   if (
-    !teammateNudge &&
+    restateEligible &&
     answers.bare_bump &&
     probabilityOf(answers.bare_bump) >= BARS.bareBump
   ) {
@@ -147,6 +147,6 @@ export async function decideFollowUp(
       },
       opts
     ),
-    { teammateNudge }
+    { restateEligible: replies.length === 1 && !teammateNudge }
   );
 }
