@@ -495,6 +495,33 @@ describe("hand_to_fixy", () => {
     );
   });
 
+  it("records a replayed handoff with its labels and never calls Linear", async () => {
+    const linear: LinearCall = () =>
+      Promise.reject(new Error("A replay must not call Linear"));
+    const result = await handToFixy(
+      { ...input, lanes: ["billing", "eng"] },
+      root,
+      linear,
+      { ...ENV, TRIAGE_REPLAY: "1" }
+    );
+    assert.equal(result.success, true);
+    assert.equal(result.replayed, true);
+    assert.equal(result.labelAdded, true);
+    assert.equal(result.fixyNotified, true);
+    assert.deepEqual(result.labels, ["fixy", "lane:billing", "lane:eng"]);
+    assert.equal(handoffOutcome(result), "replayed");
+    const offTeam = await handToFixy(
+      { ...input, issue: "ENG-1" },
+      root,
+      linear,
+      {
+        ...ENV,
+        TRIAGE_REPLAY: "1",
+      }
+    );
+    assert.equal(offTeam.success, false);
+  });
+
   it("describes this session's report ticket and no notification for an existing fixy label", () => {
     assert.ok(tool.description?.includes("this session's report ticket"));
     assert.ok(

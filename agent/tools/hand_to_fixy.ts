@@ -202,7 +202,11 @@ export interface HandToFixyResult {
   fixyNotified: boolean;
   issue: string;
   labelAdded: boolean;
+  /** Replay only: the labels a real handoff would add, in order. */
+  labels?: string[];
   reason?: string;
+  /** True when triage replay recorded the handoff instead of writing it. */
+  replayed?: boolean;
   reportedAt: string | null;
   reportedAtSource: string | null;
   success: boolean;
@@ -234,10 +238,40 @@ const sessionRefusal = (session: HandoffSession): string | null => {
   if (session.parent) {
     return "A delegated session cannot hand a report to Fixy; the root session does.";
   }
-  if (isTriageReplay()) {
-    return "Triage replay does not write to Linear.";
-  }
   return null;
+};
+
+/** Replay answers as a fresh handoff would, with no Linear call, so live Fixy never sees a label. */
+const replayedHandoff = (input: HandToFixyInput): HandToFixyResult => {
+  const { lanes } = mergeHandoffWork(null, input.lanes, input.stepsToReproduce);
+  return {
+    alreadyHandedOff: false,
+    commentId: null,
+    fixyNotified: true,
+    issue: input.issue,
+    labelAdded: true,
+    labels: [FIXY_LABEL, ...lanes.map(laneLabel)],
+    replayed: true,
+    reportedAt: input.reportedAt ?? null,
+    reportedAtSource: input.reportedAt
+      ? (input.reportedAtSource ?? null)
+      : null,
+    success: true,
+    warnings: [],
+  };
+};
+
+/** A refusal for this session, the replayed result in triage replay, or null to proceed. */
+const sessionOutcome = (
+  input: HandToFixyInput,
+  session: HandoffSession,
+  env: NodeJS.ProcessEnv
+): HandToFixyResult | null => {
+  const refused = sessionRefusal(session);
+  if (refused) {
+    return refusal(input.issue, refused);
+  }
+  return isTriageReplay(env) ? replayedHandoff(input) : null;
 };
 
 const writeHandoff = async (
@@ -300,9 +334,9 @@ export const handToFixy = async (
       `${issue} is not on a team in FIXY_TRIAGE_TEAMS, so Fixy would not pick it up. Use the triage-investigate skill instead.`
     );
   }
-  const refused = sessionRefusal(session);
-  if (refused) {
-    return refusal(issue, refused);
+  const early = sessionOutcome(input, session, env);
+  if (early) {
+    return early;
   }
   const read = await linear<IssueRead>(ISSUE_QUERY, "FixyHandoffIssue", {
     id: issue,
@@ -448,6 +482,9 @@ const errorReason = (error: unknown) =>
 
 /** The one ops-log outcome for a call: never the reason text, which may carry provider detail. */
 export const handoffOutcome = (result: HandToFixyResult): string => {
+  if (result.replayed) {
+    return "replayed";
+  }
   if (result.fixyNotified) {
     return "handed_off";
   }
@@ -495,6 +532,7 @@ export default defineTool({
     }
     logOpsEvent("fixy.handoff", {
       issue: result.issue,
+      labels: result.labels?.join(","),
       outcome: handoffOutcome(result),
       sessionId: ctx.session.id,
     });
@@ -507,7 +545,9 @@ export default defineTool({
     fixyNotified: z.boolean(),
     issue: z.string(),
     labelAdded: z.boolean(),
+    labels: z.array(z.string()).optional(),
     reason: z.string().optional(),
+    replayed: z.boolean().optional(),
     reportedAt: z.string().nullable(),
     reportedAtSource: z.string().nullable(),
     success: z.boolean(),
