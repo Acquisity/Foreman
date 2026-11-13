@@ -36,19 +36,28 @@ const FOLLOW_UP_GATE_MS = 7000;
 export const STATUS_ONLY_FOLLOW_UP =
   "Jev read this follow-up as only asking to move the ticket to a status. A person has already decided it: move the ticket to the state they named with route_ticket, send one confirming line with reply_to_requester, and end the session. Do not re-verify, call a decision tool, change the document, or run the critic. If their reply also asks a question or asks you to check something, handle it as a normal follow-up.";
 
+/** Tells the model a follow-up only nudges for an answer (ENG-18836). */
+export const RESTATE_FOLLOW_UP =
+  "Jev read this follow-up as the requester only nudging for an answer. Send exactly one reply_to_requester message whose text is your last answer restated in one sentence, leading with the answer and the next step, then end the session. Do not re-investigate, call a decision tool, call route_ticket, change the document, or run the critic.";
+
+const FOLLOW_UP_CONTEXT: Partial<Record<FollowUpOutcome, string>> = {
+  restate: RESTATE_FOLLOW_UP,
+  status: STATUS_ONLY_FOLLOW_UP,
+};
+
 /**
- * Adds the status-only instruction to a triage session. A widget-feedback
- * session keeps its own playbook, which forbids the route and reply that
- * instruction asks for.
+ * Adds the status-only or restate instruction to a triage session. A
+ * widget-feedback session keeps its own playbook, which forbids the route and
+ * reply those instructions ask for.
  */
 export const withFollowUpOutcome = (
   context: string[],
   outcome: FollowUpOutcome | null,
   widgetFeedback: boolean
-): string[] =>
-  outcome === "status" && !widgetFeedback
-    ? [...context, STATUS_ONLY_FOLLOW_UP]
-    : context;
+): string[] => {
+  const line = outcome && !widgetFeedback ? FOLLOW_UP_CONTEXT[outcome] : null;
+  return line ? [...context, line] : context;
+};
 
 /**
  * The dispatch for a judged follow-up: the turn that gets the status-only
@@ -63,7 +72,10 @@ export const followUpDispatch = (
 ): { auth: SessionAuthContext; context: string[] } => {
   const instructed = withFollowUpOutcome(context, outcome, widgetFeedback);
   return {
-    auth: instructed === context ? auth : stampStatusFollowUp(auth),
+    auth:
+      outcome === "status" && instructed !== context
+        ? stampStatusFollowUp(auth)
+        : auth,
     context: instructed,
   };
 };

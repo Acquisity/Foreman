@@ -1,7 +1,11 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { SessionAuthContext } from "eve/context";
-import { followUpDispatch, STATUS_ONLY_FOLLOW_UP } from "../channels/linear.js";
+import {
+  followUpDispatch,
+  RESTATE_FOLLOW_UP,
+  STATUS_ONLY_FOLLOW_UP,
+} from "../channels/linear.js";
 import {
   applyCriticSettlement,
   BILLING_PATH,
@@ -293,6 +297,7 @@ describe("the review cycle", () => {
       ["status", false, true],
       ["status", true, false],
       ["respond", false, false],
+      ["restate", false, false],
       [null, false, false],
     ] as const) {
       const dispatched = followUpDispatch(auth, ["ticket"], outcome, widget);
@@ -303,6 +308,10 @@ describe("the review cycle", () => {
         `${outcome}`
       );
     }
+    assert.deepEqual(
+      followUpDispatch(auth, ["ticket"], "restate", false).context,
+      ["ticket", RESTATE_FOLLOW_UP]
+    );
     assert.equal(isStatusFollowUp(auth), false);
     assert.equal(isStatusFollowUp(null), false);
   });

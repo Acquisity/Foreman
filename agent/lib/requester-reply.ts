@@ -410,7 +410,14 @@ export async function judgeFollowUp(
   }
   // Before Foreman has spoken there is nothing a reply could leave settled,
   // so only a status move is acted on; anything else runs as before.
-  return followUp.lastReply === "" && outcome === "skip" ? null : outcome;
+  if (followUp.lastReply === "" && outcome === "skip") {
+    return null;
+  }
+  // A restatement needs an answer to restate, and a widget-feedback playbook
+  // never replies to the requester.
+  return outcome === "restate" && (followUp.lastReply === "" || widgetFeedback)
+    ? "respond"
+    : outcome;
 }
 
 /**
@@ -582,6 +589,22 @@ export async function createThreadComment(
   return comment;
 }
 
+/** Asked after a restated answer, so the requester says what is still wrong (ENG-18836). */
+export const RESTATE_QUESTION =
+  "If this doesn't solve it, tell me what's still wrong.";
+
+/** The posted text: the writer's rewording, then the restate question in code so no rewrite can drop it. */
+export async function replyBody(
+  message: string,
+  outcome: FollowUpOutcome,
+  rewrite?: (message: string) => Promise<string>
+): Promise<string> {
+  const body = rewrite ? await rewrite(message) : message;
+  return outcome === "restate" && !body.trimEnd().endsWith(RESTATE_QUESTION)
+    ? `${body.trimEnd()}\n\n${RESTATE_QUESTION}`
+    : body;
+}
+
 export async function replyToRequester(
   issue: string,
   message: string,
@@ -595,14 +618,14 @@ export async function replyToRequester(
   if (!plan.ok) {
     throw new Error(plan.error);
   }
-  if (plan.followUp) {
-    const outcome = await followUpOutcome(plan.followUp, signal);
-    if (outcome === "skip") {
-      return { outcome, posted: false, reason: SKIP_REASON };
-    }
+  const outcome = plan.followUp
+    ? await followUpOutcome(plan.followUp, signal)
+    : "respond";
+  if (outcome === "skip") {
+    return { outcome, posted: false, reason: SKIP_REASON };
   }
   const created = await createThreadComment({
-    body: rewrite ? await rewrite(message) : message,
+    body: await replyBody(message, outcome, rewrite),
     credentials,
     issueId,
     parentId: plan.anchorId,

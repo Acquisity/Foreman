@@ -422,6 +422,29 @@ test("a clear status-only follow-up is moved without re-checking", () => {
   );
 });
 
+test("a clear bare bump restates the answer, after skip and status", () => {
+  assert.equal(
+    resolveFollowUp({ bare_bump: yes(0.9), follow_up: pick("respond") }),
+    "restate"
+  );
+  assert.equal(
+    resolveFollowUp({ bare_bump: yes(0.6), follow_up: pick("respond") }),
+    "respond"
+  );
+  assert.equal(
+    resolveFollowUp({ bare_bump: yes(0.9), follow_up: pick("skip") }),
+    "skip"
+  );
+  assert.equal(
+    resolveFollowUp({
+      bare_bump: yes(0.9),
+      follow_up: pick("respond"),
+      status_only: yes(0.9),
+    }),
+    "status"
+  );
+});
+
 test("a follow-up that is only mentions is skipped without asking Jev", async () => {
   const outcome = await decideFollowUp(
     {

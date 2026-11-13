@@ -1,6 +1,8 @@
 export const BARS = {
   /** Below this, money versus product is unclear and the model follows the leaning. */
   askKind: 0.7,
+  /** Below this, a follow-up is not trusted to be only a bump for an answer. */
+  bareBump: 0.7,
   classification: 0.6,
   /** A User Error or Platform Limitation below this is treated as a Feature Request, so it stays open. */
   closeExplanation: 0.7,

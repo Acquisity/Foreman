@@ -8,8 +8,10 @@ import {
   judgeFollowUp,
   planReply,
   promptedFollowUp,
+  RESTATE_QUESTION,
   readAllComments,
   relayedFollowUp,
+  replyBody,
   replyToRequester,
   type ThreadComment,
   ThreadIncompleteError,
@@ -537,6 +539,64 @@ test("acts on a person's direct status request on an ordinary ticket, and on not
     ),
     "skip"
   );
+});
+
+test("passes a restate through only where a reply follows an answer", async () => {
+  const answer = (outcome: FollowUpOutcome) => () => Promise.resolve(outcome);
+  const relay = said(
+    "b1",
+    "aaron",
+    "2026-10-02T20:09:00Z",
+    "**Gary** replied in Slack:\n\nany update?",
+    "anchor"
+  );
+  const answered = [
+    anchor,
+    said("f2", FOREMAN, "2026-10-02T20:08:00Z", "It was a typo.", "anchor"),
+    relay,
+  ];
+  const ticket = (comments: ThreadComment[], widgetFeedback = false) => ({
+    comments,
+    foreman: foremanUser,
+    plan: planReply(comments, FOREMAN),
+    widgetFeedback,
+  });
+  const trigger = { commentId: "b1", prompted: false };
+  assert.equal(
+    await judgeFollowUp(ticket(answered), trigger, answer("restate")),
+    "restate"
+  );
+  assert.equal(
+    await judgeFollowUp(ticket([anchor, relay]), trigger, answer("restate")),
+    "respond",
+    "nothing to restate before Foreman spoke"
+  );
+  assert.equal(
+    await judgeFollowUp(ticket(answered, true), trigger, answer("restate")),
+    "respond"
+  );
+  const direct = said("d2", "aaron", "2026-10-02T20:09:00Z", "any update?");
+  assert.equal(
+    await judgeFollowUp(
+      ticket([...sessionThread, direct]),
+      { commentId: "d2", prompted: true },
+      answer("restate")
+    ),
+    null
+  );
+});
+
+test("asks what is still wrong after a restated answer, even after a rewrite", async () => {
+  const asked = `It was a typo, fixed now.\n\n${RESTATE_QUESTION}`;
+  assert.equal(await replyBody("It was a typo, fixed now.", "restate"), asked);
+  assert.equal(
+    await replyBody("raw", "restate", () =>
+      Promise.resolve("It was a typo, fixed now. ")
+    ),
+    asked
+  );
+  assert.equal(await replyBody(asked, "restate"), asked);
+  assert.equal(await replyBody("Done.", "respond"), "Done.");
 });
 
 test("refuses an incomplete comment page without a continuation cursor", async () => {

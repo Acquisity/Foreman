@@ -14,8 +14,14 @@ export const FOLLOW_UP_OUTCOMES = {
     "speaks to Foreman (mentions @Foreman, or comes right after lastReply and follows on from it, or is addressed to no one without continuing an exchange between people) and asks Foreman something, corrects or doubts lastReply (for example, says they may have made a mistake), gives Foreman a new fact or evidence about the issue, including the fact lastReply said would reopen it, approves or withdraws the ask, or changes the outcome they want",
   skip: "anything else: people in the thread talking to each other, even when what they say is new about the issue (a reply that mentions only @teammate, even one that disputes lastReply or brings evidence, an answer or follow-up to a teammate's message, a question to a teammate that is still open, a hand-off, a decision people just made together), context that adds nothing new about the issue, an acknowledgement, thanks, or noise",
 } as const;
-/** status: the only ask is a ticket status move, so nothing is re-checked. */
-export type FollowUpOutcome = keyof typeof FOLLOW_UP_OUTCOMES | "status";
+/**
+ * status: the only ask is a ticket status move, so nothing is re-checked.
+ * restate: a bare bump after an answer, so the answer is restated (ENG-18836).
+ */
+export type FollowUpOutcome =
+  | keyof typeof FOLLOW_UP_OUTCOMES
+  | "restate"
+  | "status";
 
 export interface FollowUpInput {
   /** Replies since lastReply that Foreman already handled; context only. */
@@ -27,6 +33,11 @@ export interface FollowUpInput {
 }
 
 export const followUpQuestions = (): Record<string, JevQuestion> => ({
+  bare_bump: {
+    instructions:
+      "Do the replies only nudge Foreman for an answer or an update (following up, any update, bump, checking in), addressed to Foreman or to no one, with no new fact, no question beyond asking for an update, no correction, and nothing said about what is wrong with lastReply? A nudge to @teammate is not one.",
+    type: "boolean",
+  },
   follow_up: {
     criteria: { ...FOLLOW_UP_OUTCOMES },
     instructions:
@@ -42,16 +53,22 @@ export const followUpQuestions = (): Record<string, JevQuestion> => ({
 
 /**
  * Staying quiet needs a clear call; when unsure, the requester is answered.
- * A clear status-only ask is answered without re-checking the work.
+ * A clear status-only ask is answered without re-checking the work, and a
+ * clear bare bump gets the last answer restated.
  */
 export function resolveFollowUp(answers: Answers): FollowUpOutcome {
   const { choice, confidence } = choiceOf(answers.follow_up);
   if (choice === "skip" && confidence >= BARS.followUp) {
     return "skip";
   }
-  return answers.status_only &&
+  if (
+    answers.status_only &&
     probabilityOf(answers.status_only) >= BARS.statusOnly
-    ? "status"
+  ) {
+    return "status";
+  }
+  return answers.bare_bump && probabilityOf(answers.bare_bump) >= BARS.bareBump
+    ? "restate"
     : "respond";
 }
 

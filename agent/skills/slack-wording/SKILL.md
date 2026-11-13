@@ -14,6 +14,8 @@ Within the two scoped channels, the audience is an internal team member, not the
 
 The Slack channel boundary injects the canonical final-post rule into every Slack session; in a Linear session the `reply_to_requester` one-message rule does that job. Follow the one that applies for the final message; do not restate or replace it here.
 
+Every answer leads with the answer in one line and the next step. When the requester only nudges after an answer ("any update?", "following up", "bump"), the reply is that answer restated in one sentence, and code adds the fixed question asking what is still wrong. Aaron is pulled in only when the requester says what is still wrong or you cannot tell.
+
 ## Never in a Slack-facing message
 
 - Linear issue IDs, ticket numbers, statuses, duplicate status, internal routing language. The one exception: when the requester explicitly asks for the ticket link, give that link.

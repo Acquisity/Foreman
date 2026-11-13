@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 import type { LinearAgentSessionEvent } from "eve/channels/linear";
 import {
+  RESTATE_FOLLOW_UP,
   STATUS_ONLY_FOLLOW_UP,
   withFollowUpOutcome,
 } from "../channels/linear.js";
@@ -261,6 +262,16 @@ describe("widget-feedback follow-up outcome", () => {
     assert.deepEqual(withFollowUpOutcome(["triage"], "status", false), [
       "triage",
       STATUS_ONLY_FOLLOW_UP,
+    ]);
+  });
+
+  it("adds the restate instruction to a triage session only", () => {
+    assert.deepEqual(withFollowUpOutcome(["playbook"], "restate", true), [
+      "playbook",
+    ]);
+    assert.deepEqual(withFollowUpOutcome(["triage"], "restate", false), [
+      "triage",
+      RESTATE_FOLLOW_UP,
     ]);
   });
 });
