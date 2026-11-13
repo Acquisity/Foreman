@@ -599,7 +599,7 @@ test("asks what is still wrong after a restated answer, even after a rewrite", a
   assert.equal(await replyBody("Done.", "respond"), "Done.");
 });
 
-test("a stamped restate closes with the fixed question when delivery judges respond", async (t) => {
+test("a stamped restate is not judged again and closes with the fixed question", async (t) => {
   const previousKey = process.env.AI_GATEWAY_API_KEY;
   process.env.AI_GATEWAY_API_KEY = "test-key";
   t.after(() => {
@@ -625,8 +625,8 @@ test("a stamped restate closes with the fixed question when delivery judges resp
           answers: {
             bare_bump: { probability: 0.1, type: "boolean" },
             follow_up: {
-              choice: "respond",
-              probabilities: { respond: 0.9, skip: 0.1 },
+              choice: "skip",
+              probabilities: { respond: 0.1, skip: 0.9 },
               type: "choice",
             },
             status_only: { probability: 0.1, type: "boolean" },
@@ -689,7 +689,7 @@ test("a stamped restate closes with the fixed question when delivery judges resp
     )
   );
   assert.ok(results.every((result) => result.posted));
-  assert.equal(judged, 2);
+  assert.equal(judged, 0, "a second judgment could have skipped the reply");
   assert.deepEqual(bodies, [
     `${message}\n\n${RESTATE_QUESTION}`,
     `${message}\n\n${RESTATE_QUESTION}`,

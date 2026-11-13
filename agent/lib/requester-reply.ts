@@ -621,9 +621,14 @@ export async function replyToRequester(
   if (!plan.ok) {
     throw new Error(plan.error);
   }
-  const outcome = plan.followUp
-    ? await followUpOutcome(plan.followUp, signal)
-    : "respond";
+  // A stamped turn was already judged a bare bump by the channel; judging it
+  // again could drop the restatement the turn was dispatched to send.
+  let outcome: FollowUpOutcome = "respond";
+  if (restateFollowUp) {
+    outcome = "restate";
+  } else if (plan.followUp) {
+    outcome = await followUpOutcome(plan.followUp, signal);
+  }
   if (outcome === "skip") {
     return { outcome, posted: false, reason: SKIP_REASON };
   }
