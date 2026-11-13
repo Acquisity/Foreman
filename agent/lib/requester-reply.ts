@@ -597,12 +597,10 @@ export const RESTATE_QUESTION =
 export async function replyBody(
   message: string,
   outcome: FollowUpOutcome,
-  rewrite?: (message: string) => Promise<string>,
-  restateFollowUp = false
+  rewrite?: (message: string) => Promise<string>
 ): Promise<string> {
   const body = rewrite ? await rewrite(message) : message;
-  return (restateFollowUp || outcome === "restate") &&
-    !body.trimEnd().endsWith(RESTATE_QUESTION)
+  return outcome === "restate" && !body.trimEnd().endsWith(RESTATE_QUESTION)
     ? `${body.trimEnd()}\n\n${RESTATE_QUESTION}`
     : body;
 }
@@ -622,9 +620,10 @@ export async function replyToRequester(
     throw new Error(plan.error);
   }
   // A stamped turn was already judged a bare bump by the channel; judging it
-  // again could drop the restatement the turn was dispatched to send.
+  // again could drop the restatement the turn was dispatched to send. A reply
+  // that arrived since then is judged afresh with the rest.
   let outcome: FollowUpOutcome = "respond";
-  if (restateFollowUp) {
+  if (restateFollowUp && plan.followUp?.replies.length === 1) {
     outcome = "restate";
   } else if (plan.followUp) {
     outcome = await followUpOutcome(plan.followUp, signal);
@@ -633,7 +632,7 @@ export async function replyToRequester(
     return { outcome, posted: false, reason: SKIP_REASON };
   }
   const created = await createThreadComment({
-    body: await replyBody(message, outcome, rewrite, restateFollowUp),
+    body: await replyBody(message, outcome, rewrite),
     credentials,
     issueId,
     parentId: plan.anchorId,

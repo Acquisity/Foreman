@@ -694,6 +694,21 @@ test("a stamped restate is not judged again and closes with the fixed question",
     `${message}\n\n${RESTATE_QUESTION}`,
     `${message}\n\n${RESTATE_QUESTION}`,
   ]);
+  // A reply that landed during the turn is judged afresh with the bump.
+  comments.push({
+    ...reply("r2", "aaron", "2026-09-26T10:02:00Z"),
+    body: "it still fails on the billing page",
+  });
+  const late = await replyToRequester(
+    "ENG-1",
+    message,
+    "test-token",
+    undefined,
+    undefined,
+    true
+  );
+  assert.equal(late.posted, false, "the fresh judgment said skip");
+  assert.equal(judged, 1);
 });
 
 test("refuses an incomplete comment page without a continuation cursor", async () => {
