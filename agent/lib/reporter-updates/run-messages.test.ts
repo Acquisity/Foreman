@@ -266,6 +266,38 @@ describe("done without a pull request", () => {
   }
 });
 
+describe("tickets Fixy owns", () => {
+  for (const stateType of ["completed", "canceled"]) {
+    it(`posts no ${stateType} message on a ticket carrying fixy, and logs why`, async () => {
+      const s = setup([
+        ticket({
+          labels: ["fixy", "lane:billing"],
+          pullUrls: [PR_URL],
+          stateType,
+        }),
+      ]);
+      const events = logged(s);
+      assert.deepEqual(await reconcile(s), {
+        kind: "skipped",
+        why: "fixy_owned",
+      });
+      assert.equal(s.linear.posts.length, 0);
+      assert.deepEqual(events, [
+        {
+          event: "reporter.update_skipped",
+          fields: { code: "fixy_owned", issue: "ENG-1", outcome: "skipped" },
+        },
+      ]);
+    });
+  }
+
+  it("still posts received on an open ticket carrying fixy", async () => {
+    const s = setup([ticket({ labels: ["fixy"] })]);
+    await reconcile(s);
+    assert.equal(s.linear.posts.length, 1);
+  });
+});
+
 describe("staff names in written phrases", () => {
   it("posts nothing for a Done phrase that names another staff member, as Devin's example", async () => {
     const s = setup([
