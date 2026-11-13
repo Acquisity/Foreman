@@ -1159,7 +1159,7 @@ test("ENG-13397-shaped wrong-channel money ask is handled in place", () => {
   const financialRouting = billingSkill.slice(routingIndex);
   assert.ok(
     financialRouting.includes(
-      'Route financial tickets to Support/Financial in one `route_ticket` call: `project: "Support"`'
+      'Only on tickets Fixy does not own, route financial tickets to Support/Financial in one `route_ticket` call: `project: "Support"`'
     )
   );
   assert.ok(financialRouting.includes("money-kind labels as `addLabels`"));

@@ -215,6 +215,22 @@ const isLane = (value: string): value is FixyLane =>
 export const needsSteps = (lanes: readonly FixyLane[]): boolean =>
   lanes.length === 0 || lanes.includes("eng");
 
+/** Keep earlier lanes and their engineering steps when a follow-up adds work. */
+export const mergeHandoffWork = (
+  previous: FixyHandoff | null,
+  lanes: FixyLane[],
+  steps: string[]
+): Pick<FixyHandoff, "lanes" | "steps"> => {
+  const merged = [...new Set([...lanes, ...(previous?.lanes ?? [])])];
+  return {
+    lanes: merged,
+    steps:
+      needsSteps(merged) && steps.length === 0
+        ? (previous?.steps ?? [])
+        : steps,
+  };
+};
+
 const field = (lines: readonly string[], label: string): string | null => {
   const prefix = `${label}: `;
   const line = lines.find((entry) => entry.startsWith(prefix));

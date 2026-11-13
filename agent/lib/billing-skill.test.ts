@@ -32,10 +32,20 @@ test("a ticket Fixy owns is handed off, never re-routed, and a closed one is not
     "call `hand_to_fixy` with `lanes` including `billing`",
     "never call `decide_billing` or `route_ticket` again on new facts",
     "On a Done or Canceled ticket, answer the follow-up and change no state.",
-    "to move the ticket to a closed status",
+    "Only on a ticket Fixy does not own, a follow-up whose only ask is to move the ticket to a closed status",
+    "On a ticket Fixy owns, never move status",
     "Fixy judges that approval",
   ]) {
     assert.ok(billingSkill.includes(rule), rule);
   }
   assert.ok(!billingSkill.includes("reopen a closed ticket"));
+});
+
+test("Fixy routing precedes the non-Fixy Aaron and Todo route", () => {
+  const routing = billingSkill.slice(billingSkill.indexOf("## Routing"));
+  assert.ok(
+    routing.indexOf('When `decide_billing` returns `handTo: "fixy"`') <
+      routing.indexOf('`assignee: "Aaron Fraga"`')
+  );
+  assert.ok(routing.includes("Only on tickets Fixy does not own"));
 });

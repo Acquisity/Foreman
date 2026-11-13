@@ -1,3 +1,5 @@
+import { FIXY_LABEL } from "./fixy-handoff.js";
+import type { RouteTicketInput } from "./linear-api.js";
 import { isAskFromTitle, slackChannelOf } from "./linear-context.js";
 import { RECEIVER_ONLY_CHANNELS } from "./slack-intake.js";
 
@@ -11,14 +13,17 @@ export type LinearRead = <T>(
 export const REOPEN_QUERY = `query RouteReopenCheck($id: String!, $state: String!) {
   issue(id: $id) {
     state { type }
-    attachments(first: 50) { nodes { title url } }
+    attachments(first: 50) { nodes { title url } pageInfo { hasNextPage } }
     team { states(first: 5, filter: { name: { eqIgnoreCase: $state } }) { nodes { type } } }
   }
 }`;
 
 interface ReopenRead {
   issue: {
-    attachments: { nodes: { title: string; url: string }[] };
+    attachments: {
+      nodes: { title: string; url: string }[];
+      pageInfo: { hasNextPage: boolean };
+    };
     state: { type: string };
     team: { states: { nodes: { type: string }[] } };
   } | null;
@@ -65,6 +70,15 @@ export const reopenRefusal = async (
       reason: `No issue ${issue}, so nothing was written.`,
     };
   }
+  if (
+    !isReceiverAsk(ticket.attachments.nodes) &&
+    ticket.attachments.pageInfo.hasNextPage
+  ) {
+    return {
+      code: "reopen_unchecked",
+      reason: `Could not check all of ${issue}'s attachments, so the state change was not written. Leave state out.`,
+    };
+  }
   const opens = ticket.team.states.nodes.some((node) => !isClosed(node.type));
   if (
     isClosed(ticket.state.type) &&
@@ -77,4 +91,42 @@ export const reopenRefusal = async (
     };
   }
   return null;
+};
+
+/** A routing gate that refused before any write; `code` is safe to log. */
+export class RouteGateError extends Error {
+  readonly code: string;
+  constructor(code: string, message: string) {
+    super(message);
+    this.code = code;
+  }
+}
+
+/** Fixy lifecycle labels and ownership are not ordinary routing decisions. */
+export const assertFixyRouting = (
+  input: RouteTicketInput,
+  labels: readonly { name: string }[]
+): void => {
+  if (
+    [...(input.addLabels ?? []), ...(input.removeLabels ?? [])].some(
+      (label) => label.trim().toLowerCase() === FIXY_LABEL
+    )
+  ) {
+    throw new RouteGateError(
+      "fixy_label",
+      "Only hand_to_fixy adds the fixy label, and only a person removes it. Nothing was written."
+    );
+  }
+  if (
+    labels.some((label) => label.name === FIXY_LABEL) &&
+    (input.state !== undefined ||
+      input.assignee !== undefined ||
+      input.inheritAssigneeFrom !== undefined ||
+      input.releaseDeveloper)
+  ) {
+    throw new RouteGateError(
+      "fixy_owned",
+      `${input.issue} carries the ${FIXY_LABEL} label, so Fixy owns its status and assignee and nothing was written. Leave state and assignee out; labels, priority and project still apply. To give Fixy new facts, call hand_to_fixy again.`
+    );
+  }
 };

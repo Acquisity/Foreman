@@ -10,6 +10,7 @@ import {
   isFixyTriageIssue,
   isFixyTriageTeam,
   laneLabel,
+  mergeHandoffWork,
   parseFixyHandoff,
   renderFixyHandoff,
   resolveReportedAt,
@@ -349,11 +350,10 @@ export const handToFixy = async (
   );
   const body = renderFixyHandoff({
     expected: input.expected,
-    lanes: input.lanes,
+    ...mergeHandoffWork(previous, input.lanes, input.stepsToReproduce),
     notes: input.notes ?? null,
     reportedAt: reported.at,
     reportedAtSource: reported.source,
-    steps: input.stepsToReproduce,
     whatHappened: input.whatHappened,
     workspaceId: input.workspaceId?.toLowerCase() ?? null,
     workspaceUnknown: input.workspaceUnknown ?? null,

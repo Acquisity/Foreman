@@ -512,6 +512,25 @@ describe("hand_to_fixy", () => {
     });
   });
 
+  it("keeps earlier lanes and engineering steps when adding a billing lane", async () => {
+    const linear = fakeLinear();
+    await handToFixy(input, root, linear.linear, ENV);
+    const result = await handToFixy(
+      { ...input, lanes: ["billing"], stepsToReproduce: [] },
+      root,
+      linear.linear,
+      ENV
+    );
+    assert.equal(result.success, true);
+    const stored = parseFixyHandoff(linear.state.comments[0]?.body ?? "");
+    assert.deepEqual(stored?.lanes, ["billing", "eng"]);
+    assert.deepEqual(stored?.steps, input.stepsToReproduce);
+    assert.deepEqual(
+      linear.state.labels.map((label) => label.name),
+      ["fixy", "lane:eng", "lane:billing"]
+    );
+  });
+
   it("is idempotent: a second call updates the comment and writes no label", async () => {
     const linear = fakeLinear();
     await handToFixy(input, root, linear.linear, ENV);

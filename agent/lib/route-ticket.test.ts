@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { ProviderClient } from "./executor/operations.js";
 import { routeTicket } from "./linear-api.js";
-import { type LinearRead, reopenRefusal } from "./reopen-gate.js";
+import { type LinearRead, reopenRefusal } from "./route-gates.js";
 import { type Call, fakeLinear } from "./route-ticket-fixtures.js";
 
 process.env.LINEAR_CONNECTOR ??= "linear/test";
@@ -215,6 +215,7 @@ describe("routeTicket", () => {
   });
 });
 
+const FIXY_LABEL_REFUSED = /Only hand_to_fixy adds the fixy label/u;
 const FIXY_OWNED = /carries the fixy label, so Fixy owns its status/u;
 
 describe("routeTicket on a Fixy ticket", () => {
@@ -241,6 +242,32 @@ describe("routeTicket on a Fixy ticket", () => {
       );
       assert.deepEqual(linear.writes(), []);
     }
+  });
+
+  it("refuses adding or removing fixy in any case before any write", async () => {
+    for (const field of ["addLabels", "removeLabels"] as const) {
+      for (const label of ["fixy", " FIXY "]) {
+        const linear = fakeLinear({ ticketLabels: fixyLabels });
+        // biome-ignore lint/performance/noAwaitInLoops: each refusal has its own provider fixture.
+        await assert.rejects(
+          routeTicket(
+            { issue: "ENG-1", [field]: [label] },
+            { client: linear.fetchStub }
+          ),
+          FIXY_LABEL_REFUSED
+        );
+        assert.deepEqual(linear.writes(), []);
+      }
+    }
+    const linear = fakeLinear();
+    await assert.rejects(
+      routeTicket(
+        { addLabels: ["fixy"], issue: "ENG-1" },
+        { client: linear.fetchStub }
+      ),
+      FIXY_LABEL_REFUSED
+    );
+    assert.deepEqual(linear.writes(), []);
   });
 
   it("still writes labels, priority and project", async () => {
@@ -749,12 +776,13 @@ const reopenRead =
   (
     current: string,
     target: string[],
-    attachments: { title: string; url: string }[]
+    attachments: { title: string; url: string }[],
+    hasNextPage = false
   ): LinearRead =>
   <T>() =>
     Promise.resolve({
       issue: {
-        attachments: { nodes: attachments },
+        attachments: { nodes: attachments, pageInfo: { hasNextPage } },
         state: { type: current },
         team: { states: { nodes: target.map((type) => ({ type })) } },
       },
@@ -790,6 +818,15 @@ describe("reopenRefusal", () => {
       );
       assert.equal(refused, null, `${current} to ${target.join()}`);
     }
+  });
+
+  it("fails closed when a later attachment page may carry the receiver link", async () => {
+    const refused = await reopenRefusal(
+      "ENG-1",
+      "Todo",
+      reopenRead("completed", ["unstarted"], [MIGRATION_ASK], true)
+    );
+    assert.equal(refused?.code, "reopen_unchecked");
   });
 
   it("refuses when the read fails or finds no issue", async () => {
