@@ -70,24 +70,21 @@ export const reopenRefusal = async (
       reason: `No issue ${issue}, so nothing was written.`,
     };
   }
-  if (
-    !isReceiverAsk(ticket.attachments.nodes) &&
-    ticket.attachments.pageInfo.hasNextPage
-  ) {
-    return {
-      code: "reopen_unchecked",
-      reason: `Could not check all of ${issue}'s attachments, so the state change was not written. Leave state out.`,
-    };
-  }
   const opens = ticket.team.states.nodes.some((node) => !isClosed(node.type));
-  if (
-    isClosed(ticket.state.type) &&
-    opens &&
-    isReceiverAsk(ticket.attachments.nodes)
-  ) {
+  // Only a reopen needs the Asks check; closed to closed always goes through.
+  if (!(isClosed(ticket.state.type) && opens)) {
+    return null;
+  }
+  if (isReceiverAsk(ticket.attachments.nodes)) {
     return {
       code: "closed_reopen",
       reason: `${issue} is Done or Canceled and came from an Asks channel, so it is not reopened and nothing was written. Answer the requester and leave state out; only a move to another closed state is allowed.`,
+    };
+  }
+  if (ticket.attachments.pageInfo.hasNextPage) {
+    return {
+      code: "reopen_unchecked",
+      reason: `Could not check all of ${issue}'s attachments, so the state change was not written. Leave state out.`,
     };
   }
   return null;

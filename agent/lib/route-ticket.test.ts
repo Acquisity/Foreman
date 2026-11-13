@@ -827,6 +827,12 @@ describe("reopenRefusal", () => {
       reopenRead("completed", ["unstarted"], [MIGRATION_ASK], true)
     );
     assert.equal(refused?.code, "reopen_unchecked");
+    const closedToClosed = await reopenRefusal(
+      "ENG-1",
+      "Canceled",
+      reopenRead("completed", ["canceled"], [MIGRATION_ASK], true)
+    );
+    assert.equal(closedToClosed, null);
   });
 
   it("refuses when the read fails or finds no issue", async () => {
