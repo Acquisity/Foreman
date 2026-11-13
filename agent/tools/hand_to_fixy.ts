@@ -348,9 +348,10 @@ export const handToFixy = async (
     },
     ticket.createdAt
   );
+  const work = mergeHandoffWork(previous, input.lanes, input.stepsToReproduce);
   const body = renderFixyHandoff({
     expected: input.expected,
-    ...mergeHandoffWork(previous, input.lanes, input.stepsToReproduce),
+    ...work,
     notes: input.notes ?? null,
     reportedAt: reported.at,
     reportedAtSource: reported.source,
@@ -378,7 +379,7 @@ export const handToFixy = async (
   const present = new Set(ticket.labels.nodes.map((label) => label.name));
   // The fixy label is what starts Fixy, so carrying it means handed off.
   const alreadyHandedOff = present.has(FIXY_LABEL);
-  const wanted = [FIXY_LABEL, ...input.lanes.map(laneLabel)].filter(
+  const wanted = [FIXY_LABEL, ...work.lanes.map(laneLabel)].filter(
     (name) => !present.has(name)
   );
   const settled = { ...done, alreadyHandedOff, issue: ticket.identifier };

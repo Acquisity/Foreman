@@ -215,7 +215,7 @@ const isLane = (value: string): value is FixyLane =>
 export const needsSteps = (lanes: readonly FixyLane[]): boolean =>
   lanes.length === 0 || lanes.includes("eng");
 
-/** Keep earlier lanes and their engineering steps when a follow-up adds work. */
+/** Keep earlier lanes and steps when a follow-up adds work without new steps. */
 export const mergeHandoffWork = (
   previous: FixyHandoff | null,
   lanes: FixyLane[],
@@ -224,10 +224,7 @@ export const mergeHandoffWork = (
   const merged = [...new Set([...lanes, ...(previous?.lanes ?? [])])];
   return {
     lanes: merged,
-    steps:
-      needsSteps(merged) && steps.length === 0
-        ? (previous?.steps ?? [])
-        : steps,
+    steps: steps.length > 0 ? steps : (previous?.steps ?? []),
   };
 };
 

@@ -4,6 +4,7 @@ import type { SessionAuthContext } from "eve/context";
 import {
   fixyHandoffCommentId,
   parseFixyHandoff,
+  renderFixyHandoff,
   SLACK_THREAD_START,
   TICKET_CREATED,
 } from "#lib/fixy-handoff.js";
@@ -27,6 +28,7 @@ const ENV = { FIXY_TRIAGE_TEAMS: "SAN" };
 const ISSUE_ID = "6f1d2c3b-aaaa-4bbb-8ccc-123456789abc";
 const TEAM_ID = "team-san";
 const COMMENT_ID = fixyHandoffCommentId(ISSUE_ID);
+const LANES_LINE = /^Lanes: .*\n/mu;
 const QUERY_NAME = /(?:query|mutation)\s+(\w+)/u;
 // Measured shape: SAN-124's 'Ask from' link into the receiver sandbox.
 const ASK_URL =
@@ -86,6 +88,7 @@ const fakeLinear = (
   options: {
     hidden?: boolean;
     fail?: string;
+    labelsRejected?: boolean;
     lookupFails?: boolean;
     teamLabels?: LabelRow[];
   } = {}
@@ -175,6 +178,9 @@ const fakeLinear = (
         case "FixyHandoffLabels": {
           const ids = (variables.input as { addedLabelIds: string[] })
             .addedLabelIds;
+          if (options.labelsRejected) {
+            return { issueUpdate: { success: false } };
+          }
           for (const id of ids) {
             const label = (options.teamLabels ?? LABELS).find(
               (l) => l.id === id
@@ -529,6 +535,58 @@ describe("hand_to_fixy", () => {
       linear.state.labels.map((label) => label.name),
       ["fixy", "lane:eng", "lane:billing"]
     );
+  });
+
+  it("adds the lane labels of every recorded lane when an earlier label write did not land", async () => {
+    const linear = fakeLinear();
+    await handToFixy(input, root, linear.linear, ENV);
+    linear.state.labels.length = 0;
+    const result = await handToFixy(
+      { ...input, lanes: ["billing"], stepsToReproduce: [] },
+      root,
+      linear.linear,
+      ENV
+    );
+    assert.equal(result.success, true);
+    assert.deepEqual(
+      linear.state.labels.map((label) => label.name),
+      ["fixy", "lane:billing", "lane:eng"]
+    );
+  });
+
+  it("keeps a pre-lane handoff's steps when a follow-up adds only a billing lane", async () => {
+    const legacy = renderFixyHandoff({
+      expected: "It sends",
+      lanes: [],
+      notes: null,
+      reportedAt: "2026-11-01T00:00:00.000Z",
+      reportedAtSource: "Slack thread start",
+      steps: ["Open the campaign"],
+      whatHappened: "It did not send",
+      workspaceId: null,
+      workspaceUnknown: "not found",
+    }).replace(LANES_LINE, "");
+    const linear = fakeLinear({
+      comments: [{ body: legacy, id: fixyHandoffCommentId(ISSUE_ID) }],
+    });
+    const result = await handToFixy(
+      { ...input, lanes: ["billing"], stepsToReproduce: [] },
+      root,
+      linear.linear,
+      ENV
+    );
+    assert.equal(result.success, true);
+    const stored = parseFixyHandoff(linear.state.comments[0]?.body ?? "");
+    assert.deepEqual(stored?.steps, ["Open the campaign"]);
+  });
+
+  it("reports a comment-only failure when Linear rejects the label write", async () => {
+    const linear = fakeLinear({}, { labelsRejected: true });
+    const result = await handToFixy(input, root, linear.linear, ENV);
+    assert.equal(result.success, false);
+    assert.equal(result.labelAdded, false);
+    assert.ok(result.commentId);
+    assert.deepEqual(linear.state.labels, []);
   });
 
   it("is idempotent: a second call updates the comment and writes no label", async () => {
