@@ -104,6 +104,7 @@ test("the handoff carries lanes and the fixy label, never Bug or a card", () => 
   }
   assert.ok(handoff.includes("adds the `fixy` label"));
   assert.ok(handoff.includes("No `card`"));
+  assert.ok(!handoff.includes("Bug"));
   assert.ok(!skill.includes("Bug` label"));
 });
 

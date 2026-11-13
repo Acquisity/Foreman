@@ -74,7 +74,7 @@ Call `hand_to_fixy` once with:
 - `reportedAt` and `reportedAtSource` only when the ticket has no 'Ask from' Slack link and the report says when it was first raised. The tool takes the time from the Slack link itself.
 - `notes`: one line, only when there is something Fixy needs, such as a known issue `route_ticket` refused to join.
 
-The tool writes the handoff comment first and then adds the `fixy` label, which starts Fixy's run, and a `lane:` label for each lane. From then on Fixy owns the ticket's state and assignee. `success` false with a reason names what to fix, including a label missing from Linear; fix it and call again. Calling again updates the same comment.
+The tool writes the handoff comment first and then adds the `fixy` label, which starts Fixy's run, and a `lane:` label for each lane. From then on Fixy owns the ticket's state and assignee. `success` false with a reason names what to fix; fix it and call again. When it names a label missing from Linear, a person must create it: end the session saying so in one line, without retrying. Calling again updates the same comment.
 
 Post nothing to the requester on a plain hand-off: the received message they get is the acknowledgement.
 
