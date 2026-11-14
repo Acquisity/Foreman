@@ -6,7 +6,7 @@ import { rewriteDraft } from "#lib/intake-writer.js";
 import { LINEAR_ISSUE_ID_PATTERN } from "#lib/investigation-memory/scope.js";
 import { replyToRequester } from "#lib/requester-reply.js";
 import { replayReply } from "#lib/triage-replay/client.js";
-import { isTriageIntake } from "#lib/trust.js";
+import { isRestateFollowUp, isTriageIntake } from "#lib/trust.js";
 
 const MESSAGE_MAX_CHARS = 4000;
 
@@ -28,7 +28,8 @@ export default defineTool({
         ctx.abortSignal,
         isTriageIntake(ctx.session.auth.initiator ?? null)
           ? (draft) => rewriteDraft(draft, MESSAGE_MAX_CHARS, ctx.abortSignal)
-          : undefined
+          : undefined,
+        isRestateFollowUp(ctx.session.auth.current)
       );
     } catch (error) {
       if (ctx.abortSignal.aborted) {
