@@ -19,7 +19,9 @@ jobs:
     # needs a value for each one. Placeholders are enough: discovery never
     # contacts a connector. Never put a secret here.
     env:
-      EXECUTOR_MCP_CONNECTOR: placeholder/foreman-ci
+      EXECUTOR_MCP_CONNECTOR_DISPUTES: placeholder/foreman-ci
+      EXECUTOR_MCP_CONNECTOR_FOREMAN: placeholder/foreman-ci
+      EXECUTOR_MCP_CONNECTOR_SUPPORT: placeholder/foreman-ci
       LINEAR_CONNECTOR: placeholder/foreman-ci
     steps:
       - uses: actions/checkout@v5

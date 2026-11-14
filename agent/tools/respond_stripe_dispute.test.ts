@@ -3,11 +3,9 @@ import { readFileSync } from "node:fs";
 import { describe, it, type TestContext } from "node:test";
 import type { SessionAuthContext } from "eve/context";
 import type { ApprovalContext } from "eve/tools/approval";
+import { authLane } from "#lib/executor/auth.js";
 import type { ExecutorOutcome } from "#lib/executor/dispatch.js";
-import {
-  DISPUTE_WRITE_CONNECTION,
-  invokeProvider,
-} from "#lib/executor/dispatch.js";
+import { invokeProvider } from "#lib/executor/dispatch.js";
 import {
   disputeWireArgs,
   type OperationRequest,
@@ -754,8 +752,8 @@ describe("dispute write dispatch", () => {
           evidence: { uncategorized_text: "Signed in daily." },
           submit: false,
         },
-        dispute_id: ID,
-        "Idempotency-Key": "foreman-dispute-stage-abc",
+        headers: { "Idempotency-Key": "foreman-dispute-stage-abc" },
+        path: { dispute_id: ID },
       }
     );
     const pdf = Buffer.from("%PDF-1.7 proof").toString("base64");
@@ -783,7 +781,17 @@ describe("dispute write dispatch", () => {
     );
   });
 
-  it("runs in the foreman-disputes toolkit and carries the idempotency key", async (t: TestContext) => {
+  it("runs on the disputes bot's connector and carries the idempotency key", async (t: TestContext) => {
+    const prior = process.env.EXECUTOR_MCP_CONNECTOR_DISPUTES;
+    process.env.EXECUTOR_MCP_CONNECTOR_DISPUTES = "placeholder/disputes-test";
+    t.after(() => {
+      if (prior === undefined) {
+        delete process.env.EXECUTOR_MCP_CONNECTOR_DISPUTES;
+      } else {
+        process.env.EXECUTOR_MCP_CONNECTOR_DISPUTES = prior;
+      }
+    });
+    const lanes: unknown[] = [];
     const bodies: { url: string; request: Record<string, unknown> }[] = [];
     t.mock.method(globalThis, "fetch", (url: string, init?: RequestInit) => {
       const request = JSON.parse(String(init?.body));
@@ -806,7 +814,10 @@ describe("dispute write dispatch", () => {
           jsonrpc: "2.0",
           result: {
             structuredContent: {
-              result: { data: { id: ID, status: "under_review" }, ok: true },
+              execution: {
+                ok: true,
+                value: { data: { id: ID, status: "under_review" }, ok: true },
+              },
               status: "completed",
             },
           },
@@ -815,9 +826,12 @@ describe("dispute write dispatch", () => {
     });
     const ctx = {
       abortSignal: new AbortController().signal,
-      getToken: () => Promise.resolve({ token: "synthetic-executor-token" }),
+      getToken: (auth: unknown) => {
+        lanes.push(authLane(auth));
+        return Promise.resolve({ token: "synthetic-executor-token" });
+      },
     };
-    const path = `${DISPUTE_WRITE_CONNECTION}org.workspaceForemanStripeDisputeWrite.disputes.updateDisputeEvidence`;
+    const path = "foreman-stripe-dispute-write.disputes.updateDisputeEvidence";
     const input = {
       dispute_id: ID,
       "Idempotency-Key": `foreman-dispute-submit-${ID}-abc`,
@@ -825,7 +839,8 @@ describe("dispute write dispatch", () => {
     };
     await invokeProvider(ctx as never, path, input);
     assert.equal(bodies.length, 1);
-    assert.ok(bodies[0]?.url.includes("/mcp/toolkits/foreman-disputes"));
+    assert.deepEqual(lanes, ["foreman-disputes"]);
+    assert.ok(bodies[0]?.url.endsWith("/mcp"));
     assert.ok(
       JSON.stringify(bodies[0]?.request).includes(input["Idempotency-Key"])
     );

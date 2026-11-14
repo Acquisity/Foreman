@@ -32,7 +32,7 @@ Use an actual image attachment. A Slack image up to 3 MiB is already in your con
 
 ## Read-only triage walkthrough
 
-A request to walk every triage step is broader than a connection smoke test. Follow triage-investigate through its Stage 4 checkpoint and triage-handling through Stages 5, 6 and 7, reporting proposed actions or explicit reasons they are already satisfied or not applicable. Reuse prior evidence without presenting historical counts as current measurements. A duplicate skips critic under the normal rule, not handling. Report each evidence lane as read, not applicable, unavailable or unverified; a name that did not resolve is not a successful provider-resource read. Describe writes instead of performing them, and keep any proposed investigation document inline.
+A request to walk every triage step is broader than a connection smoke test. Follow the triage skill through all seven stages, reporting proposed actions or explicit reasons they are already satisfied or not applicable. Reuse prior evidence without presenting historical counts as current measurements. A duplicate skips critic under the normal rule, not handling. Report each evidence lane as read, not applicable, unavailable or unverified; a name that did not resolve is not a successful provider-resource read. Describe writes instead of performing them, and keep any proposed investigation document inline.
 
 ## Full preview test
 

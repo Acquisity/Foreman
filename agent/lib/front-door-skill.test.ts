@@ -2,8 +2,8 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import type { ProviderClient } from "./executor/operations.js";
-import { routeTicket } from "./linear-api.js";
 import { SUPPORT_OWNER } from "./owner-map.js";
+import { routeTicket } from "./route-ticket.js";
 import { fakeLinear, json } from "./route-ticket-fixtures.js";
 
 const skill = readFileSync(

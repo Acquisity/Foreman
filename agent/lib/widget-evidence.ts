@@ -70,7 +70,8 @@ const literalArray = (values: string[], pattern: RegExp, cast: string) => {
  */
 export function buildOwnershipQuery(
   context: WidgetContext,
-  candidates: IdentifierCandidates
+  candidates: IdentifierCandidates,
+  anyRole = false
 ): string {
   const scope = widgetContextSchema.parse(context);
   const uuids = literalArray(candidates.uuids, UUID, "uuid");
@@ -80,7 +81,7 @@ export function buildOwnershipQuery(
   return `with authorized as (
     select o.id, o.slug from organization o join member m on m.organization_id = o.id
     where o.id = '${scope.organizationId}'::uuid and m.user_id = '${scope.userId}'::uuid
-      and o.deleted_at is null and m.deleted_at is null and m.role in ('owner', 'admin')
+      and o.deleted_at is null and m.deleted_at is null${anyRole ? "" : " and m.role in ('owner', 'admin')"}
       and (o.partner_id is null or o.partner_id = '${scope.partnerId}'::uuid)
   )
   select (select count(*) = 1 from authorized) as authorized,
@@ -148,7 +149,7 @@ const resultSchema = z.object({
   success: z.literal(true),
 });
 
-/** The live database says the scoped user is not a current owner or admin of the workspace. */
+/** The live database says the scoped user is not a current owner or admin (or, with `anyRole`, member) of the workspace. */
 export class WorkspaceAccessDenied extends Error {
   constructor() {
     super("Current workspace access could not be verified.");
@@ -159,12 +160,13 @@ export class WorkspaceAccessDenied extends Error {
 export async function resolveOwnedIdentifiers(
   scope: WidgetContext,
   candidates: IdentifierCandidates,
-  signal: AbortSignal = AbortSignal.timeout(50_000)
+  signal: AbortSignal = AbortSignal.timeout(50_000),
+  anyRole = false
 ): Promise<OwnedIdentifiers> {
   if (isReplayActive()) {
     return replayOwnership(candidates, scope.replayCaseId);
   }
-  const query = buildOwnershipQuery(scope, candidates);
+  const query = buildOwnershipQuery(scope, candidates, anyRole);
   const data = await readWidgetOwnership(query, signal);
   const [row] = resultSchema.parse(providerData(data)).rows;
   if (!row.authorized) {

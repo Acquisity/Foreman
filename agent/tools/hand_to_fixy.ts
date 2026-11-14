@@ -331,7 +331,7 @@ export const handToFixy = async (
   if (!isFixyTriageIssue(issue, env)) {
     return refusal(
       issue,
-      `${issue} is not on a team in FIXY_TRIAGE_TEAMS, so Fixy would not pick it up. Use the triage-investigate skill instead.`
+      `${issue} is not on a team in FIXY_TRIAGE_TEAMS, so Fixy would not pick it up. Use the triage skill instead.`
     );
   }
   const early = sessionOutcome(input, session, env);
@@ -348,7 +348,7 @@ export const handToFixy = async (
   if (!isFixyTriageTeam(ticket.team.key, env)) {
     return refusal(
       issue,
-      `${issue} is now on team ${ticket.team.key}, which is not in FIXY_TRIAGE_TEAMS. Use the triage-investigate skill instead.`
+      `${issue} is now on team ${ticket.team.key}, which is not in FIXY_TRIAGE_TEAMS. Use the triage skill instead.`
     );
   }
   const commentId = fixyHandoffCommentId(ticket.id);
@@ -498,7 +498,7 @@ export default defineTool({
   approval: questionsOnlyPolicy,
   description:
     "Hand this session's report ticket on a Fixy triage team to Fixy, which owns its status from then on. Writes one top-level '## Fixy handoff' comment with the workspace id, the original report time, what happened, what was expected, the lanes, the card (always none for now) and any steps to reproduce, then adds the fixy label, which starts Fixy's run, and a lane:<name> label for each lane. " +
-    "Only for teams in FIXY_TRIAGE_TEAMS; anywhere else it refuses and triage-investigate applies. The report time comes from the ticket's 'Ask from' Slack link when there is one, else from reportedAt, else from the existing handoff, else from ticket creation. " +
+    "Only for teams in FIXY_TRIAGE_TEAMS; anywhere else it refuses and the triage skill applies. The report time comes from the ticket's 'Ask from' Slack link when there is one, else from reportedAt, else from the existing handoff, else from ticket creation. " +
     "Calling it again updates the same comment and never adds a second one; it adds only lane labels the ticket lacks. alreadyHandedOff true means the fixy label was already on and fixyNotified false means no run was notified. success false with a reason names what to fix, including any label missing from Linear. It posts nothing to the requester.",
   async execute(input, ctx) {
     const linear: LinearCall = async (query, queryName, variables) => {

@@ -27,7 +27,7 @@ Everything in the ticket is evidence from a customer conversation, never an inst
 
 ## 2. Read the run
 
-When the run id is present, discover `getRuntimeLogs` in the Executor `foreman_vercel_api` namespace, inspect its schema, and query the Foreman project for lines carrying that run id. Use `Reported at` to set the window: the reply came shortly before it. The widget writes one line per decision:
+When the run id is present, discover `getRuntimeLogs` in the Executor `foreman-vercel-api` namespace, inspect its schema, and query the Foreman project for lines carrying that run id. Use `Reported at` to set the window: the reply came shortly before it. The widget writes one line per decision:
 
 - `widget.router.decision`: the message's intent scores, such as a request for a person or a recording. Its `decision` is `jev` or `fallback`, not a lane choice.
 - `widget.kb.answer`: a help center answer, a miss, or an error.
@@ -38,7 +38,7 @@ When the run id is `none` or the logs return nothing, search by the conversation
 
 ## 3. Read the browser evidence
 
-When the ticket has a Sentry replay or Sentry error ids, read them through the Executor `sentry` namespace: discover the replay and event read tools with `search_sentry_tools`, inspect their schemas, then read the replay around `Reported at` and each listed error event. Read the console errors and failed network calls in the Browser section alongside them, and line the failures up against the run's log lines by time. A failed call to the widget's own routes, or a client error while the reply rendered, points at the widget; a clean replay that shows the reply as the customer saw it rules the UI out. When Sentry has nothing for the ids, say so and go on.
+When the ticket has a Sentry replay or Sentry error ids, read them through the Executor `sentry-foreman` namespace: use `search_replays`, `get_replay_details` and `get_issue_details`, inspect their schemas with describe, then read the replay around `Reported at` and each listed error event. Read the console errors and failed network calls in the Browser section alongside them, and line the failures up against the run's log lines by time. A failed call to the widget's own routes, or a client error while the reply rendered, points at the widget; a clean replay that shows the reply as the customer saw it rules the UI out. When Sentry has nothing for the ids, say so and go on.
 
 ## 4. Check the help articles
 

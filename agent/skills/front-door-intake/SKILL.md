@@ -1,5 +1,5 @@
 ---
-description: "Front door for a customer report on a Linear team whose real reports Fixy investigates: answer how-to asks, join an open known issue, ask once for missing details, otherwise hand the report to Fixy with hand_to_fixy. Load only when the session's route line names this skill. Not for triage-investigate tickets, Slack asks, or widget feedback."
+description: "Front door for a customer report on a Linear team whose real reports Fixy investigates: answer how-to asks, join an open known issue, ask once for missing details, otherwise hand the report to Fixy with hand_to_fixy. Load only when the session's route line names this skill. Not for other triage tickets, Slack asks, or widget feedback."
 ---
 
 # Front door intake

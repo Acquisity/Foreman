@@ -16,12 +16,12 @@ import definition, {
 } from "../tools/widget_account_access.js";
 
 const scope = verifiedWidgetContext;
-const originalConnector = process.env.EXECUTOR_MCP_CONNECTOR;
+const originalConnector = process.env.EXECUTOR_MCP_CONNECTOR_SUPPORT;
 const originalBindings = process.env.EXECUTOR_OPERATION_BINDINGS;
-process.env.EXECUTOR_MCP_CONNECTOR = "executor.test/widget";
+process.env.EXECUTOR_MCP_CONNECTOR_SUPPORT = "executor.test/widget";
 process.env.EXECUTOR_OPERATION_BINDINGS = JSON.stringify({
   "planetscale.readQuery": {
-    path: "planetscale.org.foremanPlanetscale.planetscale_execute_read_query",
+    path: "planetscale-org.planetscale_execute_read_query",
   },
 });
 after(() => {
@@ -31,9 +31,9 @@ after(() => {
     process.env.EXECUTOR_OPERATION_BINDINGS = originalBindings;
   }
   if (originalConnector === undefined) {
-    delete process.env.EXECUTOR_MCP_CONNECTOR;
+    delete process.env.EXECUTOR_MCP_CONNECTOR_SUPPORT;
   } else {
-    process.env.EXECUTOR_MCP_CONNECTOR = originalConnector;
+    process.env.EXECUTOR_MCP_CONNECTOR_SUPPORT = originalConnector;
   }
 });
 
@@ -304,10 +304,7 @@ test("dispatch sends the org-scoped query through the widget toolkit", async (t)
     { query: string; use_replica: boolean },
   ];
   assert.equal(wire.toolkit, WIDGET_TOOLKIT);
-  assert.equal(
-    path,
-    "planetscale.org.foremanPlanetscale.planetscale_execute_read_query"
-  );
+  assert.equal(path, "planetscale-org.planetscale_execute_read_query");
   assert.ok(input.query.includes(scope.organizationId));
   assert.ok(input.query.includes(scope.userId));
   assert.equal(input.use_replica, false);
@@ -393,9 +390,8 @@ test("Sentry signals aggregate to sanitized counts, and any unexpected shape rea
   });
 });
 
-const SENTRY_PATH = "sentry.user.personalSentry.search_issues";
-const PLANETSCALE_PATH =
-  "planetscale.org.foremanPlanetscale.planetscale_execute_read_query";
+const SENTRY_PATH = "sentry-foreman.search_issues";
+const PLANETSCALE_PATH = "planetscale-org.planetscale_execute_read_query";
 /** Bind Sentry and set the org slug for one test, then restore both. */
 function withSentry(t: TestContext, slug: string | null = "acquisity") {
   const bindings = process.env.EXECUTOR_OPERATION_BINDINGS;

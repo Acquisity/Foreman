@@ -1,0 +1,122 @@
+# Engineering handoff
+
+Follow this from triage Stage 6 for an engineering-actionable decision, and from Stage 5 only to run the master search before the critic review. The customer ticket never becomes the engineering ticket: a master owns the root cause, and the report attaches to it. One root cause gets one master, whatever the number of reports or implementation steps. This reference owns finding or creating the master, the report's `parent` and `assignee`, the content boundary between report and master, and proving the writes landed; triage owns everything else.
+
+## Preconditions
+
+All of these hold before anything is written:
+
+- Stage 5 settled the classification as `Bug` and the handling path as `Engineering Todo`, or settled a `Feature Request` labelled `Approved` on the `Engineering Todo` path; its master takes the `Feature Request` type label instead of `Bug`. The one other entry is a `Bug` on the `Duplicate` path that `route_ticket` left open with `grouping: "needs-grouping"` because its match had no open master: create one master for the shared cause (below), parent the match under it with `route_ticket` (`issue` the match, `parent` the master), then return to triage Stage 6 to route this ticket with the decision's `route` unchanged; `route_ticket` parents it under the same master. Never create a master for an unapproved feature request or a closed explanation: the grouping sweep groups the ones labelled `Needs grouping`, and an unmatched unapproved request just waits in Backlog for James.
+- The `Triage investigation` document is attached to the customer ticket and current.
+- When the workflow ran the critic, the review settled this exact document version: on an approval the document id and `updatedAt` the critic echoed in `reviewed`, and on an adjudication the `updatedAt` Stage 5 read back after its settling save, still match what Linear returns now. A ticket the critic blocked (two objections in a row) never reaches this step. The critic reviews a ticket at most twice and Foreman adjudicates once. A later change records its reason on the `**Review**` line and proceeds on the settled version; it never triggers a second review or a second adjudication.
+- The hotlane route is `HOTLANE` or `STANDARD_ENGINEERING`; `NEEDS_HUMAN_URGENT` never gets here. Without a hotlane assessment, treat the route as `STANDARD_ENGINEERING` and apply no `fast-lane` label.
+- The master search below has been run in this pass, not carried over from an earlier one. Stage 5 runs it before the critic review and records the chosen master or `none eligible` in the document; that run counts while the cause and code path are unchanged, and it is repeated when adjudication changed either. The critic reviewed that master, so a different one needs a new search recorded on the `**Review**` line, never a silent switch.
+
+If any precondition fails, write nothing structural. Record the blocker in the investigation document and leave the report where Stage 5 put it.
+
+## Match by cause, not symptom
+
+Parent the report to an existing master only when all of these match:
+
+- the same failing invariant or decision;
+- the same reachable code, job, state transition, provider failure, or dependency boundary;
+- compatible triggering conditions; and
+- the fix for one would prevent the other.
+
+A shared symptom, error string, component, provider, or customer outcome is not enough. Two tickets reporting the same visible failure with different causes need two masters. Two tickets with different symptoms and one cause share a master. When uncertain, add a `related` link and say so in the document; never parent speculatively.
+
+## Search for the current master
+
+Stage 5 runs this search before the critic review so the critic can check the master. When adjudication moves the decision to `Engineering Todo` or changes its cause or code path, Stage 5 runs it again and records the new master before the second review; Stage 6 reuses the latest result.
+
+Search on four axes: the cause, the Stage 4 code path, the provider failure, and the symptom. The code path is the strongest of the four, because two reports running through the same function are almost certainly one bug.
+
+1. Call `find_related_issues` with `scope: "masters"` and one phrasing per axis. The Engineering Team and full pagination are fixed inside the tool; `truncated` true means candidates were dropped, so narrow the phrasings.
+
+   In an intake-only Slack workflow or a Linear Agent Session the tool searches no further than 30 days back, and `createdAfter` in the result shows the cutoff it applied; elsewhere `createdAfter` is null and matching masters are considered regardless of creation date. `route_ticket` refuses a parent created before that cutoff however it was found, so an older match may be related for history but never reused as the parent. A candidate created exactly at the cutoff is still eligible. Never select an older one as the current master either, even when it surfaces through another issue's relations, investigation memory, an unbounded search, or prior knowledge.
+
+   Do not filter this search by label. A master carries no marker label, so a label filter would match nothing and every report would create another master. A master is recognised by its `## Regression seam` section or by already parenting customer reports.
+2. Match eligible candidates on root cause, never on symptom.
+
+A completed candidate needs the same cause and eligibility checks. Read its fix and deployment evidence against the current failure: Done alone proves neither that this customer is fixed nor that reopening is warranted. Reuse it only when it still owns this cause; otherwise relate it for history and create a master only for the distinct, proven actionable cause. If the deciding evidence is unavailable, record the precise blocker in the document. `track-issue` only watches progress; apply and read back the actual Linear relation.
+
+## Reuse an existing master
+
+If an eligible master already owns the cause:
+
+1. Read the master and the report with their current relations first. If the report is already parented to this master, that is done; do not append it again.
+2. Call `route_ticket` on this ticket once with the `decide_triage` `route` unchanged, plus `parent` and `inheritAssigneeFrom` both set to the master and `assignee` set to `route.assignee`, so the report carries its own decisions and the child never sits under a master owned by someone else. The tool inherits the master's assignee when it has one and uses the area owner only when it does not; say in the document when the master was unassigned. When the tool refuses because the master's owner is not in the owner map, write nothing else: record the refusal in the document, name the master, and leave the report where Stage 5 put it, so the report and its master never end up with different owners.
+3. Comment the new evidence on the master in aggregate form, re-count the blast radius, update the master's section with the new figure and date, and re-weigh its priority. A second independent report is frequency evidence. The child count on the master is how anyone sees how many customers hit this without asking, so the parent link matters more than a prose figure that ages.
+4. Bring the master's labels up to date with one `route_ticket` call on the master whenever any of these is missing; it keeps the master's other labels. Add the `Area:` label `route.addLabels` carries when the master has none, `Feature Request` and `Approved` for an approved feature request, and `fast-lane` only when the approved route is `HOTLANE`. Never lower the master's priority because of a workaround or one more report.
+
+## Create one master
+
+If no eligible master owns the cause, create one with the template below, on the ENG team, in the product project `route.project` carries (never the report's incoming intake project; when it has none, leave the master unprojected and say so in the document), labelled with the type (for an approved feature request, `Feature Request` and `Approved` together, so its developer passes the assignment gate), the `Area:` label that `route.addLabels` carries, priority per Stage 5, `fast-lane` when the approved route is `HOTLANE`, and assigned to `route.assignee`, the area owner. Then call `route_ticket` on this ticket once with the `decide_triage` `route` unchanged, plus `parent` set to the new master and `assignee` set to `route.assignee`.
+
+Do not create a master because a ticket has several acceptance criteria or several steps. One master per root cause.
+
+File containment, customer recovery, prevention, or observability work as child or related implementation issues under the master only when it is independently deliverable, has a different owner or risk, or can ship separately. Implementation children are not customer reports and never count toward affected-workspace totals.
+
+## Content boundary
+
+The customer report keeps everything customer-specific: the source link, workspace and customer identity, screenshots, production rows, bounded logs, the customer's timeline and unblock, and the attached investigation document. It is evidence, not the engineering owner.
+
+The master carries only sanitized, aggregate engineering context: the cause, the code path, the blast radius figure with its query and date, and links to the report children. No organization id, email, customer row, or conversation excerpt. A Linear document inherits the visibility of the issue it hangs from, so the investigation document is never attached to a master.
+
+## Read back before finishing
+
+After the writes, read the master and the report again and confirm: the parent relation, the assignee on both, the master's project, priority, label union including the `Area:` label and `fast-lane` when approved, and the report link from the master. If any of it disagrees with what was intended, stop and report the mismatch in the investigation document. Never create a second master as a recovery step; a duplicate master is worse than a missing link.
+
+Changing a diagnosis or moving a report between masters needs a new investigation document version whose changed findings are recorded on that version's `**Review**` line (no second critic review), a fresh `decide_triage` call whose `route` is applied, plus an audit comment on both affected tickets. Never silently remove or re-parent a report.
+
+## Return to Stage 6
+
+Hand back the master id, whether it was reused or created, the parent and assignee that were set, the priority and label state, and any implementation children filed. Stage 6 writes the requester comment and Stage 7 the Slack reply; this step communicates with nobody.
+
+## Master ticket template
+
+```markdown
+## Overview
+
+One to three plain-language sentences: what is broken and why it matters.
+
+## Problem
+
+The problem from the user's or operator's perspective.
+
+## Root cause
+
+The cause, with the file and function it lives in. When the regression check says `introduced by <commit>`, name that commit.
+
+## Blast radius
+
+How many orgs and users are affected, as an exact figure where one is reachable, with the query that counted it and the date counted. Where exact is not reachable, the tightest bound and what blocks the exact figure. Confirmed affected and potentially exposed stay separate. Never an adjective.
+
+## Proposed fix
+
+The end-to-end behavior that should change, without a layer-by-layer plan.
+
+## What's included
+
+Decided scope, important exclusions, dependencies, and any separately filed containment, recovery, prevention, or observability work.
+
+## Regression seam
+
+The public boundary, trigger, and observable red-before, green-after behavior a test can prove.
+
+## Reproduce
+
+How the fixer sees the bug happen before changing code, following Acquisity's `docs/agents/reproducing-customer-bugs.md`: `Replica:` with the reason when the bug depends on the customer's data, naming the report ticket that holds the workspace and the path to walk to the symptom; or `Fixture:` with the reason it reproduces on any workspace. Name any part of the path a replica can't run yet, such as an uploaded file or a calendar write.
+
+## Done when
+
+- Checkable observable outcome.
+- Checkable observable outcome.
+- A regression test proves the causal mechanism at the named seam.
+
+## Reports
+
+The customer tickets this master owns, as Linear links.
+```
+
+The `## Reproduce` section names a report ticket, never its workspace id or customer, because the master carries only sanitized context (Content boundary). Keep the `## Regression seam` heading on every master: `route_ticket` recognises a master by it, or by its already parenting an issue. Where evidence proves a section cannot apply, write `Not applicable: <short reason>`. Where it is unknown, write `Not settled: <what is missing and who can supply it>`. Never pad a thin root cause into a full-looking ticket.

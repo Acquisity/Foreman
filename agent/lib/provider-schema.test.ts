@@ -5,7 +5,7 @@ import { MockLanguageModelV4 } from "ai/test";
 import { z } from "zod";
 import { evePackageUrl } from "./eve-dynamic-tools.js";
 
-process.env.EXECUTOR_MCP_CONNECTOR ??= "executor/test";
+process.env.EXECUTOR_MCP_CONNECTOR_FOREMAN ??= "executor/test";
 process.env.LINEAR_CONNECTOR ??= "linear/test";
 
 // Exercise Eve's actual harness and artifact serializer, then inspect the

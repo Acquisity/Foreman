@@ -44,11 +44,9 @@ export async function currentConversation(
   ctx: ProviderContext,
   claim: SupportClaim
 ) {
-  const result = await invokeProvider(
-    ctx,
-    "intercom.org.foremanIntercom.get_conversation",
-    { id: claim.conversation }
-  );
+  const result = await invokeProvider(ctx, "intercom.get_conversation", {
+    id: claim.conversation,
+  });
   if (!result.ok) {
     throw new Error("Intercom conversation access failed.");
   }
@@ -155,7 +153,7 @@ export async function openSupportInvestigation(ctx: ProviderContext) {
         humanTookOwnership: current.humanTookOwnership,
         initialIntake: !row.processed_version,
         instructions:
-          "Load intercom-triage-investigate or intercom-billing-triage. Reuse recorded operations and existing helpers. Finish through support_investigation; ordinary final text is not delivered.",
+          "Load triage or billing-triage. Reuse recorded operations and existing helpers. Finish through support_investigation; ordinary final text is not delivered.",
         investigate: true,
         linearChanges: current.linear.changes,
         previousOperations: operations,

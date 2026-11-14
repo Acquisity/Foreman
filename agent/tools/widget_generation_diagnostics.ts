@@ -23,11 +23,11 @@ const AGENT_LIMIT = 20;
 const SIGNAL_LIMIT = 20;
 const CANDIDATE_LIMIT = 200;
 const COPY_REVIEW_AGENT = "copy-review";
-const SENTRY_ISSUES_PATH = "sentry.user.personalSentry.search_issues";
-const AXIOM_QUERY_PATH = "axiom.user.personalAxiom.querydataset";
+const SENTRY_ISSUES_PATH = "sentry-foreman.search_issues";
+const AXIOM_QUERY_PATH = "axiom-foreman.queryDataset";
 /** agent_executions records the AI SDR workflow's own agent runs, one row per decision. */
 const AGENT_NAME = /^[a-z][a-z0-9-]{0,40}$/;
-const DATASET_NAME = /^[A-Za-z0-9._-]{1,120}$/;
+export const DATASET_NAME = /^[A-Za-z0-9._-]{1,120}$/;
 
 /** Copy-review issue categories are a fixed enum in the product; only these may cross the boundary. */
 export const COPY_REVIEW_ISSUE_TYPES = [
@@ -287,7 +287,7 @@ const toTimestamp = (raw: unknown): string | null =>
 const ROW_KEYS = ["issues", "events", "data", "results", "rows", "matches"];
 
 /** The row array from a recognized envelope, or null when the shape is not one we know. */
-function collectRows(parsed: unknown): unknown[] | null {
+export function collectRows(parsed: unknown): unknown[] | null {
   const flatten = (rows: unknown[]): unknown[] =>
     rows
       .slice(0, CANDIDATE_LIMIT)
@@ -692,10 +692,7 @@ export async function readWidgetGenerationDiagnostics(
   try {
     ctx.abortSignal.throwIfAborted();
     const path = operationPath("planetscale.readQuery");
-    if (
-      path !==
-      "planetscale.org.foremanPlanetscale.planetscale_execute_read_query"
-    ) {
+    if (path !== "planetscale-org.planetscale_execute_read_query") {
       throw new Error("Unexpected evidence operation binding.");
     }
     stage = "transport";

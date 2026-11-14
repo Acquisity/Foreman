@@ -39,7 +39,7 @@ export const executorConnection = () =>
     },
     auth: () => executorAuth(),
     description:
-      "Foreman company connections. Discover tools inside execute using tools.search and tools.describe.tool. Prefer the authored helpers for bounded evidence reads.",
+      "Foreman company connections. Discover tools inside execute using tools.search and tools.search.describe. Prefer the authored helpers for bounded evidence reads.",
     tools: { allow: ["execute", "skills"] },
     url: toolkitUrl(),
   });
