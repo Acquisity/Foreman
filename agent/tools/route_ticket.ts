@@ -8,12 +8,12 @@ import { LINEAR_ISSUE_ID_PATTERN } from "#lib/investigation-memory/scope.js";
 import { masterCreatedAfter } from "#lib/linear-api.js";
 import { masterWindow } from "#lib/master-window.js";
 import { logOpsEvent } from "#lib/ops-log.js";
-import { routeTicket } from "#lib/route-ticket.js";
 import {
   type LinearRead,
   RouteGateError,
   reopenRefusal,
 } from "#lib/route-gates.js";
+import { routeTicket } from "#lib/route-ticket.js";
 import {
   criticRounds,
   routeDecisionEvent,

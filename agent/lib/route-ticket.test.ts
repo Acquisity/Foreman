@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { ProviderClient } from "./executor/operations.js";
-import { routeTicket } from "./route-ticket.js";
 import { type LinearRead, reopenRefusal } from "./route-gates.js";
+import { routeTicket } from "./route-ticket.js";
 import { type Call, fakeLinear } from "./route-ticket-fixtures.js";
 
 process.env.LINEAR_CONNECTOR ??= "linear/test";

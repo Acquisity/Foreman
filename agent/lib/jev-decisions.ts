@@ -895,7 +895,6 @@ export interface BillingInput {
   fixy?: boolean;
   sourceLabels: string[];
 }
-
 export interface BillingDecision extends Partial<typeof FIXY_BILLING_HANDOFF> {
   discretion: "justified" | "needs-human" | "not justified";
   notes: string[];
@@ -908,7 +907,6 @@ export interface BillingDecision extends Partial<typeof FIXY_BILLING_HANDOFF> {
   };
   unconfirmed: string[];
 }
-
 export function billingQuestions(): Record<string, JevQuestion> {
   return {
     active_blocker: {

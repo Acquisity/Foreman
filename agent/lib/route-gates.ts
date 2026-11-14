@@ -1,6 +1,6 @@
 import { FIXY_LABEL } from "./fixy-handoff.js";
-import type { RouteTicketInput } from "./route-ticket-shared.js";
 import { isAskFromTitle, slackChannelOf } from "./linear-context.js";
+import type { RouteTicketInput } from "./route-ticket-shared.js";
 import { RECEIVER_ONLY_CHANNELS } from "./slack-intake.js";
 
 /** One Linear GraphQL read with Foreman's own app token. */
