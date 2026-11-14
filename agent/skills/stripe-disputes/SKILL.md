@@ -2,7 +2,7 @@
 description: "Work one Stripe dispute from its alert thread in the disputes channel: confirm it still needs a response, resolve who the cardholder is, gather evidence, decide fight or accept, stage evidence with respond_stripe_dispute, and post one ready message. A person approves every submit. Load whenever a turn is in a Stripe dispute alert thread or someone asks to work a dispute there."
 ---
 
-Company-service tools use Executor. Use `eve__search` with a query that starts with `<connection>__`, where `<connection>` is the Executor connection named in this turn's access instructions, so it searches only that connection, and call what it returns with `eve__tool`. Inside `execute`, search one provider namespace with `tools.search({ namespace, query })`, inspect `tools.describe.tool({ path })`, and call the returned `tools[path](input)`. Check `result.ok` before reading `result.data`. The provider tool names below are search hints, not callable Executor addresses. Never guess paths or use a removed direct provider connection. Authored Foreman helpers keep their bare names and require no discovery.
+Company-service tools come through Executor. Discover and call them exactly as this session's Executor discovery instructions say; the provider names below are search hints, never callable addresses, so never guess paths. Authored Foreman helpers keep their bare names and require no discovery.
 
 # Stripe disputes
 

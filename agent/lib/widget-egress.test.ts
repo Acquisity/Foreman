@@ -141,6 +141,11 @@ for (const [label, text] of [
   ],
   ["an Inngest run id", "Run 01J8ZQ3K4M5N6P7Q8R9S0T1V2W failed twice."],
   ["a bare internal host", "The failure is visible on sentry.io."],
+  ["a trace id", "Trace 0af7651916cd43dd8448eb211c80319c shows the delay."],
+  [
+    "a trace link",
+    "See https://app.axiom.co/acquisity-3nbk/trace?traceId=0af7651916cd43dd8448eb211c80319c for the delay.",
+  ],
 ] as const) {
   test(`${label} is deleted with its item and the rest is answered; alone it blocks`, async () => {
     const { calls, deps: d } = deps();
@@ -482,6 +487,16 @@ test("redaction can only delete: sentences, facts and the needed change, never r
   assert.equal(removeItems(base, [6]), null);
   assert.equal(removeItems(base, [1.5]), null);
   assert.equal(removeItems(base, [1, 2, 3, 4]), null);
+});
+
+test("the ownership query requires owner or admin unless any member may pass", () => {
+  const none = { emails: [], slugs: [], uuids: [] };
+  const ownersOnly = buildOwnershipQuery(scope, none);
+  const anyMember = buildOwnershipQuery(scope, none, true);
+  assert.ok(ownersOnly.includes("and m.role in ('owner', 'admin')"));
+  assert.ok(!anyMember.includes("m.role in"));
+  assert.ok(anyMember.includes("m.deleted_at is null"));
+  assert.ok(anyMember.includes(`m.user_id = '${scope.userId}'::uuid`));
 });
 
 test("the ownership query binds the verified scope and only validated literals", () => {

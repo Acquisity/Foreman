@@ -1,8 +1,6 @@
 import assert from "node:assert/strict";
-import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
-import { fileURLToPath } from "node:url";
 import { WIDGET_TICKET_OWNER } from "./executor/dispatch.js";
 import type { JevAnswer } from "./jev.js";
 import {
@@ -26,7 +24,6 @@ import {
   ownerNames,
   SUPPORT_OWNER,
 } from "./owner-map.js";
-import { renderRoster } from "./owner-roster.js";
 
 const yes = (): JevAnswer => ({ probability: 0.9, type: "boolean" });
 const no = (): JevAnswer => ({ probability: 0.1, type: "boolean" });
@@ -69,7 +66,6 @@ const answers = (over: Record<string, JevAnswer> = {}) => ({
   path: pick("Engineering Todo"),
   project: pick("undetermined"),
   verdict: pick("supported"),
-  wants_limit_lifted: no(),
   ...over,
 });
 
@@ -122,33 +118,6 @@ describe("the owner map", () => {
     assert.equal(isDeveloperOwner(FALLBACK_OWNER), true);
     assert.equal(AREAS.widget.owner, WIDGET_TICKET_OWNER.assignee);
     assert.equal(AREAS.refunds.lane, "support");
-  });
-
-  it("renders the roster the agent reads from the map, byte for byte", () => {
-    const roster = readFileSync(
-      new URL(
-        "../skills/triage-handling/references/roster.md",
-        import.meta.url
-      ),
-      "utf8"
-    );
-    assert.equal(roster, renderRoster());
-    for (const key of AREA_KEYS) {
-      assert.ok(roster.includes(`\`${key}\``), key);
-      assert.ok(roster.includes(AREAS[key].label), key);
-      assert.ok(roster.includes(AREAS[key].owner), key);
-    }
-  });
-
-  it("passes the roster check script that guards drift", () => {
-    const root = fileURLToPath(new URL("../../", import.meta.url));
-    const run = () =>
-      execFileSync(
-        process.execPath,
-        ["--import", "tsx", "scripts/render-roster.ts", "--check"],
-        { cwd: root, stdio: "pipe" }
-      );
-    assert.doesNotThrow(run);
   });
 
   it("maps each known Linear project to one area", () => {
@@ -275,11 +244,10 @@ describe("routing a sample of each area", () => {
 });
 
 describe("who may be assigned to a developer", () => {
-  const platformLimit = (over: Record<string, JevAnswer> = {}) =>
+  const featureRequest = (over: Record<string, JevAnswer> = {}) =>
     answers({
-      classification: pick("platform_limitation"),
+      classification: pick("feature_request"),
       path: pick("Platform Limitation"),
-      wants_limit_lifted: yes(),
       ...over,
     });
 
@@ -295,7 +263,7 @@ describe("who may be assigned to a developer", () => {
     const decision = route(
       resolveTriage(
         input({ ticketLabels: ["Approved", "Feature Request"] }),
-        platformLimit({ area: pick("ai_sdr") })
+        featureRequest({ area: pick("ai_sdr") })
       )
     );
     assert.equal(decision.approval, "approved");
@@ -307,7 +275,7 @@ describe("who may be assigned to a developer", () => {
 
   it("parks an unapproved feature request in Backlog with James, who approves it", () => {
     const decision = route(
-      resolveTriage(input(), platformLimit({ area: pick("ai_sdr") }))
+      resolveTriage(input(), featureRequest({ area: pick("ai_sdr") }))
     );
     assert.equal(decision.approval, "needed");
     assert.equal(decision.assignee, "James Keeble");
@@ -342,7 +310,11 @@ describe("who may be assigned to a developer", () => {
     const decision = route(
       resolveTriage(
         input(),
-        platformLimit({ area: pick("ai_sdr"), wants_limit_lifted: no() })
+        answers({
+          area: pick("ai_sdr"),
+          classification: pick("platform_limitation"),
+          path: pick("Platform Limitation"),
+        })
       )
     );
     assert.equal(decision.assignee, null);

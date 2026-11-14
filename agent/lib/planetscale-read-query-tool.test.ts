@@ -1,11 +1,11 @@
-const EXECUTOR_ARGUMENTS = /\]\((.*)\);$/u;
+const EXECUTOR_ARGUMENTS = /^const input = (.*);$/mu;
 
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { PRODUCTION_READ_QUERY_ARGS } from "./lookup-customer.js";
 
 process.env.LINEAR_CONNECTOR ??= "linear/test";
-process.env.EXECUTOR_MCP_CONNECTOR = "executor/test";
+process.env.EXECUTOR_MCP_CONNECTOR_FOREMAN = "executor/test";
 process.env.EXECUTOR_OPERATION_BINDINGS = JSON.stringify({
   "planetscale.readQuery": {
     arguments: {
@@ -16,7 +16,7 @@ process.env.EXECUTOR_OPERATION_BINDINGS = JSON.stringify({
       query: "args.query",
       use_replica: "args.use_replica",
     },
-    path: "planetscale.org.app.readQuery",
+    path: "planetscale.readQuery",
   },
 });
 
@@ -56,13 +56,16 @@ describe("planetscale_execute_read_query tool", () => {
         jsonrpc: "2.0",
         result: {
           structuredContent: {
-            result: {
-              data: {
-                content: [
-                  { text: '{"success":true,"rows":[{"n":1}]}', type: "text" },
-                ],
-              },
+            execution: {
               ok: true,
+              value: {
+                data: {
+                  content: [
+                    { text: '{"success":true,"rows":[{"n":1}]}', type: "text" },
+                  ],
+                },
+                ok: true,
+              },
             },
             status: "completed",
           },

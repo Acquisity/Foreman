@@ -23,8 +23,8 @@ const ctx = () =>
 
 const withTransport = async (run: () => Promise<unknown>) => {
   const original = executorTransport.call;
-  const connector = process.env.EXECUTOR_MCP_CONNECTOR;
-  process.env.EXECUTOR_MCP_CONNECTOR = "executor.test/widget";
+  const connector = process.env.EXECUTOR_MCP_CONNECTOR_SUPPORT;
+  process.env.EXECUTOR_MCP_CONNECTOR_SUPPORT = "executor.test/widget";
   const calls: unknown[][] = [];
   executorTransport.call = ((...args: unknown[]) => {
     calls.push(args);
@@ -35,9 +35,9 @@ const withTransport = async (run: () => Promise<unknown>) => {
   } finally {
     executorTransport.call = original;
     if (connector === undefined) {
-      delete process.env.EXECUTOR_MCP_CONNECTOR;
+      delete process.env.EXECUTOR_MCP_CONNECTOR_SUPPORT;
     } else {
-      process.env.EXECUTOR_MCP_CONNECTOR = connector;
+      process.env.EXECUTOR_MCP_CONNECTOR_SUPPORT = connector;
     }
   }
   return calls;

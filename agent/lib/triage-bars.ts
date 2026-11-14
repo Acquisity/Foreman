@@ -2,6 +2,8 @@ export const BARS = {
   /** Below this, money versus product is unclear and the model follows the leaning. */
   askKind: 0.7,
   classification: 0.6,
+  /** A User Error or Platform Limitation below this is treated as a Feature Request, so it stays open. */
+  closeExplanation: 0.7,
   /** Below this, an existing investigation is not reused. */
   continuation: 0.6,
   /** A billing verdict below this is left to a person. */

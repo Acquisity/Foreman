@@ -455,14 +455,14 @@ try {
             ? { protocolVersion: "2025-06-18" }
             : {
                 structuredContent: {
-                  result: { data, ok: true },
+                  execution: { ok: true, value: { data, ok: true } },
                   status: "completed",
                 },
               },
       })
     );
   };
-  process.env.EXECUTOR_MCP_CONNECTOR = "executor/support-test";
+  process.env.EXECUTOR_MCP_CONNECTOR_SUPPORT = "executor/support-test";
   const auth = supportAuth(
     {
       attributes: {},
@@ -541,27 +541,25 @@ try {
     });
   };
   async function verifyProviderJournal() {
-    await invokeProvider(ctx, "intercom.org.foremanIntercom.get_conversation", {
+    await invokeProvider(ctx, "intercom.get_conversation", {
       id: retry.conversation,
     });
     const child = {
       ...ctx,
       session: { ...ctx.session, parent: { sessionId: "support-test" } },
     } as ProviderContext;
-    await invokeProvider(
-      child,
-      "intercom.org.foremanIntercom.get_conversation",
-      {
-        id: retry.conversation,
-      }
-    );
-    await assert.rejects(() =>
-      invokeProvider(child, "linear.org.workspaceLinear.save_issue", {
-        title: "Should never dispatch",
-      })
+    await invokeProvider(child, "intercom.get_conversation", {
+      id: retry.conversation,
+    });
+    await assert.rejects(
+      () =>
+        invokeProvider(child, "linear-foreman.save_issue", {
+          title: "Should never dispatch",
+        }),
+      SupportRefusal
     );
     assert.equal(urls.length, 6);
-    const writePath = "linear.org.workspaceLinear.save_comment";
+    const writePath = "linear-foreman.save_comment";
     const writeInput = { body: "Synthetic comment", issueId: issue.id };
     wireFailure = "initialize";
     await assert.rejects(() =>
@@ -1289,8 +1287,7 @@ try {
   assert.ok(
     urls.every(
       (url) =>
-        url ===
-          "https://executor.acquisity.ai/mcp/toolkits/foreman-support?artifacts=false" ||
+        url === "https://executor.acquisity.ai/mcp" ||
         url === "https://slack.com/api/chat.postMessage" ||
         url === "https://slack.com/api/conversations.history" ||
         url === "https://slack.com/api/conversations.replies" ||

@@ -57,7 +57,7 @@ const tool = defineTool({
     if (JSON.stringify(input.input).length > 100_000) {
       throw new SupportRefusal("Provider input exceeds its bound.");
     }
-    if (input.path.startsWith("foreman_linear_write_api.")) {
+    if (input.path.startsWith("foreman-linear-write-api.")) {
       throw new SupportRefusal(
         "Use the authored Linear routing and document helpers for fixed GraphQL writes."
       );

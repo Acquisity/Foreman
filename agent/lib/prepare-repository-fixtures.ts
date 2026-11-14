@@ -7,7 +7,7 @@ import type { VercelSandboxSession } from "eve/sandbox/vercel";
 process.env.FOREMAN_BOT_NAME ??= "Foreman";
 
 process.env.LINEAR_CONNECTOR ??= "linear/test";
-process.env.EXECUTOR_MCP_CONNECTOR ??= "executor/test";
+process.env.EXECUTOR_MCP_CONNECTOR_FOREMAN ??= "executor/test";
 
 export const REPOSITORY = "Acquisity/Foreman";
 export const DISCARD = "rm -rf /workspace/repo";

@@ -164,10 +164,9 @@ test("a platform limitation the customer wants lifted is a Low feature request",
   const decision = resolveTriage(
     triageInput({ rootCauseLabels: ["Provider limit"] }),
     bugAnswers({
-      classification: pick("platform_limitation"),
+      classification: pick("feature_request"),
       path: pick("Platform Limitation"),
       root_cause_label: pick("Provider limit"),
-      wants_limit_lifted: yes(),
     })
   );
   assert.ok(decision.outcome === "route");
@@ -182,7 +181,7 @@ test("a platform limitation the customer wants lifted is a Low feature request",
   assert.equal(decision.route.assignee, "James Keeble");
   assert.equal(decision.route.priority, 4);
   assert.equal(decision.route.state, "Backlog");
-  assert.equal(decision.path, "Backlog/low-impact");
+  assert.equal(decision.path, "Feature Request");
 });
 
 test("triage asks every question, including one per duplicate candidate", () => {
@@ -784,7 +783,7 @@ test("a shared CRM file does not override a CRM sub-area the model settled", () 
   assert.equal(specific.assignee, "Ebubeker Rexha");
 });
 
-test("an approved feature request that duplicates another stays a Duplicate", () => {
+test("an approved feature request that matches another stays open on the engineering path, related to the match instead of closing", () => {
   const decision = resolveTriage(
     triageInput({
       duplicateCandidates: [
@@ -794,17 +793,17 @@ test("an approved feature request that duplicates another stays a Duplicate", ()
     }),
     bugAnswers({
       area: pick("ai_sdr"),
-      classification: pick("platform_limitation"),
+      classification: pick("feature_request"),
       duplicate_0: pick("same_outcome", 0.9),
       path: pick("Platform Limitation"),
-      wants_limit_lifted: yes(),
     })
   );
   assert.ok(decision.outcome === "route");
-  assert.equal(decision.path, "Duplicate");
-  assert.equal(decision.route.state, "Duplicate");
-  assert.equal(decision.route.duplicateOf, "ENG-9");
-  assert.equal(decision.route.assignee, undefined);
+  assert.equal(decision.path, "Engineering Todo");
+  assert.equal(decision.route.state, "Todo");
+  assert.equal(decision.route.duplicateOf, undefined);
+  assert.equal(decision.route.relatedTo, "ENG-9");
+  assert.equal(decision.route.assignee, "James Keeble");
 });
 
 test("an approved feature request takes the engineering path so the hand-off can build it", () => {
@@ -812,13 +811,12 @@ test("an approved feature request takes the engineering path so the hand-off can
     triageInput({ ticketLabels: ["Approved", "Feature Request"] }),
     bugAnswers({
       area: pick("ai_sdr"),
-      classification: pick("platform_limitation"),
+      classification: pick("feature_request"),
       path: pick("Platform Limitation"),
-      wants_limit_lifted: yes(),
     })
   );
   assert.ok(decision.outcome === "route");
-  assert.equal(decision.classification, "Platform Limitation");
+  assert.equal(decision.classification, "Feature Request");
   assert.equal(decision.path, "Engineering Todo");
   assert.equal(decision.route.state, "Todo");
   assert.equal(decision.route.assignee, "James Keeble");
@@ -834,9 +832,8 @@ test("an approved feature request on a path that closes or delegates it keeps th
       }),
       bugAnswers({
         area: pick("ai_sdr"),
-        classification: pick("platform_limitation"),
+        classification: pick("feature_request"),
         path: pick(path),
-        wants_limit_lifted: yes(),
       })
     );
     assert.ok(decision.outcome === "route");
@@ -860,9 +857,8 @@ test("an approved feature request drops the label that held it for approval", ()
     }),
     bugAnswers({
       area: pick("ai_sdr"),
-      classification: pick("platform_limitation"),
+      classification: pick("feature_request"),
       path: pick("Platform Limitation"),
-      wants_limit_lifted: yes(),
     })
   );
   assert.ok(approved.outcome === "route");
@@ -887,9 +883,8 @@ test("an outcome that is not for a developer releases the one holding the ticket
   const unapproved = resolveTriage(
     triageInput(),
     bugAnswers({
-      classification: pick("platform_limitation"),
+      classification: pick("feature_request"),
       path: pick("Platform Limitation"),
-      wants_limit_lifted: yes(),
     })
   );
   assert.ok(unapproved.outcome === "route");
@@ -910,9 +905,8 @@ test("an approved feature request that Jev already put on the engineering path g
     triageInput({ ticketLabels: ["Approved", "Feature Request"] }),
     bugAnswers({
       area: pick("ai_sdr"),
-      classification: pick("platform_limitation"),
+      classification: pick("feature_request"),
       path: pick("Engineering Todo"),
-      wants_limit_lifted: yes(),
     })
   );
   assert.ok(decision.outcome === "route");
@@ -946,9 +940,8 @@ test("an open follow-up a person owes goes to Aaron instead of being left with n
     [
       "unapproved request on the engineering path",
       {
-        classification: pick("platform_limitation"),
+        classification: pick("feature_request"),
         path: pick("Engineering Todo"),
-        wants_limit_lifted: yes(),
       },
     ],
   ];
@@ -999,14 +992,13 @@ test("an unapproved feature request never keeps an engineering path", () => {
       triageInput(),
       bugAnswers({
         area: pick("ai_sdr"),
-        classification: pick("platform_limitation"),
+        classification: pick("feature_request"),
         path: pick(path),
-        wants_limit_lifted: yes(),
       })
     );
     assert.ok(decision.outcome === "route", path);
     assert.equal(decision.approval, "needed", path);
-    assert.equal(decision.path, "Backlog/low-impact", path);
+    assert.equal(decision.path, "Feature Request", path);
     assert.equal(decision.route.state, "Backlog", path);
     assert.equal(decision.route.assignee, "James Keeble", path);
     assert.ok(decision.route.addLabels.includes("Needs approval"), path);
@@ -1023,23 +1015,21 @@ test("a request parked in Backlog gets the Backlog priority, not the engineering
     triageInput(),
     bugAnswers({
       area: pick("ai_sdr"),
-      classification: pick("platform_limitation"),
+      classification: pick("feature_request"),
       impact: band({ "0": 0.02, "1": 0.02, "2": 0.9, "3": 0.06 }),
       path: pick("Engineering Todo"),
-      wants_limit_lifted: yes(),
     })
   );
   assert.ok(decision.outcome === "route");
-  assert.equal(decision.path, "Backlog/low-impact");
+  assert.equal(decision.path, "Feature Request");
   assert.equal(decision.route.priority, 4);
   const withMoney = resolveTriage(
     triageInput(),
     bugAnswers({
-      classification: pick("platform_limitation"),
+      classification: pick("feature_request"),
       impact: band({ "0": 0.02, "1": 0.02, "2": 0.9, "3": 0.06 }),
       money_blocker: yes(),
       path: pick("Engineering Todo"),
-      wants_limit_lifted: yes(),
     })
   );
   assert.ok(withMoney.outcome === "route");
@@ -1052,13 +1042,12 @@ test("a request parked in Backlog gets the Backlog priority, not the engineering
   assert.equal(engineering.route.priority, 2);
 });
 
-test("James owns an unapproved feature request waiting in Backlog, and Aaron keeps open support follow-ups", () => {
+test("James owns an unapproved feature request waiting in Backlog, even on a support path", () => {
   const request = resolveTriage(
     triageInput(),
     bugAnswers({
-      classification: pick("platform_limitation"),
+      classification: pick("feature_request"),
       path: pick("Engineering Todo"),
-      wants_limit_lifted: yes(),
     })
   );
   assert.ok(request.outcome === "route");
@@ -1070,12 +1059,12 @@ test("James owns an unapproved feature request waiting in Backlog, and Aaron kee
     const followUp = resolveTriage(
       triageInput(),
       bugAnswers({
-        classification: pick("platform_limitation"),
+        classification: pick("feature_request"),
         path: pick(path),
-        wants_limit_lifted: yes(),
       })
     );
     assert.ok(followUp.outcome === "route", path);
-    assert.equal(followUp.route.assignee, "Aaron Fraga", path);
+    assert.equal(followUp.route.assignee, "James Keeble", path);
+    assert.equal(followUp.route.state, "Backlog", path);
   }
 });

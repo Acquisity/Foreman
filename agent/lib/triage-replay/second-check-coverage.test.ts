@@ -66,7 +66,6 @@ const answers = (
   path: pick(path),
   project: pick("CRM"),
   verdict: pick("supported"),
-  wants_limit_lifted: no(),
   ...(duplicate ? { duplicate_0: pick("same_outcome") } : {}),
 });
 

@@ -577,10 +577,7 @@ export async function readWidgetInboxHealth(
   try {
     ctx.abortSignal.throwIfAborted();
     const path = operationPath("planetscale.readQuery");
-    if (
-      path !==
-      "planetscale.org.foremanPlanetscale.planetscale_execute_read_query"
-    ) {
+    if (path !== "planetscale-org.planetscale_execute_read_query") {
       throw new Error("Unexpected evidence operation binding.");
     }
     stage = "transport";

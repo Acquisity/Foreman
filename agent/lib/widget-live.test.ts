@@ -207,10 +207,10 @@ test("live tool boundary enforces historical date windows and preserves explicit
     session: { auth: { current: auth, initiator: auth } },
   } as never;
   for (const [key, value] of Object.entries({
-    EXECUTOR_MCP_CONNECTOR: "executor.test/widget",
+    EXECUTOR_MCP_CONNECTOR_SUPPORT: "executor.test/widget",
     EXECUTOR_OPERATION_BINDINGS: JSON.stringify({
       "planetscale.readQuery": {
-        path: "planetscale.org.foremanPlanetscale.planetscale_execute_read_query",
+        path: "planetscale-org.planetscale_execute_read_query",
       },
     }),
   })) {

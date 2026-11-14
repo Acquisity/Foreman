@@ -5,6 +5,7 @@ import {
   invokeProvider,
   type ProviderContext,
 } from "../lib/executor/dispatch.js";
+import { mcpResultText } from "../lib/executor/mcp-result.js";
 import { RECORDING_READS } from "../lib/widget-policy.js";
 import { replayable } from "../lib/widget-replay.js";
 import {
@@ -18,13 +19,7 @@ const READ_BYTES = 256 * 1024;
 const READ_TIMEOUT_MS = 30_000;
 
 const text = (data: unknown) => {
-  const content = (data as { content?: unknown } | null)?.content;
-  const parts = Array.isArray(content)
-    ? content.flatMap((part: { text?: unknown } | null) =>
-        typeof part?.text === "string" ? [part.text] : []
-      )
-    : [];
-  const raw = parts.length ? parts.join("\n") : JSON.stringify(data ?? null);
+  const raw = mcpResultText(data) || JSON.stringify(data ?? null);
   return raw.length > PART_CHARS ? `${raw.slice(0, PART_CHARS)}…` : raw;
 };
 

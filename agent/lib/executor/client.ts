@@ -9,6 +9,7 @@ import { isQuestionsOnly } from "../trust.js";
 import { operationPath } from "./bindings.js";
 import type { ExecutorOutcome } from "./dispatch.js";
 import { invokeProvider, type ProviderContext } from "./dispatch.js";
+import { mcpResultText } from "./mcp-result.js";
 import {
   operationInputs,
   type ProviderClient,
@@ -117,7 +118,14 @@ function providerResult(outcome: ExecutorOutcome): ProviderResult {
       )?.[1]
     : outcome.error.retryAfter;
   const data = outcome.ok ? outcome.data : null;
-  return { data, status, ...(retryAfter ? { retryAfter } : {}) };
+  return {
+    data,
+    status,
+    ...(!outcome.ok && outcome.error.retryable !== undefined
+      ? { retryable: outcome.error.retryable }
+      : {}),
+    ...(retryAfter ? { retryAfter } : {}),
+  };
 }
 
 export async function executorReadQuery(
@@ -133,18 +141,13 @@ export async function executorReadQuery(
       retryAfter: normalized.retryAfter,
     });
   }
-  const result = normalized.data as {
-    isError?: boolean;
-    content?: { type?: string; text?: string }[];
-  } | null;
+  const result = normalized.data as { isError?: boolean } | null;
   if (result?.isError) {
     throw new ExecutorError("planetscale_read_failed");
   }
-  if (!Array.isArray(result?.content)) {
+  const text = mcpResultText(result, "");
+  if (text === undefined) {
     throw new ExecutorError("invalid_planetscale_result");
   }
-  return result.content
-    .filter((part) => part.type === "text" && typeof part.text === "string")
-    .map((part) => part.text)
-    .join("");
+  return text;
 }

@@ -1,7 +1,10 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { inspectConversation } from "./conversation.js";
-import { parseLinearCommentPage } from "./linear-followup.js";
+import {
+  isRecoverableIssueWrite,
+  parseLinearCommentPage,
+} from "./linear-followup.js";
 import { issueSnapshot, linkedIssue } from "./linear-state.js";
 
 const issue = {
@@ -159,4 +162,18 @@ test("snoozed conversations remain eligible for linked Linear follow-up", () => 
     inspectConversation({ ...conversation, state: "closed" }, "123").closed,
     true
   );
+});
+
+test("recovery matches issue writes journaled under the v2 and the legacy v1 path", () => {
+  assert.equal(isRecoverableIssueWrite("linear-foreman.save_issue:abc"), true);
+  assert.equal(
+    isRecoverableIssueWrite("linear.org.workspaceLinear.save_issue:abc"),
+    true
+  );
+  assert.equal(isRecoverableIssueWrite("create-issue:billing"), true);
+  assert.equal(
+    isRecoverableIssueWrite("linear-foreman.save_comment:abc"),
+    false
+  );
+  assert.equal(isRecoverableIssueWrite("intercom.get_conversation:abc"), false);
 });

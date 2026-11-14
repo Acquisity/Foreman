@@ -36,7 +36,7 @@ Judge each separately, in this order, citing the evidence you used. Return exact
 4. `alternatives`: configuration, entitlement, provider, stale state, retry, concurrency, and expected-behavior explanations were checked where relevant.
 5. `evidence_integrity`: no conclusion rests on truncated, incomplete, failed, unparsed, stale, cross-workspace, or mismatched data, and the repository commit matched.
 6. `impact_measurement`: confirmed impact is separate from potential exposure, and the query or telemetry actually measures the claimed population with a window and a date.
-7. `classification`: `User Error`, `Platform Limitation`, `Bug`, or the unproven stop follows from the current evidence. A `Bug` needs a named file and function, direct production-data or runtime evidence, and a counted blast radius.
+7. `classification`: `User Error`, `Platform Limitation`, `Feature Request`, `Bug`, or the unproven stop follows from the current evidence. A `Bug` needs a named file and function, direct production-data or runtime evidence, and a counted blast radius.
 8. `core_function_and_hotlane`: the hotlane proposal follows from impact, not report count. Blocking or materially impairing a core workflow, data loss, security or privacy exposure, silently skipped paid work, active money impact, or confirmed material business harm is hotlane even for one workspace.
 9. `master_match`: a proposed existing master owns the same causal root cause, not merely the same symptom, component, provider, or error string.
 10. `unblock_safety`: the proposed unblock is causally relevant and costs the customer neither data nor money.

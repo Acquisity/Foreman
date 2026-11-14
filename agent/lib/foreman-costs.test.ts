@@ -345,9 +345,9 @@ describe("rendered report", () => {
 describe("cost tool error boundary", () => {
   it("keeps gateway secret messages and nested response bodies out of tool output and logs", async (t) => {
     const previousKey = process.env.AI_GATEWAY_API_KEY;
-    const previousConnector = process.env.EXECUTOR_MCP_CONNECTOR;
+    const previousConnector = process.env.EXECUTOR_MCP_CONNECTOR_FOREMAN;
     process.env.AI_GATEWAY_API_KEY = "fixture-key";
-    process.env.EXECUTOR_MCP_CONNECTOR ??= "executor/test";
+    process.env.EXECUTOR_MCP_CONNECTOR_FOREMAN ??= "executor/test";
     const marker = "SECRET_GATEWAY_DIAGNOSTIC_MARKER";
     const logs: unknown[][] = [];
     t.mock.method(console, "error", (...args: unknown[]) => logs.push(args));
@@ -390,9 +390,9 @@ describe("cost tool error boundary", () => {
         process.env.AI_GATEWAY_API_KEY = previousKey;
       }
       if (previousConnector === undefined) {
-        delete process.env.EXECUTOR_MCP_CONNECTOR;
+        delete process.env.EXECUTOR_MCP_CONNECTOR_FOREMAN;
       } else {
-        process.env.EXECUTOR_MCP_CONNECTOR = previousConnector;
+        process.env.EXECUTOR_MCP_CONNECTOR_FOREMAN = previousConnector;
       }
     }
   });

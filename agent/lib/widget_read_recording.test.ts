@@ -6,16 +6,17 @@ import {
 } from "#lib/executor/dispatch.js";
 import { executorTransport } from "#lib/executor/transport.js";
 import { verifiedWidgetContext } from "#lib/widget.fixture.js";
+import { RECORDING_READS } from "#lib/widget-policy.js";
 import { widgetAuth } from "#lib/widget-scope.js";
 import definition, { readRecording } from "../tools/widget_read_recording.js";
 
-const originalConnector = process.env.EXECUTOR_MCP_CONNECTOR;
-process.env.EXECUTOR_MCP_CONNECTOR = "executor.test/widget";
+const originalConnector = process.env.EXECUTOR_MCP_CONNECTOR_SUPPORT;
+process.env.EXECUTOR_MCP_CONNECTOR_SUPPORT = "executor.test/widget";
 after(() => {
   if (originalConnector === undefined) {
-    delete process.env.EXECUTOR_MCP_CONNECTOR;
+    delete process.env.EXECUTOR_MCP_CONNECTOR_SUPPORT;
   } else {
-    process.env.EXECUTOR_MCP_CONNECTOR = originalConnector;
+    process.env.EXECUTOR_MCP_CONNECTOR_SUPPORT = originalConnector;
   }
 });
 
@@ -48,7 +49,10 @@ test("reads every part of the bound recording and bounds what comes back", async
   for (const [, path, input] of call.mock.calls.map(
     (c) => c.arguments as unknown as [unknown, string, { jamId: string }]
   )) {
-    assert.ok(path.startsWith("jam.user.personalJam."));
+    assert.ok(
+      Object.values(RECORDING_READS).some((read) => read.path === path),
+      path
+    );
     assert.equal(input.jamId, jamId);
   }
   assert.ok(String(result.consoleErrors).length <= 3001);
@@ -69,7 +73,7 @@ test("a part that fails is listed as unavailable", async (t) => {
     executorTransport,
     "call",
     async (_wire: unknown, path: string) =>
-      path.endsWith("getvideotranscript")
+      path.endsWith("getVideoTranscript")
         ? { error: { code: "not_found", status: 404 }, ok: false }
         : { data: { content: [{ text: "ok", type: "text" }] }, ok: true }
   );
@@ -84,22 +88,18 @@ test("no other recording can be read, and none without a bound one", async (t) =
     ok: true,
   }));
   await assert.rejects(
-    invokeProvider(ctx, "jam.user.personalJam.getdetails", { jamId: "other" }),
+    invokeProvider(ctx, "jam-foreman.getDetails", { jamId: "other" }),
     OWN_ONLY
   );
   await assert.rejects(
-    invokeProvider(
-      context(verifiedWidgetContext),
-      "jam.user.personalJam.getdetails",
-      {
-        jamId,
-      }
-    ),
+    invokeProvider(context(verifiedWidgetContext), "jam-foreman.getDetails", {
+      jamId,
+    }),
     OWN_ONLY
   );
   // Jam listing and search stay outside the lane entirely.
   await assert.rejects(
-    invokeProvider(ctx, "jam.user.personalJam.listjams", {}),
+    invokeProvider(ctx, "jam-foreman.listJams", {}),
     OUTSIDE
   );
   assert.equal(call.mock.callCount(), 0);

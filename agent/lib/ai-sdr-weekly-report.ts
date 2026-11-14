@@ -4,6 +4,7 @@ import {
   aiSdrReportWindows,
   type ReportWindow,
 } from "./ai-sdr-report-window.js";
+import { ExecutorError } from "./executor/transport.js";
 import { parseReadQueryResult } from "./planetscale.js";
 
 const TOTAL = "__total__";
@@ -199,47 +200,75 @@ export function aiSdrWeeklyReportQueries(
     ].join("\n"),
     // Calendar-sync rows only prove that an event exists on a connected
     // calendar. The appointment origin is the authoritative AI SDR boundary.
+    // Later writes overwrite crm_message_thread.appointment_id for about a
+    // quarter of AI SDR appointments (ENG-17605), so an appointment with no
+    // linked campaign thread falls back to the campaign thread whose prospect
+    // email matches an attendee in the same organization who is not the
+    // organiser, the appointment owner or an active workspace member, nearest by
+    // last_message_at.
     [
-      "with appointment_campaign as (",
+      "with appointments as (",
+      "  select a.id, a.organization_id, a.user_id, a.created_at, a.attendees",
+      "  from scheduling_appointment a",
+      "  where a.origin = 'ai_sdr'",
+      "    and a.deleted_at is null",
+      "    and a.status = 'scheduled'",
+      `    and a.created_at >= ${timestampLiteral(month.start)} and a.created_at < ${timestampLiteral(report.endExclusive)}`,
+      "), linked_campaign as (",
       "  select distinct on (t.appointment_id)",
       `    t.appointment_id, ${NORMALIZED_CAMPAIGN_METHOD} as method`,
-      "  from crm_message_thread t",
-      "  join outreach_campaign c on c.id = t.campaign_id",
-      "  where t.appointment_id is not null",
+      "  from appointments a",
+      "  join crm_message_thread t on t.appointment_id = a.id and t.organization_id = a.organization_id",
+      "  join outreach_campaign c on c.id = t.campaign_id and c.organization_id = t.organization_id",
       "  order by t.appointment_id, t.created_at, t.id",
+      "), attendee_campaign as (",
+      "  select distinct on (a.id)",
+      "    a.id as appointment_id, nearest.method",
+      "  from appointments a",
+      "  cross join lateral jsonb_array_elements(a.attendees) attendee",
+      "  cross join lateral (",
+      `    select ${NORMALIZED_CAMPAIGN_METHOD} as method,`,
+      "      abs(extract(epoch from (t.last_message_at - a.created_at))) as distance, t.id",
+      "    from crm_message_thread t",
+      "    join outreach_campaign c on c.id = t.campaign_id and c.organization_id = t.organization_id",
+      "    where t.organization_id = a.organization_id and lower(t.prospect_email) = lower(attendee->>'email')",
+      "    order by distance, t.id",
+      "    limit 1",
+      "  ) nearest",
+      "  where coalesce((attendee->>'isOrganizer')::boolean, false) = false",
+      "    and not exists (select 1 from \"user\" u where u.id = a.user_id and lower(u.email) = lower(attendee->>'email'))",
+      "    and not exists (select 1 from member m join \"user\" u on u.id = m.user_id where m.organization_id = a.organization_id and m.deleted_at is null and lower(u.email) = lower(attendee->>'email'))",
+      "    and not exists (select 1 from linked_campaign l where l.appointment_id = a.id)",
+      "  order by a.id, nearest.distance, nearest.id",
+      "), appointment_campaign as (",
+      "  select appointment_id, method from linked_campaign",
+      "  union all",
+      "  select appointment_id, method from attendee_campaign",
       ")",
       "select case when grouping(ac.method) = 1 then '__total__' else coalesce(ac.method, '__unclassified__') end as method,",
       `${windowCounts("a.created_at", report, "report_booked")},`,
       `${windowCounts("a.created_at", previous, "previous_booked")},`,
       windowCounts("a.created_at", month, "month_booked"),
-      "from scheduling_appointment a",
+      "from appointments a",
       "left join appointment_campaign ac on ac.appointment_id = a.id",
-      "where a.origin = 'ai_sdr'",
-      "  and a.deleted_at is null",
-      "  and a.status = 'scheduled'",
-      `  and a.created_at >= ${timestampLiteral(month.start)} and a.created_at < ${timestampLiteral(report.endExclusive)}`,
       "group by grouping sets ((), (ac.method))",
       "order by method",
     ].join("\n"),
     [
-      "with transitions as (",
-      "  select t.id as thread_id, event->>'to' as stage, (event->>'timestamp')::timestamptz as reached_at",
-      "  from crm_message_thread t",
-      "  cross join lateral jsonb_array_elements(t.lifecycle_history) event",
-      "  where t.lifecycle_history is not null",
-      "), first_arrival as (",
-      "  select thread_id, stage, min(reached_at) as reached_at",
-      "  from transitions",
-      "  where stage in ('replied', 'slots_sent', 'booked', 'completed', 'declined', 'no_response')",
-      "  group by thread_id, stage",
-      ")",
-      "select stage,",
-      `  ${windowCounts("reached_at", report, "report")},`,
-      `  ${windowCounts("reached_at", previous, "previous")},`,
-      `  ${windowCounts("reached_at", month, "month")}`,
-      "from first_arrival",
-      "group by stage",
-      "order by stage",
+      "select f.stage,",
+      `  ${windowCounts("f.reached_at", report, "report")},`,
+      `  ${windowCounts("f.reached_at", previous, "previous")},`,
+      `  ${windowCounts("f.reached_at", month, "month")}`,
+      "from crm_message_thread t",
+      "cross join lateral (",
+      "  select event->>'to' as stage, min((event->>'timestamp')::timestamptz) as reached_at",
+      "  from jsonb_array_elements(t.lifecycle_history) event",
+      "  where event->>'to' in ('replied', 'slots_sent', 'booked', 'completed', 'declined', 'no_response')",
+      "  group by 1",
+      ") f",
+      "where t.lifecycle_history is not null",
+      "group by f.stage",
+      "order by f.stage",
     ].join("\n"),
   ];
 }
@@ -360,12 +389,10 @@ export async function readAiSdrWeeklyReport(
       windows,
     };
   } catch (error) {
-    return {
-      error:
-        error instanceof Error
-          ? error.message
-          : "The AI SDR report could not be generated.",
-      success: false,
-    };
+    console.error("AI SDR weekly report read failed.", {
+      code: error instanceof ExecutorError ? error.code : "unexpected_error",
+      status: error instanceof ExecutorError ? error.status : undefined,
+    });
+    return { error: "a production read failed", success: false };
   }
 }
