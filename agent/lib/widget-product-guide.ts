@@ -910,7 +910,7 @@ Choose "Static meeting link", paste the Meet URL, "Save".
 Get here: In the client's workspace, "Settings" > "Email & Calendar".
 - Click "Connect" on "Google Account (Email/Calendar)" or "Outlook Account (Email/Calendar)"; call taker signs in.
 - Set "Create events on", "Check for conflicts".
-- Set "Settings" > "Conferencing" link.
+- Set the meeting link in "Settings" > "Conferencing"; Google Meet needs a static link.
 - No calendar: "Needs Attention"; click "Resume AI SDR" per thread.
 
 ### How do I export my CRM People list to a spreadsheet? {slug: crm/faq/how-do-i-export-my-crm-people-list-to-a-spreadsheet}
@@ -1936,7 +1936,7 @@ Balance too low. Top up, resend prompt. If wrong, contact support with workspace
 Get here: In the left sidebar, click "AI SDR Inbox".
 - Replies to Cold Email Agent campaign replies, books meetings, sends follow-ups. Unclear threads go to "Needs Attention". Needs Pro or legacy plan.
 - Books on the campaign salesperson's calendar (campaign "Options" tab), else "Assigned Call Handler". If neither has a bookable calendar or booking link: no times offered, thread to "Needs Attention", "AI SDR bookings paused" notice. Click "Resume AI SDR" on each thread after fixing.
-- Not replying? In "Settings" > "AI SDR Agent" check "Auto Agent Run" and "Configure AI SDR for Specific Campaigns". Threads in "AI SDR Disabled" need the button clicked. Empty knowledge base means more escalations.
+- Not replying? In "Settings" > "AI SDR Agent" check "Auto Agent Run" and "Configure AI SDR for Specific Campaigns". For a thread in "AI SDR Disabled", open it and click the "AI SDR Disabled" button. Empty knowledge base means more escalations.
 
 ### Setup {slug: ai-sdr/setup}
 Get here: In the left sidebar, click "AI SDR Inbox"
@@ -2099,10 +2099,10 @@ Get here: "Settings" > "AI SDR Agent"
 Get here: "AI SDR Inbox"
 
 ### How do I connect a client's Google or Outlook calendar to Cold Email Agent? {slug: ai-sdr/faq/scheduling-calendar/how-do-i-connect-a-clients-google-calendar-to-cold-email-agent}
-Get here: In the left sidebar, click "Settings", then "Email & Calendar".
-- Switch to the client's workspace, click "Connect Google" or "Connect Outlook" (or "Connect account"), then "Continue to Google"/"Continue to Outlook". Sign in as the call-taker, allow permissions.
+Get here: Switch to the client's workspace in the selector at the top of the sidebar, then "Settings" > "Email & Calendar".
+- Click "Connect Google" or "Connect Outlook" (or "Connect account"), then "Continue to Google"/"Continue to Outlook". Sign in as the call-taker, allow permissions.
 - Set "Put new meetings on"; switch on "Check these calendars for busy times".
-- Max 5 accounts per user. Connecting copies recent email into CRM.
+- Max 5 accounts per user. Connecting copies recent Inbox and Sent email into the CRM, visible to members who can open those records.
 
 ### How do I set a Riverside/Zoom/custom booking link for podcast calls? {slug: ai-sdr/faq/scheduling-calendar/how-do-i-set-a-riversidezoomcustom-booking-link-for-podcast-calls}
 Get here: "Settings" > "Conferencing"
@@ -2144,7 +2144,7 @@ Get here: "AI SDR Inbox"
 ### Why is the AI SDR booking meetings on the wrong calendar/email? {slug: ai-sdr/faq/scheduling-calendar/why-is-the-ai-sdr-booking-meetings-on-the-wrong-calendaremail}
 Get here: In the left sidebar, click "Settings", then "AI SDR Agent".
 - Check campaign "Options" > "Booking & replies" > "Assigned salesperson", then "Call Assignment" > "Assigned Call Handler".
-- That user checks "Email & Calendar" settings above.
+- That user opens "Settings" > "Email & Calendar" and checks the connected account, "Put new meetings on" and "Check these calendars for busy times".
 - Multiple signed-in browser accounts can cause wrong connection; use a fresh session.
 - Existing events aren't moved.
 
