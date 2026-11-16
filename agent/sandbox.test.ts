@@ -28,14 +28,34 @@ const fakeSandbox = (exitCode: number) => {
   return { runs, sandbox };
 };
 
-test("customer investigations receive a deny-all sandbox network policy", () => {
+const RETENTION = {
+  keepLastSnapshots: { count: 1 },
+  snapshotExpiration: 604_800_000,
+};
+
+test("every session keeps its latest snapshot for 7 days, and customer investigations also get deny-all", () => {
   assert.deepEqual(sandboxSessionOptions(widgetAuth(verifiedWidgetContext)), {
+    ...RETENTION,
     networkPolicy: "deny-all",
   });
-  assert.equal(sandboxSessionOptions(null), undefined);
+  assert.deepEqual(sandboxSessionOptions(null), RETENTION);
 });
 
-test("the selector opens with deny-all for widget support and no options otherwise", async (t) => {
+test("mutating session options leaves later ordinary and widget retention unchanged", () => {
+  const options = sandboxSessionOptions(null);
+  options.keepLastSnapshots.count = 2;
+  options.snapshotExpiration = 86_400_000;
+
+  assert.deepEqual(
+    [
+      sandboxSessionOptions(null),
+      sandboxSessionOptions(widgetAuth(verifiedWidgetContext)),
+    ],
+    [RETENTION, { ...RETENTION, networkPolicy: "deny-all" }]
+  );
+});
+
+test("the selector opens with retention for every session and deny-all for widget support", async (t) => {
   const { runs, sandbox } = fakeSandbox(0);
   const open = t.mock.method(environment, "open", () =>
     Promise.resolve(sandbox)
@@ -49,7 +69,7 @@ test("the selector opens with deny-all for widget support and no options otherwi
 
   assert.deepEqual(
     open.mock.calls.map((call) => call.arguments[0]),
-    [{ networkPolicy: "deny-all" }, undefined]
+    [{ ...RETENTION, networkPolicy: "deny-all" }, RETENTION]
   );
   assert.deepEqual(
     runs.map((run) => run.command),
