@@ -50,17 +50,13 @@ export const environment = VercelSandbox.environment(
     : { resources: { vcpus: 2 } }
 );
 
-const SNAPSHOT_RETENTION = {
-  keepLastSnapshots: { count: 1 },
-  snapshotExpiration: 7 * 86_400_000,
-};
-
 export const sandboxSessionOptions = (
   initiator: Parameters<typeof isWidgetSupport>[0]
-) =>
-  isWidgetSupport(initiator)
-    ? { ...SNAPSHOT_RETENTION, networkPolicy: "deny-all" as const }
-    : SNAPSHOT_RETENTION;
+) => ({
+  keepLastSnapshots: { count: 1 },
+  snapshotExpiration: 7 * 86_400_000,
+  ...(isWidgetSupport(initiator) ? { networkPolicy: "deny-all" as const } : {}),
+});
 
 export default defineSandbox(async ({ session }) => {
   const sandbox = await environment.open(
