@@ -180,6 +180,29 @@ export function isStatusFollowUp(
 }
 
 /**
+ * Stamped by the Linear channel on the turn it judged a bare bump, so
+ * reply_to_requester always closes with the fixed question. Grants no other permission.
+ */
+export const RESTATE_FOLLOW_UP_ATTRIBUTE = "restateFollowUp";
+
+/** Returns a copy of `auth` carrying the {@link RESTATE_FOLLOW_UP_ATTRIBUTE} stamp. */
+export function stampRestateFollowUp(
+  auth: SessionAuthContext
+): SessionAuthContext {
+  return {
+    ...auth,
+    attributes: { ...auth.attributes, [RESTATE_FOLLOW_UP_ATTRIBUTE]: "true" },
+  };
+}
+
+/** Whether the channel judged this turn a bare bump. */
+export function isRestateFollowUp(
+  auth: SessionAuthContext | null | undefined
+): boolean {
+  return auth?.attributes[RESTATE_FOLLOW_UP_ATTRIBUTE] === "true";
+}
+
+/**
  * Auth attribute marking a Slack session from a questions-only channel.
  *
  * @remarks
