@@ -39,7 +39,11 @@ test("the widget lane keeps Executor helpers and strips repository and sandbox n
   assert.equal(lane.repository, false);
   assert.doesNotMatch(lane.discovery, EXCLUDED_TOOLS);
   assert.match(lane.instructions, NO_CUSTOMER_TEXT);
-  assert.deepEqual(sandboxSessionOptions(auth), { networkPolicy: "deny-all" });
+  assert.deepEqual(sandboxSessionOptions(auth), {
+    keepLastSnapshots: { count: 1 },
+    networkPolicy: "deny-all",
+    snapshotExpiration: 604_800_000,
+  });
 });
 
 test("a malformed widget issuer stays in the lane but has no usable scope", () => {

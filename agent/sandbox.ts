@@ -35,6 +35,10 @@ import { isWidgetSupport } from "#lib/widget-scope.js";
  * turn runs with no working tree. The same hazard for `/workspace/repo`
  * and the prepared worktree is handled in `agent/tools/prepare_repository.ts`.
  *
+ * Session snapshots keep only the latest one, for 7 days. That retention is passed to
+ * `open()`, never to `environment`, because eve spreads environment options into the template
+ * sandbox too, and an expired template is never rebuilt at runtime, only by a new deploy.
+ *
  * @see {@link https://vercel.com/docs/sandbox | Vercel Sandbox}
  */
 
@@ -48,10 +52,11 @@ export const environment = VercelSandbox.environment(
 
 export const sandboxSessionOptions = (
   initiator: Parameters<typeof isWidgetSupport>[0]
-) =>
-  isWidgetSupport(initiator)
-    ? { networkPolicy: "deny-all" as const }
-    : undefined;
+) => ({
+  keepLastSnapshots: { count: 1 },
+  snapshotExpiration: 7 * 86_400_000,
+  ...(isWidgetSupport(initiator) ? { networkPolicy: "deny-all" as const } : {}),
+});
 
 export default defineSandbox(async ({ session }) => {
   const sandbox = await environment.open(
