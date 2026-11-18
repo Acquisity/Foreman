@@ -26,7 +26,8 @@ export const triageDecisions = defineState<
 export const BILLING_PATH = "Support/Financial";
 
 export interface BillingRoute {
-  assignee: string;
+  /** Absent on a Fixy ticket, whose assignee Fixy owns. */
+  assignee?: string;
   project: string;
 }
 

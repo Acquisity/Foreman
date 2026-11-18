@@ -595,7 +595,7 @@ test("ENG-13175-shaped thread correction is recorded, not argued", () => {
   for (const phrase of [
     "A colleague correcting you in the thread or on the ticket is later evidence",
     "puts your overturned conclusion in `ruledOut`",
-    "New specifics from the requester reopen a closed ticket",
+    "On a Done or Canceled ticket, answer and change no state.",
     "Every close and unproven stop names the fact that would reopen it",
   ]) {
     assert.ok(triageSkill.includes(phrase), phrase);
@@ -1038,7 +1038,7 @@ test("ENG-13397-shaped wrong-channel money ask is handled in place", () => {
   const financialRouting = billingSkill.slice(routingIndex);
   assert.ok(
     financialRouting.includes(
-      'Route financial tickets to Support/Financial in one `route_ticket` call: `project: "Support"`'
+      'Only on tickets Fixy does not own, route financial tickets to Support/Financial in one `route_ticket` call: `project: "Support"`'
     )
   );
   assert.ok(financialRouting.includes("money-kind labels as `addLabels`"));

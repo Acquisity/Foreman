@@ -1,3 +1,4 @@
+import { FIXY_LABEL } from "../fixy-handoff.js";
 import { logOpsEvent, type OpsFields } from "../ops-log.js";
 import { commentIdFor } from "./comment-id.js";
 import {
@@ -5,6 +6,7 @@ import {
   composeDone,
   composeNotFixed,
   composeReceived,
+  composeVerdict,
 } from "./compose.js";
 import {
   coversOf,
@@ -18,6 +20,7 @@ import {
   closureOf,
   DEPLOY_REPOSITORY,
   deployVerdict,
+  finishedFixyVerdict,
   type Planned,
   type PullFacts,
   parsePullUrl,
@@ -48,7 +51,7 @@ export interface Deps {
 }
 
 export type Outcome =
-  | { kind: "posted"; stage: Stage; waiting?: true }
+  | { kind: "posted"; stage: Stage; waiting?: true; pendingVerdict?: true }
   | { kind: "recorded"; stage: LedgerStage }
   | { kind: "waiting" }
   | { kind: "held"; why: string }
@@ -278,6 +281,14 @@ export const reconcileTicket = async (
   const closure = closureOf(facts);
   if (
     outcome.kind === "posted" &&
+    planned.stage === "received" &&
+    !done.has("verdict") &&
+    finishedFixyVerdict(facts)
+  ) {
+    return { ...outcome, pendingVerdict: true };
+  }
+  if (
+    outcome.kind === "posted" &&
     planned.stage === "not_fixed" &&
     facts.duplicateOf &&
     closure.kind === "not_fixed" &&
@@ -443,13 +454,36 @@ const dropDuplicate = (identifier: string, code: string, deps: Deps): null => {
   return null;
 };
 
-const skipDone = (view: TicketView, deps: Deps): Outcome => {
+const skipLogged = (view: TicketView, deps: Deps, code: string): Outcome => {
   (deps.log ?? logOpsEvent)("reporter.update_skipped", {
-    code: "no_evidence_of_change",
+    code,
     issue: view.facts.identifier,
     outcome: "skipped",
   });
-  return skipped("no_evidence_of_change");
+  return skipped(code);
+};
+
+/**
+ * An open ticket hears received once, then what Fixy's finished bug run found,
+ * once. A ticket that closes first gets only its close message.
+ */
+const openMessage = async (
+  view: TicketView,
+  done: ReadonlySet<LedgerStage>,
+  deps: Deps
+): Promise<Planned | Outcome | null> => {
+  const { facts } = view;
+  if (!done.has("received")) {
+    return composeReceived(facts, deps.write);
+  }
+  const verdict = done.has("verdict") ? null : finishedFixyVerdict(facts);
+  if (!verdict) {
+    return null;
+  }
+  return (
+    (await composeVerdict(facts, verdict.body, deps.write)) ??
+    skipLogged(view, deps, "no_reporter_verdict")
+  );
 };
 
 const nextMessage = async (
@@ -461,7 +495,11 @@ const nextMessage = async (
   const { facts } = view;
   const closure = closureOf(facts);
   if (closure.kind === "open") {
-    return done.has("received") ? null : composeReceived(facts, deps.write);
+    return openMessage(view, done, deps);
+  }
+  // Fixy closes its own tickets and replies to the requester itself.
+  if (facts.labels.includes(FIXY_LABEL)) {
+    return skipLogged(view, deps, "fixy_owned");
   }
   if (closure.kind === "not_fixed") {
     if (!done.has("not_fixed")) {
@@ -480,7 +518,10 @@ const nextMessage = async (
   if (done.has("not_fixed")) {
     return null;
   }
-  return (await composeDone(facts, deps.write)) ?? skipDone(view, deps);
+  return (
+    (await composeDone(facts, deps.write)) ??
+    skipLogged(view, deps, "no_evidence_of_change")
+  );
 };
 
 const CURSOR_OVERLAP_MS = 600_000;
@@ -602,7 +643,10 @@ export const runReporterUpdates = async (
     }
     report.outcomes.push({ identifier, outcome: result.outcome });
     posts += result.outcome.kind === "posted" ? 1 : 0;
-    if (
+    if (result.outcome.kind === "posted" && result.outcome.pendingVerdict) {
+      // Keep this queue entry even when posting does not change issue.updatedAt.
+      await deps.store.deferPending(pending, clock());
+    } else if (
       result.outcome.kind === "skipped" &&
       result.outcome.retryAfter !== undefined
     ) {

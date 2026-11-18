@@ -84,7 +84,7 @@ Load slack-wording for every `reply_to_requester` message and in its channels. G
 
 Once the classification is final, call `record_investigation_case` once per ticket with the pattern, never the customer: claim, root cause, symptoms in the product's own words, stripped error signatures, code path and commit, ruled-out conclusions, evidence handles, dated counts, and `route_ticket`'s returned `projectId`. Record a `Feature Request` as `platform_limitation`. A reviewed `Bug` is final once its review has settled; a hotlane-stopped or blocked review records nothing; a `Duplicate` is final once its master link is saved. A failed write changes nothing; never mention memory in the thread.
 
-A colleague correcting you in the thread or on the ticket is later evidence: call `decide_triage` again, route its new `route`, reply with the corrected guidance, and record it: look up the source's case with `search_investigation_memory` and its `sourceIssueId` (the ticket identifier, or `intercom:<conversation id>` for a ticketless Intercom case), then `correct_investigation_case` on the active case, or a new case that puts your overturned conclusion in `ruledOut`. New specifics from the requester reopen a closed ticket.
+A colleague correcting you in the thread or on the ticket is later evidence: call `decide_triage` again, route its new `route`, reply with the corrected guidance, and record it: look up the source's case with `search_investigation_memory` and its `sourceIssueId` (the ticket identifier, or `intercom:<conversation id>` for a ticketless Intercom case), then `correct_investigation_case` on the active case, or a new case that puts your overturned conclusion in `ruledOut`. On a Done or Canceled ticket, answer and change no state.
 
 ## Intercom source
 

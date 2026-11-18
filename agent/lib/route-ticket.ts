@@ -9,6 +9,7 @@ import {
   NEEDS_APPROVAL_LABEL,
   ownerNames,
 } from "./owner-map.js";
+import { assertFixyRouting } from "./route-gates.js";
 import {
   type DuplicateRouting,
   groupingOutcome,
@@ -450,6 +451,7 @@ export async function routeTicket(
 ): Promise<RouteTicketResult> {
   const gql: Gql = (query, variables) => linearGraphql(query, variables, opts);
   const issue = await requireIssue(gql, input.issue);
+  assertFixyRouting(input, issue.labels.nodes);
   const routed = await planRoute(gql, issue, input, opts ?? {});
   const { match, parent, warnings } = routed;
   const built = await buildUpdate(gql, issue, routed.owned, parent);

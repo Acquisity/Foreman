@@ -11,6 +11,8 @@ import {
   type NotFixedReason,
   notFixedText,
   receivedText,
+  VERDICT_OUTCOMES,
+  verdictText,
 } from "./copy.js";
 import {
   type ClosingComment,
@@ -148,4 +150,25 @@ export const composeDone = async (
     cleanPhrase(reply.what, MAX_PHRASE_WORDS, firstName(facts.assignee))
   );
   return text ? { covers: ["fixed"], stage: "fixed", text } : null;
+};
+
+/**
+ * The reporter's line for what Fixy's finished run found. Null when the writer
+ * says none, fails or returns no known outcome: post nothing.
+ */
+export const composeVerdict = async (
+  facts: TicketFacts,
+  reply: string,
+  write: ReporterWriter
+): Promise<Planned | null> => {
+  const answer = await write({ kind: "verdict", reply, title: facts.title });
+  const outcome = VERDICT_OUTCOMES.find(
+    (candidate) => candidate === answer.verdict
+  );
+  const why =
+    outcome === "not_a_bug"
+      ? cleanPhrase(answer.what, MAX_REASON_WORDS, firstName(facts.assignee))
+      : null;
+  const text = outcome ? verdictText(outcome, why) : null;
+  return text ? { covers: ["verdict"], stage: "verdict", text } : null;
 };

@@ -1,3 +1,4 @@
+import { isFixyTriageTeam } from "../fixy-handoff.js";
 import type { NotFixedReason, Stage } from "./copy.js";
 
 export const DEPLOY_REPOSITORY = "Acquisity/Acquisity";
@@ -16,12 +17,16 @@ export interface TicketFacts {
   createdAt: string;
   description: string;
   duplicateOf: string | null;
+  fixyHandoffUpdatedAt: string | null;
+  /** Fixy's newest reply on the ticket, past its run-finished note. */
+  fixyVerdict: { body: string; createdAt: string } | null;
   identifier: string;
   labels: string[];
   parent: { identifier: string; stateType: string } | null;
   pullUrls: string[];
   stateName: string;
   stateType: string;
+  teamKey: string;
   title: string;
 }
 
@@ -54,6 +59,7 @@ const NO_CODE_LABELS = new Set(["User Error", "Platform Limitation"]);
 const FEATURE_LABEL = "Feature Request";
 const BUG_LABEL = "Bug";
 const FEATURE_TITLE = /^feat\b/iu;
+const FIXY_RUNNING_LABEL = "factory:running";
 
 const PULL_URL = /^https:\/\/github\.com\/([\w.-]+\/[\w.-]+)\/pull\/(\d+)$/u;
 
@@ -95,6 +101,20 @@ export const closureOf = (facts: TicketFacts): Closure => {
   }
   return { kind: "done_without_pull" };
 };
+
+/** Fixy's reply on a Bug ticket once its run has finished, or null while one runs. */
+export const finishedFixyVerdict = (
+  facts: TicketFacts
+): TicketFacts["fixyVerdict"] =>
+  isFixyTriageTeam(facts.teamKey) &&
+  facts.fixyHandoffUpdatedAt !== null &&
+  facts.fixyVerdict !== null &&
+  Date.parse(facts.fixyVerdict.createdAt) >
+    Date.parse(facts.fixyHandoffUpdatedAt) &&
+  facts.labels.includes(BUG_LABEL) &&
+  !facts.labels.includes(FIXY_RUNNING_LABEL)
+    ? facts.fixyVerdict
+    : null;
 
 export const changeKindOf = (
   labels: readonly string[],

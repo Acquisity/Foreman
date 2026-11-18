@@ -21,6 +21,6 @@ describe("commentIdFor", () => {
         ids.add(commentIdFor(issue, stage));
       }
     }
-    assert.equal(ids.size, 12);
+    assert.equal(ids.size, 3 * LEDGER_STAGES.length);
   });
 });

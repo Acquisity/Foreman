@@ -25,3 +25,31 @@ test("billing triage reads the complete Linear issue contract", () => {
     )
   );
 });
+
+test("a ticket Fixy owns is handed off, never re-routed, and a closed one is not reopened", () => {
+  for (const rule of [
+    'When `decide_billing` returns `handTo: "fixy"`',
+    "then call `hand_to_fixy` with the ticket's `issue`",
+    "`lanes` including `billing`",
+    "never call `decide_billing` or `route_ticket` again on new facts",
+    "On a Done or Canceled ticket, answer the follow-up and change no state.",
+    "Only on a ticket Fixy does not own, a follow-up whose only ask is to move the ticket to a closed status",
+    "On a ticket Fixy owns, never move status",
+    "Fixy judges that approval",
+  ]) {
+    assert.ok(billingSkill.includes(rule), rule);
+  }
+  assert.ok(!billingSkill.includes("reopen a closed ticket"));
+});
+
+test("Fixy routing precedes the non-Fixy Aaron and Todo route", () => {
+  const routing = billingSkill.slice(billingSkill.indexOf("## Routing"));
+  const fixy = routing.indexOf(
+    'When `decide_billing` returns `handTo: "fixy"`'
+  );
+  assert.ok(fixy >= 0);
+  assert.ok(fixy < routing.indexOf('`assignee: "Aaron Fraga"`'));
+  assert.ok(fixy < routing.indexOf('`state: "Todo"`'));
+  assert.ok(routing.includes("the ticket's `issue`, the pinned workspace"));
+  assert.ok(routing.includes("Only on tickets Fixy does not own"));
+});
