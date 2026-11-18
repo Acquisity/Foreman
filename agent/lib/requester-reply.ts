@@ -4,6 +4,7 @@ import {
   type LinearChannelCredentials,
 } from "eve/channels/linear";
 import { z } from "zod";
+import { FIXY_LABEL } from "./fixy-handoff.js";
 import {
   decideFollowUp,
   type FollowUpInput,
@@ -123,6 +124,7 @@ const THREAD_QUERY = `query RequesterThread($id: String!) {
     id
     identifier
     project { id }
+    labels(first: 100) { nodes { name } }
   }
 }`;
 
@@ -271,6 +273,7 @@ interface ThreadResponse {
   issue: {
     id: string;
     identifier: string;
+    labels: { nodes: { name: string }[] };
     project: { id: string } | null;
   } | null;
   viewer: ForemanUser;
@@ -327,6 +330,7 @@ async function readThread(
   credentials: LinearChannelCredentials
 ): Promise<{
   comments: ThreadComment[];
+  fixyOwned: boolean;
   foreman: ForemanUser;
   issueId: string;
   plan: ReplyPlan;
@@ -357,6 +361,9 @@ async function readThread(
   );
   return {
     comments,
+    fixyOwned: thread.issue.labels.nodes.some(
+      (label) => label.name.toLowerCase() === FIXY_LABEL
+    ),
     foreman: thread.viewer,
     issueId: thread.issue.id,
     plan: planReply(comments, thread.viewer.id),
@@ -377,7 +384,7 @@ export async function relayedFollowUpOutcome(
   trigger: { commentId: string; prompted: boolean },
   credentials: LinearChannelCredentials,
   signal?: AbortSignal
-): Promise<FollowUpOutcome | null> {
+): Promise<FollowUpOutcome | "fixy" | null> {
   return judgeFollowUp(
     await readThread(issue, credentials),
     trigger,
@@ -393,17 +400,29 @@ export async function relayedFollowUpOutcome(
 export async function judgeFollowUp(
   thread: {
     comments: readonly ThreadComment[];
+    fixyOwned?: boolean;
     foreman: ForemanUser;
     plan: ReplyPlan;
     widgetFeedback: boolean;
   },
   trigger: { commentId: string; prompted: boolean },
   decide: (followUp: FollowUpInput) => Promise<FollowUpOutcome>
-): Promise<FollowUpOutcome | null> {
+): Promise<FollowUpOutcome | "fixy" | null> {
   const { comments, foreman, plan, widgetFeedback } = thread;
   const relayed = trigger.prompted
     ? promptedFollowUp(comments, plan, trigger.commentId)
     : relayedFollowUp(comments, plan, trigger.commentId);
+  // Fixy's Linear bot wakes Fixy's run with every Slack reply on a ticket it
+  // owns, so Foreman answering too would speak for Fixy (ENG-19547).
+  const anchor = plan.ok && comments.find((c) => c.id === plan.anchorId);
+  if (
+    relayed &&
+    thread.fixyOwned &&
+    anchor &&
+    SLACK_ANCHOR_PATTERN.test(anchor.body)
+  ) {
+    return "fixy";
+  }
   const followUp = relayed ?? directFollowUp(comments, foreman, trigger);
   if (followUp === null) {
     return null;

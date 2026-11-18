@@ -46,6 +46,12 @@ export const STATUS_ONLY_FOLLOW_UP =
 export const RESTATE_FOLLOW_UP =
   "Jev read this follow-up as the requester only nudging for an answer. Send exactly one reply_to_requester message whose text is your last answer restated in one sentence, leading with the answer and the next step. Ask no question of your own: code adds the closing question about what is still wrong. Then end the session. Do not re-investigate, call a decision tool, call route_ticket, change the document, or run the critic.";
 
+/** Follow-ups that end with one line in the session chat and no model turn. */
+const QUIET_LINES: Partial<Record<FollowUpOutcome | "fixy", string>> = {
+  fixy: "Fixy has this ticket, so this reply goes to Fixy's run.",
+  skip: "No reply needed.",
+};
+
 const FOLLOW_UP_CONTEXT: Partial<Record<FollowUpOutcome, string>> = {
   restate: RESTATE_FOLLOW_UP,
   status: STATUS_ONLY_FOLLOW_UP,
@@ -116,7 +122,7 @@ const issueOf = (event: LinearAgentSessionEvent): string | undefined =>
  */
 const followUpOutcome = (
   event: LinearAgentSessionEvent
-): Promise<FollowUpOutcome | null> => {
+): Promise<FollowUpOutcome | "fixy" | null> => {
   // A reply either opened its own session (a mention) or was prompted into
   // the ticket's existing one, by the receiver or by a person in its thread.
   const prompted = event.action === "prompted";
@@ -198,14 +204,13 @@ export const onAgentSession = async (
     askFrom(event),
     widgetRoute(event),
   ]);
+  const quiet = QUIET_LINES[outcome ?? "respond"];
   if (
-    outcome === "skip" &&
-    (await ctx.linear
-      .createActivity({ body: "No reply needed.", type: "response" })
-      .then(
-        () => true,
-        () => false
-      ))
+    quiet &&
+    (await ctx.linear.createActivity({ body: quiet, type: "response" }).then(
+      () => true,
+      () => false
+    ))
   ) {
     return null;
   }
@@ -231,7 +236,12 @@ export const onAgentSession = async (
   const context =
     buildLinearContext(event, ask?.requester ?? null, selectedRoute) ?? [];
   // Only the widget playbook forbids the status move; the front door keeps it.
-  return followUpDispatch(withRepository, context, outcome, Boolean(route));
+  return followUpDispatch(
+    withRepository,
+    context,
+    outcome === "fixy" ? null : outcome,
+    Boolean(route)
+  );
 };
 
 /** Whether a Linear event is the session's Stop button (ENG-14608). */
