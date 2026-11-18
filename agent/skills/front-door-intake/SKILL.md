@@ -24,7 +24,7 @@ Read the full issue through the Linear connection: title, description, attachmen
 
 Call `classify_ask` once with the issue text and comments, and keep its `sourceLabels`. A money ask: load the billing-triage skill, which replaces this one. Otherwise continue here.
 
-When the ticket already has the `## Fixy handoff` comment, go to step 8. The `fixy` label alone does not mean a handoff was written. When `fixy` is present without that comment, continue here and write the handoff in step 6; note that Fixy may already have started.
+When the ticket already has the `## Fixy handoff` comment, go to step 8. The `fixy` label alone does not mean a handoff was written. When `fixy` is present without that comment, continue here and write the handoff in step 6; note that Fixy may already have started. On a ticket carrying `fixy` or `fixy-sandbox`, with or without that comment, a reply in the requester's Slack thread goes to Fixy's run directly: send no `reply_to_requester` for it.
 
 ## 2. Find the workspace
 

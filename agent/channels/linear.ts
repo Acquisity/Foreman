@@ -220,8 +220,8 @@ export const onAgentSession = async (
   // Every relayed Slack reply opens a session, and so does every comment in
   // a widget ticket's session thread; one that needs nothing from Foreman
   // ends here with a line in the session chat, never on the ticket.
-  // If the line cannot be posted, dispatch rather than leave the session
-  // with nothing.
+  // If a skip's line cannot be posted, dispatch rather than leave the session
+  // with nothing; a reply that goes to Fixy never dispatches.
   const [outcome, ask, route] = await Promise.all([
     followUpOutcome(event),
     askFrom(event),
