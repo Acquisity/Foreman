@@ -788,3 +788,45 @@ test("bounds the requester metadata and comment page requests with signals", asy
   }
   assert.notEqual(signals[0], signals[1]);
 });
+
+test("ENG-19547: a Slack reply on a ticket Fixy owns goes to Fixy, never Jev or the model", async () => {
+  const relay: ThreadComment = {
+    body: "**Anthony** replied in Slack:\n\nJedd confirmed it's the domains.",
+    createdAt: "2026-11-18T20:39:47Z",
+    id: "r1",
+    parentId: "anchor",
+    userId: "aaron",
+  };
+  const prompt: ThreadComment = {
+    body: "**Anthony** replied in Slack.",
+    createdAt: "2026-11-18T20:39:48Z",
+    id: "p1",
+    parentId: "session",
+    userId: "aaron",
+  };
+  const answered = { ...reply("f1", FOREMAN, "2026-11-18T20:19:49Z"), body: "Handed to Fixy." };
+  const ticket = (comments: ThreadComment[], fixyOwned: boolean) => ({
+    comments,
+    fixyOwned,
+    foreman: foremanUser,
+    plan: planReply(comments, FOREMAN),
+    widgetFeedback: false,
+  });
+  const comments = [anchor, answered, relay, prompt];
+  let judged = 0;
+  const decide = () => {
+    judged++;
+    return Promise.resolve<FollowUpOutcome>("respond");
+  };
+  assert.equal(await judgeFollowUp(ticket(comments, true), { commentId: "p1", prompted: true }, decide), "fixy");
+  assert.equal(await judgeFollowUp(ticket(comments, true), { commentId: "r1", prompted: false }, decide), "fixy");
+  assert.equal(judged, 0);
+  assert.equal(await judgeFollowUp(ticket(comments, false), { commentId: "p1", prompted: true }, decide), "respond");
+  const inbox = { ...anchor, body: "Support conversation connected in [Acquisity](https://app.acquisity.ai/inbox/1)" };
+  const note = { ...relay, body: "**Sam** added a note in the support inbox:\n\nthe customer wrote back" };
+  assert.equal(
+    await judgeFollowUp(ticket([inbox, answered, note], true), { commentId: "r1", prompted: false }, decide),
+    "respond",
+    "only Slack replies reach Fixy, so a support inbox note stays with Foreman"
+  );
+});
