@@ -1,11 +1,18 @@
+import { callLinearGraphQL } from "eve/channels/linear";
 import { defineTool } from "eve/tools";
 import { z } from "zod";
+import { linearAuth } from "#lib/constants.js";
 import { executorClient } from "#lib/executor/client.js";
 import { questionsOnlyPolicy } from "#lib/github/approval.js";
 import { LINEAR_ISSUE_ID_PATTERN } from "#lib/investigation-memory/scope.js";
 import { masterCreatedAfter } from "#lib/linear-api.js";
 import { masterWindow } from "#lib/master-window.js";
 import { logOpsEvent } from "#lib/ops-log.js";
+import {
+  type LinearRead,
+  RouteGateError,
+  reopenRefusal,
+} from "#lib/route-gates.js";
 import { routeTicket } from "#lib/route-ticket.js";
 import {
   criticRounds,
@@ -13,9 +20,11 @@ import {
   routeRefusal,
   triageDecisions,
 } from "#lib/triage-log.js";
+import { isTriageReplay } from "#lib/triage-replay/mode.js";
 import { isStatusFollowUp } from "#lib/trust.js";
 
 const identifier = z.string().trim().regex(LINEAR_ISSUE_ID_PATTERN);
+const LINEAR_TIMEOUT_MS = 15_000;
 const name = z.string().trim().min(1).max(120);
 
 /**
@@ -45,6 +54,7 @@ export default defineTool({
     "A match's report is parented under its open master for you: the match when it is a master (its description has the master template's Regression seam section, or it already parents an issue), else the match's parent when that is one. A parent that differs fails before any write; a parent passed must be an open master the match is already under. A master past the master search's recency cutoff, or one already closed, is not eligible. Duplicate is set only when the report joins that master in the same call and the read-back shows it there. With no eligible master, for every classification, the report is not closed: it is related to the match and labelled Needs grouping, a closing state becomes Backlog held by Aaron Fraga (James Keeble for a feature request) instead of the match's owner, and grouping says needs-grouping; a Bug can still join a master made through engineering-handoff on a later call. Duplicate without duplicateOf needs parent set to an open master. A parent held outside the owner map fails before any write. A Feature Request closes only when the ticket already carries Declined (a person's decision) or Approved; a route that adds Declined itself fails before any write. " +
     "The match's relation is written before the update, because Linear will not move a ticket to Duplicate without it; when the relation fails nothing is written. " +
     "links attach urls as resources on the ticket. Use the returned projectId for memory recording. " +
+    "The fixy label is reserved: only hand_to_fixy adds it and only a person removes it. On a ticket carrying the fixy label, Fixy owns state and assignee: a call that sets either fails before any write. A Done or Canceled ticket from an Asks channel is never moved back to an open state; a move to another closed state still works. " +
     "routed true with warnings means the ticket was updated but a link or the read-back after it failed; read the warning before retrying only that part.",
   async execute(input, ctx) {
     const refusal = routeRefusal(
@@ -55,6 +65,33 @@ export default defineTool({
     );
     if (refusal) {
       return { error: refusal, routed: false as const };
+    }
+    if (input.state !== undefined && !isTriageReplay()) {
+      // Not through Executor: its RouteIssue read has no state type or attachments.
+      const linear: LinearRead = async (query, queryName, variables) => {
+        const { token } = await ctx.getToken(linearAuth);
+        const signal = AbortSignal.any([
+          ctx.abortSignal,
+          AbortSignal.timeout(LINEAR_TIMEOUT_MS),
+        ]);
+        return await callLinearGraphQL({
+          api: { fetch: (url, init) => fetch(url, { ...init, signal }) },
+          credentials: { accessToken: token },
+          query,
+          queryName,
+          variables,
+        });
+      };
+      const reopen = await reopenRefusal(input.issue, input.state, linear);
+      if (reopen) {
+        ctx.abortSignal.throwIfAborted();
+        logOpsEvent("triage.route_refused", {
+          code: reopen.code,
+          issue: input.issue,
+          sessionId: ctx.session.id,
+        });
+        return { error: reopen.reason, routed: false as const };
+      }
     }
     try {
       const mastersWindow = picksMaster(input)
@@ -82,6 +119,13 @@ export default defineTool({
     } catch (error) {
       if (ctx.abortSignal.aborted) {
         throw error;
+      }
+      if (error instanceof RouteGateError) {
+        logOpsEvent("triage.route_refused", {
+          code: error.code,
+          issue: input.issue,
+          sessionId: ctx.session.id,
+        });
       }
       return {
         error: error instanceof Error ? error.message : "Routing failed.",

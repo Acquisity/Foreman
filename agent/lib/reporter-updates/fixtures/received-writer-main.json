@@ -1,0 +1,46 @@
+{
+  "prompt": "You write part of a short Slack message to a customer who reported a problem or asked for something in our product.\nWrite in plain, friendly words a customer uses. Never mention developers, owners, names of staff, tickets, pull requests, code, merges, deploys, file paths, error codes or AI models.\nNo markdown, no quotes, no links, no emoji and no em dashes.\nSay only what the text below supports. Never invent a change, a button or a page.\nReturn JSON with three fields, what, steps and asDesigned. Use null for a field you cannot write from the text, and for asDesigned unless the task asks for it.\n\nWe have just received this report.\nSet what to a phrase of at most 15 words naming the problem or request, as it fits after 'We're looking into ', for example: why your email threads won't load.\nSet steps to null.\n\nReport title: Email threads never load\n\nReport description:\nThreads show a spinner forever.",
+  "responseFormat": {
+    "type": "json",
+    "schema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "type": "object",
+      "properties": {
+        "asDesigned": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "steps": {
+          "anyOf": [
+            {
+              "type": "string",
+              "maxLength": 400
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "what": {
+          "anyOf": [
+            {
+              "type": "string",
+              "maxLength": 300
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": ["asDesigned", "steps", "what"],
+      "additionalProperties": false
+    }
+  }
+}

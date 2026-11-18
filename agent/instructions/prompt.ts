@@ -8,7 +8,9 @@ export default defineDynamic({
   events: {
     "turn.started": (_event, ctx) =>
       defineInstructions({
-        content: composePrompt(sessionLane(ctx.session.auth.initiator)),
+        content: composePrompt(
+          sessionLane(ctx.session.auth.initiator, ctx.session.auth.current)
+        ),
       }),
   },
 });

@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 import { MockLanguageModelV4 } from "ai/test";
 import type { OpsFields } from "../ops-log.js";
@@ -54,6 +55,49 @@ describe("reporterWriter", () => {
       steps: null,
       what: "why your email threads won't load",
     });
+  });
+
+  it("keeps the received prompt and three-field schema identical to main", async () => {
+    const main = JSON.parse(
+      readFileSync(
+        new URL("./fixtures/received-writer-main.json", import.meta.url),
+        "utf8"
+      )
+    );
+    const model = answer(
+      JSON.stringify({
+        asDesigned: null,
+        steps: null,
+        what: "why your email threads won't load",
+      })
+    );
+    const result = await reporterWriter(model)(TASK);
+    assert.equal(result.what, "why your email threads won't load");
+    assert.equal(writerPrompt(TASK), main.prompt);
+    assert.deepEqual(
+      model.doGenerateCalls[0]?.responseFormat,
+      main.responseFormat
+    );
+  });
+
+  it("returns the verdict outcome, and no reply for an outcome it does not know", async () => {
+    const reply = (verdict: string) =>
+      JSON.stringify({ asDesigned: null, steps: null, verdict, what: null });
+    const task: WriterTask = {
+      kind: "verdict",
+      reply: "I fixed it and the change is open for review.",
+      title: "Webhook guide link is a 404",
+    };
+    assert.equal(
+      (await reporterWriter(answer(reply("fix_in_review")))(task)).verdict,
+      "fix_in_review"
+    );
+    const { events, log } = recorder();
+    assert.deepEqual(
+      await reporterWriter(answer(reply("escalate")), 1000, log)(task),
+      NO_REPLY
+    );
+    assert.equal(events[0]?.fields.decision, "verdict");
   });
 
   it("returns no phrase and logs when the reply does not match the schema", async () => {
@@ -150,6 +194,30 @@ describe("writerPrompt", () => {
     );
     assert.ok(!prompt.includes("Foreman status note 1"));
     assert.ok(prompt.includes("Foreman status note 6"));
+  });
+
+  it("gives the verdict task Fixy's reply, clipped, and the outcome rules", () => {
+    const prompt = writerPrompt({
+      kind: "verdict",
+      reply: `I fixed and proved the bug. ${"x".repeat(5000)}`,
+      title: "Webhook guide link is a 404",
+    });
+    assert.ok(prompt.includes("Final note from our investigation:\nI fixed"));
+    assert.ok(!prompt.includes("x".repeat(3000)));
+    for (const outcome of [
+      "fix_in_review",
+      "not_a_bug",
+      "already_fixed",
+      "cannot_reproduce",
+      "none",
+    ]) {
+      assert.ok(
+        prompt.includes(`Set verdict to ${outcome} when`) ||
+          prompt.includes(`Set verdict to ${outcome} for`),
+        outcome
+      );
+    }
+    assert.ok(prompt.includes("even if it also raises internal follow-ups"));
   });
 
   it("never asks for owners, developers or engineering words", () => {

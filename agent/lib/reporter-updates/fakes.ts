@@ -39,6 +39,7 @@ export const STUB: Record<WriterTask["kind"], WriterReply> = {
   },
   reason: { steps: null, what: null },
   received: { steps: null, what: "why your export is missing rows" },
+  verdict: { steps: null, verdict: "fix_in_review", what: null },
 };
 
 export const RECEIVED = receivedText(STUB.received.what);
@@ -74,12 +75,15 @@ export const facts = (over: Partial<TicketFacts> = {}): TicketFacts => ({
   createdAt: "2026-10-10T10:00:00.000Z",
   description: "Exports stop at 500 rows.",
   duplicateOf: null,
+  fixyHandoffUpdatedAt: null,
+  fixyVerdict: null,
   identifier: "ENG-1",
   labels: [],
   parent: null,
   pullUrls: [],
   stateName: "Todo",
   stateType: "unstarted",
+  teamKey: "ENG",
   title: "Export is missing rows",
   ...over,
 });

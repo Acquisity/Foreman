@@ -23,6 +23,8 @@ import {
   receivedText,
   STAGES,
   stageOfCommentId,
+  VERDICT_OUTCOMES,
+  verdictText,
   withoutReporterUpdates,
   wordCount,
 } from "./copy.js";
@@ -126,6 +128,49 @@ describe("reporter update wording", () => {
     const long = Array.from({ length: 15 }, () => "word").join(" ");
     const steps = `${Array.from({ length: 25 }, () => "step").join(" ")}.`;
     assert.equal(liveText(long, steps), LIVE_FALLBACK);
+  });
+});
+
+describe("Fixy verdict wording", () => {
+  const texts = VERDICT_OUTCOMES.flatMap((outcome) => [
+    verdictText(outcome),
+    verdictText(outcome, "exports only include the last 12 months"),
+  ]).filter((text): text is string => text !== null);
+
+  it("has a line for every outcome but none, each within the word limit and free of banned words and staff names", () => {
+    assert.equal(texts.length, 8);
+    assert.equal(verdictText("none"), null);
+    for (const text of texts) {
+      assert.ok(wordCount(text) <= MAX_UPDATE_WORDS, text);
+      assert.deepEqual(bannedWordsIn(text), [], text);
+      assert.ok(cleanPhrase(text.replace(/[.:,]/gu, ""), 60) !== null, text);
+    }
+  });
+
+  it("adds a reason only to not a bug", () => {
+    assert.equal(
+      verdictText("not_a_bug", "exports only include the last 12 months"),
+      "We looked into this and it's working the way it's meant to: exports only include the last 12 months. If something still looks wrong, reply here with what you expected to see."
+    );
+    assert.equal(
+      verdictText("not_a_bug"),
+      "We looked into this and it's working the way it's meant to. If something still looks wrong, reply here with what you expected to see."
+    );
+    assert.equal(
+      verdictText("cannot_reproduce", "anything"),
+      verdictText("cannot_reproduce")
+    );
+  });
+
+  it("recognises a posted verdict by its id, and no empty body as one", () => {
+    assert.equal(
+      isReporterUpdate("ENG-1", {
+        body: "Whatever the line said.",
+        id: commentIdFor("ENG-1", "verdict"),
+      }),
+      true
+    );
+    assert.deepEqual(coversOf(""), []);
   });
 });
 
