@@ -145,6 +145,7 @@ describe("fixyHandoffCommentId", () => {
 describe("handoff comment", () => {
   const handoff: FixyHandoff = {
     expected: "Leads get the follow-up email",
+    lanes: ["eng"],
     notes: "ENG-100 looked like the same issue but route_ticket refused it",
     reportedAt: "2026-11-01T18:02:37.524Z",
     reportedAtSource: SLACK_THREAD_START,
@@ -164,6 +165,8 @@ describe("handoff comment", () => {
         "Reported at: 2026-11-01T18:02:37.524Z (Slack thread start)",
         "What happened: No follow-up emails were sent",
         "Expected: Leads get the follow-up email",
+        "Lanes: eng",
+        "Card: none",
         "",
         "Steps to reproduce:",
         "1. Open Campaigns",

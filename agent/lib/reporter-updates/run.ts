@@ -1,3 +1,4 @@
+import { FIXY_LABEL } from "../fixy-handoff.js";
 import { logOpsEvent, type OpsFields } from "../ops-log.js";
 import { commentIdFor } from "./comment-id.js";
 import {
@@ -453,22 +454,13 @@ const dropDuplicate = (identifier: string, code: string, deps: Deps): null => {
   return null;
 };
 
-const skipDone = (view: TicketView, deps: Deps): Outcome => {
+const skipLogged = (view: TicketView, deps: Deps, code: string): Outcome => {
   (deps.log ?? logOpsEvent)("reporter.update_skipped", {
-    code: "no_evidence_of_change",
+    code,
     issue: view.facts.identifier,
     outcome: "skipped",
   });
-  return skipped("no_evidence_of_change");
-};
-
-const skipVerdict = (view: TicketView, deps: Deps): Outcome => {
-  (deps.log ?? logOpsEvent)("reporter.update_skipped", {
-    code: "no_reporter_verdict",
-    issue: view.facts.identifier,
-    outcome: "skipped",
-  });
-  return skipped("no_reporter_verdict");
+  return skipped(code);
 };
 
 /**
@@ -490,7 +482,7 @@ const openMessage = async (
   }
   return (
     (await composeVerdict(facts, verdict.body, deps.write)) ??
-    skipVerdict(view, deps)
+    skipLogged(view, deps, "no_reporter_verdict")
   );
 };
 
@@ -504,6 +496,10 @@ const nextMessage = async (
   const closure = closureOf(facts);
   if (closure.kind === "open") {
     return openMessage(view, done, deps);
+  }
+  // Fixy closes its own tickets and replies to the requester itself.
+  if (facts.labels.includes(FIXY_LABEL)) {
+    return skipLogged(view, deps, "fixy_owned");
   }
   if (closure.kind === "not_fixed") {
     if (!done.has("not_fixed")) {
@@ -522,7 +518,10 @@ const nextMessage = async (
   if (done.has("not_fixed")) {
     return null;
   }
-  return (await composeDone(facts, deps.write)) ?? skipDone(view, deps);
+  return (
+    (await composeDone(facts, deps.write)) ??
+    skipLogged(view, deps, "no_evidence_of_change")
+  );
 };
 
 const CURSOR_OVERLAP_MS = 600_000;

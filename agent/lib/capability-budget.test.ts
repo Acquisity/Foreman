@@ -702,6 +702,8 @@ describe("capability report", () => {
         .get(lane)
         ?.rows.find((row) => row.kind === "tool" && row.source === "tools/")
         ?.entries ?? 0;
+    assert.equal(slack.catalogChars, 74_463);
+    assert.equal(repository.catalogChars, 100_046);
     assert.equal(slack.catalogChars, intake.catalogChars);
     assert.ok(repository.catalogChars > slack.catalogChars);
 
