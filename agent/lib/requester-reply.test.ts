@@ -874,6 +874,28 @@ test("ENG-19547: the gate gives a Slack reply on a ticket Fixy owns to Fixy, wit
   );
   assert.equal(
     await judgeFollowUp(
+      ticket(both, true),
+      { commentId: "p1", prompted: true },
+      decide
+    ),
+    "fixy",
+    "a Slack prompt goes to Fixy even when an inbox note is newer"
+  );
+  const quoted = {
+    ...inboxNote,
+    body: "**Sam** added a note in the support inbox:\n\n**Gary** replied in Slack: ok",
+  };
+  assert.equal(
+    await judgeFollowUp(
+      ticket([inboxAnchor, ...comments, quoted], true),
+      { commentId: "n1", prompted: false },
+      decide
+    ),
+    "respond",
+    "an inbox note quoting a Slack header stays with Foreman"
+  );
+  assert.equal(
+    await judgeFollowUp(
       ticket(comments, false),
       { commentId: "p1", prompted: true },
       decide

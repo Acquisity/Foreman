@@ -38,9 +38,30 @@ import { isWidgetFiledDescription } from "./widget-ticket-marker.js";
 // The Acquisity support inbox roots its notes the same way, in "Support
 // conversation connected in …", and imports Foreman's reply as a team note.
 export const SLACK_ANCHOR_PATTERN = /^Slack thread connected in /u;
-// The receiver's copy under the anchor ends "replied in Slack:", its prompt
-// into the session "replied in Slack.".
-const SLACK_RELAY = /\*\* replied in Slack[.:]/u;
+// The receiver's prompt into the session, and its copy under the anchor.
+const SLACK_REPLY_PROMPT = /^\*\*[^*\n]{1,100}\*\* replied in Slack\.$/u;
+const SLACK_REPLY_COPY =
+  /^[^\n]{0,300}?\*\*[^*\n]{1,100}\*\* replied in Slack:/u;
+
+/** Whether the trigger is the receiver's relay of a Slack reply, judged from that comment alone. */
+const isSlackRelay = (
+  comments: readonly ThreadComment[],
+  trigger: { commentId: string; prompted: boolean }
+): boolean => {
+  const source = comments.find((c) => c.id === trigger.commentId);
+  if (!source) {
+    return false;
+  }
+  if (trigger.prompted) {
+    return SLACK_REPLY_PROMPT.test(source.body.trim());
+  }
+  const anchor = comments.find((c) => c.id === source.parentId);
+  return Boolean(
+    anchor &&
+      SLACK_ANCHOR_PATTERN.test(anchor.body) &&
+      SLACK_REPLY_COPY.test(source.body)
+  );
+};
 const ANCHOR_PATTERN = /^(?:Slack thread|Support conversation) connected in /u;
 
 export interface ThreadComment {
@@ -412,15 +433,14 @@ export async function judgeFollowUp(
   decide: (followUp: FollowUpInput) => Promise<FollowUpOutcome>
 ): Promise<FollowUpOutcome | "fixy" | null> {
   const { comments, foreman, plan, widgetFeedback } = thread;
+  // Fixy's Linear bot wakes Fixy's run with every Slack reply on a ticket it
+  // owns, so Foreman answering too would speak for Fixy (ENG-19547).
+  if (thread.fixyOwned && isSlackRelay(comments, trigger)) {
+    return "fixy";
+  }
   const relayed = trigger.prompted
     ? promptedFollowUp(comments, plan, trigger.commentId)
     : relayedFollowUp(comments, plan, trigger.commentId);
-  // Fixy's Linear bot wakes Fixy's run with every Slack reply on a ticket it
-  // owns, so Foreman answering too would speak for Fixy (ENG-19547).
-  const source = comments.find((c) => c.id === trigger.commentId);
-  if (relayed && thread.fixyOwned && source && SLACK_RELAY.test(source.body)) {
-    return "fixy";
-  }
   const followUp = relayed ?? directFollowUp(comments, foreman, trigger);
   if (followUp === null) {
     return null;
