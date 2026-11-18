@@ -1,11 +1,6 @@
 import { createHash } from "node:crypto";
 import { isAskFromTitle } from "./linear-context.js";
 
-/**
- * FIXY_TRIAGE_TEAMS must match Fixy's FIXY_LINEAR_TEAMS, because Fixy only
- * starts runs on teams it allows.
- */
-
 /** Fixy's Linear app user, the author of each run's final reply on a ticket. */
 export const FIXY_LINEAR_USER_ID = "110978d6-72e7-4d4c-8d87-ffe3df9794cc";
 
@@ -89,7 +84,7 @@ export const FIXY_LANES = ["billing", "unblock", "eng", "question"] as const;
 export type FixyLane = (typeof FIXY_LANES)[number];
 export const laneLabel = (lane: FixyLane): string => `lane:${lane}`;
 
-/** What a billing decision on a Fixy ticket carries; no playbook cards exist yet (ENG-18834). */
+/** What a billing decision on a Fixy ticket carries; Fixy matches the playbook card from its own playbook. */
 export const FIXY_BILLING_HANDOFF = {
   card: null,
   handTo: "fixy",
@@ -192,7 +187,7 @@ export const renderFixyHandoff = (handoff: FixyHandoff): string => {
     `What happened: ${oneLine(handoff.whatHappened, FIELD_MAX_CHARS)}`,
     `Expected: ${oneLine(handoff.expected, FIELD_MAX_CHARS)}`,
     `Lanes: ${handoff.lanes.join(", ")}`,
-    // No playbook cards exist yet (ENG-18834).
+    // Fixy matches the playbook card from its own playbook (ENG-18834).
     "Card: none",
     "",
     "Steps to reproduce:",

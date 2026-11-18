@@ -103,7 +103,9 @@ export const handToFixyInputSchema = z
     card: z
       .null()
       .optional()
-      .describe("No playbook cards exist yet; leave it out."),
+      .describe(
+        "Fixy matches the playbook card from its own playbook; leave it out."
+      ),
     expected: z
       .string()
       .trim()

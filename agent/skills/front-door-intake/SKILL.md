@@ -70,7 +70,7 @@ Call `hand_to_fixy` once with:
 - `lanes`: every lane the ask carries, each once: `billing` for money, `unblock` for a stuck account, record or send a person must free by hand, `eng` for something the product does wrong (every real report from step 3 on), `question` for an answered how-to.
 - `whatHappened` and `expected`: one line each, in plain words.
 - `stepsToReproduce`: 1 to 10 short steps a person could follow, from the report and its screenshots. Needed when `lanes` includes `eng`.
-- No `card`: playbook cards do not exist yet.
+- No `card`: Fixy matches the playbook card from its own playbook.
 - `reportedAt` and `reportedAtSource` only when the ticket has no 'Ask from' Slack link and the report says when it was first raised. The tool takes the time from the Slack link itself.
 - `notes`: one line, only when there is something Fixy needs, such as a known issue `route_ticket` refused to join.
 
