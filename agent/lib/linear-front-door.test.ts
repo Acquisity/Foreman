@@ -177,11 +177,14 @@ describe("a judged follow-up that needs no model turn (ENG-19547)", () => {
   };
 
   it("ends a Slack reply on a Fixy ticket with one line, even when the line cannot be posted", async () => {
-    for (const fails of [false, true]) {
-      const { ctx, posted } = session(fails);
-      assert.equal(await endsQuietly(ctx, "fixy"), true);
-      assert.deepEqual(posted, [FIXY_HAS_IT]);
-    }
+    const posted = session(false);
+    const failed = session(true);
+    assert.equal(await endsQuietly(posted.ctx, "fixy"), true);
+    assert.equal(await endsQuietly(failed.ctx, "fixy"), true);
+    assert.deepEqual(
+      [posted.posted, failed.posted],
+      [[FIXY_HAS_IT], [FIXY_HAS_IT]]
+    );
   });
 
   it("dispatches a skip whose line cannot be posted, and anything else", async () => {
