@@ -55,11 +55,12 @@ const isSlackRelay = (
   if (trigger.prompted) {
     return SLACK_REPLY_PROMPT.test(source.body.trim());
   }
+  // A copy under the anchor, or the top-level copy that tags Foreman.
   const anchor = comments.find((c) => c.id === source.parentId);
-  return Boolean(
-    anchor &&
-      SLACK_ANCHOR_PATTERN.test(anchor.body) &&
-      SLACK_REPLY_COPY.test(source.body)
+  return (
+    SLACK_REPLY_COPY.test(source.body) &&
+    (source.parentId === null ||
+      Boolean(anchor && SLACK_ANCHOR_PATTERN.test(anchor.body)))
   );
 };
 const ANCHOR_PATTERN = /^(?:Slack thread|Support conversation) connected in /u;

@@ -881,6 +881,21 @@ test("ENG-19547: the gate gives a Slack reply on a ticket Fixy owns to Fixy, wit
     "fixy",
     "a Slack prompt goes to Fixy even when an inbox note is newer"
   );
+  const tagged = {
+    ...relay,
+    body: `@acquisityforeman1 ${relay.body}`,
+    id: "t1",
+    parentId: null,
+  };
+  assert.equal(
+    await judgeFollowUp(
+      ticket([...comments, tagged], true),
+      { commentId: "t1", prompted: false },
+      decide
+    ),
+    "fixy",
+    "the top-level copy that tags Foreman goes to Fixy too"
+  );
   const quoted = {
     ...inboxNote,
     body: "**Sam** added a note in the support inbox:\n\n**Gary** replied in Slack: ok",
