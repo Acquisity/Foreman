@@ -799,7 +799,21 @@ test("bounds the requester metadata and comment page requests with signals", asy
   assert.notEqual(signals[0], signals[1]);
 });
 
-test("ENG-19547: a Slack reply on a ticket Fixy owns goes to Fixy, never Jev or the model", async () => {
+const inboxAnchor: ThreadComment = {
+  ...anchor,
+  body: "Support conversation connected in [Acquisity](https://app.acquisity.ai/inbox/1)",
+  createdAt: "2026-11-18T20:00:00Z",
+  id: "inbox",
+};
+const inboxNote: ThreadComment = {
+  body: "**Sam** added a note in the support inbox:\n\nthe customer wrote back",
+  createdAt: "2026-11-18T20:40:00Z",
+  id: "n1",
+  parentId: "inbox",
+  userId: "aaron",
+};
+
+test("ENG-19547: the gate gives a Slack reply on a ticket Fixy owns to Fixy, without asking Jev", async () => {
   const relay: ThreadComment = {
     body: "**Anthony** replied in Slack:\n\nJedd confirmed it's the domains.",
     createdAt: "2026-11-18T20:39:47Z",
@@ -848,6 +862,16 @@ test("ENG-19547: a Slack reply on a ticket Fixy owns goes to Fixy, never Jev or 
     "fixy"
   );
   assert.equal(judged, 0);
+  const both = [inboxAnchor, ...comments, inboxNote];
+  assert.equal(
+    await judgeFollowUp(
+      ticket(both, true),
+      { commentId: "n1", prompted: false },
+      decide
+    ),
+    "respond",
+    "an inbox note stays with Foreman even when a Slack reply came first"
+  );
   assert.equal(
     await judgeFollowUp(
       ticket(comments, false),

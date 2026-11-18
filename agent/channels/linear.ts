@@ -46,10 +46,33 @@ export const STATUS_ONLY_FOLLOW_UP =
 export const RESTATE_FOLLOW_UP =
   "Jev read this follow-up as the requester only nudging for an answer. Send exactly one reply_to_requester message whose text is your last answer restated in one sentence, leading with the answer and the next step. Ask no question of your own: code adds the closing question about what is still wrong. Then end the session. Do not re-investigate, call a decision tool, call route_ticket, change the document, or run the critic.";
 
-/** Follow-ups that end with one line in the session chat and no model turn. */
-const QUIET_LINES: Partial<Record<FollowUpOutcome | "fixy", string>> = {
-  fixy: "Fixy has this ticket, so this reply goes to Fixy's run.",
-  skip: "No reply needed.",
+export const FIXY_HAS_IT =
+  "Fixy has this ticket, so this reply goes to Fixy's run.";
+
+/**
+ * Whether a judged follow-up ends here with one line in the session chat. A
+ * skip whose line cannot be posted dispatches rather than leave the session
+ * with nothing; a Fixy reply never does, since Fixy's run already has it.
+ */
+export const endsQuietly = async (
+  ctx: Pick<LinearSessionContext, "linear">,
+  outcome: FollowUpOutcome | "fixy" | null
+): Promise<boolean> => {
+  let line: string;
+  if (outcome === "fixy") {
+    line = FIXY_HAS_IT;
+  } else if (outcome === "skip") {
+    line = "No reply needed.";
+  } else {
+    return false;
+  }
+  const posted = await ctx.linear
+    .createActivity({ body: line, type: "response" })
+    .then(
+      () => true,
+      () => false
+    );
+  return posted || outcome === "fixy";
 };
 
 const FOLLOW_UP_CONTEXT: Partial<Record<FollowUpOutcome, string>> = {
@@ -204,14 +227,7 @@ export const onAgentSession = async (
     askFrom(event),
     widgetRoute(event),
   ]);
-  const quiet = QUIET_LINES[outcome ?? "respond"];
-  if (
-    quiet &&
-    (await ctx.linear.createActivity({ body: quiet, type: "response" }).then(
-      () => true,
-      () => false
-    ))
-  ) {
+  if (await endsQuietly(ctx, outcome)) {
     return null;
   }
   // URLs only: a bare `owner/repo` token in an issue title, description, or

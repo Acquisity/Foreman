@@ -78,6 +78,8 @@ export const reportedAtFromSlackUrl = (url: string): string | null => {
 
 /** The label whose addition starts a Fixy run; Bug starts nothing. */
 export const FIXY_LABEL = "fixy";
+/** Fixy's learning-environment label; it starts a Fixy run as `fixy` does. */
+export const FIXY_SANDBOX_LABEL = "fixy-sandbox";
 
 /** The work lanes a handoff can carry; each is the Linear label `lane:<name>`. */
 export const FIXY_LANES = ["billing", "unblock", "eng", "question"] as const;

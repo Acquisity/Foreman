@@ -14,7 +14,9 @@ import { sessionLane } from "./session-lane.js";
 import { canUseInvestigationMemory } from "./trust.js";
 
 process.env.LINEAR_CONNECTOR ??= "stub/stub";
-const { onAgentSession, sessionRoute } = await import("../channels/linear.js");
+const { endsQuietly, FIXY_HAS_IT, onAgentSession, sessionRoute } = await import(
+  "../channels/linear.js"
+);
 
 const WIDGET_LINE = "This issue is chat widget feedback. Load widget-feedback.";
 
@@ -157,5 +159,37 @@ describe("Linear front door route (ENG-16061)", () => {
     }
     assert.ok(!LINEAR_FRONT_DOOR_ROUTE.includes("triage-investigate"));
     assert.ok(LINEAR_FRONT_DOOR_ROUTE.includes("billing-triage"));
+  });
+});
+
+describe("a judged follow-up that needs no model turn (ENG-19547)", () => {
+  const session = (fails: boolean) => {
+    const posted: string[] = [];
+    const ctx = {
+      linear: {
+        createActivity: ({ body }: { body: string }) => {
+          posted.push(body);
+          return fails ? Promise.reject(new Error("down")) : Promise.resolve();
+        },
+      },
+    } as unknown as Pick<LinearSessionContext, "linear">;
+    return { ctx, posted };
+  };
+
+  it("ends a Slack reply on a Fixy ticket with one line, even when the line cannot be posted", async () => {
+    for (const fails of [false, true]) {
+      const { ctx, posted } = session(fails);
+      assert.equal(await endsQuietly(ctx, "fixy"), true);
+      assert.deepEqual(posted, [FIXY_HAS_IT]);
+    }
+  });
+
+  it("dispatches a skip whose line cannot be posted, and anything else", async () => {
+    assert.equal(await endsQuietly(session(false).ctx, "skip"), true);
+    assert.equal(await endsQuietly(session(true).ctx, "skip"), false);
+    const { ctx, posted } = session(false);
+    assert.equal(await endsQuietly(ctx, "respond"), false);
+    assert.equal(await endsQuietly(ctx, null), false);
+    assert.deepEqual(posted, []);
   });
 });

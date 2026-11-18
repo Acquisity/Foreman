@@ -4,7 +4,7 @@ import {
   type LinearChannelCredentials,
 } from "eve/channels/linear";
 import { z } from "zod";
-import { FIXY_LABEL } from "./fixy-handoff.js";
+import { FIXY_LABEL, FIXY_SANDBOX_LABEL } from "./fixy-handoff.js";
 import {
   decideFollowUp,
   type FollowUpInput,
@@ -38,6 +38,9 @@ import { isWidgetFiledDescription } from "./widget-ticket-marker.js";
 // The Acquisity support inbox roots its notes the same way, in "Support
 // conversation connected in …", and imports Foreman's reply as a team note.
 export const SLACK_ANCHOR_PATTERN = /^Slack thread connected in /u;
+// The receiver's copy under the anchor ends "replied in Slack:", its prompt
+// into the session "replied in Slack.".
+const SLACK_RELAY = /\*\* replied in Slack[.:]/u;
 const ANCHOR_PATTERN = /^(?:Slack thread|Support conversation) connected in /u;
 
 export interface ThreadComment {
@@ -361,8 +364,8 @@ async function readThread(
   );
   return {
     comments,
-    fixyOwned: thread.issue.labels.nodes.some(
-      (label) => label.name.toLowerCase() === FIXY_LABEL
+    fixyOwned: thread.issue.labels.nodes.some((label) =>
+      [FIXY_LABEL, FIXY_SANDBOX_LABEL].includes(label.name.toLowerCase())
     ),
     foreman: thread.viewer,
     issueId: thread.issue.id,
@@ -414,13 +417,8 @@ export async function judgeFollowUp(
     : relayedFollowUp(comments, plan, trigger.commentId);
   // Fixy's Linear bot wakes Fixy's run with every Slack reply on a ticket it
   // owns, so Foreman answering too would speak for Fixy (ENG-19547).
-  const anchor = plan.ok && comments.find((c) => c.id === plan.anchorId);
-  if (
-    relayed &&
-    thread.fixyOwned &&
-    anchor &&
-    SLACK_ANCHOR_PATTERN.test(anchor.body)
-  ) {
+  const source = comments.find((c) => c.id === trigger.commentId);
+  if (relayed && thread.fixyOwned && source && SLACK_RELAY.test(source.body)) {
     return "fixy";
   }
   const followUp = relayed ?? directFollowUp(comments, foreman, trigger);

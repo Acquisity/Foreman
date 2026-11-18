@@ -86,6 +86,7 @@ End with one short line saying what you did: answered, joined a known issue, ask
 
 The `## Fixy handoff` comment marks an earlier handoff. Do not restart anything.
 
-- A question from the requester: answer briefly with `reply_to_requester`, from what the ticket already says.
-- A new detail Fixy needs, such as the workspace, a step, or when it started: call `hand_to_fixy` again with everything known, so it updates the handoff comment. Do not change the ticket's state or assignee, and do not remove or re-add labels.
+- A reply in the requester's Slack thread: Fixy's run gets it directly, so post nothing to the requester and end the session with one short line.
+- A question from the requester anywhere else: answer briefly with `reply_to_requester`, from what the ticket already says.
+- A new detail Fixy needs that did not come from that Slack thread, such as the workspace, a step, or when it started: call `hand_to_fixy` again with everything known, so it updates the handoff comment. Do not change the ticket's state or assignee, and do not remove or re-add labels.
 - Nothing new: end the session with one short line.
