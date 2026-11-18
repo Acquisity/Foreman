@@ -4,6 +4,7 @@ import {
   type LinearChannelCredentials,
 } from "eve/channels/linear";
 import { z } from "zod";
+import { FIXY_LABEL, FIXY_SANDBOX_LABEL } from "./fixy-handoff.js";
 import {
   decideFollowUp,
   type FollowUpInput,
@@ -37,6 +38,31 @@ import { isWidgetFiledDescription } from "./widget-ticket-marker.js";
 // The Acquisity support inbox roots its notes the same way, in "Support
 // conversation connected in …", and imports Foreman's reply as a team note.
 export const SLACK_ANCHOR_PATTERN = /^Slack thread connected in /u;
+// The receiver's prompt into the session, and its copy under the anchor.
+const SLACK_REPLY_PROMPT = /^\*\*[^*\n]{1,100}\*\* replied in Slack\.$/u;
+const SLACK_REPLY_COPY =
+  /^[^\n]{0,300}?\*\*[^*\n]{1,100}\*\* replied in Slack:/u;
+
+/** Whether the trigger is the receiver's relay of a Slack reply, judged from that comment alone. */
+const isSlackRelay = (
+  comments: readonly ThreadComment[],
+  trigger: { commentId: string; prompted: boolean }
+): boolean => {
+  const source = comments.find((c) => c.id === trigger.commentId);
+  if (!source) {
+    return false;
+  }
+  if (trigger.prompted) {
+    return SLACK_REPLY_PROMPT.test(source.body.trim());
+  }
+  // A copy under the anchor, or the top-level copy that tags Foreman.
+  const anchor = comments.find((c) => c.id === source.parentId);
+  return (
+    SLACK_REPLY_COPY.test(source.body) &&
+    (source.parentId === null ||
+      Boolean(anchor && SLACK_ANCHOR_PATTERN.test(anchor.body)))
+  );
+};
 const ANCHOR_PATTERN = /^(?:Slack thread|Support conversation) connected in /u;
 
 export interface ThreadComment {
@@ -123,6 +149,7 @@ const THREAD_QUERY = `query RequesterThread($id: String!) {
     id
     identifier
     project { id }
+    labels(first: 100) { nodes { name } }
   }
 }`;
 
@@ -271,6 +298,7 @@ interface ThreadResponse {
   issue: {
     id: string;
     identifier: string;
+    labels: { nodes: { name: string }[] };
     project: { id: string } | null;
   } | null;
   viewer: ForemanUser;
@@ -327,6 +355,7 @@ async function readThread(
   credentials: LinearChannelCredentials
 ): Promise<{
   comments: ThreadComment[];
+  fixyOwned: boolean;
   foreman: ForemanUser;
   issueId: string;
   plan: ReplyPlan;
@@ -357,6 +386,9 @@ async function readThread(
   );
   return {
     comments,
+    fixyOwned: thread.issue.labels.nodes.some((label) =>
+      [FIXY_LABEL, FIXY_SANDBOX_LABEL].includes(label.name.toLowerCase())
+    ),
     foreman: thread.viewer,
     issueId: thread.issue.id,
     plan: planReply(comments, thread.viewer.id),
@@ -377,7 +409,7 @@ export async function relayedFollowUpOutcome(
   trigger: { commentId: string; prompted: boolean },
   credentials: LinearChannelCredentials,
   signal?: AbortSignal
-): Promise<FollowUpOutcome | null> {
+): Promise<FollowUpOutcome | "fixy" | null> {
   return judgeFollowUp(
     await readThread(issue, credentials),
     trigger,
@@ -393,14 +425,20 @@ export async function relayedFollowUpOutcome(
 export async function judgeFollowUp(
   thread: {
     comments: readonly ThreadComment[];
+    fixyOwned?: boolean;
     foreman: ForemanUser;
     plan: ReplyPlan;
     widgetFeedback: boolean;
   },
   trigger: { commentId: string; prompted: boolean },
   decide: (followUp: FollowUpInput) => Promise<FollowUpOutcome>
-): Promise<FollowUpOutcome | null> {
+): Promise<FollowUpOutcome | "fixy" | null> {
   const { comments, foreman, plan, widgetFeedback } = thread;
+  // Fixy's Linear bot wakes Fixy's run with every Slack reply on a ticket it
+  // owns, so Foreman answering too would speak for Fixy (ENG-19547).
+  if (thread.fixyOwned && isSlackRelay(comments, trigger)) {
+    return "fixy";
+  }
   const relayed = trigger.prompted
     ? promptedFollowUp(comments, plan, trigger.commentId)
     : relayedFollowUp(comments, plan, trigger.commentId);

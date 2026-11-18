@@ -46,6 +46,35 @@ export const STATUS_ONLY_FOLLOW_UP =
 export const RESTATE_FOLLOW_UP =
   "Jev read this follow-up as the requester only nudging for an answer. Send exactly one reply_to_requester message whose text is your last answer restated in one sentence, leading with the answer and the next step. Ask no question of your own: code adds the closing question about what is still wrong. Then end the session. Do not re-investigate, call a decision tool, call route_ticket, change the document, or run the critic.";
 
+export const FIXY_HAS_IT =
+  "Fixy has this ticket, so this reply goes to Fixy's run.";
+
+/**
+ * Whether a judged follow-up ends here with one line in the session chat. A
+ * skip whose line cannot be posted dispatches rather than leave the session
+ * with nothing; a Fixy reply never does, since Fixy's run already has it.
+ */
+export const endsQuietly = async (
+  ctx: Pick<LinearSessionContext, "linear">,
+  outcome: FollowUpOutcome | "fixy" | null
+): Promise<boolean> => {
+  let line: string;
+  if (outcome === "fixy") {
+    line = FIXY_HAS_IT;
+  } else if (outcome === "skip") {
+    line = "No reply needed.";
+  } else {
+    return false;
+  }
+  const posted = await ctx.linear
+    .createActivity({ body: line, type: "response" })
+    .then(
+      () => true,
+      () => false
+    );
+  return posted || outcome === "fixy";
+};
+
 const FOLLOW_UP_CONTEXT: Partial<Record<FollowUpOutcome, string>> = {
   restate: RESTATE_FOLLOW_UP,
   status: STATUS_ONLY_FOLLOW_UP,
@@ -116,7 +145,7 @@ const issueOf = (event: LinearAgentSessionEvent): string | undefined =>
  */
 const followUpOutcome = (
   event: LinearAgentSessionEvent
-): Promise<FollowUpOutcome | null> => {
+): Promise<FollowUpOutcome | "fixy" | null> => {
   // A reply either opened its own session (a mention) or was prompted into
   // the ticket's existing one, by the receiver or by a person in its thread.
   const prompted = event.action === "prompted";
@@ -191,22 +220,14 @@ export const onAgentSession = async (
   // Every relayed Slack reply opens a session, and so does every comment in
   // a widget ticket's session thread; one that needs nothing from Foreman
   // ends here with a line in the session chat, never on the ticket.
-  // If the line cannot be posted, dispatch rather than leave the session
-  // with nothing.
+  // If a skip's line cannot be posted, dispatch rather than leave the session
+  // with nothing; a reply that goes to Fixy never dispatches.
   const [outcome, ask, route] = await Promise.all([
     followUpOutcome(event),
     askFrom(event),
     widgetRoute(event),
   ]);
-  if (
-    outcome === "skip" &&
-    (await ctx.linear
-      .createActivity({ body: "No reply needed.", type: "response" })
-      .then(
-        () => true,
-        () => false
-      ))
-  ) {
+  if (await endsQuietly(ctx, outcome)) {
     return null;
   }
   // URLs only: a bare `owner/repo` token in an issue title, description, or
@@ -231,7 +252,12 @@ export const onAgentSession = async (
   const context =
     buildLinearContext(event, ask?.requester ?? null, selectedRoute) ?? [];
   // Only the widget playbook forbids the status move; the front door keeps it.
-  return followUpDispatch(withRepository, context, outcome, Boolean(route));
+  return followUpDispatch(
+    withRepository,
+    context,
+    outcome === "fixy" ? null : outcome,
+    Boolean(route)
+  );
 };
 
 /** Whether a Linear event is the session's Stop button (ENG-14608). */
