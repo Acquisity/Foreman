@@ -39,15 +39,32 @@ const context = (scope: typeof verifiedWidgetContext) =>
     getToken: () => Promise.resolve({ token: "test-token" }),
     session: { auth: { current: null, initiator: widgetAuth(scope) } },
   }) as unknown as ProviderContext;
-const query = posthogQuery(verifiedWidgetContext.userId, reportedAt);
+const query = posthogQuery(
+  verifiedWidgetContext.userId,
+  verifiedWidgetContext.organizationId,
+  reportedAt
+);
+const OTHER = "99999999-9999-4999-8999-999999999999";
 
-test("the PostHog query reads only this user in the 30 minutes before the report", () => {
+test("the PostHog query reads only this user in this workspace in the 30 minutes before the report", () => {
   assert.ok(query.includes(`distinct_id = '${verifiedWidgetContext.userId}'`));
   assert.ok(query.includes("toDateTime('2026-11-11T18:25:00.000Z')"));
   assert.ok(query.includes("toDateTime('2026-11-11T18:55:00.000Z')"));
   assert.ok(query.includes("properties.$pathname"));
   assert.ok(!query.includes("$current_url"));
-  assert.throws(() => posthogQuery("x' OR 1=1 --", reportedAt));
+  assert.ok(
+    query.includes(`AND $group_0 = '${verifiedWidgetContext.organizationId}'`)
+  );
+  assert.throws(() =>
+    posthogQuery(
+      "x' OR 1=1 --",
+      verifiedWidgetContext.organizationId,
+      reportedAt
+    )
+  );
+  assert.throws(() =>
+    posthogQuery(verifiedWidgetContext.userId, "x' OR 1=1 --", reportedAt)
+  );
 });
 
 test("the policy allows only the exact query built for this user and report", async (t) => {
@@ -61,11 +78,19 @@ test("the policy allows only the exact query built for this user and report", as
   assert.equal(call.mock.callCount(), 1);
   const refused = [
     {
-      query: posthogQuery("99999999-9999-4999-8999-999999999999", reportedAt),
+      query: posthogQuery(
+        OTHER,
+        verifiedWidgetContext.organizationId,
+        reportedAt
+      ),
+    },
+    {
+      query: posthogQuery(verifiedWidgetContext.userId, OTHER, reportedAt),
     },
     {
       query: posthogQuery(
         verifiedWidgetContext.userId,
+        verifiedWidgetContext.organizationId,
         new Date("2026-11-10T18:55:00.000Z")
       ),
     },

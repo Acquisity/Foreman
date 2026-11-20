@@ -45,13 +45,19 @@ export const POSTHOG_READ = { path: "posthog-widget.execute-sql" } as const;
 const POSTHOG_WINDOW_MS = 30 * 60 * 1000;
 
 /**
- * The reporting user's page views and error toasts in the 30 minutes before
- * the report, each with its session and whether PostHog recorded that session.
+ * The reporting user's page views and error toasts in the verified workspace
+ * (Acquisity puts the active organization in `$group_0`) in the 30 minutes
+ * before the report, each with its session and whether PostHog recorded it.
  * Replays are matched by session id, because a replay's distinct_id is often
  * the visitor's anonymous id.
  */
-export function posthogQuery(userId: string, reportedAt: Date): string {
+export function posthogQuery(
+  userId: string,
+  organizationId: string,
+  reportedAt: Date
+): string {
   const id = z.uuid().parse(userId);
+  const organization = z.uuid().parse(organizationId);
   const from = new Date(reportedAt.getTime() - POSTHOG_WINDOW_MS).toISOString();
   const to = reportedAt.toISOString();
   return [
@@ -61,6 +67,7 @@ export function posthogQuery(userId: string, reportedAt: Date): string {
     "properties.$pathname",
     "FROM events",
     `WHERE distinct_id = '${id}'`,
+    `AND $group_0 = '${organization}'`,
     "AND event IN ('$pageview', 'crm.error_toast_shown')",
     `AND timestamp >= toDateTime('${from}')`,
     `AND timestamp <= toDateTime('${to}')`,
@@ -129,7 +136,11 @@ export function widgetOperationPolicy(ctx: ProviderContext) {
           !(scope?.bugReportedAt && input) ||
           Object.keys(input).length !== 1 ||
           input.query !==
-            posthogQuery(scope.userId, new Date(scope.bugReportedAt))
+            posthogQuery(
+              scope.userId,
+              scope.organizationId,
+              new Date(scope.bugReportedAt)
+            )
         ) {
           throw new Error("Only this customer's own activity can be read.");
         }
