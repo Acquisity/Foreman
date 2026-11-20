@@ -3,7 +3,11 @@ import type { MessageStreamEvent } from "eve/client";
 import { z } from "zod";
 import { readRequestBody } from "./bounded-body.js";
 import { logOpsEvent } from "./ops-log.js";
-import { addToBugReport, fileBugReport } from "./widget-bug-report.js";
+import {
+  addToBugReport,
+  bugReportBrowserSchema,
+  fileBugReport,
+} from "./widget-bug-report.js";
 import { answerFromGuide, chatGuideEnabled } from "./widget-chat.js";
 import { verifyWidgetContext } from "./widget-context.js";
 import {
@@ -165,6 +169,10 @@ const inputSchema = z.discriminatedUnion("action", [
   z.strictObject({
     ...scopeFields,
     action: z.literal("start"),
+    // What Acquisity's widget captured from the browser when the customer
+    // tapped "I found a bug" (ENG-20083). Read only by a bug_report, which
+    // drops an invalid one rather than refuse the report.
+    browser: z.unknown().optional(),
     history: historySchema.optional(),
     // Short-lived links to the same screenshots, for the help-center lane to
     // look at. The readings stay: every other stage reads only text.
@@ -205,14 +213,22 @@ const inputSchema = z.discriminatedUnion("action", [
 ]);
 export type WidgetInput = z.infer<typeof inputSchema>;
 
+/** A bug report's browser capture at its schema limits: page, browser, screen, six Sentry ids and sixty console and request lines. */
+const MAX_BROWSER_CHARS = 300 + 200 + 20 + 6 * 64 + 60 * 500;
+
 /**
  * The largest body a valid start can be: the question, twelve turns with four
- * citations each, three screenshot readings and three image links at their schema limits, every
- * character escaped to six in JSON (\u0000), plus room for the ids and keys.
+ * citations each, three screenshot readings, three image links and a browser
+ * capture at their schema limits, every character escaped to six in JSON
+ * (\u0000), plus room for the ids and keys.
  * The default 8 KB read cap refused ordinary multi-turn conversations.
  */
 const MAX_START_BODY_CHARS =
-  (4000 + 12 * (4000 + 4 * (300 + 500)) + 3 * 1500 + 3 * MAX_IMAGE_URL_CHARS) *
+  (4000 +
+    12 * (4000 + 4 * (300 + 500)) +
+    3 * 1500 +
+    3 * MAX_IMAGE_URL_CHARS +
+    MAX_BROWSER_CHARS) *
     6 +
   4096;
 
@@ -1599,6 +1615,12 @@ async function toggledPersonAsk(
 /** The whole filing or comment: well inside the deadline after which a run with no session is handed to a person. */
 const BUG_REPORT_MS = 120_000;
 
+/** The widget's browser capture, or nothing when it is missing or invalid: a bad capture never stops the report. */
+const bugReportBrowser = (browser: unknown) => {
+  const parsed = bugReportBrowserSchema.safeParse(browser);
+  return parsed.success ? { browser: parsed.data } : {};
+};
+
 /**
  * Acquisity's "I found a bug" steps hand the finished report here. Every role
  * gets it: the evidence lookups go only on the internal ticket, so only
@@ -1635,6 +1657,7 @@ async function answerBugReport(
     scope,
     run.id,
     {
+      ...(mode === "bug_report" ? bugReportBrowser(input.browser) : {}),
       history: input.history,
       messageId: input.message_id,
       question: input.question,

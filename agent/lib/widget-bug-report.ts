@@ -3,21 +3,20 @@ import { getToken as getConnectToken } from "@vercel/connect";
 import { generateObject } from "ai";
 import { callLinearGraphQL } from "eve/channels/linear";
 import { z } from "zod";
-import {
-  collectRows,
-  DATASET_NAME,
-} from "../tools/widget_generation_diagnostics.js";
+import { DATASET_NAME } from "../tools/widget_generation_diagnostics.js";
 import { readRecording } from "../tools/widget_read_recording.js";
 import { acquisityOrigin } from "./acquisity-origin.js";
-import { executorClient } from "./executor/client.js";
 import { invokeProvider, type ProviderContext } from "./executor/dispatch.js";
 import { mcpResultText } from "./executor/mcp-result.js";
-import { findFunctionRuns } from "./inngest-api.js";
 import { fastCallOptions, modelFor, resolveModel } from "./models.js";
 import { logOpsEvent } from "./ops-log.js";
-import { providerData } from "./support/conversation.js";
 import type { WidgetFindings } from "./widget-findings.js";
-import { POSTHOG_READ, posthogQuery } from "./widget-policy.js";
+import {
+  INNGEST_READ,
+  inngestRunsInput,
+  POSTHOG_READ,
+  posthogQuery,
+} from "./widget-policy.js";
 import { isLiveActive, isReplayActive } from "./widget-replay.js";
 import type { WidgetContext } from "./widget-scope.js";
 import {
@@ -29,15 +28,37 @@ import {
 /**
  * Acquisity's "I found a bug" steps (ENG-17031). The app asks for the details
  * and a screen recording, then hands the conversation here: Foreman files the
- * conversation's one Bug ticket in code, with what it found in Sentry, Axiom,
- * Inngest, PostHog and the recording, and the customer gets a fixed reply. No model
+ * conversation's one Bug ticket in code, with what it found in the customer's
+ * browser, Sentry, Axiom, Inngest, PostHog and the recording, and the customer
+ * gets a fixed reply. No model
  * decides whether to file, and nothing from the evidence reaches the customer.
  */
 export const BUG_REPORT_LOGGED =
   "Thanks, we've logged this and we're looking into it. Is there anything else you'd like to add?";
 export const BUG_REPORT_ADDED = "Thanks, I've added that to your report.";
 
+const SENTRY_ID = /^[A-Za-z0-9-]{8,64}$/u;
+
+/**
+ * What Acquisity's widget captured when the customer tapped "I found a bug"
+ * (its SupportReportBrowser): the page's pathname, the Sentry replay of the
+ * last minute, and recent console errors and failed requests, with no bodies,
+ * headers, cookies or query strings. The route drops an invalid one rather
+ * than refuse the report.
+ */
+export const bugReportBrowserSchema = z.object({
+  browser: z.string().max(200),
+  consoleErrors: z.array(z.string().max(500)).max(30),
+  failedRequests: z.array(z.string().max(500)).max(30),
+  page: z.string().regex(/^\/[^?#]{0,299}$/u),
+  replayId: z.string().regex(SENTRY_ID).nullable(),
+  screen: z.string().max(20),
+  sentryEventIds: z.array(z.string().regex(SENTRY_ID)).max(5),
+});
+export type BugReportBrowser = z.infer<typeof bugReportBrowserSchema>;
+
 export interface BugReportTurn {
+  browser?: BugReportBrowser;
   history?: { role: "customer" | "assistant"; text: string }[];
   messageId: string;
   question: string;
@@ -51,8 +72,17 @@ interface EvidenceItem {
   url?: string;
 }
 export type Evidence =
-  | { items: EvidenceItem[]; status: "found" }
+  | {
+      items: EvidenceItem[];
+      /** The last page the source saw the customer on. */
+      page?: string;
+      /** A recording of the customer's session. */
+      recording?: EvidenceItem;
+      status: "found";
+    }
   | { status: "empty" }
+  /** Nothing to look up: the app or the customer sent nothing for this source. */
+  | { status: "not_sent" }
   | { reason: string; status: "unchecked" };
 
 type Lookup = (
@@ -72,9 +102,22 @@ const LINEAR_MS = 15_000;
 const clip = (text: string, max: number) =>
   text.length > max ? `${text.slice(0, max - 1)}…` : text;
 const found = (items: EvidenceItem[]): Evidence =>
-  items.length
-    ? { items: items.slice(0, ITEMS_MAX), status: "found" }
-    : { status: "empty" };
+  items.length ? { items, status: "found" } : { status: "empty" };
+
+const inWords = (date: Date) =>
+  `${new Intl.DateTimeFormat("en-GB", {
+    dateStyle: "long",
+    timeStyle: "short",
+    timeZone: "UTC",
+  }).format(date)} UTC`;
+
+/** `10:21:15 UTC`, for times within the hour before the report. */
+const clock = (iso: string) => {
+  const time = Date.parse(iso);
+  return Number.isFinite(time)
+    ? `${new Date(time).toISOString().slice(11, 19)} UTC`
+    : null;
+};
 
 const read = async (
   ctx: ProviderContext,
@@ -172,8 +215,75 @@ const sentry: Lookup = async (ctx, scope) => {
   );
 };
 
-/** Error logs from the last day that name this workspace or this user. */
-const axiom: Lookup = async (ctx, scope) => {
+const CSV_BLOCK = /^# [\w.-]+\.csv$/mu;
+const NO_ROWS = /^No [^,\n]*\.$/u;
+
+/** RFC 4180 records: quoted fields may hold commas, doubled quotes and line breaks. */
+const csvRecords = (text: string) => {
+  const records: string[][] = [];
+  let record: string[] = [];
+  let field = "";
+  let quoted = false;
+  for (let index = 0; index < text.length; index += 1) {
+    const char = text[index];
+    if (quoted) {
+      if (char !== '"') {
+        field += char;
+      } else if (text[index + 1] === '"') {
+        field += '"';
+        index += 1;
+      } else {
+        quoted = false;
+      }
+    } else if (char === '"') {
+      quoted = true;
+    } else if (char === ",") {
+      record.push(field);
+      field = "";
+    } else if (char === "\n") {
+      record.push(field);
+      records.push(record);
+      record = [];
+      field = "";
+    } else if (char !== "\r") {
+      field += char;
+    }
+  }
+  record.push(field);
+  records.push(record);
+  return records.filter((row) => row.some(Boolean));
+};
+
+/**
+ * Axiom's MCP answers in CSV text, each table under a `# name.csv` line, and
+ * says "No … found." under it when a table is empty. The query's table is the
+ * one whose header names `message`; an answer without it is unrecognized.
+ */
+const axiomRows = (data: unknown) => {
+  const result = data as { content?: unknown; isError?: unknown } | null;
+  if (result?.isError === true) {
+    throw new Error("Axiom could not run the query.");
+  }
+  const blocks = (mcpResultText({ content: result?.content }) ?? "")
+    .split(CSV_BLOCK)
+    .slice(1)
+    .map((block) => block.trim());
+  for (const block of blocks) {
+    const [header, ...rows] = csvRecords(block);
+    if (header?.includes("message")) {
+      return rows.map((row) =>
+        Object.fromEntries(header.map((name, column) => [name, row[column]]))
+      );
+    }
+  }
+  if (blocks.length === 1 && NO_ROWS.test(blocks[0] ?? "")) {
+    return [];
+  }
+  throw new Error("Unrecognized Axiom response.");
+};
+
+/** Error logs from the day before the report that name this workspace or this user. */
+const axiom: Lookup = async (ctx, scope, turn) => {
   const dataset = process.env.WIDGET_AXIOM_APP_DATASET;
   if (!(dataset && DATASET_NAME.test(dataset))) {
     return {
@@ -181,64 +291,111 @@ const axiom: Lookup = async (ctx, scope) => {
       status: "unchecked",
     };
   }
+  const to = turn.reportedAt ? new Date(turn.reportedAt) : new Date();
+  const from = new Date(to.getTime() - 24 * 60 * 60 * 1000);
   const apl = [
     `['${dataset}']`,
-    "| where _time > ago(24h)",
+    `| where _time >= datetime('${from.toISOString()}') and _time <= datetime('${to.toISOString()}')`,
     `| where tostring(['fields']['organizationId']) == '${scope.organizationId}' or tostring(['fields']['userId']) == '${scope.userId}'`,
-    "| where level == 'error'",
+    "| where tostring(['level']) in ('error', 'fatal')",
     "| summarize count = count(), lastSeen = max(_time) by message",
     "| sort by lastSeen desc",
+    // max(_time) comes back as epoch nanoseconds; this makes it an ISO time.
+    "| extend lastSeen = tostring(todatetime(lastSeen))",
     `| limit ${ITEMS_MAX}`,
   ].join("\n");
-  const rows = collectRows(
-    providerData(await read(ctx, "axiom-foreman.queryDataset", { apl }))
+  const rows = axiomRows(
+    await read(ctx, "axiom-foreman.queryDataset", { apl })
   );
-  if (!rows) {
-    throw new Error("Unrecognized Axiom response.");
-  }
   return found(
-    rows.flatMap((row) => {
-      const { count, lastSeen, message } = (row ?? {}) as Record<
-        string,
-        unknown
-      >;
-      return typeof message === "string"
-        ? [
-            {
-              text: clip(
-                `${message} (${String(count ?? 1)} times, last ${String(lastSeen ?? "unknown")})`,
-                ITEM_CHARS
-              ),
-            },
-          ]
-        : [];
+    rows.flatMap(({ count, lastSeen, message }) => {
+      if (!message) {
+        return [];
+      }
+      const last = lastSeen ? Date.parse(lastSeen) : Number.NaN;
+      return [
+        {
+          text: clip(
+            `${message} (${count || 1} times${Number.isFinite(last) ? `, last ${inWords(new Date(last))}` : ""})`,
+            ITEM_CHARS
+          ),
+        },
+      ];
     })
   );
 };
 
-/** Inngest cannot filter runs by workspace, so these are every workspace's failed runs in the hour before the report. */
-const inngest: Lookup = async (ctx) => {
-  const result = await findFunctionRuns(
-    { sinceHours: 1, status: "Failed" },
-    { client: executorClient(ctx), signal: ctx.abortSignal }
+const inngestPage = z.object({
+  data: z
+    .array(
+      z.object({
+        endedAt: z.string().max(100).nullish(),
+        function: z
+          .object({
+            id: z.string().max(500).optional(),
+            name: z.string().max(500).optional(),
+          })
+          .optional(),
+        id: z.string().min(1).max(200),
+      })
+    )
+    .optional(),
+  page: z
+    .object({
+      cursor: z.string().max(2000).optional(),
+      hasMore: z.boolean().optional(),
+    })
+    .optional(),
+});
+/** A filtered scan can return an empty page that still has more; a few pages stay inside the deadline. */
+const INNGEST_PAGES = 3;
+
+/** This workspace's failed runs in the hour before the report, filtered by Inngest itself on the triggering event's organizationId. */
+const inngest: Lookup = async (ctx, scope, turn) => {
+  if (!turn.reportedAt) {
+    throw new Error("No report time.");
+  }
+  const input = inngestRunsInput(
+    scope.organizationId,
+    new Date(turn.reportedAt)
   );
-  if (result.error) {
-    throw new Error("Inngest read failed.");
+  const runs: z.infer<typeof inngestPage>["data"] = [];
+  let cursor: string | undefined;
+  for (let page = 0; page < INNGEST_PAGES; page += 1) {
+    // biome-ignore lint/performance/noAwaitInLoops: each page needs the previous page's cursor.
+    const data = (await read(ctx, INNGEST_READ.path, {
+      ...input,
+      ...(cursor ? { cursor } : {}),
+    })) as { isError?: unknown; structuredContent?: unknown } | null;
+    const parsed = inngestPage.safeParse(data?.structuredContent);
+    if (data?.isError === true || !parsed.success) {
+      throw new Error("Unrecognized Inngest response.");
+    }
+    runs.push(...(parsed.data.data ?? []));
+    cursor = parsed.data.page?.cursor;
+    if (!(parsed.data.page?.hasMore && cursor) || runs.length >= ITEMS_MAX) {
+      break;
+    }
   }
   return found(
-    result.runs.map((run) => ({
-      text: clip(
-        `${run.functionName ?? run.functionId ?? "Unknown function"} failed${run.endedAt ? ` at ${run.endedAt}` : ""} (all workspaces)`,
-        ITEM_CHARS
-      ),
-      url: `https://app.inngest.com/env/production/runs/${encodeURIComponent(run.runId)}`,
-    }))
+    runs.map((run) => {
+      const ended = run.endedAt ? clock(run.endedAt) : null;
+      return {
+        text: clip(
+          `${run.function?.name ?? run.function?.id ?? "Unknown function"} failed${ended ? ` at ${ended}` : ""}`,
+          ITEM_CHARS
+        ),
+        url: `https://app.inngest.com/env/production/runs/${encodeURIComponent(run.id)}`,
+      };
+    })
   );
 };
 
 const TAXONOMY_WARNINGS = /<taxonomy_warnings>[\s\S]*?<\/taxonomy_warnings>/u;
-const POSTHOG_COLUMNS = "timestamp|event|errorCode|$pathname";
+const POSTHOG_COLUMNS =
+  "timestamp|event|errorCode|sessionId|recorded|$pathname";
 const POSTHOG_NULL = "(null)";
+const POSTHOG_SESSION = /^[\w-]{1,100}$/u;
 
 /** PostHog answers execute-sql with a pipe-separated table: a header line, then one line per row. */
 const posthogRows = (data: unknown) => {
@@ -255,12 +412,13 @@ const posthogRows = (data: unknown) => {
     .filter((line) => line.trim())
     .slice(1, ITEMS_MAX + 1)
     .map((line) => {
-      const [timestamp, event, errorCode, ...rest] = line
+      const [timestamp, event, errorCode, sessionId, recorded, ...rest] = line
         .split("|")
         .map((cell) => cell.trim());
       if (
         !rest.length ||
         (event !== "$pageview" && event !== "crm.error_toast_shown") ||
+        (recorded !== "0" && recorded !== "1") ||
         !Number.isFinite(Date.parse(timestamp))
       ) {
         throw new Error("Unrecognized PostHog response.");
@@ -270,12 +428,18 @@ const posthogRows = (data: unknown) => {
         errorCode: errorCode === POSTHOG_NULL ? "" : errorCode,
         event,
         path: path === POSTHOG_NULL ? "" : path,
+        recorded: recorded === "1" && POSTHOG_SESSION.test(sessionId),
+        sessionId,
         timestamp,
       };
     });
 };
 
-/** The reporting user's page views and error toasts in the 30 minutes before the report, and their PostHog person. */
+/**
+ * The reporting user's page views and error toasts in the 30 minutes before
+ * the report. PostHog records only some sessions, so the newest recorded one is
+ * linked when there is one, and the ticket says so when there is none.
+ */
 const posthog: Lookup = async (ctx, scope, turn) => {
   if (!turn.reportedAt) {
     throw new Error("No report time.");
@@ -285,29 +449,43 @@ const posthog: Lookup = async (ctx, scope, turn) => {
       query: posthogQuery(scope.userId, new Date(turn.reportedAt)),
     })
   );
+  if (!rows.length) {
+    return { status: "empty" };
+  }
   const project = process.env.WIDGET_POSTHOG_PROJECT_ID;
+  const recorded = rows.find((row) => row.recorded)?.sessionId;
+  const recording =
+    recorded && project
+      ? {
+          text: "PostHog recording of this session",
+          url: `https://us.posthog.com/project/${encodeURIComponent(project)}/replay/${encodeURIComponent(recorded)}`,
+        }
+      : undefined;
   const activity = rows.map(({ errorCode, event, path, timestamp }) => ({
     text: clip(
-      `${event === "crm.error_toast_shown" ? `Error toast ${errorCode || "without a code"} on` : "Viewed"} ${path || "an unknown page"} at ${timestamp}`,
+      `${event === "crm.error_toast_shown" ? `Error toast ${errorCode || "without a code"} on` : "Viewed"} ${path || "an unknown page"} at ${clock(timestamp)}`,
       ITEM_CHARS
     ),
   }));
-  return activity.length && project
-    ? found([
-        {
-          text: "PostHog person",
-          url: `https://us.posthog.com/project/${encodeURIComponent(project)}/person/${encodeURIComponent(scope.userId)}`,
-        },
-        ...activity,
-      ])
-    : found(activity);
+  return {
+    items: [
+      recording ??
+        (recorded
+          ? { text: "PostHog recorded this session" }
+          : { text: "No PostHog recording (we only record some sessions)" }),
+      ...activity,
+    ],
+    page: rows.find((row) => row.event === "$pageview" && row.path)?.path,
+    ...(recording ? { recording } : {}),
+    status: "found",
+  };
 };
 
 export const jamLink = (id: string) => `https://jam.dev/c/${id}`;
 
 const jam: Lookup = async (ctx, _scope, turn) => {
   if (!turn.recording) {
-    return { reason: "the customer sent no recording", status: "unchecked" };
+    return { status: "not_sent" };
   }
   const recording = await readRecording(ctx, turn.recording.id);
   if ("error" in recording) {
@@ -324,8 +502,27 @@ const jam: Lookup = async (ctx, _scope, turn) => {
   ]);
 };
 
+/** What the app captured from the customer's browser when they tapped "I found a bug". */
+const browser: Lookup = (_ctx, _scope, turn) => {
+  const capture = turn.browser;
+  if (!capture) {
+    return Promise.resolve({ status: "not_sent" });
+  }
+  const line = (text: string) => ({ text: clip(text, ITEM_CHARS) });
+  return Promise.resolve(
+    found([
+      ...capture.consoleErrors.map((text) => line(`Console: ${text}`)),
+      ...capture.failedRequests.map((text) => line(`Request failed: ${text}`)),
+      ...(capture.sentryEventIds.length
+        ? [line(`Sentry error events: ${capture.sentryEventIds.join(", ")}`)]
+        : []),
+    ])
+  );
+};
+
 export const EVIDENCE_SOURCES = {
   Axiom: axiom,
+  Browser: browser,
   Inngest: inngest,
   Jam: jam,
   PostHog: posthog,
@@ -334,6 +531,7 @@ export const EVIDENCE_SOURCES = {
 export type EvidenceSource = keyof typeof EVIDENCE_SOURCES;
 /** The order the ticket lists them in. */
 const SOURCE_ORDER: readonly EvidenceSource[] = [
+  "Browser",
   "Sentry",
   "Axiom",
   "Inngest",
@@ -469,50 +667,132 @@ export async function draftBugReport(
   }
 }
 
-const inWords = (date: Date) =>
-  `${new Intl.DateTimeFormat("en-GB", {
-    dateStyle: "long",
-    timeStyle: "short",
-    timeZone: "UTC",
-  }).format(date)} UTC`;
-
-const conversationLink = (conversationId: string) => {
+const conversationLink = (conversationId: string, label: string) => {
   try {
     const url = new URL("/dashboard/admin/support", acquisityOrigin());
     url.searchParams.set("conversation", conversationId);
-    return `[Open the support conversation](${url})`;
+    return `[${label}](${url})`;
   } catch {
-    return `Support conversation ${conversationId}`;
+    return `${label} (${conversationId})`;
   }
 };
 
 /** The verbatim conversation and each evidence source are cut to fit, so the ticket stays inside the 16,000-character description bound. */
 const SAID_CHARS = 6000;
-const EVIDENCE_CHARS = 1200;
+const EVIDENCE_CHARS = 1000;
 
-const evidenceLines = (evidence: Evidence) => {
-  if (evidence.status === "empty") {
-    return ["Nothing found."];
-  }
-  if (evidence.status === "unchecked") {
-    return [`Not checked: ${evidence.reason}.`];
-  }
+const SOURCE_TITLES: Record<EvidenceSource, string> = {
+  Axiom: "Axiom error logs",
+  Browser: "The customer's browser",
+  Inngest: "Inngest failed runs",
+  Jam: "Jam recording",
+  PostHog: "PostHog activity",
+  Sentry: "Sentry issues",
+};
+
+const evidenceLines = (items: EvidenceItem[]) => {
   let budget = EVIDENCE_CHARS;
-  const lines = evidence.items.flatMap(({ text, url }) => {
+  const lines = items.slice(0, ITEMS_MAX).flatMap(({ text, url }) => {
     const line = url
       ? `- [${inert(text).replaceAll("]", ")")}](${url})`
       : `- ${inert(text)}`;
     budget -= line.length;
     return budget >= 0 ? [line] : [];
   });
-  const left = evidence.items.length - lines.length;
+  const left = items.length - lines.length;
   return left ? [...lines, `- …and ${left} more`] : lines;
+};
+
+/** Sources that found something get a section each; the rest fold into one line per outcome. */
+const whatWeKnow = (evidence: Record<EvidenceSource, Evidence>) => {
+  const sections = SOURCE_ORDER.flatMap((source) => {
+    const entry = evidence[source];
+    return entry.status === "found"
+      ? [
+          [`### ${SOURCE_TITLES[source]}`, ...evidenceLines(entry.items)].join(
+            "\n"
+          ),
+        ]
+      : [];
+  });
+  const empty = SOURCE_ORDER.filter(
+    (source) => evidence[source].status === "empty"
+  );
+  const unchecked = SOURCE_ORDER.flatMap((source) => {
+    const entry = evidence[source];
+    return entry.status === "unchecked" ? [`${source} (${entry.reason})`] : [];
+  });
+  return [
+    ...sections,
+    ...(empty.length ? [`Checked, nothing found: ${empty.join(", ")}.`] : []),
+    ...(unchecked.length ? [`Couldn't check: ${unchecked.join(", ")}.`] : []),
+  ].join("\n\n");
+};
+
+const sentryReplayLink = (replayId: string) => {
+  const organization = process.env.WIDGET_SENTRY_ORG_SLUG;
+  return organization
+    ? `[Sentry replay](https://${organization}.sentry.io/replays/${encodeURIComponent(replayId)}/)`
+    : `Sentry replay ${replayId}`;
+};
+
+/** Recordings first, then where the screenshots are. */
+const proof = (
+  turn: BugReportTurn,
+  scope: WidgetContext,
+  posthogRecording: EvidenceItem | undefined
+) => {
+  const recordings = [
+    ...(turn.browser?.replayId
+      ? [
+          `the ${sentryReplayLink(turn.browser.replayId)} of the minute before they reported it`,
+        ]
+      : []),
+    ...(turn.recording
+      ? [`their [Jam screen recording](${jamLink(turn.recording.id)})`]
+      : []),
+    ...(posthogRecording?.url
+      ? [`the [PostHog recording](${posthogRecording.url}) of the session`]
+      : []),
+  ];
+  const shots = turn.screenshots?.length ?? 0;
+  return [
+    recordings.length
+      ? `Watch ${recordings.join(", ")}.`
+      : "No recording: the app sent no replay and the customer sent no screen recording.",
+    shots
+      ? `${shots === 1 ? "One screenshot" : `${shots} screenshots`} in the ${conversationLink(scope.conversationId, "support conversation")}, read in the details below.`
+      : `No screenshots. ${conversationLink(scope.conversationId, "Open the support conversation")}.`,
+  ].join(" ");
+};
+
+const SCREENSHOT_LABEL = /^\[Screenshot the customer attached[^\]\n]*\]\n/u;
+
+/** The verbatim conversation, oldest first, with each screenshot reading under the customer's last message. */
+const saidLines = (turn: BugReportTurn) => {
+  const entries = [
+    ...(turn.history ?? []).map(({ role, text }) => ({
+      indent: "  ",
+      text: `${role === "customer" ? "Customer" : "Support"}: ${text}`,
+    })),
+    { indent: "  ", text: `Customer: ${turn.question}` },
+    ...(turn.screenshots ?? []).map((reading) => ({
+      indent: "    ",
+      text: `Screenshot: ${reading.replace(SCREENSHOT_LABEL, "")}`,
+    })),
+  ];
+  let budget = SAID_CHARS;
+  return entries.flatMap(({ indent, text }) => {
+    const line = `${indent}- ${inert(clip(text, 1500)).split("\n").join(`\n${indent}  `)}`;
+    budget -= line.length;
+    return budget >= 0 ? [line] : [];
+  });
 };
 
 const lowerFirstWord = (text: string) =>
   CAPITALISED.test(text) ? text.charAt(0).toLowerCase() + text.slice(1) : text;
 
-/** The team's bug format, ported from Acquisity's bug-report-ticket.ts, with an Evidence section. */
+/** The team's bug format, ported from Acquisity's bug-report-ticket.ts, with what the lookups found. */
 export function bugReportTicket(input: {
   draft: BugReportDraft;
   evidence: Record<EvidenceSource, Evidence>;
@@ -521,24 +801,18 @@ export function bugReportTicket(input: {
   turn: BugReportTurn;
 }) {
   const { draft, evidence, scope, turn } = input;
-  const shots = turn.screenshots?.length ?? 0;
-  const expected =
-    draft.whatShouldHappen === NOT_STATED
-      ? "it works as the customer expects"
-      : lowerFirstWord(
-          draft.whatShouldHappen.trim().replace(TRAILING_PERIOD, "")
-        );
-  let budget = SAID_CHARS;
-  const said = customerTurns(turn).flatMap(({ speaker, text }) => {
-    const line = `  - ${speaker}: ${inert(clip(text, 1500)).split("\n").join("\n    ")}`;
-    budget -= line.length;
-    return budget >= 0 ? [line] : [];
-  });
+  const stated = draft.whatShouldHappen !== NOT_STATED;
+  const expected = stated
+    ? lowerFirstWord(draft.whatShouldHappen.trim().replace(TRAILING_PERIOD, ""))
+    : "it works as the customer expects";
+  const activity =
+    evidence.PostHog.status === "found" ? evidence.PostHog : null;
+  const page = turn.browser?.page ?? activity?.page;
+  const capture = turn.browser;
   const description = [
     "## What's happening",
     draft.whatsHappening,
-    "## What should happen",
-    draft.whatShouldHappen,
+    ...(stated ? ["## What should happen", draft.whatShouldHappen] : []),
     "## Who it hits and how bad",
     [
       `One ${scope.role} in ${inert(scope.organizationName)}, reported from the support chat on ${inWords(input.reportedAt)}.`,
@@ -546,14 +820,14 @@ export function bugReportTicket(input: {
     ].join(" "),
     "## How to see it",
     [
-      `1. ${conversationLink(scope.conversationId)}.`,
-      `2. ${turn.recording ? `Watch the [screen recording](${jamLink(turn.recording.id)}).` : "The customer didn't send a screen recording."} ${shots ? `${shots === 1 ? "One screenshot" : `${shots} screenshots`}, read in the details below.` : "No screenshots."}`,
+      `1. ${page ? `Open \`${page.replaceAll("`", "")}\`, the page the customer was on${turn.browser ? "" : " (their last page view)"}.` : "The page the customer was on is unknown."}`,
+      "2. Do what the customer describes above.",
+      `3. ${proof(turn, scope, activity?.recording)}`,
+      "",
+      "Not reproduced yet.",
     ].join("\n"),
-    "Not reproduced yet.",
-    "## Evidence",
-    SOURCE_ORDER.map((source) =>
-      [`### ${source}`, ...evidenceLines(evidence[source])].join("\n")
-    ).join("\n\n"),
+    "## What we know so far",
+    whatWeKnow(evidence),
     "## Done when",
     [
       "- [ ] Triage verdict recorded: bug, working as intended, or a how-to question, and the customer gets a reply in the chat.",
@@ -562,16 +836,19 @@ export function bugReportTicket(input: {
     "<details><summary>For whoever fixes it</summary>",
     [
       `- Customer: user ${scope.userId}, ${scope.role}`,
-      `- Workspace: ${inert(scope.organizationName)}`,
-      `- Conversation: ${conversationLink(scope.conversationId)}`,
       `- First reported: ${inWords(input.reportedAt)}`,
       '- Filed from the support chat\'s "I found a bug" button',
+      ...(capture
+        ? [
+            `- Browser: ${inert(capture.browser) || "unknown"}, screen ${inert(capture.screen) || "unknown"}`,
+          ]
+        : []),
       `- Screen recording: ${turn.recording ? `[Jam recording](${jamLink(turn.recording.id)})` : "Not sent"}`,
       ...(draft.fallback
         ? ["- Written without the AI draft, which failed"]
         : []),
       "- What the customer said (verbatim, oldest first):",
-      ...said,
+      ...saidLines(turn),
     ].join("\n"),
     "</details>",
   ].join("\n\n");
@@ -581,10 +858,13 @@ export function bugReportTicket(input: {
 const evidenceSummary = (evidence: Record<EvidenceSource, Evidence>) =>
   SOURCE_ORDER.map((source) => {
     const entry = evidence[source];
-    if (entry.status === "found") {
-      return `${source} ${entry.items.length} found`;
-    }
-    return `${source} ${entry.status === "empty" ? "nothing found" : "not checked"}`;
+    const outcome = {
+      empty: "nothing found",
+      found: `${entry.status === "found" ? entry.items.length : 0} found`,
+      not_sent: "not sent",
+      unchecked: "not checked",
+    }[entry.status];
+    return `${source} ${outcome}`;
   }).join(", ");
 
 const ticketFindings = (

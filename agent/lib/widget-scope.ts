@@ -56,7 +56,7 @@ export const ORGANIZATION_SLUG = new RegExp(
 
 const shape = {
   // When the customer sent an "I found a bug" report. Only the bug report's
-  // evidence lookup sets it, and the policy reads PostHog only for it.
+  // evidence lookup sets it, and the policy reads PostHog and Inngest only for it.
   bugReportedAt: z.iso.datetime().optional(),
   conversationId: z.uuid(),
   // Only the local live harness stamps the original conversation date.

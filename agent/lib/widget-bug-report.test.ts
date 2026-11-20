@@ -26,7 +26,7 @@ import { type WidgetContext, widgetAuth } from "./widget-scope.js";
 import { fileTicketFor } from "./widget-ticket.js";
 
 const SENTRY_SECTION =
-  /### Sentry\n- \[TypeError: cannot read schedule\]\(https:\/\/acquisity\.sentry\.io\/issues\/123\/\)/u;
+  /### Sentry issues\n- \[TypeError: cannot read schedule\]\(https:\/\/acquisity\.sentry\.io\/issues\/123\/\)/u;
 const UUID_V4 =
   /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;
 const SERVICE_SECRET = "s".repeat(40);
@@ -68,8 +68,9 @@ const turn: BugReportTurn = {
 
 const evidence: Record<EvidenceSource, Evidence> = {
   Axiom: { status: "empty" },
+  Browser: { status: "not_sent" },
   Inngest: { reason: "the lookup failed", status: "unchecked" },
-  Jam: { reason: "the customer sent no recording", status: "unchecked" },
+  Jam: { status: "not_sent" },
   PostHog: { reason: "the lookup failed", status: "unchecked" },
   Sentry: {
     items: [
@@ -253,13 +254,68 @@ for (const role of ["member", "client"] as const) {
     });
     assert.equal(
       body.findings.report,
-      "Filed the customer's bug report: ENG-901. Evidence: Sentry 1 found, Axiom nothing found, Inngest not checked, PostHog not checked, Jam not checked."
+      "Filed the customer's bug report: ENG-901. Evidence: Browser not sent, Sentry 1 found, Axiom nothing found, Inngest not checked, PostHog not checked, Jam not sent."
     );
     assert.equal(body.message.includes("TypeError"), false);
     assert.deepEqual(members, [role]);
     assert.equal(calls.creates.length, 1);
     assert.equal(calls.creates[0].bug, true);
     assert.match(calls.creates[0].report, SENTRY_SECTION);
+  });
+}
+
+for (const [name, browser, expected] of [
+  ["a valid capture reaches the report", "valid", true],
+  [
+    "an invalid capture is dropped and the report still files",
+    "invalid",
+    false,
+  ],
+] as const) {
+  test(`bug_report browser: ${name}`, async (t) => {
+    enabled(t);
+    const received: BugReportTurn[] = [];
+    const valid = {
+      browser: "Chrome 131",
+      consoleErrors: ["10:21:03 error TypeError: x"],
+      failedRequests: [],
+      page: "/dashboard/acme",
+      replayId: "a1b2c3d4e5f60718293a4b5c6d7e8f90",
+      screen: "1440x900",
+      sentryEventIds: [],
+    };
+    const response = await receiveWidgetMessage(
+      request({
+        browser:
+          browser === "valid"
+            ? valid
+            : { ...valid, page: "/dashboard?token=secret" },
+        mode: "bug_report",
+      }),
+      handlers(),
+      30_000,
+      () => Promise.resolve(verifiedWidgetContext),
+      routeDeps({
+        bugReport: (_s, _runId, input) => {
+          received.push(input);
+          return Promise.resolve({
+            findings: {
+              confidence: "high",
+              facts: [],
+              needsHuman: false,
+              recommendation: "",
+              report: "Filed",
+              ticket: { id: "ENG-901", url: "https://linear.app/x" },
+            },
+            message: BUG_REPORT_LOGGED,
+          });
+        },
+      })
+    );
+    assert.equal(response.status, 200);
+    assert.equal((await response.json()).message, BUG_REPORT_LOGGED);
+    assert.equal(received.length, 1);
+    assert.deepEqual(received[0]?.browser, expected ? valid : undefined);
   });
 }
 
@@ -284,6 +340,7 @@ test("a bug_report from someone no longer in the workspace is refused and files 
 test("each evidence source reports items, nothing found, or not checked when it throws", async () => {
   const result = await gatherEvidence(verifiedWidgetContext, turn, RUN_ID, {
     Axiom: () => Promise.resolve({ status: "empty" }),
+    Browser: () => Promise.resolve({ status: "not_sent" }),
     Inngest: () => Promise.reject(new Error("Inngest is down")),
     Jam: () => Promise.reject(new Error("recording unreadable")),
     PostHog: () =>
@@ -298,6 +355,7 @@ test("each evidence source reports items, nothing found, or not checked when it 
   });
   assert.deepEqual(result, {
     Axiom: { status: "empty" },
+    Browser: { status: "not_sent" },
     Inngest: { reason: "the lookup failed", status: "unchecked" },
     Jam: { reason: "the lookup failed", status: "unchecked" },
     PostHog: { reason: "PostHog is not set up", status: "unchecked" },
@@ -310,7 +368,7 @@ test("each evidence source reports items, nothing found, or not checked when it 
   });
 });
 
-test("the ticket's Evidence section names each source's result", () => {
+test("What we know so far lists sources that found something, then folds the rest into one line each", () => {
   const { description, title } = bugReportTicket({
     draft: fallbackDraft(turn),
     evidence,
@@ -322,10 +380,14 @@ test("the ticket's Evidence section names each source's result", () => {
   assert.ok(
     description.includes(
       [
-        "## Evidence",
-        "### Sentry\n- [TypeError: cannot read schedule](https://acquisity.sentry.io/issues/123/)\n\n### Axiom\nNothing found.\n\n### Inngest\nNot checked: the lookup failed.\n\n### PostHog\nNot checked: the lookup failed.\n\n### Jam\nNot checked: the customer sent no recording.",
+        "## What we know so far",
+        "### Sentry issues\n- [TypeError: cannot read schedule](https://acquisity.sentry.io/issues/123/)",
+        "Checked, nothing found: Axiom.",
+        "Couldn't check: Inngest (the lookup failed), PostHog (the lookup failed).",
+        "## Done when",
       ].join("\n\n")
-    )
+    ),
+    description
   );
   assert.ok(
     description.startsWith(
@@ -337,6 +399,186 @@ test("the ticket's Evidence section names each source's result", () => {
       "One owner in Aaron Fraga's Workspace, reported from the support chat on 4 November 2026 at 10:30 UTC."
     )
   );
+  // Nothing is said about a source the customer or the app sent nothing for.
+  assert.ok(!description.includes("Jam"));
+  assert.ok(!description.includes("Browser"));
+});
+
+test("an unstated expectation leaves out its section, and the page and proof are in How to see it", () => {
+  const { description } = bugReportTicket({
+    draft: fallbackDraft(turn),
+    evidence,
+    reportedAt: new Date("2026-11-04T10:30:00.000Z"),
+    scope: verifiedWidgetContext,
+    turn,
+  });
+  assert.ok(!description.includes("Not stated."));
+  assert.ok(!description.includes("## What should happen"));
+  assert.ok(!description.includes("## Evidence"));
+  assert.ok(
+    description.includes(
+      "## How to see it\n\n1. The page the customer was on is unknown.\n2. Do what the customer describes above.\n3. No recording: the app sent no replay and the customer sent no screen recording. No screenshots. Open the support conversation"
+    ),
+    description
+  );
+  assert.ok(
+    description.includes(").\n\nNot reproduced yet.\n\n## What we know so far")
+  );
+  // The workspace and conversation are in the server's scope block, so the details don't repeat them.
+  assert.ok(!description.includes("- Workspace:"));
+  assert.ok(!description.includes("- Conversation:"));
+  assert.equal(
+    description.split(verifiedWidgetContext.conversationId).length - 1,
+    1
+  );
+});
+
+test("a stated expectation keeps its section", () => {
+  const { description } = bugReportTicket({
+    draft: {
+      impact: null,
+      title: "Campaign stays on Scheduling and never sends",
+      whatShouldHappen: "The campaign starts sending.",
+      whatsHappening: "The campaign stays on Scheduling.",
+    },
+    evidence,
+    reportedAt: new Date("2026-11-04T10:30:00.000Z"),
+    scope: verifiedWidgetContext,
+    turn,
+  });
+  assert.ok(
+    description.includes(
+      "## What should happen\n\nThe campaign starts sending.\n\n## Who it hits"
+    )
+  );
+  assert.ok(
+    description.includes(
+      "- [ ] If it's a bug: the campaign starts sending on the customer's workspace"
+    )
+  );
+});
+
+const capture = {
+  browser: "Chrome 131",
+  consoleErrors: [
+    "10:21:03 error TypeError: Cannot read properties of undefined (reading 'schedule')",
+  ],
+  failedRequests: ["10:21:02 POST /api/trpc/campaigns.launch 500 812ms"],
+  page: "/dashboard/acme/campaigns/42",
+  replayId: "a1b2c3d4e5f60718293a4b5c6d7e8f90",
+  screen: "1440x900",
+  sentryEventIds: ["0123456789abcdef0123456789abcdef"],
+};
+
+test("the browser capture names the page, links the Sentry replay and lists console errors and failed requests", async (t) => {
+  withEnv(t, "WIDGET_SENTRY_ORG_SLUG", "acquisity-ai");
+  const captured = { ...turn, browser: capture };
+  const found = await EVIDENCE_SOURCES.Browser(
+    {} as ProviderContext,
+    verifiedWidgetContext,
+    captured
+  );
+  const { description } = bugReportTicket({
+    draft: fallbackDraft(turn),
+    evidence: { ...evidence, Browser: found },
+    reportedAt: new Date("2026-11-04T10:30:00.000Z"),
+    scope: verifiedWidgetContext,
+    turn: {
+      ...captured,
+      screenshots: [
+        "[Screenshot the customer attached, as read by an image model]\nScreen: Campaigns list",
+      ],
+    },
+  });
+  assert.ok(
+    description.includes(
+      "1. Open `/dashboard/acme/campaigns/42`, the page the customer was on.\n2. Do what the customer describes above.\n3. Watch the [Sentry replay](https://acquisity-ai.sentry.io/replays/a1b2c3d4e5f60718293a4b5c6d7e8f90/) of the minute before they reported it. One screenshot in the support conversation"
+    ),
+    description
+  );
+  assert.ok(
+    description.includes(
+      [
+        "## What we know so far",
+        [
+          "### The customer's browser",
+          "- Console: 10:21:03 error TypeError: Cannot read properties of undefined (reading 'schedule')",
+          "- Request failed: 10:21:02 POST /api/trpc/campaigns.launch 500 812ms",
+          "- Sentry error events: 0123456789abcdef0123456789abcdef",
+        ].join("\n"),
+        "### Sentry issues",
+      ].join("\n\n")
+    ),
+    description
+  );
+  assert.ok(description.includes("- Browser: Chrome 131, screen 1440x900"));
+  // The reading sits under the customer's message without the image model's label.
+  assert.ok(
+    description.includes(
+      "  - Customer: My campaign stays on Scheduling and never sends.\n    - Screenshot: Screen: Campaigns list"
+    ),
+    description
+  );
+  assert.ok(!description.includes("[Screenshot the customer attached"));
+});
+
+test("with no browser capture, the page comes from the last PostHog page view and a PostHog recording is the proof", () => {
+  const { description } = bugReportTicket({
+    draft: fallbackDraft(turn),
+    evidence: {
+      ...evidence,
+      PostHog: {
+        items: [
+          {
+            text: "PostHog recording of this session",
+            url: "https://us.posthog.com/project/12345/replay/01900000-0000-7000-8000-000000000001",
+          },
+          { text: "Viewed /dashboard/acme/crm/tasks at 10:21:15 UTC" },
+        ],
+        page: "/dashboard/acme/crm/tasks",
+        recording: {
+          text: "PostHog recording of this session",
+          url: "https://us.posthog.com/project/12345/replay/01900000-0000-7000-8000-000000000001",
+        },
+        status: "found",
+      },
+    },
+    reportedAt: new Date("2026-11-04T10:30:00.000Z"),
+    scope: verifiedWidgetContext,
+    turn,
+  });
+  assert.ok(
+    description.includes(
+      "1. Open `/dashboard/acme/crm/tasks`, the page the customer was on (their last page view).\n2. Do what the customer describes above.\n3. Watch the [PostHog recording](https://us.posthog.com/project/12345/replay/01900000-0000-7000-8000-000000000001) of the session."
+    ),
+    description
+  );
+});
+
+test("every source with nothing found is one line", () => {
+  const empty = { status: "empty" } as const;
+  const { description } = bugReportTicket({
+    draft: fallbackDraft(turn),
+    evidence: {
+      Axiom: empty,
+      Browser: empty,
+      Inngest: empty,
+      Jam: { status: "not_sent" },
+      PostHog: empty,
+      Sentry: empty,
+    },
+    reportedAt: new Date("2026-11-04T10:30:00.000Z"),
+    scope: verifiedWidgetContext,
+    turn,
+  });
+  assert.ok(
+    description.includes(
+      "## What we know so far\n\nChecked, nothing found: Browser, Sentry, Axiom, Inngest, PostHog.\n\n## Done when"
+    ),
+    description
+  );
+  assert.ok(!description.includes("Couldn't check"));
+  assert.ok(!description.includes("###"));
 });
 
 test("the largest report still fits Linear's 16,000-character description", () => {
@@ -352,6 +594,7 @@ test("the largest report still fits Linear's 16,000-character description", () =
     draft: fallbackDraft({ ...turn, question: long }),
     evidence: {
       Axiom: many,
+      Browser: many,
       Inngest: many,
       Jam: many,
       PostHog: many,
@@ -361,6 +604,15 @@ test("the largest report still fits Linear's 16,000-character description", () =
     scope: verifiedWidgetContext,
     turn: {
       ...turn,
+      browser: {
+        browser: "b".repeat(200),
+        consoleErrors: Array.from({ length: 30 }, () => "c".repeat(500)),
+        failedRequests: Array.from({ length: 30 }, () => "f".repeat(500)),
+        page: `/${"p".repeat(299)}`,
+        replayId: "r".repeat(64),
+        screen: "s".repeat(20),
+        sentryEventIds: Array.from({ length: 5 }, () => "e".repeat(64)),
+      },
       history: Array.from({ length: 20 }, () => ({
         role: "customer" as const,
         text: long,
@@ -383,8 +635,9 @@ test("a recording's Jam link is on the ticket", () => {
   });
   assert.ok(
     description.includes(
-      "2. Watch the [screen recording](https://jam.dev/c/jam-123). No screenshots."
-    )
+      "3. Watch their [Jam screen recording](https://jam.dev/c/jam-123). No screenshots."
+    ),
+    description
   );
   assert.ok(
     description.includes(
@@ -406,6 +659,7 @@ test("filing still happens when every evidence lookup throws", async () => {
       evidence: (scope, input, runId) =>
         gatherEvidence(scope, input, runId, {
           Axiom: failing,
+          Browser: failing,
           Inngest: failing,
           Jam: failing,
           PostHog: failing,
@@ -416,9 +670,10 @@ test("filing still happens when every evidence lookup throws", async () => {
   );
   assert.equal(calls.creates.length, 1);
   assert.equal(outcome.findings.ticket?.id, "ENG-901");
-  assert.equal(
-    calls.creates[0].report.split("Not checked: the lookup failed.").length - 1,
-    5
+  assert.ok(
+    calls.creates[0].report.includes(
+      "Couldn't check: Browser (the lookup failed), Sentry (the lookup failed), Axiom (the lookup failed), Inngest (the lookup failed), PostHog (the lookup failed), Jam (the lookup failed)."
+    )
   );
 });
 
@@ -711,8 +966,21 @@ test("Sentry is not checked when its organization is not configured", async (t) 
   );
 });
 
-test("Axiom reads the workspace and user from the app logs' fields map", async (t) => {
-  withEnv(t, "WIDGET_AXIOM_APP_DATASET", "acquisity-app");
+/**
+ * Axiom's MCP answers every tool in CSV text under a `# name.csv` line
+ * (measured on listDatasets, getDatasetFields and getSavedQueries, 20 Nov
+ * 2026). The message is a real one from the app logs: quoted, with commas
+ * and doubled quotes.
+ */
+const axiomCsv = (body: string) => ({
+  content: [{ text: `# results.csv\n\n${body}`, type: "text" }],
+});
+const FEATUREBASE =
+  'FeatureBase identify error: {"name":"Error","message":"Identify functionality is available starting from the Growth plan.","stack":"@https://do.featurebase.app/js/sdk.js:489:105234"}';
+const UNRECOGNIZED_AXIOM = /Unrecognized Axiom response/;
+
+test("Axiom reads this workspace's and user's errors in the day before the report", async (t) => {
+  withEnv(t, "WIDGET_AXIOM_APP_DATASET", "acquisity");
   withEnv(t, "EXECUTOR_MCP_CONNECTOR_SUPPORT", "executor/test");
   const apls: string[] = [];
   t.mock.method(
@@ -721,40 +989,55 @@ test("Axiom reads the workspace and user from the app logs' fields map", async (
     (_wire: unknown, _path: string, input: { apl: string }) => {
       apls.push(input.apl);
       return Promise.resolve({
-        data: { structuredContent: { matches: [] } },
+        data: axiomCsv("No results found."),
         http: { status: 200 },
         ok: true,
       });
     }
   );
-  await EVIDENCE_SOURCES.Axiom(providerCtx(), verifiedWidgetContext, turn);
-  assert.ok(
-    apls[0]?.includes(
-      `tostring(['fields']['organizationId']) == '${verifiedWidgetContext.organizationId}'`
-    )
+  assert.deepEqual(
+    await EVIDENCE_SOURCES.Axiom(providerCtx(), verifiedWidgetContext, {
+      ...turn,
+      reportedAt: "2026-11-20T10:22:00.000Z",
+    }),
+    { status: "empty" }
   );
-  assert.ok(!apls[0]?.includes("['fields.organizationId']"));
+  assert.equal(
+    apls[0],
+    [
+      "['acquisity']",
+      "| where _time >= datetime('2026-11-19T10:22:00.000Z') and _time <= datetime('2026-11-20T10:22:00.000Z')",
+      `| where tostring(['fields']['organizationId']) == '${verifiedWidgetContext.organizationId}' or tostring(['fields']['userId']) == '${verifiedWidgetContext.userId}'`,
+      "| where tostring(['level']) in ('error', 'fatal')",
+      "| summarize count = count(), lastSeen = max(_time) by message",
+      "| sort by lastSeen desc",
+      "| extend lastSeen = tostring(todatetime(lastSeen))",
+      "| limit 8",
+    ].join("\n")
+  );
 });
 
-test("Axiom lists each error message with its count", async (t) => {
-  withEnv(t, "WIDGET_AXIOM_APP_DATASET", "acquisity-app");
-  answer(t, {
-    structuredContent: {
-      matches: [
-        {
-          count: 3,
-          lastSeen: "2026-11-04T10:00:00Z",
-          message: "Campaign schedule failed",
-        },
-      ],
-    },
-  });
+test("Axiom parses its CSV answer, quoted messages included", async (t) => {
+  withEnv(t, "WIDGET_AXIOM_APP_DATASET", "acquisity");
+  answer(
+    t,
+    axiomCsv(
+      [
+        "message,count,lastSeen",
+        `"${FEATUREBASE.replaceAll('"', '""')}",4,2026-11-20T10:21:19.558000128Z`,
+        '"Send Email - Failed to send\nretrying",1,2026-11-19T12:30:17.070000128Z',
+      ].join("\n")
+    )
+  );
   assert.deepEqual(
     await EVIDENCE_SOURCES.Axiom(providerCtx(), verifiedWidgetContext, turn),
     {
       items: [
         {
-          text: "Campaign schedule failed (3 times, last 2026-11-04T10:00:00Z)",
+          text: `${FEATUREBASE} (4 times, last 20 November 2026 at 10:21 UTC)`,
+        },
+        {
+          text: "Send Email - Failed to send\nretrying (1 times, last 19 November 2026 at 12:30 UTC)",
         },
       ],
       status: "found",
@@ -762,11 +1045,133 @@ test("Axiom lists each error message with its count", async (t) => {
   );
 });
 
+test("an Axiom answer without the query's table, or an error, is reported as not checked", async (t) => {
+  withEnv(t, "WIDGET_AXIOM_APP_DATASET", "acquisity");
+  answer(t, { content: [{ text: '{"matches": []}', type: "text" }] });
+  await assert.rejects(
+    EVIDENCE_SOURCES.Axiom(providerCtx(), verifiedWidgetContext, turn),
+    UNRECOGNIZED_AXIOM
+  );
+  t.mock.restoreAll();
+  answer(t, axiomCsv("name,type\n_time,datetime"));
+  await assert.rejects(
+    EVIDENCE_SOURCES.Axiom(providerCtx(), verifiedWidgetContext, turn),
+    UNRECOGNIZED_AXIOM
+  );
+  t.mock.restoreAll();
+  answer(t, {
+    content: [{ text: "Query failed: syntax error", type: "text" }],
+    isError: true,
+  });
+  await assert.rejects(
+    EVIDENCE_SOURCES.Axiom(providerCtx(), verifiedWidgetContext, turn)
+  );
+});
+
+/** inngest.list_runs as it answered live on 20 Nov 2026: runs in structuredContent.data, and no data at all when nothing matched. */
+const inngestPage = (
+  runs: { endedAt: string; id: string; name: string }[],
+  cursor?: string
+) => ({
+  content: [],
+  structuredContent: {
+    ...(runs.length
+      ? {
+          data: runs.map(({ endedAt, id, name }) => ({
+            app: { id: "ai-clients" },
+            endedAt,
+            function: { id: `ai-clients.${name}`, name },
+            id,
+            status: "FAILED",
+          })),
+        }
+      : {}),
+    metadata: { fetchedAt: "2026-11-20T23:20:52.014308852Z" },
+    page: { ...(cursor ? { cursor, hasMore: true } : {}), limit: 8 },
+  },
+});
+
+test("Inngest lists only this workspace's failed runs in the hour before the report, following the page cursor", async (t) => {
+  withEnv(t, "EXECUTOR_MCP_CONNECTOR_SUPPORT", "executor/test");
+  const calls: { input: Record<string, unknown>; path: string }[] = [];
+  const pages = [
+    inngestPage([], "page-2"),
+    inngestPage([
+      {
+        endedAt: "2026-11-11T18:40:37.457Z",
+        id: "01JTESTRUN0000000000000001",
+        name: "Campaign email daily results sync (per campaign)",
+      },
+    ]),
+  ];
+  t.mock.method(
+    executorTransport,
+    "call",
+    (_wire: unknown, path: string, input: Record<string, unknown>) => {
+      calls.push({ input, path });
+      return Promise.resolve({
+        data: pages.shift(),
+        http: { status: 200 },
+        ok: true,
+      });
+    }
+  );
+  assert.deepEqual(
+    await EVIDENCE_SOURCES.Inngest(
+      reportedCtx(),
+      verifiedWidgetContext,
+      reportedTurn
+    ),
+    {
+      items: [
+        {
+          text: "Campaign email daily results sync (per campaign) failed at 18:40:37 UTC",
+          url: "https://app.inngest.com/env/production/runs/01JTESTRUN0000000000000001",
+        },
+      ],
+      status: "found",
+    }
+  );
+  const filter = {
+    env: "production",
+    from: "2026-11-11T17:55:00.000Z",
+    limit: 8,
+    query: `event.data.organizationId == "${verifiedWidgetContext.organizationId}"`,
+    status: ["FAILED"],
+    until: "2026-11-11T18:55:00.000Z",
+  };
+  assert.deepEqual(calls, [
+    { input: filter, path: "inngest.list_runs" },
+    { input: { ...filter, cursor: "page-2" }, path: "inngest.list_runs" },
+  ]);
+});
+
+test("Inngest with no failed runs for the workspace is nothing found, and an error answer is not checked", async (t) => {
+  answer(t, inngestPage([]));
+  assert.deepEqual(
+    await EVIDENCE_SOURCES.Inngest(
+      reportedCtx(),
+      verifiedWidgetContext,
+      reportedTurn
+    ),
+    { status: "empty" }
+  );
+  t.mock.restoreAll();
+  answer(t, {
+    content: [{ text: "REST v2 returned HTTP 400", type: "text" }],
+    isError: true,
+    structuredContent: { errors: [{ code: "missing_field" }] },
+  });
+  await assert.rejects(
+    EVIDENCE_SOURCES.Inngest(reportedCtx(), verifiedWidgetContext, reportedTurn)
+  );
+});
+
 /** The shape posthog-widget.execute-sql returned live on Executor v2: one text block, an optional warnings block, then a pipe table. */
 const posthogTable = (rows: string[]) => ({
   content: [
     {
-      text: `<taxonomy_warnings>\nYour query references names that don't exist in this project's taxonomy.\n- Event '$exception' was not found in this project taxonomy.\n</taxonomy_warnings>\n\n${["timestamp|event|errorCode|$pathname", ...rows].join("\n")}`,
+      text: `<taxonomy_warnings>\nYour query references names that don't exist in this project's taxonomy.\n- Event '$exception' was not found in this project taxonomy.\n</taxonomy_warnings>\n\n${["timestamp|event|errorCode|sessionId|recorded|$pathname", ...rows].join("\n")}`,
       type: "text",
     },
   ],
@@ -817,13 +1222,15 @@ test("PostHog reads this user's activity in the 30 minutes before the report", a
   assert.ok(query.includes("2026-11-11T18:55:00.000Z"));
 });
 
-test("PostHog lists page views and error toasts by path, with the person link", async (t) => {
+const SESSION = "01900000-0000-7000-8000-000000000001";
+
+test("PostHog links the recording of a recorded session, and lists page views and error toasts by path", async (t) => {
   withEnv(t, "WIDGET_POSTHOG_PROJECT_ID", "12345");
   answer(
     t,
     posthogTable([
-      "2026-11-11T18:53:07.841000Z|$pageview|(null)|/dashboard",
-      `2026-11-11T18:52:50.802000Z|crm.error_toast_shown|CAMPAIGN_SEND_FAILED|/campaigns/${"x".repeat(400)}`,
+      `2026-11-11T18:53:07.841000Z|$pageview|(null)|${SESSION}|1|/dashboard`,
+      `2026-11-11T18:52:50.802000Z|crm.error_toast_shown|CAMPAIGN_SEND_FAILED|${SESSION}|1|/campaigns/${"x".repeat(400)}`,
     ])
   );
   const result = await EVIDENCE_SOURCES.PostHog(
@@ -833,25 +1240,28 @@ test("PostHog lists page views and error toasts by path, with the person link", 
   );
   assert.equal(result.status, "found");
   const items = result.status === "found" ? result.items : [];
-  assert.deepEqual(items[0], {
-    text: "PostHog person",
-    url: `https://us.posthog.com/project/12345/person/${verifiedWidgetContext.userId}`,
-  });
-  assert.deepEqual(items[1], {
-    text: "Viewed /dashboard at 2026-11-11T18:53:07.841000Z",
-  });
+  const recording = {
+    text: "PostHog recording of this session",
+    url: `https://us.posthog.com/project/12345/replay/${SESSION}`,
+  };
+  assert.deepEqual(items[0], recording);
+  assert.deepEqual(result.status === "found" && result.recording, recording);
+  assert.equal(result.status === "found" && result.page, "/dashboard");
+  assert.deepEqual(items[1], { text: "Viewed /dashboard at 18:53:07 UTC" });
   assert.ok(
     items[2]?.text.startsWith("Error toast CAMPAIGN_SEND_FAILED on /campaigns/")
   );
   assert.equal(items[2]?.text.length, 300);
-  assert.ok(!items.some(({ text }) => text.includes("?")));
+  assert.ok(!items.some(({ text }) => text.includes("person")));
 });
 
-test("PostHog leaves out the person link when its project is not configured", async (t) => {
-  withEnv(t, "WIDGET_POSTHOG_PROJECT_ID", undefined);
+test("PostHog says there is no recording when the session was not recorded, and links no person", async (t) => {
+  withEnv(t, "WIDGET_POSTHOG_PROJECT_ID", "12345");
   answer(
     t,
-    posthogTable(["2026-11-11T18:53:07.841000Z|$pageview|(null)|/dashboard"])
+    posthogTable([
+      `2026-11-20T10:21:15.992000Z|$pageview|(null)|${SESSION}|0|/auth/oauth/workspace`,
+    ])
   );
   assert.deepEqual(
     await EVIDENCE_SOURCES.PostHog(
@@ -860,7 +1270,36 @@ test("PostHog leaves out the person link when its project is not configured", as
       reportedTurn
     ),
     {
-      items: [{ text: "Viewed /dashboard at 2026-11-11T18:53:07.841000Z" }],
+      items: [
+        { text: "No PostHog recording (we only record some sessions)" },
+        { text: "Viewed /auth/oauth/workspace at 10:21:15 UTC" },
+      ],
+      page: "/auth/oauth/workspace",
+      status: "found",
+    }
+  );
+});
+
+test("PostHog names a recording without a link when its project is not configured", async (t) => {
+  withEnv(t, "WIDGET_POSTHOG_PROJECT_ID", undefined);
+  answer(
+    t,
+    posthogTable([
+      `2026-11-11T18:53:07.841000Z|$pageview|(null)|${SESSION}|1|/dashboard`,
+    ])
+  );
+  assert.deepEqual(
+    await EVIDENCE_SOURCES.PostHog(
+      reportedCtx(),
+      verifiedWidgetContext,
+      reportedTurn
+    ),
+    {
+      items: [
+        { text: "PostHog recorded this session" },
+        { text: "Viewed /dashboard at 18:53:07 UTC" },
+      ],
+      page: "/dashboard",
       status: "found",
     }
   );
@@ -904,8 +1343,15 @@ test("an unrecognized PostHog response is reported as not checked", async (t) =>
 for (const [name, row] of [
   ["garbage", "garbage|garbage"],
   ["one-cell", "garbage"],
-  ["unknown event", "2026-11-11T18:53:07.841000Z|unknown|(null)|/dashboard"],
-  ["invalid timestamp", "garbage|$pageview|(null)|/dashboard"],
+  [
+    "unknown event",
+    "2026-11-11T18:53:07.841000Z|unknown|(null)|(null)|0|/dashboard",
+  ],
+  ["invalid timestamp", "garbage|$pageview|(null)|(null)|0|/dashboard"],
+  [
+    "unknown recorded flag",
+    "2026-11-11T18:53:07.841000Z|$pageview|(null)|(null)|yes|/dashboard",
+  ],
 ]) {
   test(`a PostHog ${name} row is reported as not checked`, async (t) => {
     answer(t, posthogTable([row]));
