@@ -302,7 +302,7 @@ const axiomRows = (data: unknown): Record<string, unknown>[] => {
   throw new Error("Unrecognized Axiom response.");
 };
 
-/** Error logs from the day before the report that name this workspace or this user. */
+/** Error logs from the day before the report that name this workspace, or name this user and no workspace: a user's row from another workspace names that workspace. */
 const axiom: Lookup = async (ctx, scope, turn) => {
   const dataset = process.env.WIDGET_AXIOM_APP_DATASET;
   if (!(dataset && DATASET_NAME.test(dataset))) {
@@ -316,7 +316,6 @@ const axiom: Lookup = async (ctx, scope, turn) => {
   const apl = [
     `['${dataset}']`,
     `| where _time >= datetime('${from.toISOString()}') and _time <= datetime('${to.toISOString()}')`,
-    // A row the user wrote in another workspace names that workspace, so the user matches only rows that name none.
     `| where tostring(['fields']['organizationId']) == '${scope.organizationId}' or (isempty(tostring(['fields']['organizationId'])) and tostring(['fields']['userId']) == '${scope.userId}')`,
     "| where tostring(['level']) in ('error', 'fatal')",
     "| summarize count = count(), lastSeen = max(_time) by message",

@@ -256,7 +256,7 @@ interface TicketInput {
   turn: BugReportTurn;
 }
 
-/** Linear's description bound, less the Verified scope block the ticket write appends. */
+/** Linear's description bound, which must also hold the Verified scope block the ticket write appends. */
 const DESCRIPTION_MAX = 16_000;
 
 /**
