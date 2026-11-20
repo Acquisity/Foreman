@@ -408,13 +408,12 @@ export async function relayedFollowUpOutcome(
   issue: string,
   trigger: { commentId: string; prompted: boolean },
   credentials: LinearChannelCredentials,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  decide: (followUp: FollowUpInput) => Promise<FollowUpOutcome> = (
+    followUp
+  ) => decideFollowUp(followUp, { signal })
 ): Promise<FollowUpOutcome | "fixy" | null> {
-  return judgeFollowUp(
-    await readThread(issue, credentials),
-    trigger,
-    (followUp) => decideFollowUp(followUp, { signal })
-  );
+  return judgeFollowUp(await readThread(issue, credentials), trigger, decide);
 }
 
 /**

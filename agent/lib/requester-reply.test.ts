@@ -11,6 +11,7 @@ import {
   RESTATE_QUESTION,
   readAllComments,
   relayedFollowUp,
+  relayedFollowUpOutcome,
   replyBody,
   replyToRequester,
   type ThreadComment,
@@ -934,4 +935,77 @@ test("ENG-19547: the gate gives a Slack reply on a ticket Fixy owns to Fixy, wit
     "respond",
     "only Slack replies reach Fixy, so a support inbox note stays with Foreman"
   );
+});
+
+test("ENG-19978: the gate hands a Slack reply to Fixy only while Fixy works the ticket, and Foreman answers once it's Done", async (t) => {
+  const relay: ThreadComment = {
+    body: "**Michelle** replied in Slack:\n\nIs this fixed for everyone?",
+    createdAt: "2026-11-20T08:49:56Z",
+    id: "r1",
+    parentId: "anchor",
+    userId: "aaron",
+  };
+  let state = { name: "In Progress", type: "started" };
+  t.mock.method(globalThis, "fetch", (_url: unknown, init?: RequestInit) => {
+    const { query } = JSON.parse(String(init?.body)) as { query: string };
+    if (query.includes("IssueComments")) {
+      return Promise.resolve(
+        Response.json({
+          data: {
+            issue: {
+              comments: {
+                nodes: [anchor, relay].map((comment) => ({
+                  ...comment,
+                  parent: comment.parentId ? { id: comment.parentId } : null,
+                  updatedAt: comment.createdAt,
+                  user: { id: comment.userId, name: "Tester" },
+                })),
+                pageInfo: { endCursor: null, hasNextPage: false },
+              },
+            },
+          },
+        })
+      );
+    }
+    assert.match(query, /state \{ type name \}/u);
+    return Promise.resolve(
+      Response.json({
+        data: {
+          issue: {
+            id: "issue",
+            identifier: "ENG-19424",
+            labels: { nodes: [{ name: "fixy" }] },
+            project: null,
+            state,
+          },
+          viewer: foremanUser,
+        },
+      })
+    );
+  });
+  const trigger = { commentId: "r1", prompted: false };
+  let judged = 0;
+  const decide = () => {
+    judged += 1;
+    return Promise.resolve<FollowUpOutcome>("respond");
+  };
+  assert.equal(
+    await relayedFollowUpOutcome("ENG-19424", trigger, { accessToken: "test-token" }, undefined, decide),
+    "fixy",
+    "an open Fixy ticket"
+  );
+  assert.equal(judged, 0);
+  state = { name: "Done", type: "completed" };
+  assert.equal(
+    await relayedFollowUpOutcome("ENG-19424", trigger, { accessToken: "test-token" }, undefined, decide),
+    "respond",
+    "a Done Fixy ticket"
+  );
+  state = { name: "To Code Review", type: "started" };
+  assert.equal(
+    await relayedFollowUpOutcome("ENG-19424", trigger, { accessToken: "test-token" }, undefined, decide),
+    "respond",
+    "a Fixy ticket handed to code review"
+  );
+  assert.equal(judged, 2);
 });

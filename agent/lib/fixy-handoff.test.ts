@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
+  fixyWorking,
   type FixyHandoff,
   fixyHandoffCommentId,
   fixyTriageTeams,
@@ -227,6 +228,26 @@ describe("handoff comment", () => {
       `## Fixy handoff\n${"x".repeat(21_000)}`,
     ]) {
       assert.equal(parseFixyHandoff(body), null, body.slice(0, 60));
+    }
+  });
+});
+
+describe("fixyWorking (ENG-19978)", () => {
+  const issue = (labels: string[], type: string, name: string) => ({
+    labels: { nodes: labels.map((label) => ({ name: label })) },
+    state: { name, type },
+  });
+
+  it("is true only for a fixy or fixy-sandbox ticket that is open and not in code review or QA", () => {
+    assert.equal(fixyWorking(issue(["fixy"], "started", "In Progress")), true);
+    assert.equal(fixyWorking(issue(["Fixy-Sandbox"], "unstarted", "Todo")), true);
+    assert.equal(fixyWorking(issue(["fixy"], "started", "Blocked")), true);
+    assert.equal(fixyWorking(issue(["Bug"], "started", "In Progress")), false);
+    assert.equal(fixyWorking(issue(["fixy"], "completed", "Done")), false);
+    assert.equal(fixyWorking(issue(["fixy"], "canceled", "Canceled")), false);
+    assert.equal(fixyWorking(issue(["fixy"], "canceled", "Duplicate")), false);
+    for (const review of ["To Code Review", "In Code Review", "To QA", "In QA", "Ready to Merge"]) {
+      assert.equal(fixyWorking(issue(["fixy"], "started", review)), false, review);
     }
   });
 });
