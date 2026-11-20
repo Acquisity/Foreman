@@ -24,7 +24,7 @@ Read the full issue through the Linear connection: title, description, attachmen
 
 Call `classify_ask` once with the issue text and comments, and keep its `sourceLabels`. A money ask: load the billing-triage skill, which replaces this one. Otherwise continue here.
 
-When the ticket already has the `## Fixy handoff` comment, go to step 8. The `fixy` label alone does not mean a handoff was written. When `fixy` is present without that comment, continue here and write the handoff in step 6; note that Fixy may already have started. On a ticket carrying `fixy` or `fixy-sandbox`, with or without that comment, a reply in the requester's Slack thread goes to Fixy's run directly: send no `reply_to_requester` for it.
+When the ticket already has the `## Fixy handoff` comment, go to step 8. The `fixy` label alone does not mean a handoff was written. When `fixy` is present without that comment, continue here and write the handoff in step 6; note that Fixy may already have started. On a ticket carrying `fixy` or `fixy-sandbox`, with or without that comment, a reply in the requester's Slack thread goes to Fixy's run directly while Fixy is still working it: send no `reply_to_requester` for it. Fixy's part is over once the ticket is Done or Canceled, or its state is To Code Review, In Code Review, To QA, In QA or Ready to Merge: then answer it as step 8 says.
 
 ## 2. Find the workspace
 
@@ -86,7 +86,8 @@ End with one short line saying what you did: answered, joined a known issue, ask
 
 The `## Fixy handoff` comment marks an earlier handoff. Do not restart anything.
 
-- A reply in the requester's Slack thread: Fixy's run gets it directly, so post nothing to the requester and end the session with one short line.
+- A reply in the requester's Slack thread while Fixy is still working the ticket: Fixy's run gets it directly, so post nothing to the requester and end the session with one short line.
+- A reply in the requester's Slack thread once Fixy's part is over (Done, Canceled, or To Code Review, In Code Review, To QA, In QA or Ready to Merge): answer it with `reply_to_requester` from Fixy's closing comment on the ticket (the newest comment by Fixy McFixerson, ENG-19978), in a few plain lines. Say only what that comment and the ticket show; when they don't answer the question, say the team will follow up rather than guess. Change no state.
 - A question from the requester anywhere else: answer briefly with `reply_to_requester`, from what the ticket already says.
 - A new detail Fixy needs that did not come from that Slack thread, such as the workspace, a step, or when it started: call `hand_to_fixy` again with everything known, so it updates the handoff comment. Do not change the ticket's state or assignee, and do not remove or re-add labels.
 - Nothing new: end the session with one short line.
