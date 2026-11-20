@@ -248,7 +248,11 @@ describe("fixyWorking (ENG-19978)", () => {
     assert.equal(fixyWorking(issue(["Bug"], "started", "In Progress")), false);
     assert.equal(fixyWorking(issue(["fixy"], "completed", "Done")), false);
     assert.equal(fixyWorking(issue(["fixy"], "canceled", "Canceled")), false);
-    assert.equal(fixyWorking(issue(["fixy"], "canceled", "Duplicate")), false);
+    assert.equal(
+      fixyWorking(issue(["fixy"], "canceled", "Duplicate")),
+      true,
+      "Fixy's admission still starts a run on a Duplicate"
+    );
     for (const review of [
       "To Code Review",
       "In Code Review",

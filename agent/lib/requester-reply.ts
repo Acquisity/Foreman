@@ -4,7 +4,7 @@ import {
   type LinearChannelCredentials,
 } from "eve/channels/linear";
 import { z } from "zod";
-import { fixyWorking } from "./fixy-handoff.js";
+import { fixyLabelled, fixyWorking } from "./fixy-handoff.js";
 import {
   decideFollowUp,
   type FollowUpInput,
@@ -357,6 +357,7 @@ async function readThread(
   credentials: LinearChannelCredentials
 ): Promise<{
   comments: ThreadComment[];
+  fixyDone: boolean;
   fixyOwned: boolean;
   foreman: ForemanUser;
   issueId: string;
@@ -388,6 +389,7 @@ async function readThread(
   );
   return {
     comments,
+    fixyDone: fixyLabelled(thread.issue) && !fixyWorking(thread.issue),
     fixyOwned: fixyWorking(thread.issue),
     foreman: thread.viewer,
     issueId: thread.issue.id,
@@ -423,6 +425,7 @@ export async function relayedFollowUpOutcome(
 export async function judgeFollowUp(
   thread: {
     comments: readonly ThreadComment[];
+    fixyDone?: boolean;
     fixyOwned?: boolean;
     foreman: ForemanUser;
     plan: ReplyPlan;
@@ -454,9 +457,11 @@ export async function judgeFollowUp(
   if (followUp.lastReply === "" && outcome === "skip") {
     return null;
   }
-  // A restatement needs an answer to restate, and a widget-feedback playbook
-  // never replies to the requester.
-  return outcome === "restate" && (followUp.lastReply === "" || widgetFeedback)
+  // A restatement needs an answer to restate, a widget-feedback playbook
+  // never replies to the requester, and once Fixy's part is over the answer
+  // comes from Fixy's closing comment, not Foreman's earlier reply (ENG-19978).
+  return outcome === "restate" &&
+    (followUp.lastReply === "" || widgetFeedback || thread.fixyDone)
     ? "respond"
     : outcome;
 }
