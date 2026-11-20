@@ -27,6 +27,14 @@ const answered: ThreadComment = {
   parentId: "anchor",
   userId: FOREMAN,
 };
+// The receiver's prompt into Foreman's open session for the same reply.
+const prompt: ThreadComment = {
+  body: "**Michelle** replied in Slack.",
+  createdAt: "2026-11-20T08:49:57Z",
+  id: "p1",
+  parentId: "session",
+  userId: "aaron",
+};
 const relay: ThreadComment = {
   body: "**Michelle** replied in Slack:\n\nAny update? Is this fixed for everyone?",
   createdAt: "2026-11-20T08:49:56Z",
@@ -55,7 +63,7 @@ const linear = (t: { mock: { method: typeof test.mock.method } }) =>
           data: {
             issue: {
               comments: {
-                nodes: [anchor, answered, relay].map((comment) => ({
+                nodes: [anchor, answered, relay, prompt].map((comment) => ({
                   ...comment,
                   parent: comment.parentId ? { id: comment.parentId } : null,
                   updatedAt: comment.createdAt,
@@ -85,11 +93,11 @@ const linear = (t: { mock: { method: typeof test.mock.method } }) =>
     );
   });
 
-const judge = (issue: string, judged: FollowUpOutcome) => {
+const judge = (issue: string, judged: FollowUpOutcome, prompted = false) => {
   let calls = 0;
   return relayedFollowUpOutcome(
     issue,
-    { commentId: "r1", prompted: false },
+    { commentId: prompted ? "p1" : "r1", prompted },
     { accessToken: "test-token" },
     undefined,
     () => {
@@ -110,15 +118,18 @@ test("ENG-19978: a Slack reply goes to Fixy while Fixy works the ticket, without
   );
 });
 
-test("ENG-19978: once Fixy is done or in code review, Foreman answers, and a nudge is answered afresh, not restated", async (t) => {
+test("ENG-19978: once Fixy is done or in code review, Foreman answers, and a nudge or status ask is answered afresh", async (t) => {
   linear(t);
   const closed = ["ENG-3", "ENG-4", "ENG-5"];
+  const judged: FollowUpOutcome[] = ["respond", "restate", "status"];
   const answers = await Promise.all(
-    closed.flatMap((id) => [judge(id, "respond"), judge(id, "restate")])
+    closed.flatMap((id) =>
+      judged.flatMap((j) => [judge(id, j), judge(id, j, true)])
+    )
   );
   assert.deepEqual(
     answers.map((a) => a.result),
-    closed.flatMap(() => ["respond", "respond"]),
-    "Foreman's earlier reply predates Fixy's closing comment"
+    closed.flatMap(() => judged.flatMap(() => ["respond", "respond"])),
+    "Foreman's earlier reply predates Fixy's closing comment, and Fixy owns the state"
   );
 });

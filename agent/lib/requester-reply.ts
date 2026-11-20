@@ -457,11 +457,15 @@ export async function judgeFollowUp(
   if (followUp.lastReply === "" && outcome === "skip") {
     return null;
   }
-  // A restatement needs an answer to restate, a widget-feedback playbook
-  // never replies to the requester, and once Fixy's part is over the answer
-  // comes from Fixy's closing comment, not Foreman's earlier reply (ENG-19978).
-  return outcome === "restate" &&
-    (followUp.lastReply === "" || widgetFeedback || thread.fixyDone)
+  // Once Fixy's part is over, the answer comes from Fixy's closing comment,
+  // not Foreman's earlier reply, and no state moves: Fixy owns the ticket's
+  // state (ENG-19978).
+  if (thread.fixyDone && (outcome === "restate" || outcome === "status")) {
+    return "respond";
+  }
+  // A restatement needs an answer to restate, and a widget-feedback playbook
+  // never replies to the requester.
+  return outcome === "restate" && (followUp.lastReply === "" || widgetFeedback)
     ? "respond"
     : outcome;
 }
