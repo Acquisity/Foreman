@@ -76,7 +76,6 @@ export type Evidence =
       items: EvidenceItem[];
       /** The last page the source saw the customer on. */
       page?: string;
-      /** A recording of the customer's session. */
       recording?: EvidenceItem;
       status: "found";
     }
@@ -502,7 +501,6 @@ const jam: Lookup = async (ctx, _scope, turn) => {
   ]);
 };
 
-/** What the app captured from the customer's browser when they tapped "I found a bug". */
 const browser: Lookup = (_ctx, _scope, turn) => {
   const capture = turn.browser;
   if (!capture) {
@@ -736,7 +734,6 @@ const sentryReplayLink = (replayId: string) => {
     : `Sentry replay ${replayId}`;
 };
 
-/** Recordings first, then where the screenshots are. */
 const proof = (
   turn: BugReportTurn,
   scope: WidgetContext,
@@ -855,16 +852,16 @@ export function bugReportTicket(input: {
   return { description, title: draft.title };
 }
 
+const OUTCOMES = {
+  empty: "nothing found",
+  not_sent: "not sent",
+  unchecked: "not checked",
+} as const;
+
 const evidenceSummary = (evidence: Record<EvidenceSource, Evidence>) =>
   SOURCE_ORDER.map((source) => {
     const entry = evidence[source];
-    const outcome = {
-      empty: "nothing found",
-      found: `${entry.status === "found" ? entry.items.length : 0} found`,
-      not_sent: "not sent",
-      unchecked: "not checked",
-    }[entry.status];
-    return `${source} ${outcome}`;
+    return `${source} ${entry.status === "found" ? `${entry.items.length} found` : OUTCOMES[entry.status]}`;
   }).join(", ");
 
 const ticketFindings = (

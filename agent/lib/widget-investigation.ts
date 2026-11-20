@@ -1615,7 +1615,6 @@ async function toggledPersonAsk(
 /** The whole filing or comment: well inside the deadline after which a run with no session is handed to a person. */
 const BUG_REPORT_MS = 120_000;
 
-/** The widget's browser capture, or nothing when it is missing or invalid: a bad capture never stops the report. */
 const bugReportBrowser = (browser: unknown) => {
   const parsed = bugReportBrowserSchema.safeParse(browser);
   return parsed.success ? { browser: parsed.data } : {};

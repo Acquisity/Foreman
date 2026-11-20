@@ -90,7 +90,6 @@ export function inngestRunsInput(organizationId: string, reportedAt: Date) {
   };
 }
 
-/** The fixed Inngest input for the stamped report, with an optional page cursor. */
 const isOwnInngestRead = (
   scope: ReturnType<typeof widgetContext>,
   input?: Record<string, unknown>
