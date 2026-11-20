@@ -4,7 +4,7 @@ import {
   type LinearChannelCredentials,
 } from "eve/channels/linear";
 import { z } from "zod";
-import { FIXY_LABEL, FIXY_SANDBOX_LABEL } from "./fixy-handoff.js";
+import { fixyLabelled, fixyWorking } from "./fixy-handoff.js";
 import {
   decideFollowUp,
   type FollowUpInput,
@@ -150,6 +150,7 @@ const THREAD_QUERY = `query RequesterThread($id: String!) {
     identifier
     project { id }
     labels(first: 100) { nodes { name } }
+    state { type name }
   }
 }`;
 
@@ -300,6 +301,7 @@ interface ThreadResponse {
     identifier: string;
     labels: { nodes: { name: string }[] };
     project: { id: string } | null;
+    state: { name: string; type: string };
   } | null;
   viewer: ForemanUser;
 }
@@ -355,6 +357,7 @@ async function readThread(
   credentials: LinearChannelCredentials
 ): Promise<{
   comments: ThreadComment[];
+  fixyDone: boolean;
   fixyOwned: boolean;
   foreman: ForemanUser;
   issueId: string;
@@ -386,9 +389,8 @@ async function readThread(
   );
   return {
     comments,
-    fixyOwned: thread.issue.labels.nodes.some((label) =>
-      [FIXY_LABEL, FIXY_SANDBOX_LABEL].includes(label.name.toLowerCase())
-    ),
+    fixyDone: fixyLabelled(thread.issue) && !fixyWorking(thread.issue),
+    fixyOwned: fixyWorking(thread.issue),
     foreman: thread.viewer,
     issueId: thread.issue.id,
     plan: planReply(comments, thread.viewer.id),
@@ -408,13 +410,11 @@ export async function relayedFollowUpOutcome(
   issue: string,
   trigger: { commentId: string; prompted: boolean },
   credentials: LinearChannelCredentials,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  decide: (followUp: FollowUpInput) => Promise<FollowUpOutcome> = (followUp) =>
+    decideFollowUp(followUp, { signal })
 ): Promise<FollowUpOutcome | "fixy" | null> {
-  return judgeFollowUp(
-    await readThread(issue, credentials),
-    trigger,
-    (followUp) => decideFollowUp(followUp, { signal })
-  );
+  return judgeFollowUp(await readThread(issue, credentials), trigger, decide);
 }
 
 /**
@@ -425,6 +425,7 @@ export async function relayedFollowUpOutcome(
 export async function judgeFollowUp(
   thread: {
     comments: readonly ThreadComment[];
+    fixyDone?: boolean;
     fixyOwned?: boolean;
     foreman: ForemanUser;
     plan: ReplyPlan;
@@ -435,7 +436,8 @@ export async function judgeFollowUp(
 ): Promise<FollowUpOutcome | "fixy" | null> {
   const { comments, foreman, plan, widgetFeedback } = thread;
   // Fixy's Linear bot wakes Fixy's run with every Slack reply on a ticket it
-  // owns, so Foreman answering too would speak for Fixy (ENG-19547).
+  // is still working, so Foreman answering too would speak for Fixy
+  // (ENG-19547). Once Fixy's part is over, Foreman answers (ENG-19978).
   if (thread.fixyOwned && isSlackRelay(comments, trigger)) {
     return "fixy";
   }
@@ -454,6 +456,12 @@ export async function judgeFollowUp(
   // so only a status move is acted on; anything else runs as before.
   if (followUp.lastReply === "" && outcome === "skip") {
     return null;
+  }
+  // Once Fixy's part is over, the answer comes from Fixy's closing comment,
+  // not Foreman's earlier reply, and no state moves: Fixy owns the ticket's
+  // state (ENG-19978).
+  if (thread.fixyDone && (outcome === "restate" || outcome === "status")) {
+    return "respond";
   }
   // A restatement needs an answer to restate, and a widget-feedback playbook
   // never replies to the requester.
