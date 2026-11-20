@@ -81,6 +81,32 @@ export const FIXY_LABEL = "fixy";
 /** Fixy's learning-environment label; it starts a Fixy run as `fixy` does. */
 export const FIXY_SANDBOX_LABEL = "fixy-sandbox";
 
+/** States where Fixy's PR is in code review or QA, so its part is over. Acquisity/Fixy keeps the same list (ENG-19978). */
+const FIXY_REVIEW_STATES = new Set([
+  "To Code Review",
+  "In Code Review",
+  "To QA",
+  "In QA",
+  "Ready to Merge",
+]);
+const CLOSED_STATE_TYPES = new Set(["completed", "canceled", "duplicate"]);
+
+/**
+ * Whether Fixy is still working a ticket: it carries `fixy` or `fixy-sandbox`,
+ * is open, and its PR isn't in code review or QA. Until then a reply in the
+ * ticket's Slack thread goes to Fixy's run; after, Foreman answers it from
+ * Fixy's closing comment (ENG-19978).
+ */
+export const fixyWorking = (issue: {
+  labels: { nodes: { name: string }[] };
+  state: { name: string; type: string };
+}): boolean =>
+  issue.labels.nodes.some((label) =>
+    [FIXY_LABEL, FIXY_SANDBOX_LABEL].includes(label.name.toLowerCase())
+  ) &&
+  !CLOSED_STATE_TYPES.has(issue.state.type) &&
+  !FIXY_REVIEW_STATES.has(issue.state.name);
+
 /** The work lanes a handoff can carry; each is the Linear label `lane:<name>`. */
 export const FIXY_LANES = ["billing", "unblock", "eng", "question"] as const;
 export type FixyLane = (typeof FIXY_LANES)[number];

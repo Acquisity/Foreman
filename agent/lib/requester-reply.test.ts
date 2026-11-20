@@ -19,6 +19,7 @@ import {
 } from "./requester-reply.js";
 
 const FOREMAN = "foreman";
+const STATE_FIELDS = /state \{ type name \}/u;
 const anchor: ThreadComment = {
   body: "Slack thread connected in [#acquisity-comms-feedback](https://x.slack.com/archives/C1/p1)",
   createdAt: "2026-09-25T15:15:16Z",
@@ -967,7 +968,7 @@ test("ENG-19978: the gate hands a Slack reply to Fixy only while Fixy works the 
         })
       );
     }
-    assert.match(query, /state \{ type name \}/u);
+    assert.match(query, STATE_FIELDS);
     return Promise.resolve(
       Response.json({
         data: {
@@ -990,20 +991,38 @@ test("ENG-19978: the gate hands a Slack reply to Fixy only while Fixy works the 
     return Promise.resolve<FollowUpOutcome>("respond");
   };
   assert.equal(
-    await relayedFollowUpOutcome("ENG-19424", trigger, { accessToken: "test-token" }, undefined, decide),
+    await relayedFollowUpOutcome(
+      "ENG-19424",
+      trigger,
+      { accessToken: "test-token" },
+      undefined,
+      decide
+    ),
     "fixy",
     "an open Fixy ticket"
   );
   assert.equal(judged, 0);
   state = { name: "Done", type: "completed" };
   assert.equal(
-    await relayedFollowUpOutcome("ENG-19424", trigger, { accessToken: "test-token" }, undefined, decide),
+    await relayedFollowUpOutcome(
+      "ENG-19424",
+      trigger,
+      { accessToken: "test-token" },
+      undefined,
+      decide
+    ),
     "respond",
     "a Done Fixy ticket"
   );
   state = { name: "To Code Review", type: "started" };
   assert.equal(
-    await relayedFollowUpOutcome("ENG-19424", trigger, { accessToken: "test-token" }, undefined, decide),
+    await relayedFollowUpOutcome(
+      "ENG-19424",
+      trigger,
+      { accessToken: "test-token" },
+      undefined,
+      decide
+    ),
     "respond",
     "a Fixy ticket handed to code review"
   );
