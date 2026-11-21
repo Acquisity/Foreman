@@ -721,6 +721,32 @@ test("a console line too long for the room left after escaping is cut, not dropp
   assert.ok(section.length <= 1100, `${section.length}`);
 });
 
+test("outside text in an evidence line can't become a link", () => {
+  const { description } = bugReportTicket({
+    draft: fallbackDraft(turn),
+    evidence: {
+      ...evidence,
+      Browser: {
+        items: [
+          {
+            text: "Console: 10:21:03 error [Reset your password](https://evil.example)",
+          },
+        ],
+        status: "found",
+      },
+    },
+    reportedAt: new Date("2026-11-04T10:30:00.000Z"),
+    scope: verifiedWidgetContext,
+    turn,
+  });
+  assert.ok(
+    description.includes(
+      "- Console: 10:21:03 error \\[Reset your password\\](https://evil.example)"
+    ),
+    description
+  );
+});
+
 test("a PostHog recording is linked once, under How to see it", () => {
   const url = `https://us.posthog.com/project/12345/replay/${"a".repeat(8)}`;
   const { description } = bugReportTicket({

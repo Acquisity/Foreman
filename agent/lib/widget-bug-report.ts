@@ -63,6 +63,9 @@ const plainTitle = (title: string) =>
 
 const inert = (text: string) =>
   text.replaceAll("<", "&lt;").replaceAll(">", "&gt;");
+/** Outside text in an evidence line also keeps its brackets literal, so it can't become a link. */
+const plain = (text: string) =>
+  inert(text).replaceAll("[", "\\[").replaceAll("]", "\\]");
 
 const customerTurns = (turn: BugReportTurn) => [
   ...(turn.history ?? []).map(({ role, text }) => ({
@@ -161,7 +164,7 @@ const evidenceLines = (items: EvidenceItem[]) => {
   const lines = items.slice(0, ITEMS_MAX).flatMap(({ text, url }) => {
     const line = url
       ? `- [${inert(text).replaceAll("]", ")")}](${url})`
-      : `- ${clip(inert(text), budget - 2)}`;
+      : `- ${clip(plain(text), budget - 2)}`;
     if (line.length > budget || budget < CLIPPED_MIN) {
       return [];
     }

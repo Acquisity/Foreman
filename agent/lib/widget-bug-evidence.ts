@@ -423,9 +423,7 @@ const inngest: Lookup = async (ctx, scope, turn) => {
         url: `https://app.inngest.com/env/production/runs/${encodeURIComponent(run.id)}`,
       };
     }),
-    ...(cursor
-      ? [{ text: `Inngest had more runs to scan after ${INNGEST_PAGES} pages` }]
-      : []),
+    ...(cursor ? [{ text: "Inngest had more runs to scan" }] : []),
   ]);
 };
 

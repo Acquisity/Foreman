@@ -660,7 +660,7 @@ test("Inngest runs found before the page cap say more may exist past it", async 
           text: "Sync failed at 18:40:37 UTC",
           url: "https://app.inngest.com/env/production/runs/01RUN",
         },
-        { text: "Inngest had more runs to scan after 3 pages" },
+        { text: "Inngest had more runs to scan" },
       ],
       status: "found",
     }
