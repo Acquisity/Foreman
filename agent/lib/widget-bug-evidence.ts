@@ -550,7 +550,6 @@ const SERIALIZED = /(?:\[?\{|\[)"[\s\S]*$/u;
 /**
  * The newest failed requests and console errors, alternating so each kind gets
  * a line before the section's budget runs out, with the Sentry event ids first.
- * A console line keeps its message but not an object it logged.
  */
 const browser: Lookup = (_ctx, _scope, turn) => {
   const capture = turn.browser;
