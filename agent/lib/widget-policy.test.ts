@@ -132,10 +132,10 @@ test("the PostHog query marks each row's session as recorded or not, matched by 
       "sessionId IN (SELECT session_id FROM raw_session_replay_events WHERE min_first_timestamp <= toDateTime('2026-11-11T18:55:00.000Z') AND max_last_timestamp >= toDateTime('2026-11-11T18:25:00.000Z'))"
     )
   );
-  // A session that also shows another workspace that day is never linked.
+  // A session that also shows another workspace, before or after the report, is never linked.
   assert.ok(
     query.includes(
-      `AND sessionId NOT IN (SELECT toString(properties.$session_id) FROM events WHERE distinct_id = '${verifiedWidgetContext.userId}' AND $group_0 != '' AND $group_0 != '${verifiedWidgetContext.organizationId}' AND timestamp >= toDateTime('2026-11-10T18:55:00.000Z') AND timestamp <= toDateTime('2026-11-11T18:55:00.000Z')) AS recorded`
+      `AND sessionId NOT IN (SELECT toString(properties.$session_id) FROM events WHERE distinct_id = '${verifiedWidgetContext.userId}' AND $group_0 != '' AND $group_0 != '${verifiedWidgetContext.organizationId}' AND timestamp >= toDateTime('2026-11-10T18:55:00.000Z')) AS recorded`
     )
   );
   assert.ok(query.endsWith("LIMIT 8"));

@@ -689,6 +689,38 @@ test("a full browser section still shows a console line beside long requests", (
   );
 });
 
+test("a console line too long for the room left after escaping is cut, not dropped", () => {
+  const ids = Array.from({ length: 5 }, (_, i) => `${i}`.repeat(32));
+  const { description } = bugReportTicket({
+    draft: fallbackDraft(turn),
+    evidence: {
+      ...evidence,
+      Browser: {
+        items: [
+          { text: `Sentry error events: ${ids.join(", ")}` },
+          {
+            text: `Request failed: 10:21:01 POST /${"p".repeat(240)} 500 812ms`,
+          },
+          { text: `Console: 10:21:03 error Bad markup ${"<b>".repeat(90)}` },
+        ],
+        status: "found",
+      },
+    },
+    reportedAt: new Date("2026-11-04T10:30:00.000Z"),
+    scope: verifiedWidgetContext,
+    turn,
+  });
+  assert.ok(
+    description.includes("- Console: 10:21:03 error Bad markup &lt;b&gt;"),
+    description
+  );
+  const section = description.slice(
+    description.indexOf("### The customer's browser"),
+    description.indexOf("### Sentry issues")
+  );
+  assert.ok(section.length <= 1100, `${section.length}`);
+});
+
 test("a PostHog recording is linked once, under How to see it", () => {
   const url = `https://us.posthog.com/project/12345/replay/${"a".repeat(8)}`;
   const { description } = bugReportTicket({

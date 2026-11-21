@@ -576,12 +576,14 @@ test("a console line keeps its message but not an object it logged", async () =>
         consoleErrors: [
           '10:21:03 error Save failed {"body":{"email":"a@b.co"},"headers":{"X-Signature":"abc"}}',
           '10:21:04 error [{"id":1}]',
+          '10:21:05 error Sync failed [502,"X-Api-Signature: abc"]',
         ],
       },
     }
   );
   assert.deepEqual(result, {
     items: [
+      { text: "Console: 10:21:05 error Sync failed [logged object left out]" },
       { text: "Console: 10:21:04 error [logged object left out]" },
       { text: "Console: 10:21:03 error Save failed [logged object left out]" },
     ],
@@ -628,6 +630,41 @@ test("an Inngest answer without a page, or a scan still unfinished after three p
     }
   );
   assert.equal(calls, 3);
+});
+
+test("Inngest runs found before the page cap say more may exist past it", async (t) => {
+  withEnv(t, "EXECUTOR_MCP_CONNECTOR_SUPPORT", "executor/test");
+  let calls = 0;
+  t.mock.method(executorTransport, "call", () => {
+    calls += 1;
+    return Promise.resolve({
+      data: inngestPage(
+        calls === 1
+          ? [{ endedAt: "2026-11-11T18:40:37.457Z", id: "01RUN", name: "Sync" }]
+          : [],
+        `page-${calls + 1}`
+      ),
+      http: { status: 200 },
+      ok: true,
+    });
+  });
+  assert.deepEqual(
+    await EVIDENCE_SOURCES.Inngest(
+      reportedCtx(),
+      verifiedWidgetContext,
+      reportedTurn
+    ),
+    {
+      items: [
+        {
+          text: "Sync failed at 18:40:37 UTC",
+          url: "https://app.inngest.com/env/production/runs/01RUN",
+        },
+        { text: "Inngest had more runs to scan after 3 pages" },
+      ],
+      status: "found",
+    }
+  );
 });
 
 test("PostHog reads this user's activity in the 30 minutes before the report", async (t) => {

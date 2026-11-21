@@ -144,6 +144,8 @@ const conversationLink = (conversationId: string, label: string) => {
 /** The verbatim conversation and each evidence source are cut to fit, so the ticket stays inside the 16,000-character description bound. */
 const SAID_CHARS = 6000;
 const EVIDENCE_CHARS = 1000;
+/** A plain line is cut to the room left rather than dropped, unless too little is left to say anything. */
+const CLIPPED_MIN = 80;
 
 const SOURCE_TITLES: Record<EvidenceSource, string> = {
   Axiom: "Axiom error logs",
@@ -159,8 +161,8 @@ const evidenceLines = (items: EvidenceItem[]) => {
   const lines = items.slice(0, ITEMS_MAX).flatMap(({ text, url }) => {
     const line = url
       ? `- [${inert(text).replaceAll("]", ")")}](${url})`
-      : `- ${inert(text)}`;
-    if (line.length > budget) {
+      : `- ${clip(inert(text), budget - 2)}`;
+    if (line.length > budget || budget < CLIPPED_MIN) {
       return [];
     }
     budget -= line.length;

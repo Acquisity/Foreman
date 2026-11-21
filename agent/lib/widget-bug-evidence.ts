@@ -412,8 +412,8 @@ const inngest: Lookup = async (ctx, scope, turn) => {
       status: "unchecked",
     };
   }
-  return found(
-    runs.map((run) => {
+  return found([
+    ...runs.map((run) => {
       const ended = run.endedAt ? clock(run.endedAt) : null;
       return {
         text: clip(
@@ -422,8 +422,11 @@ const inngest: Lookup = async (ctx, scope, turn) => {
         ),
         url: `https://app.inngest.com/env/production/runs/${encodeURIComponent(run.id)}`,
       };
-    })
-  );
+    }),
+    ...(cursor
+      ? [{ text: `Inngest had more runs to scan after ${INNGEST_PAGES} pages` }]
+      : []),
+  ]);
 };
 
 const TAXONOMY_WARNINGS = /<taxonomy_warnings>[\s\S]*?<\/taxonomy_warnings>/u;
@@ -544,8 +547,8 @@ const jam: Lookup = async (ctx, _scope, turn) => {
 
 const BROWSER_REQUESTS = 3;
 const BROWSER_CONSOLE = 4;
-/** Acquisity serializes a logged object as JSON, which can hold a request body or headers its redaction does not name. */
-const SERIALIZED = /(?:\[?\{|\[)"[\s\S]*$/u;
+/** Acquisity serializes a logged object or array as JSON, which can hold a request body or headers its redaction does not name. */
+const SERIALIZED = /[[{][\s\S]*$/u;
 
 /**
  * The newest failed requests and console errors, alternating so each kind gets

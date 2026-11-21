@@ -50,7 +50,8 @@ const DAY_MS = 24 * 60 * 60 * 1000;
  * (Acquisity puts the active organization in `$group_0`) in the 30 minutes
  * before the report, each with its session and whether PostHog recorded it.
  * A recording counts only when the session has no event in another workspace
- * that day, because switching workspace keeps the same session.
+ * from a day before the report up to the filing, because switching workspace
+ * keeps the same session.
  * Replays are matched by session id, because a replay's distinct_id is often
  * the visitor's anonymous id.
  */
@@ -67,7 +68,7 @@ export function posthogQuery(
   return [
     "SELECT timestamp, event, replaceAll(toString(properties.errorCode), '|', ' ') AS errorCode, toString(properties.$session_id) AS sessionId,",
     `sessionId IN (SELECT session_id FROM raw_session_replay_events WHERE min_first_timestamp <= toDateTime('${to}') AND max_last_timestamp >= toDateTime('${from}'))`,
-    `AND sessionId NOT IN (SELECT toString(properties.$session_id) FROM events WHERE distinct_id = '${id}' AND $group_0 != '' AND $group_0 != '${organization}' AND timestamp >= toDateTime('${day}') AND timestamp <= toDateTime('${to}')) AS recorded,`,
+    `AND sessionId NOT IN (SELECT toString(properties.$session_id) FROM events WHERE distinct_id = '${id}' AND $group_0 != '' AND $group_0 != '${organization}' AND timestamp >= toDateTime('${day}')) AS recorded,`,
     // The path is free text, so it comes last and the table parser keeps any pipe in it.
     "properties.$pathname",
     "FROM events",
