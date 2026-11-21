@@ -3,6 +3,7 @@ import type { MessageStreamEvent } from "eve/client";
 import { z } from "zod";
 import { readRequestBody } from "./bounded-body.js";
 import { logOpsEvent } from "./ops-log.js";
+import { bugReportBrowser, MAX_BROWSER_CHARS } from "./widget-bug-evidence.js";
 import { addToBugReport, fileBugReport } from "./widget-bug-report.js";
 import { answerFromGuide, chatGuideEnabled } from "./widget-chat.js";
 import { verifyWidgetContext } from "./widget-context.js";
@@ -165,6 +166,10 @@ const inputSchema = z.discriminatedUnion("action", [
   z.strictObject({
     ...scopeFields,
     action: z.literal("start"),
+    // What Acquisity's widget captured from the browser when the customer
+    // tapped "I found a bug" (ENG-20083). Read only by a bug_report, which
+    // drops an invalid one rather than refuse the report.
+    browser: z.unknown().optional(),
     history: historySchema.optional(),
     // Short-lived links to the same screenshots, for the help-center lane to
     // look at. The readings stay: every other stage reads only text.
@@ -207,12 +212,17 @@ export type WidgetInput = z.infer<typeof inputSchema>;
 
 /**
  * The largest body a valid start can be: the question, twelve turns with four
- * citations each, three screenshot readings and three image links at their schema limits, every
- * character escaped to six in JSON (\u0000), plus room for the ids and keys.
+ * citations each, three screenshot readings, three image links and a browser
+ * capture at their schema limits, every character escaped to six in JSON
+ * (\u0000), plus room for the ids and keys.
  * The default 8 KB read cap refused ordinary multi-turn conversations.
  */
 const MAX_START_BODY_CHARS =
-  (4000 + 12 * (4000 + 4 * (300 + 500)) + 3 * 1500 + 3 * MAX_IMAGE_URL_CHARS) *
+  (4000 +
+    12 * (4000 + 4 * (300 + 500)) +
+    3 * 1500 +
+    3 * MAX_IMAGE_URL_CHARS +
+    MAX_BROWSER_CHARS) *
     6 +
   4096;
 
@@ -1635,6 +1645,7 @@ async function answerBugReport(
     scope,
     run.id,
     {
+      ...(mode === "bug_report" ? bugReportBrowser(input.browser) : {}),
       history: input.history,
       messageId: input.message_id,
       question: input.question,
