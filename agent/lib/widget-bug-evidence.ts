@@ -268,7 +268,11 @@ const axiomRows = (data: unknown): Record<string, unknown>[] => {
     throw new Error("Axiom could not run the query.");
   }
   const text = mcpResultText({ content: result?.content }) ?? "";
-  if (result?.structuredContent || JSON_START.test(text)) {
+  if (
+    result?.structuredContent ||
+    !Array.isArray(result?.content) ||
+    JSON_START.test(text)
+  ) {
     const rows = collectRows(providerData(data));
     if (!rows) {
       throw new Error("Unrecognized Axiom response.");
@@ -365,6 +369,7 @@ const inngestPage = z.object({
   page: z.object({
     cursor: z.string().max(2000).optional(),
     hasMore: z.boolean().optional(),
+    limit: z.number(),
   }),
 });
 /** A filtered scan can return an empty page that still has more; a few pages stay inside the deadline. */
@@ -388,7 +393,11 @@ const inngest: Lookup = async (ctx, scope, turn) => {
       ...(cursor ? { cursor } : {}),
     })) as { isError?: unknown; structuredContent?: unknown } | null;
     const parsed = inngestPage.safeParse(data?.structuredContent);
-    if (data?.isError === true || !parsed.success) {
+    if (
+      data?.isError === true ||
+      !parsed.success ||
+      (parsed.data.page.hasMore && !parsed.data.page.cursor)
+    ) {
       throw new Error("Unrecognized Inngest response.");
     }
     runs.push(...(parsed.data.data ?? []));
@@ -535,28 +544,43 @@ const jam: Lookup = async (ctx, _scope, turn) => {
 
 const BROWSER_REQUESTS = 3;
 const BROWSER_CONSOLE = 4;
+/** Acquisity serializes a logged object as JSON, which can hold a request body or headers its redaction does not name. */
+const SERIALIZED = /(?:\[?\{|\[)"[\s\S]*$/u;
 
-/** The newest failed requests and console errors, each capped so neither crowds the other out, with the Sentry event ids first. */
+/**
+ * The newest failed requests and console errors, alternating so each kind gets
+ * a line before the section's budget runs out, with the Sentry event ids first.
+ * A console line keeps its message but not an object it logged.
+ */
 const browser: Lookup = (_ctx, _scope, turn) => {
   const capture = turn.browser;
   if (!capture) {
     return Promise.resolve({ status: "not_sent" });
   }
   const line = (text: string) => ({ text: clip(text, ITEM_CHARS) });
-  const requests = capture.failedRequests.filter((text) =>
-    FAILED_REQUEST.test(text)
-  );
+  const requests = capture.failedRequests
+    .filter((text) => FAILED_REQUEST.test(text))
+    .slice(-BROWSER_REQUESTS)
+    .reverse()
+    .map((text) => line(`Request failed: ${text}`));
+  const consoleErrors = capture.consoleErrors
+    .slice(-BROWSER_CONSOLE)
+    .reverse()
+    .map((text) =>
+      line(`Console: ${text.replace(SERIALIZED, "[logged object left out]")}`)
+    );
+  const alternating = Array.from(
+    { length: Math.max(requests.length, consoleErrors.length) },
+    (_, index) => [requests[index], consoleErrors[index]]
+  )
+    .flat()
+    .filter((item) => item !== undefined);
   return Promise.resolve(
     found([
       ...(capture.sentryEventIds.length
         ? [line(`Sentry error events: ${capture.sentryEventIds.join(", ")}`)]
         : []),
-      ...requests
-        .slice(-BROWSER_REQUESTS)
-        .map((text) => line(`Request failed: ${text}`)),
-      ...capture.consoleErrors
-        .slice(-BROWSER_CONSOLE)
-        .map((text) => line(`Console: ${text}`)),
+      ...alternating,
     ])
   );
 };

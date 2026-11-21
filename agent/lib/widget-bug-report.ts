@@ -160,8 +160,11 @@ const evidenceLines = (items: EvidenceItem[]) => {
     const line = url
       ? `- [${inert(text).replaceAll("]", ")")}](${url})`
       : `- ${inert(text)}`;
+    if (line.length > budget) {
+      return [];
+    }
     budget -= line.length;
-    return budget >= 0 ? [line] : [];
+    return [line];
   });
   const left = items.length - lines.length;
   return left ? [...lines, `- …and ${left} more`] : lines;
@@ -268,7 +271,9 @@ export function bugReportTicket(input: TicketInput) {
   const room = DESCRIPTION_MAX - `\n\n${widgetScopeBlock(input.scope)}`.length;
   const full = renderTicket(input, SAID_CHARS);
   const over = full.description.length - room;
-  return over > 0 ? renderTicket(input, Math.max(0, SAID_CHARS - over)) : full;
+  const { description, title } =
+    over > 0 ? renderTicket(input, Math.max(0, full.saidChars - over)) : full;
+  return { description, title };
 }
 
 function renderTicket(input: TicketInput, saidChars: number) {
@@ -281,6 +286,7 @@ function renderTicket(input: TicketInput, saidChars: number) {
     evidence.PostHog.status === "found" ? evidence.PostHog : null;
   const page = turn.browser?.page ?? activity?.page;
   const capture = turn.browser;
+  const said = saidLines(turn, saidChars);
   const description = [
     "## What's happening",
     draft.whatsHappening,
@@ -320,11 +326,15 @@ function renderTicket(input: TicketInput, saidChars: number) {
         ? ["- Written without the AI draft, which failed"]
         : []),
       "- What the customer said (verbatim, oldest first):",
-      ...saidLines(turn, saidChars),
+      ...said,
     ].join("\n"),
     "</details>",
   ].join("\n\n");
-  return { description, title: draft.title };
+  return {
+    description,
+    saidChars: said.reduce((total, line) => total + line.length, 0),
+    title: draft.title,
+  };
 }
 
 const OUTCOMES = {

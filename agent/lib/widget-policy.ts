@@ -43,11 +43,14 @@ const recordingPaths: ReadonlySet<string> = new Set(
  */
 export const POSTHOG_READ = { path: "posthog-widget.execute-sql" } as const;
 const POSTHOG_WINDOW_MS = 30 * 60 * 1000;
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 /**
  * The reporting user's page views and error toasts in the verified workspace
  * (Acquisity puts the active organization in `$group_0`) in the 30 minutes
  * before the report, each with its session and whether PostHog recorded it.
+ * A recording counts only when the session has no event in another workspace
+ * that day, because switching workspace keeps the same session.
  * Replays are matched by session id, because a replay's distinct_id is often
  * the visitor's anonymous id.
  */
@@ -60,9 +63,11 @@ export function posthogQuery(
   const organization = z.uuid().parse(organizationId);
   const from = new Date(reportedAt.getTime() - POSTHOG_WINDOW_MS).toISOString();
   const to = reportedAt.toISOString();
+  const day = new Date(reportedAt.getTime() - DAY_MS).toISOString();
   return [
     "SELECT timestamp, event, replaceAll(toString(properties.errorCode), '|', ' ') AS errorCode, toString(properties.$session_id) AS sessionId,",
-    `sessionId IN (SELECT session_id FROM raw_session_replay_events WHERE min_first_timestamp <= toDateTime('${to}') AND max_last_timestamp >= toDateTime('${from}')) AS recorded,`,
+    `sessionId IN (SELECT session_id FROM raw_session_replay_events WHERE min_first_timestamp <= toDateTime('${to}') AND max_last_timestamp >= toDateTime('${from}'))`,
+    `AND sessionId NOT IN (SELECT toString(properties.$session_id) FROM events WHERE distinct_id = '${id}' AND $group_0 != '' AND $group_0 != '${organization}' AND timestamp >= toDateTime('${day}') AND timestamp <= toDateTime('${to}')) AS recorded,`,
     // The path is free text, so it comes last and the table parser keeps any pipe in it.
     "properties.$pathname",
     "FROM events",

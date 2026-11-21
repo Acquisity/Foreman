@@ -330,11 +330,18 @@ test("Axiom still reads structured or JSON rows, the shape it read before", asyn
     }
   );
   t.mock.restoreAll();
-  answer(t, { content: [{ text: '{"matches": []}', type: "text" }] });
-  assert.deepEqual(
-    await EVIDENCE_SOURCES.Axiom(providerCtx(), verifiedWidgetContext, turn),
-    { status: "empty" }
-  );
+  for (const data of [
+    { content: [{ text: '{"matches": []}', type: "text" }] },
+    { matches: [] },
+  ]) {
+    answer(t, data);
+    assert.deepEqual(
+      // biome-ignore lint/performance/noAwaitInLoops: each answer replaces the one transport mock in turn.
+      await EVIDENCE_SOURCES.Axiom(providerCtx(), verifiedWidgetContext, turn),
+      { status: "empty" }
+    );
+    t.mock.restoreAll();
+  }
 });
 
 test("a quoted Axiom message holding a heading-shaped line stays in its row", async (t) => {
@@ -533,6 +540,7 @@ test("browser evidence keeps the newest failed requests beside a full console, a
           (_, i) => `10:20:${String(i).padStart(2, "0")} error Boom ${i}`
         ),
         failedRequests: [
+          "10:20:58 GET /api/trpc/inbox.list 502 40ms",
           "10:20:59 POST /api/trpc/campaigns.launch 500 812ms",
           "10:21:00 GET /api/x?token=secret 500 3ms",
           '10:21:01 {"authorization":"x"}',
@@ -547,21 +555,57 @@ test("browser evidence keeps the newest failed requests beside a full console, a
       {
         text: "Request failed: 10:20:59 POST /api/trpc/campaigns.launch 500 812ms",
       },
-      { text: "Console: 10:20:26 error Boom 26" },
-      { text: "Console: 10:20:27 error Boom 27" },
-      { text: "Console: 10:20:28 error Boom 28" },
       { text: "Console: 10:20:29 error Boom 29" },
+      { text: "Request failed: 10:20:58 GET /api/trpc/inbox.list 502 40ms" },
+      { text: "Console: 10:20:28 error Boom 28" },
+      { text: "Console: 10:20:27 error Boom 27" },
+      { text: "Console: 10:20:26 error Boom 26" },
+    ],
+    status: "found",
+  });
+});
+
+test("a console line keeps its message but not an object it logged", async () => {
+  const result = await EVIDENCE_SOURCES.Browser(
+    {} as ProviderContext,
+    verifiedWidgetContext,
+    {
+      ...turn,
+      browser: {
+        ...capture,
+        consoleErrors: [
+          '10:21:03 error Save failed {"body":{"email":"a@b.co"},"headers":{"X-Signature":"abc"}}',
+          '10:21:04 error [{"id":1}]',
+        ],
+      },
+    }
+  );
+  assert.deepEqual(result, {
+    items: [
+      { text: "Console: 10:21:04 error [logged object left out]" },
+      { text: "Console: 10:21:03 error Save failed [logged object left out]" },
     ],
     status: "found",
   });
 });
 
 test("an Inngest answer without a page, or a scan still unfinished after three pages, is reported as not checked", async (t) => {
-  answer(t, { content: [], structuredContent: {} });
-  await assert.rejects(
-    EVIDENCE_SOURCES.Inngest(reportedCtx(), verifiedWidgetContext, reportedTurn)
-  );
-  t.mock.restoreAll();
+  for (const structuredContent of [
+    {},
+    { page: {} },
+    { page: { hasMore: true, limit: 8 } },
+  ]) {
+    answer(t, { content: [], structuredContent });
+    // biome-ignore lint/performance/noAwaitInLoops: each answer replaces the one transport mock in turn.
+    await assert.rejects(
+      EVIDENCE_SOURCES.Inngest(
+        reportedCtx(),
+        verifiedWidgetContext,
+        reportedTurn
+      )
+    );
+    t.mock.restoreAll();
+  }
   withEnv(t, "EXECUTOR_MCP_CONNECTOR_SUPPORT", "executor/test");
   let calls = 0;
   t.mock.method(executorTransport, "call", () => {

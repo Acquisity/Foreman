@@ -620,6 +620,75 @@ test("the largest report, with its scope block, still fits Linear's 16,000-chara
   assert.ok(description.includes("  - Customer: xxx"));
 });
 
+test("a conversation whose lines leave slack in their budget is still trimmed to fit", () => {
+  const scope = { ...verifiedWidgetContext, organizationName: "W".repeat(500) };
+  const full = {
+    items: Array.from({ length: 8 }, (_, i) => ({
+      text: `${i} ${"<".repeat(20)}`,
+      url: `https://acquisity.sentry.io/issues/${i}${"9".repeat(40)}/`,
+    })),
+    status: "found" as const,
+  };
+  for (const extra of [0, 50, 150, 400]) {
+    const { description } = bugReportTicket({
+      draft: fallbackDraft({
+        ...turn,
+        history: [],
+        question: "<".repeat(2000),
+      }),
+      evidence: {
+        Axiom: full,
+        Browser: full,
+        Inngest: full,
+        Jam: full,
+        PostHog: full,
+        Sentry: full,
+      },
+      reportedAt: new Date("2026-11-04T10:30:00.000Z"),
+      scope,
+      turn: {
+        ...turn,
+        history: [
+          { role: "customer", text: "a\n".repeat(495).slice(0, 990) },
+          { role: "customer", text: "b".repeat(1490 + extra) },
+        ],
+        question: "c".repeat(210),
+      },
+    });
+    const written = `${description}\n\n${widgetScopeBlock(scope)}`;
+    assert.ok(written.length <= 16_000, `${extra}: ${written.length}`);
+  }
+});
+
+test("a full browser section still shows a console line beside long requests", () => {
+  const ids = Array.from({ length: 5 }, (_, i) => `${i}`.repeat(32));
+  const failedRequest = (n: number) =>
+    `Request failed: 10:21:0${n} POST /${"p".repeat(240)} 500 812ms`;
+  const { description } = bugReportTicket({
+    draft: fallbackDraft(turn),
+    evidence: {
+      ...evidence,
+      Browser: {
+        items: [
+          { text: `Sentry error events: ${ids.join(", ")}` },
+          { text: failedRequest(1) },
+          { text: "Console: 10:21:03 error Boom" },
+          { text: failedRequest(2) },
+          { text: failedRequest(3) },
+        ],
+        status: "found",
+      },
+    },
+    reportedAt: new Date("2026-11-04T10:30:00.000Z"),
+    scope: verifiedWidgetContext,
+    turn,
+  });
+  assert.ok(
+    description.includes("- Console: 10:21:03 error Boom"),
+    description
+  );
+});
+
 test("a PostHog recording is linked once, under How to see it", () => {
   const url = `https://us.posthog.com/project/12345/replay/${"a".repeat(8)}`;
   const { description } = bugReportTicket({
