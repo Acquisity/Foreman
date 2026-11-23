@@ -100,7 +100,7 @@ jobs:
           fi
           pnpm widget:tools --manifest "$RUNNER_TEMP/manifest.json" --commit "$commit" --previous "$previous"
           if [[ "$(manifest_body "$file")" == "$(manifest_body "$RUNNER_TEMP/main.ts")" ]]; then
-            scripts/generated-pr.sh close bot/widget-tools "Acquisity's manifest at $commit matches main again, so these tools are no longer wanted ([run]($RUN_URL))."
+            scripts/generated-pr.sh close bot/widget-tools "Acquisity's manifest at $commit matches main again, so these tools are no longer wanted ([run]($RUN_URL)). Its Fixy ticket can be closed with no merge."
             echo "Manifest matches main; no PR."
             exit 0
           fi

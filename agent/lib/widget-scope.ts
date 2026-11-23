@@ -99,7 +99,6 @@ export const stampedWidgetAttributes = z.object({
   ...shape,
   endpoints: z
     .string()
-    .max(16 * 1024)
     .optional()
     .transform((text) =>
       text === undefined ? undefined : parseAvailableEndpoints(JSON.parse(text))

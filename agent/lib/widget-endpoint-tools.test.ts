@@ -175,7 +175,17 @@ test("a session gets one tool per offered endpoint, and none outside the widget 
     null
   );
   assert.equal(endpointToolSet(null, manifest), null);
-  assert.equal(endpointToolSet(listedAuth), null);
+  // Listed, but its only manifest entry at that path is a held area.
+  assert.equal(
+    endpointToolSet(
+      widgetAuth({
+        ...verifiedWidgetContext,
+        endpoints: [listed("lead-pipeline", 1, ["sources"])],
+      }),
+      manifest
+    ),
+    null
+  );
 });
 
 test("the lane admits every manifest tool name but no code-only one", () => {
@@ -262,6 +272,25 @@ test("the endpoint list survives the session stamp, which holds strings only", (
   assert.equal(
     widgetContext(widgetAuth(verifiedWidgetContext))?.endpoints,
     undefined
+  );
+  const many = [...new Array(50).keys()].map((n) =>
+    listed(
+      `area-${n}`,
+      1,
+      [...new Array(50).keys()].map((m) => `s${m}`)
+    )
+  );
+  assert.ok(
+    String(
+      widgetAuth({ ...verifiedWidgetContext, endpoints: many }).attributes
+        ?.endpoints
+    ).length >
+      16 * 1024
+  );
+  assert.equal(
+    widgetContext(widgetAuth({ ...verifiedWidgetContext, endpoints: many }))
+      ?.endpoints?.length,
+    50
   );
 });
 

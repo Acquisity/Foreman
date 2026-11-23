@@ -110,7 +110,9 @@ function failedResult(data: z.infer<typeof eventSchema>["data"]): boolean {
   }
   return (
     ("status" in output &&
-      ["unavailable", "denied"].includes(String(output.status))) ||
+      ["unavailable", "denied", "feature_off", "invalid_input"].includes(
+        String(output.status)
+      )) ||
     ("success" in output && output.success === false) ||
     ("error" in output && Boolean(output.error))
   );

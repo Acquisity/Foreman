@@ -1,7 +1,7 @@
 // Regenerates agent/lib/widget-endpoint-manifest.ts from Acquisity's support
 // endpoint manifest (ENG-20296), with no model. Called by
 // .github/workflows/widget-tools.yml:
-//   tsx scripts/widget-endpoint-tools.ts --manifest <serialized manifest JSON> --commit <Acquisity SHA> [--previous <file>]
+//   tsx scripts/widget-endpoint-tools.ts --manifest <file holding the serialized manifest JSON> --commit <Acquisity SHA> [--previous <file>]
 // --previous is the file to compare with (the pending bot PR's, by default the
 // committed one): when only the commit differs from it, it is written back as is.
 import { execFileSync } from "node:child_process";
