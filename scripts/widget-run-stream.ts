@@ -9,9 +9,9 @@ import { promisify } from "node:util";
 import { z } from "zod";
 import type { WidgetCase } from "../agent/lib/widget-case.js";
 import {
+  stampedWidgetAttributes,
   WIDGET_SUPPORT_ISSUER,
   type WidgetContext,
-  widgetContextSchema,
 } from "../agent/lib/widget-scope.js";
 
 export const run = promisify(execFile);
@@ -128,7 +128,7 @@ export async function streamRun(
   if (auth.issuer !== WIDGET_SUPPORT_ISSUER) {
     throw new Error(`${runId} is not a widget support run.`);
   }
-  const context = z.object(widgetContextSchema.shape).parse(auth.attributes);
+  const context = stampedWidgetAttributes.parse(auth.attributes);
   if (context.source !== "widget" && !(allowInbox && target === "local")) {
     throw new Error(`${runId} is a team inbox run, not a customer widget run.`);
   }

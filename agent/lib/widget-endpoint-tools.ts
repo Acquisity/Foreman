@@ -4,9 +4,14 @@
 // is offered only the endpoints and sections the context route listed for the
 // asking user, and the endpoint re-checks that list itself.
 import type { SessionAuthContext } from "eve/context";
+import { defineTool } from "eve/tools";
 import { z } from "zod";
-import { acquisityOrigin, readContextBody } from "./acquisity-origin.js";
+import { readContextBody } from "./acquisity-origin.js";
 import { logOpsEvent } from "./ops-log.js";
+import {
+  postWidgetAppRoute,
+  type WidgetAppContext,
+} from "./widget-app-diagnostics.js";
 import { WIDGET_ENDPOINT_MANIFEST } from "./widget-endpoint-manifest.js";
 import type {
   AvailableEndpoint,
@@ -14,7 +19,11 @@ import type {
   ManifestEndpoint,
 } from "./widget-endpoint-schema.js";
 import type { CheckId } from "./widget-progress.js";
-import { requireWidgetContext } from "./widget-scope.js";
+import {
+  isWidgetSupport,
+  requireWidgetContext,
+  widgetContext,
+} from "./widget-scope.js";
 
 /**
  * Areas whose hand-written tool still answers. Each stays off the menu until
@@ -56,11 +65,15 @@ export const endpointToolName = (area: string) =>
   `widget_${area.replaceAll("-", "_")}`;
 
 /** Every tool name the manifest can produce, for the lane's allowlist. */
-export const ENDPOINT_TOOL_NAMES: ReadonlySet<string> = new Set(
-  WIDGET_ENDPOINT_MANIFEST.endpoints
-    .filter((entry) => !CODE_ONLY_AREAS.has(entry.name))
-    .map((entry) => endpointToolName(entry.name))
-);
+export const endpointToolNames = (
+  manifest: EndpointManifest = WIDGET_ENDPOINT_MANIFEST
+): ReadonlySet<string> =>
+  new Set(
+    manifest.endpoints
+      .filter((entry) => !CODE_ONLY_AREAS.has(entry.name))
+      .map((entry) => endpointToolName(entry.name))
+  );
+export const ENDPOINT_TOOL_NAMES = endpointToolNames();
 
 export const endpointToolCheck = (
   toolName: string,
@@ -140,7 +153,8 @@ export function offeredEndpointTools(
 const RESPONSE_MAX_BYTES = 128 * 1024;
 // Sections run in parallel under Acquisity's 20 s default each.
 const ENDPOINT_TIMEOUT_MS = 45_000;
-const ANSWERED = new Set([200, 400, 403, 503]);
+// Acquisity's handler answers each of these with a JSON status body.
+const ANSWERED = new Set([200, 400, 401, 403, 503]);
 
 /**
  * Calls one support endpoint for the verified chat and returns its body as it
@@ -148,40 +162,21 @@ const ANSWERED = new Set([200, 400, 403, 503]);
  * of failing the read. Refusals come back as results, never throws.
  */
 export async function callWidgetEndpoint(
-  ctx: {
-    abortSignal: AbortSignal;
-    session?: { auth: { initiator: SessionAuthContext | null } };
-  },
+  ctx: WidgetAppContext,
   tool: { name: string; path: string },
   input: Record<string, unknown>,
   request: typeof fetch = fetch
 ): Promise<Record<string, unknown>> {
-  const scope = requireWidgetContext(ctx.session?.auth.initiator);
-  const secret = process.env.FOREMAN_DIAGNOSTICS_SECRET;
-  const signal = AbortSignal.any([
-    ctx.abortSignal,
-    AbortSignal.timeout(ENDPOINT_TIMEOUT_MS),
-  ]);
+  const { conversationId } = requireWidgetContext(ctx.session?.auth.initiator);
   let outcome = "error";
   try {
-    if (!secret || secret.length < 32) {
-      throw new Error("Support endpoints are not configured.");
-    }
-    const response = await request(`${acquisityOrigin()}${tool.path}`, {
-      body: JSON.stringify({
-        ...input,
-        conversationId: scope.conversationId,
-        organizationId: scope.organizationId,
-        userId: scope.userId,
-      }),
-      headers: {
-        authorization: `Bearer ${secret}`,
-        "content-type": "application/json",
-      },
-      method: "POST",
-      redirect: "error",
-      signal,
-    });
+    const { response, signal } = await postWidgetAppRoute(
+      ctx,
+      tool.path,
+      input,
+      ENDPOINT_TIMEOUT_MS,
+      request
+    );
     if (!ANSWERED.has(response.status)) {
       response.body?.cancel().catch(() => undefined);
       throw new Error(`Support endpoint answered ${response.status}.`);
@@ -201,9 +196,48 @@ export async function callWidgetEndpoint(
     };
   } finally {
     logOpsEvent("widget.endpoint.call", {
-      conversationId: scope.conversationId,
+      conversationId,
       outcome,
       tool: tool.name,
     });
   }
+}
+
+/**
+ * The session's endpoint tools, keyed by tool name, or null when it has none
+ * (agent/tools/widget_endpoints.ts resolves it at every step).
+ */
+export function endpointToolSet(
+  initiator: SessionAuthContext | null,
+  manifest: EndpointManifest = WIDGET_ENDPOINT_MANIFEST
+) {
+  const offered = offeredEndpointTools(
+    widgetContext(initiator)?.endpoints,
+    manifest
+  );
+  if (offered.length === 0) {
+    return null;
+  }
+  return Object.fromEntries(
+    offered.map((entry) => [
+      entry.name,
+      defineTool({
+        approval: (toolCtx) =>
+          isWidgetSupport(toolCtx.session.auth.initiator)
+            ? "not-applicable"
+            : {
+                reason: "Support widget investigations only.",
+                type: "denied",
+              },
+        description: entry.description,
+        execute: (input: Record<string, unknown>, toolCtx) =>
+          callWidgetEndpoint(
+            toolCtx,
+            { name: entry.name, path: entry.path },
+            input
+          ),
+        inputSchema: entry.inputSchema,
+      }),
+    ])
+  );
 }

@@ -72,57 +72,47 @@ jobs:
         run: |
           bun install --frozen-lockfile --ignore-scripts
           node apps/web/scripts/print-foreman-manifest.mjs > "$RUNNER_TEMP/manifest.json"
-      - name: Regenerate the tools
-        run: pnpm widget:tools --manifest "$RUNNER_TEMP/manifest.json" --commit "$(git -C acquisity rev-parse HEAD)"
-      - name: Open or update the PR
+      # Compared with the pending PR's file when one exists, so a later commit
+      # with the same manifest pushes nothing, and one that matches main again
+      # closes the PR it made.
+      - name: Regenerate the tools and open, update or close the PR
         env:
           GH_TOKEN: ${{ secrets.WIDGET_GUIDE_TOKEN }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           file=agent/lib/widget-endpoint-manifest.ts
-          git_auth() { git -c credential.helper= -c 'credential.helper=!gh auth git-credential' "$@"; }
+          manifest_body() { sed -n '/^export const WIDGET_ENDPOINT_MANIFEST/,$p' "$1"; }
+          commit=$(git -C acquisity rev-parse HEAD)
+          git show "HEAD:$file" > "$RUNNER_TEMP/main.ts"
+          previous=$file
           status=0
-          git_auth ls-remote --exit-code --heads origin refs/heads/bot/widget-tools > /dev/null || status=$?
+          git -c credential.helper= -c 'credential.helper=!gh auth git-credential' ls-remote --exit-code --heads origin refs/heads/bot/widget-tools > /dev/null || status=$?
           if [[ "$status" == 0 ]]; then
-            git_auth fetch --no-tags origin refs/heads/bot/widget-tools:refs/remotes/origin/bot/widget-tools
-            if git show origin/bot/widget-tools:"$file" | diff -q - "$file" > /dev/null; then
-              echo "Pending tools PR already has this manifest; no commit or push."
-              exit 0
-            fi
+            git -c credential.helper= -c 'credential.helper=!gh auth git-credential' fetch --no-tags origin refs/heads/bot/widget-tools:refs/remotes/origin/bot/widget-tools
+            git show "origin/bot/widget-tools:$file" > "$RUNNER_TEMP/pending.ts"
+            previous=$RUNNER_TEMP/pending.ts
           elif [[ "$status" != 2 ]]; then
             exit "$status"
           fi
-          if git diff --quiet -- "$file"; then
-            echo "Manifest unchanged; no PR."
+          pnpm widget:tools --manifest "$RUNNER_TEMP/manifest.json" --commit "$commit" --previous "$previous"
+          if [[ "$(manifest_body "$file")" == "$(manifest_body "$RUNNER_TEMP/main.ts")" ]]; then
+            scripts/generated-pr.sh close bot/widget-tools "Acquisity's manifest at $commit matches main again, so these tools are no longer wanted ([run]($RUN_URL))."
+            echo "Manifest matches main; no PR."
             exit 0
           fi
-          commit=$(git -C acquisity rev-parse HEAD)
-          title="chore(widget): regenerate the support endpoint tools from Acquisity ${commit:0:12}"
-          git config user.name "foreman-widget-tools"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git switch -c bot/widget-tools
-          git commit -m "$title" -- "$file"
-          git_auth push --force-with-lease origin bot/widget-tools
+          if [[ "$previous" != "$file" ]] && cmp -s "$file" "$previous"; then
+            echo "Pending tools PR already has this manifest; no commit or push."
+            exit 0
+          fi
           cat > "$RUNNER_TEMP/body.md" <<EOF_BODY
           Regenerated from Acquisity [${commit:0:12}](https://github.com/Acquisity/Acquisity/commit/$commit) by [this run]($RUN_URL), with no model: \`$file\` is Acquisity's \`serializeForemanManifest()\` at that commit.
 
           Fixy reviews this PR and merges it once the review-bot loop clears, from the fixy-labelled Linear ticket the next step files: CI passes, and the diff removes or renames no tool, input, section or status value unless the manifest adds the change as a new endpoint version and keeps the old one live.
           EOF_BODY
-          number=$(gh api "repos/$GITHUB_REPOSITORY/pulls?head=$GITHUB_REPOSITORY_OWNER:bot/widget-tools&state=open" --jq '.[0].number // empty')
-          if [ -n "$number" ]; then
-            gh api -X PATCH "repos/$GITHUB_REPOSITORY/pulls/$number" -f title="$title" -F body=@"$RUNNER_TEMP/body.md" --jq .html_url
-          else
-            gh api -X POST "repos/$GITHUB_REPOSITORY/pulls" -f title="$title" -f head=bot/widget-tools -f base=main -F body=@"$RUNNER_TEMP/body.md" --jq .html_url
-          fi
+          scripts/generated-pr.sh publish bot/widget-tools foreman-widget-tools "chore(widget): regenerate the support endpoint tools from Acquisity ${commit:0:12}" "$RUNNER_TEMP/body.md" "$file"
       # Runs on every pass, unchanged ones too, so an open tools PR always has its Fixy ticket.
       - name: File or reuse the Fixy ticket
         env:
           GH_TOKEN: ${{ secrets.WIDGET_GUIDE_TOKEN }}
           LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
-        run: |
-          url=$(gh api "repos/$GITHUB_REPOSITORY/pulls?head=$GITHUB_REPOSITORY_OWNER:bot/widget-tools&state=open" --jq '.[0].html_url // empty')
-          if [[ -z "$url" ]]; then
-            echo "No open tools PR; no ticket."
-            exit 0
-          fi
-          pnpm exec tsx scripts/generated-pr-ticket.ts --kind tools --pr "$url"
+        run: scripts/generated-pr.sh ticket bot/widget-tools tools

@@ -100,7 +100,7 @@ export const widgetContextSchema = z.strictObject(shape);
  * Session attributes also carry trust stamps, so reading the scope back strips
  * unknown keys. They hold strings only, so the endpoint list is stamped as JSON.
  */
-const stampedAttributes = z.object({
+export const stampedWidgetAttributes = z.object({
   ...shape,
   endpoints: z
     .string()
@@ -126,7 +126,7 @@ export function widgetContext(
   if (!isWidgetSupport(auth)) {
     return null;
   }
-  const parsed = stampedAttributes.safeParse(auth?.attributes);
+  const parsed = stampedWidgetAttributes.safeParse(auth?.attributes);
   return parsed.success ? Object.freeze(parsed.data) : null;
 }
 

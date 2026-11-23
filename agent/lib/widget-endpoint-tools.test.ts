@@ -9,9 +9,16 @@ import {
 import {
   callWidgetEndpoint,
   endpointToolCheck,
+  endpointToolNames,
+  endpointToolSet,
   offeredEndpointTools,
 } from "./widget-endpoint-tools.js";
-import { widgetAuth, widgetContext } from "./widget-scope.js";
+import { widgetInvestigationMiddleware } from "./widget-investigation-model.js";
+import {
+  stampedWidgetAttributes,
+  widgetAuth,
+  widgetContext,
+} from "./widget-scope.js";
 
 // Acquisity's serializeForemanManifest() output for two scratch definitions,
 // measured with apps/web/scripts/print-foreman-manifest.mjs (lead-pipeline is
@@ -156,6 +163,53 @@ test("a listed endpoint whose path differs from the manifest's is not offered", 
   );
 });
 
+test("a session gets one tool per offered endpoint, and none outside the widget or without a list", () => {
+  const listedAuth = widgetAuth({
+    ...verifiedWidgetContext,
+    endpoints: [listed("scratch-area", 2, ["domains"])],
+  });
+  const set = endpointToolSet(listedAuth, manifest);
+  assert.deepEqual(Object.keys(set ?? {}), ["widget_scratch_area"]);
+  assert.equal(
+    endpointToolSet(widgetAuth(verifiedWidgetContext), manifest),
+    null
+  );
+  assert.equal(endpointToolSet(null, manifest), null);
+  assert.equal(endpointToolSet(listedAuth), null);
+});
+
+test("the lane admits every manifest tool name but no code-only one", () => {
+  assert.deepEqual([...endpointToolNames(manifest)].sort(), [
+    "widget_lead_pipeline",
+    "widget_scratch_area",
+  ]);
+});
+
+test("a widget_ name the committed manifest does not produce is still dropped and refused", async () => {
+  const transformed = (await widgetInvestigationMiddleware().transformParams?.({
+    params: {
+      prompt: [],
+      tools: [
+        {
+          inputSchema: { type: "object" },
+          name: "widget_scratch_area",
+          type: "function",
+        },
+        {
+          inputSchema: { type: "object" },
+          name: "widget_known_issues",
+          type: "function",
+        },
+      ],
+    },
+    type: "generate",
+  } as never)) as { tools?: { name: string }[] };
+  assert.deepEqual(
+    transformed.tools?.map((tool) => tool.name),
+    ["widget_known_issues"]
+  );
+});
+
 test("progress maps a generated tool by its area and ignores unknown names", () => {
   assert.equal(endpointToolCheck("widget_lead_pipeline", manifest), "leads");
   assert.equal(endpointToolCheck("widget_scratch_area", manifest), undefined);
@@ -200,6 +254,11 @@ test("the endpoint list survives the session stamp, which holds strings only", (
   const auth = widgetAuth({ ...verifiedWidgetContext, endpoints });
   assert.equal(typeof auth.attributes?.endpoints, "string");
   assert.deepEqual(widgetContext(auth)?.endpoints, endpoints);
+  // scripts/widget-run-stream.ts reads run stamps with the same schema.
+  assert.deepEqual(
+    stampedWidgetAttributes.parse(auth.attributes).endpoints,
+    endpoints
+  );
   assert.equal(
     widgetContext(widgetAuth(verifiedWidgetContext))?.endpoints,
     undefined
@@ -283,6 +342,10 @@ test("refusals come back as results, and anything else as unavailable", async (c
   assert.deepEqual(
     await answer(Response.json({ status: "invalid_input" }, { status: 400 })),
     { status: "invalid_input" }
+  );
+  assert.deepEqual(
+    await answer(Response.json({ status: "denied" }, { status: 401 })),
+    { status: "denied" }
   );
   const failed = await Promise.all(
     [
