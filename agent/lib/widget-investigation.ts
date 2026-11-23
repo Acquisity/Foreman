@@ -1807,8 +1807,6 @@ async function answerFreshRun(
   const helpCenterOnly = !INVESTIGATOR_ROLES.has(scope.role);
   const note = await followUpNote(input, scope, signal, deps);
   const toggled = input.mode === "investigate";
-  // The magnifying glass or a recording asks for a look only an owner or admin
-  // can start; a member or client gets the conversation's ticket instead.
   const helpCenter = () =>
     answerFromKnowledgeBase(run, scope, ask, signal, deps, true, {
       needsLook: toggled || Boolean(input.recording),
