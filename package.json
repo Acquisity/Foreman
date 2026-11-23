@@ -30,7 +30,8 @@
     "widget:case": "tsx scripts/widget-case-from-run.ts",
     "widget:guide": "tsx --env-file-if-exists=.env --env-file-if-exists=.env.local scripts/widget-product-guide.ts",
     "widget:judge": "tsx --env-file-if-exists=.env --env-file-if-exists=.env.local scripts/widget-judge.ts",
-    "widget:live": "tsx --env-file-if-exists=.env --env-file-if-exists=.env.local --env-file-if-exists=.env.prod-reader scripts/widget-live.ts"
+    "widget:live": "tsx --env-file-if-exists=.env --env-file-if-exists=.env.local --env-file-if-exists=.env.prod-reader scripts/widget-live.ts",
+    "widget:tools": "tsx scripts/widget-endpoint-tools.ts"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "4.0.52",
