@@ -248,14 +248,34 @@ const csvRecords = (text: string) => {
   }
   record.push(field);
   records.push(record);
-  return records.filter((row) => row.some(Boolean));
+  return records;
+};
+
+/** Each `# name.csv` table's records, up to its first blank line. */
+const csvTables = (text: string) => {
+  const tables: { closed: boolean; records: string[][] }[] = [];
+  for (const record of csvRecords(text)) {
+    const table = tables.at(-1);
+    if (record.length === 1 && CSV_BLOCK.test(record[0] ?? "")) {
+      tables.push({ closed: false, records: [] });
+    } else if (!record.some(Boolean)) {
+      if (table?.records.length) {
+        table.closed = true;
+      }
+    } else if (table && !table.closed) {
+      table.records.push(record);
+    }
+  }
+  return tables;
 };
 
 /**
  * Axiom's MCP answers in CSV text, each table under a `# name.csv` line, and
  * says "No … found." under it when a table is empty. Tables are framed on
- * whole records, so a quoted log line shaped like a heading stays in its row.
- * The query's table is the one whose header names `message`. Structured or
+ * whole records, so a quoted log line shaped like a heading stays in its row,
+ * and a table ends at its first blank line, before any footer such as the
+ * query budget or an "Open in Axiom" link. A row must have one field per
+ * column. The query's table is the one whose header names `message`. Structured or
  * JSON rows, the shape this lookup read before, are still accepted.
  */
 const axiomRows = (data: unknown): Record<string, unknown>[] => {
@@ -279,22 +299,20 @@ const axiomRows = (data: unknown): Record<string, unknown>[] => {
     }
     return rows.map((row) => (row ?? {}) as Record<string, unknown>);
   }
-  const tables: string[][][] = [];
-  for (const record of csvRecords(text)) {
-    if (record.length === 1 && CSV_BLOCK.test(record[0] ?? "")) {
-      tables.push([]);
-    } else {
-      tables.at(-1)?.push(record);
-    }
-  }
-  for (const [header, ...rows] of tables) {
+  const tables = csvTables(text);
+  for (const {
+    records: [header, ...rows],
+  } of tables) {
     if (header?.includes("message")) {
+      if (rows.some((row) => row.length !== header.length)) {
+        throw new Error("Unrecognized Axiom response.");
+      }
       return rows.map((row) =>
         Object.fromEntries(header.map((name, column) => [name, row[column]]))
       );
     }
   }
-  const [only] = tables;
+  const only = tables[0]?.records;
   if (
     tables.length === 1 &&
     only?.length === 1 &&

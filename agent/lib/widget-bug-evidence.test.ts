@@ -372,6 +372,43 @@ test("a quoted Axiom message holding a heading-shaped line stays in its row", as
   );
 });
 
+test("an Axiom table ends at its first blank line, before a budget footer or an Open in Axiom link", async (t) => {
+  withEnv(t, "WIDGET_AXIOM_APP_DATASET", "acquisity");
+  answer(
+    t,
+    axiomCsv(
+      [
+        "message,count,lastSeen",
+        "tRPC procedure failed,21,2026-11-20T16:17:44.912Z",
+        "",
+        "---",
+        "Query cost: 0.01 GBhr, remaining hourly 9.9 GBhr, daily 99 GBhr",
+        "[Open in Axiom](<https://app.axiom.co/acquisity/query?initForm=x>)",
+      ].join("\n")
+    )
+  );
+  assert.deepEqual(
+    await EVIDENCE_SOURCES.Axiom(providerCtx(), verifiedWidgetContext, turn),
+    {
+      items: [
+        {
+          text: "tRPC procedure failed (21 times, last 20 November 2026 at 16:17 UTC)",
+        },
+      ],
+      status: "found",
+    }
+  );
+});
+
+test("an Axiom row with the wrong number of fields is reported as not checked", async (t) => {
+  withEnv(t, "WIDGET_AXIOM_APP_DATASET", "acquisity");
+  answer(t, axiomCsv("message,count,lastSeen\nBoom,1"));
+  await assert.rejects(
+    EVIDENCE_SOURCES.Axiom(providerCtx(), verifiedWidgetContext, turn),
+    UNRECOGNIZED_AXIOM
+  );
+});
+
 test("an Axiom answer without the query's table, with an open quote, or an error, is reported as not checked", async (t) => {
   withEnv(t, "WIDGET_AXIOM_APP_DATASET", "acquisity");
   answer(t, axiomCsv('message,count,lastSeen\n"never closed,1,x'));
