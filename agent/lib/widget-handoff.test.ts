@@ -85,7 +85,7 @@ test("a ticket that cannot be filed returns no line", async () => {
   );
 });
 
-test("a follow-up reads the ticket after a filing reply, the old after-hours pickup line, or in an investigation; never on a first message, a teammate's run or another reply", async () => {
+test("a follow-up reads the ticket after a filing reply, the old after-hours pickup line, a filing in Foreman's runs, or in an investigation; never on a first message, a teammate's run or an unfiled conversation", async () => {
   const note = { forInvestigator: "i", forWriters: "w" };
   const reads: string[] = [];
   const deps: Parameters<typeof followUpNote>[3] = {
@@ -130,4 +130,32 @@ test("a follow-up reads the ticket after a filing reply, the old after-hours pic
     );
   }
   assert.equal(reads.length, 3);
+  // A filing older than the history the app sends is found in Foreman's runs.
+  const filedEarlier: Parameters<typeof followUpNote>[3] = {
+    ...deps,
+    wasFiled: () => Promise.resolve(true),
+  };
+  assert.deepEqual(
+    await followUpNote(
+      { history: said("Here are the steps.") },
+      scope,
+      signal,
+      filedEarlier
+    ),
+    note
+  );
+  const unreadable: Parameters<typeof followUpNote>[3] = {
+    ...deps,
+    wasFiled: () => Promise.reject(new Error("db down")),
+  };
+  assert.equal(
+    await followUpNote(
+      { history: said("Here are the steps.") },
+      scope,
+      signal,
+      unreadable
+    ),
+    null
+  );
+  assert.equal(reads.length, 4);
 });

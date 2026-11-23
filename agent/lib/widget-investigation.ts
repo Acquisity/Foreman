@@ -67,6 +67,7 @@ import {
   claimWidgetFinish,
   claimWidgetRun,
   completeWidgetRun,
+  conversationWasFiled,
   expireSessionlessWidgetRun,
   expireSessionlessWidgetRuns,
   FINISH_CLAIM_SECONDS,
@@ -578,6 +579,8 @@ export const defaultWidgetDependencies = {
       undefined,
       true
     ),
+  /** Whether an earlier run of the conversation filed its ticket. */
+  wasFiled: conversationWasFiled,
 };
 export type WidgetDependencies = Omit<
   typeof defaultWidgetDependencies,
@@ -593,6 +596,7 @@ export type WidgetDependencies = Omit<
   | "readTicket"
   | "ticketNote"
   | "verifyMember"
+  | "wasFiled"
 > &
   Partial<
     Pick<
@@ -609,6 +613,7 @@ export type WidgetDependencies = Omit<
       | "readTicket"
       | "ticketNote"
       | "verifyMember"
+      | "wasFiled"
     >
   >;
 

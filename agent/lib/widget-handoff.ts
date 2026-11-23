@@ -238,10 +238,11 @@ const FILED_REPLIES = [
 ];
 
 /**
- * A follow-up reads the conversation's ticket when an earlier reply in the
- * history said it was filed, or when it is an investigation, which waits on
- * slower work anyway and may follow a filing older than the history the app
- * sends. Every other front-door follow-up waits on nothing.
+ * A follow-up reads the conversation's ticket when it was filed: an earlier
+ * reply in the history says so, or, for a filing older than the history the
+ * app sends, Foreman's own runs record it (a fast local read). An
+ * investigation reads it regardless, since it waits on slower work anyway.
+ * A conversation never filed waits on no Linear read.
  */
 export const followUpNote = async (
   input: {
@@ -251,7 +252,7 @@ export const followUpNote = async (
   },
   scope: WidgetContext,
   signal: AbortSignal,
-  deps: Pick<WidgetDependencies, "ticketNote">
+  deps: Pick<WidgetDependencies, "ticketNote" | "wasFiled">
 ): Promise<TicketNote | null> => {
   if (input.staff || !(deps.ticketNote && input.history?.length)) {
     return null;
@@ -262,7 +263,10 @@ export const followUpNote = async (
       (turn) =>
         turn.role === "assistant" &&
         FILED_REPLIES.some((line) => turn.text.includes(line))
-    );
+    ) ||
+    (await (deps.wasFiled?.(scope, signal) ?? Promise.resolve(false)).catch(
+      () => false
+    ));
   return filed ? await deps.ticketNote(scope, signal) : null;
 };
 
