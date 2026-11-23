@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { logOpsEvent } from "./ops-log.js";
+import { endpointToolCheck } from "./widget-endpoint-tools.js";
 import {
   askJev,
   FRONT_DOOR_JEV_MS,
@@ -109,7 +110,9 @@ function failedResult(data: z.infer<typeof eventSchema>["data"]): boolean {
   }
   return (
     ("status" in output &&
-      ["unavailable", "denied"].includes(String(output.status))) ||
+      ["unavailable", "denied", "feature_off", "invalid_input"].includes(
+        String(output.status)
+      )) ||
     ("success" in output && output.success === false) ||
     ("error" in output && Boolean(output.error))
   );
@@ -121,7 +124,9 @@ function recordProgress(
   const { type, data } = event;
   if (type === "actions.requested") {
     for (const action of data.actions ?? []) {
-      const id = checks[action.toolName ?? ""];
+      const id =
+        checks[action.toolName ?? ""] ??
+        endpointToolCheck(action.toolName ?? "");
       if (id && !calls.has(action.callId)) {
         calls.set(action.callId, { id, status: "running" });
       }

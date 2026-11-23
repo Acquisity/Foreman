@@ -114,11 +114,6 @@ jobs:
           cost=$(grep -o 'reported_cost=\$[0-9.]*' "$RUNNER_TEMP/guide.log" | tail -1 | cut -d= -f2)
           unpriced=$(grep -o 'unpriced_calls=[0-9]*' "$RUNNER_TEMP/guide.log" | tail -1 | cut -d= -f2)
           title="chore(widget): regenerate the product guide from Acquisity ${commit:0:12}"
-          git config user.name "foreman-widget-guide"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git switch -c bot/widget-guide
-          git commit -m "$title" -- agent/lib/widget-product-guide.ts scripts/widget-product-guide.cache.json
-          git -c credential.helper= -c 'credential.helper=!gh auth git-credential' push --force-with-lease origin bot/widget-guide
           cat > "$RUNNER_TEMP/body.md" <<EOF_BODY
           Regenerated from Acquisity [${commit:0:12}](https://github.com/Acquisity/Acquisity/commit/$commit) by [this run]($RUN_URL).
 
@@ -132,21 +127,10 @@ jobs:
 
           Fixy reviews this PR against that Acquisity commit and merges it once the review-bot loop clears, from the fixy-labelled Linear ticket the next step files.
           EOF_BODY
-          number=$(gh api "repos/$GITHUB_REPOSITORY/pulls?head=$GITHUB_REPOSITORY_OWNER:bot/widget-guide&state=open" --jq '.[0].number // empty')
-          if [ -n "$number" ]; then
-            gh api -X PATCH "repos/$GITHUB_REPOSITORY/pulls/$number" -f title="$title" -F body=@"$RUNNER_TEMP/body.md" --jq .html_url
-          else
-            gh api -X POST "repos/$GITHUB_REPOSITORY/pulls" -f title="$title" -f head=bot/widget-guide -f base=main -F body=@"$RUNNER_TEMP/body.md" --jq .html_url
-          fi
+          scripts/generated-pr.sh publish bot/widget-guide foreman-widget-guide "$title" "$RUNNER_TEMP/body.md" agent/lib/widget-product-guide.ts scripts/widget-product-guide.cache.json
       # Runs on every pass, unchanged ones too, so an open guide PR always has its Fixy ticket.
       - name: File or reuse the Fixy ticket
         env:
           GH_TOKEN: ${{ secrets.WIDGET_GUIDE_TOKEN }}
           LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
-        run: |
-          url=$(gh api "repos/$GITHUB_REPOSITORY/pulls?head=$GITHUB_REPOSITORY_OWNER:bot/widget-guide&state=open" --jq '.[0].html_url // empty')
-          if [[ -z "$url" ]]; then
-            echo "No open guide PR; no ticket."
-            exit 0
-          fi
-          pnpm exec tsx scripts/generated-pr-ticket.ts --kind guide --pr "$url"
+        run: scripts/generated-pr.sh ticket bot/widget-guide guide

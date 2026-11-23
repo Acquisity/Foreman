@@ -214,7 +214,7 @@ const timeline = {
     },
   ],
   networkTypes: ["3g"],
-  padding: "p".repeat(15_000),
+  padding: "p".repeat(20_000),
 };
 
 test("the user timeline is asked for only when wanted, read past the scope's size limit, and kept out of the scope", async (context) => {
@@ -290,9 +290,41 @@ test("a timeline response past the larger limit is refused", async (context) => 
       requester(
         Response.json({
           ...appContext,
-          timeline: { padding: "p".repeat(40_000) },
+          timeline: { padding: "p".repeat(50_000) },
         })
       ).request
     )
   );
+});
+
+test("the endpoint list is kept, a malformed entry drops only itself, and a long list fits", async (context) => {
+  configure(context);
+  const endpoints = Array.from({ length: 11 }, (_, index) => ({
+    name: `area-${index}`,
+    path: `/api/internal/foreman/area-${index}`,
+    sections: [...new Array(20).keys()].map((n) => `deliverabilityAlerts${n}`),
+    version: 1,
+  }));
+  const body = JSON.stringify({
+    ...appContext,
+    endpoints: [...endpoints, { name: "Bad Name", version: 1 }],
+    featuresOff: ["lead_scrape"],
+  });
+  assert.ok(body.length > 4096);
+  const { request } = requester(new Response(body));
+  const result = await verifyWidgetContext(
+    { conversationId, organizationId, userToken },
+    request
+  );
+  assert.deepEqual(result.endpoints, endpoints);
+});
+
+test("a context without an endpoint list leaves it absent, not empty", async (context) => {
+  configure(context);
+  const { request } = requester(Response.json(appContext));
+  const result = await verifyWidgetContext(
+    { conversationId, organizationId, userToken },
+    request
+  );
+  assert.equal("endpoints" in result, false);
 });
