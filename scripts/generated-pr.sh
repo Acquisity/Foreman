@@ -5,6 +5,8 @@
 #     updates its one open PR.
 #   generated-pr.sh close <branch> <comment>
 #     closes the branch's open PR with the comment, when one is open.
+#   generated-pr.sh open <branch>
+#     prints the number of the branch's open PR, or nothing.
 #   generated-pr.sh ticket <branch> <kind>
 #     files or reuses the Fixy ticket for the branch's open PR (ENG-20297).
 # Needs GH_TOKEN, and LINEAR_API_KEY for ticket; GitHub Actions sets the rest.
@@ -32,6 +34,9 @@ case "$command" in
       gh api -X POST "repos/$GITHUB_REPOSITORY/pulls" -f title="$title" -f head="$branch" -f base=main -F body=@"$body" --jq .html_url
     fi
     ;;
+  open)
+    open_pr "$branch" number
+    ;;
   close)
     number=$(open_pr "$branch" number)
     if [[ -n "$number" ]]; then
@@ -48,7 +53,7 @@ case "$command" in
     pnpm exec tsx scripts/generated-pr-ticket.ts --kind "$3" --pr "$url"
     ;;
   *)
-    echo "Usage: generated-pr.sh publish|close|ticket <branch> ..." >&2
+    echo "Usage: generated-pr.sh publish|open|close|ticket <branch> ..." >&2
     exit 2
     ;;
 esac

@@ -90,7 +90,8 @@ jobs:
           if [[ "$status" == 0 ]]; then
             git -c credential.helper= -c 'credential.helper=!gh auth git-credential' fetch --no-tags origin refs/heads/bot/widget-tools:refs/remotes/origin/bot/widget-tools
             # Only an open PR's file is pending; a closed or merged branch's is not.
-            if [[ -n "$(gh api "repos/$GITHUB_REPOSITORY/pulls?head=$GITHUB_REPOSITORY_OWNER:bot/widget-tools&state=open" --jq '.[0].number // empty')" ]]; then
+            open_pr=$(scripts/generated-pr.sh open bot/widget-tools)
+            if [[ -n "$open_pr" ]]; then
               git show "origin/bot/widget-tools:$file" > "$RUNNER_TEMP/pending.ts"
               previous=$RUNNER_TEMP/pending.ts
             fi
