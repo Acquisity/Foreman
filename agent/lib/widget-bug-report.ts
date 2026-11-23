@@ -19,7 +19,7 @@ import {
   SOURCE_ORDER,
 } from "./widget-bug-evidence.js";
 import type { WidgetFindings } from "./widget-findings.js";
-import { isLiveActive, isReplayActive } from "./widget-replay.js";
+import { isLiveActive } from "./widget-live-policy.js";
 import type { WidgetContext } from "./widget-scope.js";
 import {
   appTicketContext,
@@ -489,7 +489,7 @@ export async function addToBugReport(
     const filed = await fileBugReport(scope, runId, turn, signal, overrides);
     return { ...filed, message: BUG_REPORT_ADDED };
   }
-  if (!(isReplayActive() || isLiveActive())) {
+  if (!isLiveActive()) {
     await deps.comment(
       existing.identifier,
       additionComment(turn, deps.now()),

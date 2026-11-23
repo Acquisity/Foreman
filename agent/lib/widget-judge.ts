@@ -19,8 +19,7 @@ import { SUPPORT_GUIDE } from "./widget-support-guide.js";
  * above both and from neither the gate's vendor nor the composer's model.
  * It runs through headless Claude Code on the local machine (`claude -p`, the
  * operator's subscription), never the AI Gateway: the Gateway key is for
- * Foreman itself only (Aaron, 2026-10-09, after judge spend drained it). A
- * change here reruns against the gold file first (`pnpm widget:judge rerun`).
+ * Foreman itself only (Aaron, 2026-10-09, after judge spend drained it).
  */
 const CLAUDE_MODEL = "opus";
 export const JUDGE_MODEL = `claude-code/${CLAUDE_MODEL}`;
@@ -71,7 +70,7 @@ export const judgeRecordSchema = z
     judgedAt: z.iso.datetime(),
     model: z.string().min(1),
     recorded: widgetCaseSchema,
-    // Replay repetition within one eval run; absent on the first run and on older records.
+    // Repetition within one scoring run; absent on the first run and on older records.
     run: z.number().int().positive().optional(),
     verdicts: z
       .array(verdictSchema.extend({ claim: z.string().min(1) }))
@@ -89,7 +88,7 @@ export const judgeRecordSchema = z
   });
 export type JudgeRecord = z.infer<typeof judgeRecordSchema>;
 
-/** Build the sample once; review, export and calibration consume this same record. */
+/** Build the sample once; the saved record and the review page both read this same record. */
 export function reviewedSample(
   name: string,
   recorded: WidgetCase,
@@ -316,7 +315,7 @@ const judgeSchema = z.strictObject({
 
 /** A headless Claude Code start plus an Opus answer on a large input. */
 export const JUDGE_TIMEOUT_MS = 240_000;
-/** Concurrent `claude -p` processes; a replay batch runs up to eight cases at once. */
+/** Concurrent `claude -p` processes. */
 const JUDGE_CONCURRENCY = 3;
 
 /** One judge call: the system prompt and input in, the structured object out. */
@@ -475,9 +474,6 @@ export async function judgeAnswer(
   }
 }
 
-/** Ignored output root; each eval invocation writes `<root>/<timestamp>/`. */
-export const JUDGE_OUTPUT = ".eve/widget-judge";
-
 export const readRecords = (dir: string): JudgeRecord[] =>
   readdirSync(`${dir}/records`)
     .filter((file) => file.endsWith(".json"))
@@ -488,7 +484,7 @@ export const readRecords = (dir: string): JudgeRecord[] =>
       )
     );
 
-/** A record's file: one per case and run, so a repeated replay keeps its own verdicts. */
+/** A record's file: one per case and run, so a repeated run keeps its own verdicts. */
 export const recordFile = (name: string, run?: number) =>
   `${name}${run ? `.run${run}` : ""}.json`;
 
@@ -519,7 +515,7 @@ export function renderReview(records: JudgeRecord[]): string {
     const record = judgeRecordSchema.parse(input);
     const rows = record.verdicts.map(
       (verdict) =>
-        `| ${record.case}#${verdict.id} | ${cell(verdict.claim)} | ${verdict.verdict} | ${cell(verdict.reason)} |  |`
+        `| ${record.case}#${verdict.id} | ${cell(verdict.claim)} | ${verdict.verdict} | ${cell(verdict.reason)} |`
     );
     return [
       `## ${record.case}`,
@@ -551,48 +547,19 @@ export function renderReview(records: JudgeRecord[]): string {
       "Answer:",
       codeBlock(record.answer),
       "",
-      "| key | claim | verdict | reason | mark |",
-      "| --- | --- | --- | --- | --- |",
+      "| key | claim | verdict | reason |",
+      "| --- | --- | --- | --- |",
       ...rows,
     ].join("\n");
   });
-  return [
-    "# Widget claims judge review",
-    "",
-    "Write right or wrong in the mark column of each row, then run `pnpm widget:judge gold <this directory>`.",
-    "",
-    sections.join("\n\n"),
-    "",
-  ].join("\n");
+  return ["# Widget claims judge review", "", sections.join("\n\n"), ""].join(
+    "\n"
+  );
 }
 
-const ROW = /^\|\s*([^|\s]+#[^|\s]+)\s*\|.*\|\s*([^|]*?)\s*\|\s*$/;
-
-/** The marks Aaron wrote, by row key; blank rows are left out. */
-export function parseMarks(review: string): Map<string, boolean> {
-  const marks = new Map<string, boolean>();
-  for (const line of review.split("\n")) {
-    const match = ROW.exec(line);
-    const mark = match?.[2]?.toLowerCase();
-    if (!(match && mark)) {
-      continue;
-    }
-    if (mark !== "right" && mark !== "wrong") {
-      throw new Error(
-        `Mark "${match[2]}" on ${match[1]} is not right or wrong.`
-      );
-    }
-    if (marks.has(match[1] as string)) {
-      throw new Error(`${match[1]} is marked more than once.`);
-    }
-    marks.set(match[1] as string, mark === "right");
-  }
-  return marks;
-}
-
-/** What the replay eval's `row:` log line carries that the scorecard reads. */
+/** What a live re-run's result row carries that the scorecard reads. */
 export interface ReplayRow {
-  /** Null means a completed replay produced no customer answer; absent on legacy rows. */
+  /** Null means a completed run produced no customer answer; absent on legacy rows. */
   answer?: string | null;
   budgetHit?: boolean;
   citations?: string[];
@@ -606,7 +573,7 @@ export interface ReplayRow {
   scored?: boolean;
 }
 
-/** One replayed case of one run: its row, the case it replayed and the judge's record when the judge ran. */
+/** One case of one run: its row, the case it ran and the judge's record when the judge ran. */
 export interface ScoredReplay {
   caseName?: string;
   record: JudgeRecord | null;

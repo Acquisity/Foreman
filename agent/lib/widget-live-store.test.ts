@@ -12,8 +12,8 @@ import {
   receiveWidgetMessage,
   type WidgetDependencies,
 } from "./widget-investigation.js";
+import { LIVE_TICKET } from "./widget-live-policy.js";
 import { liveDependencies, liveRunStore } from "./widget-live-store.js";
-import { LIVE_TICKET } from "./widget-replay.js";
 
 const secret = "s".repeat(40);
 const findings: WidgetFindings = {

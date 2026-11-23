@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { creditWindowRequestSchema } from "./billing-account.js";
+import { type WidgetContext, widgetContextSchema } from "./widget-scope.js";
 
 /** Live investigations require the local Workflow world and local file storage. */
 export function assertLiveAllowed(env: NodeJS.ProcessEnv = process.env) {
@@ -8,6 +9,64 @@ export function assertLiveAllowed(env: NodeJS.ProcessEnv = process.env) {
       "Widget live re-runs are local-only; VERCEL_ENV must be absent."
     );
   }
+}
+// The widget channel imports this module, so a deployment with the flag fails at boot.
+assertLiveAllowed();
+
+/**
+ * Live re-run (ENG-15026, `pnpm widget:live`): with WIDGET_LIVE=1 every widget read is live,
+ * widget_file_ticket files nothing, and identity is the recorded production scope the
+ * harness sends as the bearer token. Local-only.
+ */
+export const isLiveActive = () => {
+  assertLiveAllowed();
+  return process.env.WIDGET_LIVE === "1";
+};
+
+/**
+ * The result is a simulated filed ticket, so a correct ticket reaches the composer's
+ * "passed to the team" reply as it would in production (ENG-15044 round 15: with
+ * `filed: false` no live reply could say so). ENG-0 is never a real issue.
+ */
+export const LIVE_TICKET = Object.freeze({
+  identifier: "ENG-0",
+  live: "simulated: nothing was filed",
+  simulated: true,
+  url: "https://linear.app/acquisity/issue/ENG-0/simulated-live-ticket",
+});
+
+const liveIdentitySchema = z.strictObject({
+  scope: widgetContextSchema,
+  sentAt: z.iso.datetime(),
+});
+
+/**
+ * A live re-run's scope: the production run's recorded scope, sent base64url-encoded as the
+ * bearer token, on the request's own conversation and always as a team-only inbox run. A
+ * recorded `recordingId` stays, as production verified it, so the recording stays readable.
+ */
+export function liveContext(input: {
+  conversationId: string;
+  organizationId: string;
+  staff?: boolean;
+  userToken: string;
+}): WidgetContext {
+  const { scope: recorded, sentAt } = liveIdentitySchema.parse(
+    JSON.parse(Buffer.from(input.userToken, "base64url").toString("utf8"))
+  );
+  if (!input.staff || input.organizationId !== recorded.organizationId) {
+    throw new Error(
+      "Live re-runs require the recorded workspace and staff path."
+    );
+  }
+  return Object.freeze(
+    widgetContextSchema.parse({
+      ...recorded,
+      conversationId: input.conversationId,
+      liveAsOf: sentAt,
+      source: "inbox",
+    })
+  );
 }
 
 export function liveServerUrl(value: string) {

@@ -1,13 +1,5 @@
 import assert from "node:assert/strict";
-import {
-  existsSync,
-  mkdtempSync,
-  readFileSync,
-  rmSync,
-  writeFileSync,
-} from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { existsSync } from "node:fs";
 import { describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
 import { GITHUB_TOOL_ALLOWLIST } from "./github/tool-allowlist.js";
@@ -83,10 +75,6 @@ const ORDINARY_SLACK_CATALOG_CEILING = 0.75;
 // The repository root, so a fixture's dynamic tool resolves through the same
 // bundled module map the repository's own manifest does.
 const APP_ROOT = fileURLToPath(new URL("../../", import.meta.url));
-const REPLAY_CASE = join(
-  APP_ROOT,
-  "evals/widget/cases/eng-14665-paused-campaign-inbox-errors.json"
-);
 
 const APPLICATION_OWNER = { kind: "application" } as const;
 const BROWSER_OWNER = {
@@ -702,8 +690,8 @@ describe("capability report", () => {
         .get(lane)
         ?.rows.find((row) => row.kind === "tool" && row.source === "tools/")
         ?.entries ?? 0;
-    assert.equal(slack.catalogChars, 74_463);
-    assert.equal(repository.catalogChars, 100_046);
+    assert.equal(slack.catalogChars, 74_083);
+    assert.equal(repository.catalogChars, 99_666);
     assert.equal(slack.catalogChars, intake.catalogChars);
     assert.ok(repository.catalogChars > slack.catalogChars);
 
@@ -781,8 +769,8 @@ describe("capability report", () => {
   });
 });
 
-describe("widget replay", () => {
-  it("admits every widget tool and the GitHub surface unchanged under replay", {
+describe("widget tools", () => {
+  it("admits every widget tool and the GitHub surface", {
     skip: HAS_COMPILED_MANIFEST
       ? false
       : "run pnpm validate to compile the repository manifest first",
@@ -796,45 +784,28 @@ describe("widget replay", () => {
     // A recording follow-up, so the recording reader is offered too.
     const widget = widgetAuth({
       ...verifiedWidgetContext,
-      recordingId: "replay-recording",
+      recordingId: "recording",
     });
     const repository = laneAuth("repository-interactive");
-    // Fresh session ids per pass: resolutions are cached per session.
-    const resolveAll = async (pass: string) =>
-      (
-        await Promise.all(
-          manifest.dynamicTools
-            .filter(
-              (entry) =>
-                entry.sourceId.startsWith("tools/widget_") ||
-                entry.sourceId.startsWith("ext-override:github:")
-            )
-            .map((entry) =>
-              resolveCompiledDynamicTools(entry, manifest.appRoot, {
-                auth: entry.sourceId.startsWith("tools/") ? widget : repository,
-                id: `widget-replay:${pass}:${entry.sourceId}`,
-              })
-            )
-        )
+    const tools = (
+      await Promise.all(
+        manifest.dynamicTools
+          .filter(
+            (entry) =>
+              entry.sourceId.startsWith("tools/widget_") ||
+              entry.sourceId.startsWith("ext-override:github:")
+          )
+          .map((entry) =>
+            resolveCompiledDynamicTools(entry, manifest.appRoot, {
+              auth: entry.sourceId.startsWith("tools/") ? widget : repository,
+              id: `widget-tools:${entry.sourceId}`,
+            })
+          )
       )
-        .flat()
-        .sort((left, right) => left.name.localeCompare(right.name));
-    const previous = process.env.WIDGET_REPLAY_CASE;
-    Reflect.deleteProperty(process.env, "WIDGET_REPLAY_CASE");
-    const live = await resolveAll("live");
-    process.env.WIDGET_REPLAY_CASE = REPLAY_CASE;
-    try {
-      // Eve's own admission drops a tool whose callbacks are not stamped, so
-      // an identical list proves every inline replay execute was admitted.
-      assert.deepEqual(await resolveAll("replay"), live);
-    } finally {
-      if (previous === undefined) {
-        Reflect.deleteProperty(process.env, "WIDGET_REPLAY_CASE");
-      } else {
-        process.env.WIDGET_REPLAY_CASE = previous;
-      }
-    }
-    const names = live.map((tool) => tool.name);
+    )
+      .flat()
+      .sort((left, right) => left.name.localeCompare(right.name));
+    const names = tools.map((tool) => tool.name);
     for (const name of [
       "widget_file_ticket",
       "widget_inbox_health",
@@ -847,73 +818,5 @@ describe("widget replay", () => {
       names.filter((name) => GITHUB_TOOL_NAME.test(name)).length,
       GITHUB_TOOL_ALLOWLIST.length
     );
-  });
-});
-
-describe("recording replay request", () => {
-  it("restores recording context and admits its reader through Eve", {
-    skip: HAS_COMPILED_MANIFEST
-      ? false
-      : "run pnpm validate to compile the repository manifest first",
-  }, async () => {
-    const { replayRecording } = await import("./widget-replay.js");
-    const { verifyWidgetContext } = await import("./widget-context.js");
-    const { widgetCaseSchema } = await import("./widget-case.js");
-    const { widgetAuth } = await import("./widget-scope.js");
-    const { verifiedWidgetContext: fixture } = await import(
-      "./widget.fixture.js"
-    );
-    const { resolveCompiledDynamicTools } = await import(
-      "./eve-dynamic-tools.js"
-    );
-    const recorded = widgetCaseSchema.parse(
-      JSON.parse(readFileSync(REPLAY_CASE, "utf8"))
-    );
-    assert.equal(replayRecording(recorded), undefined);
-    recorded.cassette.push({
-      ...recorded.cassette[0],
-      input: {},
-      output: { summary: "Recorded screen evidence." },
-      tool: "widget_read_recording",
-    });
-    const directory = mkdtempSync(join(tmpdir(), "widget-replay-recording-"));
-    const path = join(directory, "case.json");
-    const previous = process.env.WIDGET_REPLAY_CASE;
-    writeFileSync(path, JSON.stringify(recorded));
-    process.env.WIDGET_REPLAY_CASE = path;
-    try {
-      const request = { recording: replayRecording(recorded) };
-      assert.deepEqual(request.recording, { id: "replay-recording" });
-      const scope = await verifyWidgetContext(
-        {
-          conversationId: fixture.conversationId,
-          organizationId: fixture.organizationId,
-          userToken: "replay",
-        },
-        () => Promise.reject(new Error("app contacted"))
-      );
-      // The message route carries the recording reference into investigation scope.
-      const auth = widgetAuth({ ...scope, recordingId: request.recording?.id });
-      const manifest = readCompiledManifest(new URL("../../", import.meta.url));
-      const entry = manifest.dynamicTools.find(
-        (candidate) => candidate.sourceId === "tools/widget_read_recording.ts"
-      );
-      assert.ok(entry);
-      const tools = await resolveCompiledDynamicTools(entry, manifest.appRoot, {
-        auth,
-        id: "widget-replay:recording-request",
-      });
-      assert.deepEqual(
-        tools.map((tool) => tool.name),
-        ["widget_read_recording"]
-      );
-    } finally {
-      if (previous === undefined) {
-        Reflect.deleteProperty(process.env, "WIDGET_REPLAY_CASE");
-      } else {
-        process.env.WIDGET_REPLAY_CASE = previous;
-      }
-      rmSync(directory, { force: true, recursive: true });
-    }
   });
 });
