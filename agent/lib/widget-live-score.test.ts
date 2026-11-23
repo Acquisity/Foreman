@@ -225,7 +225,7 @@ test("live judging needs no authored expectation and decides the handoff from th
   const split = splitNeedsHuman(judged.verdicts);
   assert.equal(split.needsHuman, true);
   assert.ok(!split.verdicts.some(({ id }) => id === "needs_human"));
-  // The remaining verdicts are exactly the replay claims, so the replay record accepts them.
+  // The remaining verdicts are exactly the case claims, so the judge record accepts them.
   reviewedSample(
     "wrun_41M4C65K460GV34YR42A4W6NAN",
     live(),

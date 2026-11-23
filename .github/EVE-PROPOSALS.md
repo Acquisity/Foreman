@@ -144,6 +144,8 @@ Status: Resolved in 0.69.0.
 
 ## Skip an eval after replay coverage is known
 
+Withdrawn on 23 Nov 2026 (ENG-20303): the widget replay eval that needed it was removed. The record below is kept as it was.
+
 Checked for ENG-14746 and rechecked on Eve 0.81.1. The public `t.skip(reason)` rejects calls after session activity or recorded assertions with "skip() must be called before creating sessions, sending messages, or recording assertions." Replay coverage is known only after the investigator runs, so a post-run skip cannot preserve the leak and raw-field gates.
 
 Foreman keeps those safety gates and records one tracked-only `.soft()` assertion without a threshold, named "replay coverage", stating the unrecorded tools. Uncovered rows carry `scored: false` and `unrecordedReads`; behavior checks are computed but are not asserted or counted, the claims judge does not run, and loop measurements exclude those rows. Eve's verdict reflects safety checks, not a fully covered replay pass.

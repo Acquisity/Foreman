@@ -1,7 +1,7 @@
 /**
  * Read one widget run's session stream with the workflow CLI (local runs from
  * `.eve/.workflow-data`): its customer message, verified scope and each tool
- * call paired with its result. Shared by `widget:case` and `widget:live`. Raw
+ * call paired with its result. Used by `widget:live`. Raw
  * stream data stays in memory.
  */
 import { execFile } from "node:child_process";

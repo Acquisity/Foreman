@@ -2,12 +2,7 @@ import { z } from "zod";
 import { DEFAULT_PARTNER_ID } from "./acquisity-constants.js";
 import { acquisityOrigin, readContextBody } from "./acquisity-origin.js";
 import { parseAvailableEndpoints } from "./widget-endpoint-schema.js";
-import {
-  isLiveActive,
-  isReplayActive,
-  liveContext,
-  replayContext,
-} from "./widget-replay.js";
+import { isLiveActive, liveContext } from "./widget-live-policy.js";
 import {
   ORGANIZATION_NAME_MAX,
   ORGANIZATION_SLUG,
@@ -55,20 +50,12 @@ export async function verifyWidgetContext(
     // The token belongs to a support teammate, not the customer. The app then
     // checks the teammate and returns the conversation's customer as the scope.
     staff?: boolean;
-    replayCaseId?: string | null;
     timeline?: boolean;
     onTimeline?: (timeline: Record<string, unknown>) => void;
   },
   request: typeof fetch = fetch
 ): Promise<WidgetContext> {
   const parsed = inputSchema.parse(input);
-  if (isReplayActive()) {
-    return replayContext({
-      ...parsed,
-      replayCaseId: input.replayCaseId ?? undefined,
-      staff: input.staff,
-    });
-  }
   if (isLiveActive()) {
     return liveContext({ ...parsed, staff: input.staff });
   }

@@ -254,7 +254,7 @@ test("disabled, unauthenticated, malformed and oversized requests stop before ve
   assert.equal(
     (
       await receiveWidgetMessage(
-        request({ ...start, question: "x".repeat(700_000) }),
+        request({ ...start, question: "x".repeat(900_000) }),
         noWork(),
         1,
         verified,

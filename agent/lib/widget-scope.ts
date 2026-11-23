@@ -60,7 +60,7 @@ export const ORGANIZATION_SLUG = new RegExp(
 
 const shape = {
   // When the customer sent an "I found a bug" report. Only the bug report's
-  // evidence lookup sets it, and the policy reads PostHog only for it.
+  // evidence lookup sets it, and the policy reads PostHog and Inngest only for it.
   bugReportedAt: z.iso.datetime().optional(),
   conversationId: z.uuid(),
   // The support endpoints the context route lists for the asking user
@@ -80,11 +80,6 @@ const shape = {
   recordingId: z
     .string()
     .regex(/^[A-Za-z0-9_-]{1,200}$/)
-    .optional(),
-  // Only the replay identity verifier stamps this, never the production app.
-  replayCaseId: z
-    .string()
-    .regex(/^[A-Za-z0-9][A-Za-z0-9_-]{0,199}$/)
     .optional(),
   role: z.enum(["owner", "admin", "member", "client"]),
   // "inbox" marks a run a teammate started from the support inbox: its result is
@@ -169,7 +164,6 @@ export function sameWidgetOwner(a: WidgetContext, b: WidgetContext) {
     a.organizationId === b.organizationId &&
     a.conversationId === b.conversationId &&
     a.role === b.role &&
-    a.replayCaseId === b.replayCaseId &&
     a.liveAsOf === b.liveAsOf &&
     a.partnerId === b.partnerId &&
     a.organizationSlug === b.organizationSlug

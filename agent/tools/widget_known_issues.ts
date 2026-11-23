@@ -3,7 +3,6 @@ import { defineTool } from "eve/tools";
 import { z } from "zod";
 import { executorClient } from "#lib/executor/client.js";
 import { findRelatedIssues } from "#lib/linear-api.js";
-import { replayable } from "#lib/widget-replay.js";
 import { isWidgetSupport } from "../lib/widget-scope.js";
 
 const MAX_ISSUES = 5;
@@ -98,8 +97,6 @@ export const tool = defineTool({
 export default defineDynamic({
   events: {
     "step.started": (_event, ctx) =>
-      isWidgetSupport(ctx.session.auth.initiator)
-        ? replayable("widget_known_issues", tool)
-        : null,
+      isWidgetSupport(ctx.session.auth.initiator) ? tool : null,
   },
 });
