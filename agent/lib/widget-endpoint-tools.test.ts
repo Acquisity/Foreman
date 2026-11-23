@@ -205,7 +205,7 @@ test("a widget_ name the committed manifest does not produce is still dropped an
     type: "generate",
   } as never)) as { tools?: { name: string }[] };
   assert.deepEqual(
-    transformed.tools?.map((tool) => tool.name),
+    transformed.tools?.map((listedTool) => listedTool.name),
     ["widget_known_issues"]
   );
 });

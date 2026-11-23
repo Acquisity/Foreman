@@ -2,10 +2,10 @@ import type { SessionAuthContext } from "eve/context";
 import { acquisityOrigin } from "./acquisity-origin.js";
 import { requireWidgetContext } from "./widget-scope.js";
 
-export type WidgetAppContext = {
+export interface WidgetAppContext {
   abortSignal: AbortSignal;
   session?: { auth: { initiator: SessionAuthContext | null } };
-};
+}
 
 /**
  * The one request contract for Acquisity's `/api/internal/foreman/*` routes:
