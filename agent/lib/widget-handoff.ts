@@ -226,31 +226,45 @@ export const frontDoorTicket = (
 export const UNFILED_PERSON_NOTE =
   "\n\nThe customer asked for a person. Nobody takes over this chat, and the conversation's ticket could not be filed yet: set needsHuman true, and the app files it for the team when you finish. Answer the rest of the question as usual.";
 
-/** Replies that tell the customer their conversation has a ticket. */
-const FILED_REPLIES = [ANSWER_HERE, BUG_REPORT_LOGGED, BUG_REPORT_ADDED];
+/**
+ * Replies that tell the customer their conversation has a ticket, including
+ * the after-hours pickup line filed conversations got before ENG-20301.
+ */
+const FILED_REPLIES = [
+  ANSWER_HERE,
+  BUG_REPORT_LOGGED,
+  BUG_REPORT_ADDED,
+  "a teammate will pick this up",
+];
 
 /**
- * Only a conversation an earlier reply said was filed can have a ticket, so
- * the ticket is read only then and every other follow-up waits on nothing.
+ * A follow-up reads the conversation's ticket when an earlier reply in the
+ * history said it was filed, or when it is an investigation, which waits on
+ * slower work anyway and may follow a filing older than the history the app
+ * sends. Every other front-door follow-up waits on nothing.
  */
 export const followUpNote = async (
   input: {
     history?: { role: "customer" | "assistant"; text: string }[];
+    mode?: string;
     staff?: boolean;
   },
   scope: WidgetContext,
   signal: AbortSignal,
   deps: Pick<WidgetDependencies, "ticketNote">
-): Promise<TicketNote | null> =>
-  !input.staff &&
-  deps.ticketNote &&
-  input.history?.some(
-    (turn) =>
-      turn.role === "assistant" &&
-      FILED_REPLIES.some((filed) => turn.text.includes(filed))
-  )
-    ? await deps.ticketNote(scope, signal)
-    : null;
+): Promise<TicketNote | null> => {
+  if (input.staff || !(deps.ticketNote && input.history?.length)) {
+    return null;
+  }
+  const filed =
+    input.mode === "investigate" ||
+    input.history.some(
+      (turn) =>
+        turn.role === "assistant" &&
+        FILED_REPLIES.some((line) => turn.text.includes(line))
+    );
+  return filed ? await deps.ticketNote(scope, signal) : null;
+};
 
 /** The investigator's copy of the ticket note, marked as the app's. */
 export const investigatorNote = (note: TicketNote | null) =>

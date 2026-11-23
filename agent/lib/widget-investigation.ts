@@ -1807,13 +1807,15 @@ async function answerFreshRun(
   const helpCenterOnly = !INVESTIGATOR_ROLES.has(scope.role);
   const note = await followUpNote(input, scope, signal, deps);
   const toggled = input.mode === "investigate";
+  // The magnifying glass or a recording asks for a look; on the front door
+  // only a member or client asks for one, since an owner's starts it.
+  const needsLook = toggled || Boolean(input.recording);
   const helpCenter = () =>
     answerFromKnowledgeBase(run, scope, ask, signal, deps, true, {
-      needsLook: toggled || Boolean(input.recording),
+      needsLook,
       note,
     });
-  const investigate =
-    input.staff || ((input.recording || toggled) && !helpCenterOnly);
+  const investigate = input.staff || (needsLook && !helpCenterOnly);
   if (!investigate) {
     const answered = await answerFromKnowledgeBase(
       run,
@@ -1822,7 +1824,7 @@ async function answerFreshRun(
       signal,
       deps,
       helpCenterOnly,
-      { needsLook: helpCenterOnly && toggled, note }
+      { needsLook, note }
     );
     return json(widgetRunResponse(answered ?? (await deps.read(run.id))));
   }

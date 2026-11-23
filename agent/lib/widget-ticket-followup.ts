@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { getToken as getConnectToken } from "@vercel/connect";
 import { callLinearGraphQL } from "eve/channels/linear";
 import { FIXY_LINEAR_USER_ID, FIXY_RUN_FINISHED } from "./fixy-handoff.js";
+import { isWidgetFiledDescription } from "./widget-ticket-marker.js";
 
 const LINEAR_MS = 15_000;
 
@@ -59,11 +60,33 @@ const DESCRIPTION = `query WidgetTicketDescription($id: String!) {
   issue(id: $id) { description }
 }`;
 
+const ASTERISK_ITEM = /^\* /u;
+
 /**
- * Whether a search hit is this conversation's own ticket: its description
- * carries the server-written scope block for this workspace and conversation.
- * A ticket that only mentions the conversation id elsewhere is not.
+ * Whether a description ends with the conversation's own server-written scope
+ * block: the trailing block `isWidgetFiledDescription` recognises, naming this
+ * workspace and conversation. A ticket that quotes those lines elsewhere, or
+ * ends with another conversation's block, is not this conversation's.
  */
+export const ownsDescription = (
+  description: string | null,
+  scope: { conversationId: string; organizationId: string }
+): boolean => {
+  if (!isWidgetFiledDescription(description)) {
+    return false;
+  }
+  const tail = (description ?? "").trimEnd();
+  const block = tail.slice(tail.lastIndexOf("## Verified scope"));
+  const lines = block
+    .split("\n")
+    .map((line) => line.replace(ASTERISK_ITEM, "- "));
+  return (
+    lines.includes(`- Organization ID: ${scope.organizationId}`) &&
+    lines.includes(`- Support conversation: ${scope.conversationId}`)
+  );
+};
+
+/** Whether a search hit is this conversation's own ticket; see `ownsDescription`. */
 export async function ownsConversation(
   identifier: string,
   scope: { conversationId: string; organizationId: string },
@@ -73,13 +96,7 @@ export async function ownsConversation(
   const { issue } = await request<{
     issue: { description: string | null } | null;
   }>("WidgetTicketDescription", DESCRIPTION, { id: identifier }, signal);
-  const description = issue?.description ?? "";
-  return (
-    description.includes("## Verified scope") &&
-    description.includes(
-      `- Organization ID: ${scope.organizationId}\n- Support conversation: ${scope.conversationId}`
-    )
-  );
+  return ownsDescription(issue?.description ?? null, scope);
 }
 
 const OPEN_STATES = `query WidgetTicketStates($id: String!) {

@@ -4,6 +4,7 @@ import { verifiedWidgetContext as scope } from "./widget.fixture.js";
 import { scanIdentifiers } from "./widget-egress.js";
 import {
   ANSWER_HERE,
+  followUpNote,
   personInvite,
   ticketInsteadOfHandoff,
   withAnswerHere,
@@ -82,4 +83,51 @@ test("a ticket that cannot be filed returns no line", async () => {
     await ticketInsteadOfHandoff(scope, ticket, ids, undefined, thrown),
     null
   );
+});
+
+test("a follow-up reads the ticket after a filing reply, the old after-hours pickup line, or in an investigation; never on a first message, a teammate's run or another reply", async () => {
+  const note = { forInvestigator: "i", forWriters: "w" };
+  const reads: string[] = [];
+  const deps: Parameters<typeof followUpNote>[3] = {
+    ticketNote: (verified) => {
+      reads.push(verified.conversationId);
+      return Promise.resolve(note);
+    },
+  };
+  const { signal } = new AbortController();
+  const said = (text: string) => [
+    { role: "customer" as const, text: "help" },
+    { role: "assistant" as const, text },
+  ];
+  const cases = [
+    [{ history: said(`Done. ${ANSWER_HERE}`) }, note],
+    [
+      {
+        history: said(
+          "Our team is away right now, and a teammate will pick this up when they're back."
+        ),
+      },
+      note,
+    ],
+    [{ history: said("Here are the steps."), mode: "investigate" }, note],
+    [{ history: said("Here are the steps.") }, null],
+    [{ mode: "investigate" }, null],
+    [{ history: said(ANSWER_HERE), staff: true }, null],
+  ] as const;
+  for (const [input, expected] of cases) {
+    assert.deepEqual(
+      // biome-ignore lint/performance/noAwaitInLoops: each case checks its own read.
+      await followUpNote(
+        {
+          ...input,
+          history: "history" in input ? [...input.history] : undefined,
+        },
+        scope,
+        signal,
+        deps
+      ),
+      expected
+    );
+  }
+  assert.equal(reads.length, 3);
 });

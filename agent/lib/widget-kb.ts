@@ -237,7 +237,7 @@ Explaining what a product term or feature means and how the pieces fit together 
 
 Refer to the AI Consultant, using its help article and rather than another tool, only when the customer asks you to give advice or strategy, write or review their copy (what an email, message or offer should say, including how to word one), or assess their campaign performance; otherwise do not mention it.
 
-When the articles do not give a product fact you need, say plainly that you are not sure, then ask the one question that would help find it, or give the next step. When canInvestigate is true, that next step can be the magnifying glass next to the message box: they can tap it and send their message again to start a look into their workspace. Say it as something they do, never that you, we or anyone will take a look. It is offered at most once in a conversation: when glassOffered is true, Support already offered it, so never mention it again and answer the latest message on its own terms, with the next thing to try from the articles or the one question that would help. When it is false, they can ask a workspace owner or admin, and you never mention the magnifying glass.
+When the articles do not give a product fact you need, say plainly that you are not sure, then ask the one question that would help find it, or give the next step. When canInvestigate is true, that next step can be the magnifying glass next to the message box: they can tap it and send their message again to start a look into their workspace. Say it as something they do, never that you, we or anyone will take a look. It is offered at most once in a conversation: when glassOffered is true, Support already offered it, so never mention it again and answer the latest message on its own terms, with the next thing to try from the articles or the one question that would help. When it is false, you never mention the magnifying glass, and for a problem that depends on their own account the next step is that they can ask in this chat for the team to look into their workspace; the team's answer will come here.
 
 You cannot see the customer's account, workspace, campaigns or billing: never say or suggest that you looked. You cannot make changes and nobody will make them for them, so give the steps for them to do it themselves. Never promise that Foreman, a person, a teammate, the team or a queue will look into, see, pick up, act on or follow up on this message: nobody is notified. A thanks, greeting or reaction gets a short friendly reply with no product facts.
 
@@ -276,14 +276,12 @@ const nextStep = (customer: KbCustomer | undefined) => {
   }
   return customer?.canInvestigate
     ? "Tap the magnifying glass next to the message box and send the message again to start a look into the workspace."
-    : "Ask a workspace owner or admin.";
+    : "Ask in this chat for the team to look into the workspace; the team's answer will come here.";
 };
 
 /** What REPLY_PROMPT itself tells the writer, so the check never trims it. */
 const promptFacts = (customer: KbCustomer | undefined) => [
-  ...(customer?.canInvestigate && !customer.glassOffered
-    ? [nextStep(customer)]
-    : []),
+  ...(customer?.glassOffered ? [] : [nextStep(customer)]),
   "Foreman, the writer, does not write or review copy, give strategy, or assess campaign performance, and says so.",
   "The AI Consultant is under the Chat toggle at the top of the left sidebar, for advice, strategy, copywriting and campaign performance reviews.",
   "Foreman cannot see the customer's account and cannot make changes; nobody makes changes on the customer's behalf, so the customer does the steps themselves.",

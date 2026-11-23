@@ -8,6 +8,7 @@ import {
   ownsConversation,
   ticketNote,
 } from "./widget-ticket-followup.js";
+import { WIDGET_SCOPE_NOTICE } from "./widget-ticket-marker.js";
 
 const { signal } = new AbortController();
 const RUN = "44444444-4444-4444-8444-444444444444";
@@ -126,9 +127,13 @@ const SCOPE = {
   conversationId: "33333333-3333-4333-8333-333333333333",
   organizationId: "22222222-2222-4222-8222-222222222222",
 };
-const scopeBlock = `## Verified scope\n\n- Workspace: Acme (acme)\n- Organization ID: ${SCOPE.organizationId}\n- Support conversation: ${SCOPE.conversationId}\n\nServer note.`;
+const blockFor = (organizationId: string, conversationId: string) =>
+  `## Verified scope\n\n- Workspace: Acme (acme)\n- Organization ID: ${organizationId}\n- Support conversation: ${conversationId}\n\n${WIDGET_SCOPE_NOTICE}`;
+const OTHER = "99999999-9999-4999-8999-999999999999";
+const LIST_MARKER = /\n- /gu;
 
-test("only a ticket whose description carries this conversation's scope block belongs to it", async () => {
+test("only a ticket ending with this conversation's own server-written scope block belongs to it", async () => {
+  const own = blockFor(SCOPE.organizationId, SCOPE.conversationId);
   const owns = (description: string | null) =>
     ownsConversation(
       "ENG-7",
@@ -136,22 +141,21 @@ test("only a ticket whose description carries this conversation's scope block be
       signal,
       linear({ WidgetTicketDescription: { issue: { description } } }).request
     );
-  assert.equal(await owns(`The customer wrote: x\n\n${scopeBlock}`), true);
+  assert.equal(await owns(`The customer wrote: x\n\n${own}`), true);
+  // Linear may store list markers as asterisks.
   assert.equal(
-    await owns(
-      `A master that quotes conversation ${SCOPE.conversationId} in its notes.`
-    ),
-    false
+    await owns(`The customer wrote: x\n\n${own.replace(LIST_MARKER, "\n* ")}`),
+    true
   );
-  assert.equal(
-    await owns(
-      scopeBlock.replace(
-        SCOPE.organizationId,
-        "99999999-9999-4999-8999-999999999999"
-      )
-    ),
-    false
-  );
+  for (const foreign of [
+    `A master that quotes conversation ${SCOPE.conversationId} in its notes.`,
+    `Copied from the customer's ticket:\n\n${own}\n\nMore notes after it.`,
+    `Copied:\n\n${own}\n\n${blockFor(SCOPE.organizationId, OTHER)}`,
+    blockFor(OTHER, SCOPE.conversationId),
+  ]) {
+    // biome-ignore lint/performance/noAwaitInLoops: each description is checked on its own.
+    assert.equal(await owns(foreign), false, foreign);
+  }
   assert.equal(await owns(null), false);
 });
 
