@@ -34,11 +34,10 @@ function setEnv(context: TestContext, name: string, value?: string) {
   });
 }
 
-// Every test here exercises the app path, so an inherited replay flag must not divert it.
+// Every test here exercises the app path, so an inherited live flag must not divert it.
 function configure(context: TestContext) {
   setEnv(context, "ACQUISITY_ORIGIN", origin);
-  setEnv(context, "WIDGET_REPLAY");
-  setEnv(context, "WIDGET_REPLAY_CASE");
+  setEnv(context, "WIDGET_LIVE");
 }
 
 const requester = (response: Response) => {
@@ -120,23 +119,6 @@ test("caller-authored identifiers never reach the app", async (context) => {
     )
   );
   assert.equal(requests.length, 0);
-});
-
-test("the replay case selector is ignored when replay is disabled", async (context) => {
-  configure(context);
-  const { request, requests } = requester(
-    Response.json({ ...appContext, replayCaseId: "local-widget-smoke" })
-  );
-  const scope = await verifyWidgetContext(
-    { conversationId, organizationId, replayCaseId: "../../secret", userToken },
-    request
-  );
-  assert.equal(requests.length, 1);
-  assert.equal(scope.replayCaseId, undefined);
-  assert.equal(
-    "replayCaseId" in JSON.parse(String(requests[0].init?.body)),
-    false
-  );
 });
 
 const officeHours = {

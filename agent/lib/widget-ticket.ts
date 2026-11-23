@@ -17,13 +17,8 @@ import {
   formatCustomerReport,
 } from "./linear-ticket-report.js";
 import { logOpsEvent } from "./ops-log.js";
+import { isLiveActive, LIVE_TICKET } from "./widget-live-policy.js";
 import { isRefundTicket } from "./widget-next-action.js";
-import {
-  isLiveActive,
-  isReplayActive,
-  LIVE_TICKET,
-  REPLAY_TICKET,
-} from "./widget-replay.js";
 import {
   readWidgetTicketReceipt,
   saveWidgetTicketReceipt,
@@ -173,8 +168,8 @@ export async function fileWidgetTicket(
       }
       return receipt;
     };
-    if (isReplayActive() || isLiveActive()) {
-      return await confirm(isReplayActive() ? REPLAY_TICKET : LIVE_TICKET);
+    if (isLiveActive()) {
+      return await confirm(LIVE_TICKET);
     }
     const refund = input.bug
       ? false
@@ -238,12 +233,12 @@ export const appTicketContext = (
   } as unknown as ProviderContext;
 };
 
-/** Filed from code, outside a session: replay and live re-runs file nothing, as their ticket tool does. */
+/** Filed from code, outside a session: a live re-run files nothing, as its ticket tool does. */
 export const fileTicketFor = (
   scope: WidgetContext,
   input: WidgetTicketInput,
   signal: AbortSignal,
   runId?: string,
   deps: Partial<typeof ticketDependencies> = {}
-): Promise<WidgetTicketResult | typeof REPLAY_TICKET | typeof LIVE_TICKET> =>
+): Promise<WidgetTicketResult | typeof LIVE_TICKET> =>
   fileWidgetTicket(appTicketContext(scope, signal, runId), input, deps);

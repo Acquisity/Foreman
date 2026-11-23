@@ -1859,7 +1859,6 @@ export async function receiveWidgetMessage(
         timeline = summary;
       },
       organizationId: input.organization_id,
-      replayCaseId: request.headers.get("x-widget-replay-case"),
       signal: request.signal,
       staff: input.staff,
       timeline: readsTimeline(input),

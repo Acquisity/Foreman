@@ -2,7 +2,6 @@ import { defineDynamic } from "eve";
 import { defineTool } from "eve/tools";
 import { z } from "zod";
 import { getHelpArticleContent } from "#lib/help-center.js";
-import { replayable } from "#lib/widget-replay.js";
 import { isWidgetSupport } from "../lib/widget-scope.js";
 
 export const tool = defineTool({
@@ -41,8 +40,6 @@ export const tool = defineTool({
 export default defineDynamic({
   events: {
     "step.started": (_event, ctx) =>
-      isWidgetSupport(ctx.session.auth.initiator)
-        ? replayable("widget_read_help_article", tool)
-        : null,
+      isWidgetSupport(ctx.session.auth.initiator) ? tool : null,
   },
 });
