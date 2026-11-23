@@ -75,8 +75,8 @@ export function readResult(output: unknown, status?: string): ReadResult {
     : { output, status: "ok" };
 }
 
-// Structural equality of bounded output, with key order/null normalization shared
-// with replay and only observedAt (read time) removed. Failed/partial reads carry
+// Structural equality of bounded output, with key order and null fields
+// normalized and only observedAt (read time) removed. Failed/partial reads carry
 // no comparable state. Movement requires a real change; steady requires complete,
 // nonempty comparison evidence. Cause grading is permitted only for steady cases.
 const isDropped = (value: unknown) =>
@@ -173,3 +173,13 @@ export function driftVerdict(
     verdict,
   };
 }
+
+/** First customer answer, measured at the live poll resolution. Progress is not a reply. */
+export const replyElapsed = (
+  response: { message?: unknown },
+  sentAt: number,
+  observedAt: number
+) =>
+  typeof response.message === "string" && response.message.trim()
+    ? observedAt - sentAt
+    : null;

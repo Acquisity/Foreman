@@ -17,8 +17,8 @@ import { fastCallOptions, modelFor, resolveModel } from "./models.js";
 import { logOpsEvent } from "./ops-log.js";
 import { providerData } from "./support/conversation.js";
 import type { WidgetFindings } from "./widget-findings.js";
+import { isLiveActive } from "./widget-live-policy.js";
 import { POSTHOG_READ, posthogQuery } from "./widget-policy.js";
-import { isLiveActive, isReplayActive } from "./widget-replay.js";
 import type { WidgetContext } from "./widget-scope.js";
 import {
   appTicketContext,
@@ -722,7 +722,7 @@ export async function addToBugReport(
     const filed = await fileBugReport(scope, runId, turn, signal, overrides);
     return { ...filed, message: BUG_REPORT_ADDED };
   }
-  if (!(isReplayActive() || isLiveActive())) {
+  if (!isLiveActive()) {
     await deps.comment(
       existing.identifier,
       additionComment(turn, deps.now()),

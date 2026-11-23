@@ -3,8 +3,7 @@ import {
   failWidgetRun,
   receiveWidgetMessage,
 } from "../lib/widget-investigation.js";
-import { LIVE_PROTOCOL } from "../lib/widget-live-policy.js";
-import { isLiveActive } from "../lib/widget-replay.js";
+import { isLiveActive, LIVE_PROTOCOL } from "../lib/widget-live-policy.js";
 import { receiveWidgetScreenshot } from "../lib/widget-screenshot.js";
 import { serviceSecretRefusal } from "../lib/widget-service-secret.js";
 
