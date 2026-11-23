@@ -12,7 +12,7 @@ export const GENERATED_PR_KINDS = {
   guide: {
     name: "widget guide",
     review:
-      "check each regenerated section against the Acquisity docs at the commit the PR body names",
+      "check its whole guide change against the Help Centre docs at the Acquisity commit its guide header names",
   },
   tools: {
     name: "widget tools",
