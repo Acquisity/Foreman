@@ -8,8 +8,8 @@ export const HELP_CENTER_BASE_URL =
 const MAX_ARTICLES = 5;
 
 /**
- * The asking customer's Help Centre view, from Acquisity's context route
- * (ENG-20305): `viewer` signs their gated docs features for the docs routes,
+ * The asking customer's Help Centre view, from Acquisity's context route:
+ * `viewer` signs their gated docs features for the docs routes,
  * and `featuresOff` names each feature they lack with the pages it hides.
  */
 export const helpCenterViewSchema = z.object({
@@ -36,7 +36,6 @@ export const helpViewerHeaders = (
   view: HelpCenterView | undefined
 ): Record<string, string> => (view ? { "x-help-viewer": view.viewer } : {});
 
-/** The Help Centre pages the customer's features hide from them. */
 export const hiddenHelpPages = (view: HelpCenterView | undefined) =>
   new Set(view?.featuresOff.flatMap((feature) => feature.pages) ?? []);
 const REQUEST_TIMEOUT_MS = 10_000;

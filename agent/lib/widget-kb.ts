@@ -226,7 +226,6 @@ export const replyPrompt = (customer: KbCustomer | undefined) =>
     ? REPLY_PROMPT.replace(KB_FOLLOWUP_RULE, AFTER_HOURS_WRITER_NOTE)
     : REPLY_PROMPT;
 
-/** Shared with the guide lane: a feature that is off is named, never explained. */
 export const FEATURES_OFF_RULE =
   "featuresOff, when given, names the features that are not turned on for the customer's workspace. When the customer asks about one of them, say it is not turned on for their workspace and do not explain it, give its steps or say where it is.";
 
@@ -276,10 +275,10 @@ Then set stillAnswers: false only when your reply, after trimming, gives the cus
 
 Plain text only, no markdown and no em dashes.`;
 
-/** REPLY_PROMPT's own next step for an answer the articles do not give. */
 export const featuresOffNames = (customer: KbCustomer | undefined) =>
   customer?.helpCenter?.featuresOff.map((feature) => feature.title) ?? [];
 
+/** REPLY_PROMPT's own next step for an answer the articles do not give. */
 const nextStep = (customer: KbCustomer | undefined) => {
   if (customer?.glassOffered) {
     return "Ask the one question that would help find the answer.";
@@ -945,7 +944,6 @@ export async function answerFromHelpCenter(
   customer?: KbCustomer
 ): Promise<KbAnswer> {
   const view = customer?.helpCenter;
-  // Every read is as this customer sees the Help Centre (ENG-20305).
   const deps: KbDeps = {
     ...helpCenterDeps,
     index: (abort) => helpCenterDeps.index(abort, view),

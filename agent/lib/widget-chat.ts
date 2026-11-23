@@ -100,7 +100,7 @@ const GUIDE_CITATION = /\{(?:slug:\s*)?([a-z0-9][a-z0-9/_-]*)\}/gu;
 
 /**
  * The guide without the articles for pages the customer's features hide, and
- * without a summary line that cites only those (ENG-20305). The Help Centre's
+ * without a summary line that cites only those. The Help Centre's
  * own page gates decide which; a gated section inside a page stays, because
  * the generated guide flattens it into the page.
  */
@@ -226,7 +226,7 @@ export function guideCitations(text: string): KbAnswer {
   return resolveCitations(numbered, articles);
 }
 
-/** The reply with [n] markers and the cited articles; a page hidden from the customer is never cited. */
+/** The reply with [n] markers and the cited articles. */
 function numberSlugs(text: string, hidden: ReadonlySet<string>) {
   const slugs: string[] = [];
   const numbered = text.replace(SLUG_MARKER, (_, list: string) =>
