@@ -3,6 +3,10 @@ import { z } from "zod";
 import { DEFAULT_PARTNER_ID } from "./acquisity-constants.js";
 import { helpCenterViewSchema } from "./help-center.js";
 import { stampUnattended } from "./trust.js";
+import {
+  availableEndpointSchema,
+  parseAvailableEndpoints,
+} from "./widget-endpoint-schema.js";
 
 export const WIDGET_SUPPORT_ISSUER = "foreman:widget-support";
 
@@ -57,9 +61,12 @@ export const ORGANIZATION_SLUG = new RegExp(
 
 const shape = {
   // When the customer sent an "I found a bug" report. Only the bug report's
-  // evidence lookup sets it, and the policy reads PostHog only for it.
+  // evidence lookup sets it, and the policy reads PostHog and Inngest only for it.
   bugReportedAt: z.iso.datetime().optional(),
   conversationId: z.uuid(),
+  // The support endpoints the context route lists for the asking user
+  // (ENG-20296). Absent means the list was not given or could not be read.
+  endpoints: z.array(availableEndpointSchema).max(50).optional(),
   // The customer's Help Centre view for the knowledge base lane: never stamped
   // on the session, and dropped from the stored run.
   helpCenter: helpCenterViewSchema.optional(),
@@ -88,8 +95,19 @@ const shape = {
 
 /** The complete server-verified scope stamped on an in-app support investigation. */
 export const widgetContextSchema = z.strictObject(shape);
-/** Session attributes also carry trust stamps, so reading the scope back strips unknown keys. */
-const stampedAttributes = z.object(shape);
+/**
+ * Session attributes also carry trust stamps, so reading the scope back strips
+ * unknown keys. They hold strings only, so the endpoint list is stamped as JSON.
+ */
+export const stampedWidgetAttributes = z.object({
+  ...shape,
+  endpoints: z
+    .string()
+    .optional()
+    .transform((text) =>
+      text === undefined ? undefined : parseAvailableEndpoints(JSON.parse(text))
+    ),
+});
 
 export type WidgetContext = Readonly<z.infer<typeof widgetContextSchema>>;
 
@@ -106,7 +124,7 @@ export function widgetContext(
   if (!isWidgetSupport(auth)) {
     return null;
   }
-  const parsed = stampedAttributes.safeParse(auth?.attributes);
+  const parsed = stampedWidgetAttributes.safeParse(auth?.attributes);
   return parsed.success ? Object.freeze(parsed.data) : null;
 }
 
@@ -127,12 +145,14 @@ export function widgetAuth(
 ): SessionAuthContext {
   const {
     helpCenter: _helpCenter,
+    endpoints,
     officeHours: _hours,
     ...verified
   } = widgetContextSchema.parse(scope);
   return stampUnattended({
     attributes: {
       ...verified,
+      ...(endpoints ? { endpoints: JSON.stringify(endpoints) } : {}),
       ...(runId ? { widgetRunId: z.uuid().parse(runId) } : {}),
     },
     authenticator: "bearer",

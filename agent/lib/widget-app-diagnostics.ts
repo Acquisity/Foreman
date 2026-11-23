@@ -2,16 +2,22 @@ import type { SessionAuthContext } from "eve/context";
 import { acquisityOrigin } from "./acquisity-origin.js";
 import { requireWidgetContext } from "./widget-scope.js";
 
-/** Fixed read-only app routes; all authority comes from the verified chat. */
-export async function readWidgetAppDiagnostics(
-  ctx: {
-    abortSignal: AbortSignal;
-    session?: { auth: { initiator: SessionAuthContext | null } };
-  },
-  kind: "website",
+export interface WidgetAppContext {
+  abortSignal: AbortSignal;
+  session?: { auth: { initiator: SessionAuthContext | null } };
+}
+
+/**
+ * The one request contract for Acquisity's `/api/internal/foreman/*` routes:
+ * the dedicated service secret, and the verified chat's ids over any input.
+ */
+export async function postWidgetAppRoute(
+  ctx: WidgetAppContext,
+  path: string,
   input: Record<string, unknown>,
-  request: typeof fetch = fetch
-): Promise<unknown> {
+  timeoutMs: number,
+  request: typeof fetch
+): Promise<{ response: Response; signal: AbortSignal }> {
   const scope = requireWidgetContext(ctx.session?.auth.initiator);
   const secret = process.env.FOREMAN_DIAGNOSTICS_SECRET;
   if (!secret || secret.length < 32) {
@@ -19,25 +25,39 @@ export async function readWidgetAppDiagnostics(
   }
   const signal = AbortSignal.any([
     ctx.abortSignal,
-    AbortSignal.timeout(25_000),
+    AbortSignal.timeout(timeoutMs),
   ]);
-  const response = await request(
-    `${acquisityOrigin()}/api/internal/foreman/${kind}`,
-    {
-      body: JSON.stringify({
-        ...input,
-        conversationId: scope.conversationId,
-        organizationId: scope.organizationId,
-        userId: scope.userId,
-      }),
-      headers: {
-        authorization: `Bearer ${secret}`,
-        "content-type": "application/json",
-      },
-      method: "POST",
-      redirect: "error",
-      signal,
-    }
+  const response = await request(`${acquisityOrigin()}${path}`, {
+    body: JSON.stringify({
+      ...input,
+      conversationId: scope.conversationId,
+      organizationId: scope.organizationId,
+      userId: scope.userId,
+    }),
+    headers: {
+      authorization: `Bearer ${secret}`,
+      "content-type": "application/json",
+    },
+    method: "POST",
+    redirect: "error",
+    signal,
+  });
+  return { response, signal };
+}
+
+/** Fixed read-only app routes; all authority comes from the verified chat. */
+export async function readWidgetAppDiagnostics(
+  ctx: WidgetAppContext,
+  kind: "website",
+  input: Record<string, unknown>,
+  request: typeof fetch = fetch
+): Promise<unknown> {
+  const { response, signal } = await postWidgetAppRoute(
+    ctx,
+    `/api/internal/foreman/${kind}`,
+    input,
+    25_000,
+    request
   );
   if (response.status !== 200) {
     response.body?.cancel().catch(() => undefined);

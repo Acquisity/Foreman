@@ -140,3 +140,13 @@ test("the plan retries one overloaded TypeSafe and logs why it gave up", async (
   assert.match(failed?.message, PLAN_400);
   assert.equal(failed?.runId, "r");
 });
+test("an endpoint result that is feature_off or invalid_input shows as unavailable", () => {
+  for (const status of ["feature_off", "invalid_input"]) {
+    const reduce = progressFromEvents();
+    reduce(start(1, ["a"]));
+    assert.equal(
+      reduce(result(2, "a", { status }))?.checks[0].status,
+      "unavailable"
+    );
+  }
+});

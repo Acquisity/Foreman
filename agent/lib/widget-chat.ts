@@ -34,8 +34,9 @@ import { toAsk, type WidgetAsk } from "./widget-router.js";
  * @remarks
  * The default; WIDGET_CHAT=legacy hands the front door back to the
  * help-center writer in widget-kb.ts for one release. Like that lane it is ungated on purpose: its only inputs are the
- * customer's own conversation and help-center text, and it has no
- * account data and no account tools. Keep it that way.
+ * customer's own conversation, help-center text and the names of the features
+ * the app says are off for their workspace, and it has no other account data
+ * and no account tools. Keep it that way.
  */
 
 export const chatGuideEnabled = (value = process.env.WIDGET_CHAT) =>
@@ -163,10 +164,10 @@ interface ChatAttempt {
 const REMINDER =
   'Before you reply: end every step or fact you take from the guide with its article\'s {slug}; check "Who can do what" against the customer\'s role before giving any steps; say only what the article you cite says, and never that a tool, app or kind of link it does not name works; when the customer nudges after an unanswered question of theirs, answer it or say plainly you do not know, never ask again what they mean; a request for strategy advice (including how to make money or win clients), feedback on copy or campaign results, or what an email or offer should say gets pointed to the AI Consultant, described the way the guide does, with no advice or steps of your own, and the AI Consultant\'s modes are used there, never in this chat; never suggest changing, upgrading or downgrading a plan to get around a feature; any detail the help center does not state (what a column or status means, how many plans, what happens to data, timings, a button from another path) is said as "I\'m not sure" or left out; call it the help center, never "the guide", and never write "Get here"; never speak for a team ("we", "together", "sorted out") or offer a person, and never say what an investigation of their account will find.';
 
-/** The guide's role limits, repeated in the note for a customer who is not an owner. */
-const ROLE_LIMITS =
-  PRODUCT_GUIDE.match(/\n## Who can do what\n([\s\S]*?)\n## /u)?.[1]?.trim() ??
-  "";
+/** The customer's guide's role limits, repeated in the note for a customer who is not an owner. */
+const WHO_CAN = /\n## Who can do what\n([\s\S]*?)\n## /u;
+const roleLimits = (view: HelpCenterView | undefined) =>
+  guideFor(hiddenHelpPages(view)).match(WHO_CAN)?.[1]?.trim() ?? "";
 
 /** The app's facts about the customer, then the conversation as chat turns. */
 export function chatMessages(
@@ -182,6 +183,7 @@ export function chatMessages(
         turn.role === "customer" ? ("user" as const) : ("assistant" as const),
     }));
   const featuresOff = featuresOffNames(customer?.helpCenter);
+  const limits = roleLimits(customer?.helpCenter);
   const note = {
     canInvestigate: customer?.canInvestigate ?? false,
     ...(featuresOff.length > 0 ? { featuresOff } : {}),
@@ -197,9 +199,9 @@ export function chatMessages(
         ...(featuresOff.length > 0 ? [FEATURES_OFF_RULE] : []),
         ...(customer?.afterHoursPerson ? [AFTER_HOURS_WRITER_NOTE] : []),
         ...(customer?.officeSchedule ? [customer.officeSchedule] : []),
-        ...(note.role === "owner" || !ROLE_LIMITS
+        ...(note.role === "owner" || !limits
           ? []
-          : [`Who can do what, from the guide:\n${ROLE_LIMITS}`]),
+          : [`Who can do what, from the guide:\n${limits}`]),
       ].join("\n\n"),
       role: "system",
     },

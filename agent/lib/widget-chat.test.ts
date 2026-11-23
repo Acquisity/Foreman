@@ -326,3 +326,27 @@ test("the guide writer answers from the customer's guide, is told what is off, a
     ["https://app.acquisity.ai/docs/faq"]
   );
 });
+
+test("a member's role limits come from their own guide, never a hidden page", () => {
+  const slug =
+    "sales-call-analyzer/faq/can-my-team-members-access-sales-call-analyzer";
+  const line = "Sales Call Analyzer, while Clients have none";
+  const member = { canInvestigate: false, role: "member", workspace: "w" };
+  const note = (
+    featuresOff: { feature: string; pages: string[]; title: string }[]
+  ) =>
+    chatMessages(
+      { latest: "who can use it?" },
+      { ...member, helpCenter: { featuresOff, viewer: "v" } }
+    )[0].content;
+  assert.ok(note([]).includes(line));
+  assert.ok(
+    !note([
+      {
+        feature: "sales_call_analyzer",
+        pages: [slug],
+        title: "Sales Call Analyzer",
+      },
+    ]).includes(line)
+  );
+});
