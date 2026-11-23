@@ -70,7 +70,7 @@ export const judgeRecordSchema = z
     judgedAt: z.iso.datetime(),
     model: z.string().min(1),
     recorded: widgetCaseSchema,
-    // Replay repetition within one eval run; absent on the first run and on older records.
+    // Repetition within one scoring run; absent on the first run and on older records.
     run: z.number().int().positive().optional(),
     verdicts: z
       .array(verdictSchema.extend({ claim: z.string().min(1) }))
@@ -315,7 +315,7 @@ const judgeSchema = z.strictObject({
 
 /** A headless Claude Code start plus an Opus answer on a large input. */
 export const JUDGE_TIMEOUT_MS = 240_000;
-/** Concurrent `claude -p` processes; a replay batch runs up to eight cases at once. */
+/** Concurrent `claude -p` processes. */
 const JUDGE_CONCURRENCY = 3;
 
 /** One judge call: the system prompt and input in, the structured object out. */
@@ -474,9 +474,6 @@ export async function judgeAnswer(
   }
 }
 
-/** Ignored output root; each eval invocation writes `<root>/<timestamp>/`. */
-export const JUDGE_OUTPUT = ".eve/widget-judge";
-
 export const readRecords = (dir: string): JudgeRecord[] =>
   readdirSync(`${dir}/records`)
     .filter((file) => file.endsWith(".json"))
@@ -487,7 +484,7 @@ export const readRecords = (dir: string): JudgeRecord[] =>
       )
     );
 
-/** A record's file: one per case and run, so a repeated replay keeps its own verdicts. */
+/** A record's file: one per case and run, so a repeated run keeps its own verdicts. */
 export const recordFile = (name: string, run?: number) =>
   `${name}${run ? `.run${run}` : ""}.json`;
 
@@ -562,7 +559,7 @@ export function renderReview(records: JudgeRecord[]): string {
 
 /** What a live re-run's result row carries that the scorecard reads. */
 export interface ReplayRow {
-  /** Null means a completed replay produced no customer answer; absent on legacy rows. */
+  /** Null means a completed run produced no customer answer; absent on legacy rows. */
   answer?: string | null;
   budgetHit?: boolean;
   citations?: string[];
@@ -576,7 +573,7 @@ export interface ReplayRow {
   scored?: boolean;
 }
 
-/** One replayed case of one run: its row, the case it replayed and the judge's record when the judge ran. */
+/** One case of one run: its row, the case it ran and the judge's record when the judge ran. */
 export interface ScoredReplay {
   caseName?: string;
   record: JudgeRecord | null;

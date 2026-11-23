@@ -309,7 +309,7 @@ const conclusionVerdict = (record: JudgeRecord) =>
     : undefined);
 
 /**
- * The replay scorecard for live runs. "Found the real cause" counts confirmed,
+ * The scorecard for live runs. "Found the real cause" counts confirmed,
  * non-excluded labels only; draft labels get their own row; excluded cases
  * leave the cause and answered rows; the conclusion row covers every case.
  */

@@ -17,7 +17,7 @@
  *
  * `score` picks (or reuses) a set of recent production investigations,
  * snapshots each under `.eve/widget-live/sets/<name>/`, re-runs every case
- * live, judges each reply with the replay judge and no authored expectations,
+ * live, judges each reply with the claims judge and no authored expectations,
  * and prints the scorecard (ENG-15044 round 7). `--runs N` re-runs the whole
  * set N times and reports each goal's mean pass rate over runs with its min
  * and max; `--combine` reports saved score results of one set the same way,
@@ -453,7 +453,7 @@ interface Scored {
   replay: ScoredReplay;
 }
 
-/** Judge one live reply: the replay claims plus needs_human, or needs_human alone when nothing was sent. */
+/** Judge one live reply: the judge's claims for the case plus needs_human, or needs_human alone when nothing was sent. */
 async function judgeLive(
   name: string,
   scrubbed: WidgetCase,

@@ -3,14 +3,27 @@ import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import { verifiedWidgetContext as fixture } from "./widget.fixture.js";
 import {
-  frontDoorQuestion,
+  findLeaks,
   type RunScope,
+  type ScrubbedCase,
   scrubCase,
-  serializeCase,
   toRequest,
   type WidgetCase,
   widgetCaseSchema,
 } from "./widget-case.js";
+import { renderConversation } from "./widget-router.js";
+
+/** The scrubbed case as JSON text, refused while any original identifier remains. */
+const serializeCase = (scrubbed: ScrubbedCase) => {
+  widgetCaseSchema.parse(scrubbed.case);
+  const leaks = findLeaks(scrubbed);
+  if (leaks.length) {
+    throw new Error(
+      `Case not saved: ${leaks.length} unreplaced identifier(s) remain.`
+    );
+  }
+  return `${JSON.stringify(scrubbed.case, null, 2)}\n`;
+};
 
 const scope: RunScope = {
   conversationId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
@@ -534,11 +547,11 @@ test("catalog labels inside JSON-encoded billing output are kept too", () => {
   assert.equal(JSON.parse(saved).feature.name, "Domains");
 });
 
-test("a front-door conversation replays as the message plus its earlier turns", () => {
-  const question = frontDoorQuestion([
-    { question: "Do I need Pro?", reply: "Pro adds the AI SDR.\nSee Billing." },
-    { question: "talk to human", reply: null },
-    { question: "Do I need Pro for Calendly?", reply: "unused" },
+test("a recorded question splits back into the message and its earlier turns", () => {
+  const question = renderConversation("Do I need Pro for Calendly?", [
+    { role: "customer", text: "Do I need Pro?" },
+    { role: "assistant", text: "Pro adds the AI SDR.\nSee Billing." },
+    { role: "customer", text: "talk to human" },
   ]);
   assert.deepEqual(toRequest(question), {
     history: [
@@ -548,23 +561,7 @@ test("a front-door conversation replays as the message plus its earlier turns", 
     ],
     question: "Do I need Pro for Calendly?",
   });
-  assert.deepEqual(
-    toRequest(frontDoorQuestion([{ question: "Hi", reply: "Hello" }])),
-    {
-      question: "Hi",
-    }
-  );
-  // The app sends at most the last 8 messages, 2,000 characters each.
-  const long = frontDoorQuestion(
-    Array.from({ length: 6 }, (_, n) => ({
-      question: `q${n} ${"x".repeat(3000)}`,
-      reply: `r${n}`,
-    }))
-  );
-  const { history = [] } = toRequest(long);
-  assert.ok(history.length <= 8);
-  assert.deepEqual(history.at(-1), { role: "assistant", text: "r4" });
-  assert.ok(history.every((turn) => turn.text.length <= 2000));
+  assert.deepEqual(toRequest("Hi"), { question: "Hi" });
 });
 
 test("causeType is optional and limited to the four cause types", () => {

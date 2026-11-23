@@ -1,7 +1,6 @@
 import { z } from "zod";
 import { verifiedWidgetContext as fixture } from "./widget.fixture.js";
 import { PUBLIC_HOSTS, scanIdentifiers } from "./widget-egress.js";
-import { renderConversation } from "./widget-router.js";
 import { officeHoursSchema, type WidgetContext } from "./widget-scope.js";
 
 /**
@@ -48,7 +47,7 @@ export const widgetCaseSchema = z.strictObject({
     workspace: z.string().min(1),
   }),
   source: z.strictObject({
-    // Null for a front-door case: hand-written ones have no source run, and a recorded front-door run id is a UUID the scrubber replaces. Replay still starts a run.
+    // Null for a front-door case: hand-written ones have no source run, and a recorded front-door run id is a UUID the scrubber replaces.
     runId: z
       .string()
       .regex(/^wrun_[0-9A-Z]{26}$/)
@@ -491,8 +490,8 @@ export function scrubCase(raw: WidgetCase, scope: RunScope): ScrubbedCase {
   }
   // Internal ticket refs and internal links (a filed ticket's Linear URL) are not customer data,
   // but a ticket URL's slug repeats the customer's wording, so neither is kept.
-  // A filed ticket's own link keeps its shape, without the slug, so a replay of
-  // the filing still reads as a real ticket.
+  // A filed ticket's own link keeps its shape, without the slug, so the scrubbed
+  // filing still reads as a real ticket.
   const ticketRef = (value: string) => {
     add(value, () => `ENG-${next("ticket")}`);
     return replacements.get(value.toLowerCase());
@@ -581,52 +580,9 @@ export function findLeaks({ case: scrubbed, originals }: ScrubbedCase) {
   return leaks;
 }
 
-/** The only way a case reaches disk: the file text, or a throw when anything is left. */
-export function serializeCase(scrubbed: ScrubbedCase): string {
-  widgetCaseSchema.parse(scrubbed.case);
-  const leaks = findLeaks(scrubbed);
-  if (leaks.length) {
-    throw new Error(
-      `Case not saved: ${leaks.length} unreplaced identifier(s) remain.`
-    );
-  }
-  return `${JSON.stringify(scrubbed.case, null, 2)}\n`;
-}
-
 const LATEST = "LATEST CUSTOMER MESSAGE (the one to work on):\n";
 const EARLIER = "\n\nEARLIER TURNS (";
 const TURN = /^(Customer|Support): /u;
-/** The app sends at most the last 8 customer-visible messages, 2,000 characters each. */
-const APP_HISTORY_MESSAGES = 8;
-const APP_HISTORY_CHARS = 2000;
-
-/** One recorded front-door turn: the customer's message and the reply that went out, if any. */
-export interface RecordedTurn {
-  question: string;
-  reply: string | null;
-}
-
-/**
- * A front-door run's question in the router's own rendering: the last turn's
- * message, then the earlier turns as the app sent them. Replay splits it back
- * into the message and its history with `toRequest`.
- */
-export function frontDoorQuestion(turns: RecordedTurn[]): string {
-  const latest = turns.at(-1);
-  if (!latest) {
-    throw new Error("A front-door case needs at least one turn.");
-  }
-  const history = turns
-    .slice(0, -1)
-    .flatMap(({ question, reply }) => [
-      { role: "customer" as const, text: question },
-      ...(reply ? [{ role: "assistant" as const, text: reply }] : []),
-    ])
-    .slice(-APP_HISTORY_MESSAGES)
-    .map((turn) => ({ ...turn, text: turn.text.slice(0, APP_HISTORY_CHARS) }));
-  return renderConversation(latest.question, history);
-}
-
 /** A recorded question is the router's rendering; split it back into the message and its earlier turns. */
 export function toRequest(question: string): {
   history?: { role: "assistant" | "customer"; text: string }[];
