@@ -130,7 +130,7 @@ jobs:
 
           If this change touched the sidebar catalog or apps/web/lib/features.ts, check the hardcoded facts at the top of scripts/widget-product-guide.ts (AVAILABILITY, ENTRY_POINTS) in the app; this workflow cannot verify them.
 
-          Review and merge by hand; nothing merges this automatically.
+          Fixy reviews this PR against that Acquisity commit and merges it once the review-bot loop clears, from the fixy-labelled Linear ticket the next step files.
           EOF_BODY
           number=$(gh api "repos/$GITHUB_REPOSITORY/pulls?head=$GITHUB_REPOSITORY_OWNER:bot/widget-guide&state=open" --jq '.[0].number // empty')
           if [ -n "$number" ]; then
@@ -138,3 +138,15 @@ jobs:
           else
             gh api -X POST "repos/$GITHUB_REPOSITORY/pulls" -f title="$title" -f head=bot/widget-guide -f base=main -F body=@"$RUNNER_TEMP/body.md" --jq .html_url
           fi
+      # Runs on every pass, unchanged ones too, so an open guide PR always has its Fixy ticket.
+      - name: File or reuse the Fixy ticket
+        env:
+          GH_TOKEN: ${{ secrets.WIDGET_GUIDE_TOKEN }}
+          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
+        run: |
+          url=$(gh api "repos/$GITHUB_REPOSITORY/pulls?head=$GITHUB_REPOSITORY_OWNER:bot/widget-guide&state=open" --jq '.[0].html_url // empty')
+          if [[ -z "$url" ]]; then
+            echo "No open guide PR; no ticket."
+            exit 0
+          fi
+          pnpm exec tsx scripts/generated-pr-ticket.ts --kind guide --pr "$url"
