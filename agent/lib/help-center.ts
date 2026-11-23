@@ -38,6 +38,21 @@ export const helpViewerHeaders = (
 
 export const hiddenHelpPages = (view: HelpCenterView | undefined) =>
   new Set(view?.featuresOff.flatMap((feature) => feature.pages) ?? []);
+
+/** No view is the signed-out Help Centre, never the view of a customer with nothing off. */
+export const helpViewKey = (view: HelpCenterView | undefined) =>
+  view
+    ? `viewer:${view.featuresOff
+        .map((feature) => feature.feature)
+        .sort()
+        .join(",")}`
+    : "signed-out";
+
+export const featuresOffNames = (view: HelpCenterView | undefined) =>
+  view?.featuresOff.map((feature) => feature.title) ?? [];
+
+export const FEATURES_OFF_RULE =
+  "featuresOff, when given, names the features that are not turned on for the customer's workspace. When the customer asks about one of them, say it is not turned on for their workspace and do not explain it, give its steps or say where it is.";
 const REQUEST_TIMEOUT_MS = 10_000;
 
 /** One hit from fumadocs' `simple` search: `content` is the highlighted title. */
@@ -217,4 +232,79 @@ export async function getHelpArticleContent(
       url: articleUrl,
     };
   }
+}
+
+const INDEX_TIMEOUT_MS = 5000;
+const INDEX_CACHE_MS = 10 * 60_000;
+const SEARCH_TIMEOUT_MS = 5000;
+
+// description and keywords are optional so an older web deploy still parses.
+const helpIndexSchema = z.array(
+  z.object({
+    description: z.string().optional(),
+    id: z.string().min(1).max(300),
+    keywords: z.array(z.string()).optional(),
+    title: z.string().min(1),
+  })
+);
+export type HelpIndex = z.infer<typeof helpIndexSchema>;
+
+const indexCache = new Map<string, { at: number; value: HelpIndex }>();
+
+/**
+ * Every article's id, title, description and keywords as the view sees them,
+ * or null where the web app has no index route. The list changes only when
+ * docs ship, so one warm instance fetches it rarely.
+ */
+export async function readHelpIndex(
+  signal: AbortSignal,
+  view?: HelpCenterView
+): Promise<HelpIndex | null> {
+  const key = helpViewKey(view);
+  const cached = indexCache.get(key);
+  if (cached && Date.now() - cached.at < INDEX_CACHE_MS) {
+    return cached.value;
+  }
+  const response = await fetch(`${HELP_CENTER_BASE_URL}/api/docs-index`, {
+    headers: { accept: "application/json", ...helpViewerHeaders(view) },
+    signal: AbortSignal.any([signal, AbortSignal.timeout(INDEX_TIMEOUT_MS)]),
+  });
+  if (!response.ok) {
+    return null;
+  }
+  const value = helpIndexSchema.parse(await response.json());
+  indexCache.set(key, { at: Date.now(), value });
+  return value;
+}
+
+/**
+ * Page hits from the web app's keyword search as the view sees them. The
+ * search is a public route, so this calls it directly rather than through the
+ * per-tenant executor {@link findHelpArticles} uses.
+ */
+export async function searchHelpPages(
+  question: string,
+  signal: AbortSignal,
+  view: HelpCenterView | undefined,
+  limit: number
+): Promise<{ title: string; url: string }[]> {
+  const response = await fetch(
+    `${HELP_CENTER_BASE_URL}/api/search?query=${encodeURIComponent(question)}`,
+    {
+      headers: { accept: "application/json", ...helpViewerHeaders(view) },
+      signal: AbortSignal.any([signal, AbortSignal.timeout(SEARCH_TIMEOUT_MS)]),
+    }
+  );
+  if (!response.ok) {
+    return [];
+  }
+  return z
+    .array(hitSchema)
+    .parse(await response.json())
+    .filter((hit) => hit.type === undefined || hit.type === "page")
+    .slice(0, limit)
+    .map((hit) => ({
+      title: stripMarks(hit.content),
+      url: new URL(hit.url, HELP_CENTER_BASE_URL).toString(),
+    }));
 }

@@ -102,7 +102,7 @@ export function splitGuideSections(text: string): Map<string, string> {
 
 const WHO = "## Who can do what";
 const CANNOT = "## What Acquisity cannot do";
-const CITED = /\{(?:slug: )?([^}\n]+)\}/gu;
+export const GUIDE_CITATION = /\{(?:slug: )?([^}\n]+)\}/gu;
 
 export interface GuideLimits {
   cannot: string[];
@@ -130,7 +130,7 @@ export function splitGuideLimits(
     } else if (line.trim() === CANNOT) {
       part = "cannot";
     } else if (part && line.startsWith("- ")) {
-      const slug = [...line.matchAll(CITED)]
+      const slug = [...line.matchAll(GUIDE_CITATION)]
         .map((m) => m[1].trim())
         .find((cited) => known.has(cited));
       if (slug) {
@@ -146,7 +146,7 @@ export function splitGuideLimits(
 /** Every article an article's summary lines cite, its own included. */
 export const guideLimitsCitations = (limits: GuideLimits): string[] =>
   [...limits.who, ...limits.cannot].flatMap((line) =>
-    [...line.matchAll(CITED)].map((m) => m[1].trim())
+    [...line.matchAll(GUIDE_CITATION)].map((m) => m[1].trim())
   );
 
 /** The summary's two sections, lines in article order. */

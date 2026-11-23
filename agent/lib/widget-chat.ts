@@ -1,16 +1,18 @@
 import { type LanguageModel, streamText } from "ai";
 import {
+  FEATURES_OFF_RULE,
+  featuresOffNames,
   HELP_CENTER_BASE_URL,
   type HelpCenterView,
+  helpViewKey,
   hiddenHelpPages,
 } from "./help-center.js";
 import { fastCallOptions, modelFor, resolveModel } from "./models.js";
 import { logOpsEvent } from "./ops-log.js";
+import { GUIDE_CITATION, splitGuideSections } from "./widget-guide-cache.js";
 import { WIDGET_VOICE } from "./widget-instructions.js";
 import {
   AFTER_HOURS_WRITER_NOTE,
-  FEATURES_OFF_RULE,
-  featuresOffNames,
   hedged,
   type KbAnswer,
   type KbCustomer,
@@ -96,51 +98,45 @@ export interface ChatDeps {
 
 const CHAT_FOLLOWUP_RULE =
   "Never promise that you, a person, a teammate or the team will look into, pick up or follow up on this message: nobody is notified.";
-const GUIDE_CITATION = /\{(?:slug:\s*)?([a-z0-9][a-z0-9/_-]*)\}/gu;
+const ARTICLES = "\n## Articles\n";
+
+const citesOnly = (line: string, hidden: ReadonlySet<string>) => {
+  const cited = [...line.matchAll(GUIDE_CITATION)].map(([, slug]) => slug);
+  return cited.length > 0 && cited.every((slug) => hidden.has(slug));
+};
 
 /**
  * The guide without the articles for pages the customer's features hide, and
- * without a summary line that cites only those. The Help Centre's
- * own page gates decide which; a gated section inside a page stays, because
- * the generated guide flattens it into the page.
+ * without a summary line that cites only those. The Help Centre's own page
+ * gates decide which; a gated section inside a page stays, because the
+ * generated guide flattens it into the page.
  */
 export function guideFor(hidden: ReadonlySet<string>, guide = PRODUCT_GUIDE) {
   if (hidden.size === 0) {
     return guide;
   }
-  let dropping = false;
-  return guide
+  const at = guide.indexOf(ARTICLES);
+  const summary = guide
+    .slice(0, at)
     .split("\n")
-    .filter((line) => {
-      if (line.startsWith("## ")) {
-        dropping = false;
-      } else if (line.startsWith("### ")) {
-        dropping = [...line.matchAll(GUIDE_CITATION)].some(([, slug]) =>
-          hidden.has(slug)
-        );
-      }
-      if (dropping) {
-        return false;
-      }
-      const cited = [...line.matchAll(GUIDE_CITATION)].map(([, slug]) => slug);
-      return !(
-        line.startsWith("- ") &&
-        cited.length > 0 &&
-        cited.every((slug) => hidden.has(slug))
-      );
-    })
+    .filter((line) => !(line.startsWith("- ") && citesOnly(line, hidden)))
     .join("\n");
+  const articles = [...splitGuideSections(guide.slice(at + ARTICLES.length))]
+    .filter(([slug]) => !hidden.has(slug))
+    .map(([, section]) => section);
+  return `${summary}${ARTICLES}\n${articles.join("\n\n")}\n`;
 }
 
-const promptsByHidden = new Map<string, string>();
+const promptsByView = new Map<string, string>();
 
 export const chatPrompt = (afterHoursPerson?: true, view?: HelpCenterView) => {
-  const hidden = hiddenHelpPages(view);
-  const key = [...hidden].sort().join(",");
-  let prompt = promptsByHidden.get(key);
+  const key = helpViewKey(view);
+  let prompt = promptsByView.get(key);
   if (!prompt) {
-    prompt = CHAT_PROMPT.replace(PRODUCT_GUIDE, guideFor(hidden));
-    promptsByHidden.set(key, prompt);
+    prompt = CHAT_PROMPT.replace(PRODUCT_GUIDE, () =>
+      guideFor(hiddenHelpPages(view))
+    );
+    promptsByView.set(key, prompt);
   }
   return afterHoursPerson
     ? prompt.replace(CHAT_FOLLOWUP_RULE, AFTER_HOURS_WRITER_NOTE)
@@ -185,7 +181,7 @@ export function chatMessages(
       role:
         turn.role === "customer" ? ("user" as const) : ("assistant" as const),
     }));
-  const featuresOff = featuresOffNames(customer);
+  const featuresOff = featuresOffNames(customer?.helpCenter);
   const note = {
     canInvestigate: customer?.canInvestigate ?? false,
     ...(featuresOff.length > 0 ? { featuresOff } : {}),

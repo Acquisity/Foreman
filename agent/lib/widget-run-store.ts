@@ -217,7 +217,8 @@ export async function claimWidgetRun(
       scope.conversationId,
       requestKey,
       question,
-      JSON.stringify(scope),
+      // The run's own request reads the view; a stored token would outlive it.
+      JSON.stringify({ ...scope, helpCenter: undefined }),
     ]
   );
   if (inserted.length) {

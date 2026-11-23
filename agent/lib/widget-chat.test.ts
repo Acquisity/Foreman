@@ -11,6 +11,7 @@ import {
   guideCitations,
   guideFor,
 } from "./widget-chat.js";
+import { PRODUCT_GUIDE } from "./widget-product-guide.js";
 
 const TRY_AGAIN = /try your message again/u;
 
@@ -249,8 +250,10 @@ test("the guide drops the articles and summary lines for pages the customer's fe
     "",
     "### General {slug: workspace-settings/general}",
     "- Rename the workspace.",
+    "",
   ].join("\n");
   assert.equal(guideFor(new Set(), guide), guide);
+  assert.equal(guideFor(new Set(["no-such-page"])), PRODUCT_GUIDE);
   assert.equal(
     guideFor(new Set(helpCenter.featuresOff[0].pages), guide),
     [
@@ -262,6 +265,7 @@ test("the guide drops the articles and summary lines for pages the customer's fe
       "",
       "### General {slug: workspace-settings/general}",
       "- Rename the workspace.",
+      "",
     ].join("\n")
   );
 });

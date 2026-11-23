@@ -2,11 +2,15 @@ import { setTimeout as sleep } from "node:timers/promises";
 import { generateObject } from "ai";
 import { z } from "zod";
 import {
+  FEATURES_OFF_RULE,
+  featuresOffNames,
   getHelpArticleContent,
   HELP_CENTER_BASE_URL,
   type HelpCenterView,
+  type HelpIndex,
   helpArticleSlug,
-  helpViewerHeaders,
+  readHelpIndex,
+  searchHelpPages,
 } from "./help-center.js";
 import { sniffImage } from "./image.js";
 import { fastCallOptions, modelFor, resolveModel } from "./models.js";
@@ -37,11 +41,8 @@ import {
 const MAX_ARTICLES = 4;
 /** How many previously cited articles ride along with every fresh retrieval. */
 const MAX_ACTIVE_ARTICLES = 2;
-const INDEX_TIMEOUT_MS = 5000;
-const INDEX_CACHE_MS = 10 * 60_000;
 const MAX_QUERIES = 3;
 const MAX_ARTICLE_CHARS = 8000;
-const SEARCH_TIMEOUT_MS = 5000;
 // Article selection and answer generation are sequential model calls. Live
 // selection alone can take 15s; leave time for the grounded answer as well.
 const KB_TIMEOUT_MS = 45_000;
@@ -65,7 +66,6 @@ const MAX_DESCRIPTION_CHARS = 160;
 const MAX_KEYWORDS = 8;
 // One marker, or a group such as [1, 2], which the model also writes.
 const MARKER = /\[(\d{1,2}(?:\s*,\s*\d{1,2})*)\]/gu;
-const MARK_TAG = /<\/?mark>/gu;
 
 const TEXT_ONLY = `The customer can attach up to three screenshots to a message. A screenshot reaches you as a labelled reading made by an image model, not as the image: treat what it says as what the customer's screen showed, and when it names something it could not read, do not guess at it. When the exact error text or the screen they are on would settle the question, you may ask them to paste a screenshot or the exact error text. ${RECORDING_RULE} Answer what the customer is trying to do. A screenshot reading shows where they are: use it to place them in the steps. When it shows a warning or error they did not ask about, answer first and then mention it in one short sentence; when they ask about it, answer that. Never describe anything the reading does not say.`;
 
@@ -169,22 +169,7 @@ interface KbArticle {
   url: string;
 }
 
-const hitSchema = z.looseObject({
-  content: z.string(),
-  type: z.string().optional(),
-  url: z.string(),
-});
-
-// description and keywords are optional so an older web deploy still parses.
-const indexSchema = z.array(
-  z.object({
-    description: z.string().optional(),
-    id: z.string().min(1).max(300),
-    keywords: z.array(z.string()).optional(),
-    title: z.string().min(1),
-  })
-);
-type KbIndex = z.infer<typeof indexSchema>;
+type KbIndex = HelpIndex;
 
 // Fin's rerank stage (ENG-14932): each pick says whether it answers the
 // question itself or only sits next to it, and only direct picks are read.
@@ -225,9 +210,6 @@ export const replyPrompt = (customer: KbCustomer | undefined) =>
   customer?.afterHoursPerson
     ? REPLY_PROMPT.replace(KB_FOLLOWUP_RULE, AFTER_HOURS_WRITER_NOTE)
     : REPLY_PROMPT;
-
-export const FEATURES_OFF_RULE =
-  "featuresOff, when given, names the features that are not turned on for the customer's workspace. When the customer asks about one of them, say it is not turned on for their workspace and do not explain it, give its steps or say where it is.";
 
 export const REPLY_PROMPT = `${FOREMAN_VOICE}
 
@@ -275,9 +257,6 @@ Then set stillAnswers: false only when your reply, after trimming, gives the cus
 
 Plain text only, no markdown and no em dashes.`;
 
-export const featuresOffNames = (customer: KbCustomer | undefined) =>
-  customer?.helpCenter?.featuresOff.map((feature) => feature.title) ?? [];
-
 /** REPLY_PROMPT's own next step for an answer the articles do not give. */
 const nextStep = (customer: KbCustomer | undefined) => {
   if (customer?.glassOffered) {
@@ -297,11 +276,9 @@ const promptFacts = (customer: KbCustomer | undefined) => [
   "The AI Consultant is under the Chat toggle at the top of the left sidebar, for advice, strategy, copywriting and campaign performance reviews.",
   "Foreman cannot see the customer's account and cannot make changes; nobody makes changes on the customer's behalf, so the customer does the steps themselves.",
   ...(customer?.officeSchedule ? [customer.officeSchedule] : []),
-  ...(featuresOffNames(customer).length > 0
-    ? [
-        `Not turned on for this customer's workspace: ${featuresOffNames(customer).join(", ")}.`,
-      ]
-    : []),
+  ...featuresOffNames(customer?.helpCenter).map(
+    (name) => `${name} is not turned on for this customer's workspace.`
+  ),
 ];
 
 // biome-ignore assist/source/useSortedKeys: claims first, so the model checks before it rewrites.
@@ -443,18 +420,13 @@ export interface KbDeps {
   }) => Promise<unknown>;
 }
 
-/** One index per set of features a customer lacks: that set alone decides which pages they see. */
-const indexCache = new Map<string, { at: number; value: KbIndex }>();
-const indexKey = (view: HelpCenterView | undefined) =>
-  (view?.featuresOff.map((feature) => feature.feature) ?? []).sort().join(",");
-
 /** The customer as the writer reads it: the features off by name, never the viewer token. */
 export const writerCustomer = (customer: KbCustomer | undefined) => {
   if (!customer) {
     return { canInvestigate: false, role: "unknown", workspace: "unknown" };
   }
   const { helpCenter, ...rest } = customer;
-  const featuresOff = featuresOffNames(customer);
+  const featuresOff = featuresOffNames(helpCenter);
   return featuresOff.length > 0 ? { ...rest, featuresOff } : rest;
 };
 
@@ -519,24 +491,7 @@ export const defaultKbDeps: KbDeps = {
     return object;
   },
   images: loadImages,
-  // The list changes only when docs ship, so one warm instance fetches it rarely.
-  async index(signal, view) {
-    const key = indexKey(view);
-    const cached = indexCache.get(key);
-    if (cached && Date.now() - cached.at < INDEX_CACHE_MS) {
-      return cached.value;
-    }
-    const response = await fetch(`${HELP_CENTER_BASE_URL}/api/docs-index`, {
-      headers: { accept: "application/json", ...helpViewerHeaders(view) },
-      signal: AbortSignal.any([signal, AbortSignal.timeout(INDEX_TIMEOUT_MS)]),
-    });
-    if (!response.ok) {
-      return null;
-    }
-    const value = indexSchema.parse(await response.json());
-    indexCache.set(key, { at: Date.now(), value });
-    return value;
-  },
+  index: readHelpIndex,
   async read(url, signal, view) {
     const article = await getHelpArticleContent(url, { signal, view });
     if ("error" in article || !article.content.trim()) {
@@ -563,32 +518,8 @@ export const defaultKbDeps: KbDeps = {
     );
     return object;
   },
-  // The help-center search is a public route, so this lane calls it directly
-  // rather than through the per-tenant executor the investigator's tool uses.
-  async search(question, signal, view) {
-    const response = await fetch(
-      `${HELP_CENTER_BASE_URL}/api/search?query=${encodeURIComponent(question)}`,
-      {
-        headers: { accept: "application/json", ...helpViewerHeaders(view) },
-        signal: AbortSignal.any([
-          signal,
-          AbortSignal.timeout(SEARCH_TIMEOUT_MS),
-        ]),
-      }
-    );
-    if (!response.ok) {
-      return [];
-    }
-    return z
-      .array(hitSchema)
-      .parse(await response.json())
-      .filter((hit) => hit.type === undefined || hit.type === "page")
-      .slice(0, MAX_ARTICLES)
-      .map((hit) => ({
-        title: hit.content.replace(MARK_TAG, ""),
-        url: new URL(hit.url, HELP_CENTER_BASE_URL).toString(),
-      }));
-  },
+  search: (question, signal, view) =>
+    searchHelpPages(question, signal, view, MAX_ARTICLES),
   async select({ images, index, question, signal }) {
     const model = await resolveModel("kbSelect");
     const { object } = await hedged("select", signal, (abortSignal) =>

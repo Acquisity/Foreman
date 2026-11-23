@@ -60,8 +60,8 @@ const shape = {
   // evidence lookup sets it, and the policy reads PostHog only for it.
   bugReportedAt: z.iso.datetime().optional(),
   conversationId: z.uuid(),
-  // The customer's Help Centre view for the knowledge base lane. Like the
-  // office hours, kept on the run and never stamped on the session.
+  // The customer's Help Centre view for the knowledge base lane: never stamped
+  // on the session, and dropped from the stored run.
   helpCenter: helpCenterViewSchema.optional(),
   // Only the local live harness stamps the original conversation date.
   liveAsOf: z.iso.datetime().optional(),

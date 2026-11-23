@@ -13,7 +13,7 @@ import {
 
 /** The app's verified workspace payload; Intercom's app id is irrelevant to the widget and ignored. */
 const appContextSchema = z.looseObject({
-  // Absent or malformed reads as the signed-out Help Centre.
+  // Absent or malformed: the docs are read signed out and the guide is not narrowed.
   helpCenter: helpCenterViewSchema.optional().catch(undefined),
   // Any problem with it reads as absent: support counts as open, as before.
   officeHours: officeHoursSchema.optional().catch(undefined),
