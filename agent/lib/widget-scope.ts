@@ -1,6 +1,7 @@
 import type { SessionAuthContext } from "eve/context";
 import { z } from "zod";
 import { DEFAULT_PARTNER_ID } from "./acquisity-constants.js";
+import { helpCenterViewSchema } from "./help-center.js";
 import { stampUnattended } from "./trust.js";
 
 export const WIDGET_SUPPORT_ISSUER = "foreman:widget-support";
@@ -59,6 +60,9 @@ const shape = {
   // evidence lookup sets it, and the policy reads PostHog only for it.
   bugReportedAt: z.iso.datetime().optional(),
   conversationId: z.uuid(),
+  // The customer's Help Centre view for the knowledge base lane. Like the
+  // office hours, kept on the run and never stamped on the session.
+  helpCenter: helpCenterViewSchema.optional(),
   // Only the local live harness stamps the original conversation date.
   liveAsOf: z.iso.datetime().optional(),
   // Kept on the run so its finish reads the hours the message was sent in.
@@ -126,7 +130,11 @@ export function widgetAuth(
   scope: WidgetContext,
   runId?: string
 ): SessionAuthContext {
-  const { officeHours: _hours, ...verified } = widgetContextSchema.parse(scope);
+  const {
+    helpCenter: _helpCenter,
+    officeHours: _hours,
+    ...verified
+  } = widgetContextSchema.parse(scope);
   return stampUnattended({
     attributes: {
       ...verified,

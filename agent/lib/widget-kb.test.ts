@@ -15,6 +15,7 @@ import {
   resolveCitations,
   SELECT_PROMPT,
   stepsOnOwnLines,
+  writerCustomer,
 } from "./widget-kb.js";
 
 const TRY_AGAIN = /try your message again/u;
@@ -909,4 +910,108 @@ test("the legacy writer's after-hours person note replaces the no-notification r
   assert.ok(!away.includes("nobody is notified"));
   assert.ok(away.includes("Do not deny notification or follow-up"));
   assert.ok(away.includes("do not introduce yourself"));
+});
+
+const helpCenter = {
+  featuresOff: [
+    {
+      feature: "deliverability",
+      pages: ["cold-email-agent/deliverability"],
+      title: "Deliverability",
+    },
+  ],
+  viewer: "signed.help.viewer",
+};
+
+test("every help-center read is as the customer sees it", async () => {
+  const views: [string, unknown][] = [];
+  await answerFromHelpCenter(
+    "q",
+    log,
+    {
+      ...deps({ reply: "Hi.", sources: [] }),
+      index: (_signal, view) => {
+        views.push(["index", view]);
+        return Promise.resolve(null);
+      },
+      read: (url, _signal, view) => {
+        views.push(["read", view]);
+        return Promise.resolve({ content: "body", title: "t", url });
+      },
+      search: (_query, _signal, view) => {
+        views.push(["search", view]);
+        return Promise.resolve(articles.slice(0, 1));
+      },
+    },
+    { canInvestigate: false, helpCenter, role: "member", workspace: "w" }
+  );
+  assert.deepEqual([...new Set(views.map(([read]) => read))].sort(), [
+    "index",
+    "read",
+    "search",
+  ]);
+  assert.ok(views.every(([, view]) => view === helpCenter));
+});
+
+test("the writer gets the features that are off by name, never the viewer token, and is told not to explain them", () => {
+  const customer = {
+    canInvestigate: false,
+    helpCenter,
+    role: "member",
+    workspace: "w",
+  };
+  assert.deepEqual(writerCustomer(customer), {
+    canInvestigate: false,
+    featuresOff: ["Deliverability"],
+    role: "member",
+    workspace: "w",
+  });
+  assert.deepEqual(
+    writerCustomer({
+      ...customer,
+      helpCenter: { ...helpCenter, featuresOff: [] },
+    }),
+    { canInvestigate: false, role: "member", workspace: "w" }
+  );
+  assert.ok(REPLY_PROMPT.includes("not turned on for their workspace"));
+});
+
+test("the index, search and article reads send the customer's view, and the index is cached per view", async (t) => {
+  const sent: { headers: Headers; url: string }[] = [];
+  t.mock.method(globalThis, "fetch", (url: string, init?: RequestInit) => {
+    sent.push({ headers: new Headers(init?.headers), url: String(url) });
+    const path = new URL(String(url)).pathname;
+    return Promise.resolve(
+      path === "/api/docs-content"
+        ? Response.json({ content: "body", title: "t", url: "x" })
+        : Response.json(
+            path === "/api/docs-index"
+              ? [{ id: `page-${sent.length}`, title: "t" }]
+              : []
+          )
+    );
+  });
+  const signal = AbortSignal.timeout(5000);
+  const signedOut = await defaultKbDeps.index(signal);
+  const viewed = await defaultKbDeps.index(signal, helpCenter);
+  assert.notDeepEqual(viewed, signedOut);
+  assert.deepEqual(await defaultKbDeps.index(signal, helpCenter), viewed);
+  await defaultKbDeps.search("inbox placement", signal, helpCenter);
+  await defaultKbDeps.read(
+    "https://app.acquisity.ai/docs/cold-email-agent/deliverability",
+    signal,
+    helpCenter
+  );
+  assert.deepEqual(
+    sent.map((request) => [
+      new URL(request.url).pathname,
+      request.headers.get("x-help-viewer"),
+    ]),
+    [
+      ["/api/docs-index", null],
+      ["/api/docs-index", helpCenter.viewer],
+      ["/api/search", helpCenter.viewer],
+      ["/api/docs-content", helpCenter.viewer],
+    ]
+  );
 });

@@ -1278,6 +1278,7 @@ async function answerFromKnowledgeBase(
   const schedule = officeSchedule(scope);
   const customer = {
     canInvestigate: !helpCenterOnly,
+    ...(scope.helpCenter ? { helpCenter: scope.helpCenter } : {}),
     ...(schedule ? { officeSchedule: schedule } : {}),
     role: scope.role,
     workspace: scope.organizationName,

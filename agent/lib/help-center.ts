@@ -6,6 +6,39 @@ export const HELP_CENTER_BASE_URL =
   process.env.ACQUISITY_WEB_BASE_URL?.trim() || "https://app.acquisity.ai";
 
 const MAX_ARTICLES = 5;
+
+/**
+ * The asking customer's Help Centre view, from Acquisity's context route
+ * (ENG-20305): `viewer` signs their gated docs features for the docs routes,
+ * and `featuresOff` names each feature they lack with the pages it hides.
+ */
+export const helpCenterViewSchema = z.object({
+  featuresOff: z
+    .array(
+      z.object({
+        feature: z.string().min(1).max(100),
+        pages: z.array(z.string().min(1).max(300)).max(1000),
+        title: z.string().min(1).max(300),
+      })
+    )
+    .max(200),
+  viewer: z
+    .string()
+    .min(1)
+    .max(4096)
+    .regex(/^[A-Za-z0-9_.-]+$/u),
+});
+
+export type HelpCenterView = z.infer<typeof helpCenterViewSchema>;
+
+/** Without a view the docs routes answer as a signed-out visitor. */
+export const helpViewerHeaders = (
+  view: HelpCenterView | undefined
+): Record<string, string> => (view ? { "x-help-viewer": view.viewer } : {});
+
+/** The Help Centre pages the customer's features hide from them. */
+export const hiddenHelpPages = (view: HelpCenterView | undefined) =>
+  new Set(view?.featuresOff.flatMap((feature) => feature.pages) ?? []);
 const REQUEST_TIMEOUT_MS = 10_000;
 
 /** One hit from fumadocs' `simple` search: `content` is the highlighted title. */
@@ -133,7 +166,12 @@ type FetchLike = (
  */
 export async function getHelpArticleContent(
   articleUrl: string,
-  opts?: { baseUrl?: string; fetch?: FetchLike; signal?: AbortSignal }
+  opts?: {
+    baseUrl?: string;
+    fetch?: FetchLike;
+    signal?: AbortSignal;
+    view?: HelpCenterView;
+  }
 ): Promise<HelpArticleContent> {
   const base = opts?.baseUrl ?? HELP_CENTER_BASE_URL;
   const doFetch = (opts?.fetch ?? fetch) as unknown as FetchLike;
@@ -150,7 +188,13 @@ export async function getHelpArticleContent(
       : AbortSignal.timeout(CONTENT_TIMEOUT_MS);
     const response = await doFetch(
       `${base}/api/docs-content?id=${encodeURIComponent(slug)}`,
-      { headers: { accept: "application/json" }, signal }
+      {
+        headers: {
+          accept: "application/json",
+          ...helpViewerHeaders(opts?.view),
+        },
+        signal,
+      }
     );
     if (response.status === 404) {
       return { error: "Article not found.", url: articleUrl };
