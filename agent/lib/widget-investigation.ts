@@ -1441,7 +1441,6 @@ async function answerFromKnowledgeBase(
   // message, and the reply files the ticket (see ticketInsteadOfHandoff).
   const person = asksForPerson(route) && customerTurn(scope);
   if (person && route.noNeed) {
-    // Nothing to answer or file yet: an invitation, no model.
     drafting.abort();
     return completeInvite(run, scope, deps);
   }
@@ -1502,9 +1501,6 @@ async function answerFromKnowledgeBase(
     return reply(answer.message, "kb", answer.citations);
   }
   drafting.abort();
-  // A member or client cannot start an investigation, so a refund or ticket
-  // they ask for files the conversation's ticket for the team instead of
-  // sending them to their owner (ENG-20283 default).
   const memberFiled =
     helpCenterOnly && (route.refund || route.ticket)
       ? await memberTicket(scope, route, ask, log, signal, deps)
