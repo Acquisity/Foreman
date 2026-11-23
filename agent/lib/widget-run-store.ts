@@ -58,7 +58,6 @@ export const widgetTicketReceiptSchema = z.union([
     refund: z.boolean(),
     url: z.string().url().max(500),
   }),
-  z.object({ filed: z.literal(false), replay: z.literal("recorded") }),
   z.object({
     identifier: z.literal("ENG-0"),
     live: z.literal("simulated: nothing was filed"),

@@ -1,51 +1,41 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { defineTool } from "eve/tools";
-import { z } from "zod";
 import billingDefinition from "../tools/widget_billing_summary.js";
+import ticketDefinition from "../tools/widget_file_ticket.js";
 import outreachDefinition from "../tools/widget_outreach_health.js";
 import { executorTransport } from "./executor/transport.js";
 import { verifiedWidgetContext as fixture } from "./widget.fixture.js";
 import { filedTicketResult } from "./widget-investigation.js";
-import { driftVerdict, gapSentences, readResult } from "./widget-live.js";
 import {
+  driftVerdict,
+  gapSentences,
+  readResult,
+  replyElapsed,
+} from "./widget-live.js";
+import {
+  assertLiveAllowed,
   hasMovingWindow,
   LIVE_PROTOCOL,
+  LIVE_TICKET,
+  liveContext,
   liveServerUrl,
   liveToolInput,
   verifyLiveServer,
 } from "./widget-live-policy.js";
-import {
-  assertReplayAllowed,
-  LIVE_TICKET,
-  liveContext,
-  replayable,
-} from "./widget-replay.js";
 import { widgetAuth } from "./widget-scope.js";
 
 const LOCAL_ONLY = /local-only/;
-const PRODUCTION = /not allowed on production/;
-const EXCLUSIVE = /exclusive/;
 const LOOPBACK = /loopback/;
 const NOT_LIVE = /not running/;
 
 test("live mode refuses all Vercel deployments and verifies loopback admission before customer data", async () => {
   for (const VERCEL_ENV of ["production", "preview", "development", ""]) {
     assert.throws(
-      () => assertReplayAllowed({ VERCEL_ENV, WIDGET_LIVE: "1" }),
+      () => assertLiveAllowed({ VERCEL_ENV, WIDGET_LIVE: "1" }),
       LOCAL_ONLY
     );
   }
-  assertReplayAllowed({ WIDGET_LIVE: "1" });
-  assertReplayAllowed({ VERCEL_ENV: "preview", WIDGET_REPLAY: "1" });
-  assert.throws(
-    () => assertReplayAllowed({ VERCEL_ENV: "production", WIDGET_REPLAY: "1" }),
-    PRODUCTION
-  );
-  assert.throws(
-    () => assertReplayAllowed({ WIDGET_LIVE: "1", WIDGET_REPLAY: "1" }),
-    EXCLUSIVE
-  );
+  assertLiveAllowed({ WIDGET_LIVE: "1" });
   let requests = 0;
   const probe: typeof fetch = (url, options) => {
     requests += 1;
@@ -257,7 +247,10 @@ test("live tool boundary enforces historical date windows and preserves explicit
     }
   );
   const resolveTool = (
-    definition: typeof billingDefinition | typeof outreachDefinition
+    definition:
+      | typeof billingDefinition
+      | typeof outreachDefinition
+      | typeof ticketDefinition
   ) => {
     const events = definition.events as Record<
       string,
@@ -267,11 +260,6 @@ test("live tool boundary enforces historical date windows and preserves explicit
       execute: (input: unknown, context: unknown) => Promise<unknown>;
     };
   };
-  const tool = defineTool({
-    description: "Test read.",
-    execute: (input) => input,
-    inputSchema: z.record(z.string(), z.unknown()),
-  });
   const billing = {
     execute: (input: unknown, _ctx: unknown) =>
       Promise.resolve(
@@ -336,9 +324,11 @@ test("live tool boundary enforces historical date windows and preserves explicit
   assert.equal(hasMovingWindow("widget_outreach_health", {}), true);
   assert.equal(hasMovingWindow("widget_billing_summary", explicit), false);
   assert.equal(hasMovingWindow("widget_outreach_health", window), false);
-  assert.equal(replayable("widget_inbox_health", tool), tool);
   assert.deepEqual(
-    await replayable("widget_file_ticket", tool).execute({}, ctx),
+    await resolveTool(ticketDefinition).execute(
+      { summary: "s", title: "t" },
+      ctx
+    ),
     LIVE_TICKET
   );
   // Simulated, so the composer's "passed to the team" path runs; nothing is filed.
@@ -378,4 +368,17 @@ test("a live re-run keeps the recorded screen recording so its reader is offered
   assert.equal(scope.recordingId, "jam-abc");
   assert.equal(scope.source, "inbox");
   assert.equal(scope.liveAsOf, sentAt);
+});
+
+test("first customer reply ignores progress and empty messages", () => {
+  const progress = {
+    message: null,
+    progress: { checks: [], stage: "investigating" },
+  };
+  assert.equal(replyElapsed(progress, 1000, 4000), null);
+  assert.equal(replyElapsed({ message: " " }, 1000, 4000), null);
+  assert.equal(
+    replyElapsed({ message: "Here is the answer." }, 1000, 61_000),
+    60_000
+  );
 });

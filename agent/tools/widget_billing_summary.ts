@@ -22,7 +22,6 @@ import {
 } from "#lib/planetscale.js";
 import { diagnosticText } from "#lib/widget-diagnostic-text.js";
 import { liveToolInput } from "#lib/widget-live-policy.js";
-import { replayable } from "#lib/widget-replay.js";
 import {
   isWidgetSupport,
   type WidgetContext,
@@ -1141,8 +1140,6 @@ export const tool = defineTool({
 export default defineDynamic({
   events: {
     "step.started": (_event, ctx) =>
-      isWidgetSupport(ctx.session.auth.initiator)
-        ? replayable("widget_billing_summary", tool)
-        : null,
+      isWidgetSupport(ctx.session.auth.initiator) ? tool : null,
   },
 });
