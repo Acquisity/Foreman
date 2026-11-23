@@ -22,7 +22,7 @@ import {
   conversationTicket,
   fileTicketFor,
 } from "./widget-ticket.js";
-import { commentIdFor, linearAppRequest } from "./widget-ticket-followup.js";
+import { commentIdFor, commentOnTicket } from "./widget-ticket-followup.js";
 
 /**
  * Acquisity's "I found a bug" steps (ENG-17031). The app asks for the details
@@ -658,30 +658,6 @@ export async function fileBugReport(
 /** A fixed comment id per request, so Linear refuses a second comment for the same message. */
 export const additionCommentId = (messageId: string) =>
   commentIdFor(`widget-bug-addition:${messageId}`);
-
-const COMMENT_MUTATION = `mutation WidgetBugAddition($input: CommentCreateInput!) {
-  commentCreate(input: $input) { success }
-}`;
-
-/** One comment with Foreman's own Linear app token. */
-export async function commentOnTicket(
-  identifier: string,
-  body: string,
-  id: string,
-  signal: AbortSignal
-): Promise<void> {
-  const created = await linearAppRequest<{
-    commentCreate: { success: boolean };
-  }>(
-    "WidgetBugAddition",
-    COMMENT_MUTATION,
-    { input: { body, id, issueId: identifier } },
-    signal
-  );
-  if (!created.commentCreate.success) {
-    throw new Error("Linear did not create the comment.");
-  }
-}
 
 const additionComment = (turn: BugReportTurn, at: Date) =>
   [

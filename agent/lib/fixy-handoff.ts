@@ -4,6 +4,10 @@ import { isAskFromTitle } from "./linear-context.js";
 /** Fixy's Linear app user, the author of each run's final reply on a ticket. */
 export const FIXY_LINEAR_USER_ID = "110978d6-72e7-4d4c-8d87-ffe3df9794cc";
 
+/** The note Fixy posts after its reply when a run ends; never the reply itself. */
+export const FIXY_RUN_FINISHED =
+  "This run finished. Its reply is on the ticket.";
+
 const TEAM_KEY = /^[A-Z][A-Z0-9]{1,9}$/u;
 const ISSUE_IDENTIFIER = /^([A-Z][A-Z0-9]{1,9})-\d{1,9}$/u;
 const TEAMS_MAX_CHARS = 1000;

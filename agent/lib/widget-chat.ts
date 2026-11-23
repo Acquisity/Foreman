@@ -7,8 +7,8 @@ import {
   hedged,
   type KbAnswer,
   type KbCustomer,
-  PERSON_WRITER_NOTE,
   resolveCitations,
+  TICKET_WRITER_NOTE,
 } from "./widget-kb.js";
 import {
   PRODUCT_GUIDE,
@@ -80,7 +80,7 @@ ${PRODUCT_GUIDE}`;
 export interface ChatDeps {
   /** One model attempt: the streamed reply and when its first text arrived. */
   generate: (input: {
-    personAsked?: true;
+    ticketFiling?: true;
     messages: ChatMessage[];
     signal: AbortSignal;
   }) => Promise<ChatAttempt>;
@@ -88,9 +88,9 @@ export interface ChatDeps {
 
 const CHAT_FOLLOWUP_RULE =
   "Never promise that you, a person, a teammate or the team will look into, pick up or follow up on this message: nobody is notified.";
-export const chatPrompt = (personAsked?: true) =>
-  personAsked
-    ? CHAT_PROMPT.replace(CHAT_FOLLOWUP_RULE, PERSON_WRITER_NOTE)
+export const chatPrompt = (ticketFiling?: true) =>
+  ticketFiling
+    ? CHAT_PROMPT.replace(CHAT_FOLLOWUP_RULE, TICKET_WRITER_NOTE)
     : CHAT_PROMPT;
 
 interface ChatMessage {
@@ -142,7 +142,7 @@ export function chatMessages(
       content: [
         `Note from the app, not written by the customer: ${JSON.stringify(note)}`,
         REMINDER,
-        ...(customer?.personAsked ? [PERSON_WRITER_NOTE] : []),
+        ...(customer?.ticketFiling ? [TICKET_WRITER_NOTE] : []),
         ...(customer?.officeSchedule ? [customer.officeSchedule] : []),
         ...(customer?.ticketNote ? [customer.ticketNote] : []),
         ...(note.role === "owner" || !ROLE_LIMITS
@@ -237,7 +237,7 @@ const chatFailure = (error: unknown) => {
 
 export const defaultChatDeps = {
   async generate(
-    { personAsked, messages, signal }: Parameters<ChatDeps["generate"]>[0],
+    { ticketFiling, messages, signal }: Parameters<ChatDeps["generate"]>[0],
     languageModel?: LanguageModel
   ) {
     const model =
@@ -252,7 +252,7 @@ export const defaultChatDeps = {
       maxRetries: 0,
       messages: [
         {
-          content: chatPrompt(personAsked),
+          content: chatPrompt(ticketFiling),
           // The stable prefix: Anthropic caches up to this breakpoint, and the
           // gateway turns on caching for providers that need it asked.
           providerOptions: {
@@ -328,7 +328,7 @@ export async function answerFromGuide(
       deps.generate({
         messages,
         signal: abortSignal,
-        ...(reader?.personAsked ? { personAsked: true } : {}),
+        ...(reader?.ticketFiling ? { ticketFiling: true } : {}),
       })
     );
     const { articles, numbered } = numberSlugs(

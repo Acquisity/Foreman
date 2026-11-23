@@ -107,6 +107,7 @@ const linear = (existing: boolean) => {
         });
         return Promise.resolve();
       },
+      owns: () => Promise.resolve(true),
       readReceipt: () => Promise.resolve(null),
       refund: () => assert.fail("a bug report is never a refund"),
       saveReceipt: () => Promise.resolve(),

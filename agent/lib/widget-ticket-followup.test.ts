@@ -1,10 +1,11 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { FIXY_LINEAR_USER_ID } from "./fixy-handoff.js";
+import { FIXY_RUN_FINISHED } from "./fixy-handoff.js";
 import {
   commentIdFor,
   followUpOnTicket,
   type linearAppRequest,
+  ownsConversation,
   ticketNote,
 } from "./widget-ticket-followup.js";
 
@@ -33,11 +34,10 @@ const states = {
     },
   },
 };
+const commented = { WidgetTicketComment: { commentCreate: { success: true } } };
 
-test("a follow-up on an open ticket adds one comment with a fixed id and the customer's words, and moves nothing", async () => {
-  const { request, sent } = linear({
-    WidgetFollowUp: { commentCreate: { success: true } },
-  });
+test("a follow-up on an open ticket adds one comment with a fixed id and the summary, and moves nothing", async () => {
+  const { request, sent } = linear(commented);
   await followUpOnTicket(
     { identifier: "ENG-7", stateType: "started" },
     "Still broken.\nSecond line.",
@@ -47,10 +47,10 @@ test("a follow-up on an open ticket adds one comment with a fixed id and the cus
   );
   assert.deepEqual(sent, [
     {
-      name: "WidgetFollowUp",
+      name: "WidgetTicketComment",
       variables: {
         input: {
-          body: "The customer followed up in the support chat:\n\n> Still broken.\n> Second line.",
+          body: "Foreman passed this conversation to the team again from the support chat:\n\n> Still broken.\n> Second line.",
           id: commentIdFor(`widget-follow-up:${RUN}`),
           issueId: "ENG-7",
         },
@@ -59,9 +59,9 @@ test("a follow-up on an open ticket adds one comment with a fixed id and the cus
   ]);
 });
 
-test("a follow-up on a Done ticket comments and moves it back to Todo", async () => {
+test("a follow-up on a Done ticket moves it back to Todo before it comments", async () => {
   const { request, sent } = linear({
-    WidgetFollowUp: { commentCreate: { success: true } },
+    ...commented,
     WidgetTicketReopen: { issueUpdate: { success: true } },
     WidgetTicketStates: states,
   });
@@ -74,27 +74,14 @@ test("a follow-up on a Done ticket comments and moves it back to Todo", async ()
   );
   assert.deepEqual(
     sent.map(({ name }) => name),
-    ["WidgetFollowUp", "WidgetTicketStates", "WidgetTicketReopen"]
+    ["WidgetTicketStates", "WidgetTicketReopen", "WidgetTicketComment"]
   );
-  assert.deepEqual(sent[2].variables, { id: "ENG-7", stateId: "todo" });
+  assert.deepEqual(sent[1].variables, { id: "ENG-7", stateId: "todo" });
 });
 
-test("a follow-up that Linear refuses throws, so the customer is never told it was passed on", async () => {
-  const refused = linear({
-    WidgetFollowUp: { commentCreate: { success: false } },
-  });
-  await assert.rejects(
-    followUpOnTicket(
-      { identifier: "ENG-7", stateType: "completed" },
-      "x",
-      RUN,
-      signal,
-      refused.request
-    )
-  );
-  assert.equal(refused.sent.length, 1);
+test("a reopen that fails writes no comment, and a retry after a failed comment only comments", async () => {
   const stuck = linear({
-    WidgetFollowUp: { commentCreate: { success: true } },
+    ...commented,
     WidgetTicketReopen: { issueUpdate: { success: false } },
     WidgetTicketStates: states,
   });
@@ -107,73 +94,120 @@ test("a follow-up that Linear refuses throws, so the customer is never told it w
       stuck.request
     )
   );
+  assert.ok(!stuck.sent.some(({ name }) => name === "WidgetTicketComment"));
+  // The reopen landed and the comment failed: the search now sees the ticket open.
+  const refused = linear({
+    WidgetTicketComment: { commentCreate: { success: false } },
+  });
+  await assert.rejects(
+    followUpOnTicket(
+      { identifier: "ENG-7", stateType: "unstarted" },
+      "x",
+      RUN,
+      signal,
+      refused.request
+    )
+  );
+  const retried = linear(commented);
+  await followUpOnTicket(
+    { identifier: "ENG-7", stateType: "unstarted" },
+    "x",
+    RUN,
+    signal,
+    retried.request
+  );
+  assert.deepEqual(
+    retried.sent.map(({ name }) => name),
+    ["WidgetTicketComment"]
+  );
 });
 
-const comment = (
-  body: string,
-  user: string | null,
-  updatedAt: string,
-  parent: { id: string } | null = null
-) => ({ body, parent, updatedAt, user: user ? { id: user } : null });
+const SCOPE = {
+  conversationId: "33333333-3333-4333-8333-333333333333",
+  organizationId: "22222222-2222-4222-8222-222222222222",
+};
+const scopeBlock = `## Verified scope\n\n- Workspace: Acme (acme)\n- Organization ID: ${SCOPE.organizationId}\n- Support conversation: ${SCOPE.conversationId}\n\nServer note.`;
 
-test("the ticket note gives the status and Fixy's newest top-level comment with links, ticket numbers and ids taken out", async () => {
-  const { request } = linear({
-    WidgetTicketComments: {
-      issue: {
-        comments: {
-          nodes: [
-            comment(
-              "Old closing note.",
-              FIXY_LINEAR_USER_ID,
-              "2026-11-01T00:00:00Z"
-            ),
-            comment(
-              "Fixed the sync for workspace 11111111-1111-4111-8111-111111111111 in ENG-9 https://github.com/x/y/pull/1 so sending resumes.",
-              FIXY_LINEAR_USER_ID,
-              "2026-11-03T00:00:00Z"
-            ),
-            comment(
-              "A reply in a thread.",
-              FIXY_LINEAR_USER_ID,
-              "2026-11-04T00:00:00Z",
-              { id: "p" }
-            ),
-            comment(
-              "A teammate's note.",
-              "someone-else",
-              "2026-11-05T00:00:00Z"
-            ),
-          ],
-        },
-        state: { type: "completed" },
+test("only a ticket whose description carries this conversation's scope block belongs to it", async () => {
+  const owns = (description: string | null) =>
+    ownsConversation(
+      "ENG-7",
+      SCOPE,
+      signal,
+      linear({ WidgetTicketDescription: { issue: { description } } }).request
+    );
+  assert.equal(await owns(`The customer wrote: x\n\n${scopeBlock}`), true);
+  assert.equal(
+    await owns(
+      `A master that quotes conversation ${SCOPE.conversationId} in its notes.`
+    ),
+    false
+  );
+  assert.equal(
+    await owns(
+      scopeBlock.replace(
+        SCOPE.organizationId,
+        "99999999-9999-4999-8999-999999999999"
+      )
+    ),
+    false
+  );
+  assert.equal(await owns(null), false);
+});
+
+const fixyComments = (
+  type: string,
+  nodes: { body: string; parent: { id: string } | null }[]
+) =>
+  linear({
+    WidgetTicketComments: { issue: { comments: { nodes }, state: { type } } },
+  }).request;
+
+test("the investigator's note has Fixy's newest top-level reply with links, ticket numbers and ids taken out; the writers get the status alone", async () => {
+  // Newest first, as Linear returns them for orderBy: updatedAt.
+  const note = await ticketNote(
+    "ENG-7",
+    signal,
+    fixyComments("completed", [
+      { body: FIXY_RUN_FINISHED, parent: null },
+      { body: "A reply in a thread.", parent: { id: "p" } },
+      {
+        body: "Fixed the sync for workspace 11111111-1111-4111-8111-111111111111 in ENG-9 https://github.com/x/y/pull/1 so sending resumes, UTF-8 intact.",
+        parent: null,
       },
-    },
-  });
-  const note = await ticketNote("ENG-7", signal, request);
-  assert.ok(note?.includes("it is done."));
-  assert.ok(note?.includes("Fixed the sync for workspace"));
-  assert.ok(note?.includes("so sending resumes."));
+      { body: "Old closing note.", parent: null },
+    ])
+  );
+  const investigator = note?.forInvestigator ?? "";
+  assert.ok(investigator.includes("it is done."));
+  assert.ok(investigator.includes("Fixed the sync for workspace"));
+  assert.ok(investigator.includes("so sending resumes, UTF-8 intact."));
   for (const hidden of [
     "ENG-9",
     "github.com",
     "11111111-",
     "Old closing",
-    "teammate",
     "thread",
+    FIXY_RUN_FINISHED,
   ]) {
-    assert.ok(!note?.includes(hidden), hidden);
+    assert.ok(!investigator.includes(hidden), hidden);
   }
+  assert.equal(
+    note?.forWriters,
+    "This conversation already has a ticket with the support team, and it is done. Never mention the ticket itself, its status names, links, code or people."
+  );
 });
 
-test("a ticket with no closing comment yet says the team's answer will come here", async () => {
-  const { request } = linear({
-    WidgetTicketComments: {
-      issue: { comments: { nodes: [] }, state: { type: "triage" } },
-    },
-  });
-  const note = await ticketNote("ENG-7", signal, request);
-  assert.ok(note?.includes("with the team, not started yet"));
-  assert.ok(note?.includes("their answer will come here in this chat"));
+test("a ticket with no closing reply yet says the team's answer will come here, and an unreadable one gives no note", async () => {
+  const note = await ticketNote(
+    "ENG-7",
+    signal,
+    fixyComments("triage", [{ body: FIXY_RUN_FINISHED, parent: null }])
+  );
+  for (const text of [note?.forWriters, note?.forInvestigator]) {
+    assert.ok(text?.includes("with the team, not started yet"));
+    assert.ok(text?.includes("it will come here in this chat"));
+  }
   assert.equal(
     await ticketNote(
       "ENG-7",

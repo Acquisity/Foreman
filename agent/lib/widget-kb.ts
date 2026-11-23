@@ -23,9 +23,11 @@ import {
  *
  * @remarks
  * This lane is ungated on purpose. It has no tools and never receives account
- * data: its only inputs are the customer's own message and public help-center
- * articles, so there is nothing cross-tenant for the egress gate to guard. Keep
- * it that way. Giving this lane any account lookup brings the gate back.
+ * data: its only inputs are the customer's own message, public help-center
+ * articles and server-written notes (the schedule, and on a follow-up the
+ * code-written status of the conversation's ticket, never its comments), so
+ * there is nothing cross-tenant for the egress gate to guard. Keep it that
+ * way. Giving this lane any account lookup brings the gate back.
  *
  * Product facts come only from the articles; a reply that cites nothing, such
  * as a thank-you or a plain "I'm not sure", is still delivered.
@@ -214,13 +216,13 @@ const LATEST_SUBJECT = `The input is the support conversation so far, oldest fir
 const FOREMAN_VOICE = `You are Foreman, Acquisity's support teammate in the in-app chat. You know how the product works, campaigns, the AI SDR, inboxes and domains, websites, the CRM, billing and the rest, and you help customers understand and use it. You are not a sales, strategy or copywriting coach. Talk like a knowledgeable colleague: warm, direct, in the second person, in short paragraphs. Answer first, with no preamble and no sign-off. Use a numbered list only for a real procedure. You are continuing the conversation you are given: never ask for something it already gave, never repeat your previous reply, and when the customer reports what they saw or did, accept it and give the next step. When they sound frustrated, acknowledge it in a few words and try a different approach.`;
 
 // The one front-door writer (ENG-14932). No account data and no tools reach it.
-export const PERSON_WRITER_NOTE =
-  "The customer explicitly asked for a person. Nobody takes over this chat: code files this conversation's ticket for the team and appends a line after your answer saying the team's answer will come here in this chat. Answer the product question only, starting with the answer itself: do not introduce yourself or describe what you can or cannot do. Do not address the request for a person again or draft support handling copy. Do not deny notification or follow-up, and do not promise a person, a reply, pickup, or any timing yourself, including soon, shortly, or right away. The server supplies that part of the reply.";
+export const TICKET_WRITER_NOTE =
+  "The app is filing this conversation's ticket for the support team, because the customer asked for a person or needs their workspace looked into. Nobody takes over this chat: code appends a line after your answer saying the team's answer will come here in this chat. Answer the product question only, starting with the answer itself: do not introduce yourself or describe what you can or cannot do. Do not address a request for a person, do not tell them to ask a workspace owner or admin, and do not draft support handling copy. Do not deny notification or follow-up, and do not promise a person, a reply, pickup, or any timing yourself, including soon, shortly, or right away. The server supplies that part of the reply.";
 export const KB_FOLLOWUP_RULE =
   "Never promise that Foreman, a person, a teammate, the team or a queue will look into, see, pick up, act on or follow up on this message: nobody is notified.";
 export const replyPrompt = (customer: KbCustomer | undefined) =>
-  customer?.personAsked
-    ? REPLY_PROMPT.replace(KB_FOLLOWUP_RULE, PERSON_WRITER_NOTE)
+  customer?.ticketFiling
+    ? REPLY_PROMPT.replace(KB_FOLLOWUP_RULE, TICKET_WRITER_NOTE)
     : REPLY_PROMPT;
 
 export const REPLY_PROMPT = `${FOREMAN_VOICE}
@@ -376,10 +378,10 @@ export interface KbCustomer {
   glassOffered?: boolean;
   /** The team's published hours and closures; see officeSchedule. */
   officeSchedule?: string;
-  /** Server-owned exception for an explicit ask for a person, which files the conversation's ticket. */
-  personAsked?: true;
   role: string;
-  /** A follow-up's note on the conversation's ticket and the team's closing comment; see conversationTicketNote. */
+  /** Server-owned exception for a turn that files the conversation's ticket; see TICKET_WRITER_NOTE. */
+  ticketFiling?: true;
+  /** A follow-up's code-written status of the conversation's ticket; see ticketNote. */
   ticketNote?: string;
   workspace: string;
 }
@@ -448,8 +450,8 @@ export const defaultKbDeps: KbDeps = {
         workspace: "unknown",
       },
       recordingOffered: recordingOffered === true,
-      ...(customer?.personAsked
-        ? { responseBoundary: PERSON_WRITER_NOTE }
+      ...(customer?.ticketFiling
+        ? { responseBoundary: TICKET_WRITER_NOTE }
         : {}),
     });
     const { object } = await hedged("generate", signal, (abortSignal) =>

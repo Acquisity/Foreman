@@ -2,6 +2,7 @@ import { callLinearGraphQL } from "eve/channels/linear";
 import { z } from "zod";
 import {
   FIXY_LINEAR_USER_ID,
+  FIXY_RUN_FINISHED,
   fixyHandoffCommentId,
   fixyTriageTeams,
   parseFixyHandoff,
@@ -77,8 +78,6 @@ export const closingCommentsOf = (
     .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
     .map(({ author, body, createdAt }) => ({ author, body, createdAt }));
 };
-
-const FIXY_RUN_FINISHED = "This run finished. Its reply is on the ticket.";
 
 /** Fixy's newest comment that is not its run-finished note: the run's reply. */
 export const fixyVerdictOf = (

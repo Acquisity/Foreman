@@ -2396,7 +2396,7 @@ test("an owner or admin who turns on Investigate my workspace skips the front do
   );
 });
 
-test("a sticky investigation follow-up asking for a person whose ticket cannot be filed still investigates, with no note", async (t) => {
+test("a sticky investigation follow-up asking for a person whose ticket cannot be filed still investigates and is told to hand off, so the finish files it", async (t) => {
   enabled(t);
   const { deps, run } = dependencies();
   deps.route = () =>
@@ -2421,6 +2421,7 @@ test("a sticky investigation follow-up asking for a person whose ticket cannot b
   assert.equal(response.status, 200);
   assert.equal(sends.length, 1);
   assert.ok(!sends[0].includes("already filed or reused"));
+  assert.ok(sends[0].includes("set needsHuman true"));
   assert.notEqual(run.outcome?.reason, "asked_for_human");
 });
 
@@ -2674,7 +2675,7 @@ test("an ask for a person that states no need gets an invitation, with no ticket
       Promise.resolve({ asksForHuman: 0.95, noNeed: true, source: "jev" });
     deps.fileTicket = fileTicket;
     deps.answerChat = (_ask, _log, customer) => {
-      assert.ok(!customer?.personAsked, "no person writer runs");
+      assert.ok(!customer?.ticketFiling, "no person writer runs");
       return new Promise(() => undefined);
     };
     // biome-ignore lint/performance/noAwaitInLoops: each case needs its own fresh run.
@@ -2968,7 +2969,7 @@ test("only an explicit-person route restarts the guide draft with the server's p
     assert.deepEqual(
       customers,
       kind === "person"
-        ? [ordinary, { ...ordinary, personAsked: true }]
+        ? [ordinary, { ...ordinary, ticketFiling: true }]
         : [ordinary]
     );
   }
@@ -2987,12 +2988,15 @@ test("an unreadable filing receipt still returns the allowed reply", async () =>
   assert.equal(run.outcome?.message, allowed.message);
 });
 
-test("a follow-up carries the note on the conversation's ticket to the writer and the investigator; a first message reads none", async (t) => {
+test("a follow-up in a conversation that was filed gives the writer the status alone and the investigator the closing note; any other turn reads nothing", async (t) => {
   enabled(t);
-  const note = "This conversation already has a ticket with the support team.";
-  const history = [
+  const note = {
+    forInvestigator: "Status. The team's closing note: fixed the sync.",
+    forWriters: "Status.",
+  };
+  const filed = [
     { role: "customer" as const, text: "my campaign stopped" },
-    { role: "assistant" as const, text: ANSWER_HERE },
+    { role: "assistant" as const, text: `Checked it. ${ANSWER_HERE}` },
   ];
   const kb = dependencies();
   const reads: string[] = [];
@@ -3007,39 +3011,92 @@ test("a follow-up carries the note on the conversation's ticket to the writer an
   };
   kb.deps.route = kbRoute;
   await receiveWidgetMessage(
-    request({ ...start, history, question: "any news?" }),
+    request({ ...start, history: filed, question: "any news?" }),
     noWork(),
     200,
     verify,
     kb.deps
   );
-  assert.equal(customers.at(-1)?.ticketNote, note);
-  await receiveWidgetMessage(
-    request({
-      ...start,
-      message_id: "cccccccc-3333-4333-8333-cccccccccccc",
-      question: "first message",
-    }),
-    noWork(),
-    200,
-    verify,
-    kb.deps
-  );
+  assert.equal(customers.at(-1)?.ticketNote, note.forWriters);
+  for (const [id, history] of [
+    ["cccccccc-3333-4333-8333-cccccccccccc", undefined],
+    [
+      "dddddddd-4444-4444-8444-dddddddddddd",
+      [{ role: "assistant" as const, text: kbAnswer.message }],
+    ],
+  ] as const) {
+    // biome-ignore lint/performance/noAwaitInLoops: each case needs its own fresh run.
+    await receiveWidgetMessage(
+      request({
+        ...start,
+        message_id: id,
+        question: "next",
+        ...(history ? { history: [...history] } : {}),
+      }),
+      noWork(),
+      200,
+      verify,
+      kb.deps
+    );
+  }
   assert.equal(reads.length, 1);
 
   const looked = dependencies();
   looked.deps.ticketNote = () => Promise.resolve(note);
   const { args, sends } = startedSessions();
   await receiveWidgetMessage(
-    request({ ...investigate, history, question: "any news?" }),
+    request({ ...investigate, history: filed, question: "any news?" }),
     args,
     200,
     verify,
     looked.deps
   );
   assert.ok(
-    sends[0].includes(`NOTE FROM THE APP, not written by the customer: ${note}`)
+    sends[0].includes(
+      `NOTE FROM THE APP, not written by the customer: ${note.forInvestigator}`
+    )
   );
+});
+
+test("a member or client who presses the magnifying glass or reports a bug gets the conversation's ticket with the answer", async (t) => {
+  enabled(t);
+  for (const [mode, route] of [
+    ["investigate", kbRoute],
+    [
+      undefined,
+      () =>
+        Promise.resolve({ asksForHuman: 0, bug: true, source: "jev" as const }),
+    ],
+  ] as const) {
+    const { deps, run } = dependencies();
+    const { fileTicket, filed } = ticketFiler();
+    deps.route = route;
+    deps.fileTicket = fileTicket;
+    deps.verifyAccess = () => assert.fail("a member is never investigated");
+    const customers: (KbCustomer | undefined)[] = [];
+    deps.answerChat = (_ask, _log, customer) => {
+      customers.push(customer && { ...customer });
+      return Promise.resolve(kbAnswer);
+    };
+    // biome-ignore lint/performance/noAwaitInLoops: each case needs its own fresh run.
+    const response = await receiveWidgetMessage(
+      request({
+        ...start,
+        question: "My campaign stopped sending",
+        ...(mode ? { mode } : {}),
+      }),
+      noWork(),
+      200,
+      () => Promise.resolve({ ...scope, role: "member" }),
+      deps
+    );
+    const body = (await response.json()) as Record<string, unknown>;
+    assert.equal(body.message, `${kbAnswer.message}\n\n${ANSWER_HERE}`);
+    assert.equal(run.outcome?.reason, "ticket_instead_of_handoff");
+    assert.equal(filed.length, 1);
+    assert.ok(filed[0].summary.includes("a workspace member"));
+    assert.equal(customers.at(-1)?.ticketFiling, true);
+  }
 });
 
 const CITES_TRACE = /evidence reference/u;

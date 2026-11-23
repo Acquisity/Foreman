@@ -1,6 +1,11 @@
 import { logOpsEvent } from "./ops-log.js";
+import { BUG_REPORT_ADDED, BUG_REPORT_LOGGED } from "./widget-bug-report.js";
+import { parseFindings } from "./widget-findings.js";
+import type { WidgetDependencies } from "./widget-investigation.js";
+import type { WidgetOutcome, WidgetRun } from "./widget-run-store.js";
 import type { WidgetContext } from "./widget-scope.js";
 import type { fileTicketFor } from "./widget-ticket.js";
+import type { TicketNote } from "./widget-ticket-followup.js";
 
 /**
  * Nobody takes a support chat over (ENG-20283, decision 5). Whatever would
@@ -91,3 +96,164 @@ export const ticketInsteadOfHandoff = async (
   ...args: Parameters<typeof handoffTicket>
 ): Promise<string | null> =>
   (await handoffTicket(...args)) ? ANSWER_HERE : null;
+
+// A block from our own controls (the ownership guard, a gate outage) is not a
+// finding that needs a person: the app tells the customer to send the message
+// again. The reason itself can name an identifier, so only this flag crosses
+// to the app.
+export const RETRYABLE_BLOCK =
+  /^(?:deadline$|gate_unavailable$|bug_report_unfiled$|(?:composed:)?(?:foreign_identifier|internal_artifact):)/u;
+
+/**
+ * Nobody takes a blocked chat over, so a block the customer cannot fix by
+ * sending again files the conversation's ticket and says the team's answer
+ * will come here. A teammate's run, a retryable block and a ticket that could
+ * not be filed keep the block.
+ */
+export async function ticketInsteadOfBlock(
+  run: Pick<WidgetRun, "id" | "question" | "scope">,
+  result: WidgetOutcome,
+  findings: unknown,
+  ids: { runId: string; sessionId?: string },
+  signal: AbortSignal | undefined,
+  file: typeof fileTicketFor | undefined
+): Promise<{ findings: unknown; result: WidgetOutcome }> {
+  const reason = result.reason ?? "blocked";
+  if (
+    result.decision !== "block" ||
+    // An overdue investigation would likely run out of time again on a resend.
+    (reason !== "deadline" && RETRYABLE_BLOCK.test(reason))
+  ) {
+    return { findings, result };
+  }
+  const found = parseFindings(findings);
+  const filed = await handoffTicket(
+    run.scope,
+    {
+      summary: [
+        `The customer wrote: ${run.question}`,
+        `Foreman could not answer it (${reason}).`,
+        ...(found
+          ? [
+              `What Foreman found: ${found.report}`,
+              `Recommendation: ${found.recommendation}`,
+            ]
+          : []),
+      ].join("\n\n"),
+      title: `Support chat: ${found?.report ?? run.question}`,
+    },
+    ids,
+    signal,
+    file
+  );
+  if (!filed) {
+    return { findings, result };
+  }
+  const ticket =
+    "identifier" in filed ? { id: filed.identifier, url: filed.url } : null;
+  return {
+    findings: parseFindings({
+      confidence: found?.confidence ?? "low",
+      facts: found?.facts ?? [],
+      needsHuman: false,
+      recommendation: ANSWER_HERE,
+      report: (
+        found?.report ??
+        `Foreman could not answer this (${reason}) and filed the conversation's ticket.`
+      ).slice(0, 1000),
+      ...(ticket ? { ticket } : {}),
+    }),
+    result: {
+      citations: [],
+      decision: "allow",
+      message: ANSWER_HERE,
+      reason: `${TICKET_INSTEAD} ${reason}`,
+      status: "completed",
+    },
+  };
+}
+
+/** The whole reply to an ask for a person that states no need: an invitation, no ticket. */
+export const completeInvite = (
+  run: Pick<WidgetRun, "id">,
+  scope: WidgetContext,
+  deps: Pick<WidgetDependencies, "complete">
+) =>
+  deps.complete(
+    run.id,
+    {
+      citations: [],
+      decision: "allow",
+      message: personInvite({
+        conversationId: scope.conversationId,
+        runId: run.id,
+      }),
+      reason: PERSON_INVITE,
+      status: "completed",
+    },
+    null,
+    run.id
+  );
+
+/**
+ * Why a front-door turn files the conversation's ticket: the customer asked
+ * for a person, or a member or client (who cannot start an investigation)
+ * needs one, through the magnifying glass, a bug report, a refund or a ticket.
+ */
+export type FrontDoorTicket = "person" | "member";
+
+/** The front-door ticket's summary and title for the team. */
+export const frontDoorTicket = (
+  why: FrontDoorTicket,
+  scope: WidgetContext,
+  latest: string,
+  reply: string
+) =>
+  why === "person"
+    ? {
+        summary: `The customer asked for a person and wrote: ${latest}\n\nForeman's reply: ${reply}`,
+        title: "Support chat: the customer asked for a person",
+      }
+    : {
+        summary: `The customer, a workspace ${scope.role}, needs their workspace looked into, which only an owner or admin can start, and wrote: ${latest}\n\nForeman's reply: ${reply}`,
+        title: `Support chat: a ${scope.role} needs their workspace looked into`,
+      };
+
+/**
+ * The investigator's note for a toggled ask for a person whose ticket could
+ * not be filed yet: it hands off, so the finish files the ticket.
+ */
+export const UNFILED_PERSON_NOTE =
+  "\n\nThe customer asked for a person. Nobody takes over this chat, and the conversation's ticket could not be filed yet: set needsHuman true, and the app files it for the team when you finish. Answer the rest of the question as usual.";
+
+/** Replies that tell the customer their conversation has a ticket. */
+const FILED_REPLIES = [ANSWER_HERE, BUG_REPORT_LOGGED, BUG_REPORT_ADDED];
+
+/**
+ * Only a conversation an earlier reply said was filed can have a ticket, so
+ * the ticket is read only then and every other follow-up waits on nothing.
+ */
+export const followUpNote = async (
+  input: {
+    history?: { role: "customer" | "assistant"; text: string }[];
+    staff?: boolean;
+  },
+  scope: WidgetContext,
+  signal: AbortSignal,
+  deps: Pick<WidgetDependencies, "ticketNote">
+): Promise<TicketNote | null> =>
+  !input.staff &&
+  deps.ticketNote &&
+  input.history?.some(
+    (turn) =>
+      turn.role === "assistant" &&
+      FILED_REPLIES.some((filed) => turn.text.includes(filed))
+  )
+    ? await deps.ticketNote(scope, signal)
+    : null;
+
+/** The investigator's copy of the ticket note, marked as the app's. */
+export const investigatorNote = (note: TicketNote | null) =>
+  note
+    ? `\n\nNOTE FROM THE APP, not written by the customer: ${note.forInvestigator}`
+    : "";

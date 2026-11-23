@@ -195,3 +195,95 @@ test("an abort during the receipt save propagates instead of becoming a ticket e
     )
   );
 });
+
+const hit = (identifier: string, stateType: string) => ({
+  assignee: null,
+  createdAt: "2026-11-20T00:00:00.000Z",
+  identifier,
+  labels: [],
+  matchedPhrases: [scope.conversationId],
+  parentIdentifier: null,
+  state: stateType,
+  stateType,
+  title: identifier,
+  url: `https://linear.app/acquisity/issue/${identifier}/x`,
+});
+
+test("a search hit that only mentions the conversation is skipped: the follow-up lands on the conversation's own ticket", async (t) => {
+  t.mock.method(globalThis, "fetch", () =>
+    Promise.reject(new Error("unexpected transport"))
+  );
+  const runId = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
+  const followed: { identifier: string; runId: string; stateType: string }[] =
+    [];
+  const checked: string[] = [];
+  const { signal } = new AbortController();
+  const filed = await fileTicketFor(
+    scope,
+    { summary: "It broke again.", title: "Support" },
+    signal,
+    runId,
+    {
+      create: () => assert.fail("the conversation already has a ticket"),
+      followUp: (ticket, _summary, followUpRun) => {
+        followed.push({
+          identifier: ticket.identifier,
+          runId: followUpRun,
+          stateType: ticket.stateType,
+        });
+        return Promise.resolve();
+      },
+      owns: (identifier, owner) => {
+        checked.push(identifier);
+        assert.equal(owner.conversationId, scope.conversationId);
+        return Promise.resolve(identifier === "ENG-6");
+      },
+      readReceipt: async () => null,
+      refund: () => Promise.resolve(false),
+      saveReceipt: () => Promise.resolve(),
+      search: () =>
+        Promise.resolve({
+          createdAfter: null,
+          issues: [
+            hit("ENG-4", "canceled"),
+            hit("ENG-5", "started"),
+            hit("ENG-6", "completed"),
+          ],
+          truncated: false,
+        }),
+    }
+  );
+  assert.deepEqual(checked, ["ENG-5", "ENG-6"]);
+  assert.deepEqual(followed, [
+    { identifier: "ENG-6", runId, stateType: "completed" },
+  ]);
+  assert.equal("identifier" in filed && filed.identifier, "ENG-6");
+});
+
+test("a follow-up that Linear refuses fails the filing, so nothing tells the customer it was passed on", async (t) => {
+  t.mock.method(globalThis, "fetch", () =>
+    Promise.reject(new Error("unexpected transport"))
+  );
+  const { signal } = new AbortController();
+  const filed = await fileTicketFor(
+    scope,
+    { summary: "It broke again.", title: "Support" },
+    signal,
+    "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+    {
+      create: () => assert.fail("the conversation already has a ticket"),
+      followUp: () => Promise.reject(new Error("Linear did not create it.")),
+      owns: () => Promise.resolve(true),
+      readReceipt: async () => null,
+      refund: () => Promise.resolve(false),
+      saveReceipt: () => assert.fail("nothing was confirmed"),
+      search: () =>
+        Promise.resolve({
+          createdAfter: null,
+          issues: [hit("ENG-6", "started")],
+          truncated: false,
+        }),
+    }
+  );
+  assert.ok("error" in filed);
+});
