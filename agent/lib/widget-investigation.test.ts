@@ -5,7 +5,8 @@ import { isUnattended } from "./trust.js";
 import { verifiedWidgetContext as scope } from "./widget.fixture.js";
 import { composerInput, type GateResult } from "./widget-egress.js";
 import { WorkspaceAccessDenied } from "./widget-evidence.js";
-import { parseFindings, type WidgetFindings } from "./widget-findings.js";
+import type { WidgetFindings } from "./widget-findings.js";
+import { ANSWER_HERE } from "./widget-handoff.js";
 import {
   failWidgetRun,
   finishWidgetRun,
@@ -642,7 +643,7 @@ test("a confident knowledge-base route answers with citations and never starts a
   assert.equal(run.outcome?.reason, "kb");
 });
 
-test("a request to act skips the investigation, and an ask for a person hands off at once without one", async (t) => {
+test("a request to act skips the investigation, and an ask for a person is answered and files the ticket without one", async (t) => {
   enabled(t);
   const route = (lane: "investigate" | "human") => () =>
     Promise.resolve({
@@ -665,8 +666,17 @@ test("a request to act skips the investigation, and an ask for a person hands of
 
   const human = dependencies();
   human.deps.route = route("human");
-  human.deps.answerKb = () =>
-    assert.fail("an explicit ask for a person is not fast-laned");
+  human.deps.answerKb = () => Promise.resolve(kbAnswer);
+  const filed: unknown[] = [];
+  human.deps.fileTicket = (_scope, input) => {
+    filed.push(input);
+    return Promise.resolve({
+      existing: false,
+      identifier: "ENG-1",
+      refund: false,
+      url: "https://linear.app/acquisity/issue/ENG-1/x",
+    });
+  };
   const handed = await receiveWidgetMessage(
     request({ ...start, message_id: "bbbbbbbb-2222-4222-8222-bbbbbbbbbbbb" }),
     noWork(),
@@ -674,16 +684,12 @@ test("a request to act skips the investigation, and an ask for a person hands of
     verify,
     human.deps
   );
-  const handedBody = (await handed.json()) as {
-    decision: string;
-    findings: { needsHuman: boolean };
-    message: string | null;
-  };
-  assert.equal(handedBody.decision, "block");
-  assert.equal(handedBody.message, null);
-  assert.equal(handedBody.findings.needsHuman, true);
+  const handedBody = (await handed.json()) as Record<string, unknown>;
+  assert.equal(handedBody.decision, "allow");
+  assert.equal(handedBody.message, `${kbAnswer.message}\n\n${ANSWER_HERE}`);
+  assert.equal(filed.length, 1);
   assert.deepEqual(human.gated, []);
-  assert.equal(human.run.outcome?.reason, "asked_for_human");
+  assert.equal(human.run.outcome?.reason, "ticket_instead_of_handoff");
 });
 
 test("a member or client is answered in help-center mode, never investigated", async (t) => {
@@ -726,18 +732,48 @@ test("a member or client is answered in help-center mode, never investigated", a
       source: "jev",
       ticket: true,
     });
-  const redirected = await receiveWidgetMessage(
+  const memberFiled: { summary: string; title: string }[] = [];
+  refund.deps.fileTicket = (_scope, input) => {
+    memberFiled.push(input);
+    return Promise.resolve({
+      existing: false,
+      identifier: "ENG-1",
+      refund: true,
+      url: "https://linear.app/acquisity/issue/ENG-1/x",
+    });
+  };
+  const ticketed = await receiveWidgetMessage(
     request(start),
     noWork(),
     200,
     () => Promise.resolve({ ...scope, role: "member" }),
     refund.deps
   );
+  // A member cannot investigate, so the team gets the conversation's ticket.
+  assert.equal(
+    ((await ticketed.json()) as Record<string, unknown>).message,
+    ANSWER_HERE
+  );
+  assert.equal(refund.run.outcome?.reason, "ticket_instead_of_handoff");
+  assert.equal(memberFiled.length, 1);
+  assert.ok(memberFiled[0].summary.includes("a workspace member"));
+
+  const unfiled = dependencies();
+  unfiled.deps.route = refund.deps.route;
+  unfiled.deps.fileTicket = () =>
+    Promise.resolve({ error: "Linear did not accept the ticket." });
+  const redirected = await receiveWidgetMessage(
+    request(start),
+    noWork(),
+    200,
+    () => Promise.resolve({ ...scope, role: "member" }),
+    unfiled.deps
+  );
   assert.equal(
     ((await redirected.json()) as Record<string, unknown>).message,
     REFUND_REDIRECT
   );
-  assert.equal(refund.run.outcome?.reason, "refund_redirect");
+  assert.equal(unfiled.run.outcome?.reason, "refund_redirect");
 
   const kb = dependencies();
   kb.deps.route = () =>
@@ -764,6 +800,8 @@ test("a member or client is answered in help-center mode, never investigated", a
       asksForHuman: 0.95,
       source: "jev",
     });
+  human.deps.answerKb = () => Promise.resolve(kbAnswer);
+  human.deps.fileTicket = refund.deps.fileTicket;
   await receiveWidgetMessage(
     request(start),
     noWork(),
@@ -771,7 +809,11 @@ test("a member or client is answered in help-center mode, never investigated", a
     () => Promise.resolve({ ...scope, role: "client" }),
     human.deps
   );
-  assert.equal(human.run.outcome?.reason, "asked_for_human");
+  assert.equal(human.run.outcome?.reason, "ticket_instead_of_handoff");
+  assert.equal(
+    human.run.outcome?.message,
+    `${kbAnswer.message}\n\n${ANSWER_HERE}`
+  );
 });
 
 test("a reply that cites nothing is delivered as the answer, with no gate and no session", async (t) => {
@@ -1025,7 +1067,7 @@ test("an owner or admin's refund or ticket request points to the magnifying glas
   }
 });
 
-test("with the guide lane on, a person, a refund or an owner's ticket request still bypasses it, and everything else gets its reply", async (t) => {
+test("with the guide lane on, a person, a refund or a ticket request bypasses the first draft, and everything else gets its reply", async (t) => {
   enabled(t);
   const human = () =>
     Promise.resolve({ asksForHuman: 0.95, source: "jev" as const });
@@ -1033,17 +1075,25 @@ test("with the guide lane on, a person, a refund or an owner's ticket request st
     Promise.resolve({ asksForHuman: 0, refund: true, source: "jev" as const });
   const ticket = () =>
     Promise.resolve({ asksForHuman: 0, source: "jev" as const, ticket: true });
-  for (const [role, route, message, reason] of [
-    ["owner", human, null, "asked_for_human"],
-    ["owner", refund, INVESTIGATE_REDIRECT, "investigate_redirect"],
-    ["admin", ticket, INVESTIGATE_REDIRECT, "investigate_redirect"],
-    ["member", refund, REFUND_REDIRECT, "refund_redirect"],
-    ["member", ticket, kbAnswer.message, "kb"],
-    ["owner", kbRoute, kbAnswer.message, "kb"],
+  const filedReply = `${kbAnswer.message}\n\n${ANSWER_HERE}`;
+  for (const [role, route, message, reason, aborted] of [
+    ["owner", human, filedReply, "ticket_instead_of_handoff", [true, false]],
+    ["owner", refund, INVESTIGATE_REDIRECT, "investigate_redirect", [true]],
+    ["admin", ticket, INVESTIGATE_REDIRECT, "investigate_redirect", [true]],
+    ["member", refund, ANSWER_HERE, "ticket_instead_of_handoff", [true]],
+    ["member", ticket, ANSWER_HERE, "ticket_instead_of_handoff", [true]],
+    ["owner", kbRoute, kbAnswer.message, "kb", [false]],
   ] as const) {
     const { deps, run } = dependencies();
     deps.route = route;
     deps.answerKb = () => assert.fail("the guide lane answers instead");
+    deps.fileTicket = () =>
+      Promise.resolve({
+        existing: false,
+        identifier: "ENG-1",
+        refund: false,
+        url: "https://linear.app/acquisity/issue/ENG-1/x",
+      });
     const signals: (AbortSignal | undefined)[] = [];
     deps.answerChat = (_ask, _log, _customer, signal) => {
       signals.push(signal);
@@ -1063,7 +1113,7 @@ test("with the guide lane on, a person, a refund or an owner's ticket request st
     // A draft the router sends elsewhere is aborted, never sent.
     assert.deepEqual(
       signals.map((signal) => signal?.aborted),
-      [reason !== "kb"]
+      aborted
     );
   }
 });
@@ -2346,18 +2396,16 @@ test("an owner or admin who turns on Investigate my workspace skips the front do
   );
 });
 
-test("a sticky investigation follow-up asking for a person hands off before any recording offer or session send", async (t) => {
+test("a sticky investigation follow-up asking for a person whose ticket cannot be filed still investigates, with no note", async (t) => {
   enabled(t);
   const { deps, run } = dependencies();
   deps.route = () =>
     Promise.resolve({
       asksForHuman: 0.99,
-      bug: true,
-      recording: true,
       source: "jev",
     });
-  deps.requestRecording = () =>
-    assert.fail("a human request must not offer a recording");
+  deps.fileTicket = () =>
+    Promise.resolve({ error: "Linear did not accept the ticket." });
   const { args, sends } = startedSessions();
   const response = await receiveWidgetMessage(
     request({
@@ -2371,9 +2419,9 @@ test("a sticky investigation follow-up asking for a person hands off before any 
     deps
   );
   assert.equal(response.status, 200);
-  assert.equal(sends.length, 0);
-  assert.equal(run.outcome?.reason, "asked_for_human");
-  assert.equal(parseFindings(run.findings)?.needsHuman, true);
+  assert.equal(sends.length, 1);
+  assert.ok(!sends[0].includes("already filed or reused"));
+  assert.notEqual(run.outcome?.reason, "asked_for_human");
 });
 
 test("Investigate my workspace from a member, or an owner the live database no longer backs, gets a help-center answer, and an unknown mode is refused", async (t) => {
@@ -2512,8 +2560,8 @@ const closedHours = {
   showReplyTime: true,
   timeZone: "America/New_York",
 };
-const AWAY =
-  "Our team is away right now. We're back Monday, Oct 19 at 9:00 AM EDT, and a teammate will pick this up then.";
+const INVITE =
+  "Tell me what you need help with and I'll try to sort it out now. Anything I can't, I'll pass to our team, and their answer will come here in this chat.";
 const asksForPerson = () =>
   Promise.resolve({ asksForHuman: 0.95, source: "jev" as const });
 /** Records each code-filed ticket; `fails` makes Linear refuse it. */
@@ -2538,31 +2586,39 @@ const ticketFiler = (fails = false) => {
   return { filed, fileTicket };
 };
 
-test("after hours, an ask for a person is answered with the back-at line and files the ticket instead of handing off", async (t) => {
+test("an ask for a person, at any hour, is answered and files the conversation's ticket instead of handing off", async (t) => {
   enabled(t);
-  const { deps, run } = dependencies();
-  const { fileTicket, filed } = ticketFiler();
-  deps.route = asksForPerson;
-  deps.fileTicket = fileTicket;
-  deps.answerChat = () => Promise.resolve(kbAnswer);
-  const response = await receiveWidgetMessage(
-    request({ ...start, question: "Can I talk to a person?" }),
-    noWork(),
-    200,
-    () => Promise.resolve({ ...scope, officeHours: closedHours }),
-    deps
-  );
-  const body = (await response.json()) as Record<string, unknown>;
-  assert.equal(body.decision, "allow");
-  assert.equal(body.message, `${kbAnswer.message}\n\n${AWAY}`);
-  assert.equal(body.findings, undefined);
-  assert.equal(run.outcome?.reason, "after_hours_ticket");
-  assert.equal(filed.length, 1);
-  assert.ok(filed[0].summary.includes("Can I talk to a person?"));
-  assert.ok(filed[0].summary.includes("Connect your calendar first"));
+  for (const officeHours of [
+    closedHours,
+    { ...closedHours, open: true },
+    undefined,
+  ]) {
+    const { deps, run } = dependencies();
+    const { fileTicket, filed } = ticketFiler();
+    deps.route = asksForPerson;
+    deps.fileTicket = fileTicket;
+    deps.answerChat = () => Promise.resolve(kbAnswer);
+    // biome-ignore lint/performance/noAwaitInLoops: each case needs its own fresh run.
+    const response = await receiveWidgetMessage(
+      request({ ...start, question: "Can I talk to a person?" }),
+      noWork(),
+      200,
+      () =>
+        Promise.resolve({ ...scope, ...(officeHours ? { officeHours } : {}) }),
+      deps
+    );
+    const body = (await response.json()) as Record<string, unknown>;
+    assert.equal(body.decision, "allow");
+    assert.equal(body.message, `${kbAnswer.message}\n\n${ANSWER_HERE}`);
+    assert.equal(body.findings, undefined);
+    assert.equal(run.outcome?.reason, "ticket_instead_of_handoff");
+    assert.equal(filed.length, 1);
+    assert.ok(filed[0].summary.includes("Can I talk to a person?"));
+    assert.ok(filed[0].summary.includes("Connect your calendar first"));
+  }
 });
 
-test("a question about when a person is available gets the team's schedule in the writer's note, and after hours the away line follows the answer", async (t) => {
+test("a question about when a person is available gets the team's schedule in the writer's note, and the answer-comes-here line follows the answer", async (t) => {
   enabled(t);
   const schedule = {
     hoursText: ["Monday–Friday: 9:00 AM–5:00 PM"],
@@ -2598,18 +2654,18 @@ test("a question about when a person is available gets the team's schedule in th
     );
     const body = (await response.json()) as Record<string, unknown>;
     const note = notes.at(-1);
+    assert.equal(body.message, `${kbAnswer.message}\n\n${ANSWER_HERE}`);
     if (scheduled) {
       assert.ok(note?.includes("Monday–Friday: 9:00 AM–5:00 PM"));
       assert.ok(note?.includes("Eastern Time"));
       assert.ok(note?.includes("2026-11-26 (Thanksgiving): Closed all day"));
-      assert.equal(body.message, `${kbAnswer.message}\n\n${AWAY}`);
     } else {
       assert.ok(notes.every((n) => n === undefined));
     }
   }
 });
 
-test("after hours, an ask for a person that states no need leads with the away line and an invitation, with no ticket, writer, or sources", async (t) => {
+test("an ask for a person that states no need gets an invitation, with no ticket, writer, or sources", async (t) => {
   enabled(t);
   for (const mode of [undefined, "investigate"] as const) {
     const { deps, run } = dependencies();
@@ -2618,7 +2674,7 @@ test("after hours, an ask for a person that states no need leads with the away l
       Promise.resolve({ asksForHuman: 0.95, noNeed: true, source: "jev" });
     deps.fileTicket = fileTicket;
     deps.answerChat = (_ask, _log, customer) => {
-      assert.ok(!customer?.afterHoursPerson, "no after-hours writer runs");
+      assert.ok(!customer?.personAsked, "no person writer runs");
       return new Promise(() => undefined);
     };
     // biome-ignore lint/performance/noAwaitInLoops: each case needs its own fresh run.
@@ -2630,150 +2686,184 @@ test("after hours, an ask for a person that states no need leads with the away l
       }),
       noWork(),
       200,
-      () => Promise.resolve({ ...scope, officeHours: closedHours }),
+      verify,
       deps
     );
     const body = (await response.json()) as Record<string, unknown>;
     assert.equal(body.decision, "allow");
-    assert.equal(
-      body.message,
-      "Our team is away right now. We're back Monday, Oct 19 at 9:00 AM EDT. In the meantime, tell me what you need help with and I'll try to sort it out now."
-    );
+    assert.equal(body.message, INVITE);
     assert.deepEqual(run.outcome?.citations ?? [], []);
-    assert.equal(run.outcome?.reason, "after_hours_invite");
+    assert.equal(run.outcome?.reason, "person_invite");
     assert.equal(filed.length, 0);
   }
 });
 
-test("after hours, the away line is not repeated in a conversation that already has it, unless the back-at time changed", async (t) => {
+test("the answer-comes-here line is not repeated in a conversation that already has it", async (t) => {
   enabled(t);
-  const invite =
-    "Tell me what you need help with and I'll try to sort it out now.";
-  const earlier = (line: string) => [
-    { role: "customer" as const, text: "can i speak with human" },
-    {
-      role: "assistant" as const,
-      text: `${line.replace(", and a teammate will pick this up then.", ".")} In the meantime, ${invite[0].toLowerCase()}${invite.slice(1)}`,
-    },
-  ];
-  const moved = AWAY.replace("Monday, Oct 19", "Tuesday, Oct 20");
-  for (const [history, noNeed, expected] of [
-    [earlier(AWAY), false, kbAnswer.message],
-    [earlier(moved), false, `${kbAnswer.message}\n\n${AWAY}`],
-    [earlier(AWAY), true, invite],
-  ] as const) {
-    const { deps, run } = dependencies();
-    const { fileTicket, filed } = ticketFiler();
-    deps.route = () =>
-      Promise.resolve({ asksForHuman: 0.95, noNeed, source: "jev" as const });
-    deps.fileTicket = fileTicket;
-    deps.answerChat = () => Promise.resolve(kbAnswer);
-    // biome-ignore lint/performance/noAwaitInLoops: each case needs its own fresh run.
-    const response = await receiveWidgetMessage(
-      request({
-        ...start,
-        history,
-        question: "What are the times a human is available?",
-      }),
-      noWork(),
-      200,
-      () => Promise.resolve({ ...scope, officeHours: closedHours }),
-      deps
-    );
-    const body = (await response.json()) as Record<string, unknown>;
-    assert.equal(body.message, expected);
-    assert.equal(
-      run.outcome?.reason,
-      noNeed ? "after_hours_invite" : "after_hours_ticket"
-    );
-    assert.equal(filed.length, noNeed ? 0 : 1);
-  }
-});
-
-test("an ask for a person still hands off in office hours, with no office hours sent, or when the after-hours ticket fails", async (t) => {
-  enabled(t);
-  for (const [officeHours, fails] of [
+  for (const [history, expected] of [
     [
-      { ...closedHours, nextOpenAt: null, nextOpenText: null, open: true },
-      false,
+      [
+        { role: "customer" as const, text: "can i speak with human" },
+        { role: "assistant" as const, text: `Sure. ${ANSWER_HERE}` },
+      ],
+      kbAnswer.message,
     ],
-    [undefined, false],
-    [closedHours, true],
+    [
+      [{ role: "customer" as const, text: "can i speak with human" }],
+      `${kbAnswer.message}\n\n${ANSWER_HERE}`,
+    ],
   ] as const) {
-    const { deps, run } = dependencies();
-    const { fileTicket, filed } = ticketFiler(fails);
+    const { deps } = dependencies();
+    const { fileTicket, filed } = ticketFiler();
     deps.route = asksForPerson;
     deps.fileTicket = fileTicket;
     deps.answerChat = () => Promise.resolve(kbAnswer);
     // biome-ignore lint/performance/noAwaitInLoops: each case needs its own fresh run.
     const response = await receiveWidgetMessage(
-      request({ ...start, question: "Can I talk to a person?" }),
+      request({ ...start, history, question: "a person please" }),
       noWork(),
       200,
-      () =>
-        Promise.resolve({ ...scope, ...(officeHours ? { officeHours } : {}) }),
+      verify,
       deps
     );
     const body = (await response.json()) as Record<string, unknown>;
-    assert.equal(body.decision, "block");
-    assert.equal(run.outcome?.reason, "asked_for_human");
-    assert.equal(filed.length, fails ? 1 : 0);
+    assert.equal(body.message, expected);
+    assert.equal(filed.length, 1);
   }
 });
 
-test("after hours, findings that need a person file the ticket, and the gated reply says when the team is back", async () => {
-  const finish = async (officeHours?: typeof closedHours) => {
-    const { deps, gated, run } = dependencies();
-    const { fileTicket, filed } = ticketFiler();
-    run.scope = { ...scope, ...(officeHours ? { officeHours } : {}) };
-    deps.extract = () => Promise.resolve({ ...findings, needsHuman: true });
-    deps.fileTicket = fileTicket;
-    await finishWidgetRun(
-      run,
-      "widget-session-away",
-      { findings: null, status: "completed", text: "Needs a person." },
-      deps
-    );
-    return { filed, gated: gated as WidgetFindings[], run };
-  };
-  const away = await finish(closedHours);
-  assert.equal(away.gated[0]?.needsHuman, false);
-  assert.equal(away.run.outcome?.message, `${allowed.message}\n\n${AWAY}`);
-  assert.equal(away.run.outcome?.reason, "after_hours_ticket in scope");
-  assert.equal(away.filed.length, 1);
-  assert.ok(
-    away.filed[0].summary.includes("Why did my campaign stop sending?")
+test("an ask for a person whose ticket cannot be filed falls back to the asked_for_human block", async (t) => {
+  enabled(t);
+  const { deps, run } = dependencies();
+  const { fileTicket, filed } = ticketFiler(true);
+  deps.route = asksForPerson;
+  deps.fileTicket = fileTicket;
+  deps.answerChat = () => Promise.resolve(kbAnswer);
+  const response = await receiveWidgetMessage(
+    request({ ...start, question: "Can I talk to a person?" }),
+    noWork(),
+    200,
+    verify,
+    deps
   );
-  // In office hours the findings still ask for a person, as before.
-  const open = await finish({ ...closedHours, open: true });
-  assert.equal(open.gated[0]?.needsHuman, true);
-  assert.equal(open.run.outcome?.message, allowed.message);
-  assert.equal(open.filed.length, 0);
+  const body = (await response.json()) as Record<string, unknown>;
+  assert.equal(body.decision, "block");
+  assert.equal(run.outcome?.reason, "asked_for_human");
+  assert.equal(filed.length, 1);
 });
 
-test("after hours, a blocked reply stays blocked with no away line", async () => {
-  const { deps, run } = dependencies({
-    decision: "block",
-    findings,
-    message: null,
-    reason: "model_gate:unsafe",
-  });
-  const { fileTicket } = ticketFiler();
-  run.scope = { ...scope, officeHours: closedHours };
+test("findings that need a person file the ticket, and the gated reply says the answer will come here", async () => {
+  const { deps, gated, run } = dependencies();
+  const { fileTicket, filed } = ticketFiler();
   deps.extract = () => Promise.resolve({ ...findings, needsHuman: true });
   deps.fileTicket = fileTicket;
   await finishWidgetRun(
     run,
-    "widget-session-away",
+    "widget-session-ticket",
     { findings: null, status: "completed", text: "Needs a person." },
     deps
   );
-  assert.equal(run.outcome?.decision, "block");
-  assert.equal(run.outcome?.message, null);
-  assert.equal(run.outcome?.reason, "model_gate:unsafe");
+  assert.equal((gated as WidgetFindings[])[0]?.needsHuman, false);
+  assert.equal(run.outcome?.message, `${allowed.message}\n\n${ANSWER_HERE}`);
+  assert.equal(run.outcome?.reason, "ticket_instead_of_handoff in scope");
+  assert.equal(filed.length, 1);
+  assert.ok(filed[0].summary.includes("Why did my campaign stop sending?"));
 });
 
-test("after hours, a toggled ask for a person files the ticket and still investigates", async (t) => {
+test("a blocked or failed finish files the ticket and says the answer will come here; a retryable block, a teammate's run and an unfiled ticket stay blocked", async () => {
+  const finish = async (
+    reason: string,
+    {
+      fails = false,
+      inbox = false,
+      outcome = {
+        findings: null,
+        status: "completed",
+        text: "Needs a person.",
+      } as Parameters<typeof finishWidgetRun>[2],
+    } = {}
+  ) => {
+    const { deps, run } = dependencies({
+      decision: "block",
+      findings,
+      message: null,
+      reason,
+    });
+    const { fileTicket, filed } = ticketFiler(fails);
+    if (inbox) {
+      run.scope = { ...scope, source: "inbox" };
+    }
+    deps.extract = () => Promise.resolve(findings);
+    deps.fileTicket = fileTicket;
+    await finishWidgetRun(run, "widget-session-block", outcome, deps);
+    return { filed, run };
+  };
+  const blocked = await finish("model_gate:unsafe");
+  assert.equal(blocked.run.outcome?.decision, "allow");
+  assert.equal(blocked.run.outcome?.message, ANSWER_HERE);
+  assert.equal(
+    blocked.run.outcome?.reason,
+    "ticket_instead_of_handoff model_gate:unsafe"
+  );
+  assert.deepEqual((blocked.run.findings as WidgetFindings).ticket, {
+    id: "ENG-1",
+    url: "https://linear.app/acquisity/issue/ENG-1/x",
+  });
+  assert.equal((blocked.run.findings as WidgetFindings).needsHuman, false);
+  assert.ok(blocked.filed[0].summary.includes("model_gate:unsafe"));
+
+  const failed = await finish("", { outcome: { status: "failed" } });
+  assert.equal(failed.run.outcome?.decision, "allow");
+  assert.equal(failed.run.outcome?.message, ANSWER_HERE);
+  assert.equal(
+    failed.run.outcome?.reason,
+    "ticket_instead_of_handoff session_failed"
+  );
+
+  for (const [reason, options] of [
+    ["gate_unavailable", {}],
+    ["model_gate:unsafe", { inbox: true }],
+    ["model_gate:unsafe", { fails: true }],
+  ] as const) {
+    // biome-ignore lint/performance/noAwaitInLoops: each case needs its own fresh run.
+    const kept = await finish(reason, options);
+    assert.equal(kept.run.outcome?.decision, "block");
+    assert.equal(kept.run.outcome?.reason, reason);
+    assert.equal(kept.filed.length, "fails" in options ? 1 : 0);
+  }
+});
+
+test("an overdue investigation files the ticket instead of asking for a resend", async (t) => {
+  enabled(t);
+  const { deps, run } = dependencies();
+  const { fileTicket, filed } = ticketFiler();
+  deps.fileTicket = fileTicket;
+  run.session_id = "widget-session-old";
+  run.created_at = new Date(Date.now() - WIDGET_DEADLINE_MS - 1000);
+  const result = await receiveWidgetMessage(
+    request({
+      action: "result",
+      conversation_id: scope.conversationId,
+      organization_id: scope.organizationId,
+      run_id: runId,
+    }),
+    {
+      attachSession: () => session([], "widget-session-old"),
+      ...noWork(),
+    },
+    5,
+    verify,
+    deps
+  );
+  const body = await result.json();
+  assert.equal(body.decision, "allow");
+  assert.equal(body.message, ANSWER_HERE);
+  assert.equal(body.retry, undefined);
+  assert.equal(run.outcome?.reason, "ticket_instead_of_handoff deadline");
+  assert.equal(filed.length, 1);
+});
+
+test("a toggled ask for a person files the ticket and still investigates", async (t) => {
   enabled(t);
   const { deps, run } = dependencies();
   const { fileTicket, filed } = ticketFiler();
@@ -2784,18 +2874,17 @@ test("after hours, a toggled ask for a person files the ticket and still investi
     request({ ...investigate, question: "Can I talk to a person please?" }),
     args,
     200,
-    () => Promise.resolve({ ...scope, officeHours: closedHours }),
+    verify,
     deps
   );
   assert.equal(filed.length, 1);
   assert.equal(sends.length, 1);
   assert.ok(sends[0].startsWith("Can I talk to a person please?"));
-  assert.ok(!sends[0].includes("set needsHuman true"));
   assert.ok(sends[0].includes("already filed or reused this conversation"));
   assert.notEqual(run.outcome?.reason, "asked_for_human");
 });
 
-test("a persisted after-hours filing receipt appends the away line to resolved, eligibility-cleared, and clarify finishes", async (t) => {
+test("a persisted filing receipt appends the answer-comes-here line to resolved, eligibility-cleared, and clarify finishes", async (t) => {
   setEnv(t, "WIDGET_NEXT_ACTION", "jev");
   const receipt = {
     existing: false,
@@ -2805,7 +2894,6 @@ test("a persisted after-hours filing receipt appends the away line to resolved, 
   };
   for (const kind of ["resolved", "eligibility", "clarify"] as const) {
     const { deps, run } = dependencies();
-    run.scope = { ...scope, officeHours: closedHours };
     // A fresh poll reconstructs this run from its persisted findings JSON.
     run.findings = { ticketReceipt: receipt };
     deps.extract = () =>
@@ -2816,7 +2904,7 @@ test("a persisted after-hours filing receipt appends the away line to resolved, 
     // biome-ignore lint/performance/noAwaitInLoops: each branch uses its own run and mocks.
     await finishWidgetRun(
       run,
-      "session-away",
+      "session-filed",
       {
         findings: null,
         status: "completed",
@@ -2825,62 +2913,39 @@ test("a persisted after-hours filing receipt appends the away line to resolved, 
       },
       deps
     );
-    assert.equal(run.outcome?.message, `${allowed.message}\n\n${AWAY}`);
+    assert.equal(run.outcome?.message, `${allowed.message}\n\n${ANSWER_HERE}`);
     assert.equal((run.findings as WidgetFindings).needsHuman, false);
   }
 });
 
-test("a confirmed after-hours refund adds the availability line without another write and leaves blocked replies blocked", async () => {
-  for (const kind of ["time", "hidden", "blocked"] as const) {
-    const { deps, run } = dependencies(
-      kind === "blocked"
-        ? { ...allowed, decision: "block", message: null }
-        : allowed
-    );
-    run.scope = {
-      ...scope,
-      officeHours: { ...closedHours, showReplyTime: kind !== "hidden" },
-    };
-    deps.extract = () => Promise.resolve({ ...findings, needsHuman: true });
-    deps.fileTicket = () => assert.fail("a confirmed refund is already filed");
-    // biome-ignore lint/performance/noAwaitInLoops: each gate result is tested separately.
-    await finishWidgetRun(
-      run,
-      "session-refund-away",
-      {
-        findings: null,
-        status: "completed",
-        text: "Refund filed.",
-        ticket: {
-          id: "ENG-42",
-          refund: true,
-          url: "https://linear.app/acquisity/issue/ENG-42/refund",
-        },
+test("a confirmed refund ticket adds the answer-comes-here line without another write", async () => {
+  const { deps, run } = dependencies(allowed);
+  deps.extract = () => Promise.resolve({ ...findings, needsHuman: true });
+  deps.fileTicket = () => assert.fail("a confirmed refund is already filed");
+  await finishWidgetRun(
+    run,
+    "session-refund",
+    {
+      findings: null,
+      status: "completed",
+      text: "Refund filed.",
+      ticket: {
+        id: "ENG-42",
+        refund: true,
+        url: "https://linear.app/acquisity/issue/ENG-42/refund",
       },
-      deps
-    );
-    const expected =
-      kind === "time"
-        ? AWAY
-        : "Our team is away right now, and a teammate will pick this up when they're back.";
-    assert.equal(
-      run.outcome?.message,
-      kind === "blocked" ? null : `${allowed.message}\n\n${expected}`
-    );
-    assert.equal((run.findings as WidgetFindings).needsHuman, false);
-    assert.equal((run.findings as WidgetFindings).ticket?.id, "ENG-42");
-    assert.equal(run.outcome?.decision, kind === "blocked" ? "block" : "allow");
-  }
+    },
+    deps
+  );
+  assert.equal(run.outcome?.message, `${allowed.message}\n\n${ANSWER_HERE}`);
+  assert.equal((run.findings as WidgetFindings).needsHuman, false);
+  assert.equal((run.findings as WidgetFindings).ticket?.id, "ENG-42");
+  assert.equal(run.outcome?.decision, "allow");
 });
 
-test("only a closed-hours explicit-person route restarts the guide draft with the server notification note", async (t) => {
+test("only an explicit-person route restarts the guide draft with the server's person note", async (t) => {
   enabled(t);
-  for (const kind of [
-    "closed-person",
-    "open-person",
-    "absent-person",
-    "closed-question",
-  ] as const) {
+  for (const kind of ["person", "question"] as const) {
     const { deps } = dependencies();
     const customers: (KbCustomer | undefined)[] = [];
     deps.answerChat = (_ask, _log, customer) => {
@@ -2889,26 +2954,12 @@ test("only a closed-hours explicit-person route restarts the guide draft with th
     };
     deps.route = () =>
       Promise.resolve({
-        asksForHuman: kind === "closed-question" ? 0 : 0.95,
+        asksForHuman: kind === "question" ? 0 : 0.95,
         source: "jev" as const,
       });
     deps.fileTicket = ticketFiler().fileTicket;
     // biome-ignore lint/performance/noAwaitInLoops: compare each route's writer inputs independently.
-    await receiveWidgetMessage(
-      request(start),
-      noWork(),
-      200,
-      () =>
-        Promise.resolve({
-          ...scope,
-          ...(kind === "absent-person"
-            ? {}
-            : {
-                officeHours: { ...closedHours, open: kind === "open-person" },
-              }),
-        }),
-      deps
-    );
+    await receiveWidgetMessage(request(start), noWork(), 200, verify, deps);
     const ordinary = {
       canInvestigate: true,
       role: scope.role,
@@ -2916,25 +2967,79 @@ test("only a closed-hours explicit-person route restarts the guide draft with th
     };
     assert.deepEqual(
       customers,
-      kind === "closed-person"
-        ? [ordinary, { ...ordinary, afterHoursPerson: true }]
+      kind === "person"
+        ? [ordinary, { ...ordinary, personAsked: true }]
         : [ordinary]
     );
   }
 });
 
-test("an unreadable after-hours receipt still returns the allowed reply", async () => {
+test("an unreadable filing receipt still returns the allowed reply", async () => {
   const { deps, run } = dependencies();
-  run.scope = { ...scope, officeHours: closedHours };
   deps.readTicket = () => Promise.reject(new Error("db down"));
   await finishWidgetRun(
     run,
-    "session-away",
+    "session-receipt",
     { findings: null, status: "completed", text: "Done." },
     deps
   );
   assert.equal(run.outcome?.decision, allowed.decision);
   assert.equal(run.outcome?.message, allowed.message);
+});
+
+test("a follow-up carries the note on the conversation's ticket to the writer and the investigator; a first message reads none", async (t) => {
+  enabled(t);
+  const note = "This conversation already has a ticket with the support team.";
+  const history = [
+    { role: "customer" as const, text: "my campaign stopped" },
+    { role: "assistant" as const, text: ANSWER_HERE },
+  ];
+  const kb = dependencies();
+  const reads: string[] = [];
+  kb.deps.ticketNote = (verified) => {
+    reads.push(verified.conversationId);
+    return Promise.resolve(note);
+  };
+  const customers: (KbCustomer | undefined)[] = [];
+  kb.deps.answerChat = (_ask, _log, customer) => {
+    customers.push(customer);
+    return Promise.resolve(kbAnswer);
+  };
+  kb.deps.route = kbRoute;
+  await receiveWidgetMessage(
+    request({ ...start, history, question: "any news?" }),
+    noWork(),
+    200,
+    verify,
+    kb.deps
+  );
+  assert.equal(customers.at(-1)?.ticketNote, note);
+  await receiveWidgetMessage(
+    request({
+      ...start,
+      message_id: "cccccccc-3333-4333-8333-cccccccccccc",
+      question: "first message",
+    }),
+    noWork(),
+    200,
+    verify,
+    kb.deps
+  );
+  assert.equal(reads.length, 1);
+
+  const looked = dependencies();
+  looked.deps.ticketNote = () => Promise.resolve(note);
+  const { args, sends } = startedSessions();
+  await receiveWidgetMessage(
+    request({ ...investigate, history, question: "any news?" }),
+    args,
+    200,
+    verify,
+    looked.deps
+  );
+  assert.ok(
+    sends[0].includes(`NOTE FROM THE APP, not written by the customer: ${note}`)
+  );
 });
 
 const CITES_TRACE = /evidence reference/u;

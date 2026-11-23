@@ -1,7 +1,4 @@
-import { createHash } from "node:crypto";
-import { getToken as getConnectToken } from "@vercel/connect";
 import { generateObject } from "ai";
-import { callLinearGraphQL } from "eve/channels/linear";
 import { z } from "zod";
 import {
   collectRows,
@@ -25,6 +22,7 @@ import {
   conversationTicket,
   fileTicketFor,
 } from "./widget-ticket.js";
+import { commentIdFor, linearAppRequest } from "./widget-ticket-followup.js";
 
 /**
  * Acquisity's "I found a bug" steps (ENG-17031). The app asks for the details
@@ -67,7 +65,6 @@ const READ_OPTIONS = { maxBytes: 64 * 1024, timeoutMs: 20_000 };
 /** Every lookup together; a slow source is reported unchecked and the ticket is still filed. */
 const EVIDENCE_MS = 45_000;
 const DRAFT_MS = 20_000;
-const LINEAR_MS = 15_000;
 
 const clip = (text: string, max: number) =>
   text.length > max ? `${text.slice(0, max - 1)}…` : text;
@@ -659,38 +656,28 @@ export async function fileBugReport(
 }
 
 /** A fixed comment id per request, so Linear refuses a second comment for the same message. */
-export const additionCommentId = (messageId: string) => {
-  const hex = createHash("sha256")
-    .update(`widget-bug-addition:${messageId}`)
-    .digest("hex");
-  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-4${hex.slice(13, 16)}-${"89ab"[Number.parseInt(hex[16], 16) % 4]}${hex.slice(17, 20)}-${hex.slice(20, 32)}`;
-};
+export const additionCommentId = (messageId: string) =>
+  commentIdFor(`widget-bug-addition:${messageId}`);
 
 const COMMENT_MUTATION = `mutation WidgetBugAddition($input: CommentCreateInput!) {
   commentCreate(input: $input) { success }
 }`;
 
-/** One comment with Foreman's own Linear app token: the widget toolkit's only Linear write is the ticket itself. */
+/** One comment with Foreman's own Linear app token. */
 export async function commentOnTicket(
   identifier: string,
   body: string,
   id: string,
   signal: AbortSignal
 ): Promise<void> {
-  const token = await getConnectToken(
-    process.env.LINEAR_CONNECTOR ?? "linear/foreman-agent",
-    { scopes: ["read", "write", "comments:create"], subject: { type: "app" } }
-  );
-  const timed = AbortSignal.any([signal, AbortSignal.timeout(LINEAR_MS)]);
-  const created = await callLinearGraphQL<{
+  const created = await linearAppRequest<{
     commentCreate: { success: boolean };
-  }>({
-    api: { fetch: (url, init) => fetch(url, { ...init, signal: timed }) },
-    credentials: { accessToken: token },
-    query: COMMENT_MUTATION,
-    queryName: "WidgetBugAddition",
-    variables: { input: { body, id, issueId: identifier } },
-  });
+  }>(
+    "WidgetBugAddition",
+    COMMENT_MUTATION,
+    { input: { body, id, issueId: identifier } },
+    signal
+  );
   if (!created.commentCreate.success) {
     throw new Error("Linear did not create the comment.");
   }

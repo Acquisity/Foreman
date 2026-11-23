@@ -34,6 +34,7 @@ import {
   type WidgetContext,
   widgetAuth,
 } from "./widget-scope.js";
+import { followUpOnTicket, ticketNote } from "./widget-ticket-followup.js";
 
 /** REFUND_TICKET.project (P-ENG-20, "Support") as the id Linear returns for an issue's project. */
 const SUPPORT_PROJECT_ID = "4534deb2-6bbc-4e30-ad38-48963f414d14";
@@ -91,6 +92,7 @@ export type WidgetTicketResult = WidgetTicketReceipt | { error: string };
 
 const ticketDependencies = {
   create: createWidgetTicket,
+  followUp: followUpOnTicket,
   readReceipt: readWidgetTicketReceipt,
   refund: isRefundTicket,
   saveReceipt: saveWidgetTicketReceipt,
@@ -126,9 +128,32 @@ export interface WidgetTicketInput {
 }
 
 /**
+ * The conversation's existing ticket, for a turn that needs the team again:
+ * it lands on the ticket its owner already holds. Without a run there is no
+ * fixed comment id, so nothing is added.
+ */
+async function reuseTicket(
+  ctx: ProviderContext,
+  existing: RelatedIssue,
+  input: WidgetTicketInput,
+  refund: boolean,
+  runId: string | undefined,
+  followUp: typeof followUpOnTicket
+) {
+  if (runId) {
+    await followUp(existing, input.summary, runId, ctx.abortSignal);
+  }
+  const opts = { client: executorClient(ctx), signal: ctx.abortSignal };
+  return existingTicket(
+    existing,
+    refund && (await inRefundQueue(existing.identifier, opts))
+  );
+}
+
+/**
  * File this verified conversation's one ticket, or return the one it already
- * has. widget_file_ticket runs it in the investigator session; the after-hours
- * front door and the bug report run it with `appTicketContext` instead.
+ * has. widget_file_ticket runs it in the investigator session; the handoff
+ * rule and the bug report run it with `appTicketContext` instead.
  */
 export async function fileWidgetTicket(
   ctx: ProviderContext,
@@ -181,12 +206,8 @@ export async function fileWidgetTicket(
       : await deps.refund(input, ctx.abortSignal);
     const existing = await conversationTicket(ctx, deps.search);
     if (existing) {
-      const opts = { client: executorClient(ctx), signal: ctx.abortSignal };
       return await confirm(
-        existingTicket(
-          existing,
-          refund && (await inRefundQueue(existing.identifier, opts))
-        )
+        await reuseTicket(ctx, existing, input, refund, runId, deps.followUp)
       );
     }
     const result = await deps.create(ctx, {
@@ -247,3 +268,30 @@ export const fileTicketFor = (
   deps: Partial<typeof ticketDependencies> = {}
 ): Promise<WidgetTicketResult | typeof REPLAY_TICKET | typeof LIVE_TICKET> =>
   fileWidgetTicket(appTicketContext(scope, signal, runId), input, deps);
+
+const NOTE_MS = 5000;
+
+/**
+ * For a follow-up: the conversation's ticket, where it stands and the team's
+ * closing comment, as a server-owned note for the writers and the
+ * investigator. Null with no ticket, on a teammate's run, or when it cannot be
+ * read in time; a follow-up is answered without it rather than late.
+ */
+export async function conversationTicketNote(
+  scope: WidgetContext,
+  signal: AbortSignal
+): Promise<string | null> {
+  if (scope.source !== "widget" || isReplayActive() || isLiveActive()) {
+    return null;
+  }
+  const bounded = AbortSignal.any([signal, AbortSignal.timeout(NOTE_MS)]);
+  try {
+    const ticket = await conversationTicket(appTicketContext(scope, bounded));
+    return ticket ? await ticketNote(ticket.identifier, bounded) : null;
+  } catch (error) {
+    if (signal.aborted) {
+      throw error;
+    }
+    return null;
+  }
+}

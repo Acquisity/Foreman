@@ -4,10 +4,10 @@ import { fastCallOptions, modelFor, resolveModel } from "./models.js";
 import { logOpsEvent } from "./ops-log.js";
 import { WIDGET_VOICE } from "./widget-instructions.js";
 import {
-  AFTER_HOURS_WRITER_NOTE,
   hedged,
   type KbAnswer,
   type KbCustomer,
+  PERSON_WRITER_NOTE,
   resolveCitations,
 } from "./widget-kb.js";
 import {
@@ -80,7 +80,7 @@ ${PRODUCT_GUIDE}`;
 export interface ChatDeps {
   /** One model attempt: the streamed reply and when its first text arrived. */
   generate: (input: {
-    afterHoursPerson?: true;
+    personAsked?: true;
     messages: ChatMessage[];
     signal: AbortSignal;
   }) => Promise<ChatAttempt>;
@@ -88,9 +88,9 @@ export interface ChatDeps {
 
 const CHAT_FOLLOWUP_RULE =
   "Never promise that you, a person, a teammate or the team will look into, pick up or follow up on this message: nobody is notified.";
-export const chatPrompt = (afterHoursPerson?: true) =>
-  afterHoursPerson
-    ? CHAT_PROMPT.replace(CHAT_FOLLOWUP_RULE, AFTER_HOURS_WRITER_NOTE)
+export const chatPrompt = (personAsked?: true) =>
+  personAsked
+    ? CHAT_PROMPT.replace(CHAT_FOLLOWUP_RULE, PERSON_WRITER_NOTE)
     : CHAT_PROMPT;
 
 interface ChatMessage {
@@ -142,8 +142,9 @@ export function chatMessages(
       content: [
         `Note from the app, not written by the customer: ${JSON.stringify(note)}`,
         REMINDER,
-        ...(customer?.afterHoursPerson ? [AFTER_HOURS_WRITER_NOTE] : []),
+        ...(customer?.personAsked ? [PERSON_WRITER_NOTE] : []),
         ...(customer?.officeSchedule ? [customer.officeSchedule] : []),
+        ...(customer?.ticketNote ? [customer.ticketNote] : []),
         ...(note.role === "owner" || !ROLE_LIMITS
           ? []
           : [`Who can do what, from the guide:\n${ROLE_LIMITS}`]),
@@ -236,7 +237,7 @@ const chatFailure = (error: unknown) => {
 
 export const defaultChatDeps = {
   async generate(
-    { afterHoursPerson, messages, signal }: Parameters<ChatDeps["generate"]>[0],
+    { personAsked, messages, signal }: Parameters<ChatDeps["generate"]>[0],
     languageModel?: LanguageModel
   ) {
     const model =
@@ -251,7 +252,7 @@ export const defaultChatDeps = {
       maxRetries: 0,
       messages: [
         {
-          content: chatPrompt(afterHoursPerson),
+          content: chatPrompt(personAsked),
           // The stable prefix: Anthropic caches up to this breakpoint, and the
           // gateway turns on caching for providers that need it asked.
           providerOptions: {
@@ -327,7 +328,7 @@ export async function answerFromGuide(
       deps.generate({
         messages,
         signal: abortSignal,
-        ...(reader?.afterHoursPerson ? { afterHoursPerson: true } : {}),
+        ...(reader?.personAsked ? { personAsked: true } : {}),
       })
     );
     const { articles, numbered } = numberSlugs(

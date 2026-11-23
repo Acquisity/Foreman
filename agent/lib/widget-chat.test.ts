@@ -182,7 +182,7 @@ test("the guide's own words never reach the customer", () => {
   assert.equal(customerWords(glass), glass);
 });
 
-test("the guide writer's after-hours person note replaces the no-notification rule while its default prompt stays identical", async () => {
+test("the guide writer's person note replaces the no-notification rule while its default prompt stays identical", async () => {
   const { CHAT_PROMPT, chatPrompt } = await import("./widget-chat.js");
   assert.equal(chatPrompt(), CHAT_PROMPT);
   assert.ok(CHAT_PROMPT.includes("nobody is notified"));
@@ -196,8 +196,8 @@ test("the guide writer's after-hours person note replaces the no-notification ru
     "Where do I find the AI Consultant?",
     { conversationId: "c", runId: "r" },
     {
-      afterHoursPerson: true,
       canInvestigate: true,
+      personAsked: true,
       role: "owner",
       workspace: "Company One",
     },
@@ -209,10 +209,10 @@ test("the guide writer's after-hours person note replaces the no-notification ru
       },
     }
   );
-  assert.equal(calls[0].afterHoursPerson, true);
+  assert.equal(calls[0].personAsked, true);
   assert.ok(
     calls[0].messages[0].content.includes(
-      "Code handles filing this conversation"
+      "code files this conversation's ticket"
     )
   );
 });
