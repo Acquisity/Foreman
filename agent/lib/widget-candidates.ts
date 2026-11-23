@@ -1,6 +1,6 @@
 /**
- * The production widget runs `pnpm widget:live score` picks from, and the test and
- * internal workspaces it never picks.
+ * Production widget run rows that `pnpm widget:live score` picks its set from,
+ * and the test and internal workspaces it leaves out.
  */
 import { z } from "zod";
 import { widgetOutcomeSchema } from "./widget-run-store.js";
