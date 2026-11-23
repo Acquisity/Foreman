@@ -88,7 +88,7 @@ export const judgeRecordSchema = z
   });
 export type JudgeRecord = z.infer<typeof judgeRecordSchema>;
 
-/** Build the sample once; review, export and calibration consume this same record. */
+/** Build the sample once; the saved record and the review page both read this same record. */
 export function reviewedSample(
   name: string,
   recorded: WidgetCase,
