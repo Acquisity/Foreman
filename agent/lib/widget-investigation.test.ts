@@ -6,7 +6,7 @@ import { verifiedWidgetContext as scope } from "./widget.fixture.js";
 import { composerInput, type GateResult } from "./widget-egress.js";
 import { WorkspaceAccessDenied } from "./widget-evidence.js";
 import type { WidgetFindings } from "./widget-findings.js";
-import { ANSWER_HERE } from "./widget-handoff.js";
+import { ANSWER_HERE, UNFILED_LINE } from "./widget-handoff.js";
 import {
   failWidgetRun,
   finishWidgetRun,
@@ -3058,44 +3058,52 @@ test("a follow-up in a conversation that was filed gives the writer the status a
   );
 });
 
-test("a member or client who presses the magnifying glass or reports a bug gets the conversation's ticket with the answer", async (t) => {
+test("a member or client who presses the magnifying glass or reports a bug gets the conversation's ticket with the answer, or is told nothing was passed on", async (t) => {
   enabled(t);
-  for (const [mode, route] of [
-    ["investigate", kbRoute],
-    [
-      undefined,
-      () =>
-        Promise.resolve({ asksForHuman: 0, bug: true, source: "jev" as const }),
-    ],
-  ] as const) {
-    const { deps, run } = dependencies();
-    const { fileTicket, filed } = ticketFiler();
-    deps.route = route;
-    deps.fileTicket = fileTicket;
-    deps.verifyAccess = () => assert.fail("a member is never investigated");
-    const customers: (KbCustomer | undefined)[] = [];
-    deps.answerChat = (_ask, _log, customer) => {
-      customers.push(customer && { ...customer });
-      return Promise.resolve(kbAnswer);
-    };
-    // biome-ignore lint/performance/noAwaitInLoops: each case needs its own fresh run.
-    const response = await receiveWidgetMessage(
-      request({
-        ...start,
-        question: "My campaign stopped sending",
-        ...(mode ? { mode } : {}),
-      }),
-      noWork(),
-      200,
-      () => Promise.resolve({ ...scope, role: "member" }),
-      deps
-    );
-    const body = (await response.json()) as Record<string, unknown>;
-    assert.equal(body.message, `${kbAnswer.message}\n\n${ANSWER_HERE}`);
-    assert.equal(run.outcome?.reason, "ticket_instead_of_handoff");
-    assert.equal(filed.length, 1);
-    assert.ok(filed[0].summary.includes("a workspace member"));
-    assert.equal(customers.at(-1)?.ticketFiling, true);
+  const bugRoute = () =>
+    Promise.resolve({ asksForHuman: 0, bug: true, source: "jev" as const });
+  for (const role of ["member", "client"] as const) {
+    for (const [mode, route, fails] of [
+      ["investigate", kbRoute, false],
+      [undefined, bugRoute, false],
+      [undefined, bugRoute, true],
+    ] as const) {
+      const { deps, run } = dependencies();
+      const { fileTicket, filed } = ticketFiler(fails);
+      deps.route = route;
+      deps.fileTicket = fileTicket;
+      deps.verifyAccess = () => assert.fail("a member is never investigated");
+      const customers: (KbCustomer | undefined)[] = [];
+      deps.answerChat = (_ask, _log, customer) => {
+        customers.push(customer && { ...customer });
+        return Promise.resolve(kbAnswer);
+      };
+      // biome-ignore lint/performance/noAwaitInLoops: each case needs its own fresh run.
+      const response = await receiveWidgetMessage(
+        request({
+          ...start,
+          message_id: crypto.randomUUID(),
+          question: "My campaign stopped sending",
+          ...(mode ? { mode } : {}),
+        }),
+        noWork(),
+        200,
+        () => Promise.resolve({ ...scope, role }),
+        deps
+      );
+      const body = (await response.json()) as Record<string, unknown>;
+      assert.equal(
+        body.message,
+        `${kbAnswer.message}\n\n${fails ? UNFILED_LINE : ANSWER_HERE}`
+      );
+      assert.equal(
+        run.outcome?.reason,
+        fails ? "kb" : "ticket_instead_of_handoff"
+      );
+      assert.equal(filed.length, 1);
+      assert.ok(filed[0].summary.includes(`a workspace ${role}`));
+      assert.equal(customers.at(-1)?.ticketFiling, true);
+    }
   }
 });
 

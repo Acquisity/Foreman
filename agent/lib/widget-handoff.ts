@@ -25,6 +25,10 @@ const TICKET_TIMEOUT_MS = 30_000;
 export const ANSWER_HERE =
   "I've passed this to our team, and their answer will come here in this chat.";
 
+/** Fixed wording after an answer whose filing failed, so the customer knows nothing was passed on. */
+export const UNFILED_LINE =
+  "I couldn't pass this to our team just now. Send your message again and I'll try once more.";
+
 /** A customer's own turn. A teammate's inbox run is team-only and never files. */
 export const customerTurn = (scope: WidgetContext) => scope.source === "widget";
 
@@ -254,12 +258,17 @@ export const followUpNote = async (
   signal: AbortSignal,
   deps: Pick<WidgetDependencies, "ticketNote" | "wasFiled">
 ): Promise<TicketNote | null> => {
-  if (input.staff || !(deps.ticketNote && input.history?.length)) {
+  const investigating = input.mode === "investigate";
+  if (
+    input.staff ||
+    !deps.ticketNote ||
+    !(investigating || input.history?.length)
+  ) {
     return null;
   }
   const filed =
-    input.mode === "investigate" ||
-    input.history.some(
+    investigating ||
+    input.history?.some(
       (turn) =>
         turn.role === "assistant" &&
         FILED_REPLIES.some((line) => turn.text.includes(line))

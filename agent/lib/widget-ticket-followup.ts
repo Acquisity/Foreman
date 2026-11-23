@@ -186,7 +186,8 @@ const FIXY_COMMENTS = `query WidgetTicketComments($id: String!, $fixy: ID!) {
 
 const NOTE_MAX_CHARS = 1500;
 const URL = /\bhttps?:\/\/\S+/giu;
-const TICKET_ID = /\b(?:ENG|AIAA|SEL|SAN)-\d{1,7}\b/gu;
+// Any team key, since the egress gate refuses only ENG references.
+const TICKET_ID = /\b[A-Z][A-Z0-9]{1,9}-\d{1,9}\b/gu;
 const UUID =
   /\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/giu;
 

@@ -96,18 +96,24 @@ test("a reopen that fails writes no comment, and a retry after a failed comment 
     )
   );
   assert.ok(!stuck.sent.some(({ name }) => name === "WidgetTicketComment"));
-  // The reopen landed and the comment failed: the search now sees the ticket open.
+  // The reopen lands and the comment fails; the search then sees the ticket open.
   const refused = linear({
     WidgetTicketComment: { commentCreate: { success: false } },
+    WidgetTicketReopen: { issueUpdate: { success: true } },
+    WidgetTicketStates: states,
   });
   await assert.rejects(
     followUpOnTicket(
-      { identifier: "ENG-7", stateType: "unstarted" },
+      { identifier: "ENG-7", stateType: "completed" },
       "x",
       RUN,
       signal,
       refused.request
     )
+  );
+  assert.deepEqual(
+    refused.sent.map(({ name }) => name),
+    ["WidgetTicketStates", "WidgetTicketReopen", "WidgetTicketComment"]
   );
   const retried = linear(commented);
   await followUpOnTicket(
@@ -176,7 +182,7 @@ test("the investigator's note has Fixy's newest top-level reply with links, tick
       { body: FIXY_RUN_FINISHED, parent: null },
       { body: "A reply in a thread.", parent: { id: "p" } },
       {
-        body: "Fixed the sync for workspace 11111111-1111-4111-8111-111111111111 in ENG-9 https://github.com/x/y/pull/1 so sending resumes, UTF-8 intact.",
+        body: "Fixed the sync for workspace 11111111-1111-4111-8111-111111111111 in ENG-9 https://github.com/x/y/pull/1 so sending resumes. Also see AIAA-12 and OPS-123456789.",
         parent: null,
       },
       { body: "Old closing note.", parent: null },
@@ -185,9 +191,11 @@ test("the investigator's note has Fixy's newest top-level reply with links, tick
   const investigator = note?.forInvestigator ?? "";
   assert.ok(investigator.includes("it is done."));
   assert.ok(investigator.includes("Fixed the sync for workspace"));
-  assert.ok(investigator.includes("so sending resumes, UTF-8 intact."));
+  assert.ok(investigator.includes("so sending resumes."));
   for (const hidden of [
     "ENG-9",
+    "AIAA-12",
+    "OPS-123456789",
     "github.com",
     "11111111-",
     "Old closing",

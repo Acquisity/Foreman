@@ -30,6 +30,7 @@ import {
   TICKET_INSTEAD,
   ticketInsteadOfBlock,
   ticketInsteadOfHandoff,
+  UNFILED_LINE,
   UNFILED_PERSON_NOTE,
   withAnswerHere,
 } from "./widget-handoff.js";
@@ -1296,7 +1297,9 @@ const frontDoorTicketReason = (
   scope: WidgetContext,
   route: WidgetRoute,
   helpCenterOnly: boolean,
-  needsLook: boolean
+  needsLook: boolean,
+  /** No filer wired, as in a replay harness: a member's turn stays an ordinary answer. */
+  filer: boolean
 ): FrontDoorTicket | null => {
   if (!customerTurn(scope)) {
     return null;
@@ -1304,7 +1307,8 @@ const frontDoorTicketReason = (
   if (asksForPerson(route)) {
     return "person";
   }
-  return helpCenterOnly &&
+  return filer &&
+    helpCenterOnly &&
     (needsLook || route.bug || route.refund || route.ticket)
     ? "member"
     : null;
@@ -1364,7 +1368,7 @@ function frontDoorReplies(
     }
     return why === "person"
       ? requestedHumanHandoff(run, route, deps)
-      : complete(message, reason, citations);
+      : complete(`${message}\n\n${UNFILED_LINE}`, reason, citations);
   };
   return { complete, file, reply };
 }
@@ -1442,7 +1446,13 @@ async function answerFromKnowledgeBase(
     drafting.abort();
     return completeInvite(run, scope, deps);
   }
-  const why = frontDoorTicketReason(scope, route, helpCenterOnly, needsLook);
+  const why = frontDoorTicketReason(
+    scope,
+    route,
+    helpCenterOnly,
+    needsLook,
+    Boolean(deps.fileTicket)
+  );
   if (why && !(route.refund || route.ticket)) {
     // Only a turn that files and answers gets the notification exception. Every other draft is unchanged.
     drafting.abort();

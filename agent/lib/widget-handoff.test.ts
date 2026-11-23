@@ -111,7 +111,8 @@ test("a follow-up reads the ticket after a filing reply, the old after-hours pic
     ],
     [{ history: said("Here are the steps."), mode: "investigate" }, note],
     [{ history: said("Here are the steps.") }, null],
-    [{ mode: "investigate" }, null],
+    [{ mode: "investigate" }, note],
+    [{}, null],
     [{ history: said(ANSWER_HERE), staff: true }, null],
   ] as const;
   for (const [input, expected] of cases) {
@@ -129,7 +130,7 @@ test("a follow-up reads the ticket after a filing reply, the old after-hours pic
       expected
     );
   }
-  assert.equal(reads.length, 3);
+  assert.equal(reads.length, 4);
   // A filing older than the history the app sends is found in Foreman's runs.
   const filedEarlier: Parameters<typeof followUpNote>[3] = {
     ...deps,
@@ -157,5 +158,5 @@ test("a follow-up reads the ticket after a filing reply, the old after-hours pic
     ),
     null
   );
-  assert.equal(reads.length, 4);
+  assert.equal(reads.length, 5);
 });

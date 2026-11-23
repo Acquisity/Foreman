@@ -271,7 +271,8 @@ Plain text only, no markdown and no em dashes.`;
 
 /** REPLY_PROMPT's own next step for an answer the articles do not give. */
 const nextStep = (customer: KbCustomer | undefined) => {
-  if (customer?.glassOffered) {
+  // A filing turn already says where the team's answer will come.
+  if (customer?.glassOffered || customer?.ticketFiling) {
     return "Ask the one question that would help find the answer.";
   }
   return customer?.canInvestigate
@@ -281,7 +282,9 @@ const nextStep = (customer: KbCustomer | undefined) => {
 
 /** What REPLY_PROMPT itself tells the writer, so the check never trims it. */
 const promptFacts = (customer: KbCustomer | undefined) => [
-  ...(customer?.glassOffered ? [] : [nextStep(customer)]),
+  ...(customer?.glassOffered || customer?.ticketFiling
+    ? []
+    : [nextStep(customer)]),
   "Foreman, the writer, does not write or review copy, give strategy, or assess campaign performance, and says so.",
   "The AI Consultant is under the Chat toggle at the top of the left sidebar, for advice, strategy, copywriting and campaign performance reviews.",
   "Foreman cannot see the customer's account and cannot make changes; nobody makes changes on the customer's behalf, so the customer does the steps themselves.",
