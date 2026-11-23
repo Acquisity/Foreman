@@ -1,3 +1,8 @@
+// Acquisity's support endpoints (ENG-20283) as widget tools. The manifest is
+// Acquisity's `serializeForemanManifest()` output, copied into
+// widget-endpoint-manifest.ts by scripts/widget-endpoint-tools.ts; each session
+// is offered only the endpoints and sections the context route listed for the
+// asking user, and the endpoint re-checks that list itself.
 import type { SessionAuthContext } from "eve/context";
 import { z } from "zod";
 import { acquisityOrigin, readContextBody } from "./acquisity-origin.js";
@@ -11,13 +16,6 @@ import type {
 import type { CheckId } from "./widget-progress.js";
 import { requireWidgetContext } from "./widget-scope.js";
 
-/**
- * Acquisity's support endpoints (ENG-20283) as widget tools. The manifest is
- * Acquisity's `serializeForemanManifest()` output, copied into
- * widget-endpoint-manifest.ts by scripts/widget-endpoint-tools.ts; each
- * session is offered only the endpoints and sections the context route listed
- * for the asking user, and the endpoint re-checks that list itself.
- */
 /**
  * Areas whose hand-written tool still answers. Each stays off the menu until
  * its switch PR compares the two on real conversations and deletes the old

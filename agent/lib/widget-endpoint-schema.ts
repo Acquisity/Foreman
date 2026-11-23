@@ -1,10 +1,8 @@
+// The shape of Acquisity's `serializeForemanManifest()` (format 1,
+// `apps/web/lib/support/foreman-endpoints/manifest.ts`), and of the endpoint
+// list its context route returns per user (ENG-20296).
 import { z } from "zod";
 
-/**
- * The shape of Acquisity's `serializeForemanManifest()` (format 1,
- * `apps/web/lib/support/foreman-endpoints/manifest.ts`), and of the endpoint
- * list its context route returns per user.
- */
 const AREA = /^[a-z][a-z0-9-]{0,49}$/;
 const SECTION = /^[A-Za-z][A-Za-z0-9_]{0,63}$/;
 

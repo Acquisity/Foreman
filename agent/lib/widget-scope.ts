@@ -106,16 +106,9 @@ const stampedAttributes = z.object({
     .string()
     .max(16 * 1024)
     .optional()
-    .transform((text) => {
-      try {
-        return parseAvailableEndpoints(
-          text === undefined ? undefined : JSON.parse(text)
-        );
-      } catch {
-        // An unreadable stamp offers nothing, like an absent one.
-        return parseAvailableEndpoints(null);
-      }
-    }),
+    .transform((text) =>
+      text === undefined ? undefined : parseAvailableEndpoints(JSON.parse(text))
+    ),
 });
 
 export type WidgetContext = Readonly<z.infer<typeof widgetContextSchema>>;
