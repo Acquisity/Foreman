@@ -19,9 +19,11 @@ if (!key) {
 if (!(values.kind && values.kind in GENERATED_PR_KINDS && values.pr)) {
   throw new Error("Usage: --kind guide|tools --pr <Foreman PR URL>");
 }
-const { identifier, reused } = await fileOrReuseTicket(
+const { identifier, addedLabel, reused } = await fileOrReuseTicket(
   linearRequest(key),
   values.kind as GeneratedPrKind,
   values.pr
 );
-console.log(`${reused ? "Reused" : "Filed"} ${identifier} for ${values.pr}`);
+console.log(
+  `${reused ? "Reused" : "Filed"} ${identifier} for ${values.pr}${addedLabel ? "; added fixy" : ""}`
+);

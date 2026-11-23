@@ -31,6 +31,7 @@ export type LinearRequest = <T>(
 interface OpenTicket {
   id: string;
   identifier: string;
+  labels: { nodes: { id: string }[] };
   state: { type: string };
 }
 
@@ -54,41 +55,64 @@ export const ticketDescription = (kind: GeneratedPrKind, url: string): string =>
 
 const CLOSED_STATES = new Set(["completed", "canceled"]);
 
-// The ticket is found by the PR attachment, so a ticket a person moved, relabelled or retitled is still reused.
+const write = async (
+  linear: LinearRequest,
+  field: string,
+  query: string,
+  variables: Record<string, unknown>
+): Promise<void> => {
+  const result = await linear<Record<string, { success: boolean }>>(
+    query,
+    variables
+  );
+  if (!result[field]?.success) {
+    throw new Error(`Linear did not confirm ${field}`);
+  }
+};
+
+const addFixyLabel = (linear: LinearRequest, id: string, labelId: string) =>
+  write(
+    linear,
+    "issueAddLabel",
+    "mutation($id:String!,$label:String!){issueAddLabel(id:$id,labelId:$label){success}}",
+    { id, label: labelId }
+  );
+
+// The ticket is found by the PR attachment, so a ticket a person moved, relabelled or retitled is still reused. A
+// reused ticket without `fixy` gets it, so a label write that failed after the attachment is retried by the next run.
 export const fileOrReuseTicket = async (
   linear: LinearRequest,
   kind: GeneratedPrKind,
   url: string
-): Promise<{ identifier: string; reused: boolean }> => {
+): Promise<{ identifier: string; reused: boolean; addedLabel: boolean }> => {
   const title = ticketTitle(kind, url);
   const found = await linear<{
     attachmentsForURL: { nodes: { issue: OpenTicket | null }[] };
-  }>(
-    "query($url:String!){attachmentsForURL(url:$url){nodes{issue{id identifier state{type}}}}}",
-    { url }
-  );
-  const open = found.attachmentsForURL.nodes
-    .map((node) => node.issue)
-    .find((ticket) => ticket && !CLOSED_STATES.has(ticket.state.type));
-  if (open) {
-    return { identifier: open.identifier, reused: true };
-  }
-
-  const ids = await linear<{
     teams: { nodes: { id: string }[] };
     issueLabels: { nodes: { id: string; team: { id: string } | null }[] };
   }>(
-    "query($team:String!,$label:String!){teams(filter:{key:{eq:$team}}){nodes{id}} issueLabels(filter:{name:{eq:$label}}){nodes{id team{id}}}}",
-    { label: FIXY_LABEL, team: TEAM_KEY }
+    "query($url:String!,$team:String!,$label:String!){attachmentsForURL(url:$url){nodes{issue{id identifier state{type} labels{nodes{id}}}}} teams(filter:{key:{eq:$team}}){nodes{id}} issueLabels(filter:{name:{eq:$label}}){nodes{id team{id}}}}",
+    { label: FIXY_LABEL, team: TEAM_KEY, url }
   );
-  const teamId = ids.teams.nodes[0]?.id;
-  const labelId = ids.issueLabels.nodes.find(
+  const teamId = found.teams.nodes[0]?.id;
+  const labelId = found.issueLabels.nodes.find(
     (label) => !label.team || label.team.id === teamId
   )?.id;
   if (!(teamId && labelId)) {
     throw new Error(
       `Linear has no ${TEAM_KEY} team or no ${FIXY_LABEL} label for it`
     );
+  }
+
+  const open = found.attachmentsForURL.nodes
+    .map((node) => node.issue)
+    .find((ticket) => ticket && !CLOSED_STATES.has(ticket.state.type));
+  if (open) {
+    const addedLabel = !open.labels.nodes.some((label) => label.id === labelId);
+    if (addedLabel) {
+      await addFixyLabel(linear, open.id, labelId);
+    }
+    return { addedLabel, identifier: open.identifier, reused: true };
   }
 
   const created = await linear<{
@@ -98,7 +122,9 @@ export const fileOrReuseTicket = async (
     { input: { description: ticketDescription(kind, url), teamId, title } }
   );
   const { issue } = created.issueCreate;
-  await linear(
+  await write(
+    linear,
+    "attachmentCreate",
     "mutation($input:AttachmentCreateInput!){attachmentCreate(input:$input){success}}",
     {
       input: {
@@ -108,18 +134,15 @@ export const fileOrReuseTicket = async (
       },
     }
   );
-  await linear(
-    "mutation($id:String!,$label:String!){issueAddLabel(id:$id,labelId:$label){success}}",
-    { id: issue.id, label: labelId }
-  );
-  return { identifier: issue.identifier, reused: false };
+  await addFixyLabel(linear, issue.id, labelId);
+  return { addedLabel: true, identifier: issue.identifier, reused: false };
 };
 
 // A personal API key goes in the header as is; an OAuth or app token needs Bearer.
 export const linearRequest =
-  (key: string): LinearRequest =>
+  (key: string, fetchImpl: typeof fetch = fetch): LinearRequest =>
   async <T>(query: string, variables: Record<string, unknown>) => {
-    const response = await fetch(LINEAR_URL, {
+    const response = await fetchImpl(LINEAR_URL, {
       body: JSON.stringify({ query, variables }),
       headers: {
         Authorization: key.startsWith("lin_api_") ? key : `Bearer ${key}`,
