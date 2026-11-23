@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { type Candidate, parseExcludedOrgs } from "./widget-candidates.js";
+import { type CandidateRow, parseExcludedOrgs } from "./widget-candidates.js";
 import { type WidgetCase, widgetCaseSchema } from "./widget-case.js";
 import { parseFindings } from "./widget-findings.js";
 import {
@@ -69,7 +69,7 @@ export const topicOf = (question: string): Topic =>
   "other";
 
 /** The original reply admitted something it could not check, or only asked a clarifying question. */
-export function admitsOrAsks(row: Candidate["turns"][number]) {
+export function admitsOrAsks(row: CandidateRow) {
   const reply = row.outcome?.message ?? "";
   const findings = parseFindings(row.findings);
   return (
@@ -86,10 +86,10 @@ export function admitsOrAsks(row: Candidate["turns"][number]) {
  * it has `count`, since a stream can expire or fail between pick and read.
  */
 export function rankSet(
-  rows: Candidate["turns"],
+  rows: CandidateRow[],
   excluded: Set<string> = parseExcludedOrgs(undefined)
 ) {
-  const byConversation = new Map<string, Candidate["turns"]>();
+  const byConversation = new Map<string, CandidateRow[]>();
   for (const row of rows) {
     if (
       excluded.has(row.organization_id.toLowerCase()) ||
@@ -116,7 +116,7 @@ export function rankSet(
           Number(admitsOrAsks(b)) - Number(admitsOrAsks(a)) || newestFirst(a, b)
       )
   );
-  const ranked: { row: Candidate["turns"][number]; topic: Topic }[] = [];
+  const ranked: { row: CandidateRow; topic: Topic }[] = [];
   for (let round = 0; ranked.length < picked.length; round += 1) {
     for (const [index, queue] of queues.entries()) {
       const row = queue[round];

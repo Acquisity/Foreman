@@ -9,7 +9,6 @@ import { redact } from "#lib/investigation-memory/case.js";
 import { PRODUCTION_READ_QUERY_ARGS } from "#lib/lookup-customer.js";
 import { logOpsEvent } from "#lib/ops-log.js";
 import { providerData } from "#lib/support/conversation.js";
-import { replayable } from "#lib/widget-replay.js";
 import {
   isWidgetSupport,
   requireWidgetContext,
@@ -762,8 +761,6 @@ export const tool = defineTool({
 export default defineDynamic({
   events: {
     "step.started": (_event, ctx) =>
-      isWidgetSupport(ctx.session.auth.initiator)
-        ? replayable("widget_generation_diagnostics", tool)
-        : null,
+      isWidgetSupport(ctx.session.auth.initiator) ? tool : null,
   },
 });

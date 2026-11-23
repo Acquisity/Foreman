@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readdirSync, readFileSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import { verifiedWidgetContext as fixture } from "./widget.fixture.js";
 import {
@@ -11,24 +11,6 @@ import {
   type WidgetCase,
   widgetCaseSchema,
 } from "./widget-case.js";
-
-test("active investigation cases send root mode unless a recording starts the investigation", () => {
-  const directory = new URL("../../evals/widget/cases/", import.meta.url);
-  for (const name of readdirSync(directory).filter((file) =>
-    file.endsWith(".json")
-  )) {
-    const recorded = widgetCaseSchema.parse(
-      JSON.parse(readFileSync(new URL(name, directory), "utf8"))
-    );
-    // The case schema has no staff path; recording cases restore it from their cassette.
-    if (
-      recorded.expectations.lane === "investigate" &&
-      !recorded.cassette.some((entry) => entry.tool === "widget_read_recording")
-    ) {
-      assert.equal(recorded.mode, "investigate", name);
-    }
-  }
-});
 
 const scope: RunScope = {
   conversationId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
@@ -307,20 +289,6 @@ test("a recording title's recorder name is replaced everywhere, even JSON-encode
   const text = serializeCase(scrubbed);
   assert.ok(!text.includes("Jo Recorder"));
   assert.ok(text.includes(`Name 1 · ${fixture.organizationName}`));
-});
-
-test("the outside-call inventory documents the converter and both subprocess bounds", () => {
-  const inventory = readFileSync(
-    new URL("../../.github/OUTSIDE-CALLS.md", import.meta.url),
-    "utf8"
-  );
-  const entry = inventory
-    .split("\n")
-    .find((line) => line.includes("scripts/widget-case-from-run.ts"));
-  assert.ok(entry);
-  assert.ok(entry.includes("180s per subprocess"));
-  assert.ok(entry.includes("@workflow/cli@5.0.1 inspect"));
-  assert.ok(entry.includes("Biome"));
 });
 
 test("a name shortened with an ellipsis takes the name's own placeholder", () => {
@@ -602,7 +570,7 @@ test("a front-door conversation replays as the message plus its earlier turns", 
 test("causeType is optional and limited to the four cause types", () => {
   const base = widgetCaseSchema.parse(
     JSON.parse(
-      readFileSync("evals/widget/cases/local-widget-smoke.json", "utf8")
+      readFileSync("agent/lib/fixtures/widget-case-smoke.json", "utf8")
     )
   );
   const withType = (causeType: unknown) =>
@@ -615,27 +583,6 @@ test("causeType is optional and limited to the four cause types", () => {
     assert.ok(withType(type));
   }
   assert.ok(!withType("misconfiguration"));
-});
-
-test("office-hours acceptance cases isolate navigation from cross-workspace credit transfers", () => {
-  const directory = new URL("../../evals/widget/cases/", import.meta.url);
-  for (const name of [
-    "fd-office-hours-open-person",
-    "fd-office-hours-closed-person",
-    "inv-office-hours-closed-person",
-  ]) {
-    const recorded = widgetCaseSchema.parse(
-      JSON.parse(readFileSync(new URL(`${name}.json`, directory), "utf8"))
-    );
-    assert.equal(
-      recorded.question,
-      "I'd like to speak with a person. Where do I find the AI Consultant?"
-    );
-    assert.equal(recorded.scope.workspace, "Company One");
-    if (name.startsWith("inv-")) {
-      assert.equal(recorded.mode, "investigate");
-    }
-  }
 });
 
 test("an email that starts a line is replaced whole, and its placeholder is not read as a leak", () => {

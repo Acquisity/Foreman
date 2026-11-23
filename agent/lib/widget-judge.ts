@@ -19,8 +19,7 @@ import { SUPPORT_GUIDE } from "./widget-support-guide.js";
  * above both and from neither the gate's vendor nor the composer's model.
  * It runs through headless Claude Code on the local machine (`claude -p`, the
  * operator's subscription), never the AI Gateway: the Gateway key is for
- * Foreman itself only (Aaron, 2026-10-09, after judge spend drained it). A
- * change here reruns against the gold file first (`pnpm widget:judge rerun`).
+ * Foreman itself only (Aaron, 2026-10-09, after judge spend drained it).
  */
 const CLAUDE_MODEL = "opus";
 export const JUDGE_MODEL = `claude-code/${CLAUDE_MODEL}`;
@@ -519,7 +518,7 @@ export function renderReview(records: JudgeRecord[]): string {
     const record = judgeRecordSchema.parse(input);
     const rows = record.verdicts.map(
       (verdict) =>
-        `| ${record.case}#${verdict.id} | ${cell(verdict.claim)} | ${verdict.verdict} | ${cell(verdict.reason)} |  |`
+        `| ${record.case}#${verdict.id} | ${cell(verdict.claim)} | ${verdict.verdict} | ${cell(verdict.reason)} |`
     );
     return [
       `## ${record.case}`,
@@ -551,46 +550,17 @@ export function renderReview(records: JudgeRecord[]): string {
       "Answer:",
       codeBlock(record.answer),
       "",
-      "| key | claim | verdict | reason | mark |",
-      "| --- | --- | --- | --- | --- |",
+      "| key | claim | verdict | reason |",
+      "| --- | --- | --- | --- |",
       ...rows,
     ].join("\n");
   });
-  return [
-    "# Widget claims judge review",
-    "",
-    "Write right or wrong in the mark column of each row, then run `pnpm widget:judge gold <this directory>`.",
-    "",
-    sections.join("\n\n"),
-    "",
-  ].join("\n");
+  return ["# Widget claims judge review", "", sections.join("\n\n"), ""].join(
+    "\n"
+  );
 }
 
-const ROW = /^\|\s*([^|\s]+#[^|\s]+)\s*\|.*\|\s*([^|]*?)\s*\|\s*$/;
-
-/** The marks Aaron wrote, by row key; blank rows are left out. */
-export function parseMarks(review: string): Map<string, boolean> {
-  const marks = new Map<string, boolean>();
-  for (const line of review.split("\n")) {
-    const match = ROW.exec(line);
-    const mark = match?.[2]?.toLowerCase();
-    if (!(match && mark)) {
-      continue;
-    }
-    if (mark !== "right" && mark !== "wrong") {
-      throw new Error(
-        `Mark "${match[2]}" on ${match[1]} is not right or wrong.`
-      );
-    }
-    if (marks.has(match[1] as string)) {
-      throw new Error(`${match[1]} is marked more than once.`);
-    }
-    marks.set(match[1] as string, mark === "right");
-  }
-  return marks;
-}
-
-/** What the replay eval's `row:` log line carries that the scorecard reads. */
+/** What a live re-run's result row carries that the scorecard reads. */
 export interface ReplayRow {
   /** Null means a completed replay produced no customer answer; absent on legacy rows. */
   answer?: string | null;

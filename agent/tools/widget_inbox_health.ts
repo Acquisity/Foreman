@@ -15,7 +15,6 @@ import { PRODUCTION_READ_QUERY_ARGS } from "#lib/lookup-customer.js";
 import { logOpsEvent } from "#lib/ops-log.js";
 import { providerData } from "#lib/support/conversation.js";
 import { diagnosticText } from "#lib/widget-diagnostic-text.js";
-import { replayable } from "#lib/widget-replay.js";
 import {
   isWidgetSupport,
   requireWidgetContext,
@@ -720,8 +719,6 @@ export const tool = defineTool({
 export default defineDynamic({
   events: {
     "step.started": (_event, ctx) =>
-      isWidgetSupport(ctx.session.auth.initiator)
-        ? replayable("widget_inbox_health", tool)
-        : null,
+      isWidgetSupport(ctx.session.auth.initiator) ? tool : null,
   },
 });

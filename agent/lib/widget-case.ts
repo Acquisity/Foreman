@@ -5,9 +5,8 @@ import { renderConversation } from "./widget-router.js";
 import { officeHoursSchema, type WidgetContext } from "./widget-scope.js";
 
 /**
- * One widget eval case: a real run's question and tool calls with every
- * customer identifier replaced, checked into `evals/widget/cases/`. The
- * expectations block is written empty for a person to fill.
+ * One recorded widget run: its question and tool calls with every customer
+ * identifier replaced, as `pnpm widget:live` scores and judges it.
  */
 export const widgetCaseSchema = z.strictObject({
   cassette: z.array(

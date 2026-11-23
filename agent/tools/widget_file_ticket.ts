@@ -1,9 +1,9 @@
 import { defineDynamic } from "eve";
 import { defineTool } from "eve/tools";
 import { z } from "zod";
-import { replayable } from "#lib/widget-replay.js";
+import { isLiveActive, LIVE_TICKET } from "#lib/widget-live-policy.js";
 import { fileWidgetTicket } from "#lib/widget-ticket.js";
-import { isWidgetSupport } from "../lib/widget-scope.js";
+import { isWidgetSupport, requireWidgetContext } from "../lib/widget-scope.js";
 
 export const tool = defineTool({
   approval: (ctx) =>
@@ -35,11 +35,24 @@ export const tool = defineTool({
   ]),
 });
 
+/** In a live re-run the same tool files nothing and returns the simulated ticket. */
+const liveTool = defineTool({
+  description: tool.description,
+  // No outputSchema: the simulated ticket reaches the model as it is.
+  execute: (_input, ctx) => {
+    requireWidgetContext(ctx.session?.auth.initiator);
+    return LIVE_TICKET;
+  },
+  inputSchema: tool.inputSchema,
+});
+
 export default defineDynamic({
   events: {
-    "step.started": (_event, ctx) =>
-      isWidgetSupport(ctx.session.auth.initiator)
-        ? replayable("widget_file_ticket", tool)
-        : null,
+    "step.started": (_event, ctx) => {
+      if (!isWidgetSupport(ctx.session.auth.initiator)) {
+        return null;
+      }
+      return isLiveActive() ? liveTool : tool;
+    },
   },
 });

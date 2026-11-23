@@ -75,6 +75,7 @@ import {
   pinnedQuestion,
   type ReadResult,
   readResult,
+  replyElapsed,
 } from "../agent/lib/widget-live.js";
 import {
   hasMovingWindow,
@@ -104,7 +105,6 @@ import {
   twoColumnScorecard,
 } from "../agent/lib/widget-live-score.js";
 import { MAX_WIDGET_TOOL_CALLS } from "../agent/lib/widget-next-action.js";
-import { replyElapsed } from "../agent/lib/widget-replay-timing.js";
 import { widgetRunSchema } from "../agent/lib/widget-run-store.js";
 import { type WidgetContext, widgetAuth } from "../agent/lib/widget-scope.js";
 import { SERVICE_SECRET_HEADER } from "../agent/lib/widget-service-secret.js";
@@ -156,13 +156,9 @@ if (
   );
   process.exit(2);
 }
-if (
-  process.env.WIDGET_LIVE === "1" ||
-  process.env.WIDGET_REPLAY === "1" ||
-  process.env.WIDGET_REPLAY_CASE
-) {
+if (process.env.WIDGET_LIVE === "1") {
   throw new Error(
-    "Set live/replay flags on the dev server only; the runner requires ordinary exact-input reads."
+    "Set WIDGET_LIVE on the dev server only; the runner requires ordinary exact-input reads."
   );
 }
 const server = liveServerUrl(values.server);
@@ -281,7 +277,7 @@ async function liveRun(question: string, scope: WidgetContext, sentAt: string) {
     question: pinnedQuestion(originalRequest.question, sentAt),
   });
   const deadline = Date.now() + RUN_DEADLINE_MS;
-  // Measured at the 3-second poll, like replay.
+  // Measured at the 3-second poll.
   let firstReplyMs = replyElapsed(result, sent, Date.now());
   while (result.status === "pending" && Date.now() < deadline) {
     // biome-ignore lint/performance/noAwaitInLoops: each poll waits for the previous one.
