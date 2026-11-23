@@ -116,12 +116,15 @@ export const fileOrReuseTicket = async (
   }
 
   const created = await linear<{
-    issueCreate: { issue: { id: string; identifier: string } };
+    issueCreate: { issue: { id: string; identifier: string } | null };
   }>(
     "mutation($input:IssueCreateInput!){issueCreate(input:$input){issue{id identifier}}}",
     { input: { description: ticketDescription(kind, url), teamId, title } }
   );
   const { issue } = created.issueCreate;
+  if (!issue) {
+    throw new Error("Linear did not confirm issueCreate");
+  }
   await write(
     linear,
     "attachmentCreate",

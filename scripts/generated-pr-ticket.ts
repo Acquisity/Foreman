@@ -16,7 +16,9 @@ const key = process.env.LINEAR_API_KEY;
 if (!key) {
   throw new Error("LINEAR_API_KEY is not set");
 }
-if (!(values.kind && values.kind in GENERATED_PR_KINDS && values.pr)) {
+if (
+  !(values.kind && Object.hasOwn(GENERATED_PR_KINDS, values.kind) && values.pr)
+) {
   throw new Error("Usage: --kind guide|tools --pr <Foreman PR URL>");
 }
 const { identifier, addedLabel, reused } = await fileOrReuseTicket(
