@@ -12,6 +12,7 @@ import { verifiedWidgetContext } from "#lib/widget.fixture.js";
 import { widgetAuth } from "#lib/widget-scope.js";
 import definition, {
   buildWidgetInboxHealthQuery,
+  domainReason,
   NO_SENDING_ACCOUNT,
   readMailboxNotFound,
   readWidgetInboxHealth,
@@ -48,6 +49,7 @@ after(() => {
 });
 
 const NO_CONNECTION = /No sending-provider connection/;
+const INTERNAL_WORDS = /ENG-|Instantly/u;
 const USER_MANAGED = /user-managed/;
 const TURNED_OFF = /turned off/;
 const observedAt = "2026-09-17T10:00:00.000Z";
@@ -65,6 +67,7 @@ const baseRow = (overrides: Record<string, unknown> = {}) => ({
   recentWebhookErrorCount: 0,
   recentWebhookEventCount: 0,
   reconnectAttempts: [],
+  savedDomains: { domains: [], total: 0 },
   savedInboxes: { inboxes: [], total: 0 },
   webhookRegisteredCount: 0,
   workspaceId: null,
@@ -881,4 +884,177 @@ test("a newer successful reconnect suppresses an older mailbox-not-found reading
   );
   assert.ok(reading?.includes("whether they were cancelled for non-payment"));
   assert.equal(reading?.includes("likely cancelled for non-payment"), false);
+});
+
+const suspendedDomain = {
+  autoRenew: true,
+  billingStop: {
+    attempts: 1,
+    requestedAt: "2026-11-06T00:00:17.248613+00:00",
+    status: "cancelled",
+    stoppedAt: "2026-11-06T00:09:41.861+00:00",
+  },
+  connectedInboxes: 3,
+  domain: "Ended.example.test",
+  expiresAt: "2026-12-06T13:32:16.889+00:00",
+  reason: "Cancelled by user",
+  savedInboxes: 3,
+  status: "suspended",
+  updatedAt: "2026-11-16T23:00:06.018387+00:00",
+};
+const failedStop = {
+  ...suspendedDomain,
+  billingStop: {
+    attempts: 4,
+    requestedAt: "2026-11-20T00:00:00+00:00",
+    status: "failed",
+    stoppedAt: null,
+  },
+  domain: "stuck.example.test",
+  reason: "Cancelled after provider mailbox loss",
+  status: "cancelling",
+};
+
+test("the domain read stays inside the authorized workspace and lists ended domains first", () => {
+  const query = buildWidgetInboxHealthQuery(scope);
+  for (const required of [
+    "from mail_domain md join authorized a on a.id = md.organization_id",
+    "where mi.domain_id = md.id and mi.organization_id = md.organization_id",
+    "where c.mail_domain_id = md.id and c.organization_id = md.organization_id",
+    "md.status in ('pending', 'active', 'partial') as live",
+    "order by live, domain limit 50",
+  ]) {
+    assert.ok(query.includes(required), required);
+  }
+});
+
+test("a suspended domain reports why it ended, when its billing stopped, and whether its mailboxes are still live", async (t) => {
+  const row = baseRow({
+    accountType: "system_provisioned",
+    connectionUpdatedAt: observedAt,
+    hasConnectionError: false,
+    isActive: true,
+    savedDomains: {
+      domains: [
+        suspendedDomain,
+        failedStop,
+        {
+          ...suspendedDomain,
+          domain: "odd.example.test",
+          reason: "TypeError: x is undefined",
+        },
+      ],
+      total: 3,
+    },
+    workspaceId: WORKSPACE_ID,
+  });
+  t.mock.method(
+    executorTransport,
+    "call",
+    byPath({
+      [ACCOUNTS_PATH]: () => ({
+        data: {
+          items: [
+            { email: "a@ended.example.test", status: 1 },
+            { email: "b@Ended.Example.test", status: 2 },
+            { email: "c@other.example.test", status: 1 },
+          ],
+          next_starting_after: null,
+        },
+        ok: true,
+      }),
+      [DB_PATH]: () => ({ data: dbEnvelope(row), ok: true }),
+      [MEMBERS_PATH]: () => ({
+        data: {
+          items: [member({ sub_workspace_id: WORKSPACE_ID })],
+          next_starting_after: null,
+        },
+        ok: true,
+      }),
+    })
+  );
+  const result = await readWidgetInboxHealth(ctx);
+  assert.ok(widgetInboxHealthOutput.safeParse(result).success);
+  if (result.status !== "ok" || !result.savedDomains) {
+    assert.fail("expected saved domains");
+  }
+  assert.equal(result.savedDomains.total, 3);
+  assert.deepEqual(result.savedDomains.domains[0], {
+    ...suspendedDomain,
+    liveAccounts: 2,
+    reason: "Cancelled from the workspace",
+  });
+  assert.deepEqual(
+    result.savedDomains.domains.slice(1).map((domain) => ({
+      billingStop: domain.billingStop?.status,
+      liveAccounts: domain.liveAccounts,
+      reason: domain.reason,
+    })),
+    [
+      {
+        billingStop: "failed",
+        liveAccounts: 0,
+        reason: "Cancelled after its mailboxes were lost at the email supplier",
+      },
+      {
+        billingStop: "cancelled",
+        liveAccounts: 0,
+        reason:
+          "A diagnostic was recorded; its technical details are unavailable",
+      },
+    ]
+  );
+});
+
+test("saved domains are returned with no live count when the live check cannot run", async (t) => {
+  t.mock.method(
+    executorTransport,
+    "call",
+    byPath({
+      [DB_PATH]: () => ({
+        data: dbEnvelope(
+          baseRow({
+            savedDomains: { domains: [suspendedDomain], total: 1 },
+          })
+        ),
+        ok: true,
+      }),
+    })
+  );
+  const result = await readWidgetInboxHealth(ctx);
+  if (result.status !== "ok" || !result.savedDomains) {
+    assert.fail("expected saved domains");
+  }
+  assert.equal(result.accounts.available, false);
+  assert.equal(result.savedDomains.domains[0].liveAccounts, null);
+  assert.equal(
+    result.savedDomains.domains[0].reason,
+    "Cancelled from the workspace"
+  );
+});
+
+test("every reason Acquisity saves on an ended domain has authored wording", () => {
+  // Every non-empty mail_domain.error on an ended domain in production, 24 Nov 2026.
+  const saved = [
+    "Cancelled by user",
+    "Removed because the domain subscription ended",
+    "Cancelled because the plan ended",
+    "Timeout waiting for domain/mailboxes",
+    "Cancelled because the workspace owner was banned",
+    "Suspended by billing overage reconciliation",
+    "Domain or mailbox provisioning failed",
+    "Cancelled after unpaid mailbox cleanup",
+    "Cancelled: unpaid and expired vendor inboxes reconciled (ENG-14776)",
+    "Cancelled after provider mailbox loss",
+    "Instantly has not delivered this inbox yet",
+    "Cancelled: expired vendor inboxes reconciled (ENG-14268)",
+    "Expired at provider (ENG-14945)",
+  ];
+  const generic = domainReason("something new");
+  for (const reason of saved) {
+    const worded = domainReason(reason);
+    assert.ok(worded && worded !== generic, reason);
+    assert.ok(!INTERNAL_WORDS.test(worded), worded);
+  }
+  assert.equal(domainReason(null), null);
 });

@@ -55,6 +55,10 @@ const NAME_CHARS = 100;
 const SAVED_ERROR_CHARS = 200;
 /** Sending accounts the provider reported an account_error for, most recent first. */
 const ACCOUNT_ERROR_LIMIT = 25;
+/** Acquisity-purchased domains read from the product database, ended or failing first. */
+const SAVED_DOMAIN_LIMIT = 50;
+const DOMAIN_CHARS = 253;
+const LIVE_DOMAIN_STATUSES = ["pending", "active", "partial"] as const;
 
 export const widgetInboxHealthInput = z.strictObject({});
 export type WidgetInboxHealthInput = z.infer<typeof widgetInboxHealthInput>;
@@ -126,6 +130,39 @@ const savedInboxes = z.object({
   inboxes: z.array(savedInbox).max(SAVED_INBOX_LIMIT),
   total: z.number().int().nonnegative(),
 });
+const count = z.number().int().nonnegative();
+const billingStop = z.object({
+  attempts: count,
+  requestedAt: timestamp,
+  status: z.enum(["pending", "cancelled", "failed"]),
+  stoppedAt: timestamp.nullable(),
+});
+const domainRow = z.object({
+  autoRenew: z.boolean(),
+  billingStop: billingStop.nullable(),
+  connectedInboxes: count,
+  domain: z.string().max(DOMAIN_CHARS),
+  expiresAt: timestamp.nullable(),
+  reason: z
+    .string()
+    .max(SAVED_ERROR_CHARS * 2)
+    .nullable(),
+  savedInboxes: count,
+  status: z.enum([
+    ...LIVE_DOMAIN_STATUSES,
+    "failed",
+    "expired",
+    "suspended",
+    "cancelling",
+  ]),
+  updatedAt: timestamp,
+});
+const savedDomains = z.object({
+  domains: z
+    .array(domainRow.extend({ liveAccounts: count.nullable() }))
+    .max(SAVED_DOMAIN_LIMIT),
+  total: count,
+});
 const accountDetail = z.object({
   bucket: z.enum([
     "error",
@@ -177,6 +214,8 @@ export const widgetInboxHealthOutput = z.union([
     // Optional so saved replays from before it existed still parse.
     reading: z.string().nullish(),
     reconnectAttempts,
+    // Optional so saved replays from before it existed still parse.
+    savedDomains: savedDomains.nullish(),
     savedInboxes,
     source: z.literal(
       "Acquisity product database, plus a live sending-provider read for Acquisity-provisioned connections"
@@ -305,7 +344,25 @@ export function buildWidgetInboxHealthQuery(context: WidgetContext): string {
       where e.provider_id = (select id from provider) and e.event_type = 'account_error'
         and e.created_at > current_timestamp - interval '${RECENT_WEBHOOK_WINDOW_DAYS} days'
         and nullif(e.payload->>'email_account', '') is not null
-      group by 1 order by max(e.created_at) desc limit ${ACCOUNT_ERROR_LIMIT}) ae) as "accountErrors"`;
+      group by 1 order by max(e.created_at) desc limit ${ACCOUNT_ERROR_LIMIT}) ae) as "accountErrors",
+    (select jsonb_build_object(
+      'total', (select count(*)::int from mail_domain md join authorized a on a.id = md.organization_id),
+      'domains', coalesce((select jsonb_agg(to_jsonb(d) - 'live' order by d.live, d.domain) from (
+        select left(md.domain, ${DOMAIN_CHARS}) as domain, md.status,
+          md.status in (${LIVE_DOMAIN_STATUSES.map((status) => `'${status}'`).join(", ")}) as live,
+          left(nullif(md.error, ''), ${SAVED_ERROR_CHARS}) as reason,
+          md.expires_at as "expiresAt", md.auto_renew as "autoRenew", md.updated_at as "updatedAt",
+          (select count(*)::int from mail_inbox mi
+            where mi.domain_id = md.id and mi.organization_id = md.organization_id) as "savedInboxes",
+          (select count(*)::int from mail_inbox mi
+            where mi.domain_id = md.id and mi.organization_id = md.organization_id and mi.connected) as "connectedInboxes",
+          (select jsonb_build_object('status', c.billing_status, 'stoppedAt', c.billing_cancelled_at,
+              'attempts', c.attempt_count, 'requestedAt', c.created_at)
+            from mail_domain_cancellation c
+            where c.mail_domain_id = md.id and c.organization_id = md.organization_id
+            order by c.created_at desc limit 1) as "billingStop"
+        from mail_domain md join authorized a on a.id = md.organization_id
+        order by live, domain limit ${SAVED_DOMAIN_LIMIT}) d), '[]'::jsonb))) as "savedDomains"`;
 }
 
 const dbRow = z.object({
@@ -327,6 +384,10 @@ const dbRow = z.object({
   recentWebhookErrorCount: z.number().int().nonnegative(),
   recentWebhookEventCount: z.number().int().nonnegative(),
   reconnectAttempts,
+  savedDomains: z.object({
+    domains: z.array(domainRow).max(SAVED_DOMAIN_LIMIT),
+    total: count,
+  }),
   savedInboxes,
   webhookRegisteredCount: z.number().int().nonnegative(),
   workspaceId: z.string().min(1).max(200).nullable(),
@@ -356,7 +417,54 @@ const CAVEATS = [
   "Account details come from the live provider read, except the initialWarmup bucket uses saved DFY creation dates. Non-ready accounts are listed first; detailsTruncated means some scanned accounts are omitted. dailyLimit is the provider account setting, not a campaign cap or measured sending rate; Acquisity manages these settings, so do not ask the customer to change them anywhere.",
   "senderName is the From name each live account sends with (its saved first and last name). savedInboxes lists the inboxes the customer bought through Acquisity, from saved records (total counts all of them; at most 100 shown, disconnected first), with the first and last name each was provisioned with: that is the sender name recipients see, and it was set at purchase, not taken from the customer's profile. Signature text is not readable here.",
   "Live account status is only checked for Acquisity-provisioned connections; a user-managed sending-provider workspace cannot be verified as belonging to this organization.",
+  "savedDomains lists the domains the customer bought through Acquisity, from saved records (total counts all of them; at most 50 shown, ended or failing first). status is Acquisity's: suspended means the domain was ended and its mailboxes removed or disconnected, cancelling means Acquisity is still stopping its billing. reason is the saved reason it ended or failed. billingStop is Acquisity's request to stop charging for that domain: cancelled with stoppedAt means its charge was stopped then, failed or pending means it was not stopped yet, so the customer may still be charged for it; a plan that still shows paid can be billing other domains or inboxes. savedInboxes and connectedInboxes count its saved mailboxes; liveAccounts counts sending accounts at that domain in this workspace's live read (null when the live check did not run, a lower bound when accounts.truncated). Zero liveAccounts on a suspended domain means its mailboxes are no longer in this workspace's sending account. Whether they sit in another workspace cannot be checked here.",
 ];
+
+/** Authored wording for each reason Acquisity saves on a domain; anything else stays generic. */
+const DOMAIN_REASONS: readonly (readonly [RegExp, string])[] = [
+  [/cancelled by user/i, "Cancelled from the workspace"],
+  [/subscription ended/i, "Removed because the domain's subscription ended"],
+  [/plan ended/i, "Cancelled because the plan it was on ended"],
+  [/owner was banned/i, "Cancelled because the workspace owner was banned"],
+  [/billing overage/i, "Suspended during a billing reconciliation"],
+  [/unpaid/i, "Cancelled because its mailboxes went unpaid"],
+  [
+    /expired vendor inboxes|expired at provider/i,
+    "Ended because its mailboxes expired at the email supplier",
+  ],
+  [
+    /provider mailbox loss/i,
+    "Cancelled after its mailboxes were lost at the email supplier",
+  ],
+  [
+    /timeout waiting for domain/i,
+    "Setup timed out before the domain and its mailboxes were ready",
+  ],
+  [/provisioning failed/i, "Setting up the domain or its mailboxes failed"],
+  [
+    /has not delivered this inbox/i,
+    "The sending provider has not delivered this inbox yet",
+  ],
+];
+
+export const domainReason = (saved: string | null): string | null =>
+  saved === null
+    ? null
+    : (DOMAIN_REASONS.find(([pattern]) => pattern.test(saved))?.[1] ??
+      diagnosticText(saved, SAVED_ERROR_CHARS));
+
+/** Sending accounts per domain in the live read, keyed by lower-case domain. */
+function liveAccountsByDomain(items: unknown[]): Map<string, number> {
+  const counts = new Map<string, number>();
+  for (const raw of items) {
+    const email = instantlyAccount.parse(raw).email?.trim().toLowerCase();
+    const domain = email?.split("@")[1];
+    if (domain) {
+      counts.set(domain, (counts.get(domain) ?? 0) + 1);
+    }
+  }
+  return counts;
+}
 
 /** The From display name Instantly sends with: first and last name as saved on the account. */
 const senderName = (
@@ -480,30 +588,38 @@ function bucketAccounts(
   };
 }
 
-/** Live Instantly account check, only for a workspace Acquisity itself provisioned. */
+type AccountsEvidence = z.infer<typeof accounts>;
+const unavailableAccounts = (reason: string) => ({
+  accounts: { available: false, reason } satisfies AccountsEvidence,
+  liveByDomain: null,
+});
+
+/**
+ * Live Instantly account check, only for a workspace Acquisity itself
+ * provisioned, with its accounts counted per domain (null when not read).
+ */
 async function readAccountsEvidence(
   ctx: ProviderContext,
   row: z.infer<typeof dbRow>,
   organizationId: string
-): Promise<z.infer<typeof accounts>> {
+): Promise<{
+  accounts: AccountsEvidence;
+  liveByDomain: Map<string, number> | null;
+}> {
   if (row.accountType === "user_owned") {
-    return {
-      available: false,
-      reason:
-        "This organization's sending-provider workspace is user-managed, so Acquisity cannot verify it belongs to this organization; live inbox checks are limited to Acquisity-provisioned connections.",
-    };
+    return unavailableAccounts(
+      "This organization's sending-provider workspace is user-managed, so Acquisity cannot verify it belongs to this organization; live inbox checks are limited to Acquisity-provisioned connections."
+    );
   }
   if (row.isActive === false) {
-    return {
-      available: false,
-      reason: "This organization's sending-provider connection is turned off.",
-    };
+    return unavailableAccounts(
+      "This organization's sending-provider connection is turned off."
+    );
   }
   if (!row.workspaceId) {
-    return {
-      available: false,
-      reason: "No sending-provider workspace is linked to this connection.",
-    };
+    return unavailableAccounts(
+      "No sending-provider workspace is linked to this connection."
+    );
   }
   try {
     const items: unknown[] = [];
@@ -534,13 +650,16 @@ async function readAccountsEvidence(
       row.initialWarmupEmails
     );
     return {
-      available: true,
-      ...buckets,
-      details,
-      detailsTruncated: items.length > details.length,
-      staleSyncAccounts,
-      total: items.length,
-      truncated: startingAfter !== undefined,
+      accounts: {
+        available: true,
+        ...buckets,
+        details,
+        detailsTruncated: items.length > details.length,
+        staleSyncAccounts,
+        total: items.length,
+        truncated: startingAfter !== undefined,
+      },
+      liveByDomain: liveAccountsByDomain(items),
     };
   } catch (error) {
     if (ctx.abortSignal.aborted) {
@@ -555,13 +674,11 @@ async function readAccountsEvidence(
       },
       console.warn
     );
-    return {
-      available: false,
-      reason:
-        error instanceof InstantlyApiError
-          ? `The sending provider read failed (${error.kind}).`
-          : "The sending provider could not be read.",
-    };
+    return unavailableAccounts(
+      error instanceof InstantlyApiError
+        ? `The sending provider read failed (${error.kind}).`
+        : "The sending provider could not be read."
+    );
   }
 }
 
@@ -640,6 +757,16 @@ export async function readWidgetInboxHealth(
       })),
     },
   };
+  const domainsWith = (liveCounts: Map<string, number> | null) => ({
+    domains: row.savedDomains.domains.map((domain) => ({
+      ...domain,
+      liveAccounts: liveCounts
+        ? (liveCounts.get(domain.domain.toLowerCase()) ?? 0)
+        : null,
+      reason: domainReason(domain.reason),
+    })),
+    total: row.savedDomains.total,
+  });
   if (row.accountType === null) {
     return widgetInboxHealthOutput.parse({
       accountErrors: row.accountErrors,
@@ -653,6 +780,7 @@ export async function readWidgetInboxHealth(
       observedAt: row.observedAt,
       reading: [reading, NO_SENDING_ACCOUNT].filter(Boolean).join(" "),
       reconnectAttempts: sanitized.reconnectAttempts,
+      savedDomains: domainsWith(null),
       savedInboxes: sanitized.savedInboxes,
       source:
         "Acquisity product database, plus a live sending-provider read for Acquisity-provisioned connections",
@@ -661,9 +789,11 @@ export async function readWidgetInboxHealth(
       workspace: scope.organizationName,
     });
   }
+  const { accounts: accountsEvidence, liveByDomain } =
+    await readAccountsEvidence(ctx, row, scope.organizationId);
   return widgetInboxHealthOutput.parse({
     accountErrors: row.accountErrors,
-    accounts: await readAccountsEvidence(ctx, row, scope.organizationId),
+    accounts: accountsEvidence,
     caveats: CAVEATS,
     connection: {
       accountType: row.accountType,
@@ -678,6 +808,7 @@ export async function readWidgetInboxHealth(
         ? [reading, USER_OWNED_ACCOUNT].filter(Boolean).join(" ")
         : reading,
     reconnectAttempts: sanitized.reconnectAttempts,
+    savedDomains: domainsWith(liveByDomain),
     savedInboxes: sanitized.savedInboxes,
     source:
       "Acquisity product database, plus a live sending-provider read for Acquisity-provisioned connections",
@@ -709,7 +840,7 @@ export const USER_OWNED_ACCOUNT =
   "This workspace's sending account was connected directly from its own sending-provider account (the Legacy setup), not set up by Acquisity. The addresses and inboxes in it live in that provider account, where they are managed and billed. Closing Acquisity does not stop them; they are stopped or cancelled in that provider account.";
 
 export const tool = defineTool({
-  description: `The status of every sending account, inbox and mailbox in this chat's verified workspace: connected, disconnected, erroring, paused or warming, and why. Use it for any inbox or sending-account question, including "my inbox disconnected", "my accounts show Error" and "it says no email accounts connected but they're sending". Returns the saved Instantly connection (Acquisity-provisioned vs user-managed, active flag, the saved connection error message, update time), saved webhook health (registered webhook count, last event time, recent ${RECENT_WEBHOOK_WINDOW_DAYS}-day event and error counts), and, only for an Acquisity-provisioned connection that is active, a live Instantly sending-account check that follows Instantly's pages to cover every account (accounts.truncated true means only a sample was read): per-account diagnostics (email, status/error code, warmup, slow ramp and provider daily limit; at most 200, non-ready first, with detailsTruncated), total plus ready (active, no error, setup finished, past the 14-day done-for-you warmup), paused, setupPending, initialWarmup, error and unknown counts, each account in exactly one, plus any accounts that used Instantly within ${Math.round(RECENT_ACTIVITY_WINDOW_MS / 86_400_000)} days (recently sending) while Instantly reports a negative/error status - the known stale-sync mismatch. Each live account includes senderName, the From display name recipients see. savedInboxes lists every Acquisity-purchased inbox from saved records, even when the live check cannot run (user-managed or turned off): email, status, connected, the first and last name it was provisioned with, and the saved reason it is not connected (connectionError, retryCount, lastRetryAt). accountErrors lists sending accounts the provider flagged with an account error in the last ${RECENT_WEBHOOK_WINDOW_DAYS} days, including user-managed workspaces: use it to say which accounts errored and when. Use these for "whose name is on my emails", "my inboxes have someone else's name", or "change my sender name": the names come from the inbox, not the user's profile; signature text is not available. reconnectAttempts lists this workspace's own mailbox reconnect attempts from the last ${RECONNECT_WINDOW_DAYS} days, newest first (at most ${RECONNECT_LIMIT}: email, status, error, created and completed times); when the recent attempts failed, the customer already tried reconnecting and it did not work. reading, when present, says what those failures mean and what to check first: tell the customer that. accounts.available false explains why the live check did not run (no connection, user-managed workspace, connection off, or Instantly could not be read); this is never the same as zero accounts. No SQL, workspace or field selector is accepted.`,
+  description: `The status of every sending account, inbox and mailbox in this chat's verified workspace: connected, disconnected, erroring, paused or warming, and why. Use it for any inbox or sending-account question, including "my inbox disconnected", "my accounts show Error" and "it says no email accounts connected but they're sending". Returns the saved Instantly connection (Acquisity-provisioned vs user-managed, active flag, the saved connection error message, update time), saved webhook health (registered webhook count, last event time, recent ${RECENT_WEBHOOK_WINDOW_DAYS}-day event and error counts), and, only for an Acquisity-provisioned connection that is active, a live Instantly sending-account check that follows Instantly's pages to cover every account (accounts.truncated true means only a sample was read): per-account diagnostics (email, status/error code, warmup, slow ramp and provider daily limit; at most 200, non-ready first, with detailsTruncated), total plus ready (active, no error, setup finished, past the 14-day done-for-you warmup), paused, setupPending, initialWarmup, error and unknown counts, each account in exactly one, plus any accounts that used Instantly within ${Math.round(RECENT_ACTIVITY_WINDOW_MS / 86_400_000)} days (recently sending) while Instantly reports a negative/error status - the known stale-sync mismatch. Each live account includes senderName, the From display name recipients see. savedInboxes lists every Acquisity-purchased inbox from saved records, even when the live check cannot run (user-managed or turned off): email, status, connected, the first and last name it was provisioned with, and the saved reason it is not connected (connectionError, retryCount, lastRetryAt). savedDomains lists every Acquisity-purchased domain, ended or failing first: status, the saved reason it was suspended or failed, renewal, whether and when its billing was stopped (billingStop), and its saved, connected and live mailbox counts; use it for "my domain is suspended but billing shows paid" and "do its mailboxes still exist". accountErrors lists sending accounts the provider flagged with an account error in the last ${RECENT_WEBHOOK_WINDOW_DAYS} days, including user-managed workspaces: use it to say which accounts errored and when. Use these for "whose name is on my emails", "my inboxes have someone else's name", or "change my sender name": the names come from the inbox, not the user's profile; signature text is not available. reconnectAttempts lists this workspace's own mailbox reconnect attempts from the last ${RECONNECT_WINDOW_DAYS} days, newest first (at most ${RECONNECT_LIMIT}: email, status, error, created and completed times); when the recent attempts failed, the customer already tried reconnecting and it did not work. reading, when present, says what those failures mean and what to check first: tell the customer that. accounts.available false explains why the live check did not run (no connection, user-managed workspace, connection off, or Instantly could not be read); this is never the same as zero accounts. No SQL, workspace or field selector is accepted.`,
   execute: (_input, ctx: ToolContext) =>
     readWidgetInboxHealth(ctx as unknown as ProviderContext),
   inputSchema: widgetInboxHealthInput,

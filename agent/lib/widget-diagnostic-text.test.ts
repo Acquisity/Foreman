@@ -59,6 +59,7 @@ async function diagnostics(t: TestContext, text: string) {
           status: "failed",
         },
       ],
+      savedDomains: { domains: [], total: 0 },
       savedInboxes: {
         inboxes: [
           {
