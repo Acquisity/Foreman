@@ -30,6 +30,10 @@ const STATUS_HISTORY_LIMIT = 10;
 const STATUS_MESSAGE_CHARS = 200;
 const LEAD_EVENT_LIMIT = 25;
 const EARLY_EXAMPLE_LIMIT = 10;
+const AGENT_DECISION_LIMIT = 5;
+const AGENT_ACTION_LIMIT = 10;
+const AGENT_FINDING_CHARS = 700;
+const AGENT_TEXT_CHARS = 300;
 /** Instantly campaign status codes, as Acquisity's mapInstantlyStatusToOur reads them. */
 const PROVIDER_STATUS_BY_CODE: Record<number, string> = {
   [-99]: "account_suspended",
@@ -169,90 +173,245 @@ const assignedInbox = z.object({
   id: z.uuid(),
   status: z.string().max(100),
 });
-const campaignDiagnostics = z
-  .object({
-    assignedInboxes: z.object({
-      accounts: z.array(assignedInbox).max(101),
-      configuredCount: count.nullable(),
-      healthyCount: count,
-      matchedCount: count,
-      nextAfterInboxId: z.uuid().nullable(),
+const agentText = z.string().max(AGENT_TEXT_CHARS * 2);
+const savedValue = z.string().max(64).nullable();
+const agentActionIndex = z.number().int().nonnegative().max(1000);
+const agentDecisionRow = z.object({
+  actions: z
+    .array(
+      z.object({
+        index: agentActionIndex,
+        reason: agentText.nullable(),
+        type: z.string().max(64),
+      })
+    )
+    .max(AGENT_ACTION_LIMIT),
+  approval: z
+    .object({
+      actionIndexes: z
+        .array(agentActionIndex)
+        .max(AGENT_ACTION_LIMIT)
+        .nullable(),
+      autoExecutesOnTimeout: z.boolean().nullable(),
+      expiresAt: savedValue,
+      requestedAt: savedValue,
+      respondedAt: savedValue,
+      status: savedValue,
+    })
+    .nullable(),
+  at: timestamp,
+  completed: z
+    .array(z.object({ at: savedValue, index: agentActionIndex }))
+    .max(AGENT_ACTION_LIMIT * 2),
+  error: z
+    .string()
+    .max(AGENT_TEXT_CHARS * 2)
+    .nullable(),
+  finding: z
+    .string()
+    .max(AGENT_FINDING_CHARS * 2)
+    .nullable(),
+  recommended: z.array(agentText).max(AGENT_ACTION_LIMIT),
+  runStatus: z.string().max(40),
+  skipped: z
+    .array(z.object({ index: agentActionIndex, reason: agentText.nullable() }))
+    .max(AGENT_ACTION_LIMIT * 2),
+  verdict: savedValue,
+});
+const agentActionState = z.enum([
+  "taken",
+  "skipped",
+  "waiting_for_approval",
+  "running",
+  "not_run",
+]);
+const agentDecision = z.object({
+  actions: z
+    .array(
+      z.object({
+        at: savedValue,
+        reason: agentText.nullable(),
+        state: agentActionState,
+        type: z.string().max(64),
+      })
+    )
+    .max(AGENT_ACTION_LIMIT),
+  approval: agentDecisionRow.shape.approval
+    .unwrap()
+    .omit({ actionIndexes: true })
+    .nullable(),
+  at: timestamp,
+  error: z
+    .string()
+    .max(AGENT_TEXT_CHARS * 2)
+    .nullable(),
+  finding: z
+    .string()
+    .max(AGENT_FINDING_CHARS * 2)
+    .nullable(),
+  recommended: z.array(agentText).max(AGENT_ACTION_LIMIT),
+  runStatus: z.string().max(40),
+  verdict: savedValue,
+});
+
+/**
+ * Each action's state as the campaign's AI Agent tab shows it (Acquisity's
+ * campaign-agent-insight `toInsight`): taken or skipped once recorded, waiting
+ * while the run's approval is open, running while the run is, else not run.
+ */
+export function readAgentDecision(
+  row: z.infer<typeof agentDecisionRow>
+): z.infer<typeof agentDecision> {
+  const completedAt = new Map(
+    row.completed.map((done) => [done.index, done.at])
+  );
+  const skipped = new Map(row.skipped.map((skip) => [skip.index, skip.reason]));
+  const approvalStatus = row.approval?.status ?? null;
+  const awaiting =
+    row.runStatus === "awaiting_approval" &&
+    (approvalStatus === null || approvalStatus === "awaiting_approval");
+  const approvalIndexes = row.approval?.actionIndexes
+    ? new Set(row.approval.actionIndexes)
+    : null;
+  const openState = (index: number) => {
+    if (awaiting && (!approvalIndexes || approvalIndexes.has(index))) {
+      return "waiting_for_approval" as const;
+    }
+    return awaiting || row.runStatus === "pending"
+      ? ("running" as const)
+      : ("not_run" as const);
+  };
+  const { actionIndexes: _indexes, ...approval } = row.approval ?? {};
+  return {
+    actions: row.actions.map((action) => {
+      if (completedAt.has(action.index)) {
+        return {
+          at: completedAt.get(action.index) ?? null,
+          reason: action.reason,
+          state: "taken",
+          type: action.type,
+        };
+      }
+      if (skipped.has(action.index)) {
+        return {
+          at: null,
+          reason: skipped.get(action.index) ?? action.reason,
+          state: "skipped",
+          type: action.type,
+        };
+      }
+      return {
+        at: null,
+        reason: action.reason,
+        state: openState(action.index),
+        type: action.type,
+      };
     }),
-    dailyMetrics: z.array(dailyMetrics).max(31),
-    earlyFollowUps: z
-      .object({
-        earlyCount: count,
-        earlyLeads: count,
-        examples: z
-          .array(
-            z.object({
-              at: timestamp,
-              configuredDelayDays: count,
-              leadEmail: z.string().max(320),
-              previousAt: timestamp,
-              sendingInbox: z.string().max(320).nullable(),
-              step: count,
-            })
-          )
-          .max(EARLY_EXAMPLE_LIMIT),
-        followUpsChecked: count,
-        /** Set with `reading` when the early sends are a platform fault; see `readEarlyFollowUps`. */
-        platformFault: z.literal(true).optional(),
-        reading: z.string().optional(),
-        sameDayCount: count,
-        withoutPreviousSend: count,
+    approval: row.approval
+      ? (approval as z.infer<typeof agentDecision>["approval"])
+      : null,
+    at: row.at,
+    error: diagnosticText(row.error, AGENT_TEXT_CHARS),
+    finding: row.finding,
+    recommended: row.recommended,
+    runStatus: row.runStatus,
+    verdict: row.verdict,
+  };
+}
+
+const diagnosticsFields = z.object({
+  assignedInboxes: z.object({
+    accounts: z.array(assignedInbox).max(101),
+    configuredCount: count.nullable(),
+    healthyCount: count,
+    matchedCount: count,
+    nextAfterInboxId: z.uuid().nullable(),
+  }),
+  dailyMetrics: z.array(dailyMetrics).max(31),
+  earlyFollowUps: z
+    .object({
+      earlyCount: count,
+      earlyLeads: count,
+      examples: z
+        .array(
+          z.object({
+            at: timestamp,
+            configuredDelayDays: count,
+            leadEmail: z.string().max(320),
+            previousAt: timestamp,
+            sendingInbox: z.string().max(320).nullable(),
+            step: count,
+          })
+        )
+        .max(EARLY_EXAMPLE_LIMIT),
+      followUpsChecked: count,
+      /** Set with `reading` when the early sends are a platform fault; see `readEarlyFollowUps`. */
+      platformFault: z.literal(true).optional(),
+      reading: z.string().optional(),
+      sameDayCount: count,
+      withoutPreviousSend: count,
+    })
+    .nullable(),
+  endDate: dateStr,
+  lead: z
+    .object({
+      bounceCount: count.nullable(),
+      email: z.string().max(320),
+      events: z
+        .array(
+          z.object({
+            at: timestamp,
+            eventType: z.string().max(64),
+            sendingInbox: z.string().max(320).nullable(),
+            step: count.nullable(),
+            variant: count.nullable(),
+          })
+        )
+        .max(LEAD_EVENT_LIMIT),
+      inCampaign: z.boolean(),
+      openCount: count.nullable(),
+      pushedToProvider: z.boolean().nullable(),
+      status: z.string().max(64).nullable(),
+      statusAt: timestamp.nullable(),
+    })
+    .nullable(),
+  overview: z
+    .object({
+      bounces: count,
+      emailsSent: count,
+      meetingsBooked: count,
+      opens: count,
+      replies: count,
+      snapshotAt: timestamp.nullable(),
+      unsubscribes: count,
+    })
+    .nullable(),
+  sequenceStepDelays: z.array(count.nullable()).max(20).nullable(),
+  startDate: dateStr,
+  statusHistory: z
+    .array(
+      z.object({
+        at: timestamp,
+        message: z.string().max(STATUS_MESSAGE_CHARS * 2),
+        status: z.string().max(40).nullable(),
       })
-      .nullable(),
-    endDate: dateStr,
-    lead: z
-      .object({
-        bounceCount: count.nullable(),
-        email: z.string().max(320),
-        events: z
-          .array(
-            z.object({
-              at: timestamp,
-              eventType: z.string().max(64),
-              sendingInbox: z.string().max(320).nullable(),
-              step: count.nullable(),
-              variant: count.nullable(),
-            })
-          )
-          .max(LEAD_EVENT_LIMIT),
-        inCampaign: z.boolean(),
-        openCount: count.nullable(),
-        pushedToProvider: z.boolean().nullable(),
-        status: z.string().max(64).nullable(),
-        statusAt: timestamp.nullable(),
-      })
-      .nullable(),
-    overview: z
-      .object({
-        bounces: count,
-        emailsSent: count,
-        meetingsBooked: count,
-        opens: count,
-        replies: count,
-        snapshotAt: timestamp.nullable(),
-        unsubscribes: count,
-      })
-      .nullable(),
-    sequenceStepDelays: z.array(count.nullable()).max(20).nullable(),
-    startDate: dateStr,
-    statusHistory: z
-      .array(
-        z.object({
-          at: timestamp,
-          message: z.string().max(STATUS_MESSAGE_CHARS * 2),
-          status: z.string().max(40).nullable(),
-        })
-      )
-      .max(STATUS_HISTORY_LIMIT),
-    stepSends: z
-      .array(
-        z.object({ sent: count, snapshotAt: timestamp.nullable(), step: count })
-      )
-      .max(20),
+    )
+    .max(STATUS_HISTORY_LIMIT),
+  stepSends: z
+    .array(
+      z.object({ sent: count, snapshotAt: timestamp.nullable(), step: count })
+    )
+    .max(20),
+});
+const campaignDiagnostics = diagnosticsFields
+  .extend({
+    // Optional so saved replays from before it existed still parse.
+    agentDecisions: z.array(agentDecision).max(AGENT_DECISION_LIMIT).optional(),
+  })
+  .nullable();
+const savedDiagnostics = diagnosticsFields
+  .extend({
+    agentDecisions: z.array(agentDecisionRow).max(AGENT_DECISION_LIMIT),
   })
   .nullable();
 const campaignHealth = z.object({
@@ -407,6 +566,46 @@ export function buildWidgetOutreachHealthQuery(
           "previousAt", at, inbox as "sendingInbox"
         from early order by at desc limit ${EARLY_EXAMPLE_LIMIT}
       ) x), '[]'::jsonb)))`;
+  // The campaign AI Agent's reviews, as its tab reads them (Acquisity's
+  // campaign-agent-insight): live 2026-11-24 the widget said "no automatic
+  // pause reason" for a campaign the agent had paused with the customer's okay.
+  const array = (value: string) =>
+    `case when jsonb_typeof(${value}) = 'array' then ${value} else '[]'::jsonb end`;
+  const flag = (key: string) =>
+    `case when jsonb_typeof(da.metadata->'${key}') = 'boolean' then (da.metadata->>'${key}')::boolean end`;
+  const index = (value: string) =>
+    `case when jsonb_typeof(${value}) = 'number' and (${value})::text ~ '^[0-9]{1,3}$' then (${value})::text::int end`;
+  const agentDecisionsJson = `coalesce((select jsonb_agg(to_jsonb(ad) order by ad.at desc) from (
+      select da.created_at as at, left(da.status, 40) as "runStatus",
+        left(da.decision_details->>'status', 64) as verdict,
+        left(coalesce(nullif(da.decision_details->>'reason', ''), da.decision_reason), ${AGENT_FINDING_CHARS}) as finding,
+        coalesce((select jsonb_agg(left(r.value #>> '{}', ${AGENT_TEXT_CHARS}) order by r.n)
+          from jsonb_array_elements(${array("da.decision_details->'recommendedActions'")}) with ordinality r(value, n)
+          where r.n <= ${AGENT_ACTION_LIMIT} and jsonb_typeof(r.value) = 'string' and r.value #>> '{}' <> ''), '[]'::jsonb) as recommended,
+        coalesce((select jsonb_agg(jsonb_build_object('index', a.n - 1, 'type', left(a.value->>'type', 64),
+            'reason', left(a.value->'params'->>'reason', ${AGENT_TEXT_CHARS})) order by a.n)
+          from jsonb_array_elements(${array("da.decision_details->'actions'")}) with ordinality a(value, n)
+          where a.n <= ${AGENT_ACTION_LIMIT} and jsonb_typeof(a.value->'type') = 'string'), '[]'::jsonb) as actions,
+        coalesce((select jsonb_agg(jsonb_build_object('index', ${index("d.value->'index'")}, 'at', left(d.value->>'completedAt', 64)))
+          from jsonb_array_elements(${array("da.metadata->'completedActions'")}) d(value)
+          where ${index("d.value->'index'")} < ${AGENT_ACTION_LIMIT} and jsonb_typeof(d.value->'completedAt') = 'string'), '[]'::jsonb) as completed,
+        coalesce((select jsonb_agg(jsonb_build_object('index', ${index("k.value->'index'")}, 'reason', left(k.value->>'reason', ${AGENT_TEXT_CHARS})))
+          from jsonb_array_elements(${array("da.metadata->'skippedActions'")}) k(value)
+          where ${index("k.value->'index'")} < ${AGENT_ACTION_LIMIT}), '[]'::jsonb) as skipped,
+        case when da.metadata ? 'approvalStatus' or da.metadata ? 'approvalRequestedAt' then jsonb_build_object(
+          'status', left(da.metadata->>'approvalStatus', 64),
+          'requestedAt', left(da.metadata->>'approvalRequestedAt', 64),
+          'expiresAt', left(da.metadata->>'approvalExpiresAt', 64),
+          'respondedAt', left(da.metadata->>'respondedAt', 64),
+          'autoExecutesOnTimeout', ${flag("approvalAutoExecutesOnTimeout")},
+          'actionIndexes', (select jsonb_agg(${index("i.value")})
+            from jsonb_array_elements(${array("da.metadata->'approvalActionIndexes'")}) i(value)
+            where ${index("i.value")} < ${AGENT_ACTION_LIMIT})) end as approval,
+        left(da.metadata->>'errorMessage', ${AGENT_TEXT_CHARS}) as error
+      from outreach_campaign_decision_analytics da
+      where da.organization_id = c.organization_id and da.campaign_id = c.id
+      order by da.created_at desc limit ${AGENT_DECISION_LIMIT}
+    ) ad), '[]'::jsonb)`;
   const diagnostics = input.campaignId
     ? `jsonb_build_object(
     'lead', ${leadJson},
@@ -430,6 +629,7 @@ export function buildWidgetOutreachHealthQuery(
         and (ca.message like 'Campaign status updated to %' or ca.message like 'Campaign launch failed: %')
       order by coalesce(ca.occurred_at, ca.created_at) desc limit ${STATUS_HISTORY_LIMIT}
     ) h), '[]'::jsonb),
+    'agentDecisions', ${agentDecisionsJson},
     'stepSends', coalesce((select jsonb_agg(to_jsonb(s) order by s.step) from (
       select sv.step::int as step, sum(sv.sent) as sent, max(sv.snapshot_at) as "snapshotAt"
       from outreach_campaign_step_variant_metrics sv
@@ -527,7 +727,7 @@ const campaignRow = z.object({
   createdAt: timestamp.nullish(),
   dailyLimit: count.nullable(),
   days: z.record(z.string(), z.boolean()).nullable(),
-  diagnostics: campaignDiagnostics,
+  diagnostics: savedDiagnostics,
   fromTime: z.string().max(16).nullable(),
   id: z.uuid(),
   leadsNotPushedCount: count,
@@ -590,6 +790,7 @@ export function parseWidgetOutreachHealthEvidence(
     const diagnostics = row.diagnostics
       ? {
           ...row.diagnostics,
+          agentDecisions: row.diagnostics.agentDecisions.map(readAgentDecision),
           statusHistory: row.diagnostics.statusHistory.map((event) => ({
             ...event,
             message: diagnosticText(event.message, STATUS_MESSAGE_CHARS) ?? "",
@@ -644,7 +845,7 @@ export function parseWidgetOutreachHealthEvidence(
     campaigns,
     caveats: [
       "Campaign fields are saved product state; only live contains a provider read. savedDailyLimitPerInbox is the saved per-inbox allocation, not a live campaign cap, and null means none is saved, never a limit of zero. Sending limits are set by Acquisity: the customer cannot see or change them anywhere in the product, so never tell the customer to change a limit and never describe a limit as the customer's setting.",
-      "pauseReason is the reason Acquisity saved when it paused the campaign itself or the provider did (for example accounts unhealthy, bounce protection, a high bounce rate, a subscription ending, or completed with nothing sent); the customer also sees it on the campaign's status badge. null means no reason was saved, which is what a pause the customer made themselves looks like: say no automatic pause reason is recorded, never that the cause is unknown to everyone. diagnostics.statusHistory lists the campaign's last 10 saved status changes, newest first, with when each happened; it shows when a campaign was paused or resumed, not who did it. live.providerStatus is the sending provider's current status code (accounts_unhealthy, bounce_protect and account_suspended are provider pauses).",
+      "pauseReason is the reason Acquisity saved when it paused the campaign itself or the provider did (for example accounts unhealthy, bounce protection, a high bounce rate, a subscription ending, or completed with nothing sent); the customer also sees it on the campaign's status badge. null means no reason was saved, which is what a pause the customer made themselves looks like, and also a pause the campaign's AI Agent made: check diagnostics.agentDecisions before saying no automatic pause reason is recorded, and never say the cause is unknown to everyone. diagnostics.agentDecisions (with campaignId) is the campaign AI Agent's last 5 reviews, newest first, as its AI Agent tab shows them: finding (the Key Finding), recommended (Recommended Actions), and each action with its state (taken with when, skipped with why, waiting_for_approval, running, or not_run), and approval (status approved, rejected, expired, aborted or awaiting_approval, with when it was asked, answered and expires, and whether it runs automatically on expiry). A PAUSE_CAMPAIGN action taken is the AI Agent pausing the campaign; when approval.status is approved, someone in the workspace approved it. Tell the customer what the agent found and did in plain words, never the action codes. diagnostics.statusHistory lists the campaign's last 10 saved status changes, newest first, with when each happened; it shows when a campaign was paused or resumed, not who did it. live.providerStatus is the sending provider's current status code (accounts_unhealthy, bounce_protect and account_suspended are provider pauses).",
       "notSendingReason reflects the provider's last saved code, not a live check; an unmapped code returns null, not a reason.",
       "Missing metric rows do not mean zero activity. No click metric is available in this result; never report a click count or treat opens as clicks.",
       "recentSends covers the requested date window when startDate and endDate were passed, else only the last 7 saved days. diagnostics.dailyMetrics covers the inclusive requested date window; missing days are unknown, not zero. overview is a separate cumulative saved snapshot. Neither is dispatch history or proof of individual delivery.",
@@ -1054,7 +1255,7 @@ export async function readWidgetOutreachHealth(
 
 export const tool = defineTool({
   description:
-    "Diagnose 'my campaigns stopped sending' or 'leads never went out' only in this chat's verified workspace. Inbox pagination and a lead's history require campaignId; list campaigns first to get ids. Up to 20 campaigns that are active, paused, completed or need attention (name, status, total leads, and pauseReason: why Acquisity or the provider paused it, when saved) with nextAfter for the next page; drafts and archived campaigns are not listed. When the customer names a campaign that is not on this page, read the next page with nextAfter before concluding it does not exist, each with: the provider's saved not-sending reason (outside_schedule_window, waiting_for_leads, campaign_daily_limit_reached, all_accounts_at_daily_limit, provider_error, or null when sending normally or the code is unmapped), the saved sending schedule (days, hours, timezone, and whether the window is inverted so it never opens), the saved per-inbox daily allocation (not the live campaign cap), up to 7 days of recent daily send counts (or, with startDate and endDate and no campaignId, every saved day in that window, at most 31 days: one call answers which campaigns sent on which dates), and a count of that campaign's leads never pushed to the provider (null provider lead id); compare totalLeads with leadsNotPushedCount for a lead count mismatch. Also returns an org-wide connected-inbox summary: total sending accounts and how many are healthy (active and connected). Use null for campaignId to list campaigns first; never invent IDs. Pass campaignId from this tool for saved cumulative metrics, daily sending/delivery/open/bounce/reply/meeting metrics (last 7 calendar days by default; optional startDate and endDate YYYY-MM-DD, inclusive, maximum 31 days), campaign-specific inbox assignments, the last 10 status changes with dates (statusHistory: when it was paused or resumed), saved sends per sequence step and each step's configured delay in days; use those step figures for 'follow-ups are not sending' or 'only step 1 sends' questions. With campaignId it also finds, without any lead named, which leads got a follow-up sooner than its configured delay in the date window (earlyFollowUps: counts, same-day count, up to 10 example leads with both send times and the sending inbox); use it for 'follow-ups went out early' or 'follow-up sent the same day as the first email' and never ask the customer for a lead email first. earlyFollowUps.reading, when present, is the conclusion: the product sent follow-ups days before their delay, a platform fault for the team; tell the customer that. Pass leadEmail with campaignId for one lead's own history in that campaign: its status and dated sends, opens, bounces and replies, each with the sequence step and the inbox that sent it; use it for 'did my follow-up go to this lead', 'when was this person emailed' or 'which inbox emailed them'. Pass afterInboxId from diagnostics.assignedInboxes.nextAfterInboxId to read additional owned assigned inboxes. Counts cover the full selection, not just that page. Assigned inboxes are Acquisity's saved inbox records, which can outlive the inboxes themselves: when widget_inbox_health's live check ran (accounts.available true), read every account (accounts.truncated false), includes every account's details (accounts.detailsTruncated false), and does not list an assigned inbox, that inbox is no longer in the workspace, so say the campaign points at inboxes it no longer has and tell the customer to add or assign inboxes, never to reconnect them. Compare emails ignoring case. A truncated account read, omitted details or a live account with no email cannot prove an inbox is absent; say its current presence could not be confirmed. Every listed campaign, with or without campaignId, also carries live: the provider's current status (providerStatus, including accounts_unhealthy, bounce_protect and account_suspended), campaign daily limit, not-sending code, and sending rules (live.sendingRules): newLeadsFirst (new leads are prioritized over scheduled follow-ups), maxNewLeadsPerDay (the cap on first emails per day), minutesBetweenEmails and randomExtraMinutesMax (the minimum gap between emails and the random extra wait added to it). When follow-ups aren't sending, or a new campaign sends too few new emails, check these first. sendingRules.reading, when present, says what the rules mean for this campaign: tell the customer that as the likely cause, not a certain one. Acquisity sets these rules; the customer cannot change them in the product. Other fields remain saved state. Live status does not prove actual dispatch or delivery. Acquisity manages provider limits; never tell the customer to change them in Instantly. Unavailable is not empty. No SQL, workspace or field selector is accepted.",
+    "Diagnose 'my campaigns stopped sending' or 'leads never went out' only in this chat's verified workspace. Inbox pagination and a lead's history require campaignId; list campaigns first to get ids. Up to 20 campaigns that are active, paused, completed or need attention (name, status, total leads, and pauseReason: why Acquisity or the provider paused it, when saved) with nextAfter for the next page; drafts and archived campaigns are not listed. When the customer names a campaign that is not on this page, read the next page with nextAfter before concluding it does not exist, each with: the provider's saved not-sending reason (outside_schedule_window, waiting_for_leads, campaign_daily_limit_reached, all_accounts_at_daily_limit, provider_error, or null when sending normally or the code is unmapped), the saved sending schedule (days, hours, timezone, and whether the window is inverted so it never opens), the saved per-inbox daily allocation (not the live campaign cap), up to 7 days of recent daily send counts (or, with startDate and endDate and no campaignId, every saved day in that window, at most 31 days: one call answers which campaigns sent on which dates), and a count of that campaign's leads never pushed to the provider (null provider lead id); compare totalLeads with leadsNotPushedCount for a lead count mismatch. Also returns an org-wide connected-inbox summary: total sending accounts and how many are healthy (active and connected). Use null for campaignId to list campaigns first; never invent IDs. Pass campaignId from this tool for saved cumulative metrics, daily sending/delivery/open/bounce/reply/meeting metrics (last 7 calendar days by default; optional startDate and endDate YYYY-MM-DD, inclusive, maximum 31 days), campaign-specific inbox assignments, the last 10 status changes with dates (statusHistory: when it was paused or resumed), the AI Agent's last 5 reviews (agentDecisions: finding, actions taken or awaiting approval; use for 'the AI agent paused it'), saved sends per sequence step and each step's configured delay in days; use those step figures for 'follow-ups are not sending' or 'only step 1 sends' questions. With campaignId it also finds, without any lead named, which leads got a follow-up sooner than its configured delay in the date window (earlyFollowUps: counts, same-day count, up to 10 example leads with both send times and the sending inbox); use it for 'follow-ups went out early' or 'follow-up sent the same day as the first email' and never ask the customer for a lead email first. earlyFollowUps.reading, when present, is the conclusion: the product sent follow-ups days before their delay, a platform fault for the team; tell the customer that. Pass leadEmail with campaignId for one lead's own history in that campaign: its status and dated sends, opens, bounces and replies, each with the sequence step and the inbox that sent it; use it for 'did my follow-up go to this lead', 'when was this person emailed' or 'which inbox emailed them'. Pass afterInboxId from diagnostics.assignedInboxes.nextAfterInboxId to read additional owned assigned inboxes. Counts cover the full selection, not just that page. Assigned inboxes are Acquisity's saved inbox records, which can outlive the inboxes themselves: when widget_inbox_health's live check ran (accounts.available true), read every account (accounts.truncated false), includes every account's details (accounts.detailsTruncated false), and does not list an assigned inbox, that inbox is no longer in the workspace, so say the campaign points at inboxes it no longer has and tell the customer to add or assign inboxes, never to reconnect them. Compare emails ignoring case. A truncated account read, omitted details or a live account with no email cannot prove an inbox is absent; say its current presence could not be confirmed. Every listed campaign, with or without campaignId, also carries live: the provider's current status (providerStatus, including accounts_unhealthy, bounce_protect and account_suspended), campaign daily limit, not-sending code, and sending rules (live.sendingRules): newLeadsFirst (new leads are prioritized over scheduled follow-ups), maxNewLeadsPerDay (the cap on first emails per day), minutesBetweenEmails and randomExtraMinutesMax (the minimum gap between emails and the random extra wait added to it). When follow-ups aren't sending, or a new campaign sends too few new emails, check these first. sendingRules.reading, when present, says what the rules mean for this campaign: tell the customer that as the likely cause, not a certain one. Acquisity sets these rules; the customer cannot change them in the product. Other fields remain saved state. Live status does not prove actual dispatch or delivery. Acquisity manages provider limits; never tell the customer to change them in Instantly. Unavailable is not empty. No SQL, workspace or field selector is accepted.",
   execute: async (input, ctx: ToolContext) =>
     readWidgetOutreachHealth(
       ctx,

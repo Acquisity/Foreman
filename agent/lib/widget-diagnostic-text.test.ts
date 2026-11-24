@@ -99,6 +99,7 @@ async function diagnostics(t: TestContext, text: string) {
           dailyLimit: null,
           days: null,
           diagnostics: {
+            agentDecisions: [],
             assignedInboxes: {
               accounts: [],
               configuredCount: null,
