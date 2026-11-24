@@ -9,7 +9,9 @@ import {
   customerWords,
   defaultChatDeps,
   guideCitations,
+  guideFor,
 } from "./widget-chat.js";
+import { PRODUCT_GUIDE } from "./widget-product-guide.js";
 
 const TRY_AGAIN = /try your message again/u;
 
@@ -214,5 +216,137 @@ test("the guide writer's after-hours person note replaces the no-notification ru
     calls[0].messages[0].content.includes(
       "Code handles filing this conversation"
     )
+  );
+});
+
+const helpCenter = {
+  featuresOff: [
+    {
+      feature: "deliverability",
+      pages: [
+        "cold-email-agent/deliverability",
+        "cold-email-agent/deliverability/faq",
+      ],
+      title: "Deliverability",
+    },
+  ],
+  viewer: "signed.help.viewer",
+};
+
+test("the guide drops the articles and summary lines for pages the customer's features hide", () => {
+  const guide = [
+    "## What Acquisity cannot do",
+    "- Placement tests cannot be scheduled {cold-email-agent/deliverability}",
+    "- Workspaces cannot be deleted {workspace-settings/general}",
+    "- Both {cold-email-agent/deliverability} {workspace-settings/general}",
+    "",
+    "## Articles",
+    "",
+    "### Deliverability {slug: cold-email-agent/deliverability}",
+    "- Inbox placement per provider.",
+    "",
+    "### FAQ {slug: cold-email-agent/deliverability/faq}",
+    "- Test before launch.",
+    "",
+    "### General {slug: workspace-settings/general}",
+    "- Rename the workspace.",
+    "",
+  ].join("\n");
+  assert.equal(guideFor(new Set(), guide), guide);
+  assert.equal(guideFor(new Set(["no-such-page"])), PRODUCT_GUIDE);
+  assert.equal(
+    guideFor(new Set(helpCenter.featuresOff[0].pages), guide),
+    [
+      "## What Acquisity cannot do",
+      "- Workspaces cannot be deleted {workspace-settings/general}",
+      "- Both {cold-email-agent/deliverability} {workspace-settings/general}",
+      "",
+      "## Articles",
+      "",
+      "### General {slug: workspace-settings/general}",
+      "- Rename the workspace.",
+      "",
+    ].join("\n")
+  );
+});
+
+test("the guide writer answers from the customer's guide, is told what is off, and never cites a hidden page", async () => {
+  const { chatPrompt, CHAT_PROMPT } = await import("./widget-chat.js");
+  const prompt = chatPrompt(undefined, {
+    featuresOff: [
+      {
+        feature: "local_business_leads",
+        pages: ["dashboard"],
+        title: "Dashboard",
+      },
+    ],
+    viewer: "v",
+  });
+  assert.ok(CHAT_PROMPT.includes("{slug: dashboard}"));
+  assert.ok(!prompt.includes("{slug: dashboard}"));
+  assert.equal(chatPrompt(undefined, undefined), CHAT_PROMPT);
+
+  const generated: { system: string; view?: unknown }[] = [];
+  const customer = {
+    canInvestigate: false,
+    helpCenter: {
+      ...helpCenter,
+      featuresOff: [{ ...helpCenter.featuresOff[0], pages: ["dashboard"] }],
+    },
+    role: "member",
+    workspace: "w",
+  };
+  const answer = await answerFromGuide(
+    "how am I doing?",
+    { conversationId: "c", runId: "r" },
+    customer,
+    undefined,
+    {
+      generate: (input) => {
+        generated.push({
+          system: input.messages[0].content,
+          view: input.view,
+        });
+        return Promise.resolve({
+          cachedTokens: 0,
+          inputTokens: 0,
+          model: "m",
+          text: "That is not turned on for your workspace. {dashboard} See {faq}.",
+          ttftMs: 1,
+        });
+      },
+    }
+  );
+  assert.equal(generated[0].view, customer.helpCenter);
+  assert.ok(generated[0].system.includes('"featuresOff":["Deliverability"]'));
+  assert.ok(generated[0].system.includes("not turned on for their workspace"));
+  assert.ok(!generated[0].system.includes(helpCenter.viewer));
+  assert.deepEqual(
+    answer.citations.map((citation) => citation.url),
+    ["https://app.acquisity.ai/docs/faq"]
+  );
+});
+
+test("a member's role limits come from their own guide, never a hidden page", () => {
+  const slug =
+    "sales-call-analyzer/faq/can-my-team-members-access-sales-call-analyzer";
+  const line = "Sales Call Analyzer, while Clients have none";
+  const member = { canInvestigate: false, role: "member", workspace: "w" };
+  const note = (
+    featuresOff: { feature: string; pages: string[]; title: string }[]
+  ) =>
+    chatMessages(
+      { latest: "who can use it?" },
+      { ...member, helpCenter: { featuresOff, viewer: "v" } }
+    )[0].content;
+  assert.ok(note([]).includes(line));
+  assert.ok(
+    !note([
+      {
+        feature: "sales_call_analyzer",
+        pages: [slug],
+        title: "Sales Call Analyzer",
+      },
+    ]).includes(line)
   );
 });

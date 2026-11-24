@@ -1,6 +1,7 @@
 import type { SessionAuthContext } from "eve/context";
 import { z } from "zod";
 import { DEFAULT_PARTNER_ID } from "./acquisity-constants.js";
+import { helpCenterViewSchema } from "./help-center.js";
 import { stampUnattended } from "./trust.js";
 import {
   availableEndpointSchema,
@@ -66,6 +67,9 @@ const shape = {
   // The support endpoints the context route lists for the asking user
   // (ENG-20296). Absent means the list was not given or could not be read.
   endpoints: z.array(availableEndpointSchema).max(50).optional(),
+  // The customer's Help Centre view for the knowledge base lane: never stamped
+  // on the session, and dropped from the stored run.
+  helpCenter: helpCenterViewSchema.optional(),
   // Only the local live harness stamps the original conversation date.
   liveAsOf: z.iso.datetime().optional(),
   // Kept on the run so its finish reads the hours the message was sent in.
@@ -140,6 +144,7 @@ export function widgetAuth(
   runId?: string
 ): SessionAuthContext {
   const {
+    helpCenter: _helpCenter,
     endpoints,
     officeHours: _hours,
     ...verified

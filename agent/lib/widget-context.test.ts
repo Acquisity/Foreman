@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { type TestContext, test } from "node:test";
 import { verifiedWidgetContext } from "./widget.fixture.js";
 import { verifyWidgetContext } from "./widget-context.js";
+import { widgetAuth } from "./widget-scope.js";
 
 const origin = "https://pr-13999-acquisity.vercel.app";
 const userToken = "signed.user.identity";
@@ -295,6 +296,39 @@ test("a timeline response past the larger limit is refused", async (context) => 
       ).request
     )
   );
+});
+
+test("the app's Help Centre view rides on the verified scope, never on the session; absent or malformed reads as signed out", async (context) => {
+  configure(context);
+  const helpCenter = {
+    featuresOff: [
+      {
+        feature: "deliverability",
+        pages: ["cold-email-agent/deliverability"],
+        title: "Deliverability",
+      },
+    ],
+    viewer: "signed.help.viewer",
+  };
+  const verify = (body: object) =>
+    verifyWidgetContext(
+      { conversationId, organizationId, userToken },
+      requester(Response.json(body)).request
+    );
+  const scope = await verify({ ...appContext, helpCenter });
+  assert.deepEqual(scope.helpCenter, helpCenter);
+  assert.equal("helpCenter" in (widgetAuth(scope).attributes ?? {}), false);
+  assert.equal("helpCenter" in (await verify(appContext)), false);
+  for (const malformed of [
+    { ...helpCenter, viewer: "<token>" },
+    { featuresOff: "deliverability", viewer: helpCenter.viewer },
+    "viewer",
+  ]) {
+    // biome-ignore lint/performance/noAwaitInLoops: each body is one case.
+    const read = await verify({ ...appContext, helpCenter: malformed });
+    assert.equal("helpCenter" in read, false);
+    assert.equal(read.organizationId, organizationId);
+  }
 });
 
 test("the endpoint list is kept, a malformed entry drops only itself, and a long list fits", async (context) => {

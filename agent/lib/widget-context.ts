@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { DEFAULT_PARTNER_ID } from "./acquisity-constants.js";
 import { acquisityOrigin, readContextBody } from "./acquisity-origin.js";
+import { helpCenterViewSchema } from "./help-center.js";
 import { parseAvailableEndpoints } from "./widget-endpoint-schema.js";
 import { isLiveActive, liveContext } from "./widget-live-policy.js";
 import {
@@ -14,6 +15,8 @@ import {
 /** The app's verified workspace payload; Intercom's app id is irrelevant to the widget and ignored. */
 const appContextSchema = z.looseObject({
   endpoints: z.unknown().optional().transform(parseAvailableEndpoints),
+  // Absent or malformed: the docs are read signed out and the guide is not narrowed.
+  helpCenter: helpCenterViewSchema.optional().catch(undefined),
   // Any problem with it reads as absent: support counts as open, as before.
   officeHours: officeHoursSchema.optional().catch(undefined),
   organizationId: z.uuid(),
@@ -106,6 +109,7 @@ export async function verifyWidgetContext(
       organizationId: verified.organizationId,
       organizationName: verified.organizationName,
       organizationSlug: verified.organizationSlug,
+      ...(verified.helpCenter ? { helpCenter: verified.helpCenter } : {}),
       ...(verified.officeHours ? { officeHours: verified.officeHours } : {}),
       partnerId: verified.partnerId,
       role: verified.role,
