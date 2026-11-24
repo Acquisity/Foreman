@@ -59,7 +59,8 @@ const strArr = (v: unknown, maxItems: number, maxLen: number): string[] =>
         .slice(0, maxItems)
     : [];
 
-const AREAS: ReadonlySet<string> = new Set(GAP_AREAS);
+const uncheckedArea = z.enum(GAP_AREAS).catch("other");
+const uncheckedKind = z.enum(["docs", "tool"]).catch("tool");
 
 /** Each unchecked fact the extractor wrote in general terms; one naming something from the workspace is dropped. */
 function uncheckedFacts(
@@ -71,12 +72,9 @@ function uncheckedFacts(
       return fact
         ? [
             {
-              area: (AREAS.has(item.area)
-                ? item.area
-                : "other") as (typeof GAP_AREAS)[number],
+              area: uncheckedArea.parse(item.area),
               fact,
-              kind:
-                item.kind === "docs" ? ("docs" as const) : ("tool" as const),
+              kind: uncheckedKind.parse(item.kind),
             },
           ]
         : [];
