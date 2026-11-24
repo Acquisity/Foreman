@@ -264,3 +264,52 @@ test("an Instantly failure gives no live count rather than zero", async (t) => {
   assert.equal(result.accounts.available, false);
   assert.equal(result.savedDomains?.domains[0].liveAccounts, null);
 });
+
+test("an account with no email gives no live count, since it could be one of the domain's mailboxes", async (t) => {
+  t.mock.method(
+    executorTransport,
+    "call",
+    byPath({
+      [ACCOUNTS_PATH]: () => ({
+        data: {
+          items: [{ email: "a@other.example.test", status: 1 }, { status: 1 }],
+          next_starting_after: null,
+        },
+        ok: true,
+      }),
+      [DB_PATH]: () => ({
+        data: dbEnvelope(provisioned([suspendedDomain])),
+        ok: true,
+      }),
+      [MEMBERS_PATH]: acceptedMember,
+    })
+  );
+  const result = await readWidgetInboxHealth(ctx);
+  if (result.status !== "ok" || result.accounts.available !== true) {
+    return assert.fail("live check did not run");
+  }
+  assert.equal(result.accounts.truncated, false);
+  assert.equal(result.savedDomains?.domains[0].liveAccounts, null);
+});
+
+test("a user-managed, turned-off or unlinked connection gives no live count", async (t) => {
+  for (const overrides of [
+    { accountType: "user_owned" },
+    { isActive: false },
+    { workspaceId: null },
+  ]) {
+    const row = { ...provisioned([suspendedDomain]), ...overrides };
+    t.mock.method(
+      executorTransport,
+      "call",
+      byPath({ [DB_PATH]: () => ({ data: dbEnvelope(row), ok: true }) })
+    );
+    // biome-ignore lint/performance/noAwaitInLoops: each case replaces the shared transport mock
+    const result = await readWidgetInboxHealth(ctx);
+    if (result.status !== "ok") {
+      return assert.fail("expected an ok read");
+    }
+    assert.equal(result.accounts.available, false);
+    assert.equal(result.savedDomains?.domains[0].liveAccounts, null);
+  }
+});

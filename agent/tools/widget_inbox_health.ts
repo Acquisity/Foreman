@@ -421,7 +421,7 @@ const CAVEATS = [
   "Account details come from the live provider read, except the initialWarmup bucket uses saved DFY creation dates. Non-ready accounts are listed first; detailsTruncated means some scanned accounts are omitted. dailyLimit is the provider account setting, not a campaign cap or measured sending rate; Acquisity manages these settings, so do not ask the customer to change them anywhere.",
   "senderName is the From name each live account sends with (its saved first and last name). savedInboxes lists the inboxes the customer bought through Acquisity, from saved records (total counts all of them; at most 100 shown, disconnected first), with the first and last name each was provisioned with: that is the sender name recipients see, and it was set at purchase, not taken from the customer's profile. Signature text is not readable here.",
   "Live account status is only checked for Acquisity-provisioned connections; a user-managed sending-provider workspace cannot be verified as belonging to this organization.",
-  "savedDomains lists the domains the customer bought through Acquisity, from saved records (total counts all of them; at most 50 shown, every domain that is not active first). status is Acquisity's: suspended means Acquisity ended the domain, cancelling means Acquisity is still stopping its billing. reason is the saved reason it ended or failed. billingStop is Acquisity's request to stop charging for that domain: cancelled with stoppedAt means its charge was stopped then, failed or pending means it was not stopped yet, so the customer may still be charged for it, and null means no stop was requested, which says nothing either way; a plan that still shows paid can be billing other domains or inboxes. savedInboxes and connectedInboxes count its saved mailboxes; liveAccounts counts sending accounts at that domain in this workspace's live read, and is null when the live check did not run or read only a sample (accounts.truncated). Zero liveAccounts means no mailbox at that domain is in this workspace's sending account. Whether they sit in another workspace cannot be checked here.",
+  "savedDomains lists the domains the customer bought through Acquisity, from saved records (total counts all of them; at most 50 shown, every domain that is not active first). status is Acquisity's: suspended means Acquisity ended the domain, cancelling means Acquisity is still stopping its billing. reason is the saved reason it ended or failed. billingStop is Acquisity's request to stop charging for that domain: cancelled with stoppedAt means its charge was stopped then, failed or pending means it was not stopped yet, so the customer may still be charged for it, and null means no stop was requested, which says nothing either way; a plan that still shows paid can be billing other domains or inboxes. savedInboxes and connectedInboxes count its saved mailboxes; liveAccounts counts sending accounts at that domain in this workspace's live read, and is null when the live check did not run, read only a sample (accounts.truncated), or read an account with no email. Zero liveAccounts means no mailbox at that domain is in this workspace's sending account. Whether they sit in another workspace cannot be checked here.",
 ];
 
 /** Authored wording for each reason Acquisity saves on a domain; anything else stays generic. */
@@ -508,11 +508,12 @@ function classify(
   return "unknown";
 }
 
+/** The key accounts without a readable email are counted under. */
+const NO_DOMAIN = "";
+
 function countDomain(counts: Map<string, number>, email: string | undefined) {
-  const domain = email?.trim().toLowerCase().split("@")[1];
-  if (domain) {
-    counts.set(domain, (counts.get(domain) ?? 0) + 1);
-  }
+  const domain = email?.trim().toLowerCase().split("@")[1] ?? NO_DOMAIN;
+  counts.set(domain, (counts.get(domain) ?? 0) + 1);
 }
 
 function bucketAccounts(
@@ -660,7 +661,9 @@ async function readAccountsEvidence(
         total: items.length,
         truncated,
       },
-      liveByDomain: truncated ? null : liveByDomain,
+      // A domain's mailbox can only be ruled out when every account was read and named.
+      liveByDomain:
+        truncated || liveByDomain.has(NO_DOMAIN) ? null : liveByDomain,
     };
   } catch (error) {
     if (ctx.abortSignal.aborted) {
