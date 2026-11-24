@@ -508,7 +508,6 @@ function classify(
   return "unknown";
 }
 
-/** The key accounts without a readable email are counted under. */
 const NO_DOMAIN = "";
 
 function countDomain(counts: Map<string, number>, email: string | undefined) {
