@@ -20,6 +20,7 @@ const INVITATION_LIMIT = 25;
 const ROLE_LIMIT = 4;
 const AUTH_ERROR_CLASS_LIMIT = 10;
 const SENTRY_WINDOW_DAYS = 14;
+const SENTRY_ISSUES_PATH = "sentry-foreman.search_issues";
 const sentryOrgSlug = z.string().regex(/^[a-z0-9][a-z0-9_-]{0,99}$/);
 
 const role = z.enum(["owner", "admin", "member", "client"]);
@@ -348,25 +349,19 @@ export function parseSentryUserErrors(
   }
 }
 
-/** Best-effort user-scoped error signals; no request is made unless the org slug and binding are configured. */
+/** Best-effort user-scoped error signals; no request is made unless the org slug is configured. */
 async function readUserErrors(
   ctx: ProviderContext,
   scope: WidgetContext
 ): Promise<z.infer<typeof userErrorSignals>> {
   const slug = sentryOrgSlug.safeParse(process.env.WIDGET_SENTRY_ORG_SLUG);
-  let path: string;
-  try {
-    path = operationPath("sentry.searchIssues");
-  } catch {
-    return { reason: "sentry_unconfigured", status: "unavailable" };
-  }
   if (!slug.success) {
     return { reason: "sentry_unconfigured", status: "unavailable" };
   }
   try {
     const outcome = await invokeProvider(
       ctx,
-      path,
+      SENTRY_ISSUES_PATH,
       // A validated UUID cannot break the Sentry query DSL. Bounded to this user's errors.
       {
         organizationSlug: slug.data,
