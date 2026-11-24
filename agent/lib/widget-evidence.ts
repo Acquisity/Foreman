@@ -1,6 +1,9 @@
 import { z } from "zod";
+import { readContextBody } from "./acquisity-origin.js";
 import { readWidgetOwnership } from "./executor/dispatch.js";
 import { providerData } from "./support/conversation.js";
+import { postScopedAppRoute } from "./widget-app-diagnostics.js";
+import { WIDGET_ENDPOINT_MANIFEST } from "./widget-endpoint-manifest.js";
 import { type WidgetContext, widgetContextSchema } from "./widget-scope.js";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -8,11 +11,9 @@ const EMAIL = /^[^\s'"\\{},@]+@[^\s'"\\{},@]+$/;
 const SLUG = /^[A-Za-z0-9][A-Za-z0-9_-]{0,199}$/;
 const DOMAIN = /^(?:[a-z0-9-]+\.)+[a-z]{2,}$/i;
 const CANDIDATE_LIMIT = 100;
-// ponytail: sending accounts are vouched from this org's own recent webhook rows only
-// (accountErrors reads 7 days; earlyFollowUps defaults to the last week plus up to
-// 31 days of lookback). An account seen only in an older explicit date window
-// still blocks; widen this if that shows up.
-const WEBHOOK_ACCOUNT_DAYS = 62;
+// The endpoint's own limits: a longer value is never owned, so it is not sent.
+const EMAIL_MAX = 320;
+const DOMAIN_MAX = 253;
 
 export interface IdentifierCandidates {
   /** Bare domain names. Optional so callers that never see one need not pass it. */
@@ -28,150 +29,126 @@ export interface OwnedIdentifiers {
   uuids: Set<string>;
 }
 
-const literalArray = (values: string[], pattern: RegExp, cast: string) => {
+const checkedCandidates = (values: string[], pattern: RegExp) => {
   const valid = values.filter((value) => pattern.test(value));
   if (valid.length !== values.length || valid.length > CANDIDATE_LIMIT) {
     throw new Error("Invalid identifier candidate.");
   }
-  return `'{${valid.map((value) => value.toLowerCase()).join(",")}}'::${cast}[]`;
+  return valid.map((value) => value.toLowerCase());
 };
 
+const upTo = (values: string[], max: number) =>
+  values.filter((value) => value.length <= max);
+
 /**
- * One fixed statement: which candidate identifiers belong to the verified workspace.
- * Membership is re-checked in the same snapshot, so a revoked user resolves nothing.
- *
- * An investigation names the customer's own things constantly: a lead's email,
- * the inbox a campaign sends from, a thread, a sending domain. Anything not
- * resolved here is treated as foreign and blocks the reply, so this covers the
- * objects a support answer actually mentions. Every branch joins through
- * `authorized`, which is the single place the verified organization enters the
- * query: an identifier that exists only in another workspace resolves to
- * nothing, exactly as an unknown one does.
- *
- * Scrape runs, agent executions and domain orders are here because
- * `widget_job_failures` returns their ids: a customer's own failed scrape run
- * was blocking the whole reply as foreign.
- *
- * A domain is the customer's own when it is a sending domain they bought, the
- * domain their members sign in with, or the domain of one of their inboxes: a
- * reply naming the customer's own company domain was being blocked as foreign.
- * A website's custom domain and the workspace's own billing account are here
- * because `widget_website_status` and `widget_billing_summary` return them: both
- * were blocking an owned answer as foreign.
- * These are small per-workspace tables; prospect and contact domains are left
- * out on purpose, since vouching for them means scanning every lead.
- *
- * Campaign leads and the sending accounts this org's own provider webhooks name
- * are here because `widget_outreach_health` (earlyFollowUps) and
- * `widget_inbox_health` (accountErrors) return them: a lead with no CRM row and
- * a sending account with no saved inbox were blocking an owned answer. Each
- * branch filters by the candidates itself so an index serves it.
+ * The bug report's membership check: the scoped user is a current member of
+ * the scoped workspace, in any role. The owners-and-admins endpoint can't
+ * answer it, so this one fixed statement still reads the database.
  */
-export function buildOwnershipQuery(
-  context: WidgetContext,
-  candidates: IdentifierCandidates,
-  anyRole = false
-): string {
+export function buildMembershipQuery(context: WidgetContext): string {
   const scope = widgetContextSchema.parse(context);
-  const uuids = literalArray(candidates.uuids, UUID, "uuid");
-  const slugs = literalArray(candidates.slugs, SLUG, "text");
-  const emails = literalArray(candidates.emails, EMAIL, "text");
-  const domains = literalArray(candidates.domains ?? [], DOMAIN, "text");
-  return `with authorized as (
-    select o.id, o.slug from organization o join member m on m.organization_id = o.id
+  return `select count(*) = 1 as authorized from organization o join member m on m.organization_id = o.id
     where o.id = '${scope.organizationId}'::uuid and m.user_id = '${scope.userId}'::uuid
-      and o.deleted_at is null and m.deleted_at is null${anyRole ? "" : " and m.role in ('owner', 'admin')"}
-      and (o.partner_id is null or o.partner_id = '${scope.partnerId}'::uuid)
-  )
-  select (select count(*) = 1 from authorized) as authorized,
-    coalesce((select jsonb_agg(x.id) from (
-      select a.id from authorized a
-      union select m.user_id as id from member m join authorized a on a.id = m.organization_id where m.deleted_at is null
-      union select c.id from outreach_campaign c join authorized a on a.id = c.organization_id
-      union select t.id from crm_message_thread t join authorized a on a.id = t.organization_id
-      union select ct.id from crm_contact ct join authorized a on a.id = ct.organization_id
-      union select l.id from crm_lead l join authorized a on a.id = l.organization_id
-      union select i.id from mail_inbox i join authorized a on a.id = i.organization_id
-      union select d.id from mail_domain d join authorized a on a.id = d.organization_id
-      union select sr.id from lead_scrape_run sr join authorized a on a.id = sr.organization_id
-      union select ae.id from agent_executions ae join authorized a on a.id = ae.organization_id
-      union select dpo.id from domain_purchase_order dpo join authorized a on a.id = dpo.organization_id
-      union select o.billing_account_id from organization o join authorized a on a.id = o.id where o.billing_account_id is not null
-      union select w.id from website w join authorized a on a.id = w.organization_id where w.deleted_at is null
-      union select wp.id from website_project wp join authorized a on a.id = wp.organization_id where wp.deleted_at is null
-      union select wdm.id from website_domain wdm join authorized a on a.id = wdm.organization_id
-    ) x where x.id = any(${uuids})), '[]'::jsonb) as uuids,
-    coalesce((select jsonb_agg(lower(a.slug)) from authorized a where lower(a.slug) = any(${slugs})), '[]'::jsonb) as slugs,
-    coalesce((select jsonb_agg(distinct e.email) from (
-      select lower(u.email) as email from "user" u
-        join member m on m.user_id = u.id and m.deleted_at is null
-        join authorized a on a.id = m.organization_id
-      union select lower(t.prospect_email) from crm_message_thread t join authorized a on a.id = t.organization_id
-      union select lower(ce.email) from crm_email ce
-        join crm_contact ct on ct.id = ce.contact_id join authorized a on a.id = ct.organization_id
-      union select lower(ce.email) from crm_email ce
-        join crm_lead l on l.id = ce.lead_id join authorized a on a.id = l.organization_id
-      union select lower(i.email) from mail_inbox i join authorized a on a.id = i.organization_id
-      union select lower(cl.email) from outreach_campaign_lead cl join authorized a on a.id = cl.organization_id
-        where cl.deleted_at is null and lower(cl.email) = any(${emails})
-      union select lower(e.lead_email) from outreach_webhook_event e join authorized a on a.id = e.organization_id
-        where lower(e.lead_email) = any(${emails})
-      union select lower(e.payload->>'email_account') from outreach_webhook_event e join authorized a on a.id = e.organization_id
-        where e.event_type in ('account_error', 'email_sent')
-          and e.created_at > current_timestamp - interval '${WEBHOOK_ACCOUNT_DAYS} days'
-          and lower(e.payload->>'email_account') = any(${emails})
-    ) e where e.email = any(${emails})), '[]'::jsonb) as emails,
-    coalesce((select jsonb_agg(distinct x.domain) from (
-      select lower(d.domain) as domain from mail_domain d join authorized a on a.id = d.organization_id
-      union select split_part(lower(u.email), '@', 2) from "user" u
-        join member m on m.user_id = u.id and m.deleted_at is null
-        join authorized a on a.id = m.organization_id
-      union select split_part(lower(i.email), '@', 2) from mail_inbox i join authorized a on a.id = i.organization_id
-      union select lower(w.custom_domain) from website w join authorized a on a.id = w.organization_id
-        where w.deleted_at is null and nullif(w.custom_domain, '') is not null
-      union select lower(wdm.domain) from website_domain wdm join authorized a on a.id = wdm.organization_id
-    ) x where x.domain = any(${domains})), '[]'::jsonb) as domains`;
+      and o.deleted_at is null and m.deleted_at is null
+      and (o.partner_id is null or o.partner_id = '${scope.partnerId}'::uuid)`;
 }
 
-const resultSchema = z.object({
-  rows: z
-    .array(
-      z.object({
-        authorized: z.boolean(),
-        domains: z.array(z.string()).max(CANDIDATE_LIMIT),
-        emails: z.array(z.string()).max(CANDIDATE_LIMIT),
-        slugs: z.array(z.string()).max(CANDIDATE_LIMIT),
-        uuids: z.array(z.string()).max(CANDIDATE_LIMIT),
-      })
-    )
-    .length(1),
+const membershipSchema = z.object({
+  rows: z.array(z.object({ authorized: z.boolean() })).length(1),
   success: z.literal(true),
 });
 
-/** The live database says the scoped user is not a current owner or admin (or, with `anyRole`, member) of the workspace. */
+/** The scoped user is not a current owner or admin (or, for the membership check, member) of the workspace. */
 export class WorkspaceAccessDenied extends Error {
   constructor() {
     super("Current workspace access could not be verified.");
   }
 }
 
-/** Any unresolved candidate is foreign; the caller blocks on it. */
+/** Throws WorkspaceAccessDenied unless the scoped user is a current member of the workspace. */
+export async function verifyWorkspaceMember(
+  scope: WidgetContext,
+  signal: AbortSignal = AbortSignal.timeout(50_000)
+): Promise<void> {
+  const data = await readWidgetOwnership(buildMembershipQuery(scope), signal);
+  const [row] = membershipSchema.parse(providerData(data)).rows;
+  if (!row.authorized) {
+    throw new WorkspaceAccessDenied();
+  }
+}
+
+// The response below is version 1's; a later version keeps this one live.
+const OWNED_IDENTIFIERS = WIDGET_ENDPOINT_MANIFEST.endpoints.find(
+  (entry) => entry.name === "owned-identifiers" && entry.version === 1
+);
+const OWNED_MAX_BYTES = 64 * 1024;
+const ownedList = z.array(z.string().max(EMAIL_MAX)).max(CANDIDATE_LIMIT);
+const deniedResponse = z.object({ status: z.literal("denied") });
+const ownedResponse = z.object({
+  sections: z.object({
+    owned: z.object({
+      domains: ownedList,
+      emails: ownedList,
+      slugs: ownedList,
+      uuids: ownedList,
+    }),
+  }),
+  status: z.literal("ok"),
+});
+
+/**
+ * Which candidates the verified workspace owns, from Acquisity's
+ * owned-identifiers endpoint (ENG-20527). It re-checks that the conversation
+ * is this user's in this workspace and that they are a current owner or
+ * admin. Any unresolved candidate is foreign and the caller blocks on it. A
+ * denial is the only answer that means "not allowed"; any other failure
+ * throws, so the caller refuses instead of reading it as nothing owned.
+ */
 export async function resolveOwnedIdentifiers(
   scope: WidgetContext,
   candidates: IdentifierCandidates,
   signal: AbortSignal = AbortSignal.timeout(50_000),
-  anyRole = false
+  request: typeof fetch = fetch
 ): Promise<OwnedIdentifiers> {
-  const query = buildOwnershipQuery(scope, candidates, anyRole);
-  const data = await readWidgetOwnership(query, signal);
-  const [row] = resultSchema.parse(providerData(data)).rows;
-  if (!row.authorized) {
-    throw new WorkspaceAccessDenied();
+  if (!OWNED_IDENTIFIERS) {
+    throw new Error("The owned-identifiers endpoint is not in the manifest.");
   }
+  const input = {
+    domains: upTo(
+      checkedCandidates(candidates.domains ?? [], DOMAIN),
+      DOMAIN_MAX
+    ),
+    emails: upTo(checkedCandidates(candidates.emails, EMAIL), EMAIL_MAX),
+    slugs: checkedCandidates(candidates.slugs, SLUG),
+    uuids: checkedCandidates(candidates.uuids, UUID),
+  };
+  const response = await postScopedAppRoute(
+    widgetContextSchema.parse(scope),
+    OWNED_IDENTIFIERS.path,
+    input,
+    signal,
+    request
+  );
+  if (response.status !== 200 && response.status !== 403) {
+    response.body?.cancel().catch(() => undefined);
+    throw new Error("Support identifier resolution is unavailable.");
+  }
+  const body: unknown = await readContextBody(
+    response,
+    signal,
+    OWNED_MAX_BYTES
+  );
+  if (response.status === 403) {
+    if (deniedResponse.safeParse(body).success) {
+      throw new WorkspaceAccessDenied();
+    }
+    throw new Error("Support identifier resolution is unavailable.");
+  }
+  const { owned } = ownedResponse.parse(body).sections;
   return {
-    domains: new Set(row.domains),
-    emails: new Set(row.emails),
-    slugs: new Set(row.slugs),
-    uuids: new Set(row.uuids.map((id) => id.toLowerCase())),
+    domains: new Set(owned.domains),
+    emails: new Set(owned.emails),
+    slugs: new Set(owned.slugs),
+    uuids: new Set(owned.uuids.map((id) => id.toLowerCase())),
   };
 }
