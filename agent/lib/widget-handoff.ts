@@ -130,6 +130,56 @@ export const handoffFindings = (
     ticket,
   });
 
+/**
+ * The answer-comes-here line is fixed text added after the gate, to an allowed
+ * reply whose turn filed or reused the conversation's ticket, and the findings
+ * record that ticket, so Acquisity keeps it on the chat. A blocked reply files
+ * its ticket in `ticketInsteadOfBlock`.
+ */
+export async function withAnswerLine(
+  result: WidgetOutcome,
+  findings: WidgetFindings,
+  filedTicket: HandoffTicketRef | undefined,
+  run: Pick<WidgetRun, "id" | "scope">,
+  ticket: HandoffTicketRef | null | undefined,
+  read: WidgetDependencies["readTicket"],
+  signal: AbortSignal,
+  history: Turns
+): Promise<{ findings: WidgetFindings; result: WidgetOutcome }> {
+  if (
+    !(customerTurn(run.scope) && result.message) ||
+    result.decision === "block"
+  ) {
+    return { findings, result };
+  }
+  // An unreadable receipt counts as none; it must not fail an allowed reply.
+  const receipt =
+    filedTicket || ticket
+      ? null
+      : await read?.(run.scope, run.id, signal).catch((error) => {
+          if (signal.aborted) {
+            throw error;
+          }
+          return null;
+        });
+  const filed =
+    filedTicket ??
+    (ticket ? { id: ticket.id, url: ticket.url } : undefined) ??
+    (receipt ? ticketRef(receipt) : undefined);
+  return filed
+    ? {
+        // A ticket filed earlier in the turn, such as for a toggled ask for a
+        // person, is recorded here; one the findings already carry stays.
+        findings: findings.ticket ? findings : { ...findings, ticket: filed },
+        result: {
+          ...result,
+          message: withAnswerHere(result.message, history),
+          reason: `${TICKET_INSTEAD} ${result.reason}`,
+        },
+      }
+    : { findings, result };
+}
+
 // A block from our own controls (the ownership guard, a gate outage) is not a
 // finding that needs a person: the app tells the customer to send the message
 // again. The reason itself can name an identifier, so only this flag crosses

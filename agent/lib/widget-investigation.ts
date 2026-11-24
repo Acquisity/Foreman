@@ -41,6 +41,7 @@ import {
   UNFILED_LINE,
   UNFILED_PERSON_NOTE,
   withAnswerHere,
+  withAnswerLine,
 } from "./widget-handoff.js";
 import { answerFromHelpCenter, type KbAnswer } from "./widget-kb.js";
 import { liveDependencies } from "./widget-live-store.js";
@@ -880,7 +881,9 @@ async function withHandoffTicket(
     file
   );
   return filed
-    ? { filed, structured: { ...findings, needsHuman: false, ticket: filed } }
+    ? // The ticket joins the findings after the gate, in `withAnswerLine`: a
+      // composer told one was filed would add its own line before the fixed one.
+      { filed, structured: { ...findings, needsHuman: false } }
     : { structured: findings };
 }
 
@@ -964,56 +967,6 @@ async function structureWriteUp(
       signal
     )),
   };
-}
-
-/**
- * The answer-comes-here line is fixed text added after the gate, to an allowed
- * reply whose turn filed or reused the conversation's ticket, and the findings
- * record that ticket, so Acquisity keeps it on the chat. A blocked reply files
- * its ticket in `ticketInsteadOfBlock`.
- */
-async function withAnswerLine(
-  result: WidgetOutcome,
-  findings: WidgetFindings,
-  filedTicket: HandoffTicketRef | undefined,
-  run: Pick<WidgetRun, "id" | "scope">,
-  ticket: FiledTicket | null | undefined,
-  read: WidgetDependencies["readTicket"],
-  signal: AbortSignal,
-  history: WidgetAsk["turns"]
-): Promise<{ findings: WidgetFindings; result: WidgetOutcome }> {
-  if (
-    !(customerTurn(run.scope) && result.message) ||
-    result.decision === "block"
-  ) {
-    return { findings, result };
-  }
-  // An unreadable receipt counts as none; it must not fail an allowed reply.
-  const receipt =
-    filedTicket || ticket
-      ? null
-      : await read?.(run.scope, run.id, signal).catch((error) => {
-          if (signal.aborted) {
-            throw error;
-          }
-          return null;
-        });
-  const filed =
-    filedTicket ??
-    (ticket ? { id: ticket.id, url: ticket.url } : undefined) ??
-    (receipt ? { id: receipt.identifier, url: receipt.url } : undefined);
-  return filed
-    ? {
-        // A ticket filed earlier in the turn, such as for a toggled ask for a
-        // person, is recorded here; one the findings already carry stays.
-        findings: findings.ticket ? findings : { ...findings, ticket: filed },
-        result: {
-          ...result,
-          message: withAnswerHere(result.message, history),
-          reason: `${TICKET_INSTEAD} ${result.reason}`,
-        },
-      }
-    : { findings, result };
 }
 
 /**

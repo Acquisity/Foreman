@@ -764,6 +764,7 @@ test("a member or client is answered in help-center mode, never investigated", a
     ANSWER_HERE
   );
   assert.equal(refund.run.outcome?.reason, "ticket_instead_of_handoff");
+  assert.ok((refund.run.findings as WidgetFindings).report.length > 0);
   assert.deepEqual((refund.run.findings as WidgetFindings).ticket, {
     id: "ENG-1",
     url: "https://linear.app/acquisity/issue/ENG-1/x",
@@ -2889,6 +2890,8 @@ test("findings that need a person file the ticket, and the gated reply says the 
     deps
   );
   assert.equal((gated as WidgetFindings[])[0]?.needsHuman, false);
+  // The composer is not told a ticket was filed, so the fixed line is the only one.
+  assert.equal((gated as WidgetFindings[])[0]?.ticket, undefined);
   assert.equal(run.outcome?.message, `${allowed.message}\n\n${ANSWER_HERE}`);
   assert.equal(run.outcome?.reason, "ticket_instead_of_handoff in scope");
   assert.deepEqual((run.findings as WidgetFindings).ticket, {
@@ -3054,6 +3057,15 @@ test("a persisted filing receipt appends the answer-comes-here line to resolved,
 
 test("a confirmed refund ticket adds the answer-comes-here line without another write", async () => {
   const { deps, run } = dependencies(allowed);
+  // The investigator's confirmed ticket is the one recorded, not a saved receipt.
+  run.findings = {
+    ticketReceipt: {
+      existing: true,
+      identifier: "ENG-7",
+      refund: false,
+      url: "https://linear.app/acquisity/issue/ENG-7/other",
+    },
+  };
   deps.extract = () => Promise.resolve({ ...findings, needsHuman: true });
   deps.fileTicket = () => assert.fail("a confirmed refund is already filed");
   await finishWidgetRun(
@@ -3237,6 +3249,9 @@ test("a member or client who presses the magnifying glass or reports a bug gets 
         (run.findings as WidgetFindings | null)?.ticket?.id,
         fails ? undefined : "ENG-1"
       );
+      if (!fails) {
+        assert.ok((run.findings as WidgetFindings).report.length > 0);
+      }
       assert.equal(filed.length, 1);
       assert.ok(filed[0].summary.includes(`a workspace ${role}`));
       assert.equal(customers.at(-1)?.ticketFiling, true);
