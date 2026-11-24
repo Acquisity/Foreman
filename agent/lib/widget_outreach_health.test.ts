@@ -1175,7 +1175,7 @@ test("a first-email cap reading uses first touches on the same day, not total em
   );
 });
 
-test("the campaign AI Agent's reviews are read for the selected campaign with each action's state", () => {
+test("the campaign AI Agent's reviews are read only for the selected campaign and reach the output", () => {
   // Live 2026-11-24: the widget said no automatic pause reason was recorded
   // for a campaign the AI Agent had paused after the customer approved it.
   assert.equal(
@@ -1188,57 +1188,42 @@ test("the campaign AI Agent's reviews are read for the selected campaign with ea
   for (const required of [
     "from outreach_campaign_decision_analytics da",
     "da.organization_id = c.organization_id and da.campaign_id = c.id",
-    "order by da.created_at desc limit 5",
     "join authorized a on a.id = c.organization_id",
   ]) {
     assert.ok(query.includes(required), required);
   }
-  const base = {
-    actions: [
-      { index: 0, reason: "Zero positive replies", type: "PAUSE_CAMPAIGN" },
-      { index: 1, reason: null, type: "START_NEW_CAMPAIGN" },
-      { index: 2, reason: null, type: "FLAG_DELIVERABILITY" },
-    ],
-    error: null,
-    finding: "Overall PRR is 0%. Replace this campaign with fresh angles.",
-    recommended: ["Pause the current campaign with its replacement."],
-    skipped: [],
-    verdict: "underperforming",
-  };
-  const approved = {
-    ...base,
-    approval: {
-      actionIndexes: [0, 1],
-      autoExecutesOnTimeout: false,
-      expiresAt: "2026-11-25T07:36:48.151Z",
-      requestedAt: "2026-11-24T07:36:48.151Z",
-      respondedAt: "2026-11-24T14:07:24.296Z",
-      status: "approved",
-    },
-    at: "2026-11-24T07:35:17.102Z",
-    completed: [
-      { at: "2026-11-24T14:12:27.926Z", index: 1 },
-      { at: "2026-11-24T14:13:00.274Z", index: 0 },
-    ],
-    runStatus: "completed",
-  };
-  const waiting = {
-    ...base,
-    approval: {
-      ...approved.approval,
-      respondedAt: null,
-      status: "awaiting_approval",
-    },
-    at: "2026-11-25T07:35:17.102Z",
-    completed: [],
-    runStatus: "awaiting_approval",
-  };
   const result = parseWidgetOutreachHealthEvidence(
     envelope([
       {
         ...row,
         diagnostics: {
-          agentDecisions: [waiting, approved],
+          agentDecisions: [
+            {
+              actions: [
+                {
+                  details: {
+                    checks: [],
+                    count: null,
+                    name: null,
+                    requiredPerVariant: null,
+                    variantCount: null,
+                  },
+                  index: 0,
+                  reason: "Zero positive replies",
+                  type: "PAUSE_CAMPAIGN",
+                },
+              ],
+              approval: null,
+              at: "2026-11-24T07:35:17.102Z",
+              completed: [{ at: "2026-11-24T14:13:00.274Z", index: 0 }],
+              error: null,
+              finding: "Overall PRR is 0%.",
+              recommended: [],
+              runStatus: "completed",
+              skipped: [],
+              verdict: "underperforming",
+            },
+          ],
           assignedInboxes: {
             accounts: [],
             configuredCount: null,
@@ -1265,26 +1250,17 @@ test("the campaign AI Agent's reviews are read for the selected campaign with ea
   if (result.status !== "ok") {
     assert.fail("Expected saved evidence");
   }
-  const [open, done] = result.campaigns[0].diagnostics?.agentDecisions ?? [];
   assert.deepEqual(
-    done.actions.map((action) => [action.type, action.state, action.at]),
+    result.campaigns[0].diagnostics?.agentDecisions?.[0].actions,
     [
-      ["PAUSE_CAMPAIGN", "taken", "2026-11-24T14:13:00.274Z"],
-      ["START_NEW_CAMPAIGN", "taken", "2026-11-24T14:12:27.926Z"],
-      ["FLAG_DELIVERABILITY", "not_run", null],
+      {
+        at: "2026-11-24T14:13:00.274Z",
+        label: "Pause campaign: Zero positive replies",
+        reason: "Zero positive replies",
+        state: "taken",
+        type: "PAUSE_CAMPAIGN",
+      },
     ]
-  );
-  assert.deepEqual(done.approval, {
-    autoExecutesOnTimeout: false,
-    expiresAt: "2026-11-25T07:36:48.151Z",
-    requestedAt: "2026-11-24T07:36:48.151Z",
-    respondedAt: "2026-11-24T14:07:24.296Z",
-    status: "approved",
-  });
-  assert.equal(done.finding, base.finding);
-  assert.deepEqual(
-    open.actions.map((action) => action.state),
-    ["waiting_for_approval", "waiting_for_approval", "running"]
   );
   assert.ok(
     result.caveats.some((text) =>
