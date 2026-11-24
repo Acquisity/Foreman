@@ -3,6 +3,7 @@ import { test } from "node:test";
 import { verifiedWidgetContext as scope } from "./widget.fixture.js";
 import { type GateDeps, gate } from "./widget-egress.js";
 import {
+  buildMembershipQuery,
   resolveOwnedIdentifiers,
   WorkspaceAccessDenied,
 } from "./widget-evidence.js";
@@ -63,7 +64,6 @@ const resolve = (
     scope,
     candidates,
     AbortSignal.timeout(5000),
-    false,
     request
   );
 
@@ -176,21 +176,33 @@ test("an invalid or oversized candidate list refuses before any request", async 
   assert.equal(sent.length, 0);
 });
 
-test("the membership check (anyRole) does not use the owners-only endpoint", async (t) => {
-  withEnv(t);
-  const { request, sent } = answering(200, owned());
-  await assert.rejects(
-    resolveOwnedIdentifiers(
-      scope,
-      none,
-      AbortSignal.timeout(5000),
-      true,
-      request
-    )
+test("the bug report's membership check is one fixed query, any role, on the verified ids only", () => {
+  const query = buildMembershipQuery(scope);
+  assert.match(query, new RegExp(`o\\.id = '${scope.organizationId}'::uuid`));
+  assert.match(query, new RegExp(`m\\.user_id = '${scope.userId}'::uuid`));
+  assert.ok(query.includes("o.deleted_at is null and m.deleted_at is null"));
+  assert.ok(query.includes(`o.partner_id = '${scope.partnerId}'::uuid`));
+  assert.ok(!query.includes("m.role"));
+  assert.throws(() =>
+    buildMembershipQuery({ ...scope, userId: "x'); drop table member; --" })
   );
-  assert.equal(sent.length, 0);
 });
 
+test("an email or domain longer than the endpoint accepts is not sent, so it stays foreign", async (t) => {
+  withEnv(t);
+  const { request, sent } = answering(200, owned());
+  const long = `${"a".repeat(316)}@b.co`;
+  const longDomain = `${"a".repeat(250)}.com`;
+  const result = await resolve(request, {
+    domains: [longDomain, "acme.com"],
+    emails: [long, "sam@acme.com"],
+    slugs: [],
+    uuids: [],
+  });
+  assert.deepEqual(sent[0].body.emails, ["sam@acme.com"]);
+  assert.deepEqual(sent[0].body.domains, ["acme.com"]);
+  assert.equal(result.emails.has(long), false);
+});
 test("an id the endpoint does not return as owned never reaches the reply", async (t) => {
   withEnv(t);
   const { request } = answering(200, owned({ uuids: [campaignId] }));
@@ -198,7 +210,7 @@ test("an id the endpoint does not return as owned never reaches the reply", asyn
     compose: () => Promise.resolve("Your campaign paused."),
     judge: () => Promise.resolve({ decision: "allow", reason: "in scope" }),
     resolve: (s, candidates, signal) =>
-      resolveOwnedIdentifiers(s, candidates, signal, false, request),
+      resolveOwnedIdentifiers(s, candidates, signal, request),
   };
   const fact = (id: string) => ({
     claim: `Campaign ${id} paused.`,
