@@ -1,18 +1,22 @@
 import assert from "node:assert/strict";
-import { after, beforeEach, test } from "node:test";
+import { test } from "node:test";
 import type { ProviderContext } from "#lib/executor/dispatch.js";
 import { executorTransport } from "#lib/executor/transport.js";
-import { resetInstantlyWorkspaceCache } from "#lib/instantly-api.js";
 import { member, WORKSPACE_ID } from "#lib/instantly-fixtures.js";
-
-// Resolved workspaces are cached per process; no test may see another's.
-beforeEach(resetInstantlyWorkspaceCache);
-
-import { verifiedWidgetContext } from "#lib/widget.fixture.js";
+import {
+  ACCOUNTS_PATH,
+  baseRow,
+  byPath,
+  ctx,
+  DB_PATH,
+  dbEnvelope,
+  MEMBERS_PATH,
+  observedAt,
+  scope,
+} from "#lib/widget_inbox_health.fixture.js";
 import { widgetAuth } from "#lib/widget-scope.js";
 import definition, {
   buildWidgetInboxHealthQuery,
-  domainReason,
   NO_SENDING_ACCOUNT,
   readMailboxNotFound,
   readWidgetInboxHealth,
@@ -21,84 +25,9 @@ import definition, {
   widgetInboxHealthOutput,
 } from "../tools/widget_inbox_health.js";
 
-const scope = verifiedWidgetContext;
-const DB_PATH = "planetscale-org.planetscale_execute_read_query";
-const MEMBERS_PATH =
-  "foreman-instantly-api.workspaceGroupMembers.listWorkspaceGroupMembers";
-const ACCOUNTS_PATH = "foreman-instantly-api.accounts.listAccounts";
-
-const originalConnector = process.env.EXECUTOR_MCP_CONNECTOR_SUPPORT;
-const originalBindings = process.env.EXECUTOR_OPERATION_BINDINGS;
-process.env.EXECUTOR_MCP_CONNECTOR_SUPPORT = "executor.test/widget";
-process.env.EXECUTOR_OPERATION_BINDINGS = JSON.stringify({
-  "instantly.accounts": { path: ACCOUNTS_PATH },
-  "instantly.workspace-group-members": { path: MEMBERS_PATH },
-  "planetscale.readQuery": { path: DB_PATH },
-});
-after(() => {
-  if (originalBindings === undefined) {
-    delete process.env.EXECUTOR_OPERATION_BINDINGS;
-  } else {
-    process.env.EXECUTOR_OPERATION_BINDINGS = originalBindings;
-  }
-  if (originalConnector === undefined) {
-    delete process.env.EXECUTOR_MCP_CONNECTOR_SUPPORT;
-  } else {
-    process.env.EXECUTOR_MCP_CONNECTOR_SUPPORT = originalConnector;
-  }
-});
-
 const NO_CONNECTION = /No sending-provider connection/;
-const INTERNAL_WORDS = /ENG-|Instantly/u;
 const USER_MANAGED = /user-managed/;
 const TURNED_OFF = /turned off/;
-const observedAt = "2026-09-17T10:00:00.000Z";
-const baseRow = (overrides: Record<string, unknown> = {}) => ({
-  accountErrors: [],
-  accountType: null,
-  authorized: true,
-  connectionError: null,
-  connectionUpdatedAt: null,
-  hasConnectionError: null,
-  initialWarmupEmails: [],
-  isActive: null,
-  lastWebhookEventAt: null,
-  observedAt,
-  recentWebhookErrorCount: 0,
-  recentWebhookEventCount: 0,
-  reconnectAttempts: [],
-  savedDomains: { domains: [], total: 0 },
-  savedInboxes: { inboxes: [], total: 0 },
-  webhookRegisteredCount: 0,
-  workspaceId: null,
-  ...overrides,
-});
-const dbEnvelope = (row: Record<string, unknown>) => ({
-  content: [
-    { text: JSON.stringify({ rows: [row], success: true }), type: "text" },
-  ],
-});
-const ctx = {
-  abortSignal: new AbortController().signal,
-  getToken: async () => ({ token: "test-token" }),
-  session: { auth: { current: null, initiator: widgetAuth(scope) } },
-} as unknown as ProviderContext;
-
-/** Routes the mocked transport by operation path; unrouted paths fail the test loudly. */
-const byPath =
-  (
-    handlers: Record<
-      string,
-      () => { data: unknown; ok: true } | { error: unknown; ok: false }
-    >
-  ) =>
-  (_wire: unknown, path: string) => {
-    const handler = handlers[path];
-    if (!handler) {
-      throw new Error(`Unexpected executor path in test: ${path}`);
-    }
-    return Promise.resolve(handler());
-  };
 
 test("tool is exposed only for the widget support initiator", async () => {
   const resolve = definition.events["step.started"];
@@ -884,177 +813,4 @@ test("a newer successful reconnect suppresses an older mailbox-not-found reading
   );
   assert.ok(reading?.includes("whether they were cancelled for non-payment"));
   assert.equal(reading?.includes("likely cancelled for non-payment"), false);
-});
-
-const suspendedDomain = {
-  autoRenew: true,
-  billingStop: {
-    attempts: 1,
-    requestedAt: "2026-11-06T00:00:17.248613+00:00",
-    status: "cancelled",
-    stoppedAt: "2026-11-06T00:09:41.861+00:00",
-  },
-  connectedInboxes: 3,
-  domain: "Ended.example.test",
-  expiresAt: "2026-12-06T13:32:16.889+00:00",
-  reason: "Cancelled by user",
-  savedInboxes: 3,
-  status: "suspended",
-  updatedAt: "2026-11-16T23:00:06.018387+00:00",
-};
-const failedStop = {
-  ...suspendedDomain,
-  billingStop: {
-    attempts: 4,
-    requestedAt: "2026-11-20T00:00:00+00:00",
-    status: "failed",
-    stoppedAt: null,
-  },
-  domain: "stuck.example.test",
-  reason: "Cancelled after provider mailbox loss",
-  status: "cancelling",
-};
-
-test("the domain read stays inside the authorized workspace and lists ended domains first", () => {
-  const query = buildWidgetInboxHealthQuery(scope);
-  for (const required of [
-    "from mail_domain md join authorized a on a.id = md.organization_id",
-    "where mi.domain_id = md.id and mi.organization_id = md.organization_id",
-    "where c.mail_domain_id = md.id and c.organization_id = md.organization_id",
-    "md.status in ('pending', 'active', 'partial') as live",
-    "order by live, domain limit 50",
-  ]) {
-    assert.ok(query.includes(required), required);
-  }
-});
-
-test("a suspended domain reports why it ended, when its billing stopped, and whether its mailboxes are still live", async (t) => {
-  const row = baseRow({
-    accountType: "system_provisioned",
-    connectionUpdatedAt: observedAt,
-    hasConnectionError: false,
-    isActive: true,
-    savedDomains: {
-      domains: [
-        suspendedDomain,
-        failedStop,
-        {
-          ...suspendedDomain,
-          domain: "odd.example.test",
-          reason: "TypeError: x is undefined",
-        },
-      ],
-      total: 3,
-    },
-    workspaceId: WORKSPACE_ID,
-  });
-  t.mock.method(
-    executorTransport,
-    "call",
-    byPath({
-      [ACCOUNTS_PATH]: () => ({
-        data: {
-          items: [
-            { email: "a@ended.example.test", status: 1 },
-            { email: "b@Ended.Example.test", status: 2 },
-            { email: "c@other.example.test", status: 1 },
-          ],
-          next_starting_after: null,
-        },
-        ok: true,
-      }),
-      [DB_PATH]: () => ({ data: dbEnvelope(row), ok: true }),
-      [MEMBERS_PATH]: () => ({
-        data: {
-          items: [member({ sub_workspace_id: WORKSPACE_ID })],
-          next_starting_after: null,
-        },
-        ok: true,
-      }),
-    })
-  );
-  const result = await readWidgetInboxHealth(ctx);
-  assert.ok(widgetInboxHealthOutput.safeParse(result).success);
-  if (result.status !== "ok" || !result.savedDomains) {
-    assert.fail("expected saved domains");
-  }
-  assert.equal(result.savedDomains.total, 3);
-  assert.deepEqual(result.savedDomains.domains[0], {
-    ...suspendedDomain,
-    liveAccounts: 2,
-    reason: "Cancelled from the workspace",
-  });
-  assert.deepEqual(
-    result.savedDomains.domains.slice(1).map((domain) => ({
-      billingStop: domain.billingStop?.status,
-      liveAccounts: domain.liveAccounts,
-      reason: domain.reason,
-    })),
-    [
-      {
-        billingStop: "failed",
-        liveAccounts: 0,
-        reason: "Cancelled after its mailboxes were lost at the email supplier",
-      },
-      {
-        billingStop: "cancelled",
-        liveAccounts: 0,
-        reason:
-          "A diagnostic was recorded; its technical details are unavailable",
-      },
-    ]
-  );
-});
-
-test("saved domains are returned with no live count when the live check cannot run", async (t) => {
-  t.mock.method(
-    executorTransport,
-    "call",
-    byPath({
-      [DB_PATH]: () => ({
-        data: dbEnvelope(
-          baseRow({
-            savedDomains: { domains: [suspendedDomain], total: 1 },
-          })
-        ),
-        ok: true,
-      }),
-    })
-  );
-  const result = await readWidgetInboxHealth(ctx);
-  if (result.status !== "ok" || !result.savedDomains) {
-    assert.fail("expected saved domains");
-  }
-  assert.equal(result.accounts.available, false);
-  assert.equal(result.savedDomains.domains[0].liveAccounts, null);
-  assert.equal(
-    result.savedDomains.domains[0].reason,
-    "Cancelled from the workspace"
-  );
-});
-
-test("every reason Acquisity saves on an ended domain has authored wording", () => {
-  // Every non-empty mail_domain.error on an ended domain in production, 24 Nov 2026.
-  const saved = [
-    "Cancelled by user",
-    "Removed because the domain subscription ended",
-    "Cancelled because the plan ended",
-    "Timeout waiting for domain/mailboxes",
-    "Cancelled because the workspace owner was banned",
-    "Suspended by billing overage reconciliation",
-    "Domain or mailbox provisioning failed",
-    "Cancelled after unpaid mailbox cleanup",
-    "Cancelled: unpaid and expired vendor inboxes reconciled (ENG-14776)",
-    "Cancelled after provider mailbox loss",
-    "Instantly has not delivered this inbox yet",
-    "Cancelled: expired vendor inboxes reconciled (ENG-14268)",
-    "Expired at provider (ENG-14945)",
-  ];
-  const generic = domainReason("something new");
-  for (const reason of saved) {
-    const worded = domainReason(reason);
-    assert.ok(worded && worded !== generic, reason);
-    assert.ok(!INTERNAL_WORDS.test(worded), worded);
-  }
-  assert.equal(domainReason(null), null);
 });
