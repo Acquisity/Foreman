@@ -1412,7 +1412,6 @@ function frontDoorReplies(
       // No session exists on this lane, so the run id is the fencing session id.
       run.id
     );
-  /** The findings that record the filed ticket, or null when nothing was filed. */
   const file = async (message: string) => {
     if (!why) {
       return null;
@@ -1737,8 +1736,9 @@ async function investigationDenied(
  * A toggled ask for a person. One that states no need gets an invitation and
  * no ticket; otherwise the conversation's ticket is filed now, its receipt
  * supplies the answer-comes-here line and the findings' ticket at finish,
- * and a note tells the investigator not to hand off. Unfiled, the note asks the investigator to
- * hand off, so the finish files it. An empty note continues the investigation.
+ * and a note tells the investigator not to hand off. Unfiled, the note asks
+ * the investigator to hand off, so the finish files it. An empty note
+ * continues the investigation.
  */
 async function toggledPersonAsk(
   run: WidgetRun,
