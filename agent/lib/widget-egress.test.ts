@@ -734,6 +734,7 @@ test("the default judge and composer run under a deadline, so a stalled model ca
     );
     await assert.rejects(
       defaultGateDeps.compose({
+        askedAt: "ASKED AT: now",
         findings: composerInput(findings()),
         organizationName: scope.organizationName,
         question,
