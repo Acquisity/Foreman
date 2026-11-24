@@ -54,7 +54,7 @@ const AREA_CHECKS: Readonly<Record<string, CheckId>> = {
   "ai-sdr": "conversations",
   billing: "billing",
   campaigns: "campaigns",
-  "crm-contact": "leads",
+  "crm-contact": "crm",
   inboxes: "inboxes",
   "lead-pipeline": "leads",
   orders: "orders",
