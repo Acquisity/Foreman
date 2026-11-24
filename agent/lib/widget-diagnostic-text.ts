@@ -57,7 +57,19 @@ const EXPLANATIONS: readonly (readonly [RegExp, string])[] = [
 const STATUS_CHANGE =
   /^Campaign status updated to (draft|active|paused|completed|attention_needed|archived)$/i;
 const LAUNCH_FAILURE = /^Campaign launch failed:\s*/i;
+const PAUSE = /^Campaign paused(?::\s*(.*))?$/is;
+const PAUSED = /paused/i;
 const TECHNICAL = /<[!/]?[a-z][^>]*>|\b(?:[a-z]*Error|exception)\b|\n\s*at\s/i;
+
+function explain(reason: string): string {
+  if (TECHNICAL.test(reason)) {
+    return GENERIC_DIAGNOSTIC;
+  }
+  return (
+    EXPLANATIONS.find(([pattern]) => pattern.test(reason))?.[1] ??
+    GENERIC_DIAGNOSTIC
+  );
+}
 
 /** Shared diagnostic boundary; customer-authored names and structured emails never pass here. */
 export function diagnosticText(
@@ -86,10 +98,16 @@ export function diagnosticText(
       maxChars
     );
   }
-  const explanation = TECHNICAL.test(reason)
-    ? GENERIC_DIAGNOSTIC
-    : (EXPLANATIONS.find(([pattern]) => pattern.test(reason))?.[1] ??
-      GENERIC_DIAGNOSTIC);
+  const pause = PAUSE.exec(text);
+  if (pause) {
+    const known = explain(pause[1] ?? "");
+    if (known === GENERIC_DIAGNOSTIC) {
+      return "Campaign paused".slice(0, maxChars);
+    }
+    const said = PAUSED.test(known) ? known : `Campaign paused: ${known}`;
+    return said.slice(0, maxChars);
+  }
+  const explanation = explain(reason);
   return (
     launch ? `Campaign launch failed: ${explanation}` : explanation
   ).slice(0, maxChars);

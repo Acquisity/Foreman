@@ -732,12 +732,17 @@ test("a paused campaign carries its saved pause reason and dated status changes"
   ]) {
     assert.ok(query.includes(required), required);
   }
+  const pause = (message: string) => ({
+    at: observedAt,
+    message,
+    status: "paused",
+  });
   const statusHistory = [
-    {
-      at: observedAt,
-      message: "Campaign status updated to paused",
-      status: "paused",
-    },
+    pause("Campaign status updated to paused"),
+    pause("Campaign paused"),
+    pause("Campaign paused: Accounts unhealthy"),
+    pause("Campaign paused: High bounce rate"),
+    pause("Campaign paused: Paused by the cold email agent"),
   ];
   const result = parseWidgetOutreachHealthEvidence(
     envelope([
@@ -772,10 +777,15 @@ test("a paused campaign carries its saved pause reason and dated status changes"
     assert.fail("Expected saved evidence");
   }
   assert.equal(result.campaigns[0].pauseReason, "Accounts unhealthy");
-  assert.deepEqual(
-    result.campaigns[0].diagnostics?.statusHistory,
-    statusHistory
-  );
+  assert.deepEqual(result.campaigns[0].diagnostics?.statusHistory, [
+    pause("Campaign status updated to paused"),
+    pause("Campaign paused"),
+    pause("Campaign paused: Accounts unhealthy"),
+    pause(
+      "A high bounce rate paused the campaign; re-verify leads before resuming"
+    ),
+    pause("Campaign paused"),
+  ]);
 });
 
 test("a lead's own history is read only inside the selected owned campaign, without email text", () => {
