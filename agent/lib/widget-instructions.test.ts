@@ -30,6 +30,15 @@ test("shared support facts keep unpaid cleanup guidance without investigator too
   assert.ok(
     SUPPORT_GUIDE.includes("Reconnect cannot bring back a cancelled mailbox")
   );
+  assert.equal(
+    SUPPORT_GUIDE.includes("Mailbox cancelled after unpaid cleanup"),
+    false
+  );
+  assert.ok(
+    SUPPORT_GUIDE.includes(
+      "The customer cannot see an inbox's saved connection error"
+    )
+  );
 });
 
 const FAILED_STEP_RULE =
