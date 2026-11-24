@@ -205,7 +205,7 @@ const noWork = (): Pick<RouteHandlerArgs, "from" | "waitUntil"> => ({
 });
 
 const ASKED_AT_PREFIX = /^ASKED AT: [^\n]*\n\n/u;
-const ASKED_AT_FIRST = /^ASKED AT: .+ in the customer's time zone /u;
+const ASKED_AT_FIRST = /^ASKED AT: /u;
 const withoutAskedAt = (sent: string) => sent.replace(ASKED_AT_PREFIX, "");
 
 test("disabled, unauthenticated, malformed and oversized requests stop before verification", async (t) => {
