@@ -43,6 +43,8 @@ export const gapKey = (gap: Pick<CapabilityGap, "area" | "fact">) =>
   `${gap.area}: ${gap.fact}`;
 
 const FACT_MAX = 160;
+// "DNS status" stays as it is; "Why a domain" becomes "why a domain".
+const ACRONYM = /^[A-Z]{2}/u;
 const CUSTOMER_DATA = [
   /\S@\S/u,
   /\bhttps?:\/\//iu,
@@ -65,7 +67,9 @@ export const generalFact = (text: string): string | null => {
   ) {
     return null;
   }
-  return fact.charAt(0).toLowerCase() + fact.slice(1);
+  return ACRONYM.test(fact)
+    ? fact
+    : fact.charAt(0).toLowerCase() + fact.slice(1);
 };
 
 // Hand-written tools and generated endpoint tools both start with widget_;

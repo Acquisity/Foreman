@@ -287,6 +287,11 @@ test("a missing fact naming something from a workspace is refused", () => {
     generalFact("  Why a   domain order is waiting for payment "),
     "why a domain order is waiting for payment"
   );
+  // An acronym keeps its case: "dNS status" made a broken gap title.
+  assert.equal(
+    generalFact("DNS status of a sending domain"),
+    "DNS status of a sending domain"
+  );
 });
 
 test("the count line takes the given count and nothing else changes", () => {
