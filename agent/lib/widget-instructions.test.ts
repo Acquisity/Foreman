@@ -171,3 +171,19 @@ test("outside-call inventory matches local judge and widget retry contracts", ()
     )
   );
 });
+
+const EACH_RECORD_RULE =
+  /asks for the records themselves[^.]*write each record the result returns as its own fact with its own date and amount/;
+const RECORDS_AVAILABLE_RULE =
+  /never write that the dates or amounts of records you were given are unavailable/;
+const OWN_DATE_RULE =
+  /Every amount keeps the date of its own record: never group amounts under one date unless every one of those records has that date/;
+
+test("the investigator lists each record it was asked for, each amount on its own record's date", () => {
+  // ENG-20500: "six grants totalling 38,000 … I don't have each grant's date and amount".
+  // ENG-20483: "$1 and $90 on 2026-11-14" when the $1 invoice was paid on 18 Nov.
+  const prompt = widgetInstructions(widgetAuth(scope));
+  assert.match(prompt, EACH_RECORD_RULE);
+  assert.match(prompt, RECORDS_AVAILABLE_RULE);
+  assert.match(prompt, OWN_DATE_RULE);
+});

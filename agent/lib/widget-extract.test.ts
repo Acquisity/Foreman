@@ -192,3 +192,11 @@ test("the default extractor runs under a deadline, so a stalled call hands the w
 test("a failed documented step is a ticket, never a person, a repeat or a wait", () => {
   assert.match(EXTRACT_PROMPT, FAILED_STEP_RULE);
 });
+
+const SEPARATE_RECORDS_RULE =
+  /keep each record as its own fact with its date and amount, never folded into a total or a date range, and keep every amount with the date the investigator gave that record/;
+
+test("records listed one by one stay separate facts, each amount with its own date", () => {
+  // ENG-20500 and ENG-20483: grants folded into a total and a date range, and two invoices given one date.
+  assert.match(EXTRACT_PROMPT, SEPARATE_RECORDS_RULE);
+});
