@@ -1,6 +1,6 @@
 import { redact } from "#lib/investigation-memory/case.js";
 
-const GENERIC =
+export const GENERIC_DIAGNOSTIC =
   "A diagnostic was recorded; its technical details are unavailable";
 // Return authored explanations, never fragments of a provider's error. An unknown
 // vendor needs no new exception: unrecognized diagnostics stay generic.
@@ -87,8 +87,9 @@ export function diagnosticText(
     );
   }
   const explanation = TECHNICAL.test(reason)
-    ? GENERIC
-    : (EXPLANATIONS.find(([pattern]) => pattern.test(reason))?.[1] ?? GENERIC);
+    ? GENERIC_DIAGNOSTIC
+    : (EXPLANATIONS.find(([pattern]) => pattern.test(reason))?.[1] ??
+      GENERIC_DIAGNOSTIC);
   return (
     launch ? `Campaign launch failed: ${explanation}` : explanation
   ).slice(0, maxChars);
