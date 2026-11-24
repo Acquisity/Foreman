@@ -192,3 +192,36 @@ test("the default extractor runs under a deadline, so a stalled call hands the w
 test("a failed documented step is a ticket, never a person, a repeat or a wait", () => {
   assert.match(EXTRACT_PROMPT, FAILED_STEP_RULE);
 });
+
+test("what the investigator could not check comes back as general unchecked facts", async () => {
+  const out = await extractWidgetFindings(input, {
+    generate: () =>
+      Promise.resolve({
+        ...lenient,
+        unchecked: [
+          {
+            area: "orders",
+            fact: "Why a managed domain is suspended",
+            kind: "tool",
+          },
+          { area: "inboxes", fact: "whether a mailbox still exists" },
+          {
+            area: "made-up",
+            fact: "what partial means for a domain",
+            kind: "docs",
+          },
+          // Names something from the workspace, so it can't be filed.
+          { area: "inboxes", fact: "why sam@acme.com is disconnected" },
+        ],
+      }),
+  });
+  assert.deepEqual(out?.unchecked, [
+    { area: "orders", fact: "why a managed domain is suspended", kind: "tool" },
+    { area: "inboxes", fact: "whether a mailbox still exists", kind: "tool" },
+    { area: "other", fact: "what partial means for a domain", kind: "docs" },
+  ]);
+  assert.match(
+    EXTRACT_PROMPT,
+    /list in unchecked each thing the investigator said it could not check/
+  );
+});

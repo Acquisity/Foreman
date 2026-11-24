@@ -7,7 +7,9 @@ import { bugReportBrowser, MAX_BROWSER_CHARS } from "./widget-bug-evidence.js";
 import { addToBugReport, fileBugReport } from "./widget-bug-report.js";
 import {
   type CapabilityGap,
+  distinctGaps,
   fileRunGaps,
+  gapKey,
   gapsFromResult,
 } from "./widget-capability-gaps.js";
 import { answerFromGuide, chatGuideEnabled } from "./widget-chat.js";
@@ -971,15 +973,38 @@ async function structureWriteUp(
  */
 const startGapFiling = (
   run: Pick<WidgetRun, "id" | "scope">,
-  outcome: WaitOutcome,
+  gaps: readonly CapabilityGap[] | undefined,
   fileGaps: WidgetDependencies["fileGaps"]
 ): Promise<void> | undefined =>
-  outcome.gaps?.length && fileGaps
-    ? fileGaps(outcome.gaps, {
+  gaps?.length && fileGaps
+    ? fileGaps([...gaps], {
         conversationId: run.scope.conversationId,
         runId: run.id,
       }).catch(() => undefined)
     : undefined;
+
+/**
+ * A write-up that says what it could not check names each fact in
+ * `unchecked`; they become capability gaps (ENG-20478) unless a tool result
+ * already recorded the same key, and never reach the gate or the reply.
+ */
+const writtenGaps = (
+  unchecked: WidgetFindings["unchecked"],
+  fromTools: readonly CapabilityGap[] = []
+): CapabilityGap[] => {
+  const known = new Set(fromTools.map((gap) => gapKey(gap).toLowerCase()));
+  return distinctGaps(
+    (unchecked ?? []).map((gap) => ({
+      ...gap,
+      source: "investigator" as const,
+    }))
+  ).filter((gap) => !known.has(gapKey(gap).toLowerCase()));
+};
+
+const withoutUnchecked = ({
+  unchecked: _unchecked,
+  ...findings
+}: WidgetFindings): WidgetFindings => findings;
 
 /** Gate, then persist. Runs once per session outcome; a replay finds the fenced row unchanged. */
 export async function finishWidgetRun(
@@ -1020,7 +1045,8 @@ export async function finishWidgetRun(
   ) {
     return null;
   }
-  const gapsFiled = startGapFiling(run, outcome, deps.fileGaps);
+  const gapsFiled = startGapFiling(run, outcome.gaps, deps.fileGaps);
+  let writtenGapsFiled: Promise<void> | undefined;
   // A question for the customer is not an answer being prepared; saying so
   // would pop the checklist up just before the question arrives.
   if (
@@ -1056,7 +1082,7 @@ export async function finishWidgetRun(
     const cutoff = finishCutoff(run, claimedAt);
     const deadline = clock.timeout(Math.max(0, cutoff - clock.now()));
     const extractStartedAt = Date.now();
-    const { filed, gateDeps, structured } = await structureWriteUp(
+    const written = await structureWriteUp(
       run,
       sessionId,
       outcome,
@@ -1064,6 +1090,14 @@ export async function finishWidgetRun(
       deps,
       deadline
     );
+    writtenGapsFiled = startGapFiling(
+      run,
+      writtenGaps(written.structured?.unchecked, outcome.gaps),
+      deps.fileGaps
+    );
+    const { filed, gateDeps } = written;
+    const structured =
+      written.structured && withoutUnchecked(written.structured);
     const extractMs = Date.now() - extractStartedAt;
     const handoff = structured
       ? null
@@ -1140,6 +1174,7 @@ export async function finishWidgetRun(
   );
   const saved = await deps.complete(run.id, result, findings, sessionId);
   await gapsFiled;
+  await writtenGapsFiled;
   return saved;
 }
 
@@ -1192,7 +1227,7 @@ async function settleResultRun(
       { conversationId: run.scope.conversationId, runId: run.id, sessionId },
       result
     );
-    const gapsFiled = startGapFiling(run, outcome, deps.fileGaps);
+    const gapsFiled = startGapFiling(run, outcome.gaps, deps.fileGaps);
     const saved = await deps.complete(run.id, result, findings, sessionId);
     await gapsFiled;
     return saved ?? run;

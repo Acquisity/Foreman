@@ -3324,3 +3324,51 @@ test("a message that stays at the front door never asks for the timeline", async
   );
   assert.deepEqual(asked, [false]);
 });
+
+test("a write-up that lists what it could not check files each as a gap with no report_capability_gap call (ENG-20478)", async () => {
+  const outcome = await waitForWidgetInvestigation(
+    session([
+      timedOutStripe,
+      event("message.completed", {
+        message:
+          "Inboxes read. What I couldn't check: why the domains are suspended, and the stripe section.",
+      }),
+      event("turn.completed"),
+    ])
+  );
+  assert.equal(outcome.status, "completed");
+  const { deps, gated, run } = dependencies();
+  deps.extract = () =>
+    Promise.resolve({
+      ...findings,
+      unchecked: [
+        {
+          area: "orders",
+          fact: "why a managed domain is suspended",
+          kind: "tool",
+        },
+        // A tool result already recorded this key, so it is not filed twice.
+        {
+          area: "billing",
+          fact: "the stripe section could not be read",
+          kind: "tool",
+        },
+      ],
+    });
+  const filed: string[][] = [];
+  deps.fileGaps = (gaps) => {
+    filed.push(gaps.map((gap) => `${gap.source} ${gap.area}: ${gap.fact}`));
+    return Promise.resolve();
+  };
+  if (outcome.status === "completed") {
+    await finishWidgetRun(run, "widget-session-unchecked", outcome, deps);
+  }
+  assert.deepEqual(filed, [
+    ["code billing: the stripe section could not be read"],
+    ["investigator orders: why a managed domain is suspended"],
+  ]);
+  // The list is for filing only: the gate and the stored findings never carry it.
+  assert.equal(gated.length, 1);
+  assert.equal("unchecked" in (gated[0] as object), false);
+  assert.equal(JSON.stringify(run.findings).includes("unchecked"), false);
+});
