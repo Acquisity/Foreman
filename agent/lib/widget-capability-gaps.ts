@@ -263,17 +263,23 @@ function nestedUnavailable(
   );
 }
 
-const REFUSAL =
-  /"(?:status|reason)":"(?:denied|feature_off|not_linked|invalid_input)"|"code":"TOOL_EXECUTION_DENIED"/u;
+const WHOLE_REFUSALS = new Set([
+  "denied",
+  "feature_off",
+  "invalid_input",
+  "not_linked",
+]);
 
 /**
- * The area a widget read refused by design, the same refusals gapsFromResult
- * files nothing for: denied, feature_off, not_linked or invalid_input anywhere
- * in its result, a call the framework refused or whose input it rejected, and
- * billing's own refusals. What a reply says it couldn't check there is not
- * filed as a tool gap.
+ * One widget read's area and whether the whole check was refused by design:
+ * its own status is denied, feature_off, invalid_input or not_linked, the
+ * framework refused the call or rejected its input, or billing refused it.
+ * A refused section or project inside an otherwise answered read is not a
+ * refusal of the area. Null for anything that isn't a widget read.
  */
-export function refusedAreas(result: unknown): string[] {
+export function readRefusal(
+  result: unknown
+): { area: string; refused: boolean } | null {
   const action = result as {
     errorName?: unknown;
     isError?: boolean;
@@ -286,23 +292,27 @@ export function refusedAreas(result: unknown): string[] {
     action?.kind !== "tool-result" ||
     typeof tool !== "string" ||
     !tool.startsWith("widget_") ||
+    tool === GAP_TOOL ||
     NOT_READS.has(tool)
   ) {
-    return [];
+    return null;
   }
+  const output = action.output as {
+    code?: unknown;
+    status?: unknown;
+    unavailable?: unknown;
+  } | null;
   const notRun =
     action.isError === true &&
-    typeof action.errorName === "string" &&
-    NOT_RUN.test(action.errorName);
-  const billing = billingSources.safeParse(
-    (action.output as { unavailable?: unknown } | null)?.unavailable
-  );
+    (output?.code === "TOOL_EXECUTION_DENIED" ||
+      (typeof action.errorName === "string" && NOT_RUN.test(action.errorName)));
+  const billing = billingSources.safeParse(output?.unavailable);
   const refused =
     notRun ||
-    REFUSAL.test(JSON.stringify(action.output ?? null)) ||
+    (typeof output?.status === "string" && WHOLE_REFUSALS.has(output.status)) ||
     (billing.success &&
       billing.data.some((entry) => BILLING_REFUSALS.has(entry)));
-  return refused ? [toolArea(tool)] : [];
+  return { area: toolArea(tool), refused };
 }
 
 export interface UncheckedFact {
@@ -322,8 +332,8 @@ const NAMED_DATA = "one item that named workspace data, left out";
  * kind, so rewording never opens a second ticket; each fact goes in the
  * conversation's comment. In an area whose read failed in the same run, the
  * tool facts ride on that failure's gap instead of opening another. In an
- * area whose read was refused by design, tool facts file nothing; docs facts
- * still do.
+ * area whose latest read refused the whole check by design, tool facts file
+ * nothing; docs facts still do.
  */
 export function replyGaps(
   unchecked: readonly UncheckedFact[] | undefined,

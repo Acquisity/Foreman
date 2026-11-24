@@ -9,7 +9,7 @@ import {
   type CapabilityGap,
   fileRunGaps,
   gapsFromResult,
-  refusedAreas,
+  readRefusal,
   replyGaps,
 } from "./widget-capability-gaps.js";
 import { answerFromGuide, chatGuideEnabled } from "./widget-chat.js";
@@ -466,6 +466,17 @@ interface Recorded {
   refused: string[];
   ticket: FiledTicket | null;
 }
+/** Areas whose latest read this turn refused the whole check; a later answered read clears its area. */
+const latestRefusals = (
+  refused: string[],
+  read: ReturnType<typeof readRefusal>
+): string[] => {
+  if (!read) {
+    return refused;
+  }
+  const others = refused.filter((area) => area !== read.area);
+  return read.refused ? [...others, read.area] : others;
+};
 /** What the turn's own tool results recorded: a filed ticket, a question for the customer, a workspace read. */
 const recorded = (result: unknown, so: Recorded): Recorded => {
   const action = result as { kind?: string; toolName?: unknown } | null;
@@ -478,7 +489,7 @@ const recorded = (result: unknown, so: Recorded): Recorded => {
         typeof action.toolName === "string" &&
         gathering(action.toolName)),
     readings: [...so.readings, ...toolReadings(result)],
-    refused: [...so.refused, ...refusedAreas(result)],
+    refused: latestRefusals(so.refused, readRefusal(result)),
     ticket: filedTicketResult(result) ?? so.ticket,
   };
 };
@@ -995,6 +1006,25 @@ const withoutUnchecked = ({
   ...findings
 }: WidgetFindings): WidgetFindings => findings;
 
+/**
+ * The reply's unchecked facts, filed after the tool gaps so a failed read's
+ * gap gets them on the comment the first filing wrote, never a second ticket.
+ */
+const startReplyGapFiling = (
+  run: Pick<WidgetRun, "id" | "scope">,
+  unchecked: WidgetFindings["unchecked"],
+  outcome: Extract<WaitOutcome, { status: "completed" }>,
+  after: Promise<void> | undefined,
+  fileGaps: WidgetDependencies["fileGaps"]
+): Promise<void> =>
+  (after ?? Promise.resolve()).then(() =>
+    startGapFiling(
+      run,
+      replyGaps(unchecked, outcome.gaps, outcome.refused),
+      fileGaps
+    )
+  );
+
 /** Gate, then persist. Runs once per session outcome; a replay finds the fenced row unchanged. */
 export async function finishWidgetRun(
   run: Pick<
@@ -1079,9 +1109,11 @@ export async function finishWidgetRun(
       deps,
       deadline
     );
-    writtenGapsFiled = startGapFiling(
+    writtenGapsFiled = startReplyGapFiling(
       run,
-      replyGaps(written.structured?.unchecked, outcome.gaps, outcome.refused),
+      written.structured?.unchecked,
+      outcome,
+      gapsFiled,
       deps.fileGaps
     );
     const { filed, gateDeps } = written;

@@ -3330,7 +3330,7 @@ test("a write-up that lists what it could not check files one gap per area with 
     result: {
       callId: "site",
       kind: "tool-result",
-      output: { projects: [{ render: { status: "not_linked" } }] },
+      output: { status: "feature_off" },
       toolName: "widget_website_status",
     },
   });
@@ -3417,4 +3417,68 @@ test("a write-up that lists what it could not check files one gap per area with 
   assert.equal(gated.length, 1);
   assert.equal("unchecked" in (gated[0] as object), false);
   assert.equal(JSON.stringify(run.findings).includes("unchecked"), false);
+});
+
+test("an area counts as refused only while its latest read refused the whole check", async () => {
+  const read = (callId: string, output: unknown) =>
+    event("action.result", {
+      result: {
+        callId,
+        kind: "tool-result",
+        output,
+        toolName: "widget_website_status",
+      },
+    });
+  const retried = await waitForWidgetInvestigation(
+    session([
+      read("a", { status: "invalid_input" }),
+      read("b", { projects: [] }),
+      event("turn.completed"),
+    ])
+  );
+  assert.equal(retried.status === "completed" && retried.refused, undefined);
+  const refused = await waitForWidgetInvestigation(
+    session([read("a", { status: "feature_off" }), event("turn.completed")])
+  );
+  assert.deepEqual(refused.status === "completed" && refused.refused, [
+    "website",
+  ]);
+});
+
+test("the reply's facts are filed only after the tool gaps finish", async () => {
+  const outcome = await waitForWidgetInvestigation(
+    session([
+      timedOutStripe,
+      event("message.completed", { message: "I couldn't check the invoice." }),
+      event("turn.completed"),
+    ])
+  );
+  const { deps, run } = dependencies();
+  deps.extract = () =>
+    Promise.resolve({
+      ...findings,
+      unchecked: [
+        { area: "billing", fact: "whether an invoice was paid", kind: "tool" },
+      ],
+    });
+  const order: string[] = [];
+  deps.fileGaps = (gaps) => {
+    const label = gaps[0]?.details ? "reply" : "tools";
+    order.push(`${label} started`);
+    return new Promise((resolve) =>
+      setTimeout(() => {
+        order.push(`${label} done`);
+        resolve();
+      }, 5)
+    );
+  };
+  if (outcome.status === "completed") {
+    await finishWidgetRun(run, "widget-session-order", outcome, deps);
+  }
+  assert.deepEqual(order, [
+    "tools started",
+    "tools done",
+    "reply started",
+    "reply done",
+  ]);
 });

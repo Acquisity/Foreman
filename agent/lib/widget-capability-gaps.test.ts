@@ -11,7 +11,7 @@ import {
   gapsFromResult,
   gapTitle,
   generalFact,
-  refusedAreas,
+  readRefusal,
   replyGaps,
   withDetails,
 } from "./widget-capability-gaps.js";
@@ -620,44 +620,48 @@ test("a failed read carries the reply's tool facts, a refused read files only it
     toolName: "widget_billing_summary",
   });
   const website = (output: unknown, extra: object = {}) =>
-    refusedAreas({
+    readRefusal({
       kind: "tool-result",
       output,
       toolName: "widget_website_status",
       ...extra,
-    });
-  const refused = [
-    website({ status: "denied" }),
-    website({ status: "invalid_input" }),
-    website({
-      sections: {},
-      unavailable: [{ reason: "feature_off", section: "render" }],
-    }),
-    website({ projects: [{ render: { status: "not_linked" } }] }),
-    website({ code: "TOOL_EXECUTION_DENIED" }, { isError: true }),
-    website(null, { errorName: "AI_InvalidToolInputError", isError: true }),
-    refusedAreas({
-      kind: "tool-result",
-      output: { unavailable: ["workspace could not be verified"] },
-      toolName: "widget_billing_summary",
-    }),
-  ].flat();
-  assert.deepEqual(refused, [
-    "website",
-    "website",
-    "website",
-    "website",
-    "website",
-    "website",
-    "billing",
-  ]);
+    })?.refused;
+  // A whole check refused by design, the same refusals gapsFromResult knows.
   assert.deepEqual(
-    refusedAreas({
+    [
+      website({ status: "denied" }),
+      website({ status: "invalid_input" }),
+      website({ status: "feature_off" }),
+      website({ status: "not_linked" }),
+      website({ code: "TOOL_EXECUTION_DENIED" }, { isError: true }),
+      website(null, { errorName: "AI_InvalidToolInputError", isError: true }),
+      readRefusal({
+        kind: "tool-result",
+        output: { unavailable: ["workspace could not be verified"] },
+        toolName: "widget_billing_summary",
+      })?.refused,
+    ],
+    [true, true, true, true, true, true, true]
+  );
+  // One refused section or project inside an answered read is not the area's refusal.
+  assert.deepEqual(
+    [
+      website({
+        sections: {},
+        status: "ok",
+        unavailable: [{ reason: "feature_off", section: "render" }],
+      }),
+      website({ projects: [{ render: { status: "not_linked" } }] }),
+    ],
+    [false, false]
+  );
+  assert.deepEqual(
+    readRefusal({
       kind: "tool-result",
       output: { status: "ok" },
       toolName: "widget_inboxes",
     }),
-    []
+    { area: "inboxes", refused: false }
   );
   const gaps = replyGaps(
     [
