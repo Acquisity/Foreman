@@ -10,7 +10,7 @@ const GROUP_ID = /(\w+): '([^']+)'/gu;
 const GROUP = /id: SIDEBAR_GROUP_IDS\.(\w+),\s*label: '([^']*)'/gu;
 const CRM_PAGE = /label: '([^']+)'/gu;
 const PAGE =
-  /key: '([^']+)',\s*label: '([^']+)',[\s\S]*?defaultGroupId: SIDEBAR_GROUP_IDS\.(\w+)([\s\S]*?)\n {2}\},/gu;
+  /key: '([^']+)',\s*label: '([^']+)',[\s\S]*?defaultGroupId: SIDEBAR_GROUP_IDS\.(\w+)[\s\S]*?\n {2}\},/gu;
 /** A page kept only for saved layouts, such as the old "CRM" item. */
 const NEVER_SHOWN = /isVisible: \(\) => false/u;
 
@@ -40,7 +40,7 @@ export function parseGuideSidebar(source: string): GuideSidebar {
     crmGroup?.pages.push(`"${m[1]}"`);
   }
   for (const m of (source.match(PAGES_BLOCK)?.[1] ?? "").matchAll(PAGE)) {
-    if (!NEVER_SHOWN.test(m[4])) {
+    if (!NEVER_SHOWN.test(m[0])) {
       pages.add(m[2]);
       groups.find((g) => g.id === groupIds[m[3]])?.pages.push(`"${m[2]}"`);
     }
@@ -68,20 +68,26 @@ const IN_SIDEBAR = /\bsidebar\b|\bleft menu\b/iu;
 const escapeRegExp = (text: string) =>
   text.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
 
+const headings = (sidebar: GuideSidebar) =>
+  [...sidebar.headings].map(escapeRegExp).join("|");
+
 /**
- * A path with a sidebar heading taken out where it is written as a click: at
- * the start of the path or right after "click" or "open", followed by " > " or
- * ", then ". A heading after "under" or "in" says where a page sits and stays.
+ * A path with a sidebar heading taken out where it is written as a click:
+ * anywhere before " > ", or before ", then " at the start of the path or right
+ * after "click" or "open". A heading after "under" or "in" says where a page
+ * sits and stays.
  */
 export const withoutHeadings = (sidebar: GuideSidebar, path: string) =>
   sidebar.headings.size
-    ? path.replace(
-        new RegExp(
-          `(^|\\b(?:click|open) )"(?:${[...sidebar.headings].map(escapeRegExp).join("|")})"(?: > |, then )`,
-          "giu"
-        ),
-        "$1"
-      )
+    ? path
+        .replace(new RegExp(`"(?:${headings(sidebar)})" > `, "giu"), "")
+        .replace(
+          new RegExp(
+            `(^|\\b(?:click|open) )"(?:${headings(sidebar)})", then `,
+            "giu"
+          ),
+          "$1"
+        )
     : path;
 
 /**

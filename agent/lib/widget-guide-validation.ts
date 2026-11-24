@@ -35,7 +35,7 @@ export function assertGuideSections(
 
 /** A fact line that answers with another article's slug instead of the answer. */
 const POINTER_ANSWER =
-  /^(?:- )?Same as:? (?:slug )?\{?(?:slug: )?[a-z0-9][a-z0-9/-]*\}?[.,;]?/u;
+  /^\s*(?:[-*] )?Same as:? (?:slug )?\{?(?:slug: )?[a-z0-9][a-z0-9/-]*\}?[.,;]?\s*$/u;
 
 /**
  * Every section carries its own answer (ENG-20311): a "Same as <slug>" line in

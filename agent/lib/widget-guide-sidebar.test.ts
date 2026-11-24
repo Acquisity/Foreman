@@ -44,6 +44,13 @@ const CRM_V2_PAGE_SPECS: readonly CrmPageSpec[] = [
 export const SIDEBAR_CATALOG_PAGES: SidebarCatalogPage[] = [
 ${[
   page("crm", "CRM", "main", "\n    isVisible: () => false,"),
+  `  {
+    key: 'old-inbox',
+    label: 'Old Inbox',
+    isVisible: () => false,
+    icon: Icon,
+    defaultGroupId: SIDEBAR_GROUP_IDS.coldEmail,
+  },`,
   page("cold-email-campaigns", "Campaigns", "coldEmail"),
   page("cold-email-ai-inbox", "AI Inbox", "coldEmail"),
   page("cold-email-email-accounts", "Email accounts", "coldEmail"),
@@ -80,6 +87,7 @@ test("the guide's sidebar lists no page the app never shows", () => {
     ].join("\n")
   );
   assert.ok(!sidebar.pages.has("CRM"));
+  assert.ok(!sidebar.pages.has("Old Inbox"));
   assert.deepEqual([...sidebar.headings], ["CRM", "Cold Email", "Build"]);
 });
 
@@ -118,6 +126,10 @@ test("a heading written as a click is taken out of the path", () => {
   const placed =
     'Click "Email accounts" under "Cold Email", then "Domain forwarding"';
   assert.equal(withoutHeadings(sidebar, placed), placed);
+  assert.equal(
+    withoutHeadings(sidebar, 'Go to "Build" > "Sites"'),
+    'Go to "Sites"'
+  );
 });
 
 test("a reshaped catalog fails instead of shipping a guide without a sidebar", () => {

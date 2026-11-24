@@ -89,11 +89,13 @@ test("a section that answers with another article's slug is refused", () => {
     "### How many offers? {slug: offer-creator/faq/count}",
     "Same as offer-creator.",
     "Same as slug cold-email-agent/faq/billing-domains/redirect.",
+    "  * Same as: dashboard",
     "### Campaign settings {slug: cold-email-agent/settings}",
     '- Who takes the calls: "Same as default" or "This campaign only".',
+    "Same as the monthly plan: $20.",
   ].join("\n");
   assert.throws(() => assertOwnAnswers(guide), POINTERS);
   assert.doesNotThrow(() =>
-    assertOwnAnswers(guide.split("\n").slice(5).join("\n"))
+    assertOwnAnswers(guide.split("\n").slice(6).join("\n"))
   );
 });
