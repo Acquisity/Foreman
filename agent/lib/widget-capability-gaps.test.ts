@@ -749,3 +749,23 @@ test("each conversation's comment lists what its reply couldn't check", async ()
     ]
   );
 });
+
+test("a fact with the comment's separator in it stays one fact, and jobs is an area", () => {
+  const [jobsGap] = replyGaps([
+    {
+      area: "jobs",
+      fact: "why a scrape failed; and when it retries",
+      kind: "tool",
+    },
+  ]);
+  assert.equal(
+    gapTitle(jobsGap),
+    "Capability gap: jobs: something a reply said could not be checked"
+  );
+  assert.deepEqual(jobsGap.details, [
+    "why a scrape failed, and when it retries",
+  ]);
+  const body = "Seen in support conversation c (Foreman run r).";
+  const once = withDetails(body, jobsGap.details) ?? "";
+  assert.equal(withDetails(once, jobsGap.details), null);
+});

@@ -114,9 +114,17 @@ export const stampedWidgetAttributes = z.object({
   featuresOff: z
     .string()
     .optional()
-    .transform((text) =>
-      text === undefined ? undefined : shape.featuresOff.parse(JSON.parse(text))
-    ),
+    .transform((text, ctx) => {
+      if (text === undefined) {
+        return;
+      }
+      try {
+        return shape.featuresOff.parse(JSON.parse(text));
+      } catch {
+        ctx.addIssue({ code: "custom", message: "Invalid featuresOff." });
+        return z.NEVER;
+      }
+    }),
 });
 
 export type WidgetContext = Readonly<z.infer<typeof widgetContextSchema>>;

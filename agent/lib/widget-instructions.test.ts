@@ -15,7 +15,7 @@ import {
 import { JUDGE_TIMEOUT_MS } from "./widget-judge.js";
 import { DESCRIPTION_CHARS } from "./widget-next-action.js";
 import { PRODUCT_GUIDE } from "./widget-product-guide.js";
-import { widgetAuth } from "./widget-scope.js";
+import { widgetAuth, widgetContext } from "./widget-scope.js";
 import { SUPPORT_GUIDE } from "./widget-support-guide.js";
 
 const FEATURE_OFF_NAMES =
@@ -208,5 +208,16 @@ test("an investigation in a workspace with a feature off is told the feature is 
       widgetAuth({ ...scope, helpCenter: { ...helpCenter, featuresOff: [] } })
     ).includes("not turned on for this workspace"),
     false
+  );
+});
+
+test("a malformed featuresOff stamp fails the scope closed instead of throwing", () => {
+  const auth = widgetAuth(scope);
+  assert.equal(
+    widgetContext({
+      ...auth,
+      attributes: { ...auth.attributes, featuresOff: "{bad" },
+    }),
+    null
   );
 });

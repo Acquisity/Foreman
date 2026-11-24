@@ -22,6 +22,7 @@ export const GAP_AREAS = [
   "campaigns",
   "crm-contact",
   "inboxes",
+  "jobs",
   "lead-pipeline",
   "orders",
   "website",
@@ -325,6 +326,7 @@ const REPLY_FACTS = {
   docs: "a product question a reply said the Help Centre does not answer",
   tool: "something a reply said could not be checked",
 } as const;
+const DETAIL_SEPARATOR = "; ";
 const NAMED_DATA = "one item that named workspace data, left out";
 
 /**
@@ -362,7 +364,8 @@ export function replyGaps(
         kind: item.kind,
         source: "reply" as const,
       };
-    const detail = generalFact(item.fact) ?? NAMED_DATA;
+    const detail =
+      generalFact(item.fact.replaceAll(DETAIL_SEPARATOR, ", ")) ?? NAMED_DATA;
     if (!gap.details.includes(detail)) {
       gap.details.push(detail);
     }
@@ -445,7 +448,9 @@ const occurrenceBody = (gap: CapabilityGap, seen: GapOccurrence) =>
     `${OCCURRENCE}${seen.conversationId} (Foreman run ${seen.runId}).`,
     ...(gap.reason ? [`Reason: ${gap.reason}.`] : []),
   ].join(" ") +
-  (gap.details?.length ? `${COULD_NOT_CHECK}${gap.details.join("; ")}.` : "");
+  (gap.details?.length
+    ? `${COULD_NOT_CHECK}${gap.details.join(DETAIL_SEPARATOR)}.`
+    : "");
 
 /** A conversation's comment with any of these facts it doesn't list yet, or null when it lists them all. */
 export const withDetails = (
@@ -459,13 +464,13 @@ export const withDetails = (
       : body
           .slice(at + COULD_NOT_CHECK.length)
           .replace(TRAILING_STOP, "")
-          .split("; ");
+          .split(DETAIL_SEPARATOR);
   const added = details.filter((detail) => !listed.includes(detail));
   if (added.length === 0) {
     return null;
   }
   const head = at < 0 ? body : body.slice(0, at);
-  return `${head}${COULD_NOT_CHECK}${[...listed, ...added].join("; ")}.`;
+  return `${head}${COULD_NOT_CHECK}${[...listed, ...added].join(DETAIL_SEPARATOR)}.`;
 };
 
 const FIND = `query CapabilityGapFind($team: String!, $title: String!) {
