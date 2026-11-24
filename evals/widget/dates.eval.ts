@@ -7,6 +7,8 @@ import { defaultGateDeps } from "../../agent/lib/widget-egress.js";
 const RUNS = 10;
 const TODAY = /\btoday\b/iu;
 const TOMORROW = /\btomorrow\b/iu;
+const THE_MEETING = /\b(?:11(?::00)?\s?AM|Wednesday|25)\b/iu;
+const SENTENCES = /(?<=[.!?])\s+/u;
 
 export default defineEval({
   description:
@@ -62,14 +64,23 @@ export default defineEval({
       replies.push(await defaultGateDeps.compose(input));
     }
     const wrong = replies.filter(
-      (reply) => TODAY.test(reply) || !TOMORROW.test(reply)
+      (reply) =>
+        TODAY.test(reply) ||
+        !reply
+          .split(SENTENCES)
+          .some(
+            (sentence) => TOMORROW.test(sentence) && THE_MEETING.test(sentence)
+          )
     );
     t.log(
       `${RUNS - wrong.length} of ${RUNS} replies call the meeting tomorrow`
     );
     await t.require(
       wrong.length === 0,
-      satisfies(Boolean, "every reply calls the 25 Nov meeting tomorrow")
+      satisfies(
+        Boolean,
+        "every reply calls the 25 Nov meeting tomorrow, in the sentence about it"
+      )
     );
   },
   timeoutMs: 600_000,

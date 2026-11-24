@@ -883,7 +883,9 @@ export async function gate(
   /** When `signal` fires (epoch ms); bounds the judge so the composer keeps its time. */
   finishAt?: number,
   /** Everything the customer wrote in this conversation, the latest message included. */
-  customerInput: string = question
+  customerInput: string = question,
+  /** When the customer asked: the run's creation time. */
+  askedAt: Date = new Date()
 ): Promise<GateResult> {
   let findings = withoutTicketRefs(investigated) ?? investigated;
   const resolve = vouchingTyped(deps.resolve, customerInput);
@@ -966,7 +968,7 @@ export async function gate(
       composedReply(
         deps.compose,
         {
-          askedAt: askedAtLine(scope),
+          askedAt: askedAtLine(scope, askedAt),
           askedForChange,
           findings: composerInput(gated),
           finishAt,
