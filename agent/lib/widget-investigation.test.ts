@@ -204,6 +204,10 @@ const noWork = (): Pick<RouteHandlerArgs, "from" | "waitUntil"> => ({
   waitUntil: () => assert.fail("must not start background work"),
 });
 
+const ASKED_AT_PREFIX = /^ASKED AT: [^\n]*\n\n/u;
+const ASKED_AT_FIRST = /^ASKED AT: .+ in the customer's time zone /u;
+const withoutAskedAt = (sent: string) => sent.replace(ASKED_AT_PREFIX, "");
+
 test("disabled, unauthenticated, malformed and oversized requests stop before verification", async (t) => {
   const verified = () => assert.fail("must not verify");
   const { deps } = dependencies();
@@ -594,7 +598,7 @@ test("a completed investigation is gated, answered with the composed reply, and 
     issuer: string;
     attributes: Record<string, string>;
   };
-  assert.equal(sent.message, start.question);
+  assert.equal(withoutAskedAt(sent.message), start.question);
   assert.equal(auth.issuer, WIDGET_SUPPORT_ISSUER);
   assert.equal(isUnattended(auth as never), true);
   assert.equal(auth.attributes.organizationId, scope.organizationId);
@@ -2623,7 +2627,7 @@ test("a teammate's follow-up reaches the investigator with the earlier team-only
   assert.equal(response.status, 200);
   assert.equal(sends.length, 1);
   assert.ok(
-    sends[0].startsWith(
+    withoutAskedAt(sends[0]).startsWith(
       "Check campaign B too.\n\nEARLIER TEAM-ONLY CONVERSATION"
     )
   );
@@ -2650,7 +2654,7 @@ test("a teammate's request still investigates when the team-only exchange cannot
   );
   assert.equal(response.status, 200);
   assert.equal(sends.length, 1);
-  assert.ok(sends[0].startsWith("Check campaign B too."));
+  assert.ok(withoutAskedAt(sends[0]).startsWith("Check campaign B too."));
   assert.ok(!sends[0].includes("EARLIER TEAM-ONLY CONVERSATION"));
 });
 
@@ -2668,7 +2672,10 @@ test("a customer's investigation never reads the team-only exchange", async (t) 
     deps
   );
   assert.equal(response.status, 200);
-  assert.deepEqual(sends, [withHistory(investigate.question, undefined)]);
+  assert.match(sends[0], ASKED_AT_FIRST);
+  assert.deepEqual(sends.map(withoutAskedAt), [
+    withHistory(investigate.question, undefined),
+  ]);
 });
 
 const closedHours = {
@@ -3011,7 +3018,9 @@ test("a toggled ask for a person files the ticket and still investigates", async
   );
   assert.equal(filed.length, 1);
   assert.equal(sends.length, 1);
-  assert.ok(sends[0].startsWith("Can I talk to a person please?"));
+  assert.ok(
+    withoutAskedAt(sends[0]).startsWith("Can I talk to a person please?")
+  );
   assert.ok(sends[0].includes("already filed or reused this conversation"));
   assert.notEqual(run.outcome?.reason, "asked_for_human");
 });
@@ -3302,7 +3311,7 @@ test("a teammate's investigation reads the user's timeline and is told to name t
   assert.equal(response.status, 200);
   assert.deepEqual(asked, [true]);
   assert.equal(sends.length, 1);
-  assert.ok(sends[0].startsWith("why was this call slow?"));
+  assert.ok(withoutAskedAt(sends[0]).startsWith("why was this call slow?"));
   assert.ok(sends[0].includes(JSON.stringify(staffTimeline)));
   assert.match(sends[0], CITES_TRACE);
   assert.match(sends[0], CITES_TIMELINE);

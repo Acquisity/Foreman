@@ -3,6 +3,7 @@ import type { MessageStreamEvent } from "eve/client";
 import { z } from "zod";
 import { readRequestBody } from "./bounded-body.js";
 import { logOpsEvent } from "./ops-log.js";
+import { askedAtLine } from "./widget-asked-at.js";
 import { bugReportBrowser, MAX_BROWSER_CHARS } from "./widget-bug-evidence.js";
 import { addToBugReport, fileBugReport } from "./widget-bug-report.js";
 import {
@@ -1574,10 +1575,13 @@ async function startInvestigation(
     });
     const existing = resolveSession ? await resolveSession(address) : null;
     const startIndex = existing ? await existing.getStreamTailIndex() : 0;
-    const session = await from(address).send(question, {
-      auth: widgetAuth(scope, run.id),
-      state: { runId: run.id },
-    });
+    const session = await from(address).send(
+      `${askedAtLine(scope)}\n\n${question}`,
+      {
+        auth: widgetAuth(scope, run.id),
+        state: { runId: run.id },
+      }
+    );
     sessionId = session.id;
     await deps.attach(run.id, session.id, startIndex);
     const planned = await planning;
