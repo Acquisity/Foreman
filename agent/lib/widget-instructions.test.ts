@@ -51,6 +51,8 @@ const FAILED_STEP_RULE =
   /already tried the documented step and it failed[^.]*recent reconnect attempts all failed, do not tell them to repeat that step or wait it out: state what failed, with its error, and file it with widget_file_ticket/;
 const NEXT_STEP_RULE =
   /ends with what the customer should do next: the steps[^.]*, the workaround for a[^.]*limitation, or the single most useful[^.]*check they can make/;
+const NAMED_ACTOR_RULE =
+  /When a finding names the person who did something in the workspace, keep that name in the reply: say "you" for such an action only when a finding says the customer did it, and never credit the customer with a teammate's change/;
 const STATED_FINDING_RULE =
   /a recorded count, status or absence[^;]*goes in the reply as stated, never replaced by saying it could not be confirmed or checked; what a live check could not show is said after it, never instead of it/;
 const NO_INVENTION_RULES = [
@@ -146,6 +148,11 @@ test("the chat and the reply composer share one voice", () => {
   assert.ok(CHAT_PROMPT.includes(WIDGET_VOICE));
   assert.ok(COMPOSER_PROMPT.includes(WIDGET_VOICE));
   assert.ok(!COMPOSER_PROMPT.includes("No greetings"));
+});
+
+test("the composer keeps a named teammate named instead of calling them you", () => {
+  // ENG-20512: a teammate's CRM changes reached the customer as "all by you".
+  assert.match(COMPOSER_PROMPT, NAMED_ACTOR_RULE);
 });
 
 test("without a filed ticket the composer never says it was reported", () => {
