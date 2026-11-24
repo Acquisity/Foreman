@@ -263,15 +263,20 @@ function nestedUnavailable(
   );
 }
 
-const REFUSAL = /"(?:status|reason)":"(?:denied|feature_off|not_linked)"/u;
+const REFUSAL =
+  /"(?:status|reason)":"(?:denied|feature_off|not_linked|invalid_input)"|"code":"TOOL_EXECUTION_DENIED"/u;
 
 /**
- * The area a widget read refused by design (denied, feature_off, not_linked,
- * anywhere in its result), so what a reply says it couldn't check there is
- * not filed as a gap.
+ * The area a widget read refused by design, the same refusals gapsFromResult
+ * files nothing for: denied, feature_off, not_linked or invalid_input anywhere
+ * in its result, a call the framework refused or whose input it rejected, and
+ * billing's own refusals. What a reply says it couldn't check there is not
+ * filed as a tool gap.
  */
 export function refusedAreas(result: unknown): string[] {
   const action = result as {
+    errorName?: unknown;
+    isError?: boolean;
     kind?: string;
     output?: unknown;
     toolName?: unknown;
@@ -285,9 +290,19 @@ export function refusedAreas(result: unknown): string[] {
   ) {
     return [];
   }
-  return REFUSAL.test(JSON.stringify(action.output ?? null))
-    ? [toolArea(tool)]
-    : [];
+  const notRun =
+    action.isError === true &&
+    typeof action.errorName === "string" &&
+    NOT_RUN.test(action.errorName);
+  const billing = billingSources.safeParse(
+    (action.output as { unavailable?: unknown } | null)?.unavailable
+  );
+  const refused =
+    notRun ||
+    REFUSAL.test(JSON.stringify(action.output ?? null)) ||
+    (billing.success &&
+      billing.data.some((entry) => BILLING_REFUSALS.has(entry)));
+  return refused ? [toolArea(tool)] : [];
 }
 
 export interface UncheckedFact {
@@ -305,36 +320,50 @@ const NAMED_DATA = "one item that named workspace data, left out";
 /**
  * What a reply said it couldn't check (ENG-20478), as one gap per area and
  * kind, so rewording never opens a second ticket; each fact goes in the
- * conversation's comment. An area whose read failed or was refused in the
- * same run files nothing here: the failure is already a gap, and a refusal
- * is by design.
+ * conversation's comment. In an area whose read failed in the same run, the
+ * tool facts ride on that failure's gap instead of opening another. In an
+ * area whose read was refused by design, tool facts file nothing; docs facts
+ * still do.
  */
 export function replyGaps(
   unchecked: readonly UncheckedFact[] | undefined,
   fromTools: readonly CapabilityGap[] = [],
   refused: readonly string[] = []
 ): CapabilityGap[] {
-  const skip = new Set([...fromTools.map((gap) => gap.area), ...refused]);
+  const refusedHere = new Set(refused);
+  const failed = new Map<string, CapabilityGap & { details: string[] }>();
+  for (const gap of fromTools) {
+    if (gap.source === "code" && !failed.has(gap.area)) {
+      failed.set(gap.area, { ...gap, details: [...(gap.details ?? [])] });
+    }
+  }
   const byKey = new Map<string, CapabilityGap & { details: string[] }>();
   for (const item of unchecked ?? []) {
-    if (skip.has(item.area)) {
+    const tool = item.kind === "tool";
+    if (tool && refusedHere.has(item.area)) {
       continue;
     }
     const key = `${item.area}:${item.kind}`;
-    const gap = byKey.get(key) ?? {
-      area: item.area,
-      details: [],
-      fact: REPLY_FACTS[item.kind],
-      kind: item.kind,
-      source: "reply" as const,
-    };
+    const gap = (tool ? failed.get(item.area) : undefined) ??
+      byKey.get(key) ?? {
+        area: item.area,
+        details: [],
+        fact: REPLY_FACTS[item.kind],
+        kind: item.kind,
+        source: "reply" as const,
+      };
     const detail = generalFact(item.fact) ?? NAMED_DATA;
     if (!gap.details.includes(detail)) {
       gap.details.push(detail);
     }
-    byKey.set(key, gap);
+    if (!(tool && failed.has(item.area))) {
+      byKey.set(key, gap);
+    }
   }
-  return [...byKey.values()];
+  return [
+    ...[...failed.values()].filter((gap) => gap.details.length > 0),
+    ...byKey.values(),
+  ];
 }
 
 /** One entry per gap key; the first occurrence keeps its reason. */
@@ -399,18 +428,39 @@ export const countedDescription = (description: string, count: number) =>
   );
 
 const OCCURRENCE = "Seen in support conversation ";
+const COULD_NOT_CHECK = " Couldn't check: ";
+const TRAILING_STOP = /\.$/u;
 const occurrenceBody = (gap: CapabilityGap, seen: GapOccurrence) =>
   [
     `${OCCURRENCE}${seen.conversationId} (Foreman run ${seen.runId}).`,
     ...(gap.reason ? [`Reason: ${gap.reason}.`] : []),
-    ...(gap.details?.length
-      ? [`Couldn't check: ${gap.details.join("; ")}.`]
-      : []),
-  ].join(" ");
+  ].join(" ") +
+  (gap.details?.length ? `${COULD_NOT_CHECK}${gap.details.join("; ")}.` : "");
+
+/** A conversation's comment with any of these facts it doesn't list yet, or null when it lists them all. */
+export const withDetails = (
+  body: string,
+  details: readonly string[] = []
+): string | null => {
+  const at = body.indexOf(COULD_NOT_CHECK);
+  const listed =
+    at < 0
+      ? []
+      : body
+          .slice(at + COULD_NOT_CHECK.length)
+          .replace(TRAILING_STOP, "")
+          .split("; ");
+  const added = details.filter((detail) => !listed.includes(detail));
+  if (added.length === 0) {
+    return null;
+  }
+  const head = at < 0 ? body : body.slice(0, at);
+  return `${head}${COULD_NOT_CHECK}${[...listed, ...added].join("; ")}.`;
+};
 
 const FIND = `query CapabilityGapFind($team: String!, $title: String!) {
   issues(first: 5, filter: { team: { key: { eq: $team } }, title: { eqIgnoreCase: $title }, state: { type: { nin: ["completed", "canceled"] } } }) {
-    nodes { id identifier description labels { nodes { id } } comments(first: 250) { nodes { body } } }
+    nodes { id identifier description labels { nodes { id } } comments(first: 250) { nodes { id body } } }
   }
   teams(filter: { key: { eq: $team } }) { nodes { id } }
   issueLabels(first: 20, filter: { name: { in: ["Capability Gap", "Docs Gap", "fixy"] }, or: [{ team: { key: { eq: $team } } }, { team: { null: true } }] }) { nodes { id name } }
@@ -421,6 +471,9 @@ const CREATE = `mutation CapabilityGapCreate($input: IssueCreateInput!) {
 const COUNT = `mutation CapabilityGapCount($id: String!, $description: String!) {
   issueUpdate(id: $id, input: { description: $description }) { success }
 }`;
+const UPDATE_COMMENT = `mutation CapabilityGapDetails($id: String!, $body: String!) {
+  commentUpdate(id: $id, input: { body: $body }) { success }
+}`;
 const ADD_LABEL = `mutation CapabilityGapLabel($id: String!, $label: String!) {
   issueAddLabel(id: $id, labelId: $label) { success }
 }`;
@@ -429,7 +482,7 @@ interface Found {
   issueLabels: { nodes: { id: string; name: string }[] };
   issues: {
     nodes: {
-      comments: { nodes: { body: string }[] };
+      comments: { nodes: { body: string; id: string }[] };
       description: string | null;
       id: string;
       identifier: string;
@@ -483,17 +536,31 @@ export async function fileCapabilityGap(
   if (!fixyLabel) {
     return { outcome: "failed", reason: `Linear has no ${FIXY} label.` };
   }
+  const commentId = (issueId: string) =>
+    commentIdFor(`capability-gap:${issueId}:${seen.conversationId}`);
   const record = (issueId: string) =>
     commentOnce(
       issueId,
       occurrenceBody(gap, seen),
-      commentIdFor(`capability-gap:${issueId}:${seen.conversationId}`),
+      commentId(issueId),
       signal,
       request
     );
   const [open] = found.issues.nodes;
   if (open) {
     const added = await record(open.id);
+    // A later run in the same conversation adds what its reply couldn't check
+    // to that conversation's one comment (ENG-20478).
+    const mine = added
+      ? undefined
+      : open.comments.nodes.find(({ id }) => id === commentId(open.id));
+    const merged = mine && withDetails(mine.body, gap.details);
+    if (mine && merged) {
+      await write("CapabilityGapDetails", UPDATE_COMMENT, {
+        body: merged,
+        id: mine.id,
+      });
+    }
     const count =
       open.comments.nodes.filter((comment) =>
         comment.body.startsWith(OCCURRENCE)

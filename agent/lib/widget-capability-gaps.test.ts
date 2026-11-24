@@ -13,8 +13,11 @@ import {
   generalFact,
   refusedAreas,
   replyGaps,
+  withDetails,
 } from "./widget-capability-gaps.js";
 
+const MAILBOXES_ADDED =
+  /Couldn't check: why a domain was suspended; whether its mailboxes still exist\.$/u;
 const FOUND_BY_EXTRACTION = /Found by: the extraction pass/u;
 const KEY_LINE = /^- Gap key: orders: why a domain order/mu;
 const COUNT_THREE = /^\* Conversations: 3$/mu;
@@ -377,6 +380,15 @@ const fakeLinear = (labels = ["Capability Gap", "Docs Gap", "fixy"]) => {
         issues.push(issue);
         return { issueCreate: { issue } };
       },
+      CapabilityGapDetails: () => {
+        for (const issue of issues) {
+          const comment = issue.comments.find((c) => c.id === variables.id);
+          if (comment) {
+            comment.body = String(variables.body);
+          }
+        }
+        return { commentUpdate: { success: true } };
+      },
       CapabilityGapFind: () => ({
         issueLabels: {
           nodes: labels.map((label) => ({ id: `label-${label}`, name: label })),
@@ -601,27 +613,44 @@ test("what a reply couldn't check is one gap per area and kind, never a ticket p
   assert.match(gapDescription(gaps[0]), FOUND_BY_EXTRACTION);
 });
 
-test("an area whose read failed or was refused files no reply gap", () => {
+test("a failed read carries the reply's tool facts, a refused read files only its docs facts", () => {
   const failed = gapsFromResult({
     kind: "tool-result",
     output: { available: true, unavailable: ["stripe: timeout"] },
     toolName: "widget_billing_summary",
   });
-  const refused = [
-    { status: "denied" },
-    {
-      sections: {},
-      unavailable: [{ reason: "feature_off", section: "render" }],
-    },
-    { projects: [{ render: { status: "not_linked" } }] },
-  ].flatMap((output) =>
+  const website = (output: unknown, extra: object = {}) =>
     refusedAreas({
       kind: "tool-result",
       output,
       toolName: "widget_website_status",
-    })
-  );
-  assert.deepEqual(refused, ["website", "website", "website"]);
+      ...extra,
+    });
+  const refused = [
+    website({ status: "denied" }),
+    website({ status: "invalid_input" }),
+    website({
+      sections: {},
+      unavailable: [{ reason: "feature_off", section: "render" }],
+    }),
+    website({ projects: [{ render: { status: "not_linked" } }] }),
+    website({ code: "TOOL_EXECUTION_DENIED" }, { isError: true }),
+    website(null, { errorName: "AI_InvalidToolInputError", isError: true }),
+    refusedAreas({
+      kind: "tool-result",
+      output: { unavailable: ["workspace could not be verified"] },
+      toolName: "widget_billing_summary",
+    }),
+  ].flat();
+  assert.deepEqual(refused, [
+    "website",
+    "website",
+    "website",
+    "website",
+    "website",
+    "website",
+    "billing",
+  ]);
   assert.deepEqual(
     refusedAreas({
       kind: "tool-result",
@@ -630,16 +659,73 @@ test("an area whose read failed or was refused files no reply gap", () => {
     }),
     []
   );
+  const gaps = replyGaps(
+    [
+      { area: "billing", fact: "whether an invoice was paid", kind: "tool" },
+      { area: "billing", fact: "how credits roll over", kind: "docs" },
+      { area: "website", fact: "whether the site is live", kind: "tool" },
+      { area: "website", fact: "what a not linked site means", kind: "docs" },
+    ],
+    failed,
+    ["website"]
+  );
   assert.deepEqual(
-    replyGaps(
-      [
-        { area: "billing", fact: "whether an invoice was paid", kind: "tool" },
-        { area: "website", fact: "whether the site is live", kind: "tool" },
-      ],
-      failed,
-      refused
-    ),
-    []
+    gaps.map(({ area, details, fact, source }) => ({
+      area,
+      details,
+      fact,
+      source,
+    })),
+    [
+      {
+        area: "billing",
+        details: ["whether an invoice was paid"],
+        fact: "the stripe section could not be read",
+        source: "code",
+      },
+      {
+        area: "billing",
+        details: ["how credits roll over"],
+        fact: "a product question a reply said the Help Centre does not answer",
+        source: "reply",
+      },
+      {
+        area: "website",
+        details: ["what a not linked site means"],
+        fact: "a product question a reply said the Help Centre does not answer",
+        source: "reply",
+      },
+    ]
+  );
+});
+
+test("a later run adds its facts to the conversation's one comment", async () => {
+  const linear = fakeLinear();
+  const [first] = replyGaps([
+    { area: "orders", fact: "why a domain was suspended", kind: "tool" },
+  ]);
+  const [second] = replyGaps([
+    { area: "orders", fact: "why a domain was suspended", kind: "tool" },
+    { area: "orders", fact: "whether its mailboxes still exist", kind: "tool" },
+  ]);
+  await fileWith(linear, first)("conv-1", "run-1");
+  assert.equal(
+    (await fileWith(linear, second)("conv-1", "run-2")).outcome,
+    "seen"
+  );
+  assert.equal(
+    withDetails(linear.issues[0].comments[0].body, second.details),
+    null
+  );
+  assert.match(linear.issues[0].comments[0].body, MAILBOXES_ADDED);
+  // Nothing new: no write.
+  const calls = linear.calls.length;
+  await fileWith(linear, second)("conv-1", "run-3");
+  assert.equal(
+    linear.calls
+      .slice(calls)
+      .some(({ name }) => name === "CapabilityGapDetails"),
+    false
   );
 });
 

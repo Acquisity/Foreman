@@ -3394,6 +3394,14 @@ test("a write-up that lists what it could not check files one gap per area with 
       },
     ],
     [
+      // The billing read failed, so its fact rides on that gap; the website
+      // read was refused by design, so its tool fact files nothing.
+      {
+        area: "billing",
+        details: ["whether the latest invoice was paid"],
+        fact: "the stripe section could not be read",
+        source: "code",
+      },
       {
         area: "orders",
         details: [
