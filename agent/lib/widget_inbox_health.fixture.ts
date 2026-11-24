@@ -1,5 +1,3 @@
-// Shared setup for the widget_inbox_health suites: operation bindings, the
-// saved row the database read returns, and a transport routed by path.
 import { after, beforeEach } from "node:test";
 import type { ProviderContext } from "#lib/executor/dispatch.js";
 import { resetInstantlyWorkspaceCache } from "#lib/instantly-api.js";
