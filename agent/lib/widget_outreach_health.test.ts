@@ -727,6 +727,7 @@ test("a paused campaign carries its saved pause reason and dated status changes"
     "from outreach_campaign_activity ca",
     "ca.organization_id = c.organization_id and ca.campaign_id = c.id",
     "ca.message like 'Campaign status updated to %'",
+    "ca.message like 'Campaign paused%'",
     "limit 10",
   ]) {
     assert.ok(query.includes(required), required);
