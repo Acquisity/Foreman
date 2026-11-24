@@ -225,41 +225,31 @@ const agentActionState = z.enum([
   "running",
   "not_run",
 ]);
-const agentDecision = z.object({
-  actions: z
-    .array(
-      z.object({
-        at: savedValue,
-        reason: agentText.nullable(),
-        state: agentActionState,
-        type: z.string().max(64),
-      })
-    )
-    .max(AGENT_ACTION_LIMIT),
-  approval: agentDecisionRow.shape.approval
-    .unwrap()
-    .omit({ actionIndexes: true })
-    .nullable(),
-  at: timestamp,
-  error: z
-    .string()
-    .max(AGENT_TEXT_CHARS * 2)
-    .nullable(),
-  finding: z
-    .string()
-    .max(AGENT_FINDING_CHARS * 2)
-    .nullable(),
-  recommended: z.array(agentText).max(AGENT_ACTION_LIMIT),
-  runStatus: z.string().max(40),
-  verdict: savedValue,
-});
+const agentDecision = agentDecisionRow
+  .omit({ actions: true, approval: true, completed: true, skipped: true })
+  .extend({
+    actions: z
+      .array(
+        z.object({
+          at: savedValue,
+          reason: agentText.nullable(),
+          state: agentActionState,
+          type: z.string().max(64),
+        })
+      )
+      .max(AGENT_ACTION_LIMIT),
+    approval: agentDecisionRow.shape.approval
+      .unwrap()
+      .omit({ actionIndexes: true })
+      .nullable(),
+  });
 
 /**
  * Each action's state as the campaign's AI Agent tab shows it (Acquisity's
  * campaign-agent-insight `toInsight`): taken or skipped once recorded, waiting
  * while the run's approval is open, running while the run is, else not run.
  */
-export function readAgentDecision(
+function readAgentDecision(
   row: z.infer<typeof agentDecisionRow>
 ): z.infer<typeof agentDecision> {
   const completedAt = new Map(
@@ -281,7 +271,6 @@ export function readAgentDecision(
       ? ("running" as const)
       : ("not_run" as const);
   };
-  const { actionIndexes: _indexes, ...approval } = row.approval ?? {};
   return {
     actions: row.actions.map((action) => {
       if (completedAt.has(action.index)) {
@@ -307,9 +296,13 @@ export function readAgentDecision(
         type: action.type,
       };
     }),
-    approval: row.approval
-      ? (approval as z.infer<typeof agentDecision>["approval"])
-      : null,
+    approval: row.approval && {
+      autoExecutesOnTimeout: row.approval.autoExecutesOnTimeout,
+      expiresAt: row.approval.expiresAt,
+      requestedAt: row.approval.requestedAt,
+      respondedAt: row.approval.respondedAt,
+      status: row.approval.status,
+    },
     at: row.at,
     error: diagnosticText(row.error, AGENT_TEXT_CHARS),
     finding: row.finding,
