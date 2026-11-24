@@ -114,10 +114,12 @@ const BILLING_REFUSALS = new Set([
 const SOURCE_LISTS: Readonly<Record<string, string>> = {
   widget_website_status: "projects",
 };
-// A nested key is a field name the tool wrote, never a record's name.
-const FIELD = /^[a-z][a-zA-Z0-9]{0,40}$/u;
+// A nested key is a field name the tool wrote, never a record's name; the
+// all-caps ones are the public check's DNS record types (A, AAAA, CNAME, NS).
+const FIELD = /^(?:[a-z][a-zA-Z0-9]{0,40}|[A-Z]{1,5})$/u;
 const REASON = /^[a-z][a-z_]{0,40}$/u;
-const NESTED_DEPTH = 3;
+// projects.publicCheck.dns.A is the deepest source a tool reports.
+const NESTED_DEPTH = 4;
 /** eve's result for a call the framework refused, or whose input failed validation, before any read ran. */
 const NOT_RUN =
   /^(?:AI_)?(?:InvalidToolInput|InvalidArgument|TypeValidation|NoSuchTool)Error$|^ZodError$/u;

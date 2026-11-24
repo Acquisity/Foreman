@@ -195,6 +195,10 @@ test("the hand-written tools' own failure shapes are gaps, by source", () => {
             {
               id: "p1",
               live: { status: "live" },
+              publicCheck: {
+                dns: { A: { status: "unavailable" }, NS: { status: "ok" } },
+                http: { status: "ok" },
+              },
               render: { status: "unavailable" },
             },
             {
@@ -208,6 +212,7 @@ test("the hand-written tools' own failure shapes are gaps, by source", () => {
       )
     ).map((found) => [found.area, found.fact]),
     [
+      ["website", "the projects.publicCheck.dns.A section could not be read"],
       ["website", "the projects.render section could not be read"],
       ["website", "the projects.live section could not be read"],
     ]
