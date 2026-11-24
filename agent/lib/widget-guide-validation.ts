@@ -33,6 +33,30 @@ export function assertGuideSections(
   }
 }
 
+/** A fact line that answers with another article's slug instead of the answer. */
+const POINTER_ANSWER =
+  /^(?:- )?Same as:? (?:slug )?\{?(?:slug: )?[a-z0-9][a-z0-9/-]*\}?[.,;]?/u;
+
+/**
+ * Every section carries its own answer (ENG-20311): a "Same as <slug>" line in
+ * place of the facts drops the answer from the guide.
+ */
+export function assertOwnAnswers(text: string): void {
+  const pointers: string[] = [];
+  let slug = "";
+  for (const line of text.split("\n")) {
+    slug = SECTION.exec(line)?.[1] ?? slug;
+    if (POINTER_ANSWER.test(line)) {
+      pointers.push(slug);
+    }
+  }
+  if (pointers.length) {
+    throw new Error(
+      `sections answer with another article: ${[...new Set(pointers)].join(", ")}`
+    );
+  }
+}
+
 const BLOCK_SCALAR = /^[>|][+-]?$/u;
 const INDENTED = /^[ \t]/u;
 

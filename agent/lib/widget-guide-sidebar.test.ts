@@ -58,11 +58,13 @@ ${[
 `;
 
 const sidebar = parseGuideSidebar(CATALOG);
+const ENTRIES = new Set(["Home", "Dashboard", "Settings"]);
 const QUOTED = /"([^"]+)"/gu;
 const check = (path: string) => {
   const stripped = withoutHeadings(sidebar, path);
   return startsAtSidebarPage(
     sidebar,
+    ENTRIES,
     stripped,
     [...stripped.matchAll(QUOTED)].map((m) => m[1])
   );
@@ -101,6 +103,7 @@ test("a sidebar path must start at a page the sidebar shows", () => {
   );
   assert.equal(check('Click "Settings" at the bottom of the sidebar'), true);
   assert.equal(check('"Settings" > "Billing"'), true);
+  assert.equal(check('In the left menu, click "Dashboard"'), true);
 });
 
 test("a heading written as a click is taken out of the path", () => {
@@ -112,6 +115,9 @@ test("a heading written as a click is taken out of the path", () => {
     withoutHeadings(sidebar, 'In the left sidebar, click "CRM", then "Deals"'),
     'In the left sidebar, click "Deals"'
   );
+  const placed =
+    'Click "Email accounts" under "Cold Email", then "Domain forwarding"';
+  assert.equal(withoutHeadings(sidebar, placed), placed);
 });
 
 test("a reshaped catalog fails instead of shipping a guide without a sidebar", () => {

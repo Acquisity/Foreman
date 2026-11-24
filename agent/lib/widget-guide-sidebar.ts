@@ -64,40 +64,36 @@ export function parseGuideSidebar(source: string): GuideSidebar {
   };
 }
 
-/** Where a sidebar path may start besides a page: the guide's entry points. */
-const SIDEBAR_ENTRIES = new Set([
-  "Home",
-  "Chat",
-  "Settings",
-  "Credits",
-  "Add credits",
-  "What's New",
-  "Help Center",
-]);
 const IN_SIDEBAR = /\bsidebar\b|\bleft menu\b/iu;
 const escapeRegExp = (text: string) =>
   text.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
 
-/** A path with every sidebar heading written as a click taken out. */
+/**
+ * A path with a sidebar heading taken out where it is written as a click: at
+ * the start of the path or right after "click" or "open", followed by " > " or
+ * ", then ". A heading after "under" or "in" says where a page sits and stays.
+ */
 export const withoutHeadings = (sidebar: GuideSidebar, path: string) =>
   sidebar.headings.size
     ? path.replace(
         new RegExp(
-          `"(?:${[...sidebar.headings].map(escapeRegExp).join("|")})"(?: > |, then )`,
-          "gu"
+          `(^|\\b(?:click|open) )"(?:${[...sidebar.headings].map(escapeRegExp).join("|")})"(?: > |, then )`,
+          "giu"
         ),
-        ""
+        "$1"
       )
     : path;
 
 /**
  * False only for a path that says it starts in the sidebar and whose first
- * label, past any heading, is neither a page the sidebar shows nor one of its
- * entry points: a retired label such as "Website Builder" is refused even when
- * the article's own words contain it ("AI Website Builder").
+ * label, past any heading, is neither a page the sidebar shows nor one of the
+ * entry points the guide describes: a retired label such as "Website Builder"
+ * is refused even when the article's own words contain it ("AI Website
+ * Builder").
  */
 export const startsAtSidebarPage = (
   sidebar: GuideSidebar,
+  entries: ReadonlySet<string>,
   path: string,
   labels: readonly string[]
 ) => {
@@ -106,7 +102,6 @@ export const startsAtSidebarPage = (
   }
   const first = labels.find((label) => !sidebar.headings.has(label));
   return (
-    first !== undefined &&
-    (sidebar.pages.has(first) || SIDEBAR_ENTRIES.has(first))
+    first !== undefined && (sidebar.pages.has(first) || entries.has(first))
   );
 };

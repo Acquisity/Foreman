@@ -53,6 +53,7 @@ import {
 import { guideSourcePath } from "../agent/lib/widget-guide-source.js";
 import {
   assertGuideSections,
+  assertOwnAnswers,
   frontmatterField,
   plainDashes,
 } from "../agent/lib/widget-guide-validation.js";
@@ -89,7 +90,7 @@ const RATIO = 0.06 / 6;
  * open") and home-nav.ts on Acquisity main, checked 2026-11-24.
  */
 const CLIENT_PAGES =
-  'Client users see "Client Portal", "Dashboard" (team members have "Home" instead), the CRM pages unless the CRM is off, and their own Personal settings. They see campaigns and the inbox only when their white-label partner has turned those on for clients, and never the other tools, workspace settings, "Members" or "Billing".';
+  'Client users see "Client Portal", "Dashboard" (team members have "Home" instead), the CRM pages unless the CRM is off, and their own Personal settings. They see campaigns and the inbox only when their white-label partner has turned those on for clients, and even then not the setup, new campaign or email accounts pages. They never see the other tools, workspace settings, "Members" or "Billing".';
 
 /**
  * What the app shows depends on the workspace: most features can be switched
@@ -110,16 +111,39 @@ const AVAILABILITY = [
  * 2026-10-08 (ENG-14932 round 3) and in the shell's menu components. The
  * Personal pages carry no role check (settings-menu-items.tsx, isVisible: true),
  * and the AI Consultant line is the ai-consultant article's own scope (round 4).
+ * Each line lists the labels a sidebar path may start from there (`starts`).
  */
-const ENTRY_POINTS = [
-  '"Home": the "Home" side of the Home/Chat toggle at the top of the left sidebar opens the workspace home page. Every role except Client has it; Client users have "Dashboard" in the sidebar instead.',
-  '"Settings": click "Settings" at the bottom of the sidebar, or click the workspace name in the top-left corner, then "Settings". Its left menu groups pages under "Personal" and "Workspace".',
-  'Settings, "Personal": "Profile", "Appearance", "Security", "Availability", "Email & Calendar", "Conferencing", "Access Tokens". These are each person\'s own settings: every role sees them and can change its own. "Workspace", as an owner sees it on a workspace with every feature on: "General", "Members", "Teams", "Roles & Permissions", "Workspace Snapshots", "Billing", "Payments", "Phone Numbers", "Voice", "Meeting Recordings", "Scheduling", "Cold Email Agent", "AI SDR Agent", "Sales Call Analyzer", "Your Niche & Offer", "Cold Email Blocklist", "Email Templates", "SMS Templates", "Sharing", "CRM Custom Fields", "Call & Meeting Outcomes", "Workflow Notifications", "Connected Apps & API Keys". A page shows only when the workspace has its feature and the role may use it.',
-  'Workspace menu: click the workspace name in the top-left corner. It lists your workspaces, then "New Workspace", "Settings" and "Sign Out".',
-  'Account menu: click your name at the bottom of the sidebar. It holds "Feedback" (support chat), "Resources", "Toggle theme", "Edit sidebar" and "Log out".',
-  'Bottom of the sidebar, above "Settings": the "Credits" card with "Add credits", then "What\'s New" and "Help Center".',
-  'AI Consultant: the "Chat" side of the Home/Chat toggle at the top of the left sidebar. It gives strategy advice (pricing, positioning, offer structure, niche selection, go-to-market), feedback on campaign results or copy you paste in, help troubleshooting performance, and market research in its Market Researcher mode; its Jacob AI mode helps with ad copy, campaign angles and offer messaging. It does not see your campaigns, CRM or calls. {slug: ai-consultant}',
+const ENTRY_POINTS: { starts: string[]; text: string }[] = [
+  {
+    starts: ["Home", "Dashboard"],
+    text: '"Home": the "Home" side of the Home/Chat toggle at the top of the left sidebar opens the workspace home page. Every role except Client has it; Client users have "Dashboard" in the sidebar instead.',
+  },
+  {
+    starts: ["Settings"],
+    text: '"Settings": click "Settings" at the bottom of the sidebar, or click the workspace name in the top-left corner, then "Settings". Its left menu groups pages under "Personal" and "Workspace".',
+  },
+  {
+    starts: [],
+    text: 'Settings, "Personal": "Profile", "Appearance", "Security", "Availability", "Email & Calendar", "Conferencing", "Access Tokens". These are each person\'s own settings: every role sees them and can change its own. "Workspace", as an owner sees it on a workspace with every feature on: "General", "Members", "Teams", "Roles & Permissions", "Workspace Snapshots", "Billing", "Payments", "Phone Numbers", "Voice", "Meeting Recordings", "Scheduling", "Cold Email Agent", "AI SDR Agent", "Sales Call Analyzer", "Your Niche & Offer", "Cold Email Blocklist", "Email Templates", "SMS Templates", "Sharing", "CRM Custom Fields", "Call & Meeting Outcomes", "Workflow Notifications", "Connected Apps & API Keys". A page shows only when the workspace has its feature and the role may use it.',
+  },
+  {
+    starts: [],
+    text: 'Workspace menu: click the workspace name in the top-left corner. It lists your workspaces, then "New Workspace", "Settings" and "Sign Out".',
+  },
+  {
+    starts: [],
+    text: 'Account menu: click your name at the bottom of the sidebar. It holds "Feedback" (support chat), "Resources", "Toggle theme", "Edit sidebar" and "Log out".',
+  },
+  {
+    starts: ["Credits", "Add credits", "What's New", "Help Center"],
+    text: 'Bottom of the sidebar, above "Settings": the "Credits" card with "Add credits", then "What\'s New" and "Help Center".',
+  },
+  {
+    starts: ["Chat"],
+    text: 'AI Consultant: the "Chat" side of the Home/Chat toggle at the top of the left sidebar. It gives strategy advice (pricing, positioning, offer structure, niche selection, go-to-market), feedback on campaign results or copy you paste in, help troubleshooting performance, and market research in its Market Researcher mode; its Jacob AI mode helps with ad copy, campaign angles and offer messaging. It does not see your campaigns, CRM or calls. {slug: ai-consultant}',
+  },
 ];
+const SIDEBAR_ENTRIES = new Set(ENTRY_POINTS.flatMap((entry) => entry.starts));
 
 /**
  * Vendors behind the product and developer hosts; the chat speaks in
@@ -172,9 +196,9 @@ const root = join(dir, DOCS);
 
 const GUIDE_SIDEBAR = parseGuideSidebar(git("show", `${sha}:${CATALOG}`));
 
-const SIDEBAR = `Left sidebar, top to bottom, as a new workspace has it (group headings can be collapsed; a customer clicks the page, not the heading). A page shows only when the workspace has the feature and the role may use it. ${CLIENT_PAGES} "Client Portal" is for Client users only: owners and admins invite a client from "Settings" > "Members". A customer can rearrange, hide and add pages with "Edit sidebar" in the account menu, so their sidebar may differ from this.
+const SIDEBAR = `Left sidebar, top to bottom, as a new workspace has it (group headings can be collapsed; a customer clicks the page, not the heading). A page shows only when the workspace has the feature and the role may use it. ${CLIENT_PAGES} Only Client users have "Client Portal" in the sidebar; owners and admins can preview it at the workspace address followed by /client-portal, and invite a client from "Settings" > "Members". A customer can rearrange, hide and add pages with "Edit sidebar" in the account menu, so their sidebar may differ from this.
 ${GUIDE_SIDEBAR.lines}
-${ENTRY_POINTS.map((line) => `- ${line}`).join("\n")}`;
+${ENTRY_POINTS.map((entry) => `- ${entry.text}`).join("\n")}`;
 console.log(SIDEBAR);
 
 interface Article {
@@ -426,6 +450,7 @@ await Promise.all(
             repaired,
             batch.map((a) => a.slug)
           );
+          assertOwnAnswers(repaired);
           return repaired;
         }
       );
@@ -469,7 +494,8 @@ const usablePath = (slug: string, path: string): boolean => {
     (labels.length > 0 || UNLABELLED.test(path)) &&
     !HELP_CENTER_PATH.test(path) &&
     labels.every((label) => source.includes(label)) &&
-    (UNLABELLED.test(path) || startsAtSidebarPage(GUIDE_SIDEBAR, path, labels))
+    (UNLABELLED.test(path) ||
+      startsAtSidebarPage(GUIDE_SIDEBAR, SIDEBAR_ENTRIES, path, labels))
   );
 };
 const lines = linked.split("\n");
