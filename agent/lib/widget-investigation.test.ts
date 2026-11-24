@@ -690,6 +690,15 @@ test("a request to act skips the investigation, and an ask for a person is answe
   assert.equal(filed.length, 1);
   assert.deepEqual(human.gated, []);
   assert.equal(human.run.outcome?.reason, "ticket_instead_of_handoff");
+  // The app records the filed ticket on the chat from the findings, so the
+  // team's answer can be sent into it (ENG-20454).
+  const handedFindings = handedBody.findings as Record<string, unknown>;
+  assert.deepEqual(handedFindings.ticket, {
+    id: "ENG-1",
+    url: "https://linear.app/acquisity/issue/ENG-1/x",
+  });
+  assert.equal(handedFindings.needsHuman, false);
+  assert.ok(String(handedFindings.report).length > 0);
 });
 
 test("a member or client is answered in help-center mode, never investigated", async (t) => {
