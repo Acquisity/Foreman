@@ -228,3 +228,11 @@ test("what the investigator could not check comes back as unchecked facts for th
   ]);
   assert.match(EXTRACT_PROMPT, UNCHECKED_RULE);
 });
+
+const SEPARATE_RECORDS_RULE =
+  /keep each record as its own fact with its date and amount, never folded into a total or a date range, and keep every amount with the date the investigator gave that record/;
+
+test("records listed one by one stay separate facts, each amount with its own date", () => {
+  // ENG-20500 and ENG-20483: grants folded into a total and a date range, and two invoices given one date.
+  assert.match(EXTRACT_PROMPT, SEPARATE_RECORDS_RULE);
+});
