@@ -239,7 +239,10 @@ export async function claimWidgetRun(
       scope.conversationId,
       requestKey,
       question,
-      JSON.stringify(scope),
+      // The run's own request reads the Help Centre view, and the endpoint list
+      // stays on the session stamp, so stored rows keep the shape every reader
+      // of this column has (ENG-20296).
+      JSON.stringify({ ...scope, endpoints: undefined, helpCenter: undefined }),
     ]
   );
   if (inserted.length) {

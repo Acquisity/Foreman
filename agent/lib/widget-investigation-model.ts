@@ -5,6 +5,7 @@ import {
 } from "ai";
 import { logOpsEvent } from "./ops-log.js";
 import { ticketLinkedModel } from "./ticket-link-model.js";
+import { ENDPOINT_TOOL_NAMES } from "./widget-endpoint-tools.js";
 import { cacheGuide } from "./widget-instructions.js";
 import {
   LATE_TOOLS,
@@ -48,8 +49,13 @@ const ALLOWED_TOOLS = new Set([
 ]);
 const BLOCKED = "Support investigation capability is unavailable.";
 
+// Generated endpoint tools (ENG-20296) are only registered for the sessions
+// the context route listed them for.
+const allowed = (name: string) =>
+  ALLOWED_TOOLS.has(name) || ENDPOINT_TOOL_NAMES.has(name);
+
 const namedTool = (part: { toolName?: unknown }) =>
-  typeof part.toolName === "string" && ALLOWED_TOOLS.has(part.toolName);
+  typeof part.toolName === "string" && allowed(part.toolName);
 
 function assertAllowedStreamPart(
   part: { id?: string; toolCallId?: string; toolName?: unknown; type: string },
@@ -248,7 +254,7 @@ export function widgetInvestigationMiddleware(
       // already covers the tools, and that marker would be a fifth breakpoint.
       const tools = params.tools?.flatMap((tool) =>
         typeof tool.name === "string" &&
-        ALLOWED_TOOLS.has(tool.name) &&
+        allowed(tool.name) &&
         tool.type === "function"
           ? [{ ...tool, providerOptions: undefined }]
           : []

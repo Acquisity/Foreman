@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { type TestContext, test } from "node:test";
 import { verifiedWidgetContext } from "./widget.fixture.js";
 import { verifyWidgetContext } from "./widget-context.js";
+import { widgetAuth } from "./widget-scope.js";
 
 const origin = "https://pr-13999-acquisity.vercel.app";
 const userToken = "signed.user.identity";
@@ -214,7 +215,7 @@ const timeline = {
     },
   ],
   networkTypes: ["3g"],
-  padding: "p".repeat(15_000),
+  padding: "p".repeat(20_000),
 };
 
 test("the user timeline is asked for only when wanted, read past the scope's size limit, and kept out of the scope", async (context) => {
@@ -290,9 +291,74 @@ test("a timeline response past the larger limit is refused", async (context) => 
       requester(
         Response.json({
           ...appContext,
-          timeline: { padding: "p".repeat(40_000) },
+          timeline: { padding: "p".repeat(50_000) },
         })
       ).request
     )
   );
+});
+
+test("the app's Help Centre view rides on the verified scope, never on the session; absent or malformed reads as signed out", async (context) => {
+  configure(context);
+  const helpCenter = {
+    featuresOff: [
+      {
+        feature: "deliverability",
+        pages: ["cold-email-agent/deliverability"],
+        title: "Deliverability",
+      },
+    ],
+    viewer: "signed.help.viewer",
+  };
+  const verify = (body: object) =>
+    verifyWidgetContext(
+      { conversationId, organizationId, userToken },
+      requester(Response.json(body)).request
+    );
+  const scope = await verify({ ...appContext, helpCenter });
+  assert.deepEqual(scope.helpCenter, helpCenter);
+  assert.equal("helpCenter" in (widgetAuth(scope).attributes ?? {}), false);
+  assert.equal("helpCenter" in (await verify(appContext)), false);
+  for (const malformed of [
+    { ...helpCenter, viewer: "<token>" },
+    { featuresOff: "deliverability", viewer: helpCenter.viewer },
+    "viewer",
+  ]) {
+    // biome-ignore lint/performance/noAwaitInLoops: each body is one case.
+    const read = await verify({ ...appContext, helpCenter: malformed });
+    assert.equal("helpCenter" in read, false);
+    assert.equal(read.organizationId, organizationId);
+  }
+});
+
+test("the endpoint list is kept, a malformed entry drops only itself, and a long list fits", async (context) => {
+  configure(context);
+  const endpoints = Array.from({ length: 11 }, (_, index) => ({
+    name: `area-${index}`,
+    path: `/api/internal/foreman/area-${index}`,
+    sections: [...new Array(20).keys()].map((n) => `deliverabilityAlerts${n}`),
+    version: 1,
+  }));
+  const body = JSON.stringify({
+    ...appContext,
+    endpoints: [...endpoints, { name: "Bad Name", version: 1 }],
+    featuresOff: ["lead_scrape"],
+  });
+  assert.ok(body.length > 4096);
+  const { request } = requester(new Response(body));
+  const result = await verifyWidgetContext(
+    { conversationId, organizationId, userToken },
+    request
+  );
+  assert.deepEqual(result.endpoints, endpoints);
+});
+
+test("a context without an endpoint list leaves it absent, not empty", async (context) => {
+  configure(context);
+  const { request } = requester(Response.json(appContext));
+  const result = await verifyWidgetContext(
+    { conversationId, organizationId, userToken },
+    request
+  );
+  assert.equal("endpoints" in result, false);
 });

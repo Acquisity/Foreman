@@ -1,0 +1,122 @@
+name: widget-tools
+
+# Regenerates the widget's support endpoint tools (ENG-20296) from Acquisity's
+# endpoint manifest at the commit Acquisity's support-endpoints-trigger sends,
+# with no model, onto bot/widget-tools, and files the Fixy ticket that reviews
+# and merges it (ENG-20297).
+
+on:
+  repository_dispatch:
+    types: [support-endpoints-changed]
+  workflow_dispatch:
+    inputs:
+      sha:
+        description: Acquisity commit (default main)
+        required: false
+
+permissions: {}
+
+concurrency:
+  group: widget-tools
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  regenerate:
+    permissions:
+      contents: read
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      SHA: ${{ github.event.client_payload.sha || inputs.sha || 'main' }}
+      EVENT: ${{ github.event_name }}
+    steps:
+      - name: Check the requested source
+        run: |
+          if [[ "$EVENT" == repository_dispatch ]]; then
+            [[ "$SHA" =~ ^[0-9a-f]{7,40}$ ]] || { echo "Dispatch requires a commit SHA" >&2; exit 1; }
+          else
+            [[ "$SHA" =~ ^([0-9a-f]{7,40}|main)$ ]] || { echo "Use a commit SHA or main" >&2; exit 1; }
+          fi
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          ref: main
+          persist-credentials: false
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          repository: Acquisity/Acquisity
+          ref: ${{ env.SHA }}
+          path: acquisity
+          token: ${{ secrets.WIDGET_GUIDE_TOKEN }}
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Verify source history
+        run: git -C acquisity merge-base --is-ancestor HEAD origin/main
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version: 1.4.4
+      - uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa # v4
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      # Install scripts stay off: the manifest needs only Acquisity's sources and their packages.
+      - name: Read the manifest at that commit
+        working-directory: acquisity
+        env:
+          HUSKY: '0'
+        run: |
+          bun install --frozen-lockfile --ignore-scripts
+          node apps/web/scripts/print-foreman-manifest.mjs > "$RUNNER_TEMP/manifest.json"
+      # Compared with the pending PR's file when one exists, so a later commit
+      # with the same manifest pushes nothing, and one that matches main again
+      # closes the PR it made.
+      - name: Regenerate the tools and open, update or close the PR
+        env:
+          GH_TOKEN: ${{ secrets.WIDGET_GUIDE_TOKEN }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          file=agent/lib/widget-endpoint-manifest.ts
+          manifest_body() { sed -n '/^export const WIDGET_ENDPOINT_MANIFEST/,$p' "$1"; }
+          commit=$(git -C acquisity rev-parse HEAD)
+          git show "HEAD:$file" > "$RUNNER_TEMP/main.ts"
+          previous=$file
+          status=0
+          git -c credential.helper= -c 'credential.helper=!gh auth git-credential' ls-remote --exit-code --heads origin refs/heads/bot/widget-tools > /dev/null || status=$?
+          if [[ "$status" == 0 ]]; then
+            git -c credential.helper= -c 'credential.helper=!gh auth git-credential' fetch --no-tags origin refs/heads/bot/widget-tools:refs/remotes/origin/bot/widget-tools
+            # Only an open PR's file is pending; a closed or merged branch's is not.
+            open_pr=$(scripts/generated-pr.sh open bot/widget-tools)
+            if [[ -n "$open_pr" ]]; then
+              git show "origin/bot/widget-tools:$file" > "$RUNNER_TEMP/pending.ts"
+              previous=$RUNNER_TEMP/pending.ts
+            fi
+          elif [[ "$status" != 2 ]]; then
+            exit "$status"
+          fi
+          pnpm widget:tools --manifest "$RUNNER_TEMP/manifest.json" --commit "$commit" --previous "$previous"
+          if [[ "$(manifest_body "$file")" == "$(manifest_body "$RUNNER_TEMP/main.ts")" ]]; then
+            scripts/generated-pr.sh close bot/widget-tools "Acquisity's manifest at $commit matches main again, so these tools are no longer wanted ([run]($RUN_URL)). Its Fixy ticket can be closed with no merge."
+            echo "Manifest matches main; no PR."
+            exit 0
+          fi
+          if [[ "$previous" != "$file" ]] && cmp -s "$file" "$previous"; then
+            echo "Pending tools PR already has this manifest; no commit or push."
+            exit 0
+          fi
+          cat > "$RUNNER_TEMP/body.md" <<EOF_BODY
+          Regenerated from Acquisity [${commit:0:12}](https://github.com/Acquisity/Acquisity/commit/$commit) by [this run]($RUN_URL), with no model: \`$file\` is Acquisity's \`serializeForemanManifest()\` at that commit.
+
+          Fixy reviews this PR and merges it once the review-bot loop clears, from the fixy-labelled Linear ticket the next step files: CI passes, and the diff removes or renames no tool, input, section or status value unless the manifest adds the change as a new endpoint version and keeps the old one live.
+          EOF_BODY
+          scripts/generated-pr.sh publish bot/widget-tools foreman-widget-tools "chore(widget): regenerate the support endpoint tools from Acquisity ${commit:0:12}" "$RUNNER_TEMP/body.md" "$file"
+      # Runs on every pass, unchanged ones too, so an open tools PR always has its Fixy ticket.
+      - name: File or reuse the Fixy ticket
+        env:
+          GH_TOKEN: ${{ secrets.WIDGET_GUIDE_TOKEN }}
+          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
+        run: scripts/generated-pr.sh ticket bot/widget-tools tools

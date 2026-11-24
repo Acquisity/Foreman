@@ -1,6 +1,8 @@
 import { z } from "zod";
 import { DEFAULT_PARTNER_ID } from "./acquisity-constants.js";
 import { acquisityOrigin, readContextBody } from "./acquisity-origin.js";
+import { helpCenterViewSchema } from "./help-center.js";
+import { parseAvailableEndpoints } from "./widget-endpoint-schema.js";
 import { isLiveActive, liveContext } from "./widget-live-policy.js";
 import {
   ORGANIZATION_NAME_MAX,
@@ -12,6 +14,9 @@ import {
 
 /** The app's verified workspace payload; Intercom's app id is irrelevant to the widget and ignored. */
 const appContextSchema = z.looseObject({
+  endpoints: z.unknown().optional().transform(parseAvailableEndpoints),
+  // Absent or malformed: the docs are read signed out and the guide is not narrowed.
+  helpCenter: helpCenterViewSchema.optional().catch(undefined),
   // Any problem with it reads as absent: support counts as open, as before.
   officeHours: officeHoursSchema.optional().catch(undefined),
   organizationId: z.uuid(),
@@ -24,7 +29,9 @@ const appContextSchema = z.looseObject({
   verifiedAt: z.iso.datetime(),
 });
 
-const TIMELINE_MAX_BYTES = 32 * 1024;
+// The endpoint list adds about 2 KB for eleven endpoints to the 4 KB the rest needs.
+const CONTEXT_MAX_BYTES = 16 * 1024;
+const TIMELINE_MAX_BYTES = 32 * 1024 + CONTEXT_MAX_BYTES;
 
 const inputSchema = z.object({
   conversationId: z.uuid(),
@@ -86,7 +93,7 @@ export async function verifyWidgetContext(
     await readContextBody(
       response,
       signal,
-      input.timeline ? TIMELINE_MAX_BYTES : undefined
+      input.timeline ? TIMELINE_MAX_BYTES : CONTEXT_MAX_BYTES
     )
   );
   if (verified.organizationId !== parsed.organizationId) {
@@ -98,9 +105,11 @@ export async function verifyWidgetContext(
   return Object.freeze(
     widgetContextSchema.parse({
       conversationId: parsed.conversationId,
+      ...(verified.endpoints ? { endpoints: verified.endpoints } : {}),
       organizationId: verified.organizationId,
       organizationName: verified.organizationName,
       organizationSlug: verified.organizationSlug,
+      ...(verified.helpCenter ? { helpCenter: verified.helpCenter } : {}),
       ...(verified.officeHours ? { officeHours: verified.officeHours } : {}),
       partnerId: verified.partnerId,
       role: verified.role,

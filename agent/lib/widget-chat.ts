@@ -1,7 +1,15 @@
 import { type LanguageModel, streamText } from "ai";
-import { HELP_CENTER_BASE_URL } from "./help-center.js";
+import {
+  FEATURES_OFF_RULE,
+  featuresOffNames,
+  HELP_CENTER_BASE_URL,
+  type HelpCenterView,
+  helpViewKey,
+  hiddenHelpPages,
+} from "./help-center.js";
 import { fastCallOptions, modelFor, resolveModel } from "./models.js";
 import { logOpsEvent } from "./ops-log.js";
+import { GUIDE_CITATION, splitGuideSections } from "./widget-guide-cache.js";
 import { WIDGET_VOICE } from "./widget-instructions.js";
 import {
   hedged,
@@ -19,14 +27,16 @@ import { toAsk, type WidgetAsk } from "./widget-router.js";
 /**
  * Front-door chat (ENG-14932): one streamed model call that already
  * knows the product. The system prefix is the persona, the rules and the whole
- * product guide distilled from the help center, identical on every call so
+ * product guide distilled from the help center, less the pages the customer's
+ * features hide, identical for every customer with the same features off so
  * provider prompt caching serves it; the conversation follows.
  *
  * @remarks
  * The default; WIDGET_CHAT=legacy hands the front door back to the
  * help-center writer in widget-kb.ts for one release. Like that lane it is ungated on purpose: its only inputs are the
- * customer's own conversation and public help-center text, and it has no
- * account data and no account tools. Keep it that way.
+ * customer's own conversation, help-center text and the names of the features
+ * the app says are off for their workspace, and it has no other account data
+ * and no account tools. Keep it that way.
  */
 
 export const chatGuideEnabled = (value = process.env.WIDGET_CHAT) =>
@@ -83,15 +93,56 @@ export interface ChatDeps {
     ticketFiling?: true;
     messages: ChatMessage[];
     signal: AbortSignal;
+    view?: HelpCenterView;
   }) => Promise<ChatAttempt>;
 }
 
 const CHAT_FOLLOWUP_RULE =
   "Never promise that you, a person, a teammate or the team will look into, pick up or follow up on this message: nobody is notified.";
-export const chatPrompt = (ticketFiling?: true) =>
-  ticketFiling
-    ? CHAT_PROMPT.replace(CHAT_FOLLOWUP_RULE, TICKET_WRITER_NOTE)
-    : CHAT_PROMPT;
+const ARTICLES = "\n## Articles\n";
+
+const citesOnly = (line: string, hidden: ReadonlySet<string>) => {
+  const cited = [...line.matchAll(GUIDE_CITATION)].map(([, slug]) => slug);
+  return cited.length > 0 && cited.every((slug) => hidden.has(slug));
+};
+
+/**
+ * The guide without the articles for pages the customer's features hide, and
+ * without a summary line that cites only those. The Help Centre's own page
+ * gates decide which; a gated section inside a page stays, because the
+ * generated guide flattens it into the page.
+ */
+export function guideFor(hidden: ReadonlySet<string>, guide = PRODUCT_GUIDE) {
+  if (hidden.size === 0) {
+    return guide;
+  }
+  const at = guide.indexOf(ARTICLES);
+  const summary = guide
+    .slice(0, at)
+    .split("\n")
+    .filter((line) => !(line.startsWith("- ") && citesOnly(line, hidden)))
+    .join("\n");
+  const articles = [...splitGuideSections(guide.slice(at + ARTICLES.length))]
+    .filter(([slug]) => !hidden.has(slug))
+    .map(([, section]) => section);
+  return `${summary}${ARTICLES}\n${articles.join("\n\n")}\n`;
+}
+
+const promptsByView = new Map<string, string>();
+
+export const chatPrompt = (ticketFiling?: true, view?: HelpCenterView) => {
+  const key = helpViewKey(view);
+  let prompt = promptsByView.get(key);
+  if (!prompt) {
+    prompt = CHAT_PROMPT.replace(PRODUCT_GUIDE, () =>
+      guideFor(hiddenHelpPages(view))
+    );
+    promptsByView.set(key, prompt);
+  }
+  return ticketFiling
+    ? prompt.replace(CHAT_FOLLOWUP_RULE, TICKET_WRITER_NOTE)
+    : prompt;
+};
 
 interface ChatMessage {
   content: string;
@@ -113,10 +164,10 @@ interface ChatAttempt {
 const REMINDER =
   'Before you reply: end every step or fact you take from the guide with its article\'s {slug}; check "Who can do what" against the customer\'s role before giving any steps; say only what the article you cite says, and never that a tool, app or kind of link it does not name works; when the customer nudges after an unanswered question of theirs, answer it or say plainly you do not know, never ask again what they mean; a request for strategy advice (including how to make money or win clients), feedback on copy or campaign results, or what an email or offer should say gets pointed to the AI Consultant, described the way the guide does, with no advice or steps of your own, and the AI Consultant\'s modes are used there, never in this chat; never suggest changing, upgrading or downgrading a plan to get around a feature; any detail the help center does not state (what a column or status means, how many plans, what happens to data, timings, a button from another path) is said as "I\'m not sure" or left out; call it the help center, never "the guide", and never write "Get here"; never speak for a team ("we", "together", "sorted out") or offer a person, and never say what an investigation of their account will find.';
 
-/** The guide's role limits, repeated in the note for a customer who is not an owner. */
-const ROLE_LIMITS =
-  PRODUCT_GUIDE.match(/\n## Who can do what\n([\s\S]*?)\n## /u)?.[1]?.trim() ??
-  "";
+/** The customer's guide's role limits, repeated in the note for a customer who is not an owner. */
+const WHO_CAN = /\n## Who can do what\n([\s\S]*?)\n## /u;
+const roleLimits = (view: HelpCenterView | undefined) =>
+  guideFor(hiddenHelpPages(view)).match(WHO_CAN)?.[1]?.trim() ?? "";
 
 /** The app's facts about the customer, then the conversation as chat turns. */
 export function chatMessages(
@@ -131,8 +182,11 @@ export function chatMessages(
       role:
         turn.role === "customer" ? ("user" as const) : ("assistant" as const),
     }));
+  const featuresOff = featuresOffNames(customer?.helpCenter);
+  const limits = roleLimits(customer?.helpCenter);
   const note = {
     canInvestigate: customer?.canInvestigate ?? false,
+    ...(featuresOff.length > 0 ? { featuresOff } : {}),
     glassOffered: customer?.glassOffered ?? false,
     role: customer?.role ?? "unknown",
     workspace: customer?.workspace ?? "unknown",
@@ -142,12 +196,13 @@ export function chatMessages(
       content: [
         `Note from the app, not written by the customer: ${JSON.stringify(note)}`,
         REMINDER,
+        ...(featuresOff.length > 0 ? [FEATURES_OFF_RULE] : []),
         ...(customer?.ticketFiling ? [TICKET_WRITER_NOTE] : []),
         ...(customer?.officeSchedule ? [customer.officeSchedule] : []),
         ...(customer?.ticketNote ? [customer.ticketNote] : []),
-        ...(note.role === "owner" || !ROLE_LIMITS
+        ...(note.role === "owner" || !limits
           ? []
-          : [`Who can do what, from the guide:\n${ROLE_LIMITS}`]),
+          : [`Who can do what, from the guide:\n${limits}`]),
       ].join("\n\n"),
       role: "system",
     },
@@ -166,18 +221,21 @@ export function chatMessages(
 
 /** The {slug} markers as numbered citations; a slug the guide does not have is dropped. */
 export function guideCitations(text: string): KbAnswer {
-  const { articles, numbered } = numberSlugs(text);
+  const { articles, numbered } = numberSlugs(text, new Set());
   return resolveCitations(numbered, articles);
 }
 
 /** The reply with [n] markers and the cited articles. */
-function numberSlugs(text: string) {
+function numberSlugs(text: string, hidden: ReadonlySet<string>) {
   const slugs: string[] = [];
   const numbered = text.replace(SLUG_MARKER, (_, list: string) =>
     list
       .split(SLUG_SEPARATOR)
       .map((slug) => slug.replace(TRAILING_SLASH, ""))
-      .filter((slug) => Object.hasOwn(PRODUCT_GUIDE_ARTICLES, slug))
+      .filter(
+        (slug) =>
+          Object.hasOwn(PRODUCT_GUIDE_ARTICLES, slug) && !hidden.has(slug)
+      )
       .map((slug) => {
         if (!slugs.includes(slug)) {
           slugs.push(slug);
@@ -237,7 +295,12 @@ const chatFailure = (error: unknown) => {
 
 export const defaultChatDeps = {
   async generate(
-    { ticketFiling, messages, signal }: Parameters<ChatDeps["generate"]>[0],
+    {
+      ticketFiling,
+      messages,
+      signal,
+      view,
+    }: Parameters<ChatDeps["generate"]>[0],
     languageModel?: LanguageModel
   ) {
     const model =
@@ -252,7 +315,7 @@ export const defaultChatDeps = {
       maxRetries: 0,
       messages: [
         {
-          content: chatPrompt(ticketFiling),
+          content: chatPrompt(ticketFiling, view),
           // The stable prefix: Anthropic caches up to this breakpoint, and the
           // gateway turns on caching for providers that need it asked.
           providerOptions: {
@@ -329,10 +392,12 @@ export async function answerFromGuide(
         messages,
         signal: abortSignal,
         ...(reader?.ticketFiling ? { ticketFiling: true } : {}),
+        ...(reader?.helpCenter ? { view: reader.helpCenter } : {}),
       })
     );
     const { articles, numbered } = numberSlugs(
-      customerWords(attempt.text.slice(0, MAX_ANSWER_CHARS * 2))
+      customerWords(attempt.text.slice(0, MAX_ANSWER_CHARS * 2)),
+      hiddenHelpPages(reader?.helpCenter)
     );
     const answer = resolveCitations(numbered, articles);
     if (!answer.message) {

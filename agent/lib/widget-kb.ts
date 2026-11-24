@@ -2,9 +2,15 @@ import { setTimeout as sleep } from "node:timers/promises";
 import { generateObject } from "ai";
 import { z } from "zod";
 import {
+  FEATURES_OFF_RULE,
+  featuresOffNames,
   getHelpArticleContent,
   HELP_CENTER_BASE_URL,
+  type HelpCenterView,
+  type HelpIndex,
   helpArticleSlug,
+  readHelpIndex,
+  searchHelpPages,
 } from "./help-center.js";
 import { sniffImage } from "./image.js";
 import { fastCallOptions, modelFor, resolveModel } from "./models.js";
@@ -23,8 +29,9 @@ import {
  *
  * @remarks
  * This lane is ungated on purpose. It has no tools and never receives account
- * data: its only inputs are the customer's own message, public help-center
- * articles and server-written notes (the schedule, and on a follow-up the
+ * data: its only inputs are the customer's own message, help-center
+ * articles read as that customer sees them (the app signs which features
+ * they have) and server-written notes (the schedule, and on a follow-up the
  * code-written status of the conversation's ticket, never its comments), so
  * there is nothing cross-tenant for the egress gate to guard. Keep it that
  * way. Giving this lane any account lookup brings the gate back.
@@ -36,11 +43,8 @@ import {
 const MAX_ARTICLES = 4;
 /** How many previously cited articles ride along with every fresh retrieval. */
 const MAX_ACTIVE_ARTICLES = 2;
-const INDEX_TIMEOUT_MS = 5000;
-const INDEX_CACHE_MS = 10 * 60_000;
 const MAX_QUERIES = 3;
 const MAX_ARTICLE_CHARS = 8000;
-const SEARCH_TIMEOUT_MS = 5000;
 // Article selection and answer generation are sequential model calls. Live
 // selection alone can take 15s; leave time for the grounded answer as well.
 const KB_TIMEOUT_MS = 45_000;
@@ -64,7 +68,6 @@ const MAX_DESCRIPTION_CHARS = 160;
 const MAX_KEYWORDS = 8;
 // One marker, or a group such as [1, 2], which the model also writes.
 const MARKER = /\[(\d{1,2}(?:\s*,\s*\d{1,2})*)\]/gu;
-const MARK_TAG = /<\/?mark>/gu;
 
 const TEXT_ONLY = `The customer can attach up to three screenshots to a message. A screenshot reaches you as a labelled reading made by an image model, not as the image: treat what it says as what the customer's screen showed, and when it names something it could not read, do not guess at it. When the exact error text or the screen they are on would settle the question, you may ask them to paste a screenshot or the exact error text. ${RECORDING_RULE} Answer what the customer is trying to do. A screenshot reading shows where they are: use it to place them in the steps. When it shows a warning or error they did not ask about, answer first and then mention it in one short sentence; when they ask about it, answer that. Never describe anything the reading does not say.`;
 
@@ -168,22 +171,7 @@ interface KbArticle {
   url: string;
 }
 
-const hitSchema = z.looseObject({
-  content: z.string(),
-  type: z.string().optional(),
-  url: z.string(),
-});
-
-// description and keywords are optional so an older web deploy still parses.
-const indexSchema = z.array(
-  z.object({
-    description: z.string().optional(),
-    id: z.string().min(1).max(300),
-    keywords: z.array(z.string()).optional(),
-    title: z.string().min(1),
-  })
-);
-type KbIndex = z.infer<typeof indexSchema>;
+type KbIndex = HelpIndex;
 
 // Fin's rerank stage (ENG-14932): each pick says whether it answers the
 // question itself or only sits next to it, and only direct picks are read.
@@ -228,6 +216,8 @@ export const replyPrompt = (customer: KbCustomer | undefined) =>
 export const REPLY_PROMPT = `${FOREMAN_VOICE}
 
 The input is JSON: conversation, customer (their workspace name, their role, canInvestigate and glassOffered), recordingOffered, and articles, the numbered help-center articles found for this conversation. ${LATEST_SUBJECT}
+
+${FEATURES_OFF_RULE}
 
 Facts specific to Acquisity come only from the articles: where something is, what a setting does, steps, limits, plans, prices, and whether a feature exists. After a sentence or step that uses an article, add its number in square brackets, like [1], once per step or paragraph, and only numbers you were given. Never invent menu names, links, settings or URLs. When more than one article touches a point, cite the one whose own topic is the latest message. A rule in an article applies only to the product that article is about, so never carry the policy for one product or charge (such as domains or inboxes) over to another (such as the subscription). When the question could be about more than one product or charge and the conversation does not say which, ask which one.
 
@@ -290,6 +280,9 @@ const promptFacts = (customer: KbCustomer | undefined) => [
   "Foreman cannot see the customer's account and cannot make changes; nobody makes changes on the customer's behalf, so the customer does the steps themselves.",
   ...(customer?.officeSchedule ? [customer.officeSchedule] : []),
   ...(customer?.ticketNote ? [customer.ticketNote] : []),
+  ...featuresOffNames(customer?.helpCenter).map(
+    (name) => `${name} is not turned on for this customer's workspace.`
+  ),
 ];
 
 // biome-ignore assist/source/useSortedKeys: claims first, so the model checks before it rewrites.
@@ -377,6 +370,8 @@ export interface KbCustomer {
    * it again. Read from Foreman's own earlier turns, which word it one way.
    */
   glassOffered?: boolean;
+  /** The customer's own Help Centre view; absent, the lane reads it signed out. */
+  helpCenter?: HelpCenterView;
   /** The team's published hours and closures; see officeSchedule. */
   officeSchedule?: string;
   role: string;
@@ -408,12 +403,20 @@ export interface KbDeps {
   /** The screenshots behind `WidgetAsk.images`; absent, the lane reads only their readings. */
   images?: (urls: string[], signal: AbortSignal) => Promise<KbImage[]>;
   /** Every article's id and title, or null where the web app has no index route yet. */
-  index: (signal: AbortSignal) => Promise<KbIndex | null>;
-  read: (url: string, signal: AbortSignal) => Promise<KbArticle | null>;
+  index: (
+    signal: AbortSignal,
+    view?: HelpCenterView
+  ) => Promise<KbIndex | null>;
+  read: (
+    url: string,
+    signal: AbortSignal,
+    view?: HelpCenterView
+  ) => Promise<KbArticle | null>;
   rewrite: (question: string, signal: AbortSignal) => Promise<unknown>;
   search: (
     question: string,
-    signal: AbortSignal
+    signal: AbortSignal,
+    view?: HelpCenterView
   ) => Promise<{ title: string; url: string }[]>;
   select: (input: {
     images?: KbImage[];
@@ -423,7 +426,15 @@ export interface KbDeps {
   }) => Promise<unknown>;
 }
 
-let indexCache: { at: number; value: KbIndex } | null = null;
+/** The customer as the writer reads it: the features off by name, never the viewer token. */
+export const writerCustomer = (customer: KbCustomer | undefined) => {
+  if (!customer) {
+    return { canInvestigate: false, role: "unknown", workspace: "unknown" };
+  }
+  const { helpCenter, ...rest } = customer;
+  const featuresOff = featuresOffNames(helpCenter);
+  return featuresOff.length > 0 ? { ...rest, featuresOff } : rest;
+};
 
 const articleInput = (articles: KbArticle[]) =>
   articles.map((article, index) => ({
@@ -445,11 +456,7 @@ export const defaultKbDeps: KbDeps = {
     const input = JSON.stringify({
       articles: articleInput(articles),
       conversation: question,
-      customer: customer ?? {
-        canInvestigate: false,
-        role: "unknown",
-        workspace: "unknown",
-      },
+      customer: writerCustomer(customer),
       recordingOffered: recordingOffered === true,
       ...(customer?.ticketFiling
         ? { responseBoundary: TICKET_WRITER_NOTE }
@@ -490,24 +497,9 @@ export const defaultKbDeps: KbDeps = {
     return object;
   },
   images: loadImages,
-  // The list changes only when docs ship, so one warm instance fetches it rarely.
-  async index(signal) {
-    if (indexCache && Date.now() - indexCache.at < INDEX_CACHE_MS) {
-      return indexCache.value;
-    }
-    const response = await fetch(`${HELP_CENTER_BASE_URL}/api/docs-index`, {
-      headers: { accept: "application/json" },
-      signal: AbortSignal.any([signal, AbortSignal.timeout(INDEX_TIMEOUT_MS)]),
-    });
-    if (!response.ok) {
-      return null;
-    }
-    const value = indexSchema.parse(await response.json());
-    indexCache = { at: Date.now(), value };
-    return value;
-  },
-  async read(url, signal) {
-    const article = await getHelpArticleContent(url, { signal });
+  index: readHelpIndex,
+  async read(url, signal, view) {
+    const article = await getHelpArticleContent(url, { signal, view });
     if ("error" in article || !article.content.trim()) {
       return null;
     }
@@ -532,32 +524,8 @@ export const defaultKbDeps: KbDeps = {
     );
     return object;
   },
-  // The help-center search is a public route, so this lane calls it directly
-  // rather than through the per-tenant executor the investigator's tool uses.
-  async search(question, signal) {
-    const response = await fetch(
-      `${HELP_CENTER_BASE_URL}/api/search?query=${encodeURIComponent(question)}`,
-      {
-        headers: { accept: "application/json" },
-        signal: AbortSignal.any([
-          signal,
-          AbortSignal.timeout(SEARCH_TIMEOUT_MS),
-        ]),
-      }
-    );
-    if (!response.ok) {
-      return [];
-    }
-    return z
-      .array(hitSchema)
-      .parse(await response.json())
-      .filter((hit) => hit.type === undefined || hit.type === "page")
-      .slice(0, MAX_ARTICLES)
-      .map((hit) => ({
-        title: hit.content.replace(MARK_TAG, ""),
-        url: new URL(hit.url, HELP_CENTER_BASE_URL).toString(),
-      }));
-  },
+  search: (question, signal, view) =>
+    searchHelpPages(question, signal, view, MAX_ARTICLES),
   async select({ images, index, question, signal }) {
     const model = await resolveModel("kbSelect");
     const { object } = await hedged("select", signal, (abortSignal) =>
@@ -909,9 +877,16 @@ async function grounded(
 export async function answerFromHelpCenter(
   input: string | WidgetAsk,
   log: { conversationId: string; runId: string },
-  deps: KbDeps = defaultKbDeps,
+  helpCenterDeps: KbDeps = defaultKbDeps,
   customer?: KbCustomer
 ): Promise<KbAnswer> {
+  const view = customer?.helpCenter;
+  const deps: KbDeps = {
+    ...helpCenterDeps,
+    index: (abort) => helpCenterDeps.index(abort, view),
+    read: (url, abort) => helpCenterDeps.read(url, abort, view),
+    search: (query, abort) => helpCenterDeps.search(query, abort, view),
+  };
   const ask = toAsk(input);
   const question = renderTranscript(ask);
   // Offered once, then never again: the writer repeated it turn after turn.
