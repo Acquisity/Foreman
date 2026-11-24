@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { after, type TestContext, test } from "node:test";
 import { DEFAULT_PARTNER_ID } from "#lib/acquisity-constants.js";
 import type { ProviderContext } from "#lib/executor/dispatch.js";
@@ -391,15 +392,14 @@ test("Sentry signals aggregate to sanitized counts, and any unexpected shape rea
 });
 
 const SENTRY_PATH = "sentry-foreman.search_issues";
-const PLANETSCALE_PATH = "planetscale-org.planetscale_execute_read_query";
-/** Bind Sentry and set the org slug for one test, then restore both. */
+/** Use the checked-in bindings and set the org slug for one test, then restore both. */
 function withSentry(t: TestContext, slug: string | null = "acquisity") {
   const bindings = process.env.EXECUTOR_OPERATION_BINDINGS;
   const saved = process.env.WIDGET_SENTRY_ORG_SLUG;
-  process.env.EXECUTOR_OPERATION_BINDINGS = JSON.stringify({
-    "planetscale.readQuery": { path: PLANETSCALE_PATH },
-    "sentry.searchIssues": { path: SENTRY_PATH },
-  });
+  process.env.EXECUTOR_OPERATION_BINDINGS = readFileSync(
+    new URL("../../.github/executor/operation-bindings.json", import.meta.url),
+    "utf8"
+  );
   if (slug === null) {
     delete process.env.WIDGET_SENTRY_ORG_SLUG;
   } else {
