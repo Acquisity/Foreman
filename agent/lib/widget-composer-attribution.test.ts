@@ -3,18 +3,16 @@ import test from "node:test";
 
 import { defaultGateDeps } from "./widget-egress.js";
 
-const LIVE = Boolean(
-  process.env.WIDGET_COMPOSER_LIVE &&
-    process.env.CLIPROXY_BASE_URL &&
-    process.env.CLIPROXY_API_KEY
-);
+const LIVE =
+  process.env.WIDGET_COMPOSER_LIVE === "1" &&
+  Boolean(process.env.CLIPROXY_BASE_URL && process.env.CLIPROXY_API_KEY);
 const RUNS = 10;
-const TEAMMATE = /Ervin/;
+const TEAMMATE = /Ervin Worden/;
 const ASKER_CREDITED =
   /\bby you\b|\byou (?:made|changed|removed|added|edited|updated|created|re-added|merged)\b|\byour (?:changes|edits)\b/i;
 
 test("the composer names the teammate who made a change instead of crediting the asker", {
-  skip: !LIVE && "set WIDGET_COMPOSER_LIVE with the CLI Proxy keys",
+  skip: !LIVE && "set WIDGET_COMPOSER_LIVE=1 with the CLI Proxy keys",
 }, async () => {
   const question =
     "Before the merge I tried to change his email from stephen@ecomow.com to stephen@greenformlandscapes.com and it kept going back to the old one. Why did that happen, and who in my workspace is allowed to edit contact emails?";
@@ -41,8 +39,10 @@ test("the composer names the teammate who made a change instead of crediting the
   const replies = await Promise.all(
     Array.from({ length: RUNS }, () =>
       defaultGateDeps.compose({
+        askedAt:
+          "ASKED AT: 2026-11-24T17:31:00.000Z (UTC). The customer's time zone is unknown, so give each date as a date, never as today, tomorrow or yesterday.",
         findings,
-        organizationName: "Ervin Worden's Workspace",
+        organizationName: "Greenform Landscapes",
         question,
         recordingOffered: false,
       })

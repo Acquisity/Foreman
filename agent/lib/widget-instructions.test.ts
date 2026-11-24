@@ -52,7 +52,7 @@ const FAILED_STEP_RULE =
 const NEXT_STEP_RULE =
   /ends with what the customer should do next: the steps[^.]*, the workaround for a[^.]*limitation, or the single most useful[^.]*check they can make/;
 const NAMED_ACTOR_RULE =
-  /when a finding names the person who did something, keep that name in the reply, and say "you" for an action only when a finding says the customer did it/;
+  /When a finding names the person who did something in the workspace, keep that name in the reply: say "you" for such an action only when a finding says the customer did it, and never credit the customer with a teammate's change/;
 const STATED_FINDING_RULE =
   /a recorded count, status or absence[^;]*goes in the reply as stated, never replaced by saying it could not be confirmed or checked; what a live check could not show is said after it, never instead of it/;
 const NO_INVENTION_RULES = [
