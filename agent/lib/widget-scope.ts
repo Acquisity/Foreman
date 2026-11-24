@@ -1,7 +1,7 @@
 import type { SessionAuthContext } from "eve/context";
 import { z } from "zod";
 import { DEFAULT_PARTNER_ID } from "./acquisity-constants.js";
-import { helpCenterViewSchema } from "./help-center.js";
+import { featuresOffNames, helpCenterViewSchema } from "./help-center.js";
 import { stampUnattended } from "./trust.js";
 import {
   availableEndpointSchema,
@@ -67,6 +67,10 @@ const shape = {
   // The support endpoints the context route lists for the asking user
   // (ENG-20296). Absent means the list was not given or could not be read.
   endpoints: z.array(availableEndpointSchema).max(50).optional(),
+  // The names of the features turned off for the workspace, taken from
+  // helpCenter when the session is stamped (ENG-20514), so the investigator
+  // can say a feature is off instead of that it could not be read.
+  featuresOff: z.array(z.string().min(1).max(300)).max(200).optional(),
   // The customer's Help Centre view for the knowledge base lane: never stamped
   // on the session, and dropped from the stored run.
   helpCenter: helpCenterViewSchema.optional(),
@@ -107,6 +111,12 @@ export const stampedWidgetAttributes = z.object({
     .transform((text) =>
       text === undefined ? undefined : parseAvailableEndpoints(JSON.parse(text))
     ),
+  featuresOff: z
+    .string()
+    .optional()
+    .transform((text) =>
+      text === undefined ? undefined : shape.featuresOff.parse(JSON.parse(text))
+    ),
 });
 
 export type WidgetContext = Readonly<z.infer<typeof widgetContextSchema>>;
@@ -144,8 +154,9 @@ export function widgetAuth(
   runId?: string
 ): SessionAuthContext {
   const {
-    helpCenter: _helpCenter,
+    helpCenter,
     endpoints,
+    featuresOff = featuresOffNames(helpCenter),
     officeHours: _hours,
     ...verified
   } = widgetContextSchema.parse(scope);
@@ -153,6 +164,9 @@ export function widgetAuth(
     attributes: {
       ...verified,
       ...(endpoints ? { endpoints: JSON.stringify(endpoints) } : {}),
+      ...(featuresOff.length > 0
+        ? { featuresOff: JSON.stringify(featuresOff) }
+        : {}),
       ...(runId ? { widgetRunId: z.uuid().parse(runId) } : {}),
     },
     authenticator: "bearer",

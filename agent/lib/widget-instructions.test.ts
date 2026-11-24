@@ -171,3 +171,42 @@ test("outside-call inventory matches local judge and widget retry contracts", ()
     )
   );
 });
+
+test("an investigation in a workspace with a feature off is told the feature is off, not unreadable (ENG-20514)", () => {
+  const helpCenter = {
+    featuresOff: [
+      {
+        feature: "ai_website",
+        pages: ["/docs/sites"],
+        title: "AI Website Creator",
+      },
+    ],
+    viewer: "signed.viewer.token",
+  };
+  const auth = widgetAuth({ ...scope, helpCenter });
+  // Only the names reach the session, never the signed viewer or the pages.
+  assert.equal(auth.attributes?.featuresOff, '["AI Website Creator"]');
+  assert.equal(JSON.stringify(auth).includes("signed.viewer.token"), false);
+  const text = widgetInstructions(auth);
+  assert.match(
+    text,
+    /These features are not turned on for this workspace: \["AI Website Creator"\]/
+  );
+  assert.match(
+    text,
+    /do not say it could not be read or checked, and do not ask for details of it/
+  );
+  assert.match(text, /not a capability gap/);
+  assert.equal(
+    widgetInstructions(widgetAuth(scope)).includes(
+      "not turned on for this workspace"
+    ),
+    false
+  );
+  assert.equal(
+    widgetInstructions(
+      widgetAuth({ ...scope, helpCenter: { ...helpCenter, featuresOff: [] } })
+    ).includes("not turned on for this workspace"),
+    false
+  );
+});
