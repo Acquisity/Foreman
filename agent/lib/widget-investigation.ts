@@ -21,6 +21,7 @@ import {
 } from "./widget-egress.js";
 import {
   resolveOwnedIdentifiers,
+  verifyWorkspaceMember,
   WorkspaceAccessDenied,
 } from "./widget-evidence.js";
 import { extractWidgetFindings } from "./widget-extract.js";
@@ -606,13 +607,7 @@ export const defaultWidgetDependencies = {
   verifyAccess: (scope: WidgetContext) =>
     resolveOwnedIdentifiers(scope, { emails: [], slugs: [], uuids: [] }),
   /** Throws unless the scoped user is a current member of the scoped workspace, in any role. */
-  verifyMember: (scope: WidgetContext) =>
-    resolveOwnedIdentifiers(
-      scope,
-      { emails: [], slugs: [], uuids: [] },
-      undefined,
-      true
-    ),
+  verifyMember: (scope: WidgetContext) => verifyWorkspaceMember(scope),
   /** Whether an earlier run of the conversation filed its ticket. */
   wasFiled: conversationWasFiled,
 };
