@@ -2,6 +2,7 @@ import { setTimeout as sleep } from "node:timers/promises";
 import type { LanguageModelMiddleware, wrapLanguageModel } from "ai";
 import { z } from "zod";
 import { logOpsEvent } from "./ops-log.js";
+import { GAP_TOOL } from "./widget-capability-gaps.js";
 import { customerMessages, withoutGuide } from "./widget-instructions.js";
 
 /**
@@ -57,7 +58,6 @@ const HANDOFF_ELIGIBLE = 0.5;
  */
 const MAX_READS_PER_TOOL = 2;
 const TICKET_TOOL = "widget_file_ticket";
-const GAP_TOOL = "report_capability_gap";
 const ARTICLE_TOOLS = new Set([
   "widget_help_article",
   "widget_read_help_article",

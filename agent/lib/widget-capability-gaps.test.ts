@@ -278,6 +278,8 @@ test("a missing fact naming something from a workspace is refused", () => {
     "the run 0b7c4a2e-1111-4222-8333-444455556666",
     "invoice 12345",
     'the campaign "Spring"',
+    "why Acme Corp's order waits",
+    "whether Sam Lee was invited",
   ]) {
     assert.equal(generalFact(named), null, named);
   }
@@ -308,6 +310,7 @@ interface Call {
   variables: Record<string, unknown>;
 }
 interface FakeIssue {
+  closed?: boolean;
   comments: { body: string; id: string }[];
   description: string;
   id: string;
@@ -370,11 +373,14 @@ const fakeLinear = (labels = ["Capability Gap", "Docs Gap", "fixy"]) => {
           nodes: labels.map((label) => ({ id: `label-${label}`, name: label })),
         },
         issues: {
-          nodes: issues.slice(0, 1).map((issue) => ({
-            ...issue,
-            comments: { nodes: [...issue.comments] },
-            labels: { nodes: issue.labels.map((id) => ({ id })) },
-          })),
+          nodes: issues
+            .filter((issue) => !issue.closed)
+            .slice(0, 1)
+            .map((issue) => ({
+              ...issue,
+              comments: { nodes: [...issue.comments] },
+              labels: { nodes: issue.labels.map((id) => ({ id })) },
+            })),
         },
         teams: { nodes: [{ id: "team-eng" }] },
       }),
@@ -497,6 +503,30 @@ test("a count that failed to update is set from the comments on the next call", 
     outcome: "seen",
   });
   assert.match(linear.issues[0]?.description ?? "", COUNT_TWO);
+});
+
+test("a gap whose ticket was closed gets a new ticket", async () => {
+  const linear = fakeLinear();
+  const file = fileWith(linear);
+  await file("conv-1", "run-1");
+  const [first] = linear.issues;
+  if (first) {
+    first.closed = true;
+  }
+  assert.deepEqual(await file("conv-1", "run-2"), {
+    identifier: "ENG-2",
+    outcome: "filed",
+  });
+  assert.equal(linear.issues[1]?.comments.length, 1);
+});
+
+test("with no fixy label in Linear, an open ticket is reported failed, not counted", async () => {
+  const linear = fakeLinear();
+  await fileWith(linear)("conv-1", "run-1");
+  const without = fakeLinear(["Capability Gap", "Docs Gap"]);
+  without.issues.push(...linear.issues);
+  const filed = await fileWith(without)("conv-2", "run-2");
+  assert.equal(filed.outcome, "failed");
 });
 
 test("a docs gap needs the Docs Gap label, and a missing label files nothing", async () => {

@@ -36,7 +36,7 @@ export const gapSentences = (reply: string | null) =>
     .map((sentence) => sentence.trim())
     .filter((sentence) => UNCONFIRMED.test(sentence));
 
-/** Reads with no stored state to compare: customer clarification and the stubbed ticket. */
+/** Calls with no stored state to compare: customer clarification, the stubbed ticket and a recorded gap. */
 export const NOT_READS = new Set([
   "report_capability_gap",
   "widget_ask_customer",

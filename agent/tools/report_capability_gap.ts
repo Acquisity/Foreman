@@ -22,7 +22,7 @@ export const tool = defineTool({
     if (!fact) {
       return {
         error:
-          "Write the missing fact in general terms, under 160 characters, with no names, emails, domains, ids, numbers or quotes from this workspace, and call again once.",
+          "Write the missing fact in general terms, under 160 characters, in lower case after the first word, with no names, emails, domains, ids, numbers or quotes from this workspace, and call again once.",
         recorded: false as const,
       };
     }

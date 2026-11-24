@@ -24,7 +24,8 @@ import {
  * The raw exploratory tools (planetscale_execute_read_query, widget_provider,
  * describe_table) are deliberately excluded so the model cannot write its own
  * SQL or wander. No web, browser, sandbox, repo, memory, or delegation. The one
- * write is widget_file_ticket, whose target and scope come from the session.
+ * write is widget_file_ticket, whose target and scope come from the session;
+ * report_capability_gap only records a gap, which Foreman's code files.
  */
 const ALLOWED_TOOLS = new Set([
   "widget_account_access",

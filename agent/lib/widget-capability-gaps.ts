@@ -50,6 +50,9 @@ const CUSTOMER_DATA = [
   /\b[0-9a-f]{8}-[0-9a-f]{4}-/iu,
   /\d{4,}/u,
   /["“”]/u,
+  // A capitalized word after the first is a name (a person, a company, a
+  // campaign); product terms are written in lower case.
+  /\s[A-Z][a-z]/u,
 ];
 
 /** A missing fact in general terms, or null when it names something from a workspace. */
@@ -380,6 +383,9 @@ export async function fileCapabilityGap(
   const label = (name: string) =>
     found.issueLabels.nodes.find((node) => node.name === name)?.id;
   const fixyLabel = label(FIXY);
+  if (!fixyLabel) {
+    return { outcome: "failed", reason: `Linear has no ${FIXY} label.` };
+  }
   const record = (issueId: string) =>
     commentOnce(
       issueId,
@@ -403,7 +409,7 @@ export async function fileCapabilityGap(
         id: open.id,
       });
     }
-    if (fixyLabel && !open.labels.nodes.some(({ id }) => id === fixyLabel)) {
+    if (!open.labels.nodes.some(({ id }) => id === fixyLabel)) {
       await write("CapabilityGapLabel", ADD_LABEL, {
         id: open.id,
         label: fixyLabel,
@@ -413,10 +419,10 @@ export async function fileCapabilityGap(
   }
   const teamId = found.teams.nodes[0]?.id;
   const kindLabel = label(LABELS[gap.kind]);
-  if (!(teamId && kindLabel && fixyLabel)) {
+  if (!(teamId && kindLabel)) {
     return {
       outcome: "failed",
-      reason: `Linear has no ${teamKey} team, ${LABELS[gap.kind]} label or ${FIXY} label.`,
+      reason: `Linear has no ${teamKey} team or ${LABELS[gap.kind]} label.`,
     };
   }
   const created = await request<{
