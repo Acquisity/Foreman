@@ -15,8 +15,14 @@ import {
 import { JUDGE_TIMEOUT_MS } from "./widget-judge.js";
 import { DESCRIPTION_CHARS } from "./widget-next-action.js";
 import { PRODUCT_GUIDE } from "./widget-product-guide.js";
-import { widgetAuth } from "./widget-scope.js";
+import { widgetAuth, widgetContext } from "./widget-scope.js";
 import { SUPPORT_GUIDE } from "./widget-support-guide.js";
+
+const FEATURE_OFF_NAMES =
+  /These features are not turned on for this workspace: \["AI Website Creator"\]/u;
+const FEATURE_OFF_NO_ASK =
+  /do not say it could not be read or checked, and do not ask for details of it/u;
+const FEATURE_OFF_NOT_GAP = /not a capability gap/u;
 
 test("shared support facts keep unpaid cleanup guidance without investigator tool commands", () => {
   for (const tool of [
@@ -29,6 +35,15 @@ test("shared support facts keep unpaid cleanup guidance without investigator too
   assert.equal(SUPPORT_GUIDE.includes("before anything else"), false);
   assert.ok(
     SUPPORT_GUIDE.includes("Reconnect cannot bring back a cancelled mailbox")
+  );
+  assert.equal(
+    SUPPORT_GUIDE.includes("Mailbox cancelled after unpaid cleanup"),
+    false
+  );
+  assert.ok(
+    SUPPORT_GUIDE.includes(
+      "The customer cannot see an inbox's saved connection error"
+    )
   );
 });
 
@@ -177,4 +192,66 @@ test("outside-call inventory matches local judge and widget retry contracts", ()
       `${DESCRIPTION_CHARS.toLocaleString("en-US")} characters each`
     )
   );
+});
+
+test("an investigation in a workspace with a feature off is told the feature is off, not unreadable (ENG-20514)", () => {
+  const helpCenter = {
+    featuresOff: [
+      {
+        feature: "ai_website",
+        pages: ["/docs/sites"],
+        title: "AI Website Creator",
+      },
+    ],
+    viewer: "signed.viewer.token",
+  };
+  const auth = widgetAuth({ ...scope, helpCenter });
+  // Only the names reach the session, never the signed viewer or the pages.
+  assert.equal(auth.attributes?.featuresOff, '["AI Website Creator"]');
+  assert.equal(JSON.stringify(auth).includes("signed.viewer.token"), false);
+  const text = widgetInstructions(auth);
+  assert.match(text, FEATURE_OFF_NAMES);
+  assert.match(text, FEATURE_OFF_NO_ASK);
+  assert.match(text, FEATURE_OFF_NOT_GAP);
+  assert.equal(
+    widgetInstructions(widgetAuth(scope)).includes(
+      "not turned on for this workspace"
+    ),
+    false
+  );
+  assert.equal(
+    widgetInstructions(
+      widgetAuth({ ...scope, helpCenter: { ...helpCenter, featuresOff: [] } })
+    ).includes("not turned on for this workspace"),
+    false
+  );
+});
+
+test("a malformed featuresOff stamp fails the scope closed instead of throwing", () => {
+  const auth = widgetAuth(scope);
+  assert.equal(
+    widgetContext({
+      ...auth,
+      attributes: { ...auth.attributes, featuresOff: "{bad" },
+    }),
+    null
+  );
+});
+
+const EACH_RECORD_RULE =
+  /asks for the records themselves[^.]*write each record the result returns as its own fact with its own date and amount/;
+const RECORDS_AVAILABLE_RULE =
+  /never write that the dates or amounts of records you were given are unavailable/;
+const MORE_RECORDS_RULE = /when there are more than 20, how many more/;
+const OWN_DATE_RULE =
+  /Every amount keeps the date of its own record: never group amounts under one date unless every one of those records has that date/;
+
+test("the investigator lists each record it was asked for, each amount on its own record's date", () => {
+  // ENG-20500: "six grants totalling 38,000 … I don't have each grant's date and amount".
+  // ENG-20483: "$1 and $90 on 2026-11-14" when the $1 invoice was paid on 18 Nov.
+  const prompt = widgetInstructions(widgetAuth(scope));
+  assert.match(prompt, EACH_RECORD_RULE);
+  assert.match(prompt, RECORDS_AVAILABLE_RULE);
+  assert.match(prompt, MORE_RECORDS_RULE);
+  assert.match(prompt, OWN_DATE_RULE);
 });

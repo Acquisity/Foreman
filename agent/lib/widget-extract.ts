@@ -2,6 +2,7 @@ import { generateObject } from "ai";
 import { z } from "zod";
 import { fastCallOptions, modelFor, resolveModel } from "./models.js";
 import { logOpsEvent } from "./ops-log.js";
+import { GAP_AREAS } from "./widget-capability-gaps.js";
 import { parseFindings, type WidgetFindings } from "./widget-findings.js";
 import type { WidgetContext } from "./widget-scope.js";
 
@@ -32,11 +33,20 @@ const extractionSchema = z.object({
   report: z.string().optional(),
   ticketId: z.string().optional(),
   ticketUrl: z.string().optional(),
+  unchecked: z
+    .array(
+      z.object({
+        area: z.string(),
+        fact: z.string(),
+        kind: z.string().optional(),
+      })
+    )
+    .optional(),
 });
 type LenientFindings = z.infer<typeof extractionSchema>;
 type LenientFinding = NonNullable<LenientFindings["facts"]>[number];
 
-export const EXTRACT_PROMPT = `You convert an internal support investigator's free-form findings into a structured object. You receive the customer's question and the investigator's written findings. Keep each fact to one independently useful finding. Write every claim in plain words a customer would use, never as a tool's field names, booleans or codes: write "not connected" for connected:false, "none of the 3 sending accounts are healthy" for healthyCount 0 of 3, and "no reason for not sending was recorded" for notSendingReason null. Do not bundle a customer-facing diagnosis with ancillary provider hostnames or identifiers: for example, keep observed versus recommended DNS addresses and their mismatch in a separate fact from nameserver hostnames, so filtering a provider reference cannot remove the diagnosis. For each concrete finding, produce a fact with: claim (the finding), evidenceTool (the tool or record it came from, if named), evidenceRef (any reference/id string it cited), and entityIds (identifiers it named). Also produce: recommendation (what to do), confidence (low, medium or high), needsHuman (true only when the customer explicitly asked to talk to a person, or the investigator concluded it cannot give any useful answer at all, e.g. no usable findings; a billing dispute, a refund request, an order with unconfirmed payment or incomplete delivery, and a documented step the customer already tried that failed are filed as a ticket, not handed to a person, so needsHuman stays false for them, every fact is kept and the unresolved questions go in recommendation; do NOT set it merely because one detail could not be verified while the main question was still answered; when the customer already tried the documented step and it failed, for example their recent reconnect attempts all failed, the recommendation states what failed and never tells them to repeat that step or wait it out), needsWrite (a change that was needed but could not be made), ticketId/ticketUrl only if the investigator says it created an ENG-#### ticket during this investigation (never for an existing or related ticket it merely mentions), and report (the investigator's plain-English summary for a teammate, kept to one or two short sentences and 40 words at most; shorten it if the investigator ran long, and never make it more certain than the facts: what the facts leave unconfirmed stays unconfirmed, never paid, unpaid, working or lost). Always include, as its own fact, anything the investigator said it could not check or verify, because the customer must be told what remains uncertain; word it as what remains unknown about the customer's workspace, using only what the investigator said, never as the internal source (a run trace, a log, a telemetry feed, step detail) that could not be read. A tool status of ok or normal means the read worked, never that the thing is healthy, and nothing recorded is never "no action is needed": when the investigator wrote that no action is needed or nothing needs changing while also saying something could not be checked, leave that phrase out of recommendation and report and keep what was and was not recorded. Copy faithfully; never invent a fact, id, reference, link or ticket the investigator did not state. If the investigator only asked the customer a clarifying question, or simply replied to a message that needed nothing looked up, that is a normal reply and not a failure: return an empty facts array, needsHuman false, and put what it said to the customer into recommendation and report. If instead the investigator could not produce any useful answer, return an empty facts array, needsHuman true, and put whatever was said into recommendation and report.`;
+export const EXTRACT_PROMPT = `You convert an internal support investigator's free-form findings into a structured object. You receive the customer's question and the investigator's written findings. Keep each fact to one independently useful finding. When the investigator lists records one by one, keep each record as its own fact with its date and amount, never folded into a total or a date range, and keep every amount with the date the investigator gave that record. Write every claim in plain words a customer would use, never as a tool's field names, booleans or codes: write "not connected" for connected:false, "none of the 3 sending accounts are healthy" for healthyCount 0 of 3, and "no reason for not sending was recorded" for notSendingReason null. Do not bundle a customer-facing diagnosis with ancillary provider hostnames or identifiers: for example, keep observed versus recommended DNS addresses and their mismatch in a separate fact from nameserver hostnames, so filtering a provider reference cannot remove the diagnosis. For each concrete finding, produce a fact with: claim (the finding), evidenceTool (the tool or record it came from, if named), evidenceRef (any reference/id string it cited), and entityIds (identifiers it named). Also produce: recommendation (what to do), confidence (low, medium or high), needsHuman (true only when the customer explicitly asked to talk to a person, or the investigator concluded it cannot give any useful answer at all, e.g. no usable findings; a billing dispute, a refund request, an order with unconfirmed payment or incomplete delivery, and a documented step the customer already tried that failed are filed as a ticket, not handed to a person, so needsHuman stays false for them, every fact is kept and the unresolved questions go in recommendation; do NOT set it merely because one detail could not be verified while the main question was still answered; when the customer already tried the documented step and it failed, for example their recent reconnect attempts all failed, the recommendation states what failed and never tells them to repeat that step or wait it out), needsWrite (a change that was needed but could not be made), ticketId/ticketUrl only if the investigator says it created an ENG-#### ticket during this investigation (never for an existing or related ticket it merely mentions), and report (the investigator's plain-English summary for a teammate, kept to one or two short sentences and 40 words at most; shorten it if the investigator ran long, and never make it more certain than the facts: what the facts leave unconfirmed stays unconfirmed, never paid, unpaid, working or lost). Always include, as its own fact, anything the investigator said it could not check or verify, because the customer must be told what remains uncertain; word it as what remains unknown about the customer's workspace, using only what the investigator said, never as the internal source (a run trace, a log, a telemetry feed, step detail) that could not be read. A tool status of ok or normal means the read worked, never that the thing is healthy, and nothing recorded is never "no action is needed": when the investigator wrote that no action is needed or nothing needs changing while also saying something could not be checked, leave that phrase out of recommendation and report and keep what was and was not recorded. Copy faithfully; never invent a fact, id, reference, link or ticket the investigator did not state. Also list in unchecked each thing the investigator said it could not check, verify or see, except a refusal by design (another workspace, card details, internal tickets, a feature that is off for the workspace): area is the product area it belongs to (${GAP_AREAS.join(", ")}; other when none fits), fact is the missing fact in general terms, the same for any customer, in lower case, with no names, emails, domains, ids, numbers, dates or quotes from this workspace, under 160 characters (for example "why a managed domain is suspended"), and kind is docs when the Help Centre does not explain a product question, otherwise tool. If the investigator only asked the customer a clarifying question, or simply replied to a message that needed nothing looked up, that is a normal reply and not a failure: return an empty facts array, needsHuman false, and put what it said to the customer into recommendation and report. If instead the investigator could not produce any useful answer, return an empty facts array, needsHuman true, and put whatever was said into recommendation and report.`;
 
 const str = (v: unknown, max: number): string =>
   typeof v === "string" ? v.slice(0, max) : "";
@@ -48,6 +58,25 @@ const strArr = (v: unknown, maxItems: number, maxLen: number): string[] =>
         .map((x) => x.slice(0, maxLen))
         .slice(0, maxItems)
     : [];
+
+const WHITESPACE = /\s+/gu;
+const uncheckedArea = z.enum(GAP_AREAS).catch("other");
+const uncheckedKind = z.enum(["docs", "tool"]).catch("tool");
+
+/** Each unchecked fact as the extractor wrote it; replyGaps decides what may be filed. */
+function uncheckedFacts(
+  raw: LenientFindings["unchecked"]
+): Pick<WidgetFindings, "unchecked"> {
+  const unchecked = (raw ?? [])
+    .map((item) => ({
+      area: uncheckedArea.parse(item.area),
+      fact: item.fact.replace(WHITESPACE, " ").trim().slice(0, 160),
+      kind: uncheckedKind.parse(item.kind),
+    }))
+    .filter((item) => item.fact.length >= 3)
+    .slice(0, 10);
+  return unchecked.length ? { unchecked } : {};
+}
 
 /** Build the strict WidgetFindings from the lenient model output, filling required fields. */
 function normalize(
@@ -105,6 +134,7 @@ function normalize(
     typeof raw.ticketUrl === "string"
       ? { ticket: { id: raw.ticketId, url: raw.ticketUrl.slice(0, 500) } }
       : {}),
+    ...uncheckedFacts(raw.unchecked),
   };
   return parseFindings(candidate);
 }

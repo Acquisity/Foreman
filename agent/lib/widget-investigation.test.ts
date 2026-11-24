@@ -204,6 +204,13 @@ const noWork = (): Pick<RouteHandlerArgs, "from" | "waitUntil"> => ({
   waitUntil: () => assert.fail("must not start background work"),
 });
 
+const ASKED_AT_PREFIX = /^ASKED AT: [^\n]*\n\n/u;
+const ASKED_AT_FIRST = /^ASKED AT: /u;
+const withoutAskedAt = (sent: string) => {
+  assert.match(sent, ASKED_AT_PREFIX);
+  return sent.replace(ASKED_AT_PREFIX, "");
+};
+
 test("disabled, unauthenticated, malformed and oversized requests stop before verification", async (t) => {
   const verified = () => assert.fail("must not verify");
   const { deps } = dependencies();
@@ -594,7 +601,7 @@ test("a completed investigation is gated, answered with the composed reply, and 
     issuer: string;
     attributes: Record<string, string>;
   };
-  assert.equal(sent.message, start.question);
+  assert.equal(withoutAskedAt(sent.message), start.question);
   assert.equal(auth.issuer, WIDGET_SUPPORT_ISSUER);
   assert.equal(isUnattended(auth as never), true);
   assert.equal(auth.attributes.organizationId, scope.organizationId);
@@ -2623,7 +2630,7 @@ test("a teammate's follow-up reaches the investigator with the earlier team-only
   assert.equal(response.status, 200);
   assert.equal(sends.length, 1);
   assert.ok(
-    sends[0].startsWith(
+    withoutAskedAt(sends[0]).startsWith(
       "Check campaign B too.\n\nEARLIER TEAM-ONLY CONVERSATION"
     )
   );
@@ -2650,7 +2657,7 @@ test("a teammate's request still investigates when the team-only exchange cannot
   );
   assert.equal(response.status, 200);
   assert.equal(sends.length, 1);
-  assert.ok(sends[0].startsWith("Check campaign B too."));
+  assert.ok(withoutAskedAt(sends[0]).startsWith("Check campaign B too."));
   assert.ok(!sends[0].includes("EARLIER TEAM-ONLY CONVERSATION"));
 });
 
@@ -2668,7 +2675,10 @@ test("a customer's investigation never reads the team-only exchange", async (t) 
     deps
   );
   assert.equal(response.status, 200);
-  assert.deepEqual(sends, [withHistory(investigate.question, undefined)]);
+  assert.match(sends[0], ASKED_AT_FIRST);
+  assert.deepEqual(sends.map(withoutAskedAt), [
+    withHistory(investigate.question, undefined),
+  ]);
 });
 
 const closedHours = {
@@ -3011,7 +3021,9 @@ test("a toggled ask for a person files the ticket and still investigates", async
   );
   assert.equal(filed.length, 1);
   assert.equal(sends.length, 1);
-  assert.ok(sends[0].startsWith("Can I talk to a person please?"));
+  assert.ok(
+    withoutAskedAt(sends[0]).startsWith("Can I talk to a person please?")
+  );
   assert.ok(sends[0].includes("already filed or reused this conversation"));
   assert.notEqual(run.outcome?.reason, "asked_for_human");
 });
@@ -3302,7 +3314,7 @@ test("a teammate's investigation reads the user's timeline and is told to name t
   assert.equal(response.status, 200);
   assert.deepEqual(asked, [true]);
   assert.equal(sends.length, 1);
-  assert.ok(sends[0].startsWith("why was this call slow?"));
+  assert.ok(withoutAskedAt(sends[0]).startsWith("why was this call slow?"));
   assert.ok(sends[0].includes(JSON.stringify(staffTimeline)));
   assert.match(sends[0], CITES_TRACE);
   assert.match(sends[0], CITES_TIMELINE);
@@ -3323,4 +3335,162 @@ test("a message that stays at the front door never asks for the timeline", async
     deps
   );
   assert.deepEqual(asked, [false]);
+});
+
+test("a write-up that lists what it could not check files one gap per area with no report_capability_gap call (ENG-20478)", async () => {
+  const notLinked = event("action.result", {
+    result: {
+      callId: "site",
+      kind: "tool-result",
+      output: { status: "feature_off" },
+      toolName: "widget_website_status",
+    },
+  });
+  const outcome = await waitForWidgetInvestigation(
+    session([
+      timedOutStripe,
+      notLinked,
+      event("message.completed", {
+        message: "Inboxes read. What I couldn't check: several things.",
+      }),
+      event("turn.completed"),
+    ])
+  );
+  assert.equal(outcome.status, "completed");
+  const { deps, gated, run } = dependencies();
+  deps.extract = () =>
+    Promise.resolve({
+      ...findings,
+      unchecked: [
+        {
+          area: "orders",
+          fact: "why a managed domain is suspended",
+          kind: "tool",
+        },
+        {
+          area: "orders",
+          fact: "whether sam@acme.com still has mailboxes",
+          kind: "tool",
+        },
+        // The billing read failed and the website read was refused by design.
+        {
+          area: "billing",
+          fact: "whether the latest invoice was paid",
+          kind: "tool",
+        },
+        { area: "website", fact: "whether the site is live", kind: "tool" },
+      ],
+    });
+  const filed: unknown[] = [];
+  deps.fileGaps = (gaps) => {
+    filed.push(
+      gaps.map(({ area, details, fact, source }) => ({
+        area,
+        details,
+        fact,
+        source,
+      }))
+    );
+    return Promise.resolve();
+  };
+  if (outcome.status === "completed") {
+    await finishWidgetRun(run, "widget-session-unchecked", outcome, deps);
+  }
+  assert.deepEqual(filed, [
+    [
+      {
+        area: "billing",
+        details: undefined,
+        fact: "the stripe section could not be read",
+        source: "code",
+      },
+    ],
+    [
+      // The billing read failed, so its fact rides on that gap; the website
+      // read was refused by design, so its tool fact files nothing.
+      {
+        area: "billing",
+        details: ["whether the latest invoice was paid"],
+        fact: "the stripe section could not be read",
+        source: "code",
+      },
+      {
+        area: "orders",
+        details: [
+          "why a managed domain is suspended",
+          "one item that named workspace data, left out",
+        ],
+        fact: "something a reply said could not be checked",
+        source: "reply",
+      },
+    ],
+  ]);
+  // The list is for filing only: the gate and the stored findings never carry it.
+  assert.equal(gated.length, 1);
+  assert.equal("unchecked" in (gated[0] as object), false);
+  assert.equal(JSON.stringify(run.findings).includes("unchecked"), false);
+});
+
+test("an area counts as refused only while its latest read refused the whole check", async () => {
+  const read = (callId: string, output: unknown) =>
+    event("action.result", {
+      result: {
+        callId,
+        kind: "tool-result",
+        output,
+        toolName: "widget_website_status",
+      },
+    });
+  const retried = await waitForWidgetInvestigation(
+    session([
+      read("a", { status: "invalid_input" }),
+      read("b", { projects: [] }),
+      event("turn.completed"),
+    ])
+  );
+  assert.equal(retried.status === "completed" && retried.refused, undefined);
+  const refused = await waitForWidgetInvestigation(
+    session([read("a", { status: "feature_off" }), event("turn.completed")])
+  );
+  assert.deepEqual(refused.status === "completed" && refused.refused, [
+    "website",
+  ]);
+});
+
+test("the reply's facts are filed only after the tool gaps finish", async () => {
+  const outcome = await waitForWidgetInvestigation(
+    session([
+      timedOutStripe,
+      event("message.completed", { message: "I couldn't check the invoice." }),
+      event("turn.completed"),
+    ])
+  );
+  const { deps, run } = dependencies();
+  deps.extract = () =>
+    Promise.resolve({
+      ...findings,
+      unchecked: [
+        { area: "billing", fact: "whether an invoice was paid", kind: "tool" },
+      ],
+    });
+  const order: string[] = [];
+  deps.fileGaps = (gaps) => {
+    const label = gaps[0]?.details ? "reply" : "tools";
+    order.push(`${label} started`);
+    return new Promise((resolve) =>
+      setTimeout(() => {
+        order.push(`${label} done`);
+        resolve();
+      }, 5)
+    );
+  };
+  if (outcome.status === "completed") {
+    await finishWidgetRun(run, "widget-session-order", outcome, deps);
+  }
+  assert.deepEqual(order, [
+    "tools started",
+    "tools done",
+    "reply started",
+    "reply done",
+  ]);
 });

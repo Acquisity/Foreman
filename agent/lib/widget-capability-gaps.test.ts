@@ -9,9 +9,16 @@ import {
   type GapFiling,
   gapDescription,
   gapsFromResult,
+  gapTitle,
   generalFact,
+  readRefusal,
+  replyGaps,
+  withDetails,
 } from "./widget-capability-gaps.js";
 
+const MAILBOXES_ADDED =
+  /Couldn't check: why a domain was suspended; whether its mailboxes still exist\.$/u;
+const FOUND_BY_EXTRACTION = /Found by: the extraction pass/u;
 const KEY_LINE = /^- Gap key: orders: why a domain order/mu;
 const COUNT_THREE = /^\* Conversations: 3$/mu;
 const COUNT_TWO = /^- Conversations: 2$/mu;
@@ -287,6 +294,11 @@ test("a missing fact naming something from a workspace is refused", () => {
     generalFact("  Why a   domain order is waiting for payment "),
     "why a domain order is waiting for payment"
   );
+  // An acronym keeps its case: "dNS status" made a broken gap title.
+  assert.equal(
+    generalFact("DNS status of a sending domain"),
+    "DNS status of a sending domain"
+  );
 });
 
 test("the count line takes the given count and nothing else changes", () => {
@@ -367,6 +379,15 @@ const fakeLinear = (labels = ["Capability Gap", "Docs Gap", "fixy"]) => {
         };
         issues.push(issue);
         return { issueCreate: { issue } };
+      },
+      CapabilityGapDetails: () => {
+        for (const issue of issues) {
+          const comment = issue.comments.find((c) => c.id === variables.id);
+          if (comment) {
+            comment.body = String(variables.body);
+          }
+        }
+        return { commentUpdate: { success: true } };
       },
       CapabilityGapFind: () => ({
         issueLabels: {
@@ -562,4 +583,189 @@ test("a run files each gap key once, and a failure never throws", async () => {
     "the stripe section could not be read",
     "another fact",
   ]);
+});
+
+test("what a reply couldn't check is one gap per area and kind, never a ticket per wording (ENG-20478)", () => {
+  const gaps = replyGaps([
+    { area: "orders", fact: "why a domain was suspended", kind: "tool" },
+    { area: "orders", fact: "The reason a domain is suspended", kind: "tool" },
+    { area: "orders", fact: "why a domain was suspended", kind: "tool" },
+    { area: "orders", fact: "what suspended means", kind: "docs" },
+    { area: "inboxes", fact: "why lee@acme.com bounced", kind: "tool" },
+  ]);
+  assert.deepEqual(
+    gaps.map((each) => [gapTitle(each), each.details]),
+    [
+      [
+        "Capability gap: orders: something a reply said could not be checked",
+        ["why a domain was suspended", "the reason a domain is suspended"],
+      ],
+      [
+        "Docs gap: orders: a product question a reply said the Help Centre does not answer",
+        ["what suspended means"],
+      ],
+      [
+        "Capability gap: inboxes: something a reply said could not be checked",
+        ["one item that named workspace data, left out"],
+      ],
+    ]
+  );
+  assert.match(gapDescription(gaps[0]), FOUND_BY_EXTRACTION);
+});
+
+test("a failed read carries the reply's tool facts, a refused read files only its docs facts", () => {
+  const failed = gapsFromResult({
+    kind: "tool-result",
+    output: { available: true, unavailable: ["stripe: timeout"] },
+    toolName: "widget_billing_summary",
+  });
+  const website = (output: unknown, extra: object = {}) =>
+    readRefusal({
+      kind: "tool-result",
+      output,
+      toolName: "widget_website_status",
+      ...extra,
+    })?.refused;
+  // A whole check refused by design, the same refusals gapsFromResult knows.
+  assert.deepEqual(
+    [
+      website({ status: "denied" }),
+      website({ status: "invalid_input" }),
+      website({ status: "feature_off" }),
+      website({ status: "not_linked" }),
+      website({ code: "TOOL_EXECUTION_DENIED" }, { isError: true }),
+      website(null, { errorName: "AI_InvalidToolInputError", isError: true }),
+      readRefusal({
+        kind: "tool-result",
+        output: { unavailable: ["workspace could not be verified"] },
+        toolName: "widget_billing_summary",
+      })?.refused,
+    ],
+    [true, true, true, true, true, true, true]
+  );
+  // One refused section or project inside an answered read is not the area's refusal.
+  assert.deepEqual(
+    [
+      website({
+        sections: {},
+        status: "ok",
+        unavailable: [{ reason: "feature_off", section: "render" }],
+      }),
+      website({ projects: [{ render: { status: "not_linked" } }] }),
+    ],
+    [false, false]
+  );
+  assert.deepEqual(
+    readRefusal({
+      kind: "tool-result",
+      output: { status: "ok" },
+      toolName: "widget_inboxes",
+    }),
+    { area: "inboxes", refused: false }
+  );
+  const gaps = replyGaps(
+    [
+      { area: "billing", fact: "whether an invoice was paid", kind: "tool" },
+      { area: "billing", fact: "how credits roll over", kind: "docs" },
+      { area: "website", fact: "whether the site is live", kind: "tool" },
+      { area: "website", fact: "what a not linked site means", kind: "docs" },
+    ],
+    failed,
+    ["website"]
+  );
+  assert.deepEqual(
+    gaps.map(({ area, details, fact, source }) => ({
+      area,
+      details,
+      fact,
+      source,
+    })),
+    [
+      {
+        area: "billing",
+        details: ["whether an invoice was paid"],
+        fact: "the stripe section could not be read",
+        source: "code",
+      },
+      {
+        area: "billing",
+        details: ["how credits roll over"],
+        fact: "a product question a reply said the Help Centre does not answer",
+        source: "reply",
+      },
+      {
+        area: "website",
+        details: ["what a not linked site means"],
+        fact: "a product question a reply said the Help Centre does not answer",
+        source: "reply",
+      },
+    ]
+  );
+});
+
+test("a later run adds its facts to the conversation's one comment", async () => {
+  const linear = fakeLinear();
+  const [first] = replyGaps([
+    { area: "orders", fact: "why a domain was suspended", kind: "tool" },
+  ]);
+  const [second] = replyGaps([
+    { area: "orders", fact: "why a domain was suspended", kind: "tool" },
+    { area: "orders", fact: "whether its mailboxes still exist", kind: "tool" },
+  ]);
+  await fileWith(linear, first)("conv-1", "run-1");
+  assert.equal(
+    (await fileWith(linear, second)("conv-1", "run-2")).outcome,
+    "seen"
+  );
+  assert.equal(
+    withDetails(linear.issues[0].comments[0].body, second.details),
+    null
+  );
+  assert.match(linear.issues[0].comments[0].body, MAILBOXES_ADDED);
+  // Nothing new: no write.
+  const calls = linear.calls.length;
+  await fileWith(linear, second)("conv-1", "run-3");
+  assert.equal(
+    linear.calls
+      .slice(calls)
+      .some(({ name }) => name === "CapabilityGapDetails"),
+    false
+  );
+});
+
+test("each conversation's comment lists what its reply couldn't check", async () => {
+  const [replied] = replyGaps([
+    { area: "orders", fact: "why a domain was suspended", kind: "tool" },
+  ]);
+  const linear = fakeLinear();
+  assert.equal(
+    (await fileWith(linear, replied)("conv-1", "run-1")).outcome,
+    "filed"
+  );
+  assert.deepEqual(
+    linear.issues[0].comments.map((comment) => comment.body),
+    [
+      "Seen in support conversation conv-1 (Foreman run run-1). Couldn't check: why a domain was suspended.",
+    ]
+  );
+});
+
+test("a fact with the comment's separator in it stays one fact, and jobs is an area", () => {
+  const [jobsGap] = replyGaps([
+    {
+      area: "jobs",
+      fact: "why a scrape failed; and when it retries",
+      kind: "tool",
+    },
+  ]);
+  assert.equal(
+    gapTitle(jobsGap),
+    "Capability gap: jobs: something a reply said could not be checked"
+  );
+  assert.deepEqual(jobsGap.details, [
+    "why a scrape failed, and when it retries",
+  ]);
+  const body = "Seen in support conversation c (Foreman run r).";
+  const once = withDetails(body, jobsGap.details) ?? "";
+  assert.equal(withDetails(once, jobsGap.details), null);
 });

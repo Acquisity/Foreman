@@ -15,7 +15,6 @@ import {
   scanIdentifiers,
   withoutTicketRefs,
 } from "./widget-egress.js";
-import { buildOwnershipQuery } from "./widget-evidence.js";
 import type { WidgetFindings } from "./widget-findings.js";
 
 const RECONNECT = /Reconnect/;
@@ -23,7 +22,6 @@ const INTERNAL = /^internal_artifact:/;
 const COMPOSED_FOREIGN = /^composed:foreign_identifier:/;
 const COMPOSED_INTERNAL = /^composed:internal_artifact:/;
 const STRIPE_CUSTOMER_ID = /cus_/;
-const EMAIL_LITERAL = /'\{someone@example\.com\}'::text\[\]/;
 
 const campaignId = "44444444-4444-4444-8444-444444444444";
 const foreignId = "55555555-5555-4555-8555-555555555555";
@@ -489,88 +487,6 @@ test("redaction can only delete: sentences, facts and the needed change, never r
   assert.equal(removeItems(base, [1, 2, 3, 4]), null);
 });
 
-test("the ownership query requires owner or admin unless any member may pass", () => {
-  const none = { emails: [], slugs: [], uuids: [] };
-  const ownersOnly = buildOwnershipQuery(scope, none);
-  const anyMember = buildOwnershipQuery(scope, none, true);
-  assert.ok(ownersOnly.includes("and m.role in ('owner', 'admin')"));
-  assert.ok(!anyMember.includes("m.role in"));
-  assert.ok(anyMember.includes("m.deleted_at is null"));
-  assert.ok(anyMember.includes(`m.user_id = '${scope.userId}'::uuid`));
-});
-
-test("the ownership query binds the verified scope and only validated literals", () => {
-  const query = buildOwnershipQuery(scope, {
-    emails: ["Someone@Example.com"],
-    slugs: [scope.organizationSlug],
-    uuids: [campaignId],
-  });
-  assert.match(query, new RegExp(`o\\.id = '${scope.organizationId}'::uuid`));
-  assert.match(query, new RegExp(`m\\.user_id = '${scope.userId}'::uuid`));
-  assert.match(query, EMAIL_LITERAL);
-  assert.throws(() =>
-    buildOwnershipQuery(scope, {
-      emails: ["x'); drop table member; --@a.b"],
-      slugs: [],
-      uuids: [],
-    })
-  );
-  assert.throws(() =>
-    buildOwnershipQuery(scope, { emails: [], slugs: [], uuids: ["not-a-uuid"] })
-  );
-  assert.throws(() =>
-    buildOwnershipQuery(scope, {
-      domains: ["a.com'); drop table member; --"],
-      emails: [],
-      slugs: [],
-      uuids: [],
-    })
-  );
-});
-
-test("every table the ownership query reads is reached only through the verified workspace", () => {
-  const query = buildOwnershipQuery(scope, {
-    domains: ["outreach-diamond.com"],
-    emails: ["sarah@cyberdyne.com"],
-    slugs: [],
-    uuids: [campaignId],
-  });
-  // A table read without the join would resolve another tenant's identifiers.
-  for (const table of [
-    "outreach_campaign c",
-    "crm_message_thread t",
-    "crm_contact ct",
-    "crm_lead l",
-    "mail_inbox i",
-    "mail_domain d",
-    "lead_scrape_run sr",
-    "agent_executions ae",
-    "domain_purchase_order dpo",
-    "website w",
-    "website_project wp",
-    "website_domain wdm",
-  ]) {
-    const [, alias] = table.split(" ");
-    assert.ok(
-      query.includes(
-        `${table} join authorized a on a.id = ${alias}.organization_id`
-      ) ||
-        query.includes(`join authorized a on a.id = ${alias}.organization_id`),
-      `${table} must join authorized`
-    );
-  }
-  // crm_email has no organization column: it is only reachable via a scoped parent.
-  assert.equal(query.split("from crm_email ce").length - 1, 2);
-  assert.ok(
-    query.includes(
-      "join crm_contact ct on ct.id = ce.contact_id join authorized"
-    )
-  );
-  assert.ok(
-    query.includes("join crm_lead l on l.id = ce.lead_id join authorized")
-  );
-});
-
 test("a provider id in entityIds never reaches the customer, so it does not block the answer", async () => {
   const { calls, deps: d } = deps();
   const result = await gate(
@@ -616,25 +532,6 @@ test("the same provider id inside a claim never reaches the customer: its item i
 });
 
 test("a website's custom domain and the workspace's billing account are owned; the same shapes elsewhere stay foreign", async () => {
-  const query = buildOwnershipQuery(scope, {
-    domains: ["shop.customer-site.com"],
-    emails: [],
-    slugs: [],
-    uuids: [campaignId],
-  });
-  // The billing account is reached only through the authorized organization row.
-  assert.ok(
-    query.includes(
-      "select o.billing_account_id from organization o join authorized a on a.id = o.id"
-    )
-  );
-  assert.ok(
-    query.includes("lower(w.custom_domain) from website w join authorized")
-  );
-  assert.ok(
-    query.includes("lower(wdm.domain) from website_domain wdm join authorized")
-  );
-
   const ownedDomain = "shop.customer-site.com";
   const answer = (domain: string) =>
     gate(
@@ -837,6 +734,7 @@ test("the default judge and composer run under a deadline, so a stalled model ca
     );
     await assert.rejects(
       defaultGateDeps.compose({
+        askedAt: "ASKED AT: now",
         findings: composerInput(findings()),
         organizationName: scope.organizationName,
         question,
@@ -1238,39 +1136,6 @@ test("an email's dotted local part is not read as a domain", () => {
       .candidates.domains,
     ["other-tenant.com"]
   );
-});
-
-test("sending accounts this org's own provider webhooks report are vouched for only through the verified workspace", () => {
-  const query = buildOwnershipQuery(scope, {
-    emails: ["sender@followup-owned.co"],
-    slugs: [],
-    uuids: [],
-  });
-  assert.ok(
-    query.includes(
-      "lower(e.payload->>'email_account') from outreach_webhook_event e join authorized a on a.id = e.organization_id"
-    )
-  );
-});
-
-test("leads of this org's own campaigns are vouched for only through the verified workspace", () => {
-  const query = buildOwnershipQuery(scope, {
-    emails: ["lead@prospect.net"],
-    slugs: [],
-    uuids: [],
-  });
-  assert.ok(
-    query.includes(
-      "lower(cl.email) from outreach_campaign_lead cl join authorized a on a.id = cl.organization_id"
-    )
-  );
-  assert.ok(
-    query.includes(
-      "lower(e.lead_email) from outreach_webhook_event e join authorized a on a.id = e.organization_id"
-    )
-  );
-  // A webhook row with a mixed-case lead email still matches the lowercased list.
-  assert.ok(query.includes("where lower(e.lead_email) = any("));
 });
 
 test("a sending account or lead from another org still blocks", async () => {

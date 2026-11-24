@@ -3,12 +3,15 @@ import type { MessageStreamEvent } from "eve/client";
 import { z } from "zod";
 import { readRequestBody } from "./bounded-body.js";
 import { logOpsEvent } from "./ops-log.js";
+import { askedAtLine } from "./widget-asked-at.js";
 import { bugReportBrowser, MAX_BROWSER_CHARS } from "./widget-bug-evidence.js";
 import { addToBugReport, fileBugReport } from "./widget-bug-report.js";
 import {
   type CapabilityGap,
   fileRunGaps,
   gapsFromResult,
+  readRefusal,
+  replyGaps,
 } from "./widget-capability-gaps.js";
 import { answerFromGuide, chatGuideEnabled } from "./widget-chat.js";
 import { verifyWidgetContext } from "./widget-context.js";
@@ -20,6 +23,7 @@ import {
 } from "./widget-egress.js";
 import {
   resolveOwnedIdentifiers,
+  verifyWorkspaceMember,
   WorkspaceAccessDenied,
 } from "./widget-evidence.js";
 import { extractWidgetFindings } from "./widget-extract.js";
@@ -282,6 +286,8 @@ export type WaitOutcome =
       readings?: WidgetFindings["facts"];
       /** What the turn could not check, from its tool results. */
       gaps?: CapabilityGap[];
+      /** Areas whose read was refused by design, so the reply's unchecked facts there file nothing. */
+      refused?: string[];
     };
 
 const TEXT_MAX = 4000;
@@ -457,8 +463,21 @@ interface Recorded {
   gaps: CapabilityGap[];
   read: boolean;
   readings: WidgetFindings["facts"];
+  /** Areas whose read this turn was refused by design. */
+  refused: string[];
   ticket: FiledTicket | null;
 }
+/** Areas whose latest read this turn refused the whole check; a later answered read clears its area. */
+const latestRefusals = (
+  refused: string[],
+  read: ReturnType<typeof readRefusal>
+): string[] => {
+  if (!read) {
+    return refused;
+  }
+  const others = refused.filter((area) => area !== read.area);
+  return read.refused ? [...others, read.area] : others;
+};
 /** What the turn's own tool results recorded: a filed ticket, a question for the customer, a workspace read. */
 const recorded = (result: unknown, so: Recorded): Recorded => {
   const action = result as { kind?: string; toolName?: unknown } | null;
@@ -471,6 +490,7 @@ const recorded = (result: unknown, so: Recorded): Recorded => {
         typeof action.toolName === "string" &&
         gathering(action.toolName)),
     readings: [...so.readings, ...toolReadings(result)],
+    refused: latestRefusals(so.refused, readRefusal(result)),
     ticket: filedTicketResult(result) ?? so.ticket,
   };
 };
@@ -479,16 +499,18 @@ const nothingRecorded: Recorded = {
   gaps: [],
   read: false,
   readings: [],
+  refused: [],
   ticket: null,
 };
 const completed = (
-  { asked, gaps, read, readings, ticket }: Recorded,
+  { asked, gaps, read, readings, refused, ticket }: Recorded,
   outcome: Omit<Extract<WaitOutcome, { status: "completed" }>, "ticket">
 ): WaitOutcome => {
   const done = {
     ...outcome,
     ...(gaps.length ? { gaps } : {}),
     ...(readings.length ? { readings } : {}),
+    ...(refused.length ? { refused } : {}),
     ticket,
   };
   return asked
@@ -605,13 +627,7 @@ export const defaultWidgetDependencies = {
   verifyAccess: (scope: WidgetContext) =>
     resolveOwnedIdentifiers(scope, { emails: [], slugs: [], uuids: [] }),
   /** Throws unless the scoped user is a current member of the scoped workspace, in any role. */
-  verifyMember: (scope: WidgetContext) =>
-    resolveOwnedIdentifiers(
-      scope,
-      { emails: [], slugs: [], uuids: [] },
-      undefined,
-      true
-    ),
+  verifyMember: (scope: WidgetContext) => verifyWorkspaceMember(scope),
   /** Whether an earlier run of the conversation filed its ticket. */
   wasFiled: conversationWasFiled,
 };
@@ -976,15 +992,39 @@ async function structureWriteUp(
  */
 const startGapFiling = (
   run: Pick<WidgetRun, "id" | "scope">,
-  outcome: WaitOutcome,
+  gaps: readonly CapabilityGap[] | undefined,
   fileGaps: WidgetDependencies["fileGaps"]
 ): Promise<void> | undefined =>
-  outcome.gaps?.length && fileGaps
-    ? fileGaps(outcome.gaps, {
+  gaps?.length && fileGaps
+    ? fileGaps([...gaps], {
         conversationId: run.scope.conversationId,
         runId: run.id,
       }).catch(() => undefined)
     : undefined;
+
+const withoutUnchecked = ({
+  unchecked: _unchecked,
+  ...findings
+}: WidgetFindings): WidgetFindings => findings;
+
+/**
+ * The reply's unchecked facts, filed after the tool gaps so a failed read's
+ * gap gets them on the comment the first filing wrote, never a second ticket.
+ */
+const startReplyGapFiling = (
+  run: Pick<WidgetRun, "id" | "scope">,
+  unchecked: WidgetFindings["unchecked"],
+  outcome: Extract<WaitOutcome, { status: "completed" }>,
+  after: Promise<void> | undefined,
+  fileGaps: WidgetDependencies["fileGaps"]
+): Promise<void> =>
+  (after ?? Promise.resolve()).then(() =>
+    startGapFiling(
+      run,
+      replyGaps(unchecked, outcome.gaps, outcome.refused),
+      fileGaps
+    )
+  );
 
 /** Gate, then persist. Runs once per session outcome; a replay finds the fenced row unchanged. */
 export async function finishWidgetRun(
@@ -1025,7 +1065,8 @@ export async function finishWidgetRun(
   ) {
     return null;
   }
-  const gapsFiled = startGapFiling(run, outcome, deps.fileGaps);
+  const gapsFiled = startGapFiling(run, outcome.gaps, deps.fileGaps);
+  let writtenGapsFiled: Promise<void> | undefined;
   // A question for the customer is not an answer being prepared; saying so
   // would pop the checklist up just before the question arrives.
   if (
@@ -1061,7 +1102,7 @@ export async function finishWidgetRun(
     const cutoff = finishCutoff(run, claimedAt);
     const deadline = clock.timeout(Math.max(0, cutoff - clock.now()));
     const extractStartedAt = Date.now();
-    const { filed, gateDeps, structured } = await structureWriteUp(
+    const written = await structureWriteUp(
       run,
       sessionId,
       outcome,
@@ -1069,6 +1110,16 @@ export async function finishWidgetRun(
       deps,
       deadline
     );
+    writtenGapsFiled = startReplyGapFiling(
+      run,
+      written.structured?.unchecked,
+      outcome,
+      gapsFiled,
+      deps.fileGaps
+    );
+    const { filed, gateDeps } = written;
+    const structured =
+      written.structured && withoutUnchecked(written.structured);
     const extractMs = Date.now() - extractStartedAt;
     const handoff = structured
       ? null
@@ -1092,7 +1143,8 @@ export async function finishWidgetRun(
             role === "customer" ? [text] : []
           ),
           run.question,
-        ].join("\n")
+        ].join("\n"),
+        run.created_at
       );
       // Where the wait after an investigation goes: three model calls in a row.
       // Decision and reason ride along because log search surfaces one line per
@@ -1145,6 +1197,7 @@ export async function finishWidgetRun(
   );
   const saved = await deps.complete(run.id, result, findings, sessionId);
   await gapsFiled;
+  await writtenGapsFiled;
   return saved;
 }
 
@@ -1197,7 +1250,7 @@ async function settleResultRun(
       { conversationId: run.scope.conversationId, runId: run.id, sessionId },
       result
     );
-    const gapsFiled = startGapFiling(run, outcome, deps.fileGaps);
+    const gapsFiled = startGapFiling(run, outcome.gaps, deps.fileGaps);
     const saved = await deps.complete(run.id, result, findings, sessionId);
     await gapsFiled;
     return saved ?? run;
@@ -1574,10 +1627,13 @@ async function startInvestigation(
     });
     const existing = resolveSession ? await resolveSession(address) : null;
     const startIndex = existing ? await existing.getStreamTailIndex() : 0;
-    const session = await from(address).send(question, {
-      auth: widgetAuth(scope, run.id),
-      state: { runId: run.id },
-    });
+    const session = await from(address).send(
+      `${askedAtLine(scope, run.created_at)}\n\n${question}`,
+      {
+        auth: widgetAuth(scope, run.id),
+        state: { runId: run.id },
+      }
+    );
     sessionId = session.id;
     await deps.attach(run.id, session.id, startIndex);
     const planned = await planning;

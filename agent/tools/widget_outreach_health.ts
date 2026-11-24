@@ -427,7 +427,8 @@ export function buildWidgetOutreachHealthQuery(
         left(ca.message, ${STATUS_MESSAGE_CHARS}) as message
       from outreach_campaign_activity ca
       where ca.organization_id = c.organization_id and ca.campaign_id = c.id
-        and (ca.message like 'Campaign status updated to %' or ca.message like 'Campaign launch failed: %')
+        and (ca.message like 'Campaign status updated to %' or ca.message like 'Campaign paused%'
+          or ca.message like 'Campaign launch failed: %')
       order by coalesce(ca.occurred_at, ca.created_at) desc limit ${STATUS_HISTORY_LIMIT}
     ) h), '[]'::jsonb),
     'stepSends', coalesce((select jsonb_agg(to_jsonb(s) order by s.step) from (

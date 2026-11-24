@@ -9,6 +9,8 @@ import {
 } from "./widget-extract.js";
 import type { WidgetFindings } from "./widget-findings.js";
 
+const UNCHECKED_RULE =
+  /list in unchecked each thing the investigator said it could not check/;
 const FAILED_STEP_RULE =
   /a documented step the customer already tried that failed are filed as a ticket, not handed to a person[^)]*never tells them to repeat that step or wait it out/;
 
@@ -191,4 +193,46 @@ test("the default extractor runs under a deadline, so a stalled call hands the w
 
 test("a failed documented step is a ticket, never a person, a repeat or a wait", () => {
   assert.match(EXTRACT_PROMPT, FAILED_STEP_RULE);
+});
+
+test("what the investigator could not check comes back as unchecked facts for the finish to file", async () => {
+  const out = await extractWidgetFindings(input, {
+    generate: () =>
+      Promise.resolve({
+        ...lenient,
+        unchecked: [
+          {
+            area: "orders",
+            fact: " Why a managed  domain is suspended",
+            kind: "tool",
+          },
+          {
+            area: "made-up",
+            fact: "what partial means for a domain",
+            kind: "docs",
+          },
+          {
+            area: "inboxes",
+            fact: "why sam@acme.com is disconnected",
+            kind: "nope",
+          },
+          { area: "inboxes", fact: "x" },
+        ],
+      }),
+  });
+  // Kept as written: replyGaps decides what reaches a ticket.
+  assert.deepEqual(out?.unchecked, [
+    { area: "orders", fact: "Why a managed domain is suspended", kind: "tool" },
+    { area: "other", fact: "what partial means for a domain", kind: "docs" },
+    { area: "inboxes", fact: "why sam@acme.com is disconnected", kind: "tool" },
+  ]);
+  assert.match(EXTRACT_PROMPT, UNCHECKED_RULE);
+});
+
+const SEPARATE_RECORDS_RULE =
+  /keep each record as its own fact with its date and amount, never folded into a total or a date range, and keep every amount with the date the investigator gave that record/;
+
+test("records listed one by one stay separate facts, each amount with its own date", () => {
+  // ENG-20500 and ENG-20483: grants folded into a total and a date range, and two invoices given one date.
+  assert.match(EXTRACT_PROMPT, SEPARATE_RECORDS_RULE);
 });
