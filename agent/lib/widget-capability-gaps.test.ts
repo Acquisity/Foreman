@@ -3,6 +3,7 @@ import { test } from "node:test";
 import {
   type CapabilityGap,
   countedDescription,
+  distinctGaps,
   fileCapabilityGap,
   fileRunGaps,
   type GapFiling,
@@ -184,6 +185,42 @@ test("the hand-written tools' own failure shapes are gaps, by source", () => {
       })
     ).map((found) => found.fact),
     ["the signals.axiom section could not be read"]
+  );
+  // Website status reads its sources per project; two projects' renders are one gap.
+  assert.deepEqual(
+    distinctGaps(
+      gapsFromResult(
+        result("widget_website_status", {
+          projects: [
+            {
+              id: "p1",
+              live: { status: "live" },
+              render: { status: "unavailable" },
+            },
+            {
+              id: "p2",
+              live: { status: "unavailable" },
+              render: { status: "unavailable" },
+            },
+          ],
+          status: "ok",
+        })
+      )
+    ).map((found) => [found.area, found.fact]),
+    [
+      ["website", "the projects.render section could not be read"],
+      ["website", "the projects.live section could not be read"],
+    ]
+  );
+  // Billing read nothing by design: the membership check refused.
+  assert.deepEqual(
+    gapsFromResult(
+      result("widget_billing_summary", {
+        available: false,
+        unavailable: ["workspace could not be verified"],
+      })
+    ),
+    []
   );
   // A list's entries are records, and a record's name is never a source.
   assert.deepEqual(

@@ -101,6 +101,19 @@ const unavailableSections = z.array(
 /** widget_billing_summary names each failed source first: `stripe: <reason>`, `productDb.creditHistory read unavailable`. */
 const billingSources = z.array(z.string().max(500));
 const SOURCE = /^[a-z][a-zA-Z]{0,40}(?:\.[a-z][a-zA-Z]{0,40})?/u;
+/** Billing's answers when it read nothing by design: the membership check refused, or no such workspace. */
+const BILLING_REFUSALS = new Set([
+  "workspace could not be verified",
+  "productDb: organization not found",
+]);
+/**
+ * The one list whose entries carry sources: website status reads live
+ * hosting, the public check and the render per project. Other lists hold
+ * records whose own status says nothing about a read.
+ */
+const SOURCE_LISTS: Readonly<Record<string, string>> = {
+  widget_website_status: "projects",
+};
 // A nested key is a field name the tool wrote, never a record's name.
 const FIELD = /^[a-z][a-zA-Z0-9]{0,40}$/u;
 const REASON = /^[a-z][a-z_]{0,40}$/u;
@@ -189,12 +202,14 @@ export function gapsFromResult(result: unknown): CapabilityGap[] {
   return [
     ...(billing.success
       ? billing.data.flatMap((entry) => {
-          const name = SOURCE.exec(entry)?.[0];
+          const name = BILLING_REFUSALS.has(entry)
+            ? undefined
+            : SOURCE.exec(entry)?.[0];
           return name ? [section(name, "unavailable")] : [];
         })
       : []),
-    ...nestedUnavailable(output, "").map(({ path, reason }) =>
-      section(path, reason)
+    ...nestedUnavailable(output, "", SOURCE_LISTS[tool]).map(
+      ({ path, reason }) => section(path, reason)
     ),
   ];
 }
@@ -202,15 +217,22 @@ export function gapsFromResult(result: unknown): CapabilityGap[] {
 /**
  * A source a hand-written tool reports as `{ status: "unavailable" }` inside
  * a result that is otherwise ok (account's Sentry signals, generation's
- * error sources, website's render), named by its field path. Lists are not
- * walked: their entries are records, not sources.
+ * error sources, website's render), named by its field path. Only the
+ * tool's source list is walked, and its entries share one path, so no
+ * record's id or name reaches the key.
  */
 function nestedUnavailable(
   value: unknown,
   path: string,
+  list: string | undefined,
   depth = 0
 ): { path: string; reason: string }[] {
-  if (!value || typeof value !== "object" || Array.isArray(value)) {
+  if (Array.isArray(value)) {
+    return path === list
+      ? value.flatMap((entry) => nestedUnavailable(entry, path, list, depth))
+      : [];
+  }
+  if (!value || typeof value !== "object") {
     return [];
   }
   const node = value as Record<string, unknown>;
@@ -223,7 +245,7 @@ function nestedUnavailable(
   }
   return Object.entries(node).flatMap(([key, child]) =>
     FIELD.test(key)
-      ? nestedUnavailable(child, path ? `${path}.${key}` : key, depth + 1)
+      ? nestedUnavailable(child, path ? `${path}.${key}` : key, list, depth + 1)
       : []
   );
 }
