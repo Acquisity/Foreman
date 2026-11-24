@@ -1,6 +1,8 @@
 import { z } from "zod";
+import { readContextBody } from "./acquisity-origin.js";
 import { readWidgetOwnership } from "./executor/dispatch.js";
 import { providerData } from "./support/conversation.js";
+import { postScopedAppRoute } from "./widget-app-diagnostics.js";
 import { type WidgetContext, widgetContextSchema } from "./widget-scope.js";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -28,13 +30,16 @@ export interface OwnedIdentifiers {
   uuids: Set<string>;
 }
 
-const literalArray = (values: string[], pattern: RegExp, cast: string) => {
+const checkedCandidates = (values: string[], pattern: RegExp) => {
   const valid = values.filter((value) => pattern.test(value));
   if (valid.length !== values.length || valid.length > CANDIDATE_LIMIT) {
     throw new Error("Invalid identifier candidate.");
   }
-  return `'{${valid.map((value) => value.toLowerCase()).join(",")}}'::${cast}[]`;
+  return valid.map((value) => value.toLowerCase());
 };
+
+const literalArray = (values: string[], pattern: RegExp, cast: string) =>
+  `'{${checkedCandidates(values, pattern).join(",")}}'::${cast}[]`;
 
 /**
  * One fixed statement: which candidate identifiers belong to the verified workspace.
@@ -148,20 +153,95 @@ const resultSchema = z.object({
   success: z.literal(true),
 });
 
-/** The live database says the scoped user is not a current owner or admin (or, with `anyRole`, member) of the workspace. */
+/** The scoped user is not a current owner or admin (or, with `anyRole`, member) of the workspace. */
 export class WorkspaceAccessDenied extends Error {
   constructor() {
     super("Current workspace access could not be verified.");
   }
 }
 
-/** Any unresolved candidate is foreign; the caller blocks on it. */
+const OWNED_IDENTIFIERS_PATH = "/api/internal/foreman/owned-identifiers";
+const OWNED_MAX_BYTES = 64 * 1024;
+const ownedList = z.array(z.string().max(320)).max(CANDIDATE_LIMIT);
+const deniedResponse = z.object({ status: z.literal("denied") });
+const ownedResponse = z.object({
+  sections: z.object({
+    owned: z.object({
+      domains: ownedList,
+      emails: ownedList,
+      slugs: ownedList,
+      uuids: ownedList,
+    }),
+  }),
+  status: z.literal("ok"),
+});
+
+/**
+ * Acquisity's owned-identifiers endpoint (ENG-20527). It re-checks that the
+ * conversation is this user's in this workspace and that they are a current
+ * owner or admin, then returns which candidates the workspace owns. A denial
+ * is the only answer that means "not allowed"; any other failure throws, so
+ * the caller refuses instead of reading it as nothing owned.
+ */
+async function ownedFromEndpoint(
+  scope: WidgetContext,
+  candidates: IdentifierCandidates,
+  signal: AbortSignal,
+  request: typeof fetch
+): Promise<OwnedIdentifiers> {
+  const input = {
+    domains: checkedCandidates(candidates.domains ?? [], DOMAIN),
+    emails: checkedCandidates(candidates.emails, EMAIL),
+    slugs: checkedCandidates(candidates.slugs, SLUG),
+    uuids: checkedCandidates(candidates.uuids, UUID),
+  };
+  const response = await postScopedAppRoute(
+    widgetContextSchema.parse(scope),
+    OWNED_IDENTIFIERS_PATH,
+    input,
+    signal,
+    request
+  );
+  if (response.status !== 200 && response.status !== 403) {
+    response.body?.cancel().catch(() => undefined);
+    throw new Error("Support identifier resolution is unavailable.");
+  }
+  const body: unknown = await readContextBody(
+    response,
+    signal,
+    OWNED_MAX_BYTES
+  );
+  if (response.status === 403) {
+    if (deniedResponse.safeParse(body).success) {
+      throw new WorkspaceAccessDenied();
+    }
+    throw new Error("Support identifier resolution is unavailable.");
+  }
+  const { owned } = ownedResponse.parse(body).sections;
+  return {
+    domains: new Set(owned.domains),
+    emails: new Set(owned.emails),
+    slugs: new Set(owned.slugs),
+    uuids: new Set(owned.uuids.map((id) => id.toLowerCase())),
+  };
+}
+
+/**
+ * Any unresolved candidate is foreign; the caller blocks on it. Owners and
+ * admins are checked by Acquisity's endpoint. `anyRole` (the bug report's
+ * membership check) still reads the database, because the endpoint admits
+ * owners and admins only.
+ */
 export async function resolveOwnedIdentifiers(
   scope: WidgetContext,
   candidates: IdentifierCandidates,
   signal: AbortSignal = AbortSignal.timeout(50_000),
-  anyRole = false
+  anyRole = false,
+  request: typeof fetch = fetch
 ): Promise<OwnedIdentifiers> {
+  if (!anyRole) {
+    return await ownedFromEndpoint(scope, candidates, signal, request);
+  }
   const query = buildOwnershipQuery(scope, candidates, anyRole);
   const data = await readWidgetOwnership(query, signal);
   const [row] = resultSchema.parse(providerData(data)).rows;
