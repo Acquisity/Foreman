@@ -19,6 +19,22 @@ import {
 } from "./widget-evidence.js";
 import { extractWidgetFindings } from "./widget-extract.js";
 import { parseFindings, type WidgetFindings } from "./widget-findings.js";
+import {
+  ANSWER_HERE,
+  completeInvite,
+  customerTurn,
+  type FrontDoorTicket,
+  followUpNote,
+  frontDoorTicket,
+  investigatorNote,
+  RETRYABLE_BLOCK,
+  TICKET_INSTEAD,
+  ticketInsteadOfBlock,
+  ticketInsteadOfHandoff,
+  UNFILED_LINE,
+  UNFILED_PERSON_NOTE,
+  withAnswerHere,
+} from "./widget-handoff.js";
 import { answerFromHelpCenter, type KbAnswer } from "./widget-kb.js";
 import { liveDependencies } from "./widget-live-store.js";
 import {
@@ -28,16 +44,7 @@ import {
   nextActionEnabled,
   validAsk,
 } from "./widget-next-action.js";
-import {
-  AFTER_HOURS_INVITE,
-  AFTER_HOURS_TICKET,
-  awayHours,
-  awayInvite,
-  backAtLine,
-  officeSchedule,
-  ticketInsteadOfHandoff,
-  withBackAt,
-} from "./widget-office-hours.js";
+import { officeSchedule } from "./widget-office-hours.js";
 import {
   type CheckId,
   planWidgetChecks,
@@ -62,6 +69,7 @@ import {
   claimWidgetFinish,
   claimWidgetRun,
   completeWidgetRun,
+  conversationWasFiled,
   expireSessionlessWidgetRun,
   expireSessionlessWidgetRuns,
   FINISH_CLAIM_SECONDS,
@@ -81,7 +89,8 @@ import {
   widgetAuth,
 } from "./widget-scope.js";
 import { serviceSecretRefusal } from "./widget-service-secret.js";
-import { fileTicketFor } from "./widget-ticket.js";
+import { conversationTicketNote, fileTicketFor } from "./widget-ticket.js";
+import type { TicketNote } from "./widget-ticket-followup.js";
 import { readsTimeline, withTimeline } from "./widget-timeline.js";
 
 const bearer = /^Bearer ([A-Za-z0-9_.-]{1,4096})$/;
@@ -555,7 +564,7 @@ export const defaultWidgetDependencies = {
   expire: expireSessionlessWidgetRun,
   expireAll: expireSessionlessWidgetRuns,
   extract: extractWidgetFindings,
-  /** Files the conversation's ticket from code, for the after-hours rule. */
+  /** Files the conversation's ticket from code, in place of a handoff. */
   fileTicket: fileTicketFor,
   gate: egressGate,
   handoffEligible,
@@ -568,6 +577,8 @@ export const defaultWidgetDependencies = {
   readTicket: readWidgetTicketReceipt,
   requestRecording: requestWidgetRecording,
   route: routeWidgetMessage,
+  /** A follow-up's note on the conversation's ticket and its closing comment. */
+  ticketNote: conversationTicketNote,
   /** Throws unless the scoped user is a current owner or admin of the scoped workspace. */
   verifyAccess: (scope: WidgetContext) =>
     resolveOwnedIdentifiers(scope, { emails: [], slugs: [], uuids: [] }),
@@ -579,6 +590,8 @@ export const defaultWidgetDependencies = {
       undefined,
       true
     ),
+  /** Whether an earlier run of the conversation filed its ticket. */
+  wasFiled: conversationWasFiled,
 };
 export type WidgetDependencies = Omit<
   typeof defaultWidgetDependencies,
@@ -592,7 +605,9 @@ export type WidgetDependencies = Omit<
   | "progress"
   | "requestRecording"
   | "readTicket"
+  | "ticketNote"
   | "verifyMember"
+  | "wasFiled"
 > &
   Partial<
     Pick<
@@ -607,7 +622,9 @@ export type WidgetDependencies = Omit<
       | "progress"
       | "requestRecording"
       | "readTicket"
+      | "ticketNote"
       | "verifyMember"
+      | "wasFiled"
     >
   >;
 
@@ -620,12 +637,6 @@ const disclose = (outcome: WidgetOutcome, findings: unknown) =>
  * never shown to the customer; only the gated, composed `message` is. The
  * help-center and small-talk lanes have no findings to return.
  */
-// A block from our own controls (the deadline, the ownership guard, a gate
-// outage) is not a finding that needs a person: the app tells the customer to
-// send the message again instead of promising a teammate. The reason itself can
-// name an identifier, so only this flag crosses to the app.
-const RETRYABLE_BLOCK =
-  /^(?:deadline$|gate_unavailable$|bug_report_unfiled$|(?:composed:)?(?:foreign_identifier|internal_artifact):)/u;
 
 export function widgetRunResponse(run: WidgetRun) {
   if (!run.outcome) {
@@ -749,8 +760,8 @@ function humanHandoff(
 const asksForPerson = (route: WidgetRoute) =>
   route.asksForHuman >= HUMAN_REQUEST_SCORE;
 
-const CONFIRMED_AWAY_TICKET_NOTE =
-  "\n\nThe app has already filed or reused this conversation's ticket for a teammate, and the support team is away right now. Answer the customer's remaining question as usual. Do not deny that a teammate will pick this up, and do not promise pickup or a time yourself: the server appends its availability line to the allowed reply.";
+const CONFIRMED_TICKET_NOTE =
+  "\n\nThe customer asked for a person. Nobody takes over this chat: the app has already filed or reused this conversation's ticket for the team, and the team's answer will be posted back into this chat. Answer the customer's remaining question as usual, and do not set needsHuman for the ask. Do not promise a person, a reply or a time yourself: the server appends a line saying where the answer will come.";
 
 /** An explicit ask for a person returns its completion promise; other intents return null. */
 function requestedHumanHandoff(
@@ -823,29 +834,29 @@ const survivingQuestion: GateDeps["compose"] = ({ findings }) => {
   return Promise.resolve(validAsk(findings.recommendation) ?? "");
 };
 
-/** After hours, findings that still need a person file the ticket instead and say when the team is back. */
-async function withAfterHoursTicket(
+/** Findings that still need a person file the conversation's ticket instead, and the reply says the answer will come here. */
+async function withHandoffTicket(
   findings: WidgetFindings | null,
   run: Pick<WidgetRun, "id" | "question" | "scope">,
   sessionId: string,
   file: WidgetDependencies["fileTicket"],
   signal?: AbortSignal
-): Promise<{ awayLine?: string; structured: WidgetFindings | null }> {
+): Promise<{ filedLine?: string; structured: WidgetFindings | null }> {
   if (!findings?.needsHuman) {
     return { structured: findings };
   }
-  const awayLine = await ticketInsteadOfHandoff(
+  const filedLine = await ticketInsteadOfHandoff(
     run.scope,
     {
       summary: `The customer wrote: ${run.question}\n\nWhat Foreman found: ${findings.report}\n\nRecommendation: ${findings.recommendation}`,
-      title: `Support chat after hours: ${findings.report}`,
+      title: `Support chat: ${findings.report}`,
     },
     { runId: run.id, sessionId },
     signal,
     file
   );
-  return awayLine
-    ? { awayLine, structured: { ...findings, needsHuman: false } }
+  return filedLine
+    ? { filedLine, structured: { ...findings, needsHuman: false } }
     : { structured: findings };
 }
 
@@ -859,7 +870,7 @@ async function structureWriteUp(
     Partial<Pick<WidgetDependencies, "fileTicket" | "handoffEligible">>,
   signal?: AbortSignal
 ): Promise<{
-  awayLine?: string;
+  filedLine?: string;
   gateDeps: GateDeps | undefined;
   structured: WidgetFindings | null;
 }> {
@@ -913,7 +924,7 @@ async function structureWriteUp(
       : null);
   return {
     gateDeps: undefined,
-    ...(await withAfterHoursTicket(
+    ...(await withHandoffTicket(
       await withEligibleHandoff(
         withFiledTicket(
           outcome.ticket,
@@ -932,38 +943,40 @@ async function structureWriteUp(
 }
 
 /**
- * The away line is fixed text added after the gate: a blocked reply stays
- * blocked, and the app's own after-hours handoff line covers it.
+ * The answer-comes-here line is fixed text added after the gate, to an allowed
+ * reply whose turn filed or reused the conversation's ticket. A blocked reply
+ * files its ticket in `ticketInsteadOfBlock`.
  */
-async function withAwayLine(
+async function withAnswerLine(
   result: WidgetOutcome,
-  awayLine: string | undefined,
+  filedLine: string | undefined,
   run: Pick<WidgetRun, "id" | "scope">,
   ticket: FiledTicket | null | undefined,
   read: WidgetDependencies["readTicket"],
   signal: AbortSignal,
   history: WidgetAsk["turns"]
 ): Promise<WidgetOutcome> {
-  const hours = awayHours(run.scope);
-  if (!(hours && result.message) || result.decision === "block") {
+  if (
+    !(customerTurn(run.scope) && result.message) ||
+    result.decision === "block"
+  ) {
     return result;
   }
   // An unreadable receipt counts as none; it must not fail an allowed reply.
-  const receipt = awayLine
-    ? null
-    : (ticket ??
-      (await read?.(run.scope, run.id, signal).catch((error) => {
-        if (signal.aborted) {
-          throw error;
-        }
-        return null;
-      })));
-  const line = awayLine ?? (receipt ? backAtLine(hours) : undefined);
-  return line
+  const filed =
+    filedLine ??
+    ticket ??
+    (await read?.(run.scope, run.id, signal).catch((error) => {
+      if (signal.aborted) {
+        throw error;
+      }
+      return null;
+    }));
+  return filed
     ? {
         ...result,
-        message: withBackAt(result.message, line, history),
-        reason: `${AFTER_HOURS_TICKET} ${result.reason}`,
+        message: withAnswerHere(result.message, history),
+        reason: `${TICKET_INSTEAD} ${result.reason}`,
       }
     : result;
 }
@@ -1041,7 +1054,7 @@ export async function finishWidgetRun(
     const cutoff = finishCutoff(run, claimedAt);
     const deadline = clock.timeout(Math.max(0, cutoff - clock.now()));
     const extractStartedAt = Date.now();
-    const { awayLine, gateDeps, structured } = await structureWriteUp(
+    const { filedLine, gateDeps, structured } = await structureWriteUp(
       run,
       sessionId,
       outcome,
@@ -1090,14 +1103,14 @@ export async function finishWidgetRun(
         runId: run.id,
         sessionId,
       });
-      result = await withAwayLine(
+      result = await withAnswerLine(
         {
           decision: gated.decision,
           message: gated.message,
           reason: gated.reason,
           status: "completed",
         },
-        awayLine,
+        filedLine,
         run,
         outcome.ticket,
         deps.readTicket,
@@ -1110,6 +1123,14 @@ export async function finishWidgetRun(
       result = blockedOutcome("invalid_findings", "completed");
     }
   }
+  ({ findings, result } = await ticketInsteadOfBlock(
+    run,
+    result,
+    findings,
+    { runId: run.id, sessionId },
+    clock.timeout(Math.max(0, finishCutoff(run, claimedAt) - clock.now())),
+    deps.fileTicket
+  ));
   logGateDecision(
     { conversationId: run.scope.conversationId, runId: run.id, sessionId },
     result
@@ -1154,18 +1175,19 @@ async function settleResultRun(
       ? humanHandoff(null, "deadline")
       : null;
   if (handoff) {
+    const { findings, result } = await ticketInsteadOfBlock(
+      run,
+      handoff.result,
+      handoff.findings,
+      { runId: run.id, sessionId },
+      undefined,
+      deps.fileTicket
+    );
     logGateDecision(
       { conversationId: run.scope.conversationId, runId: run.id, sessionId },
-      handoff.result
+      result
     );
-    return (
-      (await deps.complete(
-        run.id,
-        handoff.result,
-        handoff.findings,
-        sessionId
-      )) ?? run
-    );
+    return (await deps.complete(run.id, result, findings, sessionId)) ?? run;
   }
   return (await finishWidgetRun(run, sessionId, outcome, deps)) ?? run;
 }
@@ -1269,10 +1291,127 @@ async function offerRecording(
   return offered;
 }
 
+interface FrontDoorOptions {
+  /** A member or client pressed the magnifying glass, which only an owner or admin can use. */
+  needsLook?: boolean;
+  note?: TicketNote | null;
+}
+
+/**
+ * Whether this front-door turn files the conversation's ticket: a customer's
+ * ask for a person, or a member or client who needs their workspace looked
+ * into (the magnifying glass, a bug, a refund or a ticket) and cannot start
+ * an investigation (ENG-20283 default). A teammate's run never files.
+ */
+const frontDoorTicketReason = (
+  scope: WidgetContext,
+  route: WidgetRoute,
+  helpCenterOnly: boolean,
+  needsLook: boolean,
+  /** No filer wired, as in a replay harness: a member's turn stays an ordinary answer. */
+  filer: boolean
+): FrontDoorTicket | null => {
+  if (!customerTurn(scope)) {
+    return null;
+  }
+  if (asksForPerson(route)) {
+    return "person";
+  }
+  return filer &&
+    helpCenterOnly &&
+    (needsLook || route.bug || route.refund || route.ticket)
+    ? "member"
+    : null;
+};
+
+/**
+ * How a front-door turn completes: as is, or, when it files the
+ * conversation's ticket, with the answer-comes-here line. A person's ask whose
+ * ticket cannot be filed keeps the asked_for_human block.
+ */
+function frontDoorReplies(
+  run: WidgetRun,
+  scope: WidgetContext,
+  ask: WidgetAsk,
+  route: WidgetRoute,
+  why: FrontDoorTicket | null,
+  signal: AbortSignal,
+  deps: WidgetDependencies
+) {
+  const log = { conversationId: scope.conversationId, runId: run.id };
+  const complete = (
+    message: string,
+    reason: string,
+    citations: KbAnswer["citations"]
+  ) =>
+    deps.complete(
+      run.id,
+      { citations, decision: "allow", message, reason, status: "completed" },
+      null,
+      // No session exists on this lane, so the run id is the fencing session id.
+      run.id
+    );
+  const file = (message: string) =>
+    why
+      ? ticketInsteadOfHandoff(
+          scope,
+          frontDoorTicket(why, scope, ask.latest, message),
+          log,
+          signal,
+          deps.fileTicket
+        )
+      : null;
+  const reply = async (
+    message: string,
+    reason: string,
+    citations: KbAnswer["citations"] = []
+  ) => {
+    if (!why) {
+      return complete(message, reason, citations);
+    }
+    if (await file(message)) {
+      return complete(
+        withAnswerHere(message, ask.turns),
+        TICKET_INSTEAD,
+        citations
+      );
+    }
+    return why === "person"
+      ? requestedHumanHandoff(run, route, deps)
+      : complete(`${message}\n\n${UNFILED_LINE}`, reason, citations);
+  };
+  return { complete, file, reply };
+}
+
+/**
+ * A refund or ticket request's fixed next step: a member or client gets the
+ * conversation's ticket (or, unfiled, the refund redirect), and an owner or
+ * admin the magnifying glass. Undefined for any other message.
+ */
+async function requestReply(
+  route: WidgetRoute,
+  helpCenterOnly: boolean,
+  { complete, file, reply }: ReturnType<typeof frontDoorReplies>
+): Promise<WidgetRun | null | undefined> {
+  if (helpCenterOnly && (route.refund || route.ticket)) {
+    if (await file("")) {
+      return complete(ANSWER_HERE, TICKET_INSTEAD, []);
+    }
+    if (route.refund) {
+      return complete(REFUND_REDIRECT, "refund_redirect", []);
+    }
+  }
+  if (route.refund || (route.ticket && !helpCenterOnly)) {
+    return reply(INVESTIGATE_REDIRECT, "investigate_redirect");
+  }
+  return undefined;
+}
+
 /**
  * Front door, for every message that is not an explicit investigation: an ask
- * for a person hands off at once, a refund or an owner's ticket request gets
- * its fixed next step, and everything else gets the guide lane's reply, or the
+ * for a person is answered and files the conversation's ticket, a refund or
+ * ticket request gets the ticket (a member) or its fixed next step (an
+ * owner), and everything else gets the guide lane's reply, or the
  * help-center writer's with WIDGET_CHAT=legacy.
  * Nothing here starts an investigation (ENG-14841), and nothing offers a
  * screen recording.
@@ -1283,13 +1422,15 @@ async function answerFromKnowledgeBase(
   ask: WidgetAsk,
   signal: AbortSignal,
   deps: WidgetDependencies,
-  helpCenterOnly: boolean
+  helpCenterOnly: boolean,
+  { note = null, needsLook = false }: FrontDoorOptions = {}
 ): Promise<WidgetRun | null> {
   const schedule = officeSchedule(scope);
   const customer = {
     canInvestigate: !helpCenterOnly,
     ...(scope.helpCenter ? { helpCenter: scope.helpCenter } : {}),
     ...(schedule ? { officeSchedule: schedule } : {}),
+    ...(note ? { ticketNote: note.forWriters } : {}),
     role: scope.role,
     workspace: scope.organizationName,
   };
@@ -1311,30 +1452,22 @@ async function answerFromKnowledgeBase(
     { conversationId: scope.conversationId, runId: run.id },
     route
   );
-  // After hours nobody can take an ask for a person: the message is answered
-  // as any other, and the reply files the ticket (see ticketInsteadOfHandoff).
-  const hours = asksForPerson(route) ? awayHours(scope) : null;
-  const away = hours !== null;
-  if (hours && route.noNeed) {
-    // Nothing to answer or file yet: the away line and an invitation, no model.
+  const person = asksForPerson(route);
+  if (person && route.noNeed && customerTurn(scope)) {
     drafting.abort();
-    return deps.complete(
-      run.id,
-      {
-        citations: [],
-        decision: "allow",
-        message: awayInvite(hours, log, ask.turns),
-        reason: AFTER_HOURS_INVITE,
-        status: "completed",
-      },
-      null,
-      run.id
-    );
+    return completeInvite(run, scope, deps);
   }
-  if (away) {
-    // Only this routed path gets the notification exception. Every other draft is unchanged.
+  const why = frontDoorTicketReason(
+    scope,
+    route,
+    helpCenterOnly,
+    needsLook,
+    Boolean(deps.fileTicket)
+  );
+  if (why && !(route.refund || route.ticket)) {
+    // Only a turn that files and answers gets the notification exception. Every other draft is unchanged.
     drafting.abort();
-    Object.assign(customer, { afterHoursPerson: true });
+    Object.assign(customer, { ticketFiling: true });
     draft = deps.answerChat?.(
       { ...ask, recordingOffered: false },
       log,
@@ -1342,63 +1475,35 @@ async function answerFromKnowledgeBase(
       signal
     );
   }
-  const complete = (
-    message: string,
-    reason: string,
-    citations: KbAnswer["citations"]
-  ) =>
-    deps.complete(
-      run.id,
-      { citations, decision: "allow", message, reason, status: "completed" },
-      null,
-      // No session exists on this lane, so the run id is the fencing session id.
-      run.id
-    );
-  const reply = async (
-    message: string,
-    reason: string,
-    citations: KbAnswer["citations"] = []
-  ) => {
-    if (!away) {
-      return complete(message, reason, citations);
-    }
-    const awayLine = await ticketInsteadOfHandoff(
-      scope,
-      {
-        summary: `The customer asked for a person after hours and wrote: ${ask.latest}\n\nForeman's reply: ${message}`,
-        title: "Support chat after hours: the customer asked for a person",
-      },
-      log,
-      signal,
-      deps.fileTicket
-    );
-    return awayLine
-      ? complete(
-          withBackAt(message, awayLine, ask.turns),
-          AFTER_HOURS_TICKET,
-          citations
-        )
-      : requestedHumanHandoff(run, route, deps);
-  };
-  // An explicit ask for a person is honoured at once. The note tells the
-  // teammate why nothing was looked up.
-  const handoff = away ? null : requestedHumanHandoff(run, route, deps);
+  const { complete, file, reply } = frontDoorReplies(
+    run,
+    scope,
+    ask,
+    route,
+    why,
+    signal,
+    deps
+  );
+  // A teammate's run that asks for a person is answered by the teammate's own
+  // inbox. The note says why nothing was looked up.
+  const handoff =
+    person && !why ? requestedHumanHandoff(run, route, deps) : null;
   if (handoff) {
     drafting.abort();
     return handoff;
   }
-  if (draft && !(route.refund || (route.ticket && !helpCenterOnly))) {
+  if (draft && !(route.refund || route.ticket)) {
     const answer = await draft;
     return reply(answer.message, "kb", answer.citations);
   }
   drafting.abort();
-  // Refunds and owner or admin ticket requests have a fixed next step: a member
-  // to their owner or admin, an owner or admin to the magnifying glass.
-  if (route.refund && helpCenterOnly) {
-    return reply(REFUND_REDIRECT, "refund_redirect");
-  }
-  if (route.refund || (route.ticket && !helpCenterOnly)) {
-    return reply(INVESTIGATE_REDIRECT, "investigate_redirect");
+  const requested = await requestReply(route, helpCenterOnly, {
+    complete,
+    file,
+    reply,
+  });
+  if (requested !== undefined) {
+    return requested;
   }
   const answer = await deps.answerKb(
     // Every writer is told the button does not show, so none mentions it.
@@ -1553,11 +1658,11 @@ async function investigationDenied(
 }
 
 /**
- * A toggled ask for a person: in office hours the completed handoff. After
- * hours one that states no need gets the away line and an invitation, no
- * ticket; otherwise the ticket is filed now and its receipt supplies the availability line
- * at finish. A note acknowledges that confirmation without forcing findings;
- * an empty note continues any other investigation.
+ * A toggled ask for a person. One that states no need gets an invitation and
+ * no ticket; otherwise the conversation's ticket is filed now, its receipt
+ * supplies the answer-comes-here line at finish, and a note tells the
+ * investigator not to hand off. Unfiled, the note asks the investigator to
+ * hand off, so the finish files it. An empty note continues the investigation.
  */
 async function toggledPersonAsk(
   run: WidgetRun,
@@ -1570,41 +1675,20 @@ async function toggledPersonAsk(
   if (!asksForPerson(route)) {
     return "";
   }
-  const hours = awayHours(scope);
-  if (hours && route.noNeed) {
-    return deps.complete(
-      run.id,
-      {
-        citations: [],
-        decision: "allow",
-        message: awayInvite(
-          hours,
-          {
-            conversationId: scope.conversationId,
-            runId: run.id,
-          },
-          ask.turns
-        ),
-        reason: AFTER_HOURS_INVITE,
-        status: "completed",
-      },
-      null,
-      run.id
-    );
+  if (route.noNeed) {
+    return completeInvite(run, scope, deps);
   }
-  const awayLine = await ticketInsteadOfHandoff(
+  const filed = await ticketInsteadOfHandoff(
     scope,
     {
-      summary: `The customer asked for a person after hours and wrote: ${ask.latest}\n\nAn investigation of their workspace is running for this message.`,
-      title: "Support chat after hours: the customer asked for a person",
+      summary: `The customer asked for a person and wrote: ${ask.latest}\n\nAn investigation of their workspace is running for this message.`,
+      title: "Support chat: the customer asked for a person",
     },
     { runId: run.id },
     signal,
     deps.fileTicket
   );
-  return awayLine
-    ? CONFIRMED_AWAY_TICKET_NOTE
-    : ((await requestedHumanHandoff(run, route, deps)) ?? null);
+  return filed ? CONFIRMED_TICKET_NOTE : UNFILED_PERSON_NOTE;
 }
 
 /** The whole filing or comment: well inside the deadline after which a run with no session is handed to a person. */
@@ -1698,6 +1782,17 @@ async function answerBugReport(
   }
 }
 
+/** A teammate's message with their earlier team-only exchange on this conversation. */
+const teamMessage = async (
+  run: WidgetRun,
+  message: string,
+  deps: Pick<WidgetDependencies, "inboxHistory">
+) =>
+  withTeamThread(
+    message,
+    (await deps.inboxHistory?.(run).catch(() => [])) ?? []
+  );
+
 /**
  * A fresh run. Only an explicit investigation reaches the investigator: a
  * teammate's, or an owner or admin's toggle (`mode: "investigate"`) or the
@@ -1737,11 +1832,17 @@ async function answerFreshRun(
     input.images
   );
   const helpCenterOnly = !INVESTIGATOR_ROLES.has(scope.role);
-  const helpCenter = () =>
-    answerFromKnowledgeBase(run, scope, ask, signal, deps, true);
+  const note = await followUpNote(input, scope, signal, deps);
   const toggled = input.mode === "investigate";
-  const investigate =
-    input.staff || ((input.recording || toggled) && !helpCenterOnly);
+  // The magnifying glass or a recording asks for a look; on the front door
+  // only a member or client asks for one, since an owner's starts it.
+  const needsLook = toggled || Boolean(input.recording);
+  const helpCenter = () =>
+    answerFromKnowledgeBase(run, scope, ask, signal, deps, true, {
+      needsLook,
+      note,
+    });
+  const investigate = input.staff || (needsLook && !helpCenterOnly);
   if (!investigate) {
     const answered = await answerFromKnowledgeBase(
       run,
@@ -1749,7 +1850,8 @@ async function answerFreshRun(
       ask,
       signal,
       deps,
-      helpCenterOnly
+      helpCenterOnly,
+      { needsLook, note }
     );
     return json(widgetRunResponse(answered ?? (await deps.read(run.id))));
   }
@@ -1790,11 +1892,8 @@ async function answerFreshRun(
         input.recording ? { ...scope, recordingId: input.recording.id } : scope,
         withTimeline(
           input.staff
-            ? withTeamThread(
-                message,
-                (await deps.inboxHistory?.(run).catch(() => [])) ?? []
-              )
-            : `${message}${personNote}`,
+            ? await teamMessage(run, message, deps)
+            : `${message}${personNote}${investigatorNote(note)}`,
           timeline,
           Boolean(input.staff)
         ),
@@ -1943,9 +2042,10 @@ export async function receiveWidgetMessage(
 export async function failWidgetRun(
   runId: string | null,
   sessionId: string,
-  deps: Pick<WidgetDependencies, "complete" | "read"> = liveDependencies(
-    defaultWidgetDependencies
-  )
+  deps: Pick<
+    WidgetDependencies,
+    "complete" | "fileTicket" | "read"
+  > = liveDependencies(defaultWidgetDependencies)
 ) {
   if (!runId) {
     return;
@@ -1961,6 +2061,7 @@ export async function failWidgetRun(
           claimFinish: claimWidgetFinish,
           complete: deps.complete,
           extract: extractWidgetFindings,
+          fileTicket: deps.fileTicket ?? fileTicketFor,
           gate: egressGate,
           history: recentWidgetTurns,
         }

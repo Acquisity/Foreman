@@ -895,7 +895,7 @@ test("neither Foreman nor people promise action, and the customer starts the wor
   );
 });
 
-test("the legacy writer's after-hours person note replaces the no-notification rule while its default prompt stays identical", async () => {
+test("the legacy writer's ticket note replaces the no-notification rule while its default prompt stays identical", async () => {
   const { replyPrompt } = await import("./widget-kb.js");
   const customer = {
     canInvestigate: true,
@@ -905,7 +905,7 @@ test("the legacy writer's after-hours person note replaces the no-notification r
   assert.equal(replyPrompt(undefined), REPLY_PROMPT);
   assert.equal(replyPrompt(customer), REPLY_PROMPT);
   assert.ok(REPLY_PROMPT.includes("nobody is notified"));
-  const away = replyPrompt({ ...customer, afterHoursPerson: true });
+  const away = replyPrompt({ ...customer, ticketFiling: true });
   assert.ok(!away.includes("nobody is notified"));
   assert.ok(away.includes("Do not deny notification or follow-up"));
   assert.ok(away.includes("do not introduce yourself"));

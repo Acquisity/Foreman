@@ -139,6 +139,28 @@ export async function latestWidgetScope(
   return rows.length ? widgetContextSchema.parse(rows[0].scope) : null;
 }
 
+/**
+ * Whether any earlier customer run of this conversation filed or reused its
+ * ticket: a run whose findings carry one, or a reply that filed it in place of
+ * a handoff (today's reason, or the after-hours one before ENG-20301). Read
+ * from Foreman's own runs, so it outlasts the history the app sends.
+ */
+export async function conversationWasFiled(
+  scope: Pick<WidgetContext, "conversationId" | "organizationId">,
+  signal?: AbortSignal
+): Promise<boolean> {
+  const rows = await privateDatabase(5000, signal).query(
+    `SELECT 1 FROM widget_support_runs
+     WHERE organization_id = $1 AND conversation_id = $2
+       AND scope->>'source' IS DISTINCT FROM 'inbox'
+       AND (findings ? 'ticket' OR outcome->>'reason' LIKE 'ticket_instead_of_handoff%'
+         OR outcome->>'reason' LIKE 'after_hours_ticket%')
+     LIMIT 1`,
+    [scope.organizationId, scope.conversationId]
+  );
+  return rows.length > 0;
+}
+
 const RECENT_TURNS = 4;
 
 /**

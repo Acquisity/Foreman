@@ -12,11 +12,11 @@ import { logOpsEvent } from "./ops-log.js";
 import { GUIDE_CITATION, splitGuideSections } from "./widget-guide-cache.js";
 import { WIDGET_VOICE } from "./widget-instructions.js";
 import {
-  AFTER_HOURS_WRITER_NOTE,
   hedged,
   type KbAnswer,
   type KbCustomer,
   resolveCitations,
+  TICKET_WRITER_NOTE,
 } from "./widget-kb.js";
 import {
   PRODUCT_GUIDE,
@@ -77,7 +77,7 @@ Refer to the AI Consultant only when the customer asks for strategy advice (incl
 
 You cannot see the customer's account, workspace, campaigns or billing: never say or suggest that you looked. You cannot make changes and nobody will make them for them, so give the steps for them to do. Never promise that you, a person, a teammate or the team will look into, pick up or follow up on this message: nobody is notified.
 
-The app tells you, in a note before the conversation, the customer's role and whether they can start a workspace investigation. Before giving steps, check "Who can do what" and the article for a role limit on that page or action (billing to Owners, for example). When the customer's role is not one of them, say so and who can do it, exactly as the guide names them, and do not give them steps they cannot complete. When canInvestigate is true and the guide does not settle a problem that depends on their own account, the next step can be the magnifying glass next to the message box, which starts an investigation of their account. Say it as something they do, in words like "tap the magnifying glass next to the message box and send your message again to have your account investigated": never "resend", and never what the investigation will find or who will see it. Offer it at most once: when glassOffered is true, never mention it again. When canInvestigate is false, never mention the magnifying glass; they can ask a workspace owner or admin.
+The app tells you, in a note before the conversation, the customer's role and whether they can start a workspace investigation. Before giving steps, check "Who can do what" and the article for a role limit on that page or action (billing to Owners, for example). When the customer's role is not one of them, say so and who can do it, exactly as the guide names them, and do not give them steps they cannot complete. When canInvestigate is true and the guide does not settle a problem that depends on their own account, the next step can be the magnifying glass next to the message box, which starts an investigation of their account. Say it as something they do, in words like "tap the magnifying glass next to the message box and send your message again to have your account investigated": never "resend", and never what the investigation will find or who will see it. Offer it at most once: when glassOffered is true, never mention it again. When canInvestigate is false, never mention the magnifying glass; when the guide does not settle a problem that depends on their own account, they can ask in this chat for the team to look into their workspace, and the team's answer will come here.
 
 The customer can attach screenshots. A screenshot reaches you as a labelled reading made by an image model: treat it as what their screen showed, use it to place them in the steps toward what they are trying to do, and never describe anything the reading does not say. They cannot attach video here: never mention a recording option.
 
@@ -90,7 +90,7 @@ ${PRODUCT_GUIDE}`;
 export interface ChatDeps {
   /** One model attempt: the streamed reply and when its first text arrived. */
   generate: (input: {
-    afterHoursPerson?: true;
+    ticketFiling?: true;
     messages: ChatMessage[];
     signal: AbortSignal;
     view?: HelpCenterView;
@@ -130,7 +130,7 @@ export function guideFor(hidden: ReadonlySet<string>, guide = PRODUCT_GUIDE) {
 
 const promptsByView = new Map<string, string>();
 
-export const chatPrompt = (afterHoursPerson?: true, view?: HelpCenterView) => {
+export const chatPrompt = (ticketFiling?: true, view?: HelpCenterView) => {
   const key = helpViewKey(view);
   let prompt = promptsByView.get(key);
   if (!prompt) {
@@ -139,8 +139,8 @@ export const chatPrompt = (afterHoursPerson?: true, view?: HelpCenterView) => {
     );
     promptsByView.set(key, prompt);
   }
-  return afterHoursPerson
-    ? prompt.replace(CHAT_FOLLOWUP_RULE, AFTER_HOURS_WRITER_NOTE)
+  return ticketFiling
+    ? prompt.replace(CHAT_FOLLOWUP_RULE, TICKET_WRITER_NOTE)
     : prompt;
 };
 
@@ -197,8 +197,9 @@ export function chatMessages(
         `Note from the app, not written by the customer: ${JSON.stringify(note)}`,
         REMINDER,
         ...(featuresOff.length > 0 ? [FEATURES_OFF_RULE] : []),
-        ...(customer?.afterHoursPerson ? [AFTER_HOURS_WRITER_NOTE] : []),
+        ...(customer?.ticketFiling ? [TICKET_WRITER_NOTE] : []),
         ...(customer?.officeSchedule ? [customer.officeSchedule] : []),
+        ...(customer?.ticketNote ? [customer.ticketNote] : []),
         ...(note.role === "owner" || !limits
           ? []
           : [`Who can do what, from the guide:\n${limits}`]),
@@ -295,7 +296,7 @@ const chatFailure = (error: unknown) => {
 export const defaultChatDeps = {
   async generate(
     {
-      afterHoursPerson,
+      ticketFiling,
       messages,
       signal,
       view,
@@ -314,7 +315,7 @@ export const defaultChatDeps = {
       maxRetries: 0,
       messages: [
         {
-          content: chatPrompt(afterHoursPerson, view),
+          content: chatPrompt(ticketFiling, view),
           // The stable prefix: Anthropic caches up to this breakpoint, and the
           // gateway turns on caching for providers that need it asked.
           providerOptions: {
@@ -390,7 +391,7 @@ export async function answerFromGuide(
       deps.generate({
         messages,
         signal: abortSignal,
-        ...(reader?.afterHoursPerson ? { afterHoursPerson: true } : {}),
+        ...(reader?.ticketFiling ? { ticketFiling: true } : {}),
         ...(reader?.helpCenter ? { view: reader.helpCenter } : {}),
       })
     );

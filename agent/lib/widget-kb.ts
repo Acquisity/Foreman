@@ -29,10 +29,12 @@ import {
  *
  * @remarks
  * This lane is ungated on purpose. It has no tools and never receives account
- * data: its only inputs are the customer's own message and help-center
- * articles, read as that customer sees them (the app signs which features they
- * have), so there is nothing cross-tenant for the egress gate to guard. Keep
- * it that way. Giving this lane any account lookup brings the gate back.
+ * data: its only inputs are the customer's own message, help-center
+ * articles read as that customer sees them (the app signs which features
+ * they have) and server-written notes (the schedule, and on a follow-up the
+ * code-written status of the conversation's ticket, never its comments), so
+ * there is nothing cross-tenant for the egress gate to guard. Keep it that
+ * way. Giving this lane any account lookup brings the gate back.
  *
  * Product facts come only from the articles; a reply that cites nothing, such
  * as a thank-you or a plain "I'm not sure", is still delivered.
@@ -202,13 +204,13 @@ const LATEST_SUBJECT = `The input is the support conversation so far, oldest fir
 const FOREMAN_VOICE = `You are Foreman, Acquisity's support teammate in the in-app chat. You know how the product works, campaigns, the AI SDR, inboxes and domains, websites, the CRM, billing and the rest, and you help customers understand and use it. You are not a sales, strategy or copywriting coach. Talk like a knowledgeable colleague: warm, direct, in the second person, in short paragraphs. Answer first, with no preamble and no sign-off. Use a numbered list only for a real procedure. You are continuing the conversation you are given: never ask for something it already gave, never repeat your previous reply, and when the customer reports what they saw or did, accept it and give the next step. When they sound frustrated, acknowledge it in a few words and try a different approach.`;
 
 // The one front-door writer (ENG-14932). No account data and no tools reach it.
-export const AFTER_HOURS_WRITER_NOTE =
-  "The app verified that the team is away and the customer explicitly asked for a person. Code handles filing this conversation and appends its availability line after your answer. Answer the product question only, starting with the answer itself: do not introduce yourself or describe what you can or cannot do. Do not address the request for a person again or draft support handling copy. Do not deny notification or follow-up, and do not promise a person, a reply, pickup, or any timing yourself, including soon, shortly, or right away. The server supplies that part of the reply.";
+export const TICKET_WRITER_NOTE =
+  "The app is filing this conversation's ticket for the support team, because the customer asked for a person or needs their workspace looked into. Nobody takes over this chat: code appends a line after your answer saying the team's answer will come here in this chat. Answer the product question only, starting with the answer itself: do not introduce yourself or describe what you can or cannot do. Do not address a request for a person, do not tell them to ask a workspace owner or admin, and do not draft support handling copy. Do not deny notification or follow-up, and do not promise a person, a reply, pickup, or any timing yourself, including soon, shortly, or right away. The server supplies that part of the reply.";
 export const KB_FOLLOWUP_RULE =
   "Never promise that Foreman, a person, a teammate, the team or a queue will look into, see, pick up, act on or follow up on this message: nobody is notified.";
 export const replyPrompt = (customer: KbCustomer | undefined) =>
-  customer?.afterHoursPerson
-    ? REPLY_PROMPT.replace(KB_FOLLOWUP_RULE, AFTER_HOURS_WRITER_NOTE)
+  customer?.ticketFiling
+    ? REPLY_PROMPT.replace(KB_FOLLOWUP_RULE, TICKET_WRITER_NOTE)
     : REPLY_PROMPT;
 
 export const REPLY_PROMPT = `${FOREMAN_VOICE}
@@ -225,7 +227,7 @@ Explaining what a product term or feature means and how the pieces fit together 
 
 Refer to the AI Consultant, using its help article and rather than another tool, only when the customer asks you to give advice or strategy, write or review their copy (what an email, message or offer should say, including how to word one), or assess their campaign performance; otherwise do not mention it.
 
-When the articles do not give a product fact you need, say plainly that you are not sure, then ask the one question that would help find it, or give the next step. When canInvestigate is true, that next step can be the magnifying glass next to the message box: they can tap it and send their message again to start a look into their workspace. Say it as something they do, never that you, we or anyone will take a look. It is offered at most once in a conversation: when glassOffered is true, Support already offered it, so never mention it again and answer the latest message on its own terms, with the next thing to try from the articles or the one question that would help. When it is false, they can ask a workspace owner or admin, and you never mention the magnifying glass.
+When the articles do not give a product fact you need, say plainly that you are not sure, then ask the one question that would help find it, or give the next step. When canInvestigate is true, that next step can be the magnifying glass next to the message box: they can tap it and send their message again to start a look into their workspace. Say it as something they do, never that you, we or anyone will take a look. It is offered at most once in a conversation: when glassOffered is true, Support already offered it, so never mention it again and answer the latest message on its own terms, with the next thing to try from the articles or the one question that would help. When it is false, you never mention the magnifying glass, and for a problem that depends on their own account the next step is that they can ask in this chat for the team to look into their workspace; the team's answer will come here.
 
 You cannot see the customer's account, workspace, campaigns or billing: never say or suggest that you looked. You cannot make changes and nobody will make them for them, so give the steps for them to do it themselves. Never promise that Foreman, a person, a teammate, the team or a queue will look into, see, pick up, act on or follow up on this message: nobody is notified. A thanks, greeting or reaction gets a short friendly reply with no product facts.
 
@@ -259,23 +261,25 @@ Plain text only, no markdown and no em dashes.`;
 
 /** REPLY_PROMPT's own next step for an answer the articles do not give. */
 const nextStep = (customer: KbCustomer | undefined) => {
-  if (customer?.glassOffered) {
+  // A filing turn already says where the team's answer will come.
+  if (customer?.glassOffered || customer?.ticketFiling) {
     return "Ask the one question that would help find the answer.";
   }
   return customer?.canInvestigate
     ? "Tap the magnifying glass next to the message box and send the message again to start a look into the workspace."
-    : "Ask a workspace owner or admin.";
+    : "Ask in this chat for the team to look into the workspace; the team's answer will come here.";
 };
 
 /** What REPLY_PROMPT itself tells the writer, so the check never trims it. */
 const promptFacts = (customer: KbCustomer | undefined) => [
-  ...(customer?.canInvestigate && !customer.glassOffered
-    ? [nextStep(customer)]
-    : []),
+  ...(customer?.glassOffered || customer?.ticketFiling
+    ? []
+    : [nextStep(customer)]),
   "Foreman, the writer, does not write or review copy, give strategy, or assess campaign performance, and says so.",
   "The AI Consultant is under the Chat toggle at the top of the left sidebar, for advice, strategy, copywriting and campaign performance reviews.",
   "Foreman cannot see the customer's account and cannot make changes; nobody makes changes on the customer's behalf, so the customer does the steps themselves.",
   ...(customer?.officeSchedule ? [customer.officeSchedule] : []),
+  ...(customer?.ticketNote ? [customer.ticketNote] : []),
   ...featuresOffNames(customer?.helpCenter).map(
     (name) => `${name} is not turned on for this customer's workspace.`
   ),
@@ -359,8 +363,6 @@ export async function hedged<T>(
 
 /** Who is writing in, from the verified widget scope: never from the message. */
 export interface KbCustomer {
-  /** Server-owned exception for an after-hours explicit ask for a person. */
-  afterHoursPerson?: true;
   /** An owner or admin outside help-center mode, who can start a look with the magnifying glass. */
   canInvestigate: boolean;
   /**
@@ -373,6 +375,10 @@ export interface KbCustomer {
   /** The team's published hours and closures; see officeSchedule. */
   officeSchedule?: string;
   role: string;
+  /** Server-owned exception for a turn that files the conversation's ticket; see TICKET_WRITER_NOTE. */
+  ticketFiling?: true;
+  /** A follow-up's code-written status of the conversation's ticket; see ticketNote. */
+  ticketNote?: string;
   workspace: string;
 }
 
@@ -452,8 +458,8 @@ export const defaultKbDeps: KbDeps = {
       conversation: question,
       customer: writerCustomer(customer),
       recordingOffered: recordingOffered === true,
-      ...(customer?.afterHoursPerson
-        ? { responseBoundary: AFTER_HOURS_WRITER_NOTE }
+      ...(customer?.ticketFiling
+        ? { responseBoundary: TICKET_WRITER_NOTE }
         : {}),
     });
     const { object } = await hedged("generate", signal, (abortSignal) =>

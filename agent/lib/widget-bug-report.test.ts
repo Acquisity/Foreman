@@ -86,7 +86,10 @@ const evidence: Record<EvidenceSource, Evidence> = {
 
 /** Files through the real one-ticket-per-conversation path, with Linear faked. */
 const linear = (existing: boolean) => {
-  const calls = { creates: [] as { bug?: boolean; report: string }[] };
+  const calls = {
+    creates: [] as { bug?: boolean; report: string }[],
+    followUps: [] as { identifier: string; runId: string }[],
+  };
   const file: typeof fileTicketFor = (scope, input, signal, runId) =>
     fileTicketFor(scope, input, signal, runId, {
       create: (_ctx, created) => {
@@ -99,6 +102,14 @@ const linear = (existing: boolean) => {
           ok: true as const,
         });
       },
+      followUp: (ticket, _summary, followUpRun) => {
+        calls.followUps.push({
+          identifier: ticket.identifier,
+          runId: followUpRun,
+        });
+        return Promise.resolve();
+      },
+      owns: () => Promise.resolve(true),
       readReceipt: () => Promise.resolve(null),
       refund: () => assert.fail("a bug report is never a refund"),
       saveReceipt: () => Promise.resolve(),
@@ -831,7 +842,7 @@ test("the ticket's first-reported time is when the customer tapped I found a bug
   assert.match(calls.creates[0].report, FIRST_REPORTED);
 });
 
-test("a second bug_report for the same conversation returns the existing ticket and creates nothing", async () => {
+test("a second bug_report for the same conversation returns the existing ticket, creates nothing and follows up on it once", async () => {
   const { calls, file } = linear(true);
   const outcome = await fileBugReport(
     verifiedWidgetContext,
@@ -841,6 +852,9 @@ test("a second bug_report for the same conversation returns the existing ticket 
     { ...fixed, file }
   );
   assert.equal(calls.creates.length, 0);
+  assert.deepEqual(calls.followUps, [
+    { identifier: TICKET.identifier, runId: RUN_ID },
+  ]);
   assert.deepEqual(outcome.findings.ticket, {
     id: TICKET.identifier,
     url: TICKET.url,
