@@ -15,8 +15,14 @@ import {
 import { JUDGE_TIMEOUT_MS } from "./widget-judge.js";
 import { DESCRIPTION_CHARS } from "./widget-next-action.js";
 import { PRODUCT_GUIDE } from "./widget-product-guide.js";
-import { widgetAuth } from "./widget-scope.js";
+import { widgetAuth, widgetContext } from "./widget-scope.js";
 import { SUPPORT_GUIDE } from "./widget-support-guide.js";
+
+const FEATURE_OFF_NAMES =
+  /These features are not turned on for this workspace: \["AI Website Creator"\]/u;
+const FEATURE_OFF_NO_ASK =
+  /do not say it could not be read or checked, and do not ask for details of it/u;
+const FEATURE_OFF_NOT_GAP = /not a capability gap/u;
 
 test("shared support facts keep unpaid cleanup guidance without investigator tool commands", () => {
   for (const tool of [
@@ -178,6 +184,50 @@ test("outside-call inventory matches local judge and widget retry contracts", ()
     selector.includes(
       `${DESCRIPTION_CHARS.toLocaleString("en-US")} characters each`
     )
+  );
+});
+
+test("an investigation in a workspace with a feature off is told the feature is off, not unreadable (ENG-20514)", () => {
+  const helpCenter = {
+    featuresOff: [
+      {
+        feature: "ai_website",
+        pages: ["/docs/sites"],
+        title: "AI Website Creator",
+      },
+    ],
+    viewer: "signed.viewer.token",
+  };
+  const auth = widgetAuth({ ...scope, helpCenter });
+  // Only the names reach the session, never the signed viewer or the pages.
+  assert.equal(auth.attributes?.featuresOff, '["AI Website Creator"]');
+  assert.equal(JSON.stringify(auth).includes("signed.viewer.token"), false);
+  const text = widgetInstructions(auth);
+  assert.match(text, FEATURE_OFF_NAMES);
+  assert.match(text, FEATURE_OFF_NO_ASK);
+  assert.match(text, FEATURE_OFF_NOT_GAP);
+  assert.equal(
+    widgetInstructions(widgetAuth(scope)).includes(
+      "not turned on for this workspace"
+    ),
+    false
+  );
+  assert.equal(
+    widgetInstructions(
+      widgetAuth({ ...scope, helpCenter: { ...helpCenter, featuresOff: [] } })
+    ).includes("not turned on for this workspace"),
+    false
+  );
+});
+
+test("a malformed featuresOff stamp fails the scope closed instead of throwing", () => {
+  const auth = widgetAuth(scope);
+  assert.equal(
+    widgetContext({
+      ...auth,
+      attributes: { ...auth.attributes, featuresOff: "{bad" },
+    }),
+    null
   );
 });
 

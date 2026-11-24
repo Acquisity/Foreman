@@ -3324,3 +3324,161 @@ test("a message that stays at the front door never asks for the timeline", async
   );
   assert.deepEqual(asked, [false]);
 });
+
+test("a write-up that lists what it could not check files one gap per area with no report_capability_gap call (ENG-20478)", async () => {
+  const notLinked = event("action.result", {
+    result: {
+      callId: "site",
+      kind: "tool-result",
+      output: { status: "feature_off" },
+      toolName: "widget_website_status",
+    },
+  });
+  const outcome = await waitForWidgetInvestigation(
+    session([
+      timedOutStripe,
+      notLinked,
+      event("message.completed", {
+        message: "Inboxes read. What I couldn't check: several things.",
+      }),
+      event("turn.completed"),
+    ])
+  );
+  assert.equal(outcome.status, "completed");
+  const { deps, gated, run } = dependencies();
+  deps.extract = () =>
+    Promise.resolve({
+      ...findings,
+      unchecked: [
+        {
+          area: "orders",
+          fact: "why a managed domain is suspended",
+          kind: "tool",
+        },
+        {
+          area: "orders",
+          fact: "whether sam@acme.com still has mailboxes",
+          kind: "tool",
+        },
+        // The billing read failed and the website read was refused by design.
+        {
+          area: "billing",
+          fact: "whether the latest invoice was paid",
+          kind: "tool",
+        },
+        { area: "website", fact: "whether the site is live", kind: "tool" },
+      ],
+    });
+  const filed: unknown[] = [];
+  deps.fileGaps = (gaps) => {
+    filed.push(
+      gaps.map(({ area, details, fact, source }) => ({
+        area,
+        details,
+        fact,
+        source,
+      }))
+    );
+    return Promise.resolve();
+  };
+  if (outcome.status === "completed") {
+    await finishWidgetRun(run, "widget-session-unchecked", outcome, deps);
+  }
+  assert.deepEqual(filed, [
+    [
+      {
+        area: "billing",
+        details: undefined,
+        fact: "the stripe section could not be read",
+        source: "code",
+      },
+    ],
+    [
+      // The billing read failed, so its fact rides on that gap; the website
+      // read was refused by design, so its tool fact files nothing.
+      {
+        area: "billing",
+        details: ["whether the latest invoice was paid"],
+        fact: "the stripe section could not be read",
+        source: "code",
+      },
+      {
+        area: "orders",
+        details: [
+          "why a managed domain is suspended",
+          "one item that named workspace data, left out",
+        ],
+        fact: "something a reply said could not be checked",
+        source: "reply",
+      },
+    ],
+  ]);
+  // The list is for filing only: the gate and the stored findings never carry it.
+  assert.equal(gated.length, 1);
+  assert.equal("unchecked" in (gated[0] as object), false);
+  assert.equal(JSON.stringify(run.findings).includes("unchecked"), false);
+});
+
+test("an area counts as refused only while its latest read refused the whole check", async () => {
+  const read = (callId: string, output: unknown) =>
+    event("action.result", {
+      result: {
+        callId,
+        kind: "tool-result",
+        output,
+        toolName: "widget_website_status",
+      },
+    });
+  const retried = await waitForWidgetInvestigation(
+    session([
+      read("a", { status: "invalid_input" }),
+      read("b", { projects: [] }),
+      event("turn.completed"),
+    ])
+  );
+  assert.equal(retried.status === "completed" && retried.refused, undefined);
+  const refused = await waitForWidgetInvestigation(
+    session([read("a", { status: "feature_off" }), event("turn.completed")])
+  );
+  assert.deepEqual(refused.status === "completed" && refused.refused, [
+    "website",
+  ]);
+});
+
+test("the reply's facts are filed only after the tool gaps finish", async () => {
+  const outcome = await waitForWidgetInvestigation(
+    session([
+      timedOutStripe,
+      event("message.completed", { message: "I couldn't check the invoice." }),
+      event("turn.completed"),
+    ])
+  );
+  const { deps, run } = dependencies();
+  deps.extract = () =>
+    Promise.resolve({
+      ...findings,
+      unchecked: [
+        { area: "billing", fact: "whether an invoice was paid", kind: "tool" },
+      ],
+    });
+  const order: string[] = [];
+  deps.fileGaps = (gaps) => {
+    const label = gaps[0]?.details ? "reply" : "tools";
+    order.push(`${label} started`);
+    return new Promise((resolve) =>
+      setTimeout(() => {
+        order.push(`${label} done`);
+        resolve();
+      }, 5)
+    );
+  };
+  if (outcome.status === "completed") {
+    await finishWidgetRun(run, "widget-session-order", outcome, deps);
+  }
+  assert.deepEqual(order, [
+    "tools started",
+    "tools done",
+    "reply started",
+    "reply done",
+  ]);
+});
