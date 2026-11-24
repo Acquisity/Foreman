@@ -764,6 +764,10 @@ test("a member or client is answered in help-center mode, never investigated", a
     ANSWER_HERE
   );
   assert.equal(refund.run.outcome?.reason, "ticket_instead_of_handoff");
+  assert.deepEqual((refund.run.findings as WidgetFindings).ticket, {
+    id: "ENG-1",
+    url: "https://linear.app/acquisity/issue/ENG-1/x",
+  });
   assert.equal(memberFiled.length, 1);
   assert.ok(memberFiled[0].summary.includes("a workspace member"));
 
@@ -2727,7 +2731,10 @@ test("an ask for a person, at any hour, is answered and files the conversation's
     const body = (await response.json()) as Record<string, unknown>;
     assert.equal(body.decision, "allow");
     assert.equal(body.message, `${kbAnswer.message}\n\n${ANSWER_HERE}`);
-    assert.equal(body.findings, undefined);
+    assert.deepEqual((body.findings as { ticket?: unknown }).ticket, {
+      id: "ENG-1",
+      url: "https://linear.app/acquisity/issue/ENG-1/x",
+    });
     assert.equal(run.outcome?.reason, "ticket_instead_of_handoff");
     assert.equal(filed.length, 1);
     assert.ok(filed[0].summary.includes("Can I talk to a person?"));
@@ -2866,6 +2873,7 @@ test("an ask for a person whose ticket cannot be filed falls back to the asked_f
   const body = (await response.json()) as Record<string, unknown>;
   assert.equal(body.decision, "block");
   assert.equal(run.outcome?.reason, "asked_for_human");
+  assert.equal((run.findings as WidgetFindings).ticket, undefined);
   assert.equal(filed.length, 1);
 });
 
@@ -2883,6 +2891,10 @@ test("findings that need a person file the ticket, and the gated reply says the 
   assert.equal((gated as WidgetFindings[])[0]?.needsHuman, false);
   assert.equal(run.outcome?.message, `${allowed.message}\n\n${ANSWER_HERE}`);
   assert.equal(run.outcome?.reason, "ticket_instead_of_handoff in scope");
+  assert.deepEqual((run.findings as WidgetFindings).ticket, {
+    id: "ENG-1",
+    url: "https://linear.app/acquisity/issue/ENG-1/x",
+  });
   assert.equal(filed.length, 1);
   assert.ok(filed[0].summary.includes("Why did my campaign stop sending?"));
 });
@@ -3032,6 +3044,11 @@ test("a persisted filing receipt appends the answer-comes-here line to resolved,
     );
     assert.equal(run.outcome?.message, `${allowed.message}\n\n${ANSWER_HERE}`);
     assert.equal((run.findings as WidgetFindings).needsHuman, false);
+    // A toggled ask filed this receipt; the findings record it on the chat.
+    assert.deepEqual((run.findings as WidgetFindings).ticket, {
+      id: "ENG-42",
+      url: "https://linear.app/acquisity/issue/ENG-42/support",
+    });
   }
 });
 
@@ -3215,6 +3232,10 @@ test("a member or client who presses the magnifying glass or reports a bug gets 
       assert.equal(
         run.outcome?.reason,
         fails ? "kb" : "ticket_instead_of_handoff"
+      );
+      assert.equal(
+        (run.findings as WidgetFindings | null)?.ticket?.id,
+        fails ? undefined : "ENG-1"
       );
       assert.equal(filed.length, 1);
       assert.ok(filed[0].summary.includes(`a workspace ${role}`));

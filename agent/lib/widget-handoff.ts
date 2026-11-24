@@ -1,6 +1,6 @@
 import { logOpsEvent } from "./ops-log.js";
 import { BUG_REPORT_ADDED, BUG_REPORT_LOGGED } from "./widget-bug-report.js";
-import { parseFindings } from "./widget-findings.js";
+import { parseFindings, type WidgetFindings } from "./widget-findings.js";
 import type { WidgetDependencies } from "./widget-investigation.js";
 import type { WidgetOutcome, WidgetRun } from "./widget-run-store.js";
 import type { WidgetContext } from "./widget-scope.js";
@@ -95,11 +95,40 @@ export async function handoffTicket(
   return ok ? filed : null;
 }
 
-/** The line that tells the customer where the answer will come, or null when nothing was filed. */
+/** The filed ticket as the findings record it; Acquisity keeps it on the chat. */
+export type HandoffTicketRef = NonNullable<WidgetFindings["ticket"]>;
+
+const ticketRef = (filed: {
+  identifier: string;
+  url: string;
+}): HandoffTicketRef => ({ id: filed.identifier, url: filed.url });
+
+/** The ticket filed or reused in place of a handoff, or null when nothing was filed. */
 export const ticketInsteadOfHandoff = async (
   ...args: Parameters<typeof handoffTicket>
-): Promise<string | null> =>
-  (await handoffTicket(...args)) ? ANSWER_HERE : null;
+): Promise<HandoffTicketRef | null> => {
+  const filed = await handoffTicket(...args);
+  return filed ? ticketRef(filed) : null;
+};
+
+/**
+ * Findings for a turn that filed the conversation's ticket in place of a
+ * handoff. Acquisity records `ticket` on the chat, so the team's answer can be
+ * sent into it, and keeps findings only with a report.
+ */
+export const handoffFindings = (
+  report: string,
+  ticket: HandoffTicketRef,
+  found?: WidgetFindings | null
+) =>
+  parseFindings({
+    confidence: found?.confidence ?? "low",
+    facts: found?.facts ?? [],
+    needsHuman: false,
+    recommendation: ANSWER_HERE,
+    report: (found?.report ?? report).slice(0, 1000),
+    ticket,
+  });
 
 // A block from our own controls (the ownership guard, a gate outage) is not a
 // finding that needs a person: the app tells the customer to send the message
@@ -153,20 +182,12 @@ export async function ticketInsteadOfBlock(
   if (!filed) {
     return { findings, result };
   }
-  const ticket =
-    "identifier" in filed ? { id: filed.identifier, url: filed.url } : null;
   return {
-    findings: parseFindings({
-      confidence: found?.confidence ?? "low",
-      facts: found?.facts ?? [],
-      needsHuman: false,
-      recommendation: ANSWER_HERE,
-      report: (
-        found?.report ??
-        `Foreman could not answer this (${reason}) and filed the conversation's ticket.`
-      ).slice(0, 1000),
-      ...(ticket ? { ticket } : {}),
-    }),
+    findings: handoffFindings(
+      `Foreman could not answer this (${reason}) and filed the conversation's ticket.`,
+      ticketRef(filed),
+      found
+    ),
     result: {
       citations: [],
       decision: "allow",
