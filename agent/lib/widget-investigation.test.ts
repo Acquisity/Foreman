@@ -1889,6 +1889,59 @@ test("an overdue run with no answer is force-finished for a human, not left hang
   assert.equal((run.outcome as { reason: string } | null)?.reason, "deadline");
 });
 
+const timedOutStripe = event("action.result", {
+  result: {
+    callId: "billing",
+    kind: "tool-result",
+    output: { available: true, unavailable: ["stripe: timeout"] },
+    toolName: "widget_billing_summary",
+  },
+});
+
+test("an overdue run still files what it could not check", async (t) => {
+  enabled(t);
+  const { deps, run } = dependencies();
+  run.session_id = "widget-session-old";
+  run.created_at = new Date(Date.now() - WIDGET_DEADLINE_MS - 1000);
+  const filed: string[][] = [];
+  deps.fileGaps = (gaps) => {
+    filed.push(gaps.map((gap) => gap.fact));
+    return Promise.resolve();
+  };
+  await receiveWidgetMessage(
+    request({
+      action: "result",
+      conversation_id: scope.conversationId,
+      organization_id: scope.organizationId,
+      run_id: runId,
+    }),
+    {
+      attachSession: () => session([timedOutStripe], "widget-session-old"),
+      ...noWork(),
+    },
+    5,
+    verify,
+    deps
+  );
+  assert.equal((run.outcome as { reason: string } | null)?.reason, "deadline");
+  assert.deepEqual(filed, [["the stripe section could not be read"]]);
+});
+
+test("a turn that fails after a read failed still files that gap", async () => {
+  const outcome = await waitForWidgetInvestigation(
+    session([timedOutStripe, event("turn.failed")])
+  );
+  assert.equal(outcome.status, "failed");
+  const { deps, run } = dependencies();
+  const filed: string[][] = [];
+  deps.fileGaps = (gaps) => {
+    filed.push(gaps.map((gap) => gap.fact));
+    return Promise.resolve();
+  };
+  await finishWidgetRun(run, "widget-session-failed", outcome, deps);
+  assert.deepEqual(filed, [["the stripe section could not be read"]]);
+});
+
 test("a teammate's inbox run skips the front door, verifies as staff, and keeps its own session", async (t) => {
   enabled(t);
   const { deps, run } = dependencies();

@@ -263,8 +263,8 @@ export const widgetAddress = (
   `${scope.organizationId}:${scope.conversationId}:${runId}${scope.source === "inbox" ? ":inbox" : ""}`;
 
 export type WaitOutcome =
-  | { status: "pending" }
-  | { status: "failed" }
+  | { gaps?: CapabilityGap[]; status: "pending" }
+  | { gaps?: CapabilityGap[]; status: "failed" }
   | {
       /** The question widget_ask_customer recorded during this turn, if a clarify decision ran. */
       asked?: string;
@@ -493,6 +493,12 @@ const completed = (
     : done;
 };
 
+/** A turn that ended without an answer still keeps what it could not check. */
+const unfinished = (
+  { gaps }: Recorded,
+  status: "failed" | "pending"
+): WaitOutcome => (gaps.length ? { gaps, status } : { status });
+
 /** A failed or cancelled turn, or one waiting on a person nobody in the widget can answer. */
 const failedTurn = (event: MessageStreamEvent) =>
   event.type === "turn.failed" ||
@@ -530,7 +536,7 @@ export async function waitForWidgetInvestigation(
       // biome-ignore lint/performance/noAwaitInLoops: preserve durable stream order.
       const { done, value: event } = await reader.read();
       if (done) {
-        return { status: "pending" };
+        return unfinished(so, "pending");
       }
       const update = progress(event);
       if (update) {
@@ -549,11 +555,11 @@ export async function waitForWidgetInvestigation(
       } else if (event.type === "turn.completed") {
         return completed(so, { findings, status: "completed", text });
       } else if (failedTurn(event)) {
-        return { status: "failed" };
+        return unfinished(so, "failed");
       }
     }
   } catch {
-    return { status: "pending" };
+    return unfinished(so, "pending");
   } finally {
     clearTimeout(timeout);
     reader.cancel().catch(() => undefined);
@@ -997,15 +1003,16 @@ async function withAnswerLine(
 }
 
 /**
- * What the run could not check is filed beside the finish and awaited after
- * the reply is saved, so a slow Linear never delays the customer.
+ * What the run could not check, answered or not, is filed beside the finish
+ * and awaited after the reply is saved, so a slow Linear never delays the
+ * customer.
  */
 const startGapFiling = (
   run: Pick<WidgetRun, "id" | "scope">,
   outcome: WaitOutcome,
   fileGaps: WidgetDependencies["fileGaps"]
 ): Promise<void> | undefined =>
-  outcome.status === "completed" && outcome.gaps?.length && fileGaps
+  outcome.gaps?.length && fileGaps
     ? fileGaps(outcome.gaps, {
         conversationId: run.scope.conversationId,
         runId: run.id,
@@ -1222,7 +1229,10 @@ async function settleResultRun(
       { conversationId: run.scope.conversationId, runId: run.id, sessionId },
       result
     );
-    return (await deps.complete(run.id, result, findings, sessionId)) ?? run;
+    const gapsFiled = startGapFiling(run, outcome, deps.fileGaps);
+    const saved = await deps.complete(run.id, result, findings, sessionId);
+    await gapsFiled;
+    return saved ?? run;
   }
   return (await finishWidgetRun(run, sessionId, outcome, deps)) ?? run;
 }

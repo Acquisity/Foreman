@@ -5,7 +5,11 @@
 // only the area, the fact, the conversation and run ids, and the reason.
 import { z } from "zod";
 import { logOpsEvent } from "./ops-log.js";
-import { commentIdFor, linearAppRequest } from "./widget-ticket-followup.js";
+import {
+  commentIdFor,
+  commentOnce,
+  linearAppRequest,
+} from "./widget-ticket-followup.js";
 
 export const GAP_TOOL = "report_capability_gap";
 
@@ -73,7 +77,9 @@ const NOT_READS = new Set([
 ]);
 /**
  * Each hand-written tool's support endpoint area (the parent ticket's handoff),
- * so a gap keeps its key when the area switches to its endpoint.
+ * so a gap keeps its key when the area switches to its endpoint. Job failures
+ * are split across orders, lead pipeline and AI generation there, so its key
+ * changes when it goes.
  */
 const TOOL_AREAS: Readonly<Record<string, string>> = {
   widget_account_access: "account",
@@ -92,6 +98,16 @@ const READ_FAILED = new Set(["error", "timeout"]);
 const unavailableSections = z.array(
   z.looseObject({ reason: z.string(), section: z.string().max(100) })
 );
+/** widget_billing_summary names each failed source first: `stripe: <reason>`, `productDb.creditHistory read unavailable`. */
+const billingSources = z.array(z.string().max(500));
+const SOURCE = /^[a-z][a-zA-Z]{0,40}(?:\.[a-z][a-zA-Z]{0,40})?/u;
+// A nested key is a field name the tool wrote, never a record's name.
+const FIELD = /^[a-z][a-zA-Z0-9]{0,40}$/u;
+const REASON = /^[a-z][a-z_]{0,40}$/u;
+const NESTED_DEPTH = 3;
+/** eve's result for a call the framework refused, or whose input failed validation, before any read ran. */
+const NOT_RUN =
+  /^(?:AI_)?(?:InvalidToolInput|InvalidArgument|TypeValidation|NoSuchTool)Error$|^ZodError$/u;
 const recordedGap = z.object({
   gap: z.object({
     area: z.enum(GAP_AREAS),
@@ -139,28 +155,77 @@ export function gapsFromResult(result: unknown): CapabilityGap[] {
       source: "code",
     },
   ];
-  if (action.isError) {
-    return whole("error");
-  }
   const output = action.output as {
+    code?: unknown;
+    sections?: unknown;
     status?: unknown;
     unavailable?: unknown;
   } | null;
+  if (action.isError) {
+    const { errorName } = action as { errorName?: unknown };
+    const notRun =
+      output?.code === "TOOL_EXECUTION_DENIED" ||
+      (typeof errorName === "string" && NOT_RUN.test(errorName));
+    return notRun ? [] : whole("error");
+  }
   if (output?.status === "unavailable") {
     return whole("unavailable");
   }
-  const sections = unavailableSections.safeParse(output?.unavailable);
-  return sections.success
-    ? sections.data
-        .filter((entry) => READ_FAILED.has(entry.reason))
-        .map((entry) => ({
-          area,
-          fact: `the ${entry.section} section could not be read`,
-          kind: "tool" as const,
-          reason: entry.reason,
-          source: "code" as const,
-        }))
-    : [];
+  const section = (name: string, reason: string): CapabilityGap => ({
+    area,
+    fact: `the ${name} section could not be read`,
+    kind: "tool",
+    reason,
+    source: "code",
+  });
+  const endpoint = unavailableSections.safeParse(output?.unavailable);
+  // Only an endpoint body carries sections; its own section data is not walked.
+  if (endpoint.success && output && "sections" in output) {
+    return endpoint.data
+      .filter((entry) => READ_FAILED.has(entry.reason))
+      .map((entry) => section(entry.section, entry.reason));
+  }
+  const billing = billingSources.safeParse(output?.unavailable);
+  return [
+    ...(billing.success
+      ? billing.data.flatMap((entry) => {
+          const name = SOURCE.exec(entry)?.[0];
+          return name ? [section(name, "unavailable")] : [];
+        })
+      : []),
+    ...nestedUnavailable(output, "").map(({ path, reason }) =>
+      section(path, reason)
+    ),
+  ];
+}
+
+/**
+ * A source a hand-written tool reports as `{ status: "unavailable" }` inside
+ * a result that is otherwise ok (account's Sentry signals, generation's
+ * error sources, website's render), named by its field path. Lists are not
+ * walked: their entries are records, not sources.
+ */
+function nestedUnavailable(
+  value: unknown,
+  path: string,
+  depth = 0
+): { path: string; reason: string }[] {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return [];
+  }
+  const node = value as Record<string, unknown>;
+  if (path && node.status === "unavailable") {
+    const reason = typeof node.reason === "string" ? node.reason : "";
+    return [{ path, reason: REASON.test(reason) ? reason : "unavailable" }];
+  }
+  if (depth >= NESTED_DEPTH) {
+    return [];
+  }
+  return Object.entries(node).flatMap(([key, child]) =>
+    FIELD.test(key)
+      ? nestedUnavailable(child, path ? `${path}.${key}` : key, depth + 1)
+      : []
+  );
 }
 
 /** One entry per gap key; the first occurrence keeps its reason. */
@@ -206,34 +271,28 @@ export const gapDescription = (gap: CapabilityGap) =>
     ].join("\n"),
   ].join("\n\n");
 
-/** The description with its conversation count raised by one. */
-export const countedDescription = (description: string) =>
-  COUNT_LINE.test(description)
-    ? description.replace(
-        COUNT_LINE,
-        (_line, prefix: string, count: string) =>
-          `${prefix}${Number(count) + 1}`
-      )
-    : description;
+export const countedDescription = (description: string, count: number) =>
+  description.replace(
+    COUNT_LINE,
+    (_line, prefix: string) => `${prefix}${count}`
+  );
 
+const OCCURRENCE = "Seen in support conversation ";
 const occurrenceBody = (gap: CapabilityGap, seen: GapOccurrence) =>
   [
-    `Seen in support conversation ${seen.conversationId} (Foreman run ${seen.runId}).`,
+    `${OCCURRENCE}${seen.conversationId} (Foreman run ${seen.runId}).`,
     ...(gap.reason ? [`Reason: ${gap.reason}.`] : []),
   ].join(" ");
 
 const FIND = `query CapabilityGapFind($team: String!, $title: String!) {
   issues(first: 5, filter: { team: { key: { eq: $team } }, title: { eqIgnoreCase: $title }, state: { type: { nin: ["completed", "canceled"] } } }) {
-    nodes { id identifier description }
+    nodes { id identifier description labels { nodes { id } } comments(first: 250) { nodes { body } } }
   }
   teams(filter: { key: { eq: $team } }) { nodes { id } }
-  issueLabels(first: 20, filter: { name: { in: ["Capability Gap", "Docs Gap", "fixy"] } }) { nodes { id name team { key } } }
+  issueLabels(first: 20, filter: { name: { in: ["Capability Gap", "Docs Gap", "fixy"] }, or: [{ team: { key: { eq: $team } } }, { team: { null: true } }] }) { nodes { id name } }
 }`;
 const CREATE = `mutation CapabilityGapCreate($input: IssueCreateInput!) {
   issueCreate(input: $input) { issue { id identifier } }
-}`;
-const COMMENT = `mutation CapabilityGapComment($input: CommentCreateInput!) {
-  commentCreate(input: $input) { success }
 }`;
 const COUNT = `mutation CapabilityGapCount($id: String!, $description: String!) {
   issueUpdate(id: $id, input: { description: $description }) { success }
@@ -243,27 +302,31 @@ const ADD_LABEL = `mutation CapabilityGapLabel($id: String!, $label: String!) {
 }`;
 
 interface Found {
-  issueLabels: {
-    nodes: { id: string; name: string; team: { key: string } | null }[];
-  };
+  issueLabels: { nodes: { id: string; name: string }[] };
   issues: {
-    nodes: { description: string | null; id: string; identifier: string }[];
+    nodes: {
+      comments: { nodes: { body: string }[] };
+      description: string | null;
+      id: string;
+      identifier: string;
+      labels: { nodes: { id: string }[] };
+    }[];
   };
   teams: { nodes: { id: string }[] };
 }
-
-// Linear refuses a second comment under the same id: this conversation is already counted.
-const ALREADY = /conflict on insert/iu;
 
 export type GapFiling =
   | { identifier: string; outcome: "counted" | "filed" | "seen" }
   | { outcome: "failed"; reason: string };
 
 /**
- * Files the gap's ticket or counts this conversation on the open one. The
- * comment goes first under a fixed id per ticket and conversation, so a
- * conversation is counted once however often it hits the gap; `fixy` is added
- * last, after the ticket holds what Fixy's run reads.
+ * Files the gap's ticket or counts this conversation on the open one. Each
+ * conversation is one comment under a fixed id per ticket and conversation,
+ * so it is counted once however often it hits the gap, and the count is
+ * read back from those comments. `fixy` goes on last, after the ticket holds
+ * what Fixy's run reads. Every write is checked and every call reconciles
+ * the open ticket, so a retry repairs a count or label an earlier failure
+ * left behind.
  */
 export async function fileCapabilityGap(
   gap: CapabilityGap,
@@ -279,55 +342,53 @@ export async function fileCapabilityGap(
     { team: teamKey, title },
     signal
   );
-  const comment = async (issueId: string) => {
-    try {
-      const created = await request<{ commentCreate: { success: boolean } }>(
-        "CapabilityGapComment",
-        COMMENT,
-        {
-          input: {
-            body: occurrenceBody(gap, seen),
-            id: commentIdFor(
-              `capability-gap:${issueId}:${seen.conversationId}`
-            ),
-            issueId,
-          },
-        },
-        signal
-      );
-      return created.commentCreate.success;
-    } catch (error) {
-      // eve's LinearApiError keeps Linear's own errors in `body`.
-      const body = (error as { body?: unknown } | null)?.body;
-      if (!signal.aborted && ALREADY.test(JSON.stringify(body ?? null))) {
-        return false;
-      }
-      throw error;
-    }
-  };
-  const [open] = found.issues.nodes;
-  if (open) {
-    if (!(await comment(open.id))) {
-      return { identifier: open.identifier, outcome: "seen" };
-    }
-    await request(
-      "CapabilityGapCount",
-      COUNT,
-      {
-        description: countedDescription(open.description ?? ""),
-        id: open.id,
-      },
+  const write = async (name: string, query: string, variables: object) => {
+    const result = await request<Record<string, { success: boolean }>>(
+      name,
+      query,
+      variables as Parameters<typeof request>[2],
       signal
     );
-    return { identifier: open.identifier, outcome: "counted" };
+    if (!Object.values(result)[0]?.success) {
+      throw new Error(`Linear did not confirm ${name}.`);
+    }
+  };
+  const label = (name: string) =>
+    found.issueLabels.nodes.find((node) => node.name === name)?.id;
+  const fixyLabel = label(FIXY);
+  const record = (issueId: string) =>
+    commentOnce(
+      issueId,
+      occurrenceBody(gap, seen),
+      commentIdFor(`capability-gap:${issueId}:${seen.conversationId}`),
+      signal,
+      request
+    );
+  const [open] = found.issues.nodes;
+  if (open) {
+    const added = await record(open.id);
+    const count =
+      open.comments.nodes.filter((comment) =>
+        comment.body.startsWith(OCCURRENCE)
+      ).length + (added ? 1 : 0);
+    const description = open.description ?? "";
+    const counted = countedDescription(description, count);
+    if (counted !== description) {
+      await write("CapabilityGapCount", COUNT, {
+        description: counted,
+        id: open.id,
+      });
+    }
+    if (fixyLabel && !open.labels.nodes.some(({ id }) => id === fixyLabel)) {
+      await write("CapabilityGapLabel", ADD_LABEL, {
+        id: open.id,
+        label: fixyLabel,
+      });
+    }
+    return { identifier: open.identifier, outcome: added ? "counted" : "seen" };
   }
   const teamId = found.teams.nodes[0]?.id;
-  const label = (name: string) =>
-    found.issueLabels.nodes.find(
-      (node) => node.name === name && (!node.team || node.team.key === teamKey)
-    )?.id;
   const kindLabel = label(LABELS[gap.kind]);
-  const fixyLabel = label(FIXY);
   if (!(teamId && kindLabel && fixyLabel)) {
     return {
       outcome: "failed",
@@ -353,21 +414,20 @@ export async function fileCapabilityGap(
   if (!issue) {
     return { outcome: "failed", reason: "Linear did not confirm the ticket." };
   }
-  await comment(issue.id);
-  await request(
-    "CapabilityGapLabel",
-    ADD_LABEL,
-    { id: issue.id, label: fixyLabel },
-    signal
-  );
+  await record(issue.id);
+  await write("CapabilityGapLabel", ADD_LABEL, {
+    id: issue.id,
+    label: fixyLabel,
+  });
   return { identifier: issue.identifier, outcome: "filed" };
 }
 
 const GAPS_MS = 60_000;
 
 /**
- * Files every gap a run recorded, one after another, after the run's reply is
- * saved. A failure is logged and never reaches the customer.
+ * Files every gap a run recorded, one after another. It starts beside the
+ * run's finish and the finish awaits it only after the reply is saved, so it
+ * never delays the customer; a failure is logged and never reaches them.
  */
 export async function fileRunGaps(
   gaps: readonly CapabilityGap[],

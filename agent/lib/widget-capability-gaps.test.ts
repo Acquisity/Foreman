@@ -14,6 +14,7 @@ import {
 const KEY_LINE = /^- Gap key: orders: why a domain order/mu;
 const COUNT_THREE = /^\* Conversations: 3$/mu;
 const COUNT_TWO = /^- Conversations: 2$/mu;
+const COUNT_ONE = /^- Conversations: 1$/mu;
 
 const result = (toolName: string, output: unknown, isError = false) => ({
   isError,
@@ -130,6 +131,103 @@ test("what report_capability_gap recorded is a gap from the investigator; a refu
   );
 });
 
+test("the hand-written tools' own failure shapes are gaps, by source", () => {
+  // widget_billing_summary: string entries naming the source first.
+  assert.deepEqual(
+    gapsFromResult(
+      result("widget_billing_summary", {
+        available: true,
+        unavailable: [
+          "stripe: timeout",
+          "productDb.creditHistory read unavailable",
+        ],
+      })
+    ).map((found) => [found.area, found.fact]),
+    [
+      ["billing", "the stripe section could not be read"],
+      ["billing", "the productDb.creditHistory section could not be read"],
+    ]
+  );
+  // widget_account_access and widget_generation_diagnostics nest a failed source in an ok result.
+  assert.deepEqual(
+    gapsFromResult(
+      result("widget_account_access", {
+        status: "ok",
+        userErrorSignals: {
+          reason: "sentry_unreachable",
+          status: "unavailable",
+        },
+      })
+    ),
+    [
+      {
+        area: "account",
+        fact: "the userErrorSignals section could not be read",
+        kind: "tool",
+        reason: "sentry_unreachable",
+        source: "code",
+      },
+    ]
+  );
+  assert.deepEqual(
+    gapsFromResult(
+      result("widget_generation_diagnostics", {
+        signals: {
+          axiom: {
+            items: [],
+            reason: "provider_failure",
+            status: "unavailable",
+          },
+          sentry: { items: [], status: "ok" },
+        },
+        status: "ok",
+      })
+    ).map((found) => found.fact),
+    ["the signals.axiom section could not be read"]
+  );
+  // A list's entries are records, and a record's name is never a source.
+  assert.deepEqual(
+    gapsFromResult(
+      result("widget_inbox_health", {
+        accounts: [{ status: "unavailable" }],
+        byName: { "Spring Launch": { status: "unavailable" } },
+        status: "ok",
+      })
+    ),
+    []
+  );
+});
+
+test("a call the framework refused or whose input was rejected opens nothing", () => {
+  assert.deepEqual(
+    gapsFromResult(
+      result(
+        "widget_billing_summary",
+        {
+          code: "TOOL_EXECUTION_DENIED",
+          message: "Support widget investigations only.",
+        },
+        true
+      )
+    ),
+    []
+  );
+  assert.deepEqual(
+    gapsFromResult({
+      ...result("widget_orders", "Invalid input for tool widget_orders", true),
+      errorName: "AI_InvalidToolInputError",
+    }),
+    []
+  );
+  assert.equal(
+    gapsFromResult({
+      ...result("widget_orders", "fetch failed", true),
+      errorName: "TypeError",
+    }).length,
+    1
+  );
+});
+
 test("a missing fact naming something from a workspace is refused", () => {
   for (const named of [
     "the inbox sam@example.com",
@@ -147,91 +245,117 @@ test("a missing fact naming something from a workspace is refused", () => {
   );
 });
 
-test("the count line goes up by one and nothing else changes", () => {
-  const gap: CapabilityGap = {
+test("the count line takes the given count and nothing else changes", () => {
+  const investigated: CapabilityGap = {
     area: "orders",
     fact: "why a domain order is waiting for payment",
     kind: "tool",
     source: "investigator",
   };
-  const first = gapDescription(gap);
+  const first = gapDescription(investigated);
   assert.match(first, KEY_LINE);
   // Linear stores "- " bullets as "* ".
   const stored = first.replaceAll("\n- ", "\n* ");
-  const twice = countedDescription(countedDescription(stored));
-  assert.match(twice, COUNT_THREE);
-  assert.equal(twice.replace("Conversations: 3", "Conversations: 1"), stored);
+  const counted = countedDescription(stored, 3);
+  assert.match(counted, COUNT_THREE);
+  assert.equal(counted.replace("Conversations: 3", "Conversations: 1"), stored);
 });
 
 interface Call {
   name: string;
   variables: Record<string, unknown>;
 }
+interface FakeIssue {
+  comments: { body: string; id: string }[];
+  description: string;
+  id: string;
+  identifier: string;
+  labels: string[];
+}
 
-/** A fake Linear that holds one team, its labels, and the tickets and comments written. */
+// The shape eve's LinearApiError has (measured on real Linear, SAN-284).
+const taken = () =>
+  Object.assign(
+    new Error("Linear GraphQL WidgetTicketComment failed with HTTP 200."),
+    {
+      body: {
+        data: null,
+        errors: [{ message: "conflict on insert of Comment" }],
+      },
+    }
+  );
+
+/**
+ * A fake Linear holding one team, its labels, and the tickets and comments
+ * written. A call named in `failing` throws once, after nothing was written.
+ */
 const fakeLinear = (labels = ["Capability Gap", "Docs Gap", "fixy"]) => {
   const calls: Call[] = [];
-  const issues: { description: string; id: string; identifier: string }[] = [];
-  const comments = new Set<string>();
+  const issues: FakeIssue[] = [];
+  const failing = new Set<string>();
+  const issueOf = (id: unknown) => issues.find((entry) => entry.id === id);
   const request = <T>(
     name: string,
     _query: string,
     variables: Record<string, unknown> = {}
   ): Promise<T> => {
     calls.push({ name, variables });
+    if (failing.delete(name)) {
+      return Promise.reject(new Error(`${name} timed out`));
+    }
     const input = variables.input as Record<string, unknown> | undefined;
     const answers: Record<string, () => unknown> = {
-      CapabilityGapComment: () => {
-        const id = String(input?.id);
-        if (comments.has(id)) {
-          // The shape eve's LinearApiError has (measured on real Linear, SAN-284).
-          throw Object.assign(
-            new Error(
-              "Linear GraphQL CapabilityGapComment failed with HTTP 200."
-            ),
-            {
-              body: {
-                data: null,
-                errors: [{ message: "conflict on insert of Comment" }],
-              },
-            }
-          );
-        }
-        comments.add(id);
-        return { commentCreate: { success: true } };
-      },
       CapabilityGapCount: () => {
-        const issue = issues.find((entry) => entry.id === variables.id);
+        const issue = issueOf(variables.id);
         if (issue) {
           issue.description = String(variables.description);
         }
         return { issueUpdate: { success: true } };
       },
       CapabilityGapCreate: () => {
-        const issue = {
+        const issue: FakeIssue = {
+          comments: [],
           description: String(input?.description),
           id: `issue-${issues.length + 1}`,
           identifier: `ENG-${issues.length + 1}`,
+          labels: [...(input as { labelIds: string[] }).labelIds],
         };
         issues.push(issue);
         return { issueCreate: { issue } };
       },
       CapabilityGapFind: () => ({
         issueLabels: {
-          nodes: labels.map((label) => ({
-            id: `label-${label}`,
-            name: label,
-            team: null,
+          nodes: labels.map((label) => ({ id: `label-${label}`, name: label })),
+        },
+        issues: {
+          nodes: issues.slice(0, 1).map((issue) => ({
+            ...issue,
+            comments: { nodes: [...issue.comments] },
+            labels: { nodes: issue.labels.map((id) => ({ id })) },
           })),
         },
-        issues: { nodes: issues.slice(0, 1) },
         teams: { nodes: [{ id: "team-eng" }] },
       }),
-      CapabilityGapLabel: () => ({ issueAddLabel: { success: true } }),
+      CapabilityGapLabel: () => {
+        issueOf(variables.id)?.labels.push(String(variables.label));
+        return { issueAddLabel: { success: true } };
+      },
+      WidgetTicketComment: () => {
+        const issue = issueOf(input?.issueId);
+        const id = String(input?.id);
+        if (
+          !issue ||
+          issues.some((entry) => entry.comments.some((c) => c.id === id))
+        ) {
+          throw taken();
+        }
+        issue.comments.push({ body: String(input?.body), id });
+        return { commentCreate: { success: true } };
+      },
     };
     return Promise.resolve(answers[name]?.() as T);
   };
-  return { calls, comments, issues, request };
+  return { calls, failing, issues, request };
 };
 
 const gap: CapabilityGap = {
@@ -242,22 +366,28 @@ const gap: CapabilityGap = {
   source: "code",
 };
 const { signal } = new AbortController();
+const fileWith =
+  (linear: ReturnType<typeof fakeLinear>, filed: CapabilityGap = gap) =>
+  (conversationId: string, runId: string) =>
+    fileCapabilityGap(
+      filed,
+      { conversationId, runId },
+      signal,
+      linear.request as never
+    );
 
 test("a new gap files one ticket with its kind label, comments for the conversation, then adds fixy last", async () => {
   const linear = fakeLinear();
-  const filed = await fileCapabilityGap(
-    gap,
-    { conversationId: "conv-1", runId: "run-1" },
-    signal,
-    linear.request as never
-  );
-  assert.deepEqual(filed, { identifier: "ENG-1", outcome: "filed" });
+  assert.deepEqual(await fileWith(linear)("conv-1", "run-1"), {
+    identifier: "ENG-1",
+    outcome: "filed",
+  });
   assert.deepEqual(
     linear.calls.map((call) => call.name),
     [
       "CapabilityGapFind",
       "CapabilityGapCreate",
-      "CapabilityGapComment",
+      "WidgetTicketComment",
       "CapabilityGapLabel",
     ]
   );
@@ -267,44 +397,71 @@ test("a new gap files one ticket with its kind label, comments for the conversat
     "Capability gap: billing: the stripe section could not be read"
   );
   assert.deepEqual(create.labelIds, ["label-Capability Gap"]);
-  assert.equal(linear.calls[3]?.variables.label, "label-fixy");
-  const comment = linear.calls[2]?.variables.input as Record<string, unknown>;
+  assert.deepEqual(linear.issues[0]?.labels, [
+    "label-Capability Gap",
+    "label-fixy",
+  ]);
   assert.equal(
-    comment.body,
+    linear.issues[0]?.comments[0]?.body,
     "Seen in support conversation conv-1 (Foreman run run-1). Reason: timeout."
   );
 });
 
 test("a second conversation counts once on the open ticket; the same conversation again changes nothing", async () => {
   const linear = fakeLinear();
-  const file = (conversationId: string, runId: string) =>
-    fileCapabilityGap(
-      gap,
-      { conversationId, runId },
-      signal,
-      linear.request as never
-    );
+  const file = fileWith(linear);
   await file("conv-1", "run-1");
   assert.deepEqual(await file("conv-2", "run-2"), {
     identifier: "ENG-1",
     outcome: "counted",
   });
+  const writes = linear.calls.length;
   assert.deepEqual(await file("conv-2", "run-3"), {
     identifier: "ENG-1",
     outcome: "seen",
   });
+  // Only the find and the refused comment: the count and labels already hold.
+  assert.equal(linear.calls.length - writes, 2);
   assert.equal(linear.issues.length, 1);
-  assert.equal(linear.comments.size, 2);
+  assert.equal(linear.issues[0]?.comments.length, 2);
+  assert.match(linear.issues[0]?.description ?? "", COUNT_TWO);
+});
+
+test("a fixy label that failed to land is added by the next call", async () => {
+  const linear = fakeLinear();
+  const file = fileWith(linear);
+  linear.failing.add("CapabilityGapLabel");
+  await assert.rejects(file("conv-1", "run-1"));
+  assert.deepEqual(linear.issues[0]?.labels, ["label-Capability Gap"]);
+  assert.deepEqual(await file("conv-1", "run-2"), {
+    identifier: "ENG-1",
+    outcome: "seen",
+  });
+  assert.deepEqual(linear.issues[0]?.labels, [
+    "label-Capability Gap",
+    "label-fixy",
+  ]);
+});
+
+test("a count that failed to update is set from the comments on the next call", async () => {
+  const linear = fakeLinear();
+  const file = fileWith(linear);
+  await file("conv-1", "run-1");
+  linear.failing.add("CapabilityGapCount");
+  await assert.rejects(file("conv-2", "run-2"));
+  assert.match(linear.issues[0]?.description ?? "", COUNT_ONE);
+  assert.deepEqual(await file("conv-2", "run-3"), {
+    identifier: "ENG-1",
+    outcome: "seen",
+  });
   assert.match(linear.issues[0]?.description ?? "", COUNT_TWO);
 });
 
 test("a docs gap needs the Docs Gap label, and a missing label files nothing", async () => {
   const linear = fakeLinear(["Capability Gap", "fixy"]);
-  const filed = await fileCapabilityGap(
-    { ...gap, kind: "docs" },
-    { conversationId: "conv-1", runId: "run-1" },
-    signal,
-    linear.request as never
+  const filed = await fileWith(linear, { ...gap, kind: "docs" })(
+    "conv-1",
+    "run-1"
   );
   assert.equal(filed.outcome, "failed");
   assert.deepEqual(
