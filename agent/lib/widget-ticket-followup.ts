@@ -56,6 +56,32 @@ export async function commentOnTicket(
   }
 }
 
+// eve's LinearApiError keeps Linear's own errors in `body`; this one means the id is taken.
+const TAKEN = /conflict on insert of Comment/u;
+
+/**
+ * `commentOnTicket` that reads Linear's refusal of a taken id as the comment
+ * already being there: true when this call wrote it, false when it existed.
+ */
+export async function commentOnce(
+  identifier: string,
+  body: string,
+  id: string,
+  signal: AbortSignal,
+  request: typeof linearAppRequest = linearAppRequest
+): Promise<boolean> {
+  try {
+    await commentOnTicket(identifier, body, id, signal, request);
+    return true;
+  } catch (error) {
+    const refusal = (error as { body?: unknown } | null)?.body;
+    if (!signal.aborted && TAKEN.test(JSON.stringify(refusal ?? null))) {
+      return false;
+    }
+    throw error;
+  }
+}
+
 const DESCRIPTION = `query WidgetTicketDescription($id: String!) {
   issue(id: $id) { description }
 }`;

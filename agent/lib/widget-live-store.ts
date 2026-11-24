@@ -302,6 +302,8 @@ export function liveDependencies<T extends WidgetDependencies>(
   return {
     ...deps,
     ...store,
+    // A live re-run reads production but reports nothing.
+    fileGaps: () => Promise.resolve(),
     fileTicket: (scope, input, signal, runId) =>
       fileTicketFor(scope, input, signal, runId, {
         readReceipt: store.readTicket,

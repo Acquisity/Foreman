@@ -1625,6 +1625,60 @@ test("a reading a tool fired reaches the composer even when the write-up set it 
   );
 });
 
+test("what a run could not check is filed after its reply is saved", async () => {
+  const result = (toolName: string, output: unknown) =>
+    event("action.result", {
+      result: { callId: toolName, kind: "tool-result", output, toolName },
+    });
+  const outcome = await waitForWidgetInvestigation(
+    session([
+      result("widget_billing", {
+        sections: {},
+        status: "ok",
+        unavailable: [
+          { reason: "timeout", section: "stripe" },
+          { reason: "feature_off", section: "deliverability" },
+        ],
+      }),
+      result("widget_orders", { status: "denied" }),
+      result("report_capability_gap", {
+        gap: { area: "orders", fact: "why an order waits", kind: "tool" },
+        recorded: true,
+      }),
+      event("message.completed", { message: "Billing partly read." }),
+      event("turn.completed"),
+    ])
+  );
+  assert.equal(outcome.status, "completed");
+  const { deps, run } = dependencies();
+  const order: string[] = [];
+  const filed: unknown[] = [];
+  const { complete } = deps;
+  deps.complete = (...args) => {
+    order.push("complete");
+    return complete(...args);
+  };
+  deps.fileGaps = (gaps, seen) => {
+    filed.push({ facts: gaps.map((gap) => gap.fact), seen });
+    return new Promise((resolve) =>
+      setTimeout(() => {
+        order.push("gaps filed");
+        resolve();
+      }, 5)
+    );
+  };
+  if (outcome.status === "completed") {
+    await finishWidgetRun(run, "widget-session-gaps", outcome, deps);
+  }
+  assert.deepEqual(filed, [
+    {
+      facts: ["the stripe section could not be read", "why an order waits"],
+      seen: { conversationId: scope.conversationId, runId: run.id },
+    },
+  ]);
+  assert.deepEqual(order, ["complete", "gaps filed"]);
+});
+
 test("a fired reading leads the composer's facts and a write-up fact calling it unconfirmed is dropped", () => {
   const fact = (claim: string, ref = "") => ({
     claim,
@@ -1833,6 +1887,59 @@ test("an overdue run with no answer is force-finished for a human, not left hang
   assert.equal(body.status, "completed");
   assert.equal(body.findings.needsHuman, true);
   assert.equal((run.outcome as { reason: string } | null)?.reason, "deadline");
+});
+
+const timedOutStripe = event("action.result", {
+  result: {
+    callId: "billing",
+    kind: "tool-result",
+    output: { available: true, unavailable: ["stripe: timeout"] },
+    toolName: "widget_billing_summary",
+  },
+});
+
+test("an overdue run still files what it could not check", async (t) => {
+  enabled(t);
+  const { deps, run } = dependencies();
+  run.session_id = "widget-session-old";
+  run.created_at = new Date(Date.now() - WIDGET_DEADLINE_MS - 1000);
+  const filed: string[][] = [];
+  deps.fileGaps = (gaps) => {
+    filed.push(gaps.map((gap) => gap.fact));
+    return Promise.resolve();
+  };
+  await receiveWidgetMessage(
+    request({
+      action: "result",
+      conversation_id: scope.conversationId,
+      organization_id: scope.organizationId,
+      run_id: runId,
+    }),
+    {
+      attachSession: () => session([timedOutStripe], "widget-session-old"),
+      ...noWork(),
+    },
+    5,
+    verify,
+    deps
+  );
+  assert.equal((run.outcome as { reason: string } | null)?.reason, "deadline");
+  assert.deepEqual(filed, [["the stripe section could not be read"]]);
+});
+
+test("a turn that fails after a read failed still files that gap", async () => {
+  const outcome = await waitForWidgetInvestigation(
+    session([timedOutStripe, event("turn.failed")])
+  );
+  assert.equal(outcome.status, "failed");
+  const { deps, run } = dependencies();
+  const filed: string[][] = [];
+  deps.fileGaps = (gaps) => {
+    filed.push(gaps.map((gap) => gap.fact));
+    return Promise.resolve();
+  };
+  await finishWidgetRun(run, "widget-session-failed", outcome, deps);
+  assert.deepEqual(filed, [["the stripe section could not be read"]]);
 });
 
 test("a teammate's inbox run skips the front door, verifies as staff, and keeps its own session", async (t) => {

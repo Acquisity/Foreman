@@ -2,6 +2,7 @@ import { setTimeout as sleep } from "node:timers/promises";
 import type { LanguageModelMiddleware, wrapLanguageModel } from "ai";
 import { z } from "zod";
 import { logOpsEvent } from "./ops-log.js";
+import { GAP_TOOL } from "./widget-capability-gaps.js";
 import { customerMessages, withoutGuide } from "./widget-instructions.js";
 
 /**
@@ -65,7 +66,7 @@ export const ASK_TOOL = "widget_ask_customer";
 /** Past this many tool calls the model is told to stop gathering and answer. */
 export const MAX_WIDGET_TOOL_CALLS = 14;
 // A ticket the instructions require must stay possible after the last workspace read.
-export const LATE_TOOLS = new Set([...ARTICLE_TOOLS, TICKET_TOOL]);
+export const LATE_TOOLS = new Set([...ARTICLE_TOOLS, TICKET_TOOL, GAP_TOOL]);
 export const MAX_WORKSPACE_CALLS = MAX_WIDGET_TOOL_CALLS - 2;
 /** Whether a turn that already made `used` tool calls may still call `tool`. */
 export const withinBudget = (tool: string, used: number) =>
@@ -266,7 +267,10 @@ function askState(messages: Params["prompt"]) {
 
 /** A workspace read, not the ticket, the ask or a help-center article. */
 export const gathering = (tool: string) =>
-  tool !== TICKET_TOOL && tool !== ASK_TOOL && !ARTICLE_TOOLS.has(tool);
+  tool !== TICKET_TOOL &&
+  tool !== ASK_TOOL &&
+  tool !== GAP_TOOL &&
+  !ARTICLE_TOOLS.has(tool);
 
 /** This turn only: the customer's message, then each tool call paired with its result. No reasoning, no prose. */
 export function turnEvidence(withControl: Params["prompt"]) {

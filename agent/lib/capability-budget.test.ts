@@ -731,7 +731,7 @@ describe("capability report", () => {
       manifest.dynamicTools.filter(
         (tool) =>
           isAuthoredTool(tool) &&
-          // Every tools/widget_* module is offered to the support widget lane alone,
+          // Every tools/widget_* module and report_capability_gap are offered to the support widget lane alone,
           // and the replay document, issue, comment, create and catalog tools to triage
           // replay sessions alone. file_migration_ticket is offered only to a
           // ticket-filing questions-only Slack thread.
@@ -743,6 +743,7 @@ describe("capability report", () => {
             "tools/list_triage_replay_catalog.ts",
             "tools/read_triage_replay_document.ts",
             "tools/read_triage_replay_issue.ts",
+            "tools/report_capability_gap.ts",
             "tools/support_investigation.ts",
             "tools/support_provider.ts",
           ].includes(tool.sourceId)
