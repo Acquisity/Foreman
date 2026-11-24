@@ -1625,6 +1625,60 @@ test("a reading a tool fired reaches the composer even when the write-up set it 
   );
 });
 
+test("what a run could not check is filed after its reply is saved", async () => {
+  const result = (toolName: string, output: unknown) =>
+    event("action.result", {
+      result: { callId: toolName, kind: "tool-result", output, toolName },
+    });
+  const outcome = await waitForWidgetInvestigation(
+    session([
+      result("widget_billing", {
+        sections: {},
+        status: "ok",
+        unavailable: [
+          { reason: "timeout", section: "stripe" },
+          { reason: "feature_off", section: "deliverability" },
+        ],
+      }),
+      result("widget_orders", { status: "denied" }),
+      result("report_capability_gap", {
+        gap: { area: "orders", fact: "why an order waits", kind: "tool" },
+        recorded: true,
+      }),
+      event("message.completed", { message: "Billing partly read." }),
+      event("turn.completed"),
+    ])
+  );
+  assert.equal(outcome.status, "completed");
+  const { deps, run } = dependencies();
+  const order: string[] = [];
+  const filed: unknown[] = [];
+  const { complete } = deps;
+  deps.complete = (...args) => {
+    order.push("complete");
+    return complete(...args);
+  };
+  deps.fileGaps = (gaps, seen) => {
+    filed.push({ facts: gaps.map((gap) => gap.fact), seen });
+    return new Promise((resolve) =>
+      setTimeout(() => {
+        order.push("gaps filed");
+        resolve();
+      }, 5)
+    );
+  };
+  if (outcome.status === "completed") {
+    await finishWidgetRun(run, "widget-session-gaps", outcome, deps);
+  }
+  assert.deepEqual(filed, [
+    {
+      facts: ["the stripe section could not be read", "why an order waits"],
+      seen: { conversationId: scope.conversationId, runId: run.id },
+    },
+  ]);
+  assert.deepEqual(order, ["complete", "gaps filed"]);
+});
+
 test("a fired reading leads the composer's facts and a write-up fact calling it unconfirmed is dropped", () => {
   const fact = (claim: string, ref = "") => ({
     claim,

@@ -37,7 +37,11 @@ export const gapSentences = (reply: string | null) =>
     .filter((sentence) => UNCONFIRMED.test(sentence));
 
 /** Reads with no stored state to compare: customer clarification and the stubbed ticket. */
-export const NOT_READS = new Set(["widget_ask_customer", "widget_file_ticket"]);
+export const NOT_READS = new Set([
+  "report_capability_gap",
+  "widget_ask_customer",
+  "widget_file_ticket",
+]);
 
 export type ReadResult =
   | { status: "ok"; output: unknown }

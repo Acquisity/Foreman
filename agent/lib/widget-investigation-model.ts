@@ -46,6 +46,8 @@ const ALLOWED_TOOLS = new Set([
   "widget_read_recording",
   "widget_sdr_thread_status",
   "widget_website_status",
+  // Records what no tool returns; Foreman's code files the ticket.
+  "report_capability_gap",
 ]);
 const BLOCKED = "Support investigation capability is unavailable.";
 

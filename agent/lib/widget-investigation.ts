@@ -5,6 +5,11 @@ import { readRequestBody } from "./bounded-body.js";
 import { logOpsEvent } from "./ops-log.js";
 import { bugReportBrowser, MAX_BROWSER_CHARS } from "./widget-bug-evidence.js";
 import { addToBugReport, fileBugReport } from "./widget-bug-report.js";
+import {
+  type CapabilityGap,
+  fileRunGaps,
+  gapsFromResult,
+} from "./widget-capability-gaps.js";
 import { answerFromGuide, chatGuideEnabled } from "./widget-chat.js";
 import { verifyWidgetContext } from "./widget-context.js";
 import {
@@ -272,6 +277,8 @@ export type WaitOutcome =
       ticket?: FiledTicket | null;
       /** Each reading the turn's tools computed, as findings facts. */
       readings?: WidgetFindings["facts"];
+      /** What the turn could not check, from its tool results. */
+      gaps?: CapabilityGap[];
     };
 
 const TEXT_MAX = 4000;
@@ -444,6 +451,7 @@ const withFiledTicket = (
 
 interface Recorded {
   asked: string | null;
+  gaps: CapabilityGap[];
   read: boolean;
   readings: WidgetFindings["facts"];
   ticket: FiledTicket | null;
@@ -453,6 +461,7 @@ const recorded = (result: unknown, so: Recorded): Recorded => {
   const action = result as { kind?: string; toolName?: unknown } | null;
   return {
     asked: askedResult(result) ?? so.asked,
+    gaps: [...so.gaps, ...gapsFromResult(result)],
     read:
       so.read ||
       (action?.kind === "tool-result" &&
@@ -464,16 +473,18 @@ const recorded = (result: unknown, so: Recorded): Recorded => {
 };
 const nothingRecorded: Recorded = {
   asked: null,
+  gaps: [],
   read: false,
   readings: [],
   ticket: null,
 };
 const completed = (
-  { asked, read, readings, ticket }: Recorded,
+  { asked, gaps, read, readings, ticket }: Recorded,
   outcome: Omit<Extract<WaitOutcome, { status: "completed" }>, "ticket">
 ): WaitOutcome => {
   const done = {
     ...outcome,
+    ...(gaps.length ? { gaps } : {}),
     ...(readings.length ? { readings } : {}),
     ticket,
   };
@@ -564,6 +575,8 @@ export const defaultWidgetDependencies = {
   expire: expireSessionlessWidgetRun,
   expireAll: expireSessionlessWidgetRuns,
   extract: extractWidgetFindings,
+  /** Files or counts the tickets for what a run could not check. */
+  fileGaps: fileRunGaps,
   /** Files the conversation's ticket from code, in place of a handoff. */
   fileTicket: fileTicketFor,
   gate: egressGate,
@@ -599,6 +612,7 @@ export type WidgetDependencies = Omit<
   | "bugReport"
   | "bugReportAddition"
   | "changeRequested"
+  | "fileGaps"
   | "fileTicket"
   | "inboxHistory"
   | "plan"
@@ -616,6 +630,7 @@ export type WidgetDependencies = Omit<
       | "bugReport"
       | "bugReportAddition"
       | "changeRequested"
+      | "fileGaps"
       | "fileTicket"
       | "inboxHistory"
       | "plan"
@@ -981,6 +996,22 @@ async function withAnswerLine(
     : result;
 }
 
+/**
+ * What the run could not check is filed beside the finish and awaited after
+ * the reply is saved, so a slow Linear never delays the customer.
+ */
+const startGapFiling = (
+  run: Pick<WidgetRun, "id" | "scope">,
+  outcome: WaitOutcome,
+  fileGaps: WidgetDependencies["fileGaps"]
+): Promise<void> | undefined =>
+  outcome.status === "completed" && outcome.gaps?.length && fileGaps
+    ? fileGaps(outcome.gaps, {
+        conversationId: run.scope.conversationId,
+        runId: run.id,
+      }).catch(() => undefined)
+    : undefined;
+
 /** Gate, then persist. Runs once per session outcome; a replay finds the fenced row unchanged. */
 export async function finishWidgetRun(
   run: Pick<
@@ -997,6 +1028,7 @@ export async function finishWidgetRun(
       Pick<
         WidgetDependencies,
         | "changeRequested"
+        | "fileGaps"
         | "fileTicket"
         | "handoffEligible"
         | "progress"
@@ -1019,6 +1051,7 @@ export async function finishWidgetRun(
   ) {
     return null;
   }
+  const gapsFiled = startGapFiling(run, outcome, deps.fileGaps);
   // A question for the customer is not an answer being prepared; saying so
   // would pop the checklist up just before the question arrives.
   if (
@@ -1135,7 +1168,9 @@ export async function finishWidgetRun(
     { conversationId: run.scope.conversationId, runId: run.id, sessionId },
     result
   );
-  return deps.complete(run.id, result, findings, sessionId);
+  const saved = await deps.complete(run.id, result, findings, sessionId);
+  await gapsFiled;
+  return saved;
 }
 
 /** Polls replay the turn; skip already persisted events before making a database call. */
