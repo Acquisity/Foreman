@@ -176,6 +176,7 @@ const EACH_RECORD_RULE =
   /asks for the records themselves[^.]*write each record the result returns as its own fact with its own date and amount/;
 const RECORDS_AVAILABLE_RULE =
   /never write that the dates or amounts of records you were given are unavailable/;
+const MORE_RECORDS_RULE = /when there are more than 20, how many more/;
 const OWN_DATE_RULE =
   /Every amount keeps the date of its own record: never group amounts under one date unless every one of those records has that date/;
 
@@ -185,5 +186,6 @@ test("the investigator lists each record it was asked for, each amount on its ow
   const prompt = widgetInstructions(widgetAuth(scope));
   assert.match(prompt, EACH_RECORD_RULE);
   assert.match(prompt, RECORDS_AVAILABLE_RULE);
+  assert.match(prompt, MORE_RECORDS_RULE);
   assert.match(prompt, OWN_DATE_RULE);
 });
