@@ -1,6 +1,6 @@
 import { logOpsEvent } from "./ops-log.js";
 import { BUG_REPORT_ADDED, BUG_REPORT_LOGGED } from "./widget-bug-report.js";
-import { parseFindings } from "./widget-findings.js";
+import { parseFindings, type WidgetFindings } from "./widget-findings.js";
 import type { WidgetDependencies } from "./widget-investigation.js";
 import type { WidgetOutcome, WidgetRun } from "./widget-run-store.js";
 import type { WidgetContext } from "./widget-scope.js";
@@ -95,11 +95,90 @@ export async function handoffTicket(
   return ok ? filed : null;
 }
 
-/** The line that tells the customer where the answer will come, or null when nothing was filed. */
+/** The filed ticket as the findings record it; Acquisity keeps it on the chat. */
+export type HandoffTicketRef = NonNullable<WidgetFindings["ticket"]>;
+
+const ticketRef = (filed: {
+  identifier: string;
+  url: string;
+}): HandoffTicketRef => ({ id: filed.identifier, url: filed.url });
+
+/** The ticket filed or reused in place of a handoff, or null when nothing was filed. */
 export const ticketInsteadOfHandoff = async (
   ...args: Parameters<typeof handoffTicket>
-): Promise<string | null> =>
-  (await handoffTicket(...args)) ? ANSWER_HERE : null;
+): Promise<HandoffTicketRef | null> => {
+  const filed = await handoffTicket(...args);
+  return filed ? ticketRef(filed) : null;
+};
+
+/**
+ * Findings for a turn that filed the conversation's ticket in place of a
+ * handoff. Acquisity records `ticket` on the chat, so the team's answer can be
+ * sent into it, and keeps findings only with a report.
+ */
+export const handoffFindings = (
+  report: string,
+  ticket: HandoffTicketRef,
+  found?: WidgetFindings | null
+) =>
+  parseFindings({
+    confidence: found?.confidence ?? "low",
+    facts: found?.facts ?? [],
+    needsHuman: false,
+    recommendation: ANSWER_HERE,
+    report: (found?.report ?? report).slice(0, 1000),
+    ticket,
+  });
+
+/**
+ * The answer-comes-here line is fixed text added after the gate, to an allowed
+ * reply whose turn filed or reused the conversation's ticket, and the findings
+ * record that ticket, so Acquisity keeps it on the chat. A blocked reply files
+ * its ticket in `ticketInsteadOfBlock`.
+ */
+export async function withAnswerLine(
+  result: WidgetOutcome,
+  findings: WidgetFindings,
+  filedTicket: HandoffTicketRef | undefined,
+  run: Pick<WidgetRun, "id" | "scope">,
+  ticket: HandoffTicketRef | null | undefined,
+  read: WidgetDependencies["readTicket"],
+  signal: AbortSignal,
+  history: Turns
+): Promise<{ findings: WidgetFindings; result: WidgetOutcome }> {
+  if (
+    !(customerTurn(run.scope) && result.message) ||
+    result.decision === "block"
+  ) {
+    return { findings, result };
+  }
+  // An unreadable receipt counts as none; it must not fail an allowed reply.
+  const receipt =
+    filedTicket || ticket
+      ? null
+      : await read?.(run.scope, run.id, signal).catch((error) => {
+          if (signal.aborted) {
+            throw error;
+          }
+          return null;
+        });
+  const filed =
+    filedTicket ??
+    (ticket ? { id: ticket.id, url: ticket.url } : undefined) ??
+    (receipt ? ticketRef(receipt) : undefined);
+  return filed
+    ? {
+        // A ticket filed earlier in the turn, such as for a toggled ask for a
+        // person, is recorded here; one the findings already carry stays.
+        findings: findings.ticket ? findings : { ...findings, ticket: filed },
+        result: {
+          ...result,
+          message: withAnswerHere(result.message, history),
+          reason: `${TICKET_INSTEAD} ${result.reason}`,
+        },
+      }
+    : { findings, result };
+}
 
 // A block from our own controls (the ownership guard, a gate outage) is not a
 // finding that needs a person: the app tells the customer to send the message
@@ -153,20 +232,12 @@ export async function ticketInsteadOfBlock(
   if (!filed) {
     return { findings, result };
   }
-  const ticket =
-    "identifier" in filed ? { id: filed.identifier, url: filed.url } : null;
   return {
-    findings: parseFindings({
-      confidence: found?.confidence ?? "low",
-      facts: found?.facts ?? [],
-      needsHuman: false,
-      recommendation: ANSWER_HERE,
-      report: (
-        found?.report ??
-        `Foreman could not answer this (${reason}) and filed the conversation's ticket.`
-      ).slice(0, 1000),
-      ...(ticket ? { ticket } : {}),
-    }),
+    findings: handoffFindings(
+      `Foreman could not answer this (${reason}) and filed the conversation's ticket.`,
+      ticketRef(filed),
+      found
+    ),
     result: {
       citations: [],
       decision: "allow",

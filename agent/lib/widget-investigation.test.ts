@@ -690,6 +690,15 @@ test("a request to act skips the investigation, and an ask for a person is answe
   assert.equal(filed.length, 1);
   assert.deepEqual(human.gated, []);
   assert.equal(human.run.outcome?.reason, "ticket_instead_of_handoff");
+  // The app records the filed ticket on the chat from the findings, so the
+  // team's answer can be sent into it (ENG-20454).
+  const handedFindings = handedBody.findings as Record<string, unknown>;
+  assert.deepEqual(handedFindings.ticket, {
+    id: "ENG-1",
+    url: "https://linear.app/acquisity/issue/ENG-1/x",
+  });
+  assert.equal(handedFindings.needsHuman, false);
+  assert.ok(String(handedFindings.report).length > 0);
 });
 
 test("a member or client is answered in help-center mode, never investigated", async (t) => {
@@ -755,6 +764,11 @@ test("a member or client is answered in help-center mode, never investigated", a
     ANSWER_HERE
   );
   assert.equal(refund.run.outcome?.reason, "ticket_instead_of_handoff");
+  assert.ok((refund.run.findings as WidgetFindings).report.length > 0);
+  assert.deepEqual((refund.run.findings as WidgetFindings).ticket, {
+    id: "ENG-1",
+    url: "https://linear.app/acquisity/issue/ENG-1/x",
+  });
   assert.equal(memberFiled.length, 1);
   assert.ok(memberFiled[0].summary.includes("a workspace member"));
 
@@ -2718,7 +2732,10 @@ test("an ask for a person, at any hour, is answered and files the conversation's
     const body = (await response.json()) as Record<string, unknown>;
     assert.equal(body.decision, "allow");
     assert.equal(body.message, `${kbAnswer.message}\n\n${ANSWER_HERE}`);
-    assert.equal(body.findings, undefined);
+    assert.deepEqual((body.findings as { ticket?: unknown }).ticket, {
+      id: "ENG-1",
+      url: "https://linear.app/acquisity/issue/ENG-1/x",
+    });
     assert.equal(run.outcome?.reason, "ticket_instead_of_handoff");
     assert.equal(filed.length, 1);
     assert.ok(filed[0].summary.includes("Can I talk to a person?"));
@@ -2857,6 +2874,7 @@ test("an ask for a person whose ticket cannot be filed falls back to the asked_f
   const body = (await response.json()) as Record<string, unknown>;
   assert.equal(body.decision, "block");
   assert.equal(run.outcome?.reason, "asked_for_human");
+  assert.equal((run.findings as WidgetFindings).ticket, undefined);
   assert.equal(filed.length, 1);
 });
 
@@ -2872,8 +2890,14 @@ test("findings that need a person file the ticket, and the gated reply says the 
     deps
   );
   assert.equal((gated as WidgetFindings[])[0]?.needsHuman, false);
+  // The composer is not told a ticket was filed, so the fixed line is the only one.
+  assert.equal((gated as WidgetFindings[])[0]?.ticket, undefined);
   assert.equal(run.outcome?.message, `${allowed.message}\n\n${ANSWER_HERE}`);
   assert.equal(run.outcome?.reason, "ticket_instead_of_handoff in scope");
+  assert.deepEqual((run.findings as WidgetFindings).ticket, {
+    id: "ENG-1",
+    url: "https://linear.app/acquisity/issue/ENG-1/x",
+  });
   assert.equal(filed.length, 1);
   assert.ok(filed[0].summary.includes("Why did my campaign stop sending?"));
 });
@@ -3023,11 +3047,25 @@ test("a persisted filing receipt appends the answer-comes-here line to resolved,
     );
     assert.equal(run.outcome?.message, `${allowed.message}\n\n${ANSWER_HERE}`);
     assert.equal((run.findings as WidgetFindings).needsHuman, false);
+    // A toggled ask filed this receipt; the findings record it on the chat.
+    assert.deepEqual((run.findings as WidgetFindings).ticket, {
+      id: "ENG-42",
+      url: "https://linear.app/acquisity/issue/ENG-42/support",
+    });
   }
 });
 
 test("a confirmed refund ticket adds the answer-comes-here line without another write", async () => {
   const { deps, run } = dependencies(allowed);
+  // The investigator's confirmed ticket is the one recorded, not a saved receipt.
+  run.findings = {
+    ticketReceipt: {
+      existing: true,
+      identifier: "ENG-7",
+      refund: false,
+      url: "https://linear.app/acquisity/issue/ENG-7/other",
+    },
+  };
   deps.extract = () => Promise.resolve({ ...findings, needsHuman: true });
   deps.fileTicket = () => assert.fail("a confirmed refund is already filed");
   await finishWidgetRun(
@@ -3207,6 +3245,13 @@ test("a member or client who presses the magnifying glass or reports a bug gets 
         run.outcome?.reason,
         fails ? "kb" : "ticket_instead_of_handoff"
       );
+      assert.equal(
+        (run.findings as WidgetFindings | null)?.ticket?.id,
+        fails ? undefined : "ENG-1"
+      );
+      if (!fails) {
+        assert.ok((run.findings as WidgetFindings).report.length > 0);
+      }
       assert.equal(filed.length, 1);
       assert.ok(filed[0].summary.includes(`a workspace ${role}`));
       assert.equal(customers.at(-1)?.ticketFiling, true);

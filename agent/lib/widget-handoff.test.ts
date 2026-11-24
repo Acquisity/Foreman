@@ -49,9 +49,9 @@ test("the answer-comes-here line follows a reply once per conversation", () => {
 
 test("a customer turn files the ticket; a teammate's run and a caller with no filer file nothing", async () => {
   const customer = filer(filed);
-  assert.equal(
+  assert.deepEqual(
     await ticketInsteadOfHandoff(scope, ticket, ids, undefined, customer.file),
-    ANSWER_HERE
+    { id: "ENG-1", url: "u" }
   );
   assert.equal(customer.calls.length, 1);
   const { calls, file } = filer(filed);
@@ -72,7 +72,7 @@ test("a customer turn files the ticket; a teammate's run and a caller with no fi
   );
 });
 
-test("a ticket that cannot be filed returns no line", async () => {
+test("a ticket that cannot be filed returns no ticket", async () => {
   const refused = filer({ error: "Linear did not accept the ticket." });
   assert.equal(
     await ticketInsteadOfHandoff(scope, ticket, ids, undefined, refused.file),
