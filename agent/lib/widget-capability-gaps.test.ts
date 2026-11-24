@@ -9,9 +9,13 @@ import {
   type GapFiling,
   gapDescription,
   gapsFromResult,
+  gapTitle,
   generalFact,
+  refusedAreas,
+  replyGaps,
 } from "./widget-capability-gaps.js";
 
+const FOUND_BY_EXTRACTION = /Found by: the extraction pass/u;
 const KEY_LINE = /^- Gap key: orders: why a domain order/mu;
 const COUNT_THREE = /^\* Conversations: 3$/mu;
 const COUNT_TWO = /^- Conversations: 2$/mu;
@@ -567,4 +571,91 @@ test("a run files each gap key once, and a failure never throws", async () => {
     "the stripe section could not be read",
     "another fact",
   ]);
+});
+
+test("what a reply couldn't check is one gap per area and kind, never a ticket per wording (ENG-20478)", () => {
+  const gaps = replyGaps([
+    { area: "orders", fact: "why a domain was suspended", kind: "tool" },
+    { area: "orders", fact: "The reason a domain is suspended", kind: "tool" },
+    { area: "orders", fact: "why a domain was suspended", kind: "tool" },
+    { area: "orders", fact: "what suspended means", kind: "docs" },
+    { area: "inboxes", fact: "why lee@acme.com bounced", kind: "tool" },
+  ]);
+  assert.deepEqual(
+    gaps.map((each) => [gapTitle(each), each.details]),
+    [
+      [
+        "Capability gap: orders: something a reply said could not be checked",
+        ["why a domain was suspended", "the reason a domain is suspended"],
+      ],
+      [
+        "Docs gap: orders: a product question a reply said the Help Centre does not answer",
+        ["what suspended means"],
+      ],
+      [
+        "Capability gap: inboxes: something a reply said could not be checked",
+        ["one item that named workspace data, left out"],
+      ],
+    ]
+  );
+  assert.match(gapDescription(gaps[0]), FOUND_BY_EXTRACTION);
+});
+
+test("an area whose read failed or was refused files no reply gap", () => {
+  const failed = gapsFromResult({
+    kind: "tool-result",
+    output: { available: true, unavailable: ["stripe: timeout"] },
+    toolName: "widget_billing_summary",
+  });
+  const refused = [
+    { status: "denied" },
+    {
+      sections: {},
+      unavailable: [{ reason: "feature_off", section: "render" }],
+    },
+    { projects: [{ render: { status: "not_linked" } }] },
+  ].flatMap((output) =>
+    refusedAreas({
+      kind: "tool-result",
+      output,
+      toolName: "widget_website_status",
+    })
+  );
+  assert.deepEqual(refused, ["website", "website", "website"]);
+  assert.deepEqual(
+    refusedAreas({
+      kind: "tool-result",
+      output: { status: "ok" },
+      toolName: "widget_inboxes",
+    }),
+    []
+  );
+  assert.deepEqual(
+    replyGaps(
+      [
+        { area: "billing", fact: "whether an invoice was paid", kind: "tool" },
+        { area: "website", fact: "whether the site is live", kind: "tool" },
+      ],
+      failed,
+      refused
+    ),
+    []
+  );
+});
+
+test("each conversation's comment lists what its reply couldn't check", async () => {
+  const [replied] = replyGaps([
+    { area: "orders", fact: "why a domain was suspended", kind: "tool" },
+  ]);
+  const linear = fakeLinear();
+  assert.equal(
+    (await fileWith(linear, replied)("conv-1", "run-1")).outcome,
+    "filed"
+  );
+  assert.deepEqual(
+    linear.issues[0].comments.map((comment) => comment.body),
+    [
+      "Seen in support conversation conv-1 (Foreman run run-1). Couldn't check: why a domain was suspended.",
+    ]
+  );
 });

@@ -7,10 +7,10 @@ import { bugReportBrowser, MAX_BROWSER_CHARS } from "./widget-bug-evidence.js";
 import { addToBugReport, fileBugReport } from "./widget-bug-report.js";
 import {
   type CapabilityGap,
-  distinctGaps,
   fileRunGaps,
-  gapKey,
   gapsFromResult,
+  refusedAreas,
+  replyGaps,
 } from "./widget-capability-gaps.js";
 import { answerFromGuide, chatGuideEnabled } from "./widget-chat.js";
 import { verifyWidgetContext } from "./widget-context.js";
@@ -285,6 +285,8 @@ export type WaitOutcome =
       readings?: WidgetFindings["facts"];
       /** What the turn could not check, from its tool results. */
       gaps?: CapabilityGap[];
+      /** Areas whose read was refused by design, so the reply's unchecked facts there file nothing. */
+      refused?: string[];
     };
 
 const TEXT_MAX = 4000;
@@ -460,6 +462,8 @@ interface Recorded {
   gaps: CapabilityGap[];
   read: boolean;
   readings: WidgetFindings["facts"];
+  /** Areas whose read this turn was refused by design. */
+  refused: string[];
   ticket: FiledTicket | null;
 }
 /** What the turn's own tool results recorded: a filed ticket, a question for the customer, a workspace read. */
@@ -474,6 +478,7 @@ const recorded = (result: unknown, so: Recorded): Recorded => {
         typeof action.toolName === "string" &&
         gathering(action.toolName)),
     readings: [...so.readings, ...toolReadings(result)],
+    refused: [...so.refused, ...refusedAreas(result)],
     ticket: filedTicketResult(result) ?? so.ticket,
   };
 };
@@ -482,16 +487,18 @@ const nothingRecorded: Recorded = {
   gaps: [],
   read: false,
   readings: [],
+  refused: [],
   ticket: null,
 };
 const completed = (
-  { asked, gaps, read, readings, ticket }: Recorded,
+  { asked, gaps, read, readings, refused, ticket }: Recorded,
   outcome: Omit<Extract<WaitOutcome, { status: "completed" }>, "ticket">
 ): WaitOutcome => {
   const done = {
     ...outcome,
     ...(gaps.length ? { gaps } : {}),
     ...(readings.length ? { readings } : {}),
+    ...(refused.length ? { refused } : {}),
     ticket,
   };
   return asked
@@ -983,24 +990,6 @@ const startGapFiling = (
       }).catch(() => undefined)
     : undefined;
 
-/**
- * A write-up that says what it could not check names each fact in
- * `unchecked`; they become capability gaps (ENG-20478) unless a tool result
- * already recorded the same key, and never reach the gate or the reply.
- */
-const writtenGaps = (
-  unchecked: WidgetFindings["unchecked"],
-  fromTools: readonly CapabilityGap[] = []
-): CapabilityGap[] => {
-  const known = new Set(fromTools.map((gap) => gapKey(gap).toLowerCase()));
-  return distinctGaps(
-    (unchecked ?? []).map((gap) => ({
-      ...gap,
-      source: "investigator" as const,
-    }))
-  ).filter((gap) => !known.has(gapKey(gap).toLowerCase()));
-};
-
 const withoutUnchecked = ({
   unchecked: _unchecked,
   ...findings
@@ -1092,7 +1081,7 @@ export async function finishWidgetRun(
     );
     writtenGapsFiled = startGapFiling(
       run,
-      writtenGaps(written.structured?.unchecked, outcome.gaps),
+      replyGaps(written.structured?.unchecked, outcome.gaps, outcome.refused),
       deps.fileGaps
     );
     const { filed, gateDeps } = written;

@@ -3325,13 +3325,21 @@ test("a message that stays at the front door never asks for the timeline", async
   assert.deepEqual(asked, [false]);
 });
 
-test("a write-up that lists what it could not check files each as a gap with no report_capability_gap call (ENG-20478)", async () => {
+test("a write-up that lists what it could not check files one gap per area with no report_capability_gap call (ENG-20478)", async () => {
+  const notLinked = event("action.result", {
+    result: {
+      callId: "site",
+      kind: "tool-result",
+      output: { projects: [{ render: { status: "not_linked" } }] },
+      toolName: "widget_website_status",
+    },
+  });
   const outcome = await waitForWidgetInvestigation(
     session([
       timedOutStripe,
+      notLinked,
       event("message.completed", {
-        message:
-          "Inboxes read. What I couldn't check: why the domains are suspended, and the stripe section.",
+        message: "Inboxes read. What I couldn't check: several things.",
       }),
       event("turn.completed"),
     ])
@@ -3347,25 +3355,55 @@ test("a write-up that lists what it could not check files each as a gap with no 
           fact: "why a managed domain is suspended",
           kind: "tool",
         },
-        // A tool result already recorded this key, so it is not filed twice.
         {
-          area: "billing",
-          fact: "the stripe section could not be read",
+          area: "orders",
+          fact: "whether sam@acme.com still has mailboxes",
           kind: "tool",
         },
+        // The billing read failed and the website read was refused by design.
+        {
+          area: "billing",
+          fact: "whether the latest invoice was paid",
+          kind: "tool",
+        },
+        { area: "website", fact: "whether the site is live", kind: "tool" },
       ],
     });
-  const filed: string[][] = [];
+  const filed: unknown[] = [];
   deps.fileGaps = (gaps) => {
-    filed.push(gaps.map((gap) => `${gap.source} ${gap.area}: ${gap.fact}`));
+    filed.push(
+      gaps.map(({ area, details, fact, source }) => ({
+        area,
+        details,
+        fact,
+        source,
+      }))
+    );
     return Promise.resolve();
   };
   if (outcome.status === "completed") {
     await finishWidgetRun(run, "widget-session-unchecked", outcome, deps);
   }
   assert.deepEqual(filed, [
-    ["code billing: the stripe section could not be read"],
-    ["investigator orders: why a managed domain is suspended"],
+    [
+      {
+        area: "billing",
+        details: undefined,
+        fact: "the stripe section could not be read",
+        source: "code",
+      },
+    ],
+    [
+      {
+        area: "orders",
+        details: [
+          "why a managed domain is suspended",
+          "one item that named workspace data, left out",
+        ],
+        fact: "something a reply said could not be checked",
+        source: "reply",
+      },
+    ],
   ]);
   // The list is for filing only: the gate and the stored findings never carry it.
   assert.equal(gated.length, 1);

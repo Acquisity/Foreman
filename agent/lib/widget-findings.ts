@@ -27,8 +27,8 @@ export const findingsSchema = z.strictObject({
       url: z.string().url().max(500),
     })
     .optional(),
-  // What the write-up says could not be checked, in general terms. Foreman's
-  // code files each as a capability gap and drops it before the gate.
+  // What the write-up says could not be checked. Foreman's code files these
+  // as capability gaps (replyGaps) and drops them before the gate.
   unchecked: z
     .array(
       z.strictObject({

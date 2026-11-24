@@ -9,6 +9,8 @@ import {
 } from "./widget-extract.js";
 import type { WidgetFindings } from "./widget-findings.js";
 
+const UNCHECKED_RULE =
+  /list in unchecked each thing the investigator said it could not check/;
 const FAILED_STEP_RULE =
   /a documented step the customer already tried that failed are filed as a ticket, not handed to a person[^)]*never tells them to repeat that step or wait it out/;
 
@@ -193,7 +195,7 @@ test("a failed documented step is a ticket, never a person, a repeat or a wait",
   assert.match(EXTRACT_PROMPT, FAILED_STEP_RULE);
 });
 
-test("what the investigator could not check comes back as general unchecked facts", async () => {
+test("what the investigator could not check comes back as unchecked facts for the finish to file", async () => {
   const out = await extractWidgetFindings(input, {
     generate: () =>
       Promise.resolve({
@@ -201,27 +203,28 @@ test("what the investigator could not check comes back as general unchecked fact
         unchecked: [
           {
             area: "orders",
-            fact: "Why a managed domain is suspended",
+            fact: " Why a managed  domain is suspended",
             kind: "tool",
           },
-          { area: "inboxes", fact: "whether a mailbox still exists" },
           {
             area: "made-up",
             fact: "what partial means for a domain",
             kind: "docs",
           },
-          // Names something from the workspace, so it can't be filed.
-          { area: "inboxes", fact: "why sam@acme.com is disconnected" },
+          {
+            area: "inboxes",
+            fact: "why sam@acme.com is disconnected",
+            kind: "nope",
+          },
+          { area: "inboxes", fact: "x" },
         ],
       }),
   });
+  // Kept as written: replyGaps decides what reaches a ticket.
   assert.deepEqual(out?.unchecked, [
-    { area: "orders", fact: "why a managed domain is suspended", kind: "tool" },
-    { area: "inboxes", fact: "whether a mailbox still exists", kind: "tool" },
+    { area: "orders", fact: "Why a managed domain is suspended", kind: "tool" },
     { area: "other", fact: "what partial means for a domain", kind: "docs" },
+    { area: "inboxes", fact: "why sam@acme.com is disconnected", kind: "tool" },
   ]);
-  assert.match(
-    EXTRACT_PROMPT,
-    /list in unchecked each thing the investigator said it could not check/
-  );
+  assert.match(EXTRACT_PROMPT, UNCHECKED_RULE);
 });

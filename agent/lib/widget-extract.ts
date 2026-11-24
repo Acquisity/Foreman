@@ -2,7 +2,7 @@ import { generateObject } from "ai";
 import { z } from "zod";
 import { fastCallOptions, modelFor, resolveModel } from "./models.js";
 import { logOpsEvent } from "./ops-log.js";
-import { GAP_AREAS, generalFact } from "./widget-capability-gaps.js";
+import { GAP_AREAS } from "./widget-capability-gaps.js";
 import { parseFindings, type WidgetFindings } from "./widget-findings.js";
 import type { WidgetContext } from "./widget-scope.js";
 
@@ -59,26 +59,21 @@ const strArr = (v: unknown, maxItems: number, maxLen: number): string[] =>
         .slice(0, maxItems)
     : [];
 
+const WHITESPACE = /\s+/gu;
 const uncheckedArea = z.enum(GAP_AREAS).catch("other");
 const uncheckedKind = z.enum(["docs", "tool"]).catch("tool");
 
-/** Each unchecked fact the extractor wrote in general terms; one naming something from the workspace is dropped. */
+/** Each unchecked fact as the extractor wrote it; replyGaps decides what may be filed. */
 function uncheckedFacts(
   raw: LenientFindings["unchecked"]
 ): Pick<WidgetFindings, "unchecked"> {
   const unchecked = (raw ?? [])
-    .flatMap((item) => {
-      const fact = generalFact(item.fact);
-      return fact
-        ? [
-            {
-              area: uncheckedArea.parse(item.area),
-              fact,
-              kind: uncheckedKind.parse(item.kind),
-            },
-          ]
-        : [];
-    })
+    .map((item) => ({
+      area: uncheckedArea.parse(item.area),
+      fact: item.fact.replace(WHITESPACE, " ").trim().slice(0, 160),
+      kind: uncheckedKind.parse(item.kind),
+    }))
+    .filter((item) => item.fact.length >= 3)
     .slice(0, 10);
   return unchecked.length ? { unchecked } : {};
 }

@@ -31,12 +31,15 @@ export const GAP_AREAS = [
 
 export interface CapabilityGap {
   area: string;
+  /** What a reply said it could not check, in general terms, for its conversation's comment. */
+  details?: string[];
   fact: string;
   /** `docs` is a Help Centre gap, filed with Docs Gap instead of Capability Gap. */
   kind: "docs" | "tool";
   /** Why the read failed (error, timeout), for an endpoint or tool result. */
   reason?: string;
-  source: "code" | "investigator";
+  /** `reply`: the extraction pass read it from what the reply said it could not check. */
+  source: "code" | "investigator" | "reply";
 }
 
 export const gapKey = (gap: Pick<CapabilityGap, "area" | "fact">) =>
@@ -101,6 +104,8 @@ const TOOL_AREAS: Readonly<Record<string, string>> = {
   widget_sdr_thread_status: "ai-sdr",
   widget_website_status: "website",
 };
+const toolArea = (tool: string) =>
+  TOOL_AREAS[tool] ?? tool.slice("widget_".length).replaceAll("_", "-");
 const READ_FAILED = new Set(["error", "timeout"]);
 const unavailableSections = z.array(
   z.looseObject({ reason: z.string(), section: z.string().max(100) })
@@ -166,8 +171,7 @@ export function gapsFromResult(result: unknown): CapabilityGap[] {
   if (!tool.startsWith("widget_") || NOT_READS.has(tool)) {
     return [];
   }
-  const area =
-    TOOL_AREAS[tool] ?? tool.slice("widget_".length).replaceAll("_", "-");
+  const area = toolArea(tool);
   const whole = (reason: string): CapabilityGap[] => [
     {
       area,
@@ -259,6 +263,80 @@ function nestedUnavailable(
   );
 }
 
+const REFUSAL = /"(?:status|reason)":"(?:denied|feature_off|not_linked)"/u;
+
+/**
+ * The area a widget read refused by design (denied, feature_off, not_linked,
+ * anywhere in its result), so what a reply says it couldn't check there is
+ * not filed as a gap.
+ */
+export function refusedAreas(result: unknown): string[] {
+  const action = result as {
+    kind?: string;
+    output?: unknown;
+    toolName?: unknown;
+  } | null;
+  const tool = action?.toolName;
+  if (
+    action?.kind !== "tool-result" ||
+    typeof tool !== "string" ||
+    !tool.startsWith("widget_") ||
+    NOT_READS.has(tool)
+  ) {
+    return [];
+  }
+  return REFUSAL.test(JSON.stringify(action.output ?? null))
+    ? [toolArea(tool)]
+    : [];
+}
+
+export interface UncheckedFact {
+  area: (typeof GAP_AREAS)[number];
+  fact: string;
+  kind: "docs" | "tool";
+}
+
+const REPLY_FACTS = {
+  docs: "a product question a reply said the Help Centre does not answer",
+  tool: "something a reply said could not be checked",
+} as const;
+const NAMED_DATA = "one item that named workspace data, left out";
+
+/**
+ * What a reply said it couldn't check (ENG-20478), as one gap per area and
+ * kind, so rewording never opens a second ticket; each fact goes in the
+ * conversation's comment. An area whose read failed or was refused in the
+ * same run files nothing here: the failure is already a gap, and a refusal
+ * is by design.
+ */
+export function replyGaps(
+  unchecked: readonly UncheckedFact[] | undefined,
+  fromTools: readonly CapabilityGap[] = [],
+  refused: readonly string[] = []
+): CapabilityGap[] {
+  const skip = new Set([...fromTools.map((gap) => gap.area), ...refused]);
+  const byKey = new Map<string, CapabilityGap & { details: string[] }>();
+  for (const item of unchecked ?? []) {
+    if (skip.has(item.area)) {
+      continue;
+    }
+    const key = `${item.area}:${item.kind}`;
+    const gap = byKey.get(key) ?? {
+      area: item.area,
+      details: [],
+      fact: REPLY_FACTS[item.kind],
+      kind: item.kind,
+      source: "reply" as const,
+    };
+    const detail = generalFact(item.fact) ?? NAMED_DATA;
+    if (!gap.details.includes(detail)) {
+      gap.details.push(detail);
+    }
+    byKey.set(key, gap);
+  }
+  return [...byKey.values()];
+}
+
 /** One entry per gap key; the first occurrence keeps its reason. */
 export const distinctGaps = (gaps: readonly CapabilityGap[]) => {
   const byKey = new Map<string, CapabilityGap>();
@@ -286,18 +364,30 @@ export const gapTitle = (gap: CapabilityGap) =>
     255
   );
 
+const FOUND_BY = {
+  code: "Foreman's code, from a tool result",
+  investigator: "the investigator",
+  reply:
+    "the extraction pass, from what a reply told the customer it couldn't check",
+} as const;
+
+const INTRO = {
+  docs: "The support widget could not answer a customer from the Help Centre: the docs do not cover this.",
+  reply:
+    "A support reply told a customer it couldn't check something in this area. Each comment below lists what, in general terms; test each against the conversation before building.",
+  tool: "The support widget could not check this for a customer: no Foreman tool or support endpoint returns it, or the read failed.",
+} as const;
+
 export const gapDescription = (gap: CapabilityGap) =>
   [
-    gap.kind === "docs"
-      ? "The support widget could not answer a customer from the Help Centre: the docs do not cover this."
-      : "The support widget could not check this for a customer: no Foreman tool or support endpoint returns it, or the read failed.",
+    INTRO[gap.source === "reply" ? "reply" : gap.kind],
     "Each comment below names one support conversation that hit this gap. Fixy builds the fix without plan approval when it only adds or repairs a read or a Help Centre page (Aaron, 2026-11-23); anything that adds an action or moves money still waits for approval. After the fix is live, Fixy reruns the check for each conversation and answers the ones still open.",
     "## Capability gap",
     [
       `- Gap key: ${gapKey(gap)}`,
       `- Area: ${gap.area}`,
       `- Kind: ${gap.kind}`,
-      `- Found by: ${gap.source === "code" ? "Foreman's code, from a tool result" : "the investigator"}`,
+      `- Found by: ${FOUND_BY[gap.source]}`,
       "- Conversations: 1",
     ].join("\n"),
   ].join("\n\n");
@@ -313,6 +403,9 @@ const occurrenceBody = (gap: CapabilityGap, seen: GapOccurrence) =>
   [
     `${OCCURRENCE}${seen.conversationId} (Foreman run ${seen.runId}).`,
     ...(gap.reason ? [`Reason: ${gap.reason}.`] : []),
+    ...(gap.details?.length
+      ? [`Couldn't check: ${gap.details.join("; ")}.`]
+      : []),
   ].join(" ");
 
 const FIND = `query CapabilityGapFind($team: String!, $title: String!) {

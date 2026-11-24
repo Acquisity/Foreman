@@ -18,6 +18,12 @@ import { PRODUCT_GUIDE } from "./widget-product-guide.js";
 import { widgetAuth } from "./widget-scope.js";
 import { SUPPORT_GUIDE } from "./widget-support-guide.js";
 
+const FEATURE_OFF_NAMES =
+  /These features are not turned on for this workspace: \["AI Website Creator"\]/u;
+const FEATURE_OFF_NO_ASK =
+  /do not say it could not be read or checked, and do not ask for details of it/u;
+const FEATURE_OFF_NOT_GAP = /not a capability gap/u;
+
 test("shared support facts keep unpaid cleanup guidance without investigator tool commands", () => {
   for (const tool of [
     "widget_inbox_health",
@@ -188,15 +194,9 @@ test("an investigation in a workspace with a feature off is told the feature is 
   assert.equal(auth.attributes?.featuresOff, '["AI Website Creator"]');
   assert.equal(JSON.stringify(auth).includes("signed.viewer.token"), false);
   const text = widgetInstructions(auth);
-  assert.match(
-    text,
-    /These features are not turned on for this workspace: \["AI Website Creator"\]/
-  );
-  assert.match(
-    text,
-    /do not say it could not be read or checked, and do not ask for details of it/
-  );
-  assert.match(text, /not a capability gap/);
+  assert.match(text, FEATURE_OFF_NAMES);
+  assert.match(text, FEATURE_OFF_NO_ASK);
+  assert.match(text, FEATURE_OFF_NOT_GAP);
   assert.equal(
     widgetInstructions(widgetAuth(scope)).includes(
       "not turned on for this workspace"

@@ -409,23 +409,35 @@ test("a call without the shared secret reads nothing", async (context) => {
 // ENG-20528: eve names a hand-written tool by its file, so an area switched
 // off HELD_AREAS while agent/tools still holds a tool of the same name would
 // register two widget_<area> tools. The switch deletes or renames the old one.
-test("no offered endpoint tool shares its name with a hand-written tool", () => {
+const offeredClashes = (
+  held: ReadonlySet<string>,
+  files: readonly string[]
+) => {
   const handWritten = new Set(
-    readdirSync(new URL("../tools/", import.meta.url))
+    files
       .filter((file) => file.endsWith(".ts") && !file.endsWith(".test.ts"))
       .map((file) => file.slice(0, -3))
   );
-  const clashes = (held: ReadonlySet<string>) =>
-    WIDGET_ENDPOINT_MANIFEST.endpoints
-      .filter(
-        (entry) => !(held.has(entry.name) || CODE_ONLY_AREAS.has(entry.name))
-      )
-      .map((entry) => endpointToolName(entry.name))
-      .filter((name) => handWritten.has(name));
-  assert.deepEqual(clashes(HELD_AREAS), []);
-  // Switching CRM contact today would clash with the old hand-written tool.
-  const withoutCrm = new Set(
-    [...HELD_AREAS].filter((a) => a !== "crm-contact")
+  return WIDGET_ENDPOINT_MANIFEST.endpoints
+    .filter(
+      (entry) => !(held.has(entry.name) || CODE_ONLY_AREAS.has(entry.name))
+    )
+    .map((entry) => endpointToolName(entry.name))
+    .filter((name) => handWritten.has(name));
+};
+
+test("no offered endpoint tool shares its name with a hand-written tool", () => {
+  assert.deepEqual(
+    offeredClashes(
+      HELD_AREAS,
+      readdirSync(new URL("../tools/", import.meta.url))
+    ),
+    []
   );
-  assert.deepEqual([...new Set(clashes(withoutCrm))], ["widget_crm_contact"]);
+  // Unholding an area whose old tool file is still there is caught.
+  const unheld = new Set([...HELD_AREAS].filter((area) => area !== "account"));
+  assert.deepEqual(
+    [...new Set(offeredClashes(unheld, ["widget_account.ts", "other.ts"]))],
+    ["widget_account"]
+  );
 });
