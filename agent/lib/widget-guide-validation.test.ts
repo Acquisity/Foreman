@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
   assertGuideSections,
+  assertOwnAnswers,
   frontmatterField,
   plainDashes,
 } from "./widget-guide-validation.js";
@@ -11,6 +12,8 @@ import {
 } from "./widget-product-guide.js";
 
 const MISSING = /missing slugs: second/u;
+const POINTERS =
+  /sections answer with another article: dashboard\/faq\/sample, offer-creator\/faq\/count$/u;
 const DUPLICATE = /duplicate slug: first/u;
 const UNEXPECTED = /unexpected slug: other/u;
 const INVALID = /invalid heading: ### Second; missing slugs: second/u;
@@ -75,5 +78,24 @@ test("em dashes become commas between words and a hyphen when they stand alone",
   assert.equal(
     plainDashes("Status: —\n### Next {slug: next}"),
     "Status:, \n### Next {slug: next}"
+  );
+});
+
+test("a section that answers with another article's slug is refused", () => {
+  // Shapes seen in Foreman#274's guide (ENG-20311).
+  const guide = [
+    "### Where did my sample data go? {slug: dashboard/faq/sample}",
+    "Same as: dashboard",
+    "### How many offers? {slug: offer-creator/faq/count}",
+    "Same as offer-creator.",
+    "Same as slug cold-email-agent/faq/billing-domains/redirect.",
+    "  * Same as: dashboard",
+    "### Campaign settings {slug: cold-email-agent/settings}",
+    '- Who takes the calls: "Same as default" or "This campaign only".',
+    "Same as the monthly plan: $20.",
+  ].join("\n");
+  assert.throws(() => assertOwnAnswers(guide), POINTERS);
+  assert.doesNotThrow(() =>
+    assertOwnAnswers(guide.split("\n").slice(6).join("\n"))
   );
 });

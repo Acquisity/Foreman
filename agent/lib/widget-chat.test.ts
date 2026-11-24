@@ -11,9 +11,11 @@ import {
   guideCitations,
   guideFor,
 } from "./widget-chat.js";
+import { GUIDE_CITATION } from "./widget-guide-cache.js";
 import { PRODUCT_GUIDE } from "./widget-product-guide.js";
 
 const TRY_AGAIN = /try your message again/u;
+const WHO_CAN = /\n## Who can do what\n([\s\S]*?)\n## /u;
 
 test("SDK failures never log provider text or raw errors", async (t) => {
   const sentinel = "private-customer-sentinel";
@@ -328,9 +330,17 @@ test("the guide writer answers from the customer's guide, is told what is off, a
 });
 
 test("a member's role limits come from their own guide, never a hidden page", () => {
-  const slug =
-    "sales-call-analyzer/faq/can-my-team-members-access-sales-call-analyzer";
-  const line = "Sales Call Analyzer, while Clients have none";
+  // The guide is regenerated from the docs, so the line comes from whatever
+  // guide this runs against: the first role limit citing exactly one page.
+  const [line, slug] =
+    (PRODUCT_GUIDE.match(WHO_CAN)?.[1] ?? "")
+      .split("\n")
+      .map((limit) => [
+        limit,
+        ...[...limit.matchAll(GUIDE_CITATION)].map((m) => m[1]),
+      ])
+      .find((cited) => cited[0].startsWith("- ") && cited.length === 2) ?? [];
+  assert.ok(line && slug, "the guide has a role limit citing one page");
   const member = { canInvestigate: false, role: "member", workspace: "w" };
   const note = (
     featuresOff: { feature: string; pages: string[]; title: string }[]
@@ -343,9 +353,9 @@ test("a member's role limits come from their own guide, never a hidden page", ()
   assert.ok(
     !note([
       {
-        feature: "sales_call_analyzer",
+        feature: "hidden_feature",
         pages: [slug],
-        title: "Sales Call Analyzer",
+        title: "Hidden feature",
       },
     ]).includes(line)
   );
