@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readdirSync } from "node:fs";
 import { type TestContext, test } from "node:test";
 import { verifiedWidgetContext } from "./widget.fixture.js";
 import { WIDGET_ENDPOINT_MANIFEST } from "./widget-endpoint-manifest.js";
@@ -7,10 +8,13 @@ import {
   renderEndpointManifest,
 } from "./widget-endpoint-schema.js";
 import {
+  CODE_ONLY_AREAS,
   callWidgetEndpoint,
   endpointToolCheck,
+  endpointToolName,
   endpointToolNames,
   endpointToolSet,
+  HELD_AREAS,
   offeredEndpointTools,
 } from "./widget-endpoint-tools.js";
 import { widgetInvestigationMiddleware } from "./widget-investigation-model.js";
@@ -400,4 +404,28 @@ test("a call without the shared secret reads nothing", async (context) => {
   });
   assert.equal(called, false);
   assert.equal(result.status, "unavailable");
+});
+
+// ENG-20528: eve names a hand-written tool by its file, so an area switched
+// off HELD_AREAS while agent/tools still holds a tool of the same name would
+// register two widget_<area> tools. The switch deletes or renames the old one.
+test("no offered endpoint tool shares its name with a hand-written tool", () => {
+  const handWritten = new Set(
+    readdirSync(new URL("../tools/", import.meta.url))
+      .filter((file) => file.endsWith(".ts") && !file.endsWith(".test.ts"))
+      .map((file) => file.slice(0, -3))
+  );
+  const clashes = (held: ReadonlySet<string>) =>
+    WIDGET_ENDPOINT_MANIFEST.endpoints
+      .filter(
+        (entry) => !(held.has(entry.name) || CODE_ONLY_AREAS.has(entry.name))
+      )
+      .map((entry) => endpointToolName(entry.name))
+      .filter((name) => handWritten.has(name));
+  assert.deepEqual(clashes(HELD_AREAS), []);
+  // Switching CRM contact today would clash with the old hand-written tool.
+  const withoutCrm = new Set(
+    [...HELD_AREAS].filter((a) => a !== "crm-contact")
+  );
+  assert.deepEqual([...new Set(clashes(withoutCrm))], ["widget_crm_contact"]);
 });
