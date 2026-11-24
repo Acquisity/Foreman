@@ -133,6 +133,14 @@ test("the chat and the reply composer share one voice", () => {
   assert.ok(!COMPOSER_PROMPT.includes("No greetings"));
 });
 
+test("the composer keeps a named teammate named instead of calling them you", () => {
+  // ENG-20512: a teammate's CRM changes reached the customer as "all by you".
+  assert.match(
+    COMPOSER_PROMPT,
+    /when a finding names the person who did something, keep that name in the reply, and say "you" for an action only when a finding says the customer did it/,
+  );
+});
+
 test("without a filed ticket the composer never says it was reported", () => {
   assert.match(COMPOSER_PROMPT, UNFILED_TICKET_RULE);
 });
