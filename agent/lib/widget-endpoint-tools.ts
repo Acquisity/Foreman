@@ -34,7 +34,6 @@ import {
  */
 export const HELD_AREAS: ReadonlySet<string> = new Set([
   "crm-contact",
-  "website",
 ]);
 /**
  * The hand-written widget tools an endpoint area replaces, and the areas each
@@ -53,7 +52,6 @@ export const LEGACY_TOOL_AREAS: Readonly<Record<string, readonly string[]>> = {
   widget_outreach_health: ["campaigns"],
   widget_provisioning_status: ["orders"],
   widget_sdr_thread_status: ["ai-sdr"],
-  widget_website_status: ["website"],
 };
 
 /** A hand-written tool is offered while an area it answers for is held; any other tool is not an area's. */

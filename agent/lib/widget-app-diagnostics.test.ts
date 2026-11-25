@@ -1,18 +1,16 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { verifiedWidgetContext } from "./widget.fixture.js";
-import { readWidgetAppDiagnostics } from "./widget-app-diagnostics.js";
+import { postWidgetAppRoute } from "./widget-app-diagnostics.js";
 import { widgetAuth } from "./widget-scope.js";
 
-const forbidden = /403/;
-const oversized = /too large/;
 const unconfigured = /not configured/;
 
 const ctx = {
   abortSignal: new AbortController().signal,
   session: { auth: { initiator: widgetAuth(verifiedWidgetContext) } },
 };
-test("app diagnostics send trusted scope to a fixed origin and refuse redirects/oversized replies", async (t) => {
+test("app routes send the verified chat's scope to the fixed origin, over any input, and refuse redirects", async (t) => {
   const before = {
     origin: process.env.ACQUISITY_ORIGIN,
     secret: process.env.FOREMAN_DIAGNOSTICS_SECRET,
@@ -49,30 +47,23 @@ test("app diagnostics send trusted scope to a fixed origin and refuse redirects/
     assert.ok(init?.signal);
     return Promise.resolve(Response.json({ status: "ok" }));
   }) as typeof fetch;
-  assert.deepEqual(
-    await readWidgetAppDiagnostics(
-      ctx,
-      "website",
-      { organizationId: "other", userId: "other" },
-      request
-    ),
-    { status: "ok" }
+  const { response } = await postWidgetAppRoute(
+    ctx,
+    "/api/internal/foreman/website",
+    { organizationId: "other", userId: "other" },
+    25_000,
+    request
   );
-  await assert.rejects(
-    readWidgetAppDiagnostics(ctx, "website", {}, (() =>
-      Promise.resolve(
-        new Response("not authorized", { status: 403 })
-      )) as typeof fetch),
-    forbidden
-  );
-  await assert.rejects(
-    readWidgetAppDiagnostics(ctx, "website", {}, (() =>
-      Promise.resolve(new Response("x".repeat(65_537)))) as typeof fetch),
-    oversized
-  );
+  assert.deepEqual(await response.json(), { status: "ok" });
   delete process.env.FOREMAN_DIAGNOSTICS_SECRET;
   await assert.rejects(
-    readWidgetAppDiagnostics(ctx, "website", {}, request),
+    postWidgetAppRoute(
+      ctx,
+      "/api/internal/foreman/website",
+      {},
+      25_000,
+      request
+    ),
     unconfigured
   );
 });
