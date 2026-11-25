@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
+  answerWords,
   assertGuideSections,
   assertOwnAnswers,
   frontmatterField,
@@ -123,5 +124,13 @@ test("a long article answered in a line is short, and a short article or a full 
       { slug: "missing", text: long },
     ]),
     ["client-portal", "missing"]
+  );
+  assert.deepEqual(
+    [...answerWords(guide)],
+    [
+      ["client-portal", 1],
+      ["sca/voice", 3],
+      ["sca", 26],
+    ]
   );
 });

@@ -145,37 +145,118 @@ export const startsAtSidebarPage = (
   );
 };
 
+const QUOTED = /"([^"]+)"/gu;
+const LABEL_EDGE = /^[\s,.;:]+|[\s,.;:]+$/gu;
+/** The two entry points that have no label to quote. */
+export const UNLABELLED = /\bworkspace name\b|\byour name\b/iu;
+const LEFT_SIDEBAR = /\bsidebar\b/iu;
+
+/** Each quoted label in a path, without edge punctuation, with where it starts. */
+export const labelsIn = (path: string) =>
+  [...path.matchAll(QUOTED)].map((m) => ({
+    at: m.index,
+    label: m[1].replace(LABEL_EDGE, ""),
+  }));
+
 /**
- * A path that says it starts in the sidebar but opens at a label the sidebar
- * doesn't show, such as `click "Cold Email Agent", then "Deliverability"`,
- * starts again at its first label that is a sidebar page. Any other path is
- * returned as it was.
+ * A path that says it starts in the left sidebar but opens at a label the
+ * sidebar doesn't show, such as `click "Cold Email Agent", then
+ * "Deliverability"`, starts again at its first label that is a sidebar page.
+ * A path through the account or workspace menu, or through Settings, is a
+ * different route and stays as it was, as does any path with no sidebar page
+ * in it.
  */
 export const fromFirstSidebarPage = (
   sidebar: GuideSidebar,
   entries: ReadonlySet<string>,
-  path: string,
-  labels: readonly string[]
+  path: string
 ) => {
-  if (startsAtSidebarPage(sidebar, entries, path, labels)) {
+  const labels = labelsIn(path);
+  if (
+    !LEFT_SIDEBAR.test(path) ||
+    UNLABELLED.test(path) ||
+    labels.some((l) => l.label === "Settings") ||
+    startsAtSidebarPage(
+      sidebar,
+      entries,
+      path,
+      labels.map((l) => l.label)
+    )
+  ) {
     return path;
   }
-  const page = labels.find((label) => sidebar.pages.has(label));
+  const page = labels.find((l) => sidebar.pages.has(l.label));
   return page === undefined
     ? path
-    : `In the left sidebar, click ${path.slice(path.indexOf(`"${page}"`))}`;
+    : `In the left sidebar, click ${path.slice(page.at)}`;
 };
 
-const SETTINGS_ROUTE = /group: '([^']+)',\s*label: '([^']+)'/gu;
+const ROUTE_START = "segment: '";
+const ROUTE_SEGMENT = /^([^']+)'/u;
+const ROUTE_GROUP = /group: '([^']+)'/u;
+const ROUTE_LABEL = /label: '([^']+)'/u;
+const ROUTE_ALTS = /altSegments: \[([^\]]*)\]/u;
+const QUOTED_SEGMENT = /'([^']+)'/gu;
+const FALLBACK = /FALLBACK_GROUP = '([^']+)'/u;
+const MENU_ITEM =
+  /label: '([^']+)',\s*href: `\$\{settingsBasePath\}\/([a-z0-9-]+)`/gu;
+/** The kit leaves Calendly out of the menu (settings-menu-items.tsx). */
+const NOT_IN_MENU = new Set(["calendly"]);
 
 /**
- * The settings menu's groups and pages, in order, from settings-nav.ts: one
- * line per group, such as `"Workspace": "General", "Members"`.
+ * The settings menu as an owner sees it with every feature on, one line per
+ * group, such as `"Workspace": "General", "Members"`. It follows the app's
+ * `buildKitSettingsGroups` (settings-nav.ts): each grouped route row holds its
+ * page, a page that can fill a row's slot (`altSegments`) is named with it, and
+ * every other menu item (settings-menu-items.tsx) goes under the fallback
+ * group with its own label.
  */
-export function parseSettingsMenu(source: string): string {
+export function parseSettingsMenu(nav: string, menu: string): string {
+  const routes = nav
+    .split(ROUTE_START)
+    .slice(1)
+    .map((row) => ({
+      alts: [...(ROUTE_ALTS.exec(row)?.[1] ?? "").matchAll(QUOTED_SEGMENT)].map(
+        (m) => m[1]
+      ),
+      group: ROUTE_GROUP.exec(row)?.[1],
+      label: ROUTE_LABEL.exec(row)?.[1],
+      segment: ROUTE_SEGMENT.exec(row)?.[1] ?? "",
+    }));
+  const menuLabels = new Map<string, string>();
+  for (const [, label, segment] of menu.matchAll(MENU_ITEM)) {
+    if (!menuLabels.has(segment)) {
+      menuLabels.set(segment, label);
+    }
+  }
+  const labelOf = (segment: string) =>
+    routes.find((r) => r.segment === segment)?.label ?? menuLabels.get(segment);
   const groups = new Map<string, string[]>();
-  for (const [, group, label] of source.matchAll(SETTINGS_ROUTE)) {
-    groups.set(group, [...(groups.get(group) ?? []), `"${label}"`]);
+  const add = (group: string, entry: string) =>
+    groups.set(group, [...(groups.get(group) ?? []), entry]);
+  const claimed = new Set<string>();
+  for (const route of routes) {
+    if (!(route.group && route.label)) {
+      continue;
+    }
+    claimed.add(route.segment);
+    const alternatives = route.alts.flatMap((alt) => {
+      claimed.add(alt);
+      const label = labelOf(alt);
+      return label ? [`"${label}"`] : [];
+    });
+    add(
+      route.group,
+      alternatives.length
+        ? `"${route.label}" (or ${alternatives.join(", ")} where turned on)`
+        : `"${route.label}"`
+    );
+  }
+  const fallback = FALLBACK.exec(nav)?.[1] ?? "Workspace";
+  for (const [segment, label] of menuLabels) {
+    if (!(claimed.has(segment) || NOT_IN_MENU.has(segment))) {
+      add(fallback, `"${label}"`);
+    }
   }
   const pages = [...groups.values()].flat().length;
   // A reshaped settings table must fail here, not ship a stale menu.

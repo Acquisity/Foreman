@@ -47,13 +47,16 @@ import {
 } from "../agent/lib/widget-guide-cache.js";
 import {
   fromFirstSidebarPage,
+  labelsIn,
   parseGuideSidebar,
   parseSettingsMenu,
   startsAtSidebarPage,
+  UNLABELLED,
   withoutHeadings,
 } from "../agent/lib/widget-guide-sidebar.js";
 import { guideSourcePath } from "../agent/lib/widget-guide-source.js";
 import {
+  answerWords,
   assertGuideSections,
   assertOwnAnswers,
   frontmatterField,
@@ -68,6 +71,8 @@ const DOCS = "apps/web/content/docs";
 const CATALOG = "apps/web/lib/sidebar/catalog.ts";
 const FEATURES = "apps/web/lib/features.ts";
 const SETTINGS_NAV = "apps/web/lib/new-design/settings-nav.ts";
+const SETTINGS_MENU_ITEMS =
+  "apps/web/components/organization/settings-menu-items.tsx";
 const MDX = /\.mdx$/u;
 const FRONTMATTER = /^---\n([\s\S]*?)\n---\n?/u;
 const INDEX_PAGE = /(^|\/)index$/u;
@@ -141,7 +146,7 @@ const ENTRY_POINTS: { starts: string[]; text: string }[] = [
   },
   {
     starts: [],
-    text: 'Account menu: click your name at the bottom of the sidebar. It holds "Feedback" (support chat), "Light theme" or "Dark theme", "Edit sidebar" (not for Client users) and "Log out".',
+    text: 'Account menu: click your name at the bottom of the sidebar. It holds "Feedback" (support chat, not for Client users), "Light theme" or "Dark theme", "Edit sidebar" (not for Client users) and "Log out".',
   },
   {
     starts: ["Credits", "Add credits", "What's New", "Help Center"],
@@ -207,7 +212,10 @@ const GUIDE_SIDEBAR = parseGuideSidebar(
   git("show", `${sha}:${CATALOG}`),
   git("show", `${sha}:${FEATURES}`)
 );
-const SETTINGS_MENU = parseSettingsMenu(git("show", `${sha}:${SETTINGS_NAV}`));
+const SETTINGS_MENU = parseSettingsMenu(
+  git("show", `${sha}:${SETTINGS_NAV}`),
+  git("show", `${sha}:${SETTINGS_MENU_ITEMS}`)
+);
 
 const SIDEBAR = `Left sidebar, top to bottom (group headings can be collapsed; a customer clicks the page, not the heading). A page marked "(only where turned on)" is off until it is turned on for the workspace, so a new workspace doesn't have it. A page shows only when the workspace has the feature and the role may use it. ${CLIENT_PAGES} Only Client users have "Client Portal" in the sidebar; owners and admins can preview it at the workspace address followed by /client-portal, and invite a client from "Settings" > "Members". A customer can rearrange, hide and add pages with "Edit sidebar" in the account menu, so their sidebar may differ from this.
 ${GUIDE_SIDEBAR.lines}
@@ -494,20 +502,31 @@ await Promise.all(
 
 /**
  * A long article a batch answered in a line or two is distilled once more on
- * its own (ENG-20575). Whatever that returns is kept, and one still short is
- * only logged, so a stubborn article never stops the run.
+ * its own (ENG-20575). Its section replaces the batch's only when it says
+ * more. One still short, or whose call fails, is logged and kept out of the
+ * cache, so the next run tries it again; it never stops this run.
  */
 const shortened = pending.filter(
   (a) => shortAnswers(distilled.get(a.slug) ?? "", [a]).length > 0
 );
+const stillShort = new Set<string>();
 for (const article of shortened) {
-  // biome-ignore lint/performance/noAwaitInLoops: a few calls, one at a time.
-  const out = await distillBatch([article], `alone ${article.slug}`);
-  distilled.set(article.slug, out.text);
-  if (out.fresh) {
-    rewritten.push(article.slug);
+  const label = `alone ${article.slug}`;
+  const before = distilled.get(article.slug) ?? "";
+  try {
+    // biome-ignore lint/performance/noAwaitInLoops: a few calls, one at a time.
+    const out = await distillBatch([article], label);
+    const section = splitGuideSections(out.text).get(article.slug);
+    const words = (text: string) => answerWords(text).get(article.slug) ?? 0;
+    if (section && words(section) > words(before)) {
+      distilled.set(article.slug, section);
+      rewritten.push(article.slug);
+    }
+  } catch (error) {
+    console.log(`  ${label} failed: ${String(error).slice(0, 160)}`);
   }
-  if (shortAnswers(out.text, [article]).length) {
+  if (shortAnswers(distilled.get(article.slug) ?? "", [article]).length) {
+    stillShort.add(article.slug);
     console.log(`  still short ${article.slug}`);
   }
 }
@@ -525,17 +544,11 @@ const linked = slugs.map((slug) => distilled.get(slug)).join("\n\n");
  */
 const SECTION_HEAD = /^### .*\{slug: ([^}]+)\}$/u;
 const GET_HERE = /^Get here: (.*)$/u;
-const QUOTED = /"([^"]+)"/gu;
-const LABEL_EDGE = /^[\s,.;:]+|[\s,.;:]+$/gu;
-/** The two entry points that have no label to quote. */
-const UNLABELLED = /\bworkspace name\b|\byour name\b/iu;
 const HELP_CENTER_PATH =
   /\bnot stated\b|\bFAQ\b|\bhelp center\b|"Getting Started"|\bsee (?:the )?\S+ section\b/iu;
 const sourceText = new Map(available.map((a) => [a.slug, a.text]));
-const labelsIn = (path: string) =>
-  [...path.matchAll(QUOTED)].map((m) => m[1].replace(LABEL_EDGE, ""));
 const usablePath = (slug: string, path: string): boolean => {
-  const labels = labelsIn(path);
+  const labels = labelsIn(path).map((l) => l.label);
   const source = `${sourceText.get(slug) ?? ""}\n${SIDEBAR}`;
   return (
     (labels.length > 0 || UNLABELLED.test(path)) &&
@@ -554,13 +567,7 @@ for (const line of lines) {
   const found = line.match(GET_HERE)?.[1];
   const stripped = found && withoutHeadings(GUIDE_SIDEBAR, found);
   const path =
-    stripped &&
-    fromFirstSidebarPage(
-      GUIDE_SIDEBAR,
-      SIDEBAR_ENTRIES,
-      stripped,
-      labelsIn(stripped)
-    );
+    stripped && fromFirstSidebarPage(GUIDE_SIDEBAR, SIDEBAR_ENTRIES, stripped);
   if (path && usablePath(current, path)) {
     paths.set(current, path);
   } else if (path) {
@@ -661,7 +668,9 @@ const limits = joinGuideLimits(
   slugs.map((slug) => summarised.get(slug) ?? { cannot: [], who: [] })
 );
 for (const article of available) {
-  cache.set(articleKey(article), distilled.get(article.slug) ?? "");
+  if (!stillShort.has(article.slug)) {
+    cache.set(articleKey(article), distilled.get(article.slug) ?? "");
+  }
 }
 for (const slug of slugs) {
   cache.set(limitsKey(slug), JSON.stringify(summarised.get(slug)));

@@ -160,12 +160,7 @@ test("a reshaped catalog fails instead of shipping a guide without a sidebar", (
 
 test("a sidebar path that opens at a retired label starts again at its first sidebar page", () => {
   const repaired = (path: string) =>
-    fromFirstSidebarPage(
-      sidebar,
-      ENTRIES,
-      path,
-      [...path.matchAll(QUOTED)].map((m) => m[1])
-    );
+    fromFirstSidebarPage(sidebar, ENTRIES, path);
   // Foreman#274's guide at 30052833 (ENG-20575).
   assert.equal(
     repaired(
@@ -174,36 +169,65 @@ test("a sidebar path that opens at a retired label starts again at its first sid
     'In the left sidebar, click "Deliverability" > "Results".'
   );
   assert.equal(
-    repaired('In the left sidebar, click "Website Builder"'),
-    'In the left sidebar, click "Website Builder"'
+    repaired(
+      'In the left sidebar, click "Cold Email Agent", then "Deliverability."'
+    ),
+    'In the left sidebar, click "Deliverability."'
   );
-  assert.equal(repaired('"Settings" > "Billing"'), '"Settings" > "Billing"');
+  // Other routes, and paths with no sidebar page, stay as they were.
+  for (const path of [
+    'In the left sidebar, click "Website Builder"',
+    '"Settings" > "Billing"',
+    'In the left sidebar, click your name, then "Edit sidebar", and turn on "Workflows"',
+    'In the sidebar, click "Settings", then "Cold Email Agent" and "Email accounts"',
+    'In the Settings left menu, click "Cold Email Agent", then "Email accounts"',
+  ]) {
+    assert.equal(repaired(path), path);
+  }
 });
 
-/** Shaped like Acquisity's apps/web/lib/new-design/settings-nav.ts. */
+/** One route row shaped like Acquisity's apps/web/lib/new-design/settings-nav.ts. */
+const route = (segment: string, group?: string, label?: string, extra = "") =>
+  `  {\n    segment: '${segment}',${group ? `\n    group: '${group}',` : ""}${label ? `\n    label: '${label}',` : ""}${extra}\n  },`;
 const SETTINGS_NAV = [
-  ["Account", ["Profile", "Notifications", "Appearance", "Security"]],
-  ["Your calendar", ["Email & Calendar", "Availability"]],
-  ["Workspace", ["General", "Members", "Billing", "Integrations"]],
-  ["CRM", ["Pipelines", "Records & fields", "Messaging", "Phone"]],
-  ["Outreach", ["Cold Email Agent", "AI SDR Agent"]],
-]
-  .flatMap(([group, labels]) =>
-    (labels as string[]).map(
-      (label) =>
-        `  {\n    segment: 'x',\n    group: '${group}',\n    label: '${label}',\n  },`
+  "const FALLBACK_GROUP = 'Workspace';",
+  ...[
+    ["Account", ["Profile", "Notifications", "Appearance", "Security"]],
+    ["Your calendar", ["Email & Calendar", "Availability"]],
+    ["Workspace", ["General", "Members", "Billing", "Integrations"]],
+    ["CRM", ["Pipelines", "Records & fields", "Messaging", "Phone"]],
+  ].flatMap(([group, labels]) =>
+    (labels as string[]).map((label) =>
+      route(label.toLowerCase(), group as string, label)
     )
-  )
-  .join("\n");
+  ),
+  route(
+    "niche-offer",
+    "Outreach",
+    "Your Niche & Offer",
+    "\n    altSegments: ['acquisity-brain'],"
+  ),
+  route("cold-email-agent", "Outreach", "Cold Email Agent"),
+  "  { segment: 'calendly', label: 'Calendly', wide: true },",
+  route("acquisity-brain", undefined, "Acquisity Brain"),
+  "  { segment: 'scheduling', tool: ACTIVATION_TOOLS.SettingsScheduling },",
+].join("\n");
+/** Production items shaped like settings-menu-items.tsx. */
+const menuItem = (label: string, segment: string) =>
+  `      {\n        label: '${label}',\n        href: \`\${settingsBasePath}/${segment}\`,\n      },`;
+const SETTINGS_MENU = [
+  menuItem("Members", "members"),
+  menuItem("Scheduling", "scheduling"),
+  menuItem("Calendly", "calendly"),
+  menuItem("Email Templates", "email-templates"),
+].join("\n");
 
-test("the settings menu comes from the app's own table, grouped as it shows it", () => {
+test("the settings menu follows the app's grouping, with alternate slots and its other pages", () => {
   assert.equal(
-    parseSettingsMenu(
-      `${SETTINGS_NAV}\n  { segment: 'calendly', label: 'Calendly', wide: true },`
-    ),
-    '"Account": "Profile", "Notifications", "Appearance", "Security"; "Your calendar": "Email & Calendar", "Availability"; "Workspace": "General", "Members", "Billing", "Integrations"; "CRM": "Pipelines", "Records & fields", "Messaging", "Phone"; "Outreach": "Cold Email Agent", "AI SDR Agent"'
+    parseSettingsMenu(SETTINGS_NAV, SETTINGS_MENU),
+    '"Account": "Profile", "Notifications", "Appearance", "Security"; "Your calendar": "Email & Calendar", "Availability"; "Workspace": "General", "Members", "Billing", "Integrations", "Scheduling", "Email Templates"; "CRM": "Pipelines", "Records & fields", "Messaging", "Phone"; "Outreach": "Your Niche & Offer" (or "Acquisity Brain" where turned on), "Cold Email Agent"'
   );
-  assert.throws(() => parseSettingsMenu(""), {
+  assert.throws(() => parseSettingsMenu("", ""), {
     message: "settings menu parse found 0 groups, 0 pages",
   });
 });
