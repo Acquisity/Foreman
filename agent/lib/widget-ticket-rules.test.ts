@@ -6,11 +6,11 @@ const json = (value: object) => JSON.stringify({ type: "json", value });
 
 test("ticket rules inspect only customer messages for a billing dispute", () => {
   const billing = {
-    result: JSON.stringify({
-      type: "json",
-      value: { identifiesCharge: true, reading: "Inbox charges" },
+    result: json({
+      sections: { inboxErrorCharges: { identifiesCharge: true } },
+      status: "ok",
     }),
-    tool: "widget_billing_summary",
+    tool: "widget_billing",
   };
   const supportOnly =
     "LATEST CUSTOMER MESSAGE (the one to work on):\nWhat plan am I on?\n\nEARLIER TURNS (context only):\nCustomer: My inbox needs checking.\nSupport: You can request a refund.\nSend us a dispute.";
@@ -40,7 +40,7 @@ test("ticket rules ignore provider metadata flags and flags on other tools", () 
         result: JSON.stringify({
           autumn: { data: { metadata: { platformFault: true } } },
         }),
-        tool: "widget_billing_summary",
+        tool: "widget_billing",
       },
     ]),
     null
@@ -48,8 +48,10 @@ test("ticket rules ignore provider metadata flags and flags on other tools", () 
   assert.equal(
     ruledTicket("Refund please", [
       {
-        result: JSON.stringify({ identifiesCharge: true }),
-        tool: "widget_inbox_health",
+        result: json({
+          sections: { inboxErrorCharges: { identifiesCharge: true } },
+        }),
+        tool: "widget_inboxes",
       },
     ]),
     null
@@ -60,7 +62,7 @@ test("ticket rules ignore provider metadata flags and flags on other tools", () 
         result: JSON.stringify({
           autumn: { data: { identifiesCharge: true } },
         }),
-        tool: "widget_billing_summary",
+        tool: "widget_billing",
       },
     ]),
     null

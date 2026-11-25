@@ -806,3 +806,37 @@ test("an area a feature that is off closes files no reply gap of either kind (EN
     ["inboxes/tool"]
   );
 });
+
+// ENG-20543: the old billing tool's BILLING_REFUSALS ("workspace could not be
+// verified", "productDb: organization not found") kept a membership refusal from
+// filing a gap. The billing endpoint answers that refusal as { status: "denied" }
+// (Acquisity's foremanEndpointHandler, HTTP 401/403), which must do the same.
+test("the billing endpoint's refusal files no gap and silences the reply's billing tool facts", () => {
+  const denied = result("widget_billing", { status: "denied" });
+  assert.deepEqual(gapsFromResult(denied), []);
+  assert.deepEqual(readRefusal(denied), { area: "billing", refused: true });
+  const gaps = replyGaps(
+    [
+      { area: "billing", fact: "whether an invoice was paid", kind: "tool" },
+      { area: "billing", fact: "how credits roll over", kind: "docs" },
+    ],
+    [],
+    ["billing"]
+  );
+  assert.deepEqual(
+    gaps.map(({ area, source }) => ({ area, source })),
+    [{ area: "billing", source: "reply" }]
+  );
+  assert.equal(gaps[0]?.kind, "docs");
+  // A section the endpoint could not read still files, keyed as the old tool's.
+  assert.deepEqual(
+    gapsFromResult(
+      result("widget_billing", {
+        sections: {},
+        status: "ok",
+        unavailable: [{ reason: "timeout", section: "stripe" }],
+      })
+    ).map(({ area, fact }) => [area, fact]),
+    [["billing", "the stripe section could not be read"]]
+  );
+});

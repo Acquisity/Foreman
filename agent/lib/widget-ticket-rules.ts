@@ -52,17 +52,10 @@ const earlyFollowUpFault = (tool: string, output: unknown) =>
     ) ??
       false));
 
-/**
- * The billing read names the charges a dispute is about: the billing
- * endpoint's `inboxErrorCharges` section (ENG-20547), or the old hand-written
- * billing tool's top-level field while billing is held.
- */
+/** The billing read names the charges a dispute is about: the billing endpoint's `inboxErrorCharges` section (ENG-20547). */
 const identifiesCharge = (tool: string, output: unknown) =>
   endpointSection(tool, output, "widget_billing", "inboxErrorCharges")
-    ?.identifiesCharge === true ||
-  (tool === "widget_billing_summary" &&
-    (output as { identifiesCharge?: boolean } | null)?.identifiesCharge ===
-      true);
+    ?.identifiesCharge === true;
 
 /**
  * The ticket the reads already settle, decided in code before Jev is asked.
