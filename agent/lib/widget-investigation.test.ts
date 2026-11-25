@@ -3526,8 +3526,7 @@ test("a reply about an area the workspace's features close files nothing (ENG-20
     filed.push(gaps);
     return Promise.resolve();
   };
-  if (outcome.status === "completed") {
-    await finishWidgetRun(run, "widget-session-closed", outcome, deps);
-  }
+  assert.equal(outcome.status, "completed");
+  await finishWidgetRun(run, "widget-session-closed", outcome, deps);
   assert.deepEqual(filed, []);
 });
