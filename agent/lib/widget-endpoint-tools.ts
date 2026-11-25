@@ -33,7 +33,6 @@ import {
  * offered as soon as the manifest has it.
  */
 export const HELD_AREAS: ReadonlySet<string> = new Set([
-  "ai-sdr",
   "crm-contact",
   "lead-pipeline",
   "website",
