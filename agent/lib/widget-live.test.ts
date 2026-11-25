@@ -7,6 +7,7 @@ import { executorTransport } from "./executor/transport.js";
 import { verifiedWidgetContext as fixture } from "./widget.fixture.js";
 import { filedTicketResult } from "./widget-investigation.js";
 import {
+  datedTools,
   driftVerdict,
   gapSentences,
   readResult,
@@ -438,4 +439,35 @@ test("billing endpoint reads always cover a moving window, and campaigns ones do
     ),
     { creditWindow: 30 }
   );
+});
+
+test("an endpoint's whole-read refusal is unverifiable, never steady or movement", () => {
+  for (const status of ["feature_off", "invalid_input"]) {
+    const refused = readResult({ status });
+    const ok = readResult({
+      sections: { orders: [] },
+      status: "ok",
+      unavailable: [],
+    });
+    for (const [recorded, reread] of [
+      [refused, refused],
+      [ok, refused],
+    ]) {
+      const verdict = driftVerdict([
+        { recorded, reread, tool: "widget_orders" },
+      ]);
+      assert.equal(verdict.verdict, "unverifiable", status);
+      assert.deepEqual(verdict.unverifiable, ["widget_orders"]);
+    }
+  }
+});
+
+test("the re-run's date note names each dated tool the rollout offers", () => {
+  assert.deepEqual(datedTools(new Set(["billing", "campaigns"])), {
+    widget_billing_summary: "creditWindow",
+    widget_outreach_health: "startDate and endDate",
+  });
+  assert.deepEqual(datedTools(new Set()), {
+    widget_campaigns: "startDate and endDate",
+  });
 });

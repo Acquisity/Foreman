@@ -49,6 +49,7 @@ import {
   toRequest,
   type WidgetCase,
 } from "../agent/lib/widget-case.js";
+import { heldAreasOfRun } from "../agent/lib/widget-endpoint-tools.js";
 import {
   answeredLane,
   handedOff,
@@ -570,13 +571,18 @@ function judgeCase(
     message ?? "",
     snapshot.reply ?? "",
   ]);
-  // The original reply, judged the same way against its own production tool results.
+  // The original reply, judged the same way against its own production tool
+  // results and the tools its own rollout offered.
+  const productionScope = {
+    ...scope,
+    heldAreas: heldAreasOfRun(snapshot.cassette.map(({ tool }) => tool)),
+  };
   const productionRaw = liveCase(
     {
       cassette: snapshot.cassette,
       question: snapshot.question,
       runId: snapshot.runId,
-      scope,
+      scope: productionScope,
     },
     false,
     label
@@ -660,7 +666,7 @@ function judgeCase(
             cassette: snapshot.cassette,
             question: snapshot.question,
             runId: snapshot.runId,
-            scope,
+            scope: productionScope,
           },
           original.needsHuman,
           label

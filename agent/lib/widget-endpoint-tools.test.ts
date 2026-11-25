@@ -15,6 +15,7 @@ import {
   endpointToolNames,
   endpointToolSet,
   HELD_AREAS,
+  heldAreasOfRun,
   LEGACY_TOOL_AREAS,
   legacyToolOffered,
   offeredEndpointTools,
@@ -575,4 +576,29 @@ test("the judge is given only the endpoint tools the case's own endpoint list of
     judged.some(({ name }) => name === "widget_billing"),
     false
   );
+});
+
+test("an old production run is judged against its own rollout, read from the tools it called", () => {
+  const today = new Set(["billing", "campaigns"]);
+  // It called the old orders tool, so orders was held then; it called the
+  // campaigns endpoint, so campaigns had switched.
+  assert.deepEqual(
+    heldAreasOfRun(
+      ["widget_provisioning_status", "widget_campaigns", "widget_help_article"],
+      today
+    ),
+    ["billing", "orders"]
+  );
+  // Job failures and the shared CRM name say nothing about which area was held.
+  assert.deepEqual(
+    heldAreasOfRun(["widget_job_failures", "widget_crm_contact"], today),
+    ["billing", "campaigns"]
+  );
+  const judged = judgeToolCapabilities(
+    ALL_LISTED,
+    new Set(heldAreasOfRun(["widget_provisioning_status"], new Set()))
+  ).map(({ name }) => name);
+  assert.ok(judged.includes("widget_provisioning_status"));
+  assert.equal(judged.includes("widget_orders"), false);
+  assert.ok(judged.includes("widget_billing"));
 });

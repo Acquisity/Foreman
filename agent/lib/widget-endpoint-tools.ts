@@ -69,6 +69,29 @@ export const legacyToolOffered = (
   held: ReadonlySet<string> = HELD_AREAS
 ) => LEGACY_TOOL_AREAS[tool]?.some((area) => held.has(area)) ?? true;
 
+/**
+ * The areas a recorded run had held, read from the tools it called: an area
+ * whose own old tool it called was held, one whose endpoint tool it called
+ * had switched, and any other area is taken as today's. Job failures answers
+ * for three areas and CRM contact's old tool shares its endpoint tool's name,
+ * so a call to either shows nothing.
+ */
+export function heldAreasOfRun(
+  tools: readonly string[],
+  held: ReadonlySet<string> = HELD_AREAS
+): string[] {
+  const areas = new Set(held);
+  for (const tool of new Set(tools)) {
+    const toolAreas = LEGACY_TOOL_AREAS[tool];
+    if (toolAreas?.length === 1 && endpointToolName(toolAreas[0]) !== tool) {
+      areas.add(toolAreas[0]);
+    } else if (!toolAreas && tool.startsWith("widget_")) {
+      areas.delete(tool.slice("widget_".length).replaceAll("_", "-"));
+    }
+  }
+  return [...areas].sort();
+}
+
 /** Endpoints Foreman's own code calls, never offered to the model. */
 export const CODE_ONLY_AREAS: ReadonlySet<string> = new Set([
   "owned-identifiers",

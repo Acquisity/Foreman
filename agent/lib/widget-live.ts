@@ -1,3 +1,4 @@
+import { HELD_AREAS } from "./widget-endpoint-tools.js";
 import { normalize } from "./widget-normalize.js";
 
 /**
@@ -6,21 +7,26 @@ import { normalize } from "./widget-normalize.js";
  */
 
 /**
- * Widget tools that accept an absolute date today: the re-run asks for the
- * original conversation date on these. widget_job_failures and
+ * Widget tools that accept an absolute date today, for the rollout's held
+ * areas: the re-run asks for the original conversation date on these. The
+ * old billing tool takes a `creditWindow` with dates; the billing endpoint's
+ * `creditWindow` counts days back from now, like widget_job_failures and
  * widget_generation_diagnostics (`since`), widget_lead_pipeline_status
- * (`sinceDays`) and widget_sdr_thread_status (a fixed 30 days) only take
- * windows that end now, so they cannot be pinned; every other tool has no
- * date input.
+ * (`sinceDays`) and widget_sdr_thread_status (a fixed 30 days), so those
+ * cannot be pinned. Campaigns takes `startDate` and `endDate` on both its old
+ * tool and its endpoint. Every other tool has no date input.
  */
-export const DATED_TOOLS: Readonly<Record<string, string>> = {
-  widget_billing_summary: "creditWindow",
-  widget_outreach_health: "startDate and endDate",
-};
+export const datedTools = (
+  held: ReadonlySet<string> = HELD_AREAS
+): Readonly<Record<string, string>> => ({
+  ...(held.has("billing") ? { widget_billing_summary: "creditWindow" } : {}),
+  [held.has("campaigns") ? "widget_outreach_health" : "widget_campaigns"]:
+    "startDate and endDate",
+});
 
 /** The original message with a teammate's note pinning dated reads to the day it was sent. */
 export const pinnedQuestion = (question: string, sentAt: string) =>
-  `${question}\n\n(Team re-run: the customer sent this on ${sentAt.slice(0, 10)}. Where a read accepts a date window (${Object.keys(DATED_TOOLS).join(", ")}), ask about that date.)`;
+  `${question}\n\n(Team re-run: the customer sent this on ${sentAt.slice(0, 10)}. Where a read accepts a date window (${Object.keys(datedTools()).join(", ")}), ask about that date.)`;
 
 const SENTENCE_BREAK = /(?<=[.!?])\s+|\n+/;
 const UNCONFIRMED =
@@ -65,9 +71,16 @@ const failed = (value: unknown): boolean => {
     item.success === false ||
     item.ok === false ||
     item.isError === true ||
-    ["unavailable", "denied", "error", "failed", "cancelled"].includes(
-      String(item.status)
-    ) ||
+    // An endpoint's whole-read refusals (feature_off, invalid_input) carry no state either.
+    [
+      "unavailable",
+      "denied",
+      "error",
+      "failed",
+      "cancelled",
+      "feature_off",
+      "invalid_input",
+    ].includes(String(item.status)) ||
     Boolean(item.error)
   );
 };
