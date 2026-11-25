@@ -25,11 +25,10 @@ const FEATURE_NAME = /FEATURES\.(\w+)/gu;
  */
 const CRM_OPT_IN = /crmV2Access\(ctx\)\.(?:myDay|conversations)/u;
 const OPT_IN_NOTE = " (only where turned on)";
-const QUOTED_START = /^"([^"]+)"/u;
 const UNDER_GROUP = /"([^"]+)" \(under (the )?"([^"]+)"( group)?\)/gu;
 
 export interface GuideSidebar {
-  /** The heading each page sits under, for pages under one. */
+  /** The heading each page sits under, or "" for a page under none. */
   groupOf: ReadonlyMap<string, string>;
   /** Group headings, which a customer never clicks to reach a page. */
   headings: ReadonlySet<string>;
@@ -96,12 +95,14 @@ export function parseGuideSidebar(
     ...(source.match(GROUPS_BLOCK)?.[1] ?? "").matchAll(GROUP),
   ].map((m) => ({ id: groupIds[m[1]], label: m[2], pages: [] as string[] }));
   const pages = new Set<string>();
+  const groupOf = new Map<string, string>();
   const crmGroup = groups.find((g) => g.id === "crm");
   const crmEntries = (source.match(CRM_BLOCK)?.[1] ?? "").split(CRM_ENTRY);
   for (const entry of crmEntries) {
     const label = CRM_LABEL.exec(entry)?.[1];
     if (label) {
       pages.add(label);
+      groupOf.set(label, crmGroup?.label ?? "");
       crmGroup?.pages.push(
         `"${label}"${opensOnlyWhereOn(entry) ? OPT_IN_NOTE : ""}`
       );
@@ -109,10 +110,12 @@ export function parseGuideSidebar(
   }
   for (const m of (source.match(PAGES_BLOCK)?.[1] ?? "").matchAll(PAGE)) {
     if (!NEVER_SHOWN.test(m[0])) {
+      const group = groups.find((g) => g.id === groupIds[m[3]]);
       pages.add(m[2]);
-      groups
-        .find((g) => g.id === groupIds[m[3]])
-        ?.pages.push(`"${m[2]}"${opensOnlyWhereOn(m[0]) ? OPT_IN_NOTE : ""}`);
+      groupOf.set(m[2], group?.label ?? "");
+      group?.pages.push(
+        `"${m[2]}"${opensOnlyWhereOn(m[0]) ? OPT_IN_NOTE : ""}`
+      );
     }
   }
   // A reshaped catalog must fail here, not ship a guide without a sidebar.
@@ -122,16 +125,7 @@ export function parseGuideSidebar(
     );
   }
   return {
-    groupOf: new Map(
-      groups.flatMap((g) =>
-        g.label
-          ? g.pages.flatMap((entry) => {
-              const page = QUOTED_START.exec(entry)?.[1];
-              return page ? [[page, g.label] as const] : [];
-            })
-          : []
-      )
-    ),
+    groupOf,
     headings: new Set(groups.map((g) => g.label).filter(Boolean)),
     lines: groups
       .filter((g) => g.pages.length)
