@@ -13,8 +13,8 @@
 // inputs (model, prompt, sidebar, articles), so a rerun calls the model only
 // for the batches whose inputs changed; --full ignores those stored outputs.
 // A run that changes nothing but the commit leaves the file as it was.
-// Needs AI_GATEWAY_API_KEY or VERCEL_OIDC_TOKEN for the gateway call, and
-// CLIPROXY_BASE_URL and CLIPROXY_API_KEY for the Claude calls (ENG-15082).
+// Needs CLIPROXY_BASE_URL and CLIPROXY_API_KEY for the Claude calls
+// (ENG-15082); since ENG-20607 every call, the limits pass included, is one.
 import { execFileSync } from "node:child_process";
 import {
   existsSync,
@@ -68,8 +68,12 @@ import {
 } from "../agent/lib/widget-guide-validation.js";
 
 const MODEL = "anthropic/claude-sonnet-5.5";
-/** The limits pass only collects what the distilled guide already says. */
-const NAV_MODEL = "google/gemini-3.5-flash";
+/**
+ * The role and limit pass runs on the distill model: on Gemini Flash it
+ * inverted exceptions and merged lines into false limits (ENG-20607).
+ */
+const LIMITS_MODEL = MODEL;
+const LIMITS_MAX_TOKENS = 16_000;
 const DOCS = "apps/web/content/docs";
 const CATALOG = "apps/web/lib/sidebar/catalog.ts";
 const FEATURES = "apps/web/lib/features.ts";
@@ -231,6 +235,8 @@ ${ENTRY_POINTS.map((entry) => `- ${entry.text.replace("SETTINGS_MENU", SETTINGS_
 console.log(SIDEBAR);
 
 interface Article {
+  /** The whole page is behind an opt-in feature (front matter `features:`). */
+  optIn: boolean;
   section: string;
   slug: string;
   text: string;
@@ -268,8 +274,22 @@ const order = (path: string): string[] => {
   });
 };
 
-/** MDX to plain markdown: components become text, navigation-only lists go. */
-function stripMdx(source: string): { body: string; title: string } {
+const FEATURE_GATE = /<FeatureGate\s+feature="([^"]+)"[^>]*>/gu;
+const PAGE_FEATURES = /^features:\s*\[([^\]]*)\]/mu;
+const FEATURE_KEY = /[a-z0-9_]+/gu;
+const turnedOn = (key: string) => GUIDE_SIDEBAR.optInFeatures.has(key);
+/** Said of a page or section behind an opt-in feature (ENG-20607). */
+const OPT_IN_NOTE = "Only on workspaces where it has been turned on.";
+
+/**
+ * MDX to plain markdown: components become text, navigation-only lists go. A
+ * section behind an opt-in feature gate is introduced with OPT_IN_NOTE.
+ */
+function stripMdx(source: string): {
+  body: string;
+  optIn: boolean;
+  title: string;
+} {
   const front = source.match(FRONTMATTER);
   const field = (name: string) => frontmatterField(front?.[1] ?? "", name);
   const body = source
@@ -286,21 +306,27 @@ function stripMdx(source: string): { body: string; title: string } {
     .replace(/<Accordion\s+title="([^"]*)"[^>]*>/gu, "\n#### $1\n")
     .replace(/<Tab\s+value="([^"]*)"[^>]*>/gu, "\n$1:\n")
     .replace(/<Callout(?:\s+[^>]*)?>/gu, "\nNote: ")
+    .replace(FEATURE_GATE, (gate, key: string) =>
+      turnedOn(key) ? `\nNote: ${OPT_IN_NOTE}\n` : gate
+    )
     .replace(/<\/?[A-Z][A-Za-z.]*[^>]*>/gu, "")
     .replace(/!\[[^\]]*\]\([^)]*\)/gu, "")
     .replace(/\n{3,}/gu, "\n\n")
     .trim();
   const description = field("description");
+  const pageFeatures = front?.[1].match(PAGE_FEATURES)?.[1] ?? "";
   return {
     body: description ? `${description}\n\n${body}` : body,
+    optIn: (pageFeatures.match(FEATURE_KEY) ?? []).some(turnedOn),
     title: field("title"),
   };
 }
 
 const articles: Article[] = order(root).map((path) => {
   const slug = relative(root, path).replace(MDX, "").replace(INDEX_PAGE, "");
-  const { body, title } = stripMdx(scrub(readFileSync(path, "utf8")));
+  const { body, optIn, title } = stripMdx(scrub(readFileSync(path, "utf8")));
   return {
+    optIn,
     section: slug.split("/")[0] || "index",
     slug: slug || "index",
     text: body,
@@ -326,6 +352,8 @@ Keep, in this order of importance:
 
 Never name the outside services behind the product or developer web addresses; the docs already call them "the sending platform" and "the developer docs".
 
+Advice ("we recommend", "best", "avoid", "keep it short") stays advice: never turn it into a rule or a limit. A limit on one way of doing something (dragging on the board) is stated with that way, never as a limit on the action, which another way (a table action) may still allow. Never write that something can't be done unless the article says so.
+
 Keep every condition a fact depends on ("only when", "only for", "unless", "sometimes") and the exact scope it applies to. Never widen a fact to cases the article does not name, never narrow it by adding "only", never turn "can sometimes" into "cannot", and copy every count exactly.
 
 Drop marketing language, motivation, generic advice that is not about Acquisity, repeated explanations, and examples that add no fact. Never add a fact the articles do not state. Plain markdown, no tables, no em dashes. Each article's header gives its word allowance: write about that many words for it, and stay under WORDS words for this batch in total. Shorten wording and merge facts an article repeats rather than drop an article or its answer; never reduce an article with steps, conditions or limits to one line.
@@ -340,7 +368,7 @@ Every role limit the guide states: which roles (Owner, Admin, Member, Client) ca
 ## What Acquisity cannot do
 Every explicit limit and unsupported thing the guide states, one line each with its slug in braces.
 
-Only what the guide states; never generalise one line to other features or roles. Keep the condition and scope each line has in the guide ("only for CRM payments", "only where Acquisity bills directly", "except when no domain was provisioned", "support can sometimes"): a limit without its condition is wrong. Start with the line "## Who can do what". Plain markdown, no tables, no em dashes. About 2,000 words in total.`;
+Only what the guide states; never generalise one line to other features or roles. Each line restates one statement from one article: never combine two statements into one, and never turn an exception ("not for link payments") into a rule about everything else. Keep the condition and scope each line has in the guide ("only for CRM payments", "only where Acquisity bills directly", "except when no domain was provisioned", "support can sometimes"): a limit without its condition is wrong. Start with the line "## Who can do what". Plain markdown, no tables, no em dashes. About 2,000 words in total.`;
 
 let spent = 0;
 let unpriced = 0;
@@ -566,6 +594,7 @@ const GET_HERE = /^Get here: (.*)$/u;
 const HELP_CENTER_PATH =
   /\bnot stated\b|\bFAQ\b|\bhelp center\b|"Getting Started"|\bsee (?:the )?\S+ section\b/iu;
 const sourceText = new Map(available.map((a) => [a.slug, a.text]));
+const pageOptIn = new Set(available.filter((a) => a.optIn).map((a) => a.slug));
 const usablePath = (slug: string, path: string): boolean => {
   const labels = labelsIn(path).map((l) => l.label);
   const source = `${sourceText.get(slug) ?? ""}\n${SIDEBAR}`;
@@ -581,6 +610,8 @@ const lines = linked.split("\n");
 const paths = new Map<string, string>();
 let current = "";
 let dropped = 0;
+/** Sections whose own path was refused: a parent's path would be a guess. */
+const refused = new Set<string>();
 for (const line of lines) {
   current = line.match(SECTION_HEAD)?.[1] ?? current;
   const found = line.match(GET_HERE)?.[1];
@@ -596,6 +627,7 @@ for (const line of lines) {
     paths.set(current, path);
   } else if (path) {
     dropped += 1;
+    refused.add(current);
     console.log(`  rejected ${current}: ${path}`);
   }
 }
@@ -616,8 +648,13 @@ const body = lines
     if (!slug) {
       return [line];
     }
-    const path = paths.get(slug) ?? inherited(slug);
-    return path ? [line, `Get here: ${path}`] : [line];
+    const path =
+      paths.get(slug) ?? (refused.has(slug) ? undefined : inherited(slug));
+    return [
+      line,
+      ...(path ? [`Get here: ${path}`] : []),
+      ...(pageOptIn.has(slug) ? [`- ${OPT_IN_NOTE}`] : []),
+    ];
   })
   .join("\n");
 const headed = new Set(
@@ -632,7 +669,7 @@ assertGuideSections(body, slugs);
  */
 const finished = splitGuideSections(body);
 const limitsKey = (slug: string) =>
-  guideCallKey(NAV_MODEL, LIMITS_PROMPT, finished.get(slug) ?? "");
+  guideCallKey(LIMITS_MODEL, LIMITS_PROMPT, finished.get(slug) ?? "");
 const summarised = new Map<string, GuideLimits>();
 const stale = slugs.filter((slug) => {
   const text = cachedGuideText(
@@ -669,8 +706,8 @@ if (stale.length) {
               "Write nothing for an article that states no role limit or unsupported thing."
             ),
         whole ? body : stale.map((slug) => finished.get(slug)).join("\n\n"),
-        8000,
-        NAV_MODEL
+        LIMITS_MAX_TOKENS,
+        LIMITS_MODEL
       ),
     (text) => {
       if (!text.startsWith("## Who can do what")) {

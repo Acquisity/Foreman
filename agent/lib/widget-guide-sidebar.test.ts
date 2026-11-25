@@ -110,6 +110,10 @@ test("the guide's sidebar lists no page the app never shows", () => {
     ].join("\n")
   );
   assert.ok(!sidebar.pages.has("CRM"));
+  assert.deepEqual(
+    [...sidebar.optInFeatures],
+    ["ai_website_creator", "workflows", "my_day"]
+  );
   assert.ok(!sidebar.pages.has("Old Inbox"));
   assert.deepEqual([...sidebar.headings], ["CRM", "Cold Email", "Build"]);
 });
@@ -156,9 +160,12 @@ test("a heading written as a click is taken out of the path", () => {
 });
 
 test("a reshaped catalog fails instead of shipping a guide without a sidebar", () => {
-  assert.throws(() => parseGuideSidebar("export const nothing = 1;", ""), {
-    message: "sidebar parse found 0 groups, 0 pages",
-  });
+  assert.throws(
+    () => parseGuideSidebar("export const nothing = 1;", FEATURES),
+    {
+      message: "sidebar parse found 0 groups, 0 pages",
+    }
+  );
   assert.throws(() => parseGuideSidebar(CATALOG, "export const nothing = 1;"), {
     message: "features parse found no OPT_IN_FEATURES",
   });
