@@ -213,8 +213,9 @@ const LEGACY_KEY = /^ {2}'?([a-z0-9-]+)'?:/gmu;
  * every other menu item (settings-menu-items.tsx) goes under the fallback
  * group with its own label. With the CRM on, the app drops the legacy pages
  * its CRM pages replace (LEGACY_CRM_SETTINGS_TARGETS in
- * crm-v2/settings-routes.ts), so those are listed apart, for a workspace with
- * the CRM off.
+ * crm-v2/settings-routes.ts), so those are left out. Which of them a
+ * workspace with the CRM off sees depends on other gates, so the menu does not
+ * list that case; each page's own article says how to reach it.
  */
 export function parseSettingsMenu(
   nav: string,
@@ -267,11 +268,10 @@ export function parseSettingsMenu(
     );
   }
   const fallback = FALLBACK.exec(nav)?.[1] ?? "Workspace";
-  const crmOff: string[] = [];
   for (const [segment, label] of menuLabels) {
-    if (legacy.has(segment)) {
-      crmOff.push(`"${label}"`);
-    } else if (!(claimed.has(segment) || NOT_IN_MENU.has(segment))) {
+    if (
+      !(claimed.has(segment) || legacy.has(segment) || NOT_IN_MENU.has(segment))
+    ) {
       add(fallback, `"${label}"`);
     }
   }
@@ -282,10 +282,7 @@ export function parseSettingsMenu(
       `settings menu parse found ${groups.size} groups, ${pages} pages`
     );
   }
-  const menuLine = [...groups]
+  return [...groups]
     .map(([group, labels]) => `"${group}": ${labels.join(", ")}`)
     .join("; ");
-  return crmOff.length
-    ? `${menuLine}. On a workspace with the CRM off, the "CRM" group is not there and "${fallback}" has ${crmOff.join(", ")} instead`
-    : menuLine;
 }

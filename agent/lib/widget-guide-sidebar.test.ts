@@ -231,7 +231,7 @@ const CRM_ROUTES = `export const LEGACY_CRM_SETTINGS_TARGETS = {
 test("the settings menu follows the app's grouping, with alternate slots and its other pages", () => {
   assert.equal(
     parseSettingsMenu(SETTINGS_NAV, SETTINGS_MENU, CRM_ROUTES),
-    '"Account": "Profile", "Notifications", "Appearance", "Security"; "Your calendar": "Email & Calendar", "Availability"; "Workspace": "General", "Members", "Billing", "Integrations", "Workflow Notifications"; "CRM": "Pipelines", "Records & fields", "Messaging", "Phone"; "Outreach": "Your Niche & Offer" (or "Acquisity Brain" where turned on), "Cold Email Agent". On a workspace with the CRM off, the "CRM" group is not there and "Workspace" has "Scheduling", "Email Templates" instead'
+    '"Account": "Profile", "Notifications", "Appearance", "Security"; "Your calendar": "Email & Calendar", "Availability"; "Workspace": "General", "Members", "Billing", "Integrations", "Workflow Notifications"; "CRM": "Pipelines", "Records & fields", "Messaging", "Phone"; "Outreach": "Your Niche & Offer" (or "Acquisity Brain" where turned on), "Cold Email Agent"'
   );
   assert.throws(() => parseSettingsMenu("", "", ""), {
     message: "settings menu parse found 0 groups, 0 pages",
