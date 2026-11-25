@@ -335,14 +335,17 @@ const NAMED_DATA = "one item that named workspace data, left out";
  * conversation's comment. In an area whose read failed in the same run, the
  * tool facts ride on that failure's gap instead of opening another. In an
  * area whose latest read refused the whole check by design, tool facts file
- * nothing; docs facts still do.
+ * nothing; docs facts still do. An area a feature that is off closes for the
+ * workspace files nothing at all.
  */
 export function replyGaps(
   unchecked: readonly UncheckedFact[] | undefined,
   fromTools: readonly CapabilityGap[] = [],
-  refused: readonly string[] = []
+  refused: readonly string[] = [],
+  closed: readonly string[] = []
 ): CapabilityGap[] {
   const refusedHere = new Set(refused);
+  const closedHere = new Set(closed);
   const failed = new Map<string, CapabilityGap & { details: string[] }>();
   for (const gap of fromTools) {
     if (gap.source === "code" && !failed.has(gap.area)) {
@@ -352,7 +355,7 @@ export function replyGaps(
   const byKey = new Map<string, CapabilityGap & { details: string[] }>();
   for (const item of unchecked ?? []) {
     const tool = item.kind === "tool";
-    if (tool && refusedHere.has(item.area)) {
+    if ((tool && refusedHere.has(item.area)) || closedHere.has(item.area)) {
       continue;
     }
     const key = `${item.area}:${item.kind}`;
