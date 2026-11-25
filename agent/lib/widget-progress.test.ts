@@ -150,3 +150,18 @@ test("an endpoint result that is feature_off or invalid_input shows as unavailab
     );
   }
 });
+
+test("a CRM contact check shows as crm, not leads (ENG-20513)", () => {
+  const reduce = progressFromEvents();
+  const event = {
+    data: {
+      actions: [{ callId: "c", toolName: "widget_crm_contact" }],
+      sequence: 1,
+    },
+    type: "actions.requested",
+  };
+  assert.deepEqual(reduce(event)?.checks, [{ id: "crm", status: "running" }]);
+  assert.deepEqual(reduce(result(2, "c", { status: "ok" }))?.checks, [
+    { id: "crm", status: "completed" },
+  ]);
+});

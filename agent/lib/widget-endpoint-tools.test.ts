@@ -226,6 +226,7 @@ test("a widget_ name the committed manifest does not produce is still dropped an
 
 test("progress maps a generated tool by its area and ignores unknown names", () => {
   assert.equal(endpointToolCheck("widget_lead_pipeline", manifest), "leads");
+  assert.equal(endpointToolCheck("widget_crm_contact"), "crm");
   assert.equal(endpointToolCheck("widget_scratch_area", manifest), undefined);
   assert.equal(endpointToolCheck("widget_unknown", manifest), undefined);
 });

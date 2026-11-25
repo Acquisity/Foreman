@@ -26,13 +26,14 @@ export const widgetProgressSchema = z.object({
           "issues",
           "guides",
           "generation",
+          "crm",
         ]),
         // "planned" is a guess made before the investigation starts; a real
         // call for the same check replaces it.
         status: z.enum(["planned", "running", "completed", "unavailable"]),
       })
     )
-    .max(12),
+    .max(13),
   sequence: z.number().int().nonnegative(),
   stage: z.enum(["investigating", "preparing"]),
 });
@@ -41,8 +42,7 @@ export type CheckId = WidgetProgress["checks"][number]["id"];
 const checks: Record<string, CheckId> = {
   widget_account_access: "account",
   widget_billing_summary: "billing",
-  // Acquisity's progress enum is fixed; CRM people sit with leads.
-  widget_crm_contact: "leads",
+  widget_crm_contact: "crm",
   widget_generation_diagnostics: "generation",
   widget_help_article: "guides",
   widget_inbox_health: "inboxes",
@@ -172,6 +172,7 @@ const PLANNABLE: Partial<Record<CheckId, string>> = {
   billing: "the plan, charges, invoices, credits and credit usage",
   campaigns: "whether cold email campaigns are sending, paused or stalled",
   conversations: "AI SDR reply threads, their status and booked meetings",
+  crm: "a CRM contact's emails, merges, duplicates and edits",
   generation: "failed or stuck AI generations such as ads, offers or research",
   inboxes: "connected sending inboxes, their health, warmup and errors",
   issues: "known platform incidents that could explain the problem",
