@@ -134,3 +134,26 @@ test("a long article answered in a line is short, and a short article or a full 
     ]
   );
 });
+
+test("a how-to with many steps answered in a line is short, even when its page is short", () => {
+  const steps = [
+    "1. Log in.",
+    "2. Open DNS.",
+    "3. Add the record.",
+    "4. Save.",
+  ].join("\n");
+  const guide = [
+    "### Connect a Porkbun domain {slug: porkbun}",
+    "Add the DNS records at Porkbun.",
+    "### Connect a Cloudflare domain {slug: cloudflare}",
+    "- Log in, open DNS for the domain, add the CNAME and TXT records the",
+    "  Partner Panel shows, turn the proxy off, then click Verify Domain.",
+  ].join("\n");
+  assert.deepEqual(
+    shortAnswers(guide, [
+      { slug: "porkbun", text: steps },
+      { slug: "cloudflare", text: steps },
+    ]),
+    ["porkbun"]
+  );
+});

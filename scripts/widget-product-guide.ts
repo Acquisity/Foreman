@@ -50,9 +50,11 @@ import {
   labelsIn,
   parseGuideSidebar,
   parseSettingsMenu,
+  retiredFor,
   startsAtSidebarPage,
   UNLABELLED,
   withoutHeadings,
+  withoutRetiredStart,
 } from "../agent/lib/widget-guide-sidebar.js";
 import { guideSourcePath } from "../agent/lib/widget-guide-source.js";
 import {
@@ -60,6 +62,7 @@ import {
   assertGuideSections,
   assertOwnAnswers,
   frontmatterField,
+  numberedSteps,
   plainDashes,
   shortAnswers,
 } from "../agent/lib/widget-guide-validation.js";
@@ -93,6 +96,9 @@ const BATCH_CHARS = 30_000;
 /** Words asked for even the shortest article, so no answer is squeezed out. */
 const MIN_ARTICLE_WORDS = 15;
 const MIN_BATCH_WORDS = 60;
+const WORDS_PER_STEP = 4;
+const WORDS_PER_LABEL = 2;
+const BOLD_LABEL = /\*\*[^*\n]{2,60}\*\*/gu;
 /**
  * Words asked for per source character. The model writes about twice what it
  * is asked for, so 1.09M source characters come out near 45k tokens.
@@ -311,7 +317,7 @@ Cover every article in the batch, in order. For each article write a heading lin
 then one line "Get here: <path>" giving how a customer reaches, inside the Acquisity app, the page or feature the article is about, then the article's facts as short lines or bullets. Every article gets this line, FAQ and overview pages included. The path is a path only: it stops at the page, and the steps go below it. It is never the help center's own sections or page titles ("Getting Started", "FAQ"). Write the path the way the article does when it gives one ("In the left sidebar, click "Email accounts""); when it gives none, build it from the sidebar and entry points below, which are the product's real navigation, starting from the sidebar page or entry point. Never put a sidebar heading in a path as something to click. Use only labels the article or the sidebar list gives, each in double quotes; never a slug, an article title or "see" another section. When neither places the feature, write exactly "Get here: not stated" with nothing after it. Every article keeps its own answer: never write "Same as", "see" or another slug in place of a fact, even when another article says the same thing. A question article's first line answers its question.
 
 Keep, in this order of importance:
-1. Where things are: every navigation path, page, tab, menu, button, field, toggle and setting name. Copy each UI label exactly as the article writes it, with its capitalisation, in double quotes, and write paths as "Settings" > "Members". Never paraphrase or invent a label.
+1. Where things are: every navigation path, page, tab, menu, button, field, toggle and setting name. Copy each UI label exactly as the article writes it, with its capitalisation, in double quotes, and write paths as "Settings" > "Members". Never paraphrase or invent a label. On a page that lists settings, modes or options, keep each one by name with its choices and what it does, before any explanation.
 2. Steps: every click in order, compressed to one line each, with every warning or lasting consequence (data deleted for good, inboxes warming up for 14 days). Keep every screen and choice the article names along the way, such as an offer or a second confirmation. Copy a step's path from the article; never build it from the sidebar list or another article.
 3. What each feature does, who can use it (roles such as Owner, Admin, Member, Client; plans; credits) and what it costs.
 4. Common problems and their fixes.
@@ -334,7 +340,7 @@ Every role limit the guide states: which roles (Owner, Admin, Member, Client) ca
 ## What Acquisity cannot do
 Every explicit limit and unsupported thing the guide states, one line each with its slug in braces.
 
-Only what the guide states; never generalise one line to other features or roles. Start with the line "## Who can do what". Plain markdown, no tables, no em dashes. About 2,000 words in total.`;
+Only what the guide states; never generalise one line to other features or roles. Keep the condition and scope each line has in the guide ("only for CRM payments", "only where Acquisity bills directly", "except when no domain was provisioned", "support can sometimes"): a limit without its condition is wrong. Start with the line "## Who can do what". Plain markdown, no tables, no em dashes. About 2,000 words in total.`;
 
 let spent = 0;
 let unpriced = 0;
@@ -439,9 +445,18 @@ for (const article of pending) {
   }
 }
 
-/** Words asked for one article: its share of the ratio, never below a floor. */
+/**
+ * Words asked for one article: its share of the ratio, never below a floor,
+ * and enough for every numbered step and every bold UI label it names, so a
+ * how-to or settings page keeps its steps and settings (ENG-20601).
+ */
 const allowance = (a: Article) =>
-  Math.max(MIN_ARTICLE_WORDS, Math.round(a.text.length * RATIO));
+  Math.max(
+    MIN_ARTICLE_WORDS,
+    Math.round(a.text.length * RATIO),
+    numberedSteps(a.text) * WORDS_PER_STEP,
+    new Set(a.text.match(BOLD_LABEL)).size * WORDS_PER_LABEL
+  );
 
 const distillBatch = (batch: Article[], label: string) =>
   checkedGuideCall(
@@ -569,7 +584,12 @@ let dropped = 0;
 for (const line of lines) {
   current = line.match(SECTION_HEAD)?.[1] ?? current;
   const found = line.match(GET_HERE)?.[1];
-  const stripped = found && withoutHeadings(GUIDE_SIDEBAR, found);
+  const stripped =
+    found &&
+    withoutRetiredStart(
+      retiredFor(current),
+      withoutHeadings(GUIDE_SIDEBAR, found)
+    );
   const path =
     stripped && fromFirstSidebarPage(GUIDE_SIDEBAR, SIDEBAR_ENTRIES, stripped);
   if (path && usablePath(current, path)) {

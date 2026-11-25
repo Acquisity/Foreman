@@ -290,3 +290,67 @@ export function parseSettingsMenu(
     .map(([group, labels]) => `"${group}": ${labels.join(", ")}`)
     .join("; ");
 }
+
+/**
+ * Sidebar labels the app no longer shows, and the pages that took each one's
+ * place, the first being where it led. Campaigns and Email accounts replace
+ * "cold-email-agent" and AI Inbox replaces "ai-sdr-inbox" in catalog.ts
+ * (`replaces`); Sites took over the "Website Builder" item, checked on
+ * Acquisity main 2026-11-25 (ENG-20601).
+ */
+export const RETIRED_LABELS: ReadonlyMap<string, readonly string[]> = new Map([
+  ["Cold Email Agent", ["Campaigns", "Email accounts", "Deliverability"]],
+  ["AI SDR Inbox", ["AI Inbox"]],
+  ["Website Builder", ["Sites"]],
+]);
+/** "Dashboard" is only Client users' name for Home (home-nav.ts). */
+const RETIRED_FOR_TEAM: ReadonlyMap<string, readonly string[]> = new Map([
+  ...RETIRED_LABELS,
+  ["Dashboard", ["Home"]],
+]);
+/** The retired labels for an article: Client Portal articles keep "Dashboard". */
+export const retiredFor = (slug: string) =>
+  slug.startsWith("client-portal") ? RETIRED_LABELS : RETIRED_FOR_TEAM;
+
+const MENTIONS_SETTINGS = /\bsettings\b/iu;
+const CLAUSE_END = /[.;:](?:\s|$)/u;
+
+/**
+ * A path that opens at a retired sidebar label, such as `"Cold Email Agent" >
+ * "Email Accounts"`, opens instead at the later label when it is one of the
+ * pages that replaced the retired one (in the sidebar's own spelling), or at
+ * the first of those pages. A later label is never promoted otherwise, so a
+ * campaign's "Sequences" tab never becomes the CRM's "Sequences" page.
+ * "Cold Email Agent" is also a Settings page and a section of a campaign's
+ * Settings tab, so a path that names Settings before the retired label, or in
+ * the same clause, stays as it was, unless it says it starts in the sidebar.
+ */
+export const withoutRetiredStart = (
+  retired: ReadonlyMap<string, readonly string[]>,
+  path: string
+) => {
+  const [first, ...rest] = labelsIn(path);
+  const successors =
+    first &&
+    [...retired].find(
+      ([label]) => label.toLowerCase() === first.label.toLowerCase()
+    )?.[1];
+  if (!successors?.length) {
+    return path;
+  }
+  const before = path.slice(0, first.at);
+  const [clause] = path.slice(first.at).split(CLAUSE_END);
+  if (!LEFT_SIDEBAR.test(before) && MENTIONS_SETTINGS.test(before + clause)) {
+    return path;
+  }
+  for (const later of rest) {
+    const page = successors.find(
+      (name) => name.toLowerCase() === later.label.toLowerCase()
+    );
+    if (page) {
+      const end = path.indexOf('"', later.at + 1);
+      return `${path.slice(0, first.at)}"${page}"${path.slice(end + 1)}`;
+    }
+  }
+  return `${path.slice(0, first.at)}"${successors[0]}"${path.slice(path.indexOf('"', first.at + 1) + 1)}`;
+};
