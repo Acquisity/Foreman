@@ -13,9 +13,8 @@
 // inputs (model, prompt, sidebar, articles), so a rerun calls the model only
 // for the batches whose inputs changed; --full ignores those stored outputs.
 // A run that changes nothing but the commit leaves the file as it was.
-// Needs AI_GATEWAY_API_KEY or VERCEL_OIDC_TOKEN for the gateway call (the
-// limits pass), and CLIPROXY_BASE_URL and CLIPROXY_API_KEY for the Claude
-// calls (ENG-15082).
+// Needs CLIPROXY_BASE_URL and CLIPROXY_API_KEY: every call is a Claude call
+// through the CLI Proxy (ENG-15082, ENG-20629).
 import { execFileSync } from "node:child_process";
 import {
   existsSync,
@@ -62,6 +61,7 @@ import {
   UNLABELLED,
   withoutHeadings,
   withoutRetiredStart,
+  withRealGroups,
 } from "../agent/lib/widget-guide-sidebar.js";
 import { guideSourcePath } from "../agent/lib/widget-guide-source.js";
 import {
@@ -76,14 +76,15 @@ import {
 
 const MODEL = "anthropic/claude-sonnet-5.5";
 /**
- * The role and limit pass runs on Gemini Flash through the gateway. On the
- * distill model through the CLI Proxy, a full-guide summary spent all 16,000
- * output tokens reasoning and never answered, which stopped every
- * regeneration (ENG-20607); its prompt keeps the rules against merging lines
- * and inverting exceptions.
+ * The role and limit pass runs on the distill model with thinking off. On
+ * Gemini Flash it invented limits, such as clients not seeing Meetings or a
+ * "Record manual payment" button (ENG-20629). With thinking on, the full-guide
+ * summary spent all 16,000 output tokens reasoning and never answered
+ * (ENG-20607). With it off, the full guide took 6,700 tokens and 37s.
  */
-const LIMITS_MODEL = "google/gemini-3.5-flash";
-const LIMITS_MAX_TOKENS = 8000;
+const LIMITS_MODEL = MODEL;
+const LIMITS_MAX_TOKENS = 16_000;
+const NO_THINKING = { anthropic: { thinking: { type: "disabled" } } } as const;
 const DOCS = "apps/web/content/docs";
 const CATALOG = "apps/web/lib/sidebar/catalog.ts";
 const FEATURES = "apps/web/lib/features.ts";
@@ -371,7 +372,7 @@ Every explicit limit and unsupported thing the guide states, one line each with 
 
 Only what the guide states; never generalise one line to other features or roles. Each line restates one statement from one article: never combine two statements into one, and never turn an exception ("not for link payments") into a rule about everything else. Keep the condition and scope each line has in the guide ("only for CRM payments", "only where Acquisity bills directly", "except when no domain was provisioned", "support can sometimes"): a limit without its condition is wrong. Start with the line "## Who can do what". Plain markdown, no tables, no em dashes. About 2,000 words in total.`;
 
-let spent = 0;
+/** CLI Proxy calls report no cost, so the run counts them instead. */
 let unpriced = 0;
 const stats = { attempts: 0, successfulCalls: 0 };
 /** This run's outputs by key, in guide order: the next run's cache. */
@@ -380,7 +381,8 @@ const call = async (
   system: string,
   prompt: string,
   maxOutputTokens: number,
-  model = MODEL
+  model = MODEL,
+  think = true
 ): Promise<{ fresh: boolean; key: string; text: string }> => {
   const key = guideCallKey(model, String(maxOutputTokens), system, prompt);
   const reused = cachedGuideText(productGuideCache, key, values.full ?? false);
@@ -395,9 +397,7 @@ const call = async (
         maxRetries: 0,
         model: modelFor(model),
         prompt,
-        providerOptions: {
-          google: { thinkingConfig: { thinkingLevel: "minimal" } },
-        },
+        providerOptions: think ? {} : NO_THINKING,
         system,
       }),
       sleep(CALL_TIMEOUT_MS + 5000).then(() => {
@@ -405,16 +405,7 @@ const call = async (
       }),
     ])
   );
-  // Only gateway calls report a cost; a CLI Proxy call is counted as unpriced.
-  const reported = (
-    result.providerMetadata?.gateway as { cost?: string } | undefined
-  )?.cost;
-  if (reported === undefined) {
-    unpriced += 1;
-  } else {
-    const cost = Number(reported);
-    spent += Number.isFinite(cost) ? cost : 0;
-  }
+  unpriced += 1;
   console.log(
     `  out=${result.usage.outputTokens} reasoning=${result.usage.outputTokenDetails?.reasoningTokens ?? 0} words=${result.text.split(WHITESPACE).length}`
   );
@@ -617,11 +608,16 @@ const refused = new Set<string>();
 for (const line of lines) {
   current = line.match(SECTION_HEAD)?.[1] ?? current;
   const found = line.match(GET_HERE)?.[1];
+  // The group check runs last: a retired start such as "Cold Email Agent"
+  // (under "Outreach") only becomes a real page, Campaigns, in the rewrite.
   const stripped =
     found &&
-    withoutRetiredStart(
-      retiredFor(current),
-      withoutHeadings(GUIDE_SIDEBAR, found)
+    withRealGroups(
+      GUIDE_SIDEBAR,
+      withoutRetiredStart(
+        retiredFor(current),
+        withoutHeadings(GUIDE_SIDEBAR, found)
+      )
     );
   const path =
     stripped && fromFirstSidebarPage(GUIDE_SIDEBAR, SIDEBAR_ENTRIES, stripped);
@@ -700,7 +696,8 @@ if (stale.length) {
             ),
         whole ? body : stale.map((slug) => finished.get(slug)).join("\n\n"),
         LIMITS_MAX_TOKENS,
-        LIMITS_MODEL
+        LIMITS_MODEL,
+        false
       ),
     (text) => {
       if (!text.startsWith("## Who can do what")) {
@@ -792,5 +789,5 @@ const tokens = Math.round(plain.length / 4);
 const getHere = (body.match(/^Get here:/gmu) ?? []).length;
 console.log(`regenerated=${regenerated.join(",") || "none"}`);
 console.log(
-  `successful_calls=${stats.successfulCalls} attempts=${stats.attempts} get_here=${getHere} rejected=${dropped} headed=${slugs.filter((slug) => headed.has(slug)).length} articles=${articles.length} distilled=${available.length} batches=${batches.length} source_chars=${available.reduce((s, a) => s + a.text.length, 0)} guide_chars=${plain.length} ~tokens=${tokens} reported_cost=$${spent.toFixed(2)} unpriced_calls=${unpriced} s=${Math.round((Date.now() - startedAt) / 1000)}`
+  `successful_calls=${stats.successfulCalls} attempts=${stats.attempts} get_here=${getHere} rejected=${dropped} headed=${slugs.filter((slug) => headed.has(slug)).length} articles=${articles.length} distilled=${available.length} batches=${batches.length} source_chars=${available.reduce((s, a) => s + a.text.length, 0)} guide_chars=${plain.length} ~tokens=${tokens} unpriced_calls=${unpriced} s=${Math.round((Date.now() - startedAt) / 1000)}`
 );

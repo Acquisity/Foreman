@@ -10,6 +10,7 @@ import {
   startsAtSidebarPage,
   withoutHeadings,
   withoutRetiredStart,
+  withRealGroups,
 } from "./widget-guide-sidebar.js";
 
 const page = (key: string, label: string, group: string, extra = "") => `  {
@@ -355,5 +356,49 @@ test("a refused Get here path borrows no parent's, and a missing one does", () =
   assert.equal(
     getHereFor("account-settings/faq/notifications", paths, refused),
     '"Settings" > "Notifications"'
+  );
+});
+
+test("a sidebar page named under the wrong heading is named under its real one", () => {
+  // Foreman#274 at 87a8b4be: Campaigns moved from Outreach to Cold Email (ENG-20629).
+  assert.equal(
+    withRealGroups(
+      sidebar,
+      'In the left sidebar, click "Campaigns" (under "Outreach"), then the campaign'
+    ),
+    'In the left sidebar, click "Campaigns" (under "Cold Email"), then the campaign'
+  );
+  assert.equal(
+    withRealGroups(sidebar, 'click "Campaigns" (under the "Outreach" group)'),
+    'click "Campaigns" (under the "Cold Email" group)'
+  );
+  for (const path of [
+    'click "Campaigns" (under "Cold Email")',
+    'click "Profile" (under "Account")',
+    // A Settings page groups differently from the sidebar.
+    '"Settings" > "Sites" (under "Outreach")',
+  ]) {
+    assert.equal(withRealGroups(sidebar, path), path);
+  }
+  assert.equal(sidebar.groupOf.get("Deals"), "CRM");
+  // Settings named after the page, in a later step, doesn't block the fix.
+  assert.equal(
+    withRealGroups(
+      sidebar,
+      'click "Campaigns" (under "Outreach"), open the campaign, then its "Settings" tab'
+    ),
+    'click "Campaigns" (under "Cold Email"), open the campaign, then its "Settings" tab'
+  );
+  // The stored path behind Foreman#274's "Campaigns" (under "Outreach"), after
+  // the retired-label rewrite, as the generator runs them.
+  assert.equal(
+    withRealGroups(
+      sidebar,
+      withoutRetiredStart(
+        retiredFor("cold-email-agent/faq/lead-search/x"),
+        '"Cold Email Agent" (under "Outreach") > the campaign > "Leads" tab.'
+      )
+    ),
+    '"Campaigns" (under "Cold Email") > the campaign > "Leads" tab.'
   );
 });
