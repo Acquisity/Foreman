@@ -426,7 +426,7 @@ const INTRO = {
 export const gapDescription = (gap: CapabilityGap) =>
   [
     INTRO[gap.source === "reply" ? "reply" : gap.kind],
-    "Each comment below names one support conversation that hit this gap. Fixy first checks whether this would have changed the reply and can be known from our data, then builds the fix or cancels the ticket with the reason, with no plan card (Aaron, 2026-11-25). A fix that would add an action, write customer data or move money becomes its own ENG ticket without the `fixy` label, and this one is canceled with a link to it. After a read or Help Centre fix is live, Fixy reruns the check for each conversation and answers the ones whose question it now answers and that are still waiting.",
+    "Each comment below names one support conversation that hit this gap. Fixy first checks whether this would have changed the reply and can be known from our data, then builds the fix or cancels the ticket with the reason, with no plan card, question card or draft (Aaron, 2026-11-25). A fix that would add an action, write customer data or move money becomes its own ENG ticket without the `fixy` label, linked from this one. After a read or Help Centre fix is live, Fixy reruns the check for each conversation and answers the ones whose question it now answers and that are still waiting.",
     "## Capability gap",
     [
       `- Gap key: ${gapKey(gap)}`,

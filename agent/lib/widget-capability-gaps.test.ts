@@ -317,9 +317,9 @@ test("the count line takes the given count and nothing else changes", () => {
   assert.equal(counted.replace("Conversations: 3", "Conversations: 1"), stored);
 });
 
-const NO_PLAN_CARD = /with no plan card/;
+const NO_PLAN_CARD = /with no plan card, question card or draft/;
 const OWN_TICKET =
-  /move money becomes its own ENG ticket without the `fixy` label, and this one is canceled/;
+  /move money becomes its own ENG ticket without the `fixy` label, linked from this one/;
 const WAITS_FOR_APPROVAL = /waits for approval/;
 
 test("the description tells Fixy's reader no plan card waits and an action fix becomes its own ticket", () => {
