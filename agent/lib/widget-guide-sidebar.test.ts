@@ -381,6 +381,14 @@ test("a sidebar page named under the wrong heading is named under its real one",
     assert.equal(withRealGroups(sidebar, path), path);
   }
   assert.equal(sidebar.groupOf.get("Deals"), "CRM");
+  // Settings named after the page, in a later step, doesn't block the fix.
+  assert.equal(
+    withRealGroups(
+      sidebar,
+      'click "Campaigns" (under "Outreach"), open the campaign, then its "Settings" tab'
+    ),
+    'click "Campaigns" (under "Cold Email"), open the campaign, then its "Settings" tab'
+  );
   // The stored path behind Foreman#274's "Campaigns" (under "Outreach"), after
   // the retired-label rewrite, as the generator runs them.
   assert.equal(
