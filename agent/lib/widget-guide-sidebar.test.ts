@@ -261,6 +261,10 @@ test("a path that opens at a retired sidebar label opens at the real page", () =
     '"Email accounts".'
   );
   assert.equal(
+    fixed('"Cold email agent" > "Email accounts"'),
+    '"Email accounts"'
+  );
+  assert.equal(
     fixed('"Cold Email Agent" > campaign > "Leads"'),
     '"Campaigns" > campaign > "Leads"'
   );

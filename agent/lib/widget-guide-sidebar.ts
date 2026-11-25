@@ -330,7 +330,11 @@ export const withoutRetiredStart = (
   path: string
 ) => {
   const [first, ...rest] = labelsIn(path);
-  const successors = first && retired.get(first.label);
+  const successors =
+    first &&
+    [...retired].find(
+      ([label]) => label.toLowerCase() === first.label.toLowerCase()
+    )?.[1];
   if (!successors?.length) {
     return path;
   }
