@@ -12,7 +12,7 @@ export const GENERATED_PR_KINDS = {
   guide: {
     name: "widget guide",
     review:
-      "check its whole guide change against the Help Centre docs at the Acquisity commit its guide header names",
+      "check its whole guide change against the Help Centre docs at the Acquisity commit its guide header names, and merge it when it is sound: no line sends a customer to a menu, page or button that is not there or gets wrong what they can or cannot do, and it is better than main's guide. List wording slips in one follow-up ticket instead of holding the merge",
   },
   tools: {
     name: "widget tools",
