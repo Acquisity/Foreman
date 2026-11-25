@@ -3,7 +3,11 @@ import { type TestContext, test } from "node:test";
 import type { RouteHandlerArgs, Session } from "eve/channels";
 import { isUnattended } from "./trust.js";
 import { verifiedWidgetContext as scope } from "./widget.fixture.js";
-import { composerInput, type GateResult } from "./widget-egress.js";
+import {
+  composerInput,
+  type GateResult,
+  gate as replyGate,
+} from "./widget-egress.js";
 import { WorkspaceAccessDenied } from "./widget-evidence.js";
 import type { WidgetFindings } from "./widget-findings.js";
 import { ANSWER_HERE, UNFILED_LINE } from "./widget-handoff.js";
@@ -169,6 +173,8 @@ const investigate = { ...start, mode: "investigate" as const };
 type EventStream = Awaited<ReturnType<Session["getEventStream"]>>;
 type StreamEvent =
   EventStream extends ReadableStream<infer Event> ? Event : never;
+const ASKS_ABOUT_REFUND = /do you want[^.?]*refund/iu;
+const TEAM_REFUNDS = /Our team will refund/u;
 const event = (type: string, data: unknown = {}) =>
   ({ data, type }) as unknown as StreamEvent;
 const session = (events: StreamEvent[], id = "widget-session-1") =>
@@ -3493,4 +3499,86 @@ test("the reply's facts are filed only after the tool gaps finish", async () => 
     "reply started",
     "reply done",
   ]);
+});
+
+test("an orders read whose next step is a refund never ends in a reply asking whether to refund (ENG-20615)", async () => {
+  const orderId = "4ca90c58-0000-4000-8000-000000000000";
+  const ordersRead = event("action.result", {
+    result: {
+      callId: "orders",
+      kind: "tool-result",
+      output: {
+        sections: {
+          attention: [
+            {
+              kind: "finished",
+              nextStep: "refund_unfinished",
+              orderId,
+              unfinishedInboxCount: 9,
+            },
+          ],
+        },
+        status: "ok",
+        unavailable: [],
+      },
+      toolName: "widget_orders",
+    },
+  });
+  const outcome = await waitForWidgetInvestigation(
+    session([
+      ordersRead,
+      event("message.completed", {
+        message:
+          "The order finished with 27 of 36 inboxes; its next step is a refund.",
+      }),
+      event("turn.completed"),
+    ])
+  );
+  assert.equal(outcome.status, "completed");
+  const { deps, run } = dependencies();
+  deps.extract = () =>
+    Promise.resolve({
+      confidence: "high",
+      facts: [
+        {
+          claim:
+            "The 5 October order finished with 27 of 36 inboxes, and its next step is that the team refunds what couldn't be set up.",
+          entityIds: [orderId],
+          evidence: {
+            ref: "attention.nextStep:refund_unfinished",
+            tool: "widget_orders",
+          },
+        },
+      ],
+      needsHuman: false,
+      recommendation:
+        "Ask the customer whether they want the 9 missing inboxes refunded.",
+      report: "Order parked with refund_unfinished.",
+    });
+  const composed: string[] = [];
+  deps.gate = (gateScope, gateQuestion, gateFindings) =>
+    replyGate(gateScope, gateQuestion, gateFindings, {
+      compose: () => {
+        composed.push("x");
+        return Promise.resolve(
+          composed.length === 1
+            ? "Your order finished with 27 of 36 inboxes. Do you want the 9 missing inboxes refunded?"
+            : "Your order finished with 27 of 36 inboxes. Our team will refund the 9 that couldn't be set up, so you don't need to do anything."
+        );
+      },
+      judge: () => Promise.resolve({ decision: "allow", reason: "in scope" }),
+      resolve: () =>
+        Promise.resolve({
+          domains: new Set<string>(),
+          emails: new Set<string>(),
+          slugs: new Set<string>(),
+          uuids: new Set([orderId]),
+        }),
+    });
+  await finishWidgetRun(run, "widget-session-refund", outcome, deps);
+  const message =
+    (run.outcome as { message: string | null } | null)?.message ?? "";
+  assert.equal(composed.length, 2);
+  assert.doesNotMatch(message, ASKS_ABOUT_REFUND);
+  assert.match(message, TEAM_REFUNDS);
 });
