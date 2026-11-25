@@ -46,8 +46,9 @@ export const HELD_AREAS: ReadonlySet<string> = new Set([
 ]);
 /**
  * The hand-written widget tools an endpoint area replaces, and the areas each
- * answers for. Job failures covers three areas, so it stays until all three
- * have switched.
+ * answers for. Job failures reads failed AI SDR runs, provisioning orders and
+ * lead scrapes (its AREAS), so it stays until AI SDR, orders and lead
+ * pipeline have all switched.
  */
 export const LEGACY_TOOL_AREAS: Readonly<Record<string, readonly string[]>> = {
   widget_account_access: ["account"],
@@ -55,7 +56,7 @@ export const LEGACY_TOOL_AREAS: Readonly<Record<string, readonly string[]>> = {
   widget_crm_contact: ["crm-contact"],
   widget_generation_diagnostics: ["ai-generation"],
   widget_inbox_health: ["inboxes"],
-  widget_job_failures: ["orders", "lead-pipeline", "ai-generation"],
+  widget_job_failures: ["ai-sdr", "lead-pipeline", "orders"],
   widget_lead_pipeline_status: ["lead-pipeline"],
   widget_outreach_health: ["campaigns"],
   widget_provisioning_status: ["orders"],

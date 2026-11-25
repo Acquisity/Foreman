@@ -89,7 +89,7 @@ const NOT_READS = new Set([
 /**
  * Each hand-written tool's support endpoint area (the parent ticket's handoff),
  * so a gap keeps its key when the area switches to its endpoint. Job failures
- * are split across orders, lead pipeline and AI generation there, so its key
+ * are split across AI SDR, orders and lead pipeline there, so its key
  * changes when it goes.
  */
 const TOOL_AREAS: Readonly<Record<string, string>> = {

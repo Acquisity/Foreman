@@ -533,13 +533,14 @@ for (const [label, held] of HELD_STATES) {
   });
 }
 
-test("job failures stays on the lane until orders, lead pipeline and AI generation have all switched", () => {
+test("job failures stays on the lane until AI SDR, orders and lead pipeline have all switched", () => {
   const offered = (held: string[]) =>
     legacyToolOffered("widget_job_failures", new Set(held));
+  assert.equal(offered(["ai-sdr"]), true);
   assert.equal(offered(["orders"]), true);
   assert.equal(offered(["lead-pipeline"]), true);
-  assert.equal(offered(["ai-generation"]), true);
-  assert.equal(offered(["billing", "campaigns"]), false);
+  // It reads no AI generation, billing or campaigns failures.
+  assert.equal(offered(["ai-generation", "billing", "campaigns"]), false);
   // A tool that answers for no area is never an area's to take off.
   assert.equal(legacyToolOffered("widget_help_article", new Set()), true);
 });
