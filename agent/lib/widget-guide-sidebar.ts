@@ -25,8 +25,12 @@ const FEATURE_NAME = /FEATURES\.(\w+)/gu;
  */
 const CRM_OPT_IN = /crmV2Access\(ctx\)\.(?:myDay|conversations)/u;
 const OPT_IN_NOTE = " (only where turned on)";
+const QUOTED_START = /^"([^"]+)"/u;
+const UNDER_GROUP = /"([^"]+)" \(under (the )?"([^"]+)"( group)?\)/gu;
 
 export interface GuideSidebar {
+  /** The heading each page sits under, for pages under one. */
+  groupOf: ReadonlyMap<string, string>;
   /** Group headings, which a customer never clicks to reach a page. */
   headings: ReadonlySet<string>;
   /** One line per group, top to bottom. */
@@ -118,6 +122,16 @@ export function parseGuideSidebar(
     );
   }
   return {
+    groupOf: new Map(
+      groups.flatMap((g) =>
+        g.label
+          ? g.pages.flatMap((entry) => {
+              const page = QUOTED_START.exec(entry)?.[1];
+              return page ? [[page, g.label] as const] : [];
+            })
+          : []
+      )
+    ),
     headings: new Set(groups.map((g) => g.label).filter(Boolean)),
     lines: groups
       .filter((g) => g.pages.length)
@@ -406,3 +420,26 @@ export const getHereFor = (
     }
   }
 };
+
+/**
+ * A path that places a sidebar page under the wrong heading, such as
+ * `"Campaigns" (under "Outreach")` after the sidebar moved it to Cold Email,
+ * names the heading the page is really under (ENG-20629). A label the sidebar
+ * doesn't group is left as it was.
+ */
+export const withRealGroups = (sidebar: GuideSidebar, path: string) =>
+  path.replace(
+    UNDER_GROUP,
+    (
+      whole,
+      page: string,
+      the: string | undefined,
+      heading: string,
+      group: string | undefined
+    ) => {
+      const real = sidebar.groupOf.get(page);
+      return real && real !== heading
+        ? `"${page}" (under ${the ?? ""}"${real}"${group ?? ""})`
+        : whole;
+    }
+  );

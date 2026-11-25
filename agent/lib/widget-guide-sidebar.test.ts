@@ -10,6 +10,7 @@ import {
   startsAtSidebarPage,
   withoutHeadings,
   withoutRetiredStart,
+  withRealGroups,
 } from "./widget-guide-sidebar.js";
 
 const page = (key: string, label: string, group: string, extra = "") => `  {
@@ -356,4 +357,26 @@ test("a refused Get here path borrows no parent's, and a missing one does", () =
     getHereFor("account-settings/faq/notifications", paths, refused),
     '"Settings" > "Notifications"'
   );
+});
+
+test("a sidebar page named under the wrong heading is named under its real one", () => {
+  // Foreman#274 at 87a8b4be: Campaigns moved from Outreach to Cold Email (ENG-20629).
+  assert.equal(
+    withRealGroups(
+      sidebar,
+      'In the left sidebar, click "Campaigns" (under "Outreach"), then the campaign'
+    ),
+    'In the left sidebar, click "Campaigns" (under "Cold Email"), then the campaign'
+  );
+  assert.equal(
+    withRealGroups(sidebar, 'click "Campaigns" (under the "Outreach" group)'),
+    'click "Campaigns" (under the "Cold Email" group)'
+  );
+  for (const path of [
+    'click "Campaigns" (under "Cold Email")',
+    'click "Profile" (under "Account")',
+  ]) {
+    assert.equal(withRealGroups(sidebar, path), path);
+  }
+  assert.equal(sidebar.groupOf.get("Deals"), "CRM");
 });
