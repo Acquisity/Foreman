@@ -1021,7 +1021,7 @@ const startReplyGapFiling = (
   (after ?? Promise.resolve()).then(() =>
     startGapFiling(
       run,
-      replyGaps(unchecked, outcome.gaps, outcome.refused),
+      replyGaps(unchecked, outcome.gaps, outcome.refused, run.scope.areasOff),
       fileGaps
     )
   );

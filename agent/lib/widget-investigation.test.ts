@@ -3501,6 +3501,42 @@ test("the reply's facts are filed only after the tool gaps finish", async () => 
   ]);
 });
 
+test("a reply about an area the workspace's features close files nothing (ENG-20478, ENG-20514)", async () => {
+  const outcome = await waitForWidgetInvestigation(
+    session([
+      event("message.completed", {
+        message: "I couldn't read your site's status.",
+      }),
+      event("turn.completed"),
+    ])
+  );
+  const { deps, run } = dependencies();
+  run.scope = {
+    ...run.scope,
+    areasOff: ["website"],
+    featuresOff: ["ai website creator"],
+  };
+  deps.extract = () =>
+    Promise.resolve({
+      ...findings,
+      unchecked: [
+        {
+          area: "website",
+          fact: "site status and publish state",
+          kind: "tool",
+        },
+      ],
+    });
+  const filed: unknown[] = [];
+  deps.fileGaps = (gaps) => {
+    filed.push(gaps);
+    return Promise.resolve();
+  };
+  assert.equal(outcome.status, "completed");
+  await finishWidgetRun(run, "widget-session-closed", outcome, deps);
+  assert.deepEqual(filed, []);
+});
+
 test("an orders read whose next step is a refund never ends in a reply asking whether to refund (ENG-20615)", async () => {
   const orderId = "4ca90c58-0000-4000-8000-000000000000";
   const ordersRead = event("action.result", {

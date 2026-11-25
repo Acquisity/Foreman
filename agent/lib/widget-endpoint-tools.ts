@@ -61,6 +61,27 @@ const AREA_CHECKS: Readonly<Record<string, CheckId>> = {
   website: "website",
 };
 
+/**
+ * The endpoint areas a workspace can't use because a feature they require is
+ * off (ENG-20514): every version of the area needs at least one of them. Read
+ * from the manifest, so a new endpoint or requirement needs no change here.
+ */
+export const areasOffFor = (
+  featuresOff: readonly string[] | undefined,
+  manifest: EndpointManifest = WIDGET_ENDPOINT_MANIFEST
+): string[] => {
+  const off = new Set(featuresOff ?? []);
+  const byArea = new Map<string, boolean>();
+  for (const entry of manifest.endpoints) {
+    if (CODE_ONLY_AREAS.has(entry.name)) {
+      continue;
+    }
+    const blocked = entry.requires.some((feature) => off.has(feature));
+    byArea.set(entry.name, (byArea.get(entry.name) ?? true) && blocked);
+  }
+  return [...byArea].filter(([, blocked]) => blocked).map(([area]) => area);
+};
+
 export const endpointToolName = (area: string) =>
   `widget_${area.replaceAll("-", "_")}`;
 
