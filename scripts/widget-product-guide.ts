@@ -617,11 +617,16 @@ const refused = new Set<string>();
 for (const line of lines) {
   current = line.match(SECTION_HEAD)?.[1] ?? current;
   const found = line.match(GET_HERE)?.[1];
+  // The group check runs last: a retired start such as "Cold Email Agent"
+  // (under "Outreach") only becomes a real page, Campaigns, in the rewrite.
   const stripped =
     found &&
-    withoutRetiredStart(
-      retiredFor(current),
-      withoutHeadings(GUIDE_SIDEBAR, withRealGroups(GUIDE_SIDEBAR, found))
+    withRealGroups(
+      GUIDE_SIDEBAR,
+      withoutRetiredStart(
+        retiredFor(current),
+        withoutHeadings(GUIDE_SIDEBAR, found)
+      )
     );
   const path =
     stripped && fromFirstSidebarPage(GUIDE_SIDEBAR, SIDEBAR_ENTRIES, stripped);

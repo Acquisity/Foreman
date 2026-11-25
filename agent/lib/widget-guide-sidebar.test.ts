@@ -379,4 +379,16 @@ test("a sidebar page named under the wrong heading is named under its real one",
     assert.equal(withRealGroups(sidebar, path), path);
   }
   assert.equal(sidebar.groupOf.get("Deals"), "CRM");
+  // The stored path behind Foreman#274's "Campaigns" (under "Outreach"), after
+  // the retired-label rewrite, as the generator runs them.
+  assert.equal(
+    withRealGroups(
+      sidebar,
+      withoutRetiredStart(
+        retiredFor("cold-email-agent/faq/lead-search/x"),
+        '"Cold Email Agent" (under "Outreach") > the campaign > "Leads" tab.'
+      )
+    ),
+    '"Campaigns" (under "Cold Email") > the campaign > "Leads" tab.'
+  );
 });
