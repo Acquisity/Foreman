@@ -16,6 +16,8 @@ const PAGE =
 /** A page kept only for saved layouts, such as the old "CRM" item. */
 const NEVER_SHOWN = /isVisible: \(\) => false/u;
 const OPT_IN_BLOCK = /OPT_IN_FEATURES[^=]*= \[([\s\S]*?)\];/u;
+const FEATURES_BLOCK = /export const FEATURES = \{([\s\S]*?)\n\}/u;
+const FEATURE_VALUE = /(\w+): '([a-z0-9_]+)'/gu;
 const FEATURE_NAME = /FEATURES\.(\w+)/gu;
 /**
  * The CRM's My Day and Conversations pages follow the opt-in MY_DAY feature
@@ -29,8 +31,43 @@ export interface GuideSidebar {
   headings: ReadonlySet<string>;
   /** One line per group, top to bottom. */
   lines: string;
+  /** Feature keys (such as `local_business_leads`) that are off until turned on. */
+  optInFeatures: ReadonlySet<string>;
   /** Every page label the sidebar can show. */
   pages: ReadonlySet<string>;
+}
+
+/**
+ * The opt-in features in features.ts: their constant names (as the catalog
+ * writes them) and their keys (as docs pages write them). A key set through
+ * an imported constant (CRM_PAYMENTS) is taken as the lowercased name, which is
+ * how every literal key is spelled.
+ */
+function parseOptIn(features: string) {
+  const names = new Set(
+    [...(features.match(OPT_IN_BLOCK)?.[1] ?? "").matchAll(FEATURE_NAME)].map(
+      (m) => m[1]
+    )
+  );
+  // Without the opt-in list every page would read as on for a new workspace.
+  if (names.size === 0) {
+    throw new Error("features parse found no OPT_IN_FEATURES");
+  }
+  const keys = new Map(
+    [
+      ...(features.match(FEATURES_BLOCK)?.[1] ?? "").matchAll(FEATURE_VALUE),
+    ].map((m) => [m[1], m[2]])
+  );
+  // Without the key map an opt-in key spelled unlike its name would be missed.
+  if (keys.size === 0) {
+    throw new Error("features parse found no FEATURES block");
+  }
+  return {
+    keys: new Set(
+      [...names].flatMap((name) => keys.get(name) ?? name.toLowerCase())
+    ),
+    names,
+  };
 }
 
 /**
@@ -42,14 +79,10 @@ export function parseGuideSidebar(
   source: string,
   features: string
 ): GuideSidebar {
-  const optIn = new Set(
-    [...(features.match(OPT_IN_BLOCK)?.[1] ?? "").matchAll(FEATURE_NAME)].map(
-      (m) => m[1]
-    )
-  );
+  const optIn = parseOptIn(features);
   const opensOnlyWhereOn = (entry: string) =>
     CRM_OPT_IN.test(entry) ||
-    [...entry.matchAll(FEATURE_NAME)].some((m) => optIn.has(m[1]));
+    [...entry.matchAll(FEATURE_NAME)].some((m) => optIn.names.has(m[1]));
   const groupIds = Object.fromEntries(
     [...(source.match(GROUP_IDS_BLOCK)?.[1] ?? "").matchAll(GROUP_ID)].map(
       (m) => [m[1], m[2]]
@@ -84,10 +117,6 @@ export function parseGuideSidebar(
       `sidebar parse found ${groups.length} groups, ${pages.size} pages`
     );
   }
-  // Without the opt-in list every page would read as on for a new workspace.
-  if (optIn.size === 0) {
-    throw new Error("features parse found no OPT_IN_FEATURES");
-  }
   return {
     headings: new Set(groups.map((g) => g.label).filter(Boolean)),
     lines: groups
@@ -97,6 +126,7 @@ export function parseGuideSidebar(
           `- ${g.label ? `Under the "${g.label}" heading` : "At the top"}: ${g.pages.join(", ")}`
       )
       .join("\n"),
+    optInFeatures: optIn.keys,
     pages,
   };
 }
@@ -353,4 +383,26 @@ export const withoutRetiredStart = (
     }
   }
   return `${path.slice(0, first.at)}"${successors[0]}"${path.slice(path.indexOf('"', first.at + 1) + 1)}`;
+};
+
+/**
+ * A section's Get here path: its own usable one, or, when it gave none, its
+ * nearest parent article's. A section whose own path was refused gets none,
+ * and so does one below a refused parent, since a borrowed path would be a
+ * guess (ENG-20607).
+ */
+export const getHereFor = (
+  slug: string,
+  paths: ReadonlyMap<string, string>,
+  refused: ReadonlySet<string>
+): string | undefined => {
+  if (paths.has(slug) || refused.has(slug)) {
+    return paths.get(slug);
+  }
+  for (let parent = slug; parent.includes("/"); ) {
+    parent = parent.slice(0, parent.lastIndexOf("/"));
+    if (paths.has(parent) || refused.has(parent)) {
+      return paths.get(parent);
+    }
+  }
 };

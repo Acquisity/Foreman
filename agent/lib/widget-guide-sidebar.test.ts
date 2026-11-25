@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
   fromFirstSidebarPage,
+  getHereFor,
   parseGuideSidebar,
   parseSettingsMenu,
   RETIRED_LABELS,
@@ -81,10 +82,18 @@ ${[
 `;
 
 /** Shaped like Acquisity's apps/web/lib/features.ts. */
-const FEATURES = `export const OPT_IN_FEATURES: FeatureName[] = [
+const FEATURES = `export const FEATURES = {
+  AI_WEBSITE_CREATOR: 'ai_website_creator',
+  WORKFLOWS: 'workflow_builder',
+  MY_DAY: 'my_day',
+  CRM_PAYMENTS: CRM_PAYMENTS_FEATURE,
+} as const;
+
+export const OPT_IN_FEATURES: FeatureName[] = [
   FEATURES.AI_WEBSITE_CREATOR,
   FEATURES.WORKFLOWS,
   FEATURES.MY_DAY,
+  FEATURES.CRM_PAYMENTS,
 ];`;
 
 const sidebar = parseGuideSidebar(CATALOG, FEATURES);
@@ -110,6 +119,11 @@ test("the guide's sidebar lists no page the app never shows", () => {
     ].join("\n")
   );
   assert.ok(!sidebar.pages.has("CRM"));
+  assert.deepEqual(
+    [...sidebar.optInFeatures],
+    // A literal key is read as written; an imported one is the lowercased name.
+    ["ai_website_creator", "workflow_builder", "my_day", "crm_payments"]
+  );
   assert.ok(!sidebar.pages.has("Old Inbox"));
   assert.deepEqual([...sidebar.headings], ["CRM", "Cold Email", "Build"]);
 });
@@ -156,12 +170,23 @@ test("a heading written as a click is taken out of the path", () => {
 });
 
 test("a reshaped catalog fails instead of shipping a guide without a sidebar", () => {
-  assert.throws(() => parseGuideSidebar("export const nothing = 1;", ""), {
-    message: "sidebar parse found 0 groups, 0 pages",
-  });
+  assert.throws(
+    () => parseGuideSidebar("export const nothing = 1;", FEATURES),
+    {
+      message: "sidebar parse found 0 groups, 0 pages",
+    }
+  );
   assert.throws(() => parseGuideSidebar(CATALOG, "export const nothing = 1;"), {
     message: "features parse found no OPT_IN_FEATURES",
   });
+  assert.throws(
+    () =>
+      parseGuideSidebar(
+        CATALOG,
+        "export const OPT_IN_FEATURES: FeatureName[] = [\n  FEATURES.MY_DAY,\n];"
+      ),
+    { message: "features parse found no FEATURES block" }
+  );
 });
 
 test("a sidebar path that opens at a retired label starts again at its first sidebar page", () => {
@@ -306,4 +331,29 @@ test("a path that opens at a retired sidebar label opens at the real page", () =
     dashboard
   );
   assert.equal(retiredFor("client-portal"), RETIRED_LABELS);
+});
+
+test("a refused Get here path borrows no parent's, and a missing one does", () => {
+  const paths = new Map([
+    ["account-settings", '"Settings" > "Profile"'],
+    ["account-settings/faq/notifications", '"Settings" > "Notifications"'],
+  ]);
+  // Foreman#274 at 77de3dc7: the course-login FAQ's sign-in path was refused.
+  const refused = new Set(["account-settings/faq/course-login"]);
+  assert.equal(
+    getHereFor("account-settings/faq/course-login", paths, refused),
+    undefined
+  );
+  assert.equal(
+    getHereFor("account-settings/faq/course-login/old", paths, refused),
+    undefined
+  );
+  assert.equal(
+    getHereFor("account-settings/faq/password", paths, refused),
+    '"Settings" > "Profile"'
+  );
+  assert.equal(
+    getHereFor("account-settings/faq/notifications", paths, refused),
+    '"Settings" > "Notifications"'
+  );
 });
