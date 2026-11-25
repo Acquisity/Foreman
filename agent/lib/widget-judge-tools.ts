@@ -2,7 +2,6 @@ import { z } from "zod";
 import { tool as account_access } from "../tools/widget_account_access.js";
 import { tool as ask_customer } from "../tools/widget_ask_customer.js";
 import { tool as billing_summary } from "../tools/widget_billing_summary.js";
-import { tool as crm_contact } from "../tools/widget_crm_contact.js";
 import { tool as file_ticket } from "../tools/widget_file_ticket.js";
 import { tool as generation_diagnostics } from "../tools/widget_generation_diagnostics.js";
 import { tool as help_article } from "../tools/widget_help_article.js";
@@ -27,7 +26,6 @@ const handWrittenCapabilities = Object.entries({
   widget_account_access: account_access,
   widget_ask_customer: ask_customer,
   widget_billing_summary: billing_summary,
-  widget_crm_contact: crm_contact,
   widget_file_ticket: file_ticket,
   widget_generation_diagnostics: generation_diagnostics,
   widget_help_article: help_article,
