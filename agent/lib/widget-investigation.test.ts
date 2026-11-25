@@ -3618,3 +3618,44 @@ test("an orders read whose next step is a refund never ends in a reply asking wh
   assert.doesNotMatch(message, ASKS_ABOUT_REFUND);
   assert.match(message, TEAM_REFUNDS);
 });
+
+test("what the turn's workspace reads returned reaches the gate to vouch for their identifiers (ENG-20659)", async () => {
+  const outcome = await waitForWidgetInvestigation(
+    session([
+      event("action.result", {
+        result: {
+          callId: "kb",
+          kind: "tool-result",
+          output: {
+            sections: { knowledgeBase: { text: "Podcast on youtube.com" } },
+            status: "ok",
+          },
+          toolName: "widget_ai_generation",
+        },
+      }),
+      event("action.result", {
+        result: {
+          callId: "issues",
+          kind: "tool-result",
+          output: { issues: [{ text: "Seen on rival-agency.com" }] },
+          toolName: "widget_known_issues",
+        },
+      }),
+      event("message.completed", {
+        message: "The knowledge base names youtube.com.",
+      }),
+      event("turn.completed"),
+    ])
+  );
+  assert.equal(outcome.status, "completed");
+  const vouched = outcome.status === "completed" ? outcome.vouched : undefined;
+  assert.deepEqual(vouched?.domains, ["youtube.com"]);
+  const { deps, run } = dependencies();
+  const passed: unknown[] = [];
+  deps.gate = (...args) => {
+    passed.push(args.at(-1));
+    return Promise.resolve(allowed);
+  };
+  await finishWidgetRun(run, "widget-session-vouch", outcome, deps);
+  assert.deepEqual(passed, [vouched]);
+});

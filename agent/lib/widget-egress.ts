@@ -761,23 +761,48 @@ export const defaultGateDeps: GateDeps = {
 };
 
 /**
+ * Identifiers a text vouches for. Each source is scanned on its own, and an
+ * email's domain counts too: the scanner leaves out a bare domain that an email
+ * in the same text already covers, which is right for a reply's check but
+ * would drop it here (ENG-20659).
+ */
+export const vouchedBy = (text: string): Required<IdentifierCandidates> => {
+  const { candidates } = scanIdentifiers(text);
+  return {
+    ...candidates,
+    domains: [
+      ...(candidates.domains ?? []),
+      ...candidates.emails.map((email) => email.split("@")[1] ?? ""),
+    ].filter(Boolean),
+  };
+};
+
+/**
  * An identifier the customer typed in this conversation is their own input, and
  * repeating it discloses nothing: a reply quoting the email in a thread they
- * pasted was blocked whole (wrun_41M4DWMXRT0GKGYCZG5WMT5N25). Anything else
- * still needs the verified workspace to own it.
+ * pasted was blocked whole (wrun_41M4DWMXRT0GKGYCZG5WMT5N25). So is one a read
+ * scoped to the verified workspace returned (ENG-20659). Anything else still
+ * needs the verified workspace to own it.
  */
 const vouchingTyped =
-  (resolve: GateDeps["resolve"], customerInput: string): GateDeps["resolve"] =>
+  (
+    resolve: GateDeps["resolve"],
+    customerInput: string,
+    workspaceReads?: IdentifierCandidates
+  ): GateDeps["resolve"] =>
   async (scope, candidates, signal) => {
     const owned = await resolve(scope, candidates, signal);
-    const typed = scanIdentifiers(customerInput).candidates;
-    const add = (set: Set<string>, ids: string[] = []) =>
-      new Set([...set, ...ids]);
+    const sources: IdentifierCandidates[] = [
+      vouchedBy(customerInput),
+      ...(workspaceReads ? [workspaceReads] : []),
+    ];
+    const add = (set: Set<string>, kind: keyof IdentifierCandidates) =>
+      new Set([...set, ...sources.flatMap((source) => source[kind] ?? [])]);
     return {
-      domains: add(owned.domains, typed.domains),
-      emails: add(owned.emails, typed.emails),
-      slugs: add(owned.slugs, typed.slugs),
-      uuids: add(owned.uuids, typed.uuids),
+      domains: add(owned.domains, "domains"),
+      emails: add(owned.emails, "emails"),
+      slugs: add(owned.slugs, "slugs"),
+      uuids: add(owned.uuids, "uuids"),
     };
   };
 
@@ -897,10 +922,12 @@ export async function gate(
   /** Everything the customer wrote in this conversation, the latest message included. */
   customerInput: string = question,
   /** When the customer asked: the run's creation time. */
-  askedAt: Date = new Date()
+  askedAt: Date = new Date(),
+  /** What this run's workspace reads returned (ENG-20659): the workspace's own identifiers. */
+  workspaceReads?: IdentifierCandidates
 ): Promise<GateResult> {
   let findings = withoutTicketRefs(investigated) ?? investigated;
-  const resolve = vouchingTyped(deps.resolve, customerInput);
+  const resolve = vouchingTyped(deps.resolve, customerInput, workspaceReads);
   const timings: Record<string, number> = {};
   const timed = async <T>(step: string, work: () => Promise<T>): Promise<T> => {
     signal?.throwIfAborted();
