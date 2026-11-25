@@ -112,8 +112,24 @@ test("another workspace's domain, a known issue's domain or a diagnosis-only val
 
 test("only a successful read of the workspace vouches, and never its diagnosis-only values", () => {
   assert.match(workspaceReadText(knowledgeBase), YOUTUBE);
+  assert.match(
+    workspaceReadText(
+      read("widget_generation_diagnostics", { knowledgeBase: "youtube.com" })
+    ),
+    YOUTUBE
+  );
   for (const notRead of [
     read("widget_known_issues", { text: "x.com" }),
+    read("widget_billing_summary", {
+      stripe: { invoices: [{ line: "x.com" }] },
+    }),
+    read("widget_billing", { sections: { charges: "x.com" } }),
+    read("widget_account_access", { userErrorSignals: { classes: ["x.com"] } }),
+    read("widget_job_failures", { error_message: "x.com" }),
+    read("widget_sdr_thread_status", { host: { email: "h@x.com" } }),
+    read("widget_website_status", { live: { buildLog: "x.com" } }),
+    read("widget_provider", { rows: ["x.com"] }),
+    read("widget_new_tool", { site: "x.com" }),
     read("widget_help_article", { url: "x.com" }),
     read("widget_file_ticket", { url: "x.com" }),
     read("report_capability_gap", { gap: "x.com" }),
