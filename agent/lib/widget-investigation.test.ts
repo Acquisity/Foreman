@@ -3648,9 +3648,8 @@ test("what the turn's workspace reads returned reaches the gate to vouch for the
     ])
   );
   assert.equal(outcome.status, "completed");
-  const vouched = outcome.status === "completed" ? (outcome.vouched ?? "") : "";
-  assert.ok(vouched.includes("youtube.com"));
-  assert.equal(vouched.includes("rival-agency.com"), false);
+  const vouched = outcome.status === "completed" ? outcome.vouched : undefined;
+  assert.deepEqual(vouched?.domains, ["youtube.com"]);
   const { deps, run } = dependencies();
   const passed: unknown[] = [];
   deps.gate = (...args) => {

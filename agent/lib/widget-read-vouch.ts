@@ -4,7 +4,9 @@
 // name it, as it may name what the customer typed. Only reads whose whole
 // result is the workspace's own data vouch, and a value marked diagnosis only
 // can hold raw provider text, so it never does.
+import { vouchedBy } from "./widget-egress.js";
 import { ENDPOINT_TOOL_NAMES } from "./widget-endpoint-tools.js";
+import type { IdentifierCandidates } from "./widget-evidence.js";
 
 /**
  * Hand-written tools whose every query is filtered to the verified
@@ -35,8 +37,23 @@ const vouchesFor = (tool: string) =>
   SCOPED_TOOLS.has(tool) ||
   (ENDPOINT_TOOL_NAMES.has(tool) && tool !== "widget_billing");
 
-/** Enough for every read a turn makes; the egress scan stops at its own bound. */
-export const VOUCHED_TEXT_MAX = 256 * 1024;
+export const NOTHING_VOUCHED: Required<IdentifierCandidates> = {
+  domains: [],
+  emails: [],
+  slugs: [],
+  uuids: [],
+};
+
+/** Every identifier either set vouches for, each once. */
+export const addVouched = (
+  so: Required<IdentifierCandidates>,
+  more: Required<IdentifierCandidates>
+): Required<IdentifierCandidates> => ({
+  domains: [...new Set([...so.domains, ...more.domains])],
+  emails: [...new Set([...so.emails, ...more.emails])],
+  slugs: [...new Set([...so.slugs, ...more.slugs])],
+  uuids: [...new Set([...so.uuids, ...more.uuids])],
+});
 
 const withoutDiagnosisOnly = (value: unknown): unknown => {
   if (Array.isArray(value)) {
@@ -56,21 +73,28 @@ const withoutDiagnosisOnly = (value: unknown): unknown => {
   );
 };
 
-/** The text of one tool result that vouches for its identifiers, or "" when it vouches for none. */
-export function workspaceReadText(result: unknown): string {
+/**
+ * The identifiers one tool result vouches for: none unless it is a vouching
+ * read that answered status "ok". A refusal or unavailable answer is not an
+ * error result, so the status is checked too.
+ */
+export function workspaceReadIdentifiers(
+  result: unknown
+): Required<IdentifierCandidates> {
   const action = result as {
     isError?: boolean;
     kind?: string;
-    output?: unknown;
+    output?: { status?: unknown } | null;
     toolName?: unknown;
   } | null;
   if (
     action?.kind !== "tool-result" ||
     action.isError === true ||
     typeof action.toolName !== "string" ||
-    !vouchesFor(action.toolName)
+    !vouchesFor(action.toolName) ||
+    action.output?.status !== "ok"
   ) {
-    return "";
+    return NOTHING_VOUCHED;
   }
-  return JSON.stringify(withoutDiagnosisOnly(action.output ?? null)) ?? "";
+  return vouchedBy(JSON.stringify(withoutDiagnosisOnly(action.output)));
 }
