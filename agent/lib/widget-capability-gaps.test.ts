@@ -319,7 +319,7 @@ test("the count line takes the given count and nothing else changes", () => {
 
 const NO_PLAN_CARD = /with no plan card/;
 const OWN_TICKET =
-  /move money becomes its own ticket, and this one is canceled/;
+  /move money becomes its own ENG ticket without the `fixy` label, and this one is canceled/;
 const WAITS_FOR_APPROVAL = /waits for approval/;
 
 test("the description tells Fixy's reader no plan card waits and an action fix becomes its own ticket", () => {
