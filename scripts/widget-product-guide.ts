@@ -505,9 +505,12 @@ await Promise.all(
 /**
  * A long article a batch answered in a line or two is distilled once more on
  * its own (ENG-20575). Its section replaces the batch's only when it says
- * more. One still short, or whose call fails, is logged and kept, so it never
- * stops the run, and a rerun with the same docs leaves the guide as it was.
+ * more. One still short is logged and kept, so a rerun with the same docs
+ * leaves the guide as it was. One whose call fails keeps its batch section but
+ * stays out of the cache, so the next run tries it again; it never stops this
+ * run.
  */
+const retryFailed = new Set<string>();
 const shortened = pending.filter(
   (a) => shortAnswers(distilled.get(a.slug) ?? "", [a]).length > 0
 );
@@ -524,6 +527,7 @@ for (const article of shortened) {
       rewritten.push(article.slug);
     }
   } catch (error) {
+    retryFailed.add(article.slug);
     console.log(`  ${label} failed: ${String(error).slice(0, 160)}`);
   }
   if (shortAnswers(distilled.get(article.slug) ?? "", [article]).length) {
@@ -668,7 +672,9 @@ const limits = joinGuideLimits(
   slugs.map((slug) => summarised.get(slug) ?? { cannot: [], who: [] })
 );
 for (const article of available) {
-  cache.set(articleKey(article), distilled.get(article.slug) ?? "");
+  if (!retryFailed.has(article.slug)) {
+    cache.set(articleKey(article), distilled.get(article.slug) ?? "");
+  }
 }
 for (const slug of slugs) {
   cache.set(limitsKey(slug), JSON.stringify(summarised.get(slug)));
