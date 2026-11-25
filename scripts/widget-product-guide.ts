@@ -73,6 +73,7 @@ const FEATURES = "apps/web/lib/features.ts";
 const SETTINGS_NAV = "apps/web/lib/new-design/settings-nav.ts";
 const SETTINGS_MENU_ITEMS =
   "apps/web/components/organization/settings-menu-items.tsx";
+const CRM_SETTINGS_ROUTES = "apps/web/lib/crm-v2/settings-routes.ts";
 const MDX = /\.mdx$/u;
 const FRONTMATTER = /^---\n([\s\S]*?)\n---\n?/u;
 const INDEX_PAGE = /(^|\/)index$/u;
@@ -214,7 +215,8 @@ const GUIDE_SIDEBAR = parseGuideSidebar(
 );
 const SETTINGS_MENU = parseSettingsMenu(
   git("show", `${sha}:${SETTINGS_NAV}`),
-  git("show", `${sha}:${SETTINGS_MENU_ITEMS}`)
+  git("show", `${sha}:${SETTINGS_MENU_ITEMS}`),
+  git("show", `${sha}:${CRM_SETTINGS_ROUTES}`)
 );
 
 const SIDEBAR = `Left sidebar, top to bottom (group headings can be collapsed; a customer clicks the page, not the heading). A page marked "(only where turned on)" is off until it is turned on for the workspace, so a new workspace doesn't have it. A page shows only when the workspace has the feature and the role may use it. ${CLIENT_PAGES} Only Client users have "Client Portal" in the sidebar; owners and admins can preview it at the workspace address followed by /client-portal, and invite a client from "Settings" > "Members". A customer can rearrange, hide and add pages with "Edit sidebar" in the account menu, so their sidebar may differ from this.

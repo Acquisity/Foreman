@@ -202,6 +202,8 @@ const MENU_ITEM =
   /label: '([^']+)',\s*href: `\$\{settingsBasePath\}\/([a-z0-9-]+)`/gu;
 /** The kit leaves Calendly out of the menu (settings-menu-items.tsx). */
 const NOT_IN_MENU = new Set(["calendly"]);
+const LEGACY_BLOCK = /LEGACY_CRM_SETTINGS_TARGETS = \{([\s\S]*?)\n\}/u;
+const LEGACY_KEY = /^ {2}'?([a-z0-9-]+)'?:/gmu;
 
 /**
  * The settings menu as an owner sees it with every feature on, one line per
@@ -209,9 +211,21 @@ const NOT_IN_MENU = new Set(["calendly"]);
  * `buildKitSettingsGroups` (settings-nav.ts): each grouped route row holds its
  * page, a page that can fill a row's slot (`altSegments`) is named with it, and
  * every other menu item (settings-menu-items.tsx) goes under the fallback
- * group with its own label.
+ * group with its own label. With the CRM on, the app drops the legacy pages
+ * its CRM pages replace (LEGACY_CRM_SETTINGS_TARGETS in
+ * crm-v2/settings-routes.ts), so those are listed apart, for a workspace with
+ * the CRM off.
  */
-export function parseSettingsMenu(nav: string, menu: string): string {
+export function parseSettingsMenu(
+  nav: string,
+  menu: string,
+  crmRoutes: string
+): string {
+  const legacy = new Set(
+    [...(crmRoutes.match(LEGACY_BLOCK)?.[1] ?? "").matchAll(LEGACY_KEY)].map(
+      (m) => m[1]
+    )
+  );
   const routes = nav
     .split(ROUTE_START)
     .slice(1)
@@ -253,8 +267,11 @@ export function parseSettingsMenu(nav: string, menu: string): string {
     );
   }
   const fallback = FALLBACK.exec(nav)?.[1] ?? "Workspace";
+  const crmOff: string[] = [];
   for (const [segment, label] of menuLabels) {
-    if (!(claimed.has(segment) || NOT_IN_MENU.has(segment))) {
+    if (legacy.has(segment)) {
+      crmOff.push(`"${label}"`);
+    } else if (!(claimed.has(segment) || NOT_IN_MENU.has(segment))) {
       add(fallback, `"${label}"`);
     }
   }
@@ -265,7 +282,10 @@ export function parseSettingsMenu(nav: string, menu: string): string {
       `settings menu parse found ${groups.size} groups, ${pages} pages`
     );
   }
-  return [...groups]
+  const menuLine = [...groups]
     .map(([group, labels]) => `"${group}": ${labels.join(", ")}`)
     .join("; ");
+  return crmOff.length
+    ? `${menuLine}. On a workspace with the CRM off, the "CRM" group is not there and "${fallback}" has ${crmOff.join(", ")} instead`
+    : menuLine;
 }
