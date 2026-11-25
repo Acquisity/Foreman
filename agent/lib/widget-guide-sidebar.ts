@@ -313,15 +313,17 @@ export const retiredFor = (slug: string) =>
   slug.startsWith("client-portal") ? RETIRED_LABELS : RETIRED_FOR_TEAM;
 
 const MENTIONS_SETTINGS = /\bsettings\b/iu;
+const CLAUSE_END = /[.;:](?:\s|$)/u;
 
 /**
  * A path that opens at a retired sidebar label, such as `"Cold Email Agent" >
  * "Email Accounts"`, opens instead at the later label when it is one of the
  * pages that replaced the retired one (in the sidebar's own spelling), or at
  * the first of those pages. A later label is never promoted otherwise, so a
- * campaign's "Sequences" tab never becomes the CRM's "Sequences" page. A path
- * that mentions Settings anywhere stays as it was, because "Cold Email Agent"
- * is also a Settings page and a section of a campaign's Settings tab.
+ * campaign's "Sequences" tab never becomes the CRM's "Sequences" page.
+ * "Cold Email Agent" is also a Settings page and a section of a campaign's
+ * Settings tab, so a path that names Settings before the retired label, or in
+ * the same clause, stays as it was, unless it says it starts in the sidebar.
  */
 export const withoutRetiredStart = (
   retired: ReadonlyMap<string, readonly string[]>,
@@ -329,7 +331,12 @@ export const withoutRetiredStart = (
 ) => {
   const [first, ...rest] = labelsIn(path);
   const successors = first && retired.get(first.label);
-  if (!successors?.length || MENTIONS_SETTINGS.test(path)) {
+  if (!successors?.length) {
+    return path;
+  }
+  const before = path.slice(0, first.at);
+  const [clause] = path.slice(first.at).split(CLAUSE_END);
+  if (!LEFT_SIDEBAR.test(before) && MENTIONS_SETTINGS.test(before + clause)) {
     return path;
   }
   for (const later of rest) {

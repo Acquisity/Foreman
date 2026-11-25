@@ -4,6 +4,8 @@ import {
   fromFirstSidebarPage,
   parseGuideSidebar,
   parseSettingsMenu,
+  RETIRED_LABELS,
+  retiredFor,
   startsAtSidebarPage,
   withoutHeadings,
   withoutRetiredStart,
@@ -243,11 +245,8 @@ test("the settings menu follows the app's grouping, with alternate slots and its
 });
 
 test("a path that opens at a retired sidebar label opens at the real page", () => {
-  const retired = new Map<string, readonly string[]>([
-    ["Cold Email Agent", ["Campaigns", "Email accounts", "Deliverability"]],
-    ["Dashboard", ["Home"]],
-  ]);
-  const fixed = (path: string) => withoutRetiredStart(retired, path);
+  const fixed = (path: string) =>
+    withoutRetiredStart(retiredFor("workspace-settings/faq"), path);
   // Foreman#274's guide at 61b34ffa (ENG-20601).
   assert.equal(
     fixed('"Cold Email Agent" > "Deliverability", "Results" tab.'),
@@ -256,6 +255,10 @@ test("a path that opens at a retired sidebar label opens at the real page", () =
   assert.equal(
     fixed('"Cold Email Agent" > "Email Accounts"'),
     '"Email accounts"'
+  );
+  assert.equal(
+    fixed('"Cold Email Agent" > "Email Accounts".'),
+    '"Email accounts".'
   );
   assert.equal(
     fixed('"Cold Email Agent" > campaign > "Leads"'),
@@ -272,6 +275,13 @@ test("a path that opens at a retired sidebar label opens at the real page", () =
     ),
     'In the left sidebar, click "Campaigns", open a campaign, then click the "Sequences" tab.'
   );
+  // Settings named in a later sentence doesn't stop a sidebar repair.
+  assert.equal(
+    fixed(
+      'In the left sidebar, click "Cold Email Agent", open a campaign, then click the "AI Agent" tab. Settings: "Settings" > "Cold Email Agent".'
+    ),
+    'In the left sidebar, click "Campaigns", open a campaign, then click the "AI Agent" tab. Settings: "Settings" > "Cold Email Agent".'
+  );
   assert.equal(
     fixed('In the left sidebar, click "Dashboard".'),
     'In the left sidebar, click "Home".'
@@ -280,7 +290,16 @@ test("a path that opens at a retired sidebar label opens at the real page", () =
     '"Settings" > "Cold Email Agent"',
     'In the left sidebar, click "Settings", then "Cold Email Agent"',
     '"Campaigns" > "New campaign"',
+    'Settings > "Cold Email Agent"',
+    '"Cold Email Agent" section of a campaign\'s "Settings" tab',
   ]) {
     assert.equal(fixed(path), path);
   }
+  // Client users do have "Dashboard"; everyone else has "Home".
+  const dashboard = 'In the left sidebar, click "Dashboard".';
+  assert.equal(
+    withoutRetiredStart(retiredFor("client-portal/faq"), dashboard),
+    dashboard
+  );
+  assert.equal(retiredFor("client-portal"), RETIRED_LABELS);
 });
