@@ -128,7 +128,7 @@ const featuresOffNote = (
   areas: readonly string[] | undefined
 ) =>
   names?.length
-    ? ` These features are not turned on for this workspace: ${JSON.stringify(names)}.${areas?.length ? ` They close these areas, so nothing in them can be read: ${JSON.stringify(areas)}.` : ""} When the question is about one of them, there is nothing of it to check or ask about: do not say it could not be read or checked, and do not ask for details of it. The recommendation says plainly that the feature is not turned on for their workspace, and how to get it only when the product guide says. This is a refusal by design, not a capability gap.`
+    ? ` These features are not turned on for this workspace: ${JSON.stringify(names)}.${areas?.length ? ` A feature that is off closes these whole areas for this workspace, so nothing in them can be read: ${JSON.stringify(areas)}.` : ""} When the question is about one of them, there is nothing of it to check or ask about: do not say it could not be read or checked, and do not ask for details of it. The recommendation says plainly that the feature is not turned on for their workspace, and how to get it only when the product guide says. This is a refusal by design, not a capability gap.`
     : "";
 
 export const widgetInstructions = (
