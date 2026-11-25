@@ -391,9 +391,6 @@ const call = async (
         maxRetries: 0,
         model: modelFor(model),
         prompt,
-        providerOptions: {
-          google: { thinkingConfig: { thinkingLevel: "minimal" } },
-        },
         system,
       }),
       sleep(CALL_TIMEOUT_MS + 5000).then(() => {

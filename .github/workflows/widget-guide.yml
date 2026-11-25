@@ -87,7 +87,6 @@ jobs:
           pnpm exec tsx --eval 'import { readFileSync } from "node:fs"; import { parseGuideCache } from "./agent/lib/widget-guide-cache.ts"; const cache = parseGuideCache(readFileSync("scripts/widget-product-guide.cache.json", "utf8")); console.log(Object.keys(cache).length === 0 ? "First run: full bootstrap regenerates every section." : "Loaded validated guide cache.");'
       - name: Regenerate the guide
         env:
-          AI_GATEWAY_API_KEY: ${{ secrets.AI_GATEWAY_API_KEY }}
           CLIPROXY_BASE_URL: ${{ secrets.CLIPROXY_BASE_URL }}
           CLIPROXY_API_KEY: ${{ secrets.CLIPROXY_API_KEY }}
         run: pnpm widget:guide --repo acquisity --ref HEAD $FULL | tee "$RUNNER_TEMP/guide.log"
