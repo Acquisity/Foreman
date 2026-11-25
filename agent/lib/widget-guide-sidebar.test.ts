@@ -179,6 +179,14 @@ test("a reshaped catalog fails instead of shipping a guide without a sidebar", (
   assert.throws(() => parseGuideSidebar(CATALOG, "export const nothing = 1;"), {
     message: "features parse found no OPT_IN_FEATURES",
   });
+  assert.throws(
+    () =>
+      parseGuideSidebar(
+        CATALOG,
+        "export const OPT_IN_FEATURES: FeatureName[] = [\n  FEATURES.MY_DAY,\n];"
+      ),
+    { message: "features parse found no FEATURES block" }
+  );
 });
 
 test("a sidebar path that opens at a retired label starts again at its first sidebar page", () => {

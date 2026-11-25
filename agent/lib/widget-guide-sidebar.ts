@@ -58,6 +58,10 @@ function parseOptIn(features: string) {
       ...(features.match(FEATURES_BLOCK)?.[1] ?? "").matchAll(FEATURE_VALUE),
     ].map((m) => [m[1], m[2]])
   );
+  // Without the key map an opt-in key spelled unlike its name would be missed.
+  if (keys.size === 0) {
+    throw new Error("features parse found no FEATURES block");
+  }
   return {
     keys: new Set(
       [...names].flatMap((name) => keys.get(name) ?? name.toLowerCase())
