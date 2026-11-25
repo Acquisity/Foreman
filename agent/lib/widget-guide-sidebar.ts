@@ -84,6 +84,10 @@ export function parseGuideSidebar(
       `sidebar parse found ${groups.length} groups, ${pages.size} pages`
     );
   }
+  // Without the opt-in list every page would read as on for a new workspace.
+  if (optIn.size === 0) {
+    throw new Error("features parse found no OPT_IN_FEATURES");
+  }
   return {
     headings: new Set(groups.map((g) => g.label).filter(Boolean)),
     lines: groups

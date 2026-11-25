@@ -156,6 +156,9 @@ test("a reshaped catalog fails instead of shipping a guide without a sidebar", (
   assert.throws(() => parseGuideSidebar("export const nothing = 1;", ""), {
     message: "sidebar parse found 0 groups, 0 pages",
   });
+  assert.throws(() => parseGuideSidebar(CATALOG, "export const nothing = 1;"), {
+    message: "features parse found no OPT_IN_FEATURES",
+  });
 });
 
 test("a sidebar path that opens at a retired label starts again at its first sidebar page", () => {

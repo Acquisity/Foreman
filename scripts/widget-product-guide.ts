@@ -505,13 +505,12 @@ await Promise.all(
 /**
  * A long article a batch answered in a line or two is distilled once more on
  * its own (ENG-20575). Its section replaces the batch's only when it says
- * more. One still short, or whose call fails, is logged and kept out of the
- * cache, so the next run tries it again; it never stops this run.
+ * more. One still short, or whose call fails, is logged and kept, so it never
+ * stops the run, and a rerun with the same docs leaves the guide as it was.
  */
 const shortened = pending.filter(
   (a) => shortAnswers(distilled.get(a.slug) ?? "", [a]).length > 0
 );
-const stillShort = new Set<string>();
 for (const article of shortened) {
   const label = `alone ${article.slug}`;
   const before = distilled.get(article.slug) ?? "";
@@ -528,7 +527,6 @@ for (const article of shortened) {
     console.log(`  ${label} failed: ${String(error).slice(0, 160)}`);
   }
   if (shortAnswers(distilled.get(article.slug) ?? "", [article]).length) {
-    stillShort.add(article.slug);
     console.log(`  still short ${article.slug}`);
   }
 }
@@ -670,9 +668,7 @@ const limits = joinGuideLimits(
   slugs.map((slug) => summarised.get(slug) ?? { cannot: [], who: [] })
 );
 for (const article of available) {
-  if (!stillShort.has(article.slug)) {
-    cache.set(articleKey(article), distilled.get(article.slug) ?? "");
-  }
+  cache.set(articleKey(article), distilled.get(article.slug) ?? "");
 }
 for (const slug of slugs) {
   cache.set(limitsKey(slug), JSON.stringify(summarised.get(slug)));
