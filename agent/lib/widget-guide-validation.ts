@@ -61,6 +61,10 @@ const WORD = /\S+/gu;
 /** An article this long in the docs needs more than a one-liner (ENG-20575). */
 export const LONG_ARTICLE_CHARS = 1500;
 export const MIN_ANSWER_WORDS = 12;
+/** A how-to with this many numbered steps needs room for them (ENG-20601). */
+export const MANY_STEPS = 4;
+export const MIN_STEPS_ANSWER_WORDS = 20;
+const STEP = /^\s*\d+\. /gmu;
 
 /** Each section's fact words, not counting its heading and "Get here:" line. */
 export function answerWords(text: string): Map<string, number> {
@@ -80,7 +84,8 @@ export function answerWords(text: string): Map<string, number> {
 
 /**
  * The slugs whose section answers a long article in fewer than
- * MIN_ANSWER_WORDS words.
+ * MIN_ANSWER_WORDS words, or an article with MANY_STEPS numbered steps in
+ * fewer than MIN_STEPS_ANSWER_WORDS.
  */
 export function shortAnswers(
   text: string,
@@ -88,11 +93,14 @@ export function shortAnswers(
 ): string[] {
   const words = answerWords(text);
   return articles
-    .filter(
-      (a) =>
-        a.text.length >= LONG_ARTICLE_CHARS &&
-        (words.get(a.slug) ?? 0) < MIN_ANSWER_WORDS
-    )
+    .filter((a) => {
+      const said = words.get(a.slug) ?? 0;
+      return (
+        (a.text.length >= LONG_ARTICLE_CHARS && said < MIN_ANSWER_WORDS) ||
+        ((a.text.match(STEP)?.length ?? 0) >= MANY_STEPS &&
+          said < MIN_STEPS_ANSWER_WORDS)
+      );
+    })
     .map((a) => a.slug);
 }
 

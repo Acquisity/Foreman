@@ -154,6 +154,7 @@ const LABEL_EDGE = /^[\s,.;:]+|[\s,.;:]+$/gu;
 /** The two entry points that have no label to quote. */
 export const UNLABELLED = /\bworkspace name\b|\byour name\b/iu;
 const LEFT_SIDEBAR = /\bsidebar\b/iu;
+const SETTINGS_BEFORE = /"Settings"/u;
 
 /** Each quoted label in a path, without edge punctuation, with where it starts. */
 export const labelsIn = (path: string) =>
@@ -290,3 +291,32 @@ export function parseSettingsMenu(
     .map(([group, labels]) => `"${group}": ${labels.join(", ")}`)
     .join("; ");
 }
+
+/**
+ * A path that opens at a retired sidebar label, such as `"Cold Email Agent" >
+ * "Email Accounts"`, opens instead at the first later label the sidebar shows
+ * (in the sidebar's own spelling), or at the page that replaced the retired
+ * label. A path whose first label follows "Settings" is a Settings page, such as
+ * `"Settings" > "Cold Email Agent"`, and stays as it was.
+ */
+export const withoutRetiredStart = (
+  sidebar: GuideSidebar,
+  retired: ReadonlyMap<string, string>,
+  path: string
+) => {
+  const [first, ...rest] = labelsIn(path);
+  const replacement = first && retired.get(first.label);
+  if (!replacement || SETTINGS_BEFORE.test(path.slice(0, first.at))) {
+    return path;
+  }
+  const pages = new Map(
+    [...sidebar.pages].map((page) => [page.toLowerCase(), page])
+  );
+  const later = rest.find((l) => pages.has(l.label.toLowerCase()));
+  if (later) {
+    const page = pages.get(later.label.toLowerCase()) as string;
+    const tail = path.slice(later.at).replace(`"${later.label}"`, `"${page}"`);
+    return `${path.slice(0, first.at)}${tail}`;
+  }
+  return `${path.slice(0, first.at)}"${replacement}"${path.slice(path.indexOf('"', first.at + 1) + 1)}`;
+};
