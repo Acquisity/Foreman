@@ -476,22 +476,19 @@ const HELD_STATES: [string, ReadonlySet<string>][] = [
   ]),
 ];
 
-test("held and legacy areas are the manifest's own areas", () => {
+test("held and legacy areas are the manifest's own areas, and every held area has an old tool", () => {
   for (const area of HELD_AREAS) {
     assert.ok(AREAS.includes(area), area);
+    assert.ok(
+      Object.values(LEGACY_TOOL_AREAS).some((areas) => areas.includes(area)),
+      area
+    );
   }
   for (const areas of Object.values(LEGACY_TOOL_AREAS)) {
     for (const area of areas) {
       assert.ok(AREAS.includes(area), area);
     }
   }
-  assert.deepEqual(
-    AREAS.filter(
-      (area) =>
-        !Object.values(LEGACY_TOOL_AREAS).some((areas) => areas.includes(area))
-    ),
-    []
-  );
 });
 
 for (const [label, held] of HELD_STATES) {
