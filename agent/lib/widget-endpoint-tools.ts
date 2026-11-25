@@ -37,7 +37,6 @@ export const HELD_AREAS: ReadonlySet<string> = new Set([
   "billing",
   "campaigns",
   "crm-contact",
-  "inboxes",
   "lead-pipeline",
   "website",
 ]);
