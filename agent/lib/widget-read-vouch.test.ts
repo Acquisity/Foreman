@@ -136,3 +136,34 @@ test("only a successful read of the workspace vouches, and never its diagnosis-o
     SECRET
   );
 });
+
+test("an email in a read never drops the domain it shares, typed or read (ENG-20659 review)", async () => {
+  const kbWithEmail = read("widget_ai_generation", {
+    sections: {
+      knowledgeBase: {
+        text: "Listen at podcast-host.com; contact producer@podcast-host.com.",
+      },
+    },
+    status: "ok",
+  });
+  const claim = "Your knowledge base sends listeners to podcast-host.com.";
+  for (const typed of [question, `${question} What about podcast-host.com?`]) {
+    // biome-ignore lint/performance/noAwaitInLoops: each input is one case.
+    const result = await gate(
+      scope,
+      typed,
+      findings(claim),
+      { ...deps, compose: () => Promise.resolve(claim) },
+      typed,
+      false,
+      undefined,
+      false,
+      undefined,
+      typed,
+      new Date(),
+      workspaceReadText(kbWithEmail)
+    );
+    assert.equal(result.decision, "allow", typed);
+    assert.equal(result.message, claim);
+  }
+});

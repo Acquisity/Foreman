@@ -766,6 +766,23 @@ export const defaultGateDeps: GateDeps = {
  * pasted was blocked whole (wrun_41M4DWMXRT0GKGYCZG5WMT5N25). Anything else
  * still needs the verified workspace to own it.
  */
+/**
+ * Identifiers a text vouches for. Each source is scanned on its own, and an
+ * email's domain counts too: the scanner leaves out a bare domain that an email
+ * in the same text already covers, which is right for a reply's check but
+ * would drop it here (ENG-20659).
+ */
+const vouchedBy = (text: string) => {
+  const { candidates } = scanIdentifiers(text);
+  return {
+    ...candidates,
+    domains: [
+      ...(candidates.domains ?? []),
+      ...candidates.emails.map((email) => email.split("@")[1] ?? ""),
+    ].filter(Boolean),
+  };
+};
+
 const vouchingTyped =
   (
     resolve: GateDeps["resolve"],
@@ -774,16 +791,14 @@ const vouchingTyped =
   ): GateDeps["resolve"] =>
   async (scope, candidates, signal) => {
     const owned = await resolve(scope, candidates, signal);
-    const typed = scanIdentifiers(
-      `${customerInput}\n${workspaceReads}`
-    ).candidates;
-    const add = (set: Set<string>, ids: string[] = []) =>
-      new Set([...set, ...ids]);
+    const sources = [vouchedBy(customerInput), vouchedBy(workspaceReads)];
+    const add = (set: Set<string>, kind: keyof (typeof sources)[number]) =>
+      new Set([...set, ...sources.flatMap((source) => source[kind] ?? [])]);
     return {
-      domains: add(owned.domains, typed.domains),
-      emails: add(owned.emails, typed.emails),
-      slugs: add(owned.slugs, typed.slugs),
-      uuids: add(owned.uuids, typed.uuids),
+      domains: add(owned.domains, "domains"),
+      emails: add(owned.emails, "emails"),
+      slugs: add(owned.slugs, "slugs"),
+      uuids: add(owned.uuids, "uuids"),
     };
   };
 
