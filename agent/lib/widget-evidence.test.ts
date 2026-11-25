@@ -3,8 +3,8 @@ import { test } from "node:test";
 import { verifiedWidgetContext as scope } from "./widget.fixture.js";
 import { type GateDeps, gate } from "./widget-egress.js";
 import {
-  buildMembershipQuery,
   resolveOwnedIdentifiers,
+  verifyWorkspaceMember,
   WorkspaceAccessDenied,
 } from "./widget-evidence.js";
 
@@ -176,18 +176,64 @@ test("an invalid or oversized candidate list refuses before any request", async 
   assert.equal(sent.length, 0);
 });
 
-test("the bug report's membership check is one fixed query, any role, on the verified ids only", () => {
-  const query = buildMembershipQuery(scope);
-  assert.match(query, new RegExp(`o\\.id = '${scope.organizationId}'::uuid`));
-  assert.match(query, new RegExp(`m\\.user_id = '${scope.userId}'::uuid`));
-  assert.ok(query.includes("o.deleted_at is null and m.deleted_at is null"));
-  assert.ok(query.includes(`o.partner_id = '${scope.partnerId}'::uuid`));
-  assert.ok(!query.includes("m.role"));
-  assert.throws(() =>
-    buildMembershipQuery({ ...scope, userId: "x'); drop table member; --" })
+test("the bug report's membership check asks owned-identifiers v2 with anyRole, never SQL (ENG-20532)", async (t) => {
+  withEnv(t);
+  const sent: { url: string; body: Record<string, unknown> }[] = [];
+  const answer = (status: number, body: unknown) =>
+    ((url, init) => {
+      sent.push({ body: JSON.parse(String(init?.body)), url: String(url) });
+      return Promise.resolve(Response.json(body, { status }));
+    }) as typeof fetch;
+  await verifyWorkspaceMember(
+    scope,
+    AbortSignal.timeout(5000),
+    answer(200, {
+      sections: { owned: { domains: [], emails: [], slugs: [], uuids: [] } },
+      status: "ok",
+      unavailable: [],
+    })
   );
+  assert.deepEqual(sent, [
+    {
+      body: {
+        anyRole: true,
+        conversationId: scope.conversationId,
+        domains: [],
+        emails: [],
+        organizationId: scope.organizationId,
+        slugs: [],
+        userId: scope.userId,
+        uuids: [],
+      },
+      url: "https://app.test/api/internal/foreman/owned-identifiers/v2",
+    },
+  ]);
+  await assert.rejects(
+    verifyWorkspaceMember(
+      scope,
+      AbortSignal.timeout(5000),
+      answer(403, { status: "denied" })
+    ),
+    WorkspaceAccessDenied
+  );
+  for (const [status, body] of [
+    [401, { status: "denied" }],
+    [503, { status: "unavailable" }],
+    [400, { status: "invalid_input" }],
+    [200, { status: "unavailable" }],
+    [403, { status: "feature_off" }],
+  ] as const) {
+    // biome-ignore lint/performance/noAwaitInLoops: each answer is its own case.
+    await assert.rejects(
+      verifyWorkspaceMember(
+        scope,
+        AbortSignal.timeout(5000),
+        answer(status, body)
+      ),
+      (error) => !(error instanceof WorkspaceAccessDenied)
+    );
+  }
 });
-
 test("an email or domain longer than the endpoint accepts is not sent, so it stays foreign", async (t) => {
   withEnv(t);
   const { request, sent } = answering(200, owned());
