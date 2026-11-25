@@ -50,6 +50,7 @@ import {
   labelsIn,
   parseGuideSidebar,
   parseSettingsMenu,
+  retiredFor,
   startsAtSidebarPage,
   UNLABELLED,
   withoutHeadings,
@@ -61,6 +62,7 @@ import {
   assertGuideSections,
   assertOwnAnswers,
   frontmatterField,
+  numberedSteps,
   plainDashes,
   shortAnswers,
 } from "../agent/lib/widget-guide-validation.js";
@@ -96,7 +98,6 @@ const MIN_ARTICLE_WORDS = 15;
 const MIN_BATCH_WORDS = 60;
 const WORDS_PER_STEP = 4;
 const WORDS_PER_LABEL = 2;
-const STEP_LINE = /^\s*\d+\. /gmu;
 const BOLD_LABEL = /\*\*[^*\n]{2,60}\*\*/gu;
 /**
  * Words asked for per source character. The model writes about twice what it
@@ -164,23 +165,6 @@ const ENTRY_POINTS: { starts: string[]; text: string }[] = [
   },
 ];
 const SIDEBAR_ENTRIES = new Set(ENTRY_POINTS.flatMap((entry) => entry.starts));
-
-/**
- * Sidebar labels the app no longer shows, and the pages that took each one's
- * place, the first being where it led (catalog.ts `replaces`, checked on
- * Acquisity main 2026-11-25). A path that still opens at one is rewritten to
- * the real page (ENG-20601).
- * "Dashboard" is only Client users' name for Home (home-nav.ts), so it is
- * rewritten everywhere but the Client Portal articles.
- */
-const RETIRED_LABELS = new Map<string, readonly string[]>([
-  ["Cold Email Agent", ["Campaigns", "Email accounts", "Deliverability"]],
-  ["AI SDR Inbox", ["AI Inbox"]],
-  ["Website Builder", ["Sites"]],
-]);
-const RETIRED_FOR_TEAM = new Map([...RETIRED_LABELS, ["Dashboard", ["Home"]]]);
-const retiredFor = (slug: string) =>
-  slug.startsWith("client-portal") ? RETIRED_LABELS : RETIRED_FOR_TEAM;
 
 /**
  * Vendors behind the product and developer hosts; the chat speaks in
@@ -470,7 +454,7 @@ const allowance = (a: Article) =>
   Math.max(
     MIN_ARTICLE_WORDS,
     Math.round(a.text.length * RATIO),
-    (a.text.match(STEP_LINE)?.length ?? 0) * WORDS_PER_STEP,
+    numberedSteps(a.text) * WORDS_PER_STEP,
     new Set(a.text.match(BOLD_LABEL)).size * WORDS_PER_LABEL
   );
 

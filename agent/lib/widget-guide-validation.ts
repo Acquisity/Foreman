@@ -66,6 +66,9 @@ export const MANY_STEPS = 4;
 export const MIN_STEPS_ANSWER_WORDS = 20;
 const STEP = /^\s*\d+\. /gmu;
 
+/** How many numbered steps a docs article has. */
+export const numberedSteps = (text: string) => text.match(STEP)?.length ?? 0;
+
 /** Each section's fact words, not counting its heading and "Get here:" line. */
 export function answerWords(text: string): Map<string, number> {
   const words = new Map<string, number>();
@@ -97,8 +100,7 @@ export function shortAnswers(
       const said = words.get(a.slug) ?? 0;
       return (
         (a.text.length >= LONG_ARTICLE_CHARS && said < MIN_ANSWER_WORDS) ||
-        ((a.text.match(STEP)?.length ?? 0) >= MANY_STEPS &&
-          said < MIN_STEPS_ANSWER_WORDS)
+        (numberedSteps(a.text) >= MANY_STEPS && said < MIN_STEPS_ANSWER_WORDS)
       );
     })
     .map((a) => a.slug);

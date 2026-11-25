@@ -292,12 +292,36 @@ export function parseSettingsMenu(
 }
 
 /**
+ * Sidebar labels the app no longer shows, and the pages that took each one's
+ * place, the first being where it led. Campaigns and Email accounts replace
+ * "cold-email-agent" and AI Inbox replaces "ai-sdr-inbox" in catalog.ts
+ * (`replaces`); Sites took over the "Website Builder" item, checked on
+ * Acquisity main 2026-11-25 (ENG-20601).
+ */
+export const RETIRED_LABELS: ReadonlyMap<string, readonly string[]> = new Map([
+  ["Cold Email Agent", ["Campaigns", "Email accounts", "Deliverability"]],
+  ["AI SDR Inbox", ["AI Inbox"]],
+  ["Website Builder", ["Sites"]],
+]);
+/** "Dashboard" is only Client users' name for Home (home-nav.ts). */
+const RETIRED_FOR_TEAM: ReadonlyMap<string, readonly string[]> = new Map([
+  ...RETIRED_LABELS,
+  ["Dashboard", ["Home"]],
+]);
+/** The retired labels for an article: Client Portal articles keep "Dashboard". */
+export const retiredFor = (slug: string) =>
+  slug.startsWith("client-portal") ? RETIRED_LABELS : RETIRED_FOR_TEAM;
+
+const MENTIONS_SETTINGS = /\bsettings\b/iu;
+
+/**
  * A path that opens at a retired sidebar label, such as `"Cold Email Agent" >
  * "Email Accounts"`, opens instead at the later label when it is one of the
  * pages that replaced the retired one (in the sidebar's own spelling), or at
  * the first of those pages. A later label is never promoted otherwise, so a
- * campaign's "Sequences" tab never becomes the CRM's "Sequences" page. Only
- * the first label is checked, so `"Settings" > "Cold Email Agent"` stays.
+ * campaign's "Sequences" tab never becomes the CRM's "Sequences" page. A path
+ * that mentions Settings anywhere stays as it was, because "Cold Email Agent"
+ * is also a Settings page and a section of a campaign's Settings tab.
  */
 export const withoutRetiredStart = (
   retired: ReadonlyMap<string, readonly string[]>,
@@ -305,17 +329,17 @@ export const withoutRetiredStart = (
 ) => {
   const [first, ...rest] = labelsIn(path);
   const successors = first && retired.get(first.label);
-  if (!successors?.length) {
+  if (!successors?.length || MENTIONS_SETTINGS.test(path)) {
     return path;
   }
-  const bySpelling = new Map(
-    successors.map((page) => [page.toLowerCase(), page])
-  );
-  const later = rest.find((l) => bySpelling.has(l.label.toLowerCase()));
-  if (later) {
-    const page = bySpelling.get(later.label.toLowerCase()) as string;
-    const tail = path.slice(later.at).replace(`"${later.label}"`, `"${page}"`);
-    return `${path.slice(0, first.at)}${tail}`;
+  for (const later of rest) {
+    const page = successors.find(
+      (name) => name.toLowerCase() === later.label.toLowerCase()
+    );
+    if (page) {
+      const end = path.indexOf('"', later.at + 1);
+      return `${path.slice(0, first.at)}"${page}"${path.slice(end + 1)}`;
+    }
   }
   return `${path.slice(0, first.at)}"${successors[0]}"${path.slice(path.indexOf('"', first.at + 1) + 1)}`;
 };
