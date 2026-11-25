@@ -372,7 +372,7 @@ Every explicit limit and unsupported thing the guide states, one line each with 
 
 Only what the guide states; never generalise one line to other features or roles. Each line restates one statement from one article: never combine two statements into one, and never turn an exception ("not for link payments") into a rule about everything else. Keep the condition and scope each line has in the guide ("only for CRM payments", "only where Acquisity bills directly", "except when no domain was provisioned", "support can sometimes"): a limit without its condition is wrong. Start with the line "## Who can do what". Plain markdown, no tables, no em dashes. About 2,000 words in total.`;
 
-let spent = 0;
+/** CLI Proxy calls report no cost, so the run counts them instead. */
 let unpriced = 0;
 const stats = { attempts: 0, successfulCalls: 0 };
 /** This run's outputs by key, in guide order: the next run's cache. */
@@ -405,16 +405,7 @@ const call = async (
       }),
     ])
   );
-  // Only gateway calls report a cost; a CLI Proxy call is counted as unpriced.
-  const reported = (
-    result.providerMetadata?.gateway as { cost?: string } | undefined
-  )?.cost;
-  if (reported === undefined) {
-    unpriced += 1;
-  } else {
-    const cost = Number(reported);
-    spent += Number.isFinite(cost) ? cost : 0;
-  }
+  unpriced += 1;
   console.log(
     `  out=${result.usage.outputTokens} reasoning=${result.usage.outputTokenDetails?.reasoningTokens ?? 0} words=${result.text.split(WHITESPACE).length}`
   );
@@ -798,5 +789,5 @@ const tokens = Math.round(plain.length / 4);
 const getHere = (body.match(/^Get here:/gmu) ?? []).length;
 console.log(`regenerated=${regenerated.join(",") || "none"}`);
 console.log(
-  `successful_calls=${stats.successfulCalls} attempts=${stats.attempts} get_here=${getHere} rejected=${dropped} headed=${slugs.filter((slug) => headed.has(slug)).length} articles=${articles.length} distilled=${available.length} batches=${batches.length} source_chars=${available.reduce((s, a) => s + a.text.length, 0)} guide_chars=${plain.length} ~tokens=${tokens} reported_cost=$${spent.toFixed(2)} unpriced_calls=${unpriced} s=${Math.round((Date.now() - startedAt) / 1000)}`
+  `successful_calls=${stats.successfulCalls} attempts=${stats.attempts} get_here=${getHere} rejected=${dropped} headed=${slugs.filter((slug) => headed.has(slug)).length} articles=${articles.length} distilled=${available.length} batches=${batches.length} source_chars=${available.reduce((s, a) => s + a.text.length, 0)} guide_chars=${plain.length} ~tokens=${tokens} unpriced_calls=${unpriced} s=${Math.round((Date.now() - startedAt) / 1000)}`
 );

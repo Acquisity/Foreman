@@ -375,6 +375,8 @@ test("a sidebar page named under the wrong heading is named under its real one",
   for (const path of [
     'click "Campaigns" (under "Cold Email")',
     'click "Profile" (under "Account")',
+    // A Settings page groups differently from the sidebar.
+    '"Settings" > "Sites" (under "Outreach")',
   ]) {
     assert.equal(withRealGroups(sidebar, path), path);
   }

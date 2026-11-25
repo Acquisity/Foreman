@@ -419,21 +419,24 @@ export const getHereFor = (
  * A path that places a sidebar page under the wrong heading, such as
  * `"Campaigns" (under "Outreach")` after the sidebar moved it to Cold Email,
  * names the heading the page is really under (ENG-20629). A label the sidebar
- * doesn't group is left as it was.
+ * doesn't group is left as it was, and so is a path through Settings, whose
+ * menu has its own groups (Sales Call Analyzer is under "Outreach" there).
  */
 export const withRealGroups = (sidebar: GuideSidebar, path: string) =>
-  path.replace(
-    UNDER_GROUP,
-    (
-      whole,
-      page: string,
-      the: string | undefined,
-      heading: string,
-      group: string | undefined
-    ) => {
-      const real = sidebar.groupOf.get(page);
-      return real && real !== heading
-        ? `"${page}" (under ${the ?? ""}"${real}"${group ?? ""})`
-        : whole;
-    }
-  );
+  MENTIONS_SETTINGS.test(path)
+    ? path
+    : path.replace(
+        UNDER_GROUP,
+        (
+          whole,
+          page: string,
+          the: string | undefined,
+          heading: string,
+          group: string | undefined
+        ) => {
+          const real = sidebar.groupOf.get(page);
+          return real && real !== heading
+            ? `"${page}" (under ${the ?? ""}"${real}"${group ?? ""})`
+            : whole;
+        }
+      );
