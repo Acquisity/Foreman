@@ -63,6 +63,7 @@ import {
   progressFromEvents,
   type WidgetProgress,
 } from "./widget-progress.js";
+import { VOUCHED_TEXT_MAX, workspaceReadText } from "./widget-read-vouch.js";
 import {
   asksForChange,
   DECISION_CONTEXT,
@@ -288,6 +289,8 @@ export type WaitOutcome =
       gaps?: CapabilityGap[];
       /** Areas whose read was refused by design, so the reply's unchecked facts there file nothing. */
       refused?: string[];
+      /** What the turn's workspace reads returned, which vouches for its identifiers (ENG-20659). */
+      vouched?: string;
     };
 
 const TEXT_MAX = 4000;
@@ -466,6 +469,8 @@ interface Recorded {
   /** Areas whose read this turn was refused by design. */
   refused: string[];
   ticket: FiledTicket | null;
+  /** What this turn's workspace reads returned; its identifiers are the workspace's own. */
+  vouched: string;
 }
 /** Areas whose latest read this turn refused the whole check; a later answered read clears its area. */
 const latestRefusals = (
@@ -492,6 +497,10 @@ const recorded = (result: unknown, so: Recorded): Recorded => {
     readings: [...so.readings, ...toolReadings(result)],
     refused: latestRefusals(so.refused, readRefusal(result)),
     ticket: filedTicketResult(result) ?? so.ticket,
+    vouched: `${so.vouched}\n${workspaceReadText(result)}`.slice(
+      0,
+      VOUCHED_TEXT_MAX
+    ),
   };
 };
 const nothingRecorded: Recorded = {
@@ -501,9 +510,10 @@ const nothingRecorded: Recorded = {
   readings: [],
   refused: [],
   ticket: null,
+  vouched: "",
 };
 const completed = (
-  { asked, gaps, read, readings, refused, ticket }: Recorded,
+  { asked, gaps, read, readings, refused, ticket, vouched }: Recorded,
   outcome: Omit<Extract<WaitOutcome, { status: "completed" }>, "ticket">
 ): WaitOutcome => {
   const done = {
@@ -511,6 +521,7 @@ const completed = (
     ...(gaps.length ? { gaps } : {}),
     ...(readings.length ? { readings } : {}),
     ...(refused.length ? { refused } : {}),
+    ...(vouched.trim() ? { vouched } : {}),
     ticket,
   };
   return asked
@@ -1144,7 +1155,8 @@ export async function finishWidgetRun(
           ),
           run.question,
         ].join("\n"),
-        run.created_at
+        run.created_at,
+        outcome.vouched
       );
       // Where the wait after an investigation goes: three model calls in a row.
       // Decision and reason ride along because log search surfaces one line per

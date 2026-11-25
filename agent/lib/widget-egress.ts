@@ -767,10 +767,16 @@ export const defaultGateDeps: GateDeps = {
  * still needs the verified workspace to own it.
  */
 const vouchingTyped =
-  (resolve: GateDeps["resolve"], customerInput: string): GateDeps["resolve"] =>
+  (
+    resolve: GateDeps["resolve"],
+    customerInput: string,
+    workspaceReads = ""
+  ): GateDeps["resolve"] =>
   async (scope, candidates, signal) => {
     const owned = await resolve(scope, candidates, signal);
-    const typed = scanIdentifiers(customerInput).candidates;
+    const typed = scanIdentifiers(
+      `${customerInput}\n${workspaceReads}`
+    ).candidates;
     const add = (set: Set<string>, ids: string[] = []) =>
       new Set([...set, ...ids]);
     return {
@@ -897,10 +903,12 @@ export async function gate(
   /** Everything the customer wrote in this conversation, the latest message included. */
   customerInput: string = question,
   /** When the customer asked: the run's creation time. */
-  askedAt: Date = new Date()
+  askedAt: Date = new Date(),
+  /** What this run's workspace reads returned (ENG-20659): the workspace's own identifiers. */
+  workspaceReads = ""
 ): Promise<GateResult> {
   let findings = withoutTicketRefs(investigated) ?? investigated;
-  const resolve = vouchingTyped(deps.resolve, customerInput);
+  const resolve = vouchingTyped(deps.resolve, customerInput, workspaceReads);
   const timings: Record<string, number> = {};
   const timed = async <T>(step: string, work: () => Promise<T>): Promise<T> => {
     signal?.throwIfAborted();

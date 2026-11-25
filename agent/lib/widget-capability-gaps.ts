@@ -105,6 +105,10 @@ const TOOL_AREAS: Readonly<Record<string, string>> = {
   widget_sdr_thread_status: "ai-sdr",
   widget_website_status: "website",
 };
+/** A read of this chat's verified workspace: a widget_ tool that isn't a help, ticket, recording or known-issue tool. */
+export const isWorkspaceRead = (tool: string) =>
+  tool.startsWith("widget_") && tool !== GAP_TOOL && !NOT_READS.has(tool);
+
 const toolArea = (tool: string) =>
   TOOL_AREAS[tool] ?? tool.slice("widget_".length).replaceAll("_", "-");
 const READ_FAILED = new Set(["error", "timeout"]);
