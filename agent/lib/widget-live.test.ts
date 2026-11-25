@@ -7,6 +7,7 @@ import { executorTransport } from "./executor/transport.js";
 import { verifiedWidgetContext as fixture } from "./widget.fixture.js";
 import { filedTicketResult } from "./widget-investigation.js";
 import {
+  datedTools,
   driftVerdict,
   gapSentences,
   readResult,
@@ -20,6 +21,7 @@ import {
   liveContext,
   liveServerUrl,
   liveToolInput,
+  pinLiveInput,
   verifyLiveServer,
 } from "./widget-live-policy.js";
 import { widgetAuth } from "./widget-scope.js";
@@ -381,4 +383,91 @@ test("first customer reply ignores progress and empty messages", () => {
     replyElapsed({ message: "Here is the answer." }, 1000, 61_000),
     60_000
   );
+});
+
+// ENG-20609: a switched area's endpoint read compares by section, and a
+// section the endpoint lists in unavailable leaves both sides.
+test("an endpoint read compares its sections, and an unavailable section is partial, not movement", () => {
+  const body = (sections: object, unavailable: object[] = []) =>
+    readResult({ sections, status: "ok", unavailable });
+  const recorded = body({ orders: [{ status: "paid" }], refunds: [] });
+  const steady = {
+    recorded,
+    reread: body({ orders: [{ status: "paid" }], refunds: [] }),
+    tool: "widget_orders",
+  };
+  assert.equal(driftVerdict([steady]).verdict, "steady");
+  const moved = {
+    ...steady,
+    reread: body({ orders: [{ status: "refunded" }], refunds: [] }),
+  };
+  assert.deepEqual(driftVerdict([moved]).changed, ["widget_orders"]);
+  // The refunds section timed out on the re-read: not movement, but not steady either.
+  const timedOut = {
+    ...steady,
+    reread: body({ orders: [{ status: "paid" }] }, [
+      { reason: "timeout", section: "refunds" },
+    ]),
+  };
+  const verdict = driftVerdict([timedOut]);
+  assert.deepEqual(verdict.changed, []);
+  assert.deepEqual(verdict.partial, ["widget_orders"]);
+  assert.equal(verdict.verdict, "unverifiable");
+});
+
+test("billing endpoint reads always cover a moving window, and campaigns ones do without both dates", () => {
+  assert.equal(hasMovingWindow("widget_billing", {}), true);
+  assert.equal(hasMovingWindow("widget_billing", { creditWindow: 30 }), true);
+  assert.equal(hasMovingWindow("widget_campaigns", {}), true);
+  assert.equal(
+    hasMovingWindow("widget_campaigns", { startDate: "2026-11-01" }),
+    true
+  );
+  assert.equal(
+    hasMovingWindow("widget_campaigns", {
+      endDate: "2026-11-07",
+      startDate: "2026-11-01",
+    }),
+    false
+  );
+  // An endpoint tool's input is never rewritten: only the hand-written tools pin.
+  assert.deepEqual(
+    pinLiveInput(
+      "widget_billing",
+      { creditWindow: 30 },
+      "2026-11-01T10:00:00.000Z"
+    ),
+    { creditWindow: 30 }
+  );
+});
+
+test("an endpoint's whole-read refusal is unverifiable, never steady or movement", () => {
+  for (const status of ["feature_off", "invalid_input"]) {
+    const refused = readResult({ status });
+    const ok = readResult({
+      sections: { orders: [] },
+      status: "ok",
+      unavailable: [],
+    });
+    for (const [recorded, reread] of [
+      [refused, refused],
+      [ok, refused],
+    ]) {
+      const verdict = driftVerdict([
+        { recorded, reread, tool: "widget_orders" },
+      ]);
+      assert.equal(verdict.verdict, "unverifiable", status);
+      assert.deepEqual(verdict.unverifiable, ["widget_orders"]);
+    }
+  }
+});
+
+test("the re-run's date note names each dated tool the rollout offers", () => {
+  assert.deepEqual(datedTools(new Set(["billing", "campaigns"])), {
+    widget_billing_summary: "creditWindow",
+    widget_outreach_health: "startDate and endDate",
+  });
+  assert.deepEqual(datedTools(new Set()), {
+    widget_campaigns: "startDate and endDate",
+  });
 });

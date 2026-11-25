@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { verifiedWidgetContext as fixture } from "./widget.fixture.js";
 import { PUBLIC_HOSTS, scanIdentifiers } from "./widget-egress.js";
+import { availableEndpointSchema } from "./widget-endpoint-schema.js";
 import { officeHoursSchema, type WidgetContext } from "./widget-scope.js";
 
 /**
@@ -43,6 +44,10 @@ export const widgetCaseSchema = z.strictObject({
   officeHours: officeHoursSchema.optional(),
   question: z.string().min(1),
   scope: z.strictObject({
+    /** The support endpoints the context route listed for the run (ENG-20296); absent on cases recorded before it. */
+    endpoints: z.array(availableEndpointSchema).max(50).optional(),
+    /** The areas still held when the run happened; absent means today's (agent/lib/widget-endpoint-tools.ts). */
+    heldAreas: z.array(z.string().max(100)).max(50).optional(),
     role: z.enum(["owner", "admin", "member", "client"]),
     workspace: z.string().min(1),
   }),

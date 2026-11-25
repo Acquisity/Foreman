@@ -38,7 +38,7 @@ const ASK = {
   name: "widget_ask_customer",
   type: "function" as const,
 };
-const READ = { ...ASK, name: "widget_outreach_health" };
+const READ = { ...ASK, name: "widget_campaigns" };
 
 async function execute(question: string): Promise<unknown> {
   process.env.WIDGET_NEXT_ACTION = "jev";
@@ -137,7 +137,7 @@ async function deliver(
                 callId: "r",
                 kind: "tool-result",
                 output: { campaigns: ["A", "B"] },
-                toolName: "widget_outreach_health",
+                toolName: "widget_campaigns",
               },
             },
             type: "action.result",
@@ -244,10 +244,7 @@ test("the exact live ask payload is recorded by the tool, ends the turn, and rea
 
   const step = await nextStep([output]);
   // The tools stay listed for the cache; a call to any of them is refused.
-  assert.deepEqual(step.tools, [
-    "widget_outreach_health",
-    "widget_ask_customer",
-  ]);
+  assert.deepEqual(step.tools, ["widget_campaigns", "widget_ask_customer"]);
   assert.equal(step.toolChoice, undefined);
   assert.equal(step.jevCalls, 0);
 
@@ -266,10 +263,7 @@ test("a question the tool does not record comes back as an error, is retried onc
 
   // First failure: the ask tool is forced again, not an empty last step.
   const retry = await nextStep([rejected]);
-  assert.deepEqual(retry.tools, [
-    "widget_outreach_health",
-    "widget_ask_customer",
-  ]);
+  assert.deepEqual(retry.tools, ["widget_campaigns", "widget_ask_customer"]);
   assert.deepEqual(retry.toolChoice, {
     toolName: "widget_ask_customer",
     type: "tool",
@@ -319,10 +313,7 @@ test("a question after reads goes out after what the reads found, as the compose
   const output = await execute(LIVE);
   const step = await nextStep([output]);
   // The tools stay listed for the cache; a call to any of them is refused.
-  assert.deepEqual(step.tools, [
-    "widget_outreach_health",
-    "widget_ask_customer",
-  ]);
+  assert.deepEqual(step.tools, ["widget_campaigns", "widget_ask_customer"]);
   assert.equal(step.toolChoice, undefined);
   assert.equal(step.note.includes("what the completed reads showed"), true);
 
@@ -332,7 +323,7 @@ test("a question after reads goes out after what the reads found, as the compose
       {
         claim: "Both campaigns are paused.",
         entityIds: [],
-        evidence: { ref: "", tool: "widget_outreach_health" },
+        evidence: { ref: "", tool: "widget_campaigns" },
       },
     ],
     needsHuman: true,

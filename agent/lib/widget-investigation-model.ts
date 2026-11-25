@@ -5,7 +5,10 @@ import {
 } from "ai";
 import { logOpsEvent } from "./ops-log.js";
 import { ticketLinkedModel } from "./ticket-link-model.js";
-import { ENDPOINT_TOOL_NAMES } from "./widget-endpoint-tools.js";
+import {
+  ENDPOINT_TOOL_NAMES,
+  legacyToolOffered,
+} from "./widget-endpoint-tools.js";
 import { cacheGuide } from "./widget-instructions.js";
 import {
   LATE_TOOLS,
@@ -53,9 +56,11 @@ const ALLOWED_TOOLS = new Set([
 const BLOCKED = "Support investigation capability is unavailable.";
 
 // Generated endpoint tools (ENG-20296) are only registered for the sessions
-// the context route listed them for.
+// the context route listed them for. A hand-written area tool leaves the lane
+// once its area has switched to its endpoint.
 const allowed = (name: string) =>
-  ALLOWED_TOOLS.has(name) || ENDPOINT_TOOL_NAMES.has(name);
+  (ALLOWED_TOOLS.has(name) && legacyToolOffered(name)) ||
+  ENDPOINT_TOOL_NAMES.has(name);
 
 const namedTool = (part: { toolName?: unknown }) =>
   typeof part.toolName === "string" && allowed(part.toolName);

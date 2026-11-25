@@ -10,13 +10,14 @@ import {
   DESCRIPTION_CHARS,
   nextActionEnabled,
   note,
-  ruledTicket,
   selectNextAction,
   turnEvidence,
   widgetNextActionMiddleware,
 } from "./widget-next-action.js";
+import { ruledTicket } from "./widget-ticket-rules.js";
 
 const RUN_ENDED = /run ended/;
+const WEBSITE_ID = "11111111-1111-4111-8111-111111111111";
 const SUPPORT_BLOCKED = /Support investigation capability is unavailable/u;
 
 const usage = {
@@ -24,16 +25,16 @@ const usage = {
   outputTokens: { reasoning: 0, text: 1, total: 1 },
 };
 const TOOLS = [
-  "widget_account_access",
-  "widget_billing_summary",
+  "widget_account",
+  "widget_billing",
   "widget_file_ticket",
-  "widget_generation_diagnostics",
+  "widget_ai_generation",
   "widget_help_article",
-  "widget_inbox_health",
-  "widget_outreach_health",
-  "widget_provisioning_status",
+  "widget_inboxes",
+  "widget_campaigns",
+  "widget_orders",
   "widget_read_help_article",
-  "widget_website_status",
+  "widget_website",
   "web_fetch",
 ].map((name) => ({
   // Longer than the old 300-character cut, with the caveat at the very end.
@@ -174,7 +175,7 @@ const forced = (toolName: string) => ({ toolName, type: "tool" });
 
 for (const mode of ["generate", "stream"] as const) {
   for (const action of ["finish", "human", "asked", "found"] as const) {
-    for (const tool of ["widget_ask_customer", "widget_billing_summary"]) {
+    for (const tool of ["widget_ask_customer", "widget_billing"]) {
       it(`${mode}: ${action} refuses ${tool} in the no-tool redo without another retry`, async () => {
         const ask = {
           input: { question: "Which campaign do you mean?" },
@@ -184,7 +185,7 @@ for (const mode of ["generate", "stream"] as const) {
         const workspaceRead = {
           input: {},
           output: {},
-          tool: "widget_outreach_health",
+          tool: "widget_campaigns",
         };
         const reads = {
           asked: [ask],
@@ -194,7 +195,7 @@ for (const mode of ["generate", "stream"] as const) {
         }[action];
         const { base, model } = harness(
           jev(action === "human" ? "human" : "finish", 1),
-          call("widget_billing_summary", {}),
+          call("widget_billing", {}),
           call(tool, { question: "Which campaign do you mean?" })
         );
         const params = {
@@ -252,14 +253,14 @@ describe("widget next-action selector", () => {
       questions?: { action: { criteria: object }; handoff_eligible?: unknown };
     }[] = [];
     const { model, sent } = harness(
-      jev("widget_billing_summary", 0, seen),
-      call("widget_billing_summary", {})
+      jev("widget_billing", 0, seen),
+      call("widget_billing", {})
     );
     await model.doGenerate({
       prompt: prompt("Why was I charged?", []),
       tools: TOOLS,
     });
-    assert.deepEqual(sent().toolChoice, forced("widget_billing_summary"));
+    assert.deepEqual(sent().toolChoice, forced("widget_billing"));
     assert.equal(seen.length, 1);
     assert.equal(seen[0].questions?.handoff_eligible, undefined);
     assert.equal("clarify" in (seen[0].questions?.action.criteria ?? {}), true);
@@ -291,13 +292,13 @@ describe("widget next-action selector", () => {
     });
   });
   it("one selected read cannot dispatch twelve parameter variants or duplicates", async () => {
-    const batch = call("widget_outreach_health", {});
+    const batch = call("widget_campaigns", {});
     batch.content = Array.from({ length: 12 }, (_, n) => ({
       ...batch.content[0],
       input: JSON.stringify(n < 2 ? {} : { after: `page-${n}` }),
       toolCallId: `batch-${n}`,
     }));
-    const { model, base } = harness(jev("widget_outreach_health"), batch);
+    const { model, base } = harness(jev("widget_campaigns"), batch);
     const out = await model.doGenerate({
       prompt: prompt("Check campaign A", []),
       tools: TOOLS,
@@ -307,19 +308,19 @@ describe("widget next-action selector", () => {
   });
 
   it("a repeated call in a batch cannot discard a distinct useful page", async () => {
-    const batch = call("widget_outreach_health", {});
+    const batch = call("widget_campaigns", {});
     batch.content.push({
       ...batch.content[0],
       input: JSON.stringify({ after: "page2" }),
       toolCallId: "page2",
     });
-    const { model, base } = harness(jev("widget_outreach_health"), batch);
+    const { model, base } = harness(jev("widget_campaigns"), batch);
     const out = await model.doGenerate({
       prompt: prompt("Check the next campaign", [
         {
           input: {},
           output: { nextAfter: "page2" },
-          tool: "widget_outreach_health",
+          tool: "widget_campaigns",
         },
       ]),
       tools: TOOLS,
@@ -334,44 +335,44 @@ describe("widget next-action selector", () => {
     [
       "campaigns",
       "Why did campaign A stop?",
-      "widget_inbox_health",
-      "widget_outreach_health",
+      "widget_inboxes",
+      "widget_campaigns",
     ],
     [
       "inbox health",
       "Are my inboxes broken?",
-      "widget_outreach_health",
-      "widget_inbox_health",
+      "widget_campaigns",
+      "widget_inboxes",
     ],
     [
       "generation",
       "Why was my draft blocked?",
-      "widget_outreach_health",
-      "widget_generation_diagnostics",
+      "widget_campaigns",
+      "widget_ai_generation",
     ],
     [
       "provisioning",
       "Where are my new inboxes?",
-      "widget_billing_summary",
-      "widget_provisioning_status",
+      "widget_billing",
+      "widget_orders",
     ],
     [
       "billing",
       "Why was I charged yesterday?",
-      "widget_account_access",
-      "widget_billing_summary",
+      "widget_account",
+      "widget_billing",
     ],
     [
       "account access",
       "Why can't my teammate sign in?",
-      "widget_billing_summary",
-      "widget_account_access",
+      "widget_billing",
+      "widget_account",
     ],
     [
       "websites",
       "Why does my site show 404?",
-      "widget_account_access",
-      "widget_website_status",
+      "widget_account",
+      "widget_website",
     ],
   ] as const) {
     it(`${area}: a read decision forces exactly that tool`, async () => {
@@ -396,7 +397,7 @@ describe("widget next-action selector", () => {
         {
           input: { site: "x" },
           output: { liveHosting: "unavailable", savedBuild: "completed" },
-          tool: "widget_website_status",
+          tool: "widget_website",
         },
       ]),
       tools: TOOLS,
@@ -420,7 +421,7 @@ describe("widget next-action selector", () => {
             caveats: "x".repeat(4000),
             publicCheck: { dns: "no_records" },
           },
-          tool: "widget_website_status",
+          tool: "widget_website",
         },
         {
           input: { inspectWebsiteId: "selected" },
@@ -429,7 +430,7 @@ describe("widget next-action selector", () => {
             publicCheck: { dns: "no_records" },
             trailing: "x".repeat(50_000),
           },
-          tool: "widget_website_status",
+          tool: "widget_website",
         },
       ]),
       tools: TOOLS,
@@ -452,7 +453,7 @@ describe("widget next-action selector", () => {
     );
     const first = await model.doGenerate({
       prompt: prompt("How do I get campaign A sending again?", [
-        { input: {}, output: campaigns, tool: "widget_outreach_health" },
+        { input: {}, output: campaigns, tool: "widget_campaigns" },
       ]),
       tools: TOOLS,
     });
@@ -461,7 +462,7 @@ describe("widget next-action selector", () => {
     assert.equal(first.content[0]?.type, "tool-call");
     await model.doGenerate({
       prompt: prompt("How do I get campaign A sending again?", [
-        { input: {}, output: campaigns, tool: "widget_outreach_health" },
+        { input: {}, output: campaigns, tool: "widget_campaigns" },
         {
           input: { url: "https://help.example/launch" },
           output: { text: "Open the campaign and choose Resume." },
@@ -479,8 +480,8 @@ describe("widget next-action selector", () => {
   it("legitimate reads before finishing are kept: articles the investigator read first do not end the gathering", async () => {
     const seen: { state?: string }[] = [];
     const { model, sent } = harness(
-      jev("widget_outreach_health", 0, seen),
-      call("widget_outreach_health", {})
+      jev("widget_campaigns", 0, seen),
+      call("widget_campaigns", {})
     );
     await model.doGenerate({
       prompt: prompt("How do I get campaign A sending again?", [
@@ -493,7 +494,7 @@ describe("widget next-action selector", () => {
       tools: TOOLS,
     });
     assert.equal(seen.length, 1);
-    assert.deepEqual(sent().toolChoice, forced("widget_outreach_health"));
+    assert.deepEqual(sent().toolChoice, forced("widget_campaigns"));
   });
 
   it("a tool that has already run is offered to Jev as a re-read with its own bar, for every tool alike", async () => {
@@ -503,17 +504,14 @@ describe("widget next-action selector", () => {
     const { model } = harness(jev("finish", 0, seen as never));
     await model.doGenerate({
       prompt: prompt("Why did my campaign stop?", [
-        { input: {}, output: campaigns, tool: "widget_outreach_health" },
+        { input: {}, output: campaigns, tool: "widget_campaigns" },
       ]),
       tools: TOOLS,
     });
     const criteria = seen[0].questions?.action?.criteria ?? {};
     const lead = (tool: string) => criteria[tool].split(":")[0];
-    assert.notEqual(
-      lead("widget_outreach_health"),
-      lead("widget_inbox_health")
-    );
-    assert.equal(lead("widget_inbox_health"), lead("widget_billing_summary"));
+    assert.notEqual(lead("widget_campaigns"), lead("widget_inboxes"));
+    assert.equal(lead("widget_inboxes"), lead("widget_billing"));
   });
 
   it("Jev is never offered an article or the ticket tool as a read", async () => {
@@ -521,12 +519,12 @@ describe("widget next-action selector", () => {
     const { model } = harness(jev("finish", 0, seen as never));
     await model.doGenerate({
       prompt: prompt("Why did campaign A stop?", [
-        { input: {}, output: campaigns, tool: "widget_outreach_health" },
+        { input: {}, output: campaigns, tool: "widget_campaigns" },
       ]),
       tools: TOOLS,
     });
     const menu = Object.keys(seen[0].questions?.action?.criteria ?? {});
-    assert.equal(menu.includes("widget_outreach_health"), true);
+    assert.equal(menu.includes("widget_campaigns"), true);
     assert.equal(
       menu.some(
         (key) => key.includes("help_article") || key === "widget_file_ticket"
@@ -547,7 +545,7 @@ describe("widget next-action selector", () => {
       {
         input: {},
         output: { reconnects: "all 3 failed", status: "error" },
-        tool: "widget_inbox_health",
+        tool: "widget_inboxes",
       },
     ];
     const out = await model.doGenerate({
@@ -584,7 +582,7 @@ describe("widget next-action selector", () => {
     const { model } = harness(jev("finish", 0, seen as never));
     await model.doGenerate({
       prompt: prompt("It still fails.", [
-        { input: {}, output: { status: "error" }, tool: "widget_inbox_health" },
+        { input: {}, output: { status: "error" }, tool: "widget_inboxes" },
         {
           input: {},
           output: { identifier: "ENG-1", url: "u" },
@@ -593,7 +591,7 @@ describe("widget next-action selector", () => {
         {
           input: {},
           output: { status: "error" },
-          tool: "widget_outreach_health",
+          tool: "widget_campaigns",
         },
       ]),
       tools: TOOLS,
@@ -604,36 +602,43 @@ describe("widget next-action selector", () => {
 
   it("files the ticket in code: a refund ask with a billing reading that names the charge, or a fault reading", async () => {
     const billed = {
-      identifiesCharge: true,
-      reading:
-        "6 of the purchased inboxes have been in error since 2026-09-18, and inbox charges covering time after that were billed for them: 2026-10-01 ($48.00), 2026-09-01 ($48.00).",
+      sections: {
+        inboxErrorCharges: {
+          charges: [
+            { amount: 48, invoiceId: "inv_1", periodEnd: "2026-10-31" },
+            { amount: 48, invoiceId: "inv_2", periodEnd: "2026-09-30" },
+          ],
+          erroredInboxes: 6,
+          erroredSince: "2026-09-18T00:00:00.000Z",
+          identifiesCharge: true,
+        },
+      },
       status: "ok",
+      unavailable: [],
     };
     const early = {
-      campaigns: [
-        {
-          diagnostics: {
-            earlyFollowUps: {
-              platformFault: true,
-              reading: "221 follow-ups went out sooner than the delay.",
-            },
-          },
-          name: "A",
+      sections: {
+        earlyFollowUps: {
+          earlyCount: 221,
+          examples: [],
+          platformFault: true,
+          sameDayCount: 221,
         },
-      ],
+      },
       status: "ok",
+      unavailable: [],
     };
     const cases = [
       {
         kind: "billing",
         question:
           "My inboxes broke in September but I was invoiced anyway. Can you please reimburse the amounts?",
-        reads: [{ input: {}, output: billed, tool: "widget_billing_summary" }],
+        reads: [{ input: {}, output: billed, tool: "widget_billing" }],
       },
       {
         kind: "fault",
         question: "All follow-ups went out 3 hours after the first email.",
-        reads: [{ input: {}, output: early, tool: "widget_outreach_health" }],
+        reads: [{ input: {}, output: early, tool: "widget_campaigns" }],
       },
     ];
     for (const { question, reads } of cases) {
@@ -670,7 +675,7 @@ describe("widget next-action selector", () => {
       ruledTicket("How many inboxes am I paying for?", [
         {
           result: result({ identifiesCharge: true, reading: "r" }),
-          tool: "widget_billing_summary",
+          tool: "widget_billing",
         },
       ]),
       null
@@ -678,7 +683,7 @@ describe("widget next-action selector", () => {
     // A refund ask with no reading naming the charge: Jev still decides (clarify).
     assert.equal(
       ruledTicket("I want a refund.", [
-        { result: result({ status: "ok" }), tool: "widget_billing_summary" },
+        { result: result({ status: "ok" }), tool: "widget_billing" },
       ]),
       null
     );
@@ -687,7 +692,7 @@ describe("widget next-action selector", () => {
       ruledTicket("Reconnect keeps failing.", [
         {
           result: result({ reading: "mailbox not found" }),
-          tool: "widget_inbox_health",
+          tool: "widget_inboxes",
         },
       ]),
       null
@@ -702,7 +707,7 @@ describe("widget next-action selector", () => {
         {
           input: {},
           output: { identifiesCharge: true, reading: "r" },
-          tool: "widget_billing_summary",
+          tool: "widget_billing",
         },
       ]),
       tools: TOOLS,
@@ -721,7 +726,7 @@ describe("widget next-action selector", () => {
     const { model } = harness(jev("finish", 0, seen as never));
     await model.doGenerate({
       prompt: prompt("I was charged twice for the same inbox order.", [
-        { input: {}, output: { charges: 2 }, tool: "widget_billing_summary" },
+        { input: {}, output: { charges: 2 }, tool: "widget_billing" },
       ]),
       tools: TOOLS,
     });
@@ -739,7 +744,7 @@ describe("widget next-action selector", () => {
     const { model } = harness(jev("finish", 0, seen));
     await model.doGenerate({
       prompt: prompt("Why was I charged?", [
-        { input: {}, output: {}, tool: "widget_account_access" },
+        { input: {}, output: {}, tool: "widget_account" },
       ]),
       tools: TOOLS,
     });
@@ -761,9 +766,7 @@ describe("widget next-action selector", () => {
       jev("clarify", 0, seen),
       call("widget_ask_customer", { question: "Which campaign do you mean?" })
     );
-    const reads = [
-      { input: {}, output: campaigns, tool: "widget_outreach_health" },
-    ];
+    const reads = [{ input: {}, output: campaigns, tool: "widget_campaigns" }];
     await model.doGenerate({
       prompt: prompt("Why did my campaign stop?", reads),
       tools: [...TOOLS, ASK],
@@ -812,7 +815,7 @@ describe("widget next-action selector", () => {
           | { effort?: string }
           | undefined
       )?.effort;
-    const read = harness(jev("read"), call("widget_outreach_health", {}));
+    const read = harness(jev("read"), call("widget_campaigns", {}));
     await read.model.doGenerate({
       prompt: prompt("Why did my campaign stop?", []),
       tools: TOOLS,
@@ -822,7 +825,7 @@ describe("widget next-action selector", () => {
     const writeUp = harness(jev("finish"), text("findings"));
     await writeUp.model.doGenerate({
       prompt: prompt("Why did my campaign stop?", [
-        { input: {}, output: {}, tool: "widget_outreach_health" },
+        { input: {}, output: {}, tool: "widget_campaigns" },
       ]),
       tools: TOOLS,
     });
@@ -840,7 +843,7 @@ describe("widget next-action selector", () => {
         Promise.resolve({
           ...call("widget_ask_customer", { question: "Which campaign?" }),
           content: [
-            ...call("widget_billing_summary", {}).content,
+            ...call("widget_billing", {}).content,
             ...call("widget_ask_customer", { question: "Which campaign?" })
               .content,
           ],
@@ -856,7 +859,7 @@ describe("widget next-action selector", () => {
     });
     const out = await model.doGenerate({
       prompt: prompt("Why did my campaign stop?", [
-        { input: {}, output: campaigns, tool: "widget_outreach_health" },
+        { input: {}, output: campaigns, tool: "widget_campaigns" },
       ]),
       tools: [...TOOLS, ASK],
     });
@@ -886,9 +889,7 @@ describe("widget next-action selector", () => {
         }).content.map((part) => ({ ...part, toolCallId: "second" })),
       ],
     };
-    const reads = [
-      { input: {}, output: campaigns, tool: "widget_billing_summary" },
-    ];
+    const reads = [{ input: {}, output: campaigns, tool: "widget_billing" }];
     await Promise.all(
       [
         {
@@ -904,14 +905,14 @@ describe("widget next-action selector", () => {
           selected: firstAsk.content,
         },
         {
-          choice: "widget_billing_summary",
-          output: call("widget_billing_summary", {}),
+          choice: "widget_billing",
+          output: call("widget_billing", {}),
           reads,
           selected: [],
         },
         {
           choice: "clarify",
-          output: call("widget_billing_summary", {}),
+          output: call("widget_billing", {}),
           reads: [],
           selected: [],
         },
@@ -990,7 +991,7 @@ describe("widget next-action selector", () => {
         {
           input: {},
           output: { live: "unavailable", savedErrors: 0 },
-          tool: "widget_inbox_health",
+          tool: "widget_inboxes",
         },
       ]),
       tools: TOOLS,
@@ -1004,13 +1005,13 @@ describe("widget next-action selector", () => {
     for (const question of ["Please connect me with a person."]) {
       const { base, model, sent } = harness(
         jev("human", 0.9),
-        call("widget_billing_summary", {}),
+        call("widget_billing", {}),
         text("findings")
       );
       // biome-ignore lint/performance/noAwaitInLoops: each case needs its own fresh harness, in order.
       await model.doGenerate({
         prompt: prompt(question, [
-          { input: {}, output: { charges: 1 }, tool: "widget_billing_summary" },
+          { input: {}, output: { charges: 1 }, tool: "widget_billing" },
         ]),
         tools: TOOLS,
       });
@@ -1029,7 +1030,7 @@ describe("widget next-action selector", () => {
         {
           input: {},
           output: { historical: "old order counts differ", live: "failed" },
-          tool: "widget_inbox_health",
+          tool: "widget_inboxes",
         },
       ]),
       tools: TOOLS,
@@ -1040,8 +1041,8 @@ describe("widget next-action selector", () => {
 
   it("an exhausted read is not repeated: the identical call is dropped and the step redone as a finish", async () => {
     const { base, model, sent } = harness(
-      jev("widget_outreach_health"),
-      call("widget_outreach_health", { a: 1, b: 2 }),
+      jev("widget_campaigns"),
+      call("widget_campaigns", { a: 1, b: 2 }),
       text("findings")
     );
     const out = await model.doGenerate({
@@ -1049,7 +1050,7 @@ describe("widget next-action selector", () => {
         {
           input: { a: 1, b: 2 },
           output: campaigns,
-          tool: "widget_outreach_health",
+          tool: "widget_campaigns",
         },
       ]),
       tools: TOOLS,
@@ -1062,15 +1063,15 @@ describe("widget next-action selector", () => {
 
   it("a new argument on the same tool is a new read and goes through", async () => {
     const { base, model } = harness(
-      jev("widget_outreach_health"),
-      call("widget_outreach_health", { cursor: "p2" })
+      jev("widget_campaigns"),
+      call("widget_campaigns", { cursor: "p2" })
     );
     const out = await model.doGenerate({
       prompt: prompt("Why did campaign A stop?", [
         {
           input: {},
           output: { ...campaigns, next: "p2" },
-          tool: "widget_outreach_health",
+          tool: "widget_campaigns",
         },
       ]),
       tools: TOOLS,
@@ -1089,7 +1090,7 @@ describe("widget next-action selector", () => {
       // biome-ignore lint/performance/noAwaitInLoops: each case needs its own fresh harness, in order.
       await model.doGenerate({
         prompt: prompt("Check my other workspace.", [
-          { input: {}, output: {}, tool: "widget_account_access" },
+          { input: {}, output: {}, tool: "widget_account" },
         ]),
         tools: TOOLS,
       });
@@ -1121,7 +1122,7 @@ describe("widget next-action selector", () => {
       // biome-ignore lint/performance/noAwaitInLoops: each case needs its own fresh harness, in order.
       await model.doGenerate({
         prompt: prompt("Why was I charged?", [
-          { input: {}, output: {}, tool: "widget_billing_summary" },
+          { input: {}, output: {}, tool: "widget_billing" },
         ]),
         tools: TOOLS,
       });
@@ -1147,14 +1148,14 @@ describe("widget next-action selector", () => {
         widgetInvestigationMiddleware(),
         widgetNextActionMiddleware({
           apiKey: "k",
-          fetch: jev("widget_inbox_health"),
+          fetch: jev("widget_inboxes"),
         }),
       ],
       model: base,
     });
     await model.doGenerate({
       prompt: prompt("Inboxes?", [
-        { input: {}, output: {}, tool: "widget_outreach_health" },
+        { input: {}, output: {}, tool: "widget_campaigns" },
       ]),
       tools: TOOLS,
     });
@@ -1197,7 +1198,7 @@ describe("widget next-action selector", () => {
         simulateStreamingMiddleware(),
         widgetNextActionMiddleware({
           apiKey: "k",
-          fetch: jev("widget_website_status"),
+          fetch: jev("widget_website"),
         }),
       ],
       model: base,
@@ -1228,7 +1229,7 @@ describe("widget next-action selector", () => {
       doGenerate: (params) => {
         const n = base.doGenerateCalls.length;
         if (n === 1) {
-          return Promise.resolve(call("widget_website_status", {}));
+          return Promise.resolve(call("widget_website", {}));
         }
         if (n === 2) {
           timers.at(-1)?.abort(new DOMException("timed out", "TimeoutError"));
@@ -1242,7 +1243,7 @@ describe("widget next-action selector", () => {
     const model = wrapLanguageModel({
       middleware: widgetNextActionMiddleware({
         apiKey: "k",
-        fetch: jev("widget_website_status"),
+        fetch: jev("widget_website"),
       }),
       model: base,
     });
@@ -1251,7 +1252,7 @@ describe("widget next-action selector", () => {
         {
           input: {},
           output: { status: "misconfigured" },
-          tool: "widget_website_status",
+          tool: "widget_website",
         },
       ]),
       tools: TOOLS,
@@ -1309,7 +1310,7 @@ describe("widget next-action selector", () => {
     const model = wrapLanguageModel({
       middleware: widgetNextActionMiddleware({
         apiKey: "k",
-        fetch: jev("widget_website_status"),
+        fetch: jev("widget_website"),
       }),
       model: base,
     });
@@ -1337,7 +1338,7 @@ describe("widget next-action selector", () => {
         Array.from({ length: 14 }, (_, page) => ({
           input: { page },
           output: {},
-          tool: "widget_outreach_health",
+          tool: "widget_campaigns",
         }))
       ),
       tools: TOOLS,
@@ -1349,32 +1350,37 @@ describe("widget next-action selector", () => {
 
   it("the decision holds on the streaming path Eve uses", async () => {
     const { model, sent } = harness(
-      jev("widget_website_status"),
-      call("widget_website_status", { live: true })
+      jev("widget_website"),
+      call("widget_website", { websiteId: WEBSITE_ID })
     );
     const { stream } = await model.doStream({
       prompt: prompt("Why does my site 404?", [
-        { input: {}, output: {}, tool: "widget_account_access" },
+        { input: {}, output: {}, tool: "widget_account" },
       ]),
       tools: TOOLS,
     });
-    const types: string[] = [];
+    const parts: { input?: string; type: string }[] = [];
     for await (const part of stream as unknown as AsyncIterable<{
+      input?: string;
       type: string;
     }>) {
-      types.push(part.type);
+      parts.push(part);
     }
-    assert.deepEqual(sent().toolChoice, forced("widget_website_status"));
-    assert.equal(types.includes("tool-call"), true);
+    assert.deepEqual(sent().toolChoice, forced("widget_website"));
+    const forwarded = parts.find((part) => part.type === "tool-call");
+    // The endpoint's own input, forwarded unchanged.
+    assert.deepEqual(JSON.parse(forwarded?.input ?? "null"), {
+      websiteId: WEBSITE_ID,
+    });
   });
 });
 
 describe("repeat reads", () => {
   const billing = {
     description: "Billing summary",
-    name: "widget_billing_summary",
+    name: "widget_billing",
   };
-  const inbox = { description: "Inbox health", name: "widget_inbox_health" };
+  const inbox = { description: "Inbox health", name: "widget_inboxes" };
   const read = (n: number) => ({
     input: `{"page":${n}}`,
     result: "{}",
@@ -1426,7 +1432,7 @@ describe("repeat reads", () => {
 describe("control notes", () => {
   it("are never read as the customer's message, so a note cannot restart the turn", () => {
     const turn = prompt("why did my campaign stop?", [
-      { input: {}, output: { ok: true }, tool: "widget_outreach_health" },
+      { input: {}, output: { ok: true }, tool: "widget_campaigns" },
     ]);
     const plain = turnEvidence(turn as never);
     const noted = turnEvidence([
@@ -1465,8 +1471,8 @@ describe("step model", () => {
 
   it("fills in a read Jev picked, and never writes the findings", async () => {
     const { main, model, step } = build(
-      "widget_billing_summary",
-      call("widget_billing_summary", {})
+      "widget_billing",
+      call("widget_billing", {})
     );
     await model.doGenerate({
       prompt: prompt("Why was I charged?", []),
@@ -1475,7 +1481,7 @@ describe("step model", () => {
     assert.equal(step.doGenerateCalls.length, 1);
     assert.deepEqual(
       step.doGenerateCalls[0].toolChoice,
-      forced("widget_billing_summary")
+      forced("widget_billing")
     );
     assert.equal(main.doGenerateCalls.length, 0);
   });
@@ -1486,7 +1492,7 @@ describe("step model", () => {
       lines.push(JSON.stringify(line));
     });
     const { model } = build(
-      "widget_billing_summary",
+      "widget_billing",
       text("secret reply") as unknown as ReturnType<typeof call>
     );
     await model.doGenerate({
@@ -1507,7 +1513,7 @@ describe("step model", () => {
     t.mock.method(console, "info", (line: unknown) => lines.push(String(line)));
     const customerName = "customer_account_482";
     const rawReason = "Acme renewal dispute";
-    const { model } = build("widget_billing_summary", {
+    const { model } = build("widget_billing", {
       ...call(customerName, { customer: "secret argument" }),
       finishReason: { raw: rawReason, unified: "tool-calls" },
     });
@@ -1526,7 +1532,7 @@ describe("step model", () => {
   });
 
   it("unforceable filler overrides use the filler with a guide-free prompt", async () => {
-    const result = call("widget_billing_summary", {});
+    const result = call("widget_billing", {});
     const main = new MockLanguageModelV4({
       doGenerate: () => Promise.resolve(result),
     });
@@ -1539,7 +1545,7 @@ describe("step model", () => {
         widgetInvestigationMiddleware(),
         widgetNextActionMiddleware({
           apiKey: "k",
-          fetch: jev("widget_billing_summary"),
+          fetch: jev("widget_billing"),
           stepModel: wrapLanguageModel({ middleware: [], model: step }),
         }),
       ],
@@ -1569,10 +1575,7 @@ describe("step model", () => {
   });
 
   it("steered filler requests disable parallel tool use and preserve provider options and tools", async () => {
-    const { model, step } = build(
-      "widget_billing_summary",
-      call("widget_billing_summary", {})
-    );
+    const { model, step } = build("widget_billing", call("widget_billing", {}));
     await model.doGenerate({
       prompt: prompt("Why was I charged?", []),
       providerOptions: {
@@ -1592,13 +1595,10 @@ describe("step model", () => {
   });
 
   it("leaves a finish write-up to the main model", async () => {
-    const { main, model, step } = build(
-      "finish",
-      call("widget_billing_summary", {})
-    );
+    const { main, model, step } = build("finish", call("widget_billing", {}));
     await model.doGenerate({
       prompt: prompt("Why was I charged?", [
-        { input: {}, output: { ok: true }, tool: "widget_billing_summary" },
+        { input: {}, output: { ok: true }, tool: "widget_billing" },
       ]),
       tools: TOOLS,
     });
@@ -1675,67 +1675,4 @@ describe("tool descriptions Jev reads", () => {
     const guidance = tool.description.indexOf("sendingRules.reading");
     assert.ok(guidance > 0 && guidance < DESCRIPTION_CHARS);
   });
-});
-
-it("ticket rules inspect only customer messages for a billing dispute", () => {
-  const billing = {
-    result: JSON.stringify({
-      type: "json",
-      value: { identifiesCharge: true, reading: "Inbox charges" },
-    }),
-    tool: "widget_billing_summary",
-  };
-  const supportOnly =
-    "LATEST CUSTOMER MESSAGE (the one to work on):\nWhat plan am I on?\n\nEARLIER TURNS (context only):\nCustomer: My inbox needs checking.\nSupport: You can request a refund.\nSend us a dispute.";
-  assert.equal(ruledTicket(supportOnly, [billing]), null);
-  // An earlier turn's refund ask does not force another ticket on a follow-up.
-  assert.equal(
-    ruledTicket(
-      supportOnly +
-        "\nCustomer: Please refund those charges.\nI was billed while the inboxes were broken.",
-      [billing]
-    ),
-    null
-  );
-  assert.equal(
-    ruledTicket(
-      "LATEST CUSTOMER MESSAGE (the one to work on):\nPlease refund those charges.\n\nEARLIER TURNS (context only):\nSupport: Which inboxes?",
-      [billing]
-    ),
-    "billing"
-  );
-});
-
-it("ticket rules ignore provider metadata flags and flags on other tools", () => {
-  assert.equal(
-    ruledTicket("What plan am I on?", [
-      {
-        result: JSON.stringify({
-          autumn: { data: { metadata: { platformFault: true } } },
-        }),
-        tool: "widget_billing_summary",
-      },
-    ]),
-    null
-  );
-  assert.equal(
-    ruledTicket("Refund please", [
-      {
-        result: JSON.stringify({ identifiesCharge: true }),
-        tool: "widget_inbox_health",
-      },
-    ]),
-    null
-  );
-  assert.equal(
-    ruledTicket("Refund please", [
-      {
-        result: JSON.stringify({
-          autumn: { data: { identifiesCharge: true } },
-        }),
-        tool: "widget_billing_summary",
-      },
-    ]),
-    null
-  );
 });

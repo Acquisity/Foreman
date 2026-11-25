@@ -16,9 +16,15 @@ import { tool as read_help_article } from "../tools/widget_read_help_article.js"
 import { tool as read_recording } from "../tools/widget_read_recording.js";
 import { tool as sdr_thread_status } from "../tools/widget_sdr_thread_status.js";
 import { tool as website_status } from "../tools/widget_website_status.js";
+import type { AvailableEndpoint } from "./widget-endpoint-schema.js";
+import {
+  HELD_AREAS,
+  legacyToolOffered,
+  offeredEndpointTools,
+} from "./widget-endpoint-tools.js";
 
 /** The investigator's actual definitions, including selector and recording-only tools. No callbacks run. */
-export const judgeToolCapabilities = Object.entries({
+const handWrittenCapabilities = Object.entries({
   widget_account_access: account_access,
   widget_ask_customer: ask_customer,
   widget_billing_summary: billing_summary,
@@ -46,3 +52,24 @@ export const judgeToolCapabilities = Object.entries({
     name,
   };
 });
+
+/**
+ * What the investigator could call in this case: the hand-written tools the
+ * lane still offers, and the endpoint tools the case's own endpoint list
+ * offered (none when the case recorded no list).
+ */
+export const judgeToolCapabilities = (
+  endpoints: readonly AvailableEndpoint[] | undefined,
+  held: ReadonlySet<string> = HELD_AREAS
+) => [
+  ...handWrittenCapabilities.filter(({ name }) =>
+    legacyToolOffered(name, held)
+  ),
+  ...offeredEndpointTools(endpoints, undefined, held).map(
+    ({ description, inputSchema, name }) => ({
+      description,
+      inputSchema,
+      name,
+    })
+  ),
+];

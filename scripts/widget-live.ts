@@ -49,6 +49,7 @@ import {
   toRequest,
   type WidgetCase,
 } from "../agent/lib/widget-case.js";
+import { heldAreasOfRun } from "../agent/lib/widget-endpoint-tools.js";
 import {
   answeredLane,
   handedOff,
@@ -104,6 +105,7 @@ import {
   splitNeedsHuman,
   twoColumnScorecard,
 } from "../agent/lib/widget-live-score.js";
+import { liveTool } from "../agent/lib/widget-live-tool.js";
 import { MAX_WIDGET_TOOL_CALLS } from "../agent/lib/widget-next-action.js";
 import { widgetRunSchema } from "../agent/lib/widget-run-store.js";
 import { type WidgetContext, widgetAuth } from "../agent/lib/widget-scope.js";
@@ -230,12 +232,7 @@ async function reread(
     session: { auth: { current: auth, initiator: auth } },
   } as unknown as ToolContext;
   try {
-    const dynamic = (await import(`../agent/tools/${tool}.ts`)).default as {
-      events: Record<string, (event: unknown, ctx: unknown) => unknown>;
-    };
-    const resolved = (await dynamic.events["step.started"]({}, ctx)) as {
-      execute: (input: unknown, ctx: ToolContext) => unknown;
-    } | null;
+    const resolved = await liveTool(tool, ctx);
     return resolved
       ? readResult(await resolved.execute(input, ctx))
       : { status: "unverifiable" };
@@ -517,10 +514,7 @@ async function scoreCase(snapshot: LiveSnapshot) {
     cassette,
     question: snapshot.question,
     runId: snapshot.runId,
-    scope: {
-      role: snapshot.scope.role,
-      workspace: snapshot.scope.organizationSlug,
-    },
+    scope: caseScope(snapshot),
   });
   const row = {
     answer: message,
@@ -544,6 +538,13 @@ async function scoreCase(snapshot: LiveSnapshot) {
   return { pending };
 }
 
+/** The case scope of a live run: its role, workspace and the endpoints its context route listed. */
+const caseScope = (snapshot: LiveSnapshot): WidgetCase["scope"] => ({
+  ...(snapshot.scope.endpoints ? { endpoints: snapshot.scope.endpoints } : {}),
+  role: snapshot.scope.role,
+  workspace: snapshot.scope.organizationSlug,
+});
+
 /** Judge a live run's reply and the original production reply the same way. */
 function judgeCase(
   snapshot: LiveSnapshot,
@@ -555,10 +556,7 @@ function judgeCase(
   const message = row.answer ?? null;
   const citations = row.citations ?? [];
   const label = labels[snapshot.runId];
-  const scope = {
-    role: snapshot.scope.role,
-    workspace: snapshot.scope.organizationSlug,
-  };
+  const scope = caseScope(snapshot);
   const raw = liveCase(
     {
       cassette,
@@ -573,13 +571,18 @@ function judgeCase(
     message ?? "",
     snapshot.reply ?? "",
   ]);
-  // The original reply, judged the same way against its own production tool results.
+  // The original reply, judged the same way against its own production tool
+  // results and the tools its own rollout offered.
+  const productionScope = {
+    ...scope,
+    heldAreas: heldAreasOfRun(snapshot.cassette.map(({ tool }) => tool)),
+  };
   const productionRaw = liveCase(
     {
       cassette: snapshot.cassette,
       question: snapshot.question,
       runId: snapshot.runId,
-      scope,
+      scope: productionScope,
     },
     false,
     label
@@ -663,7 +666,7 @@ function judgeCase(
             cassette: snapshot.cassette,
             question: snapshot.question,
             runId: snapshot.runId,
-            scope,
+            scope: productionScope,
           },
           original.needsHuman,
           label

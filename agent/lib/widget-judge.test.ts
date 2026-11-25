@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { test } from "node:test";
-import { tool as sdrTool } from "../tools/widget_sdr_thread_status.js";
+import { tool as helpArticleTool } from "../tools/widget_help_article.js";
 import { type WidgetCase, widgetCaseSchema } from "./widget-case.js";
 import {
   citedArticles,
@@ -524,11 +524,11 @@ const scoredSample = () => {
 
 test("gap judging receives authoritative tool schemas and ranks unused capabilities separately", () => {
   const input = JSON.parse(judgeInput(recorded, "Answer.", claims));
-  const sdr = input.widgetToolCapabilities.find(
-    (tool: { name: string }) => tool.name === "widget_sdr_thread_status"
+  const help = input.widgetToolCapabilities.find(
+    (tool: { name: string }) => tool.name === "widget_help_article"
   );
-  assert.equal(sdr.description, sdrTool.description);
-  assert.ok(sdr.inputSchema.properties.threadId);
+  assert.equal(help.description, helpArticleTool.description);
+  assert.ok(help.inputSchema.properties.query);
   const gaps = parseGaps({
     gaps: [
       {
