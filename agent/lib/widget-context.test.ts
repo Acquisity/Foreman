@@ -362,3 +362,46 @@ test("a context without an endpoint list leaves it absent, not empty", async (co
   );
   assert.equal("endpoints" in result, false);
 });
+
+test("the context route's endpoint features that are off reach the investigation, with the areas they close (ENG-20514)", async (context) => {
+  configure(context);
+  const verify = (body: object) =>
+    verifyWidgetContext(
+      { conversationId, organizationId, userToken },
+      requester(Response.json(body)).request
+    );
+  const helpCenter = {
+    featuresOff: [
+      {
+        feature: "cold_email_agent",
+        pages: ["cold-email-agent"],
+        title: "Cold Email Agent",
+      },
+    ],
+    viewer: "signed.help.viewer",
+  };
+  // AI Website Creator gates no Help Centre page, so only the top-level list names it.
+  const scope = await verify({
+    ...appContext,
+    featuresOff: ["ai_website_creator"],
+    helpCenter,
+  });
+  assert.deepEqual(scope.featuresOff, [
+    "ai website creator",
+    "Cold Email Agent",
+  ]);
+  assert.deepEqual(scope.areasOff, ["website"]);
+  const attributes = widgetAuth(scope).attributes ?? {};
+  assert.equal(
+    attributes.featuresOff,
+    '["ai website creator","Cold Email Agent"]'
+  );
+  assert.equal(attributes.areasOff, '["website"]');
+  // Nothing off, or a malformed list: no note and no closed area.
+  for (const featuresOff of [undefined, ["Not A Flag"], "ai_website_creator"]) {
+    // biome-ignore lint/performance/noAwaitInLoops: each body is one case.
+    const read = await verify({ ...appContext, featuresOff });
+    assert.equal("featuresOff" in read, false);
+    assert.equal("areasOff" in read, false);
+  }
+});

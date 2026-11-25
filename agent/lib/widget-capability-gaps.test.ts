@@ -769,3 +769,23 @@ test("a fact with the comment's separator in it stays one fact, and jobs is an a
   const once = withDetails(body, jobsGap.details) ?? "";
   assert.equal(withDetails(once, jobsGap.details), null);
 });
+
+test("an area a feature that is off closes files no reply gap of either kind (ENG-20478)", () => {
+  assert.deepEqual(
+    replyGaps(
+      [
+        {
+          area: "website",
+          fact: "site status and publish state",
+          kind: "tool",
+        },
+        { area: "website", fact: "how publishing works", kind: "docs" },
+        { area: "inboxes", fact: "dns and live sending health", kind: "tool" },
+      ],
+      [],
+      [],
+      ["website"]
+    ).map((each) => `${each.area}/${each.kind}`),
+    ["inboxes/tool"]
+  );
+});

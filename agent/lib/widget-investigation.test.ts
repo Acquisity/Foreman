@@ -3494,3 +3494,40 @@ test("the reply's facts are filed only after the tool gaps finish", async () => 
     "reply done",
   ]);
 });
+
+test("a reply about an area the workspace's features close files nothing (ENG-20478, ENG-20514)", async () => {
+  const outcome = await waitForWidgetInvestigation(
+    session([
+      event("message.completed", {
+        message: "I couldn't read your site's status.",
+      }),
+      event("turn.completed"),
+    ])
+  );
+  const { deps, run } = dependencies();
+  run.scope = {
+    ...run.scope,
+    areasOff: ["website"],
+    featuresOff: ["ai website creator"],
+  };
+  deps.extract = () =>
+    Promise.resolve({
+      ...findings,
+      unchecked: [
+        {
+          area: "website",
+          fact: "site status and publish state",
+          kind: "tool",
+        },
+      ],
+    });
+  const filed: unknown[] = [];
+  deps.fileGaps = (gaps) => {
+    filed.push(gaps);
+    return Promise.resolve();
+  };
+  if (outcome.status === "completed") {
+    await finishWidgetRun(run, "widget-session-closed", outcome, deps);
+  }
+  assert.deepEqual(filed, []);
+});

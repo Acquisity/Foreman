@@ -23,6 +23,8 @@ const FEATURE_OFF_NAMES =
 const FEATURE_OFF_NO_ASK =
   /do not say it could not be read or checked, and do not ask for details of it/u;
 const FEATURE_OFF_NOT_GAP = /not a capability gap/u;
+const FEATURE_OFF_AREAS =
+  /These features are not turned on for this workspace: \["ai website creator"\]\. They close these areas, so nothing in them can be read: \["website"\]/u;
 
 test("shared support facts keep unpaid cleanup guidance without investigator tool commands", () => {
   for (const tool of [
@@ -254,4 +256,16 @@ test("the investigator lists each record it was asked for, each amount on its ow
   assert.match(prompt, RECORDS_AVAILABLE_RULE);
   assert.match(prompt, MORE_RECORDS_RULE);
   assert.match(prompt, OWN_DATE_RULE);
+});
+
+test("an endpoint feature that is off names the areas it closes", () => {
+  const text = widgetInstructions(
+    widgetAuth({
+      ...scope,
+      areasOff: ["website"],
+      featuresOff: ["ai website creator"],
+    })
+  );
+  assert.match(text, FEATURE_OFF_AREAS);
+  assert.match(text, FEATURE_OFF_NOT_GAP);
 });

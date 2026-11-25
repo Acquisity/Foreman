@@ -60,6 +60,9 @@ export const ORGANIZATION_SLUG = new RegExp(
 );
 
 const shape = {
+  // The endpoint areas a feature that is off closes for this workspace
+  // (ENG-20514). A reply about one files no capability gap.
+  areasOff: z.array(z.string().min(1).max(100)).max(50).optional(),
   // When the customer sent an "I found a bug" report. Only the bug report's
   // evidence lookup sets it, and the policy reads PostHog and Inngest only for it.
   bugReportedAt: z.iso.datetime().optional(),
@@ -67,9 +70,10 @@ const shape = {
   // The support endpoints the context route lists for the asking user
   // (ENG-20296). Absent means the list was not given or could not be read.
   endpoints: z.array(availableEndpointSchema).max(50).optional(),
-  // The names of the features turned off for the workspace, taken from
-  // helpCenter when the session is stamped (ENG-20514), so the investigator
-  // can say a feature is off instead of that it could not be read.
+  // The names of the features turned off for the workspace: the context
+  // route's endpoint features and the Help Centre's gated ones (ENG-20514),
+  // so the investigator can say a feature is off instead of that it could not
+  // be read.
   featuresOff: z.array(z.string().min(1).max(300)).max(200).optional(),
   // The customer's Help Centre view for the knowledge base lane: never stamped
   // on the session, and dropped from the stored run.
@@ -103,15 +107,8 @@ export const widgetContextSchema = z.strictObject(shape);
  * Session attributes also carry trust stamps, so reading the scope back strips
  * unknown keys. They hold strings only, so the endpoint list is stamped as JSON.
  */
-export const stampedWidgetAttributes = z.object({
-  ...shape,
-  endpoints: z
-    .string()
-    .optional()
-    .transform((text) =>
-      text === undefined ? undefined : parseAvailableEndpoints(JSON.parse(text))
-    ),
-  featuresOff: z
+const stampedList = (list: z.ZodOptional<z.ZodArray<z.ZodString>>) =>
+  z
     .string()
     .optional()
     .transform((text, ctx) => {
@@ -119,12 +116,23 @@ export const stampedWidgetAttributes = z.object({
         return;
       }
       try {
-        return shape.featuresOff.parse(JSON.parse(text));
+        return list.parse(JSON.parse(text));
       } catch {
-        ctx.addIssue({ code: "custom", message: "Invalid featuresOff." });
+        ctx.addIssue({ code: "custom", message: "Invalid stamped list." });
         return z.NEVER;
       }
-    }),
+    });
+
+export const stampedWidgetAttributes = z.object({
+  ...shape,
+  areasOff: stampedList(shape.areasOff),
+  endpoints: z
+    .string()
+    .optional()
+    .transform((text) =>
+      text === undefined ? undefined : parseAvailableEndpoints(JSON.parse(text))
+    ),
+  featuresOff: stampedList(shape.featuresOff),
 });
 
 export type WidgetContext = Readonly<z.infer<typeof widgetContextSchema>>;
@@ -162,6 +170,7 @@ export function widgetAuth(
   runId?: string
 ): SessionAuthContext {
   const {
+    areasOff = [],
     helpCenter,
     endpoints,
     featuresOff = featuresOffNames(helpCenter),
@@ -175,6 +184,7 @@ export function widgetAuth(
       ...(featuresOff.length > 0
         ? { featuresOff: JSON.stringify(featuresOff) }
         : {}),
+      ...(areasOff.length > 0 ? { areasOff: JSON.stringify(areasOff) } : {}),
       ...(runId ? { widgetRunId: z.uuid().parse(runId) } : {}),
     },
     authenticator: "bearer",

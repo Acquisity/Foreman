@@ -1,8 +1,13 @@
 import { z } from "zod";
 import { DEFAULT_PARTNER_ID } from "./acquisity-constants.js";
 import { acquisityOrigin, readContextBody } from "./acquisity-origin.js";
-import { helpCenterViewSchema } from "./help-center.js";
+import {
+  featuresOffNames,
+  type HelpCenterView,
+  helpCenterViewSchema,
+} from "./help-center.js";
 import { parseAvailableEndpoints } from "./widget-endpoint-schema.js";
+import { areasOffFor } from "./widget-endpoint-tools.js";
 import { isLiveActive, liveContext } from "./widget-live-policy.js";
 import {
   ORGANIZATION_NAME_MAX,
@@ -12,9 +17,19 @@ import {
   widgetContextSchema,
 } from "./widget-scope.js";
 
+const FEATURE_FLAG = /^[a-z][a-z0-9_]{0,99}$/u;
+const featureName = (flag: string) => flag.replaceAll("_", " ");
+
 /** The app's verified workspace payload; Intercom's app id is irrelevant to the widget and ignored. */
 const appContextSchema = z.looseObject({
   endpoints: z.unknown().optional().transform(parseAvailableEndpoints),
+  // The endpoint features that are off (raw flags such as ai_website_creator),
+  // listed beside the endpoints. Malformed reads as none.
+  featuresOff: z
+    .array(z.string().regex(FEATURE_FLAG))
+    .max(200)
+    .optional()
+    .catch(undefined),
   // Absent or malformed: the docs are read signed out and the guide is not narrowed.
   helpCenter: helpCenterViewSchema.optional().catch(undefined),
   // Any problem with it reads as absent: support counts as open, as before.
@@ -28,6 +43,24 @@ const appContextSchema = z.looseObject({
   userId: z.uuid(),
   verifiedAt: z.iso.datetime(),
 });
+
+/** Both lists of features that are off, and the endpoint areas they close. */
+const offFeatures = (
+  endpointFlags: readonly string[] | undefined,
+  helpCenter: HelpCenterView | undefined
+) => {
+  const featuresOff = [
+    ...new Set([
+      ...(endpointFlags ?? []).map(featureName),
+      ...featuresOffNames(helpCenter),
+    ]),
+  ];
+  const areasOff = areasOffFor(endpointFlags);
+  return {
+    ...(featuresOff.length > 0 ? { featuresOff } : {}),
+    ...(areasOff.length > 0 ? { areasOff } : {}),
+  };
+};
 
 // The endpoint list adds about 2 KB for eleven endpoints to the 4 KB the rest needs.
 const CONTEXT_MAX_BYTES = 16 * 1024;
@@ -106,6 +139,7 @@ export async function verifyWidgetContext(
     widgetContextSchema.parse({
       conversationId: parsed.conversationId,
       ...(verified.endpoints ? { endpoints: verified.endpoints } : {}),
+      ...offFeatures(verified.featuresOff, verified.helpCenter),
       organizationId: verified.organizationId,
       organizationName: verified.organizationName,
       organizationSlug: verified.organizationSlug,
