@@ -1,7 +1,9 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
+  fromFirstSidebarPage,
   parseGuideSidebar,
+  parseSettingsMenu,
   startsAtSidebarPage,
   withoutHeadings,
 } from "./widget-guide-sidebar.js";
@@ -33,6 +35,12 @@ export const SIDEBAR_CATALOG_GROUPS: readonly SidebarCatalogGroup[] = [
 ];
 
 const CRM_V2_PAGE_SPECS: readonly CrmPageSpec[] = [
+  {
+    key: 'crm-my-day',
+    label: 'My Day',
+    segment: 'my-day',
+    isVisible: (ctx) => crmV2Access(ctx).myDay,
+  },
   { key: 'crm-deals', label: 'Deals', segment: 'deals' },
   { key: 'crm-people', label: 'People', segment: 'people' },
   { key: 'crm-companies', label: 'Companies', segment: 'companies' },
@@ -55,7 +63,12 @@ ${[
   page("cold-email-ai-inbox", "AI Inbox", "coldEmail"),
   page("cold-email-email-accounts", "Email accounts", "coldEmail"),
   page("cold-email-deliverability-v2", "Deliverability", "coldEmail"),
-  page("workflows", "Workflows", "build"),
+  page(
+    "workflows",
+    "Workflows",
+    "build",
+    "\n    isVisible: (ctx) => feature(ctx, FEATURES.WORKFLOWS) && notClient(ctx),"
+  ),
   page("sites", "Sites", "build"),
   page("growth-plan-creator", "Growth Plan Creator", "build"),
   page("market-researcher", "Market Researcher", "build"),
@@ -64,7 +77,14 @@ ${[
 ];
 `;
 
-const sidebar = parseGuideSidebar(CATALOG);
+/** Shaped like Acquisity's apps/web/lib/features.ts. */
+const FEATURES = `export const OPT_IN_FEATURES: FeatureName[] = [
+  FEATURES.AI_WEBSITE_CREATOR,
+  FEATURES.WORKFLOWS,
+  FEATURES.MY_DAY,
+];`;
+
+const sidebar = parseGuideSidebar(CATALOG, FEATURES);
 const ENTRIES = new Set(["Home", "Dashboard", "Settings"]);
 const QUOTED = /"([^"]+)"/gu;
 const check = (path: string) => {
@@ -81,9 +101,9 @@ test("the guide's sidebar lists no page the app never shows", () => {
   assert.equal(
     sidebar.lines,
     [
-      '- Under the "CRM" heading: "Deals", "People", "Companies", "Meetings", "Tasks", "Notes"',
+      '- Under the "CRM" heading: "My Day" (only where turned on), "Deals", "People", "Companies", "Meetings", "Tasks", "Notes"',
       '- Under the "Cold Email" heading: "Campaigns", "AI Inbox", "Email accounts", "Deliverability"',
-      '- Under the "Build" heading: "Workflows", "Sites", "Growth Plan Creator", "Market Researcher", "Offer Creator"',
+      '- Under the "Build" heading: "Workflows" (only where turned on), "Sites", "Growth Plan Creator", "Market Researcher", "Offer Creator"',
     ].join("\n")
   );
   assert.ok(!sidebar.pages.has("CRM"));
@@ -133,7 +153,57 @@ test("a heading written as a click is taken out of the path", () => {
 });
 
 test("a reshaped catalog fails instead of shipping a guide without a sidebar", () => {
-  assert.throws(() => parseGuideSidebar("export const nothing = 1;"), {
+  assert.throws(() => parseGuideSidebar("export const nothing = 1;", ""), {
     message: "sidebar parse found 0 groups, 0 pages",
+  });
+});
+
+test("a sidebar path that opens at a retired label starts again at its first sidebar page", () => {
+  const repaired = (path: string) =>
+    fromFirstSidebarPage(
+      sidebar,
+      ENTRIES,
+      path,
+      [...path.matchAll(QUOTED)].map((m) => m[1])
+    );
+  // Foreman#274's guide at 30052833 (ENG-20575).
+  assert.equal(
+    repaired(
+      'In the left sidebar, click "Cold Email Agent", then "Deliverability" > "Results".'
+    ),
+    'In the left sidebar, click "Deliverability" > "Results".'
+  );
+  assert.equal(
+    repaired('In the left sidebar, click "Website Builder"'),
+    'In the left sidebar, click "Website Builder"'
+  );
+  assert.equal(repaired('"Settings" > "Billing"'), '"Settings" > "Billing"');
+});
+
+/** Shaped like Acquisity's apps/web/lib/new-design/settings-nav.ts. */
+const SETTINGS_NAV = [
+  ["Account", ["Profile", "Notifications", "Appearance", "Security"]],
+  ["Your calendar", ["Email & Calendar", "Availability"]],
+  ["Workspace", ["General", "Members", "Billing", "Integrations"]],
+  ["CRM", ["Pipelines", "Records & fields", "Messaging", "Phone"]],
+  ["Outreach", ["Cold Email Agent", "AI SDR Agent"]],
+]
+  .flatMap(([group, labels]) =>
+    (labels as string[]).map(
+      (label) =>
+        `  {\n    segment: 'x',\n    group: '${group}',\n    label: '${label}',\n  },`
+    )
+  )
+  .join("\n");
+
+test("the settings menu comes from the app's own table, grouped as it shows it", () => {
+  assert.equal(
+    parseSettingsMenu(
+      `${SETTINGS_NAV}\n  { segment: 'calendly', label: 'Calendly', wide: true },`
+    ),
+    '"Account": "Profile", "Notifications", "Appearance", "Security"; "Your calendar": "Email & Calendar", "Availability"; "Workspace": "General", "Members", "Billing", "Integrations"; "CRM": "Pipelines", "Records & fields", "Messaging", "Phone"; "Outreach": "Cold Email Agent", "AI SDR Agent"'
+  );
+  assert.throws(() => parseSettingsMenu(""), {
+    message: "settings menu parse found 0 groups, 0 pages",
   });
 });

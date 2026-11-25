@@ -57,6 +57,39 @@ export function assertOwnAnswers(text: string): void {
   }
 }
 
+const WORD = /\S+/gu;
+/** An article this long in the docs needs more than a one-liner (ENG-20575). */
+export const LONG_ARTICLE_CHARS = 1500;
+export const MIN_ANSWER_WORDS = 12;
+
+/**
+ * The slugs whose section answers a long article in fewer than
+ * MIN_ANSWER_WORDS words, not counting the heading and its "Get here:" line.
+ */
+export function shortAnswers(
+  text: string,
+  articles: readonly { slug: string; text: string }[]
+): string[] {
+  const words = new Map<string, number>();
+  let slug = "";
+  for (const line of text.split("\n")) {
+    const heading = SECTION.exec(line)?.[1];
+    if (heading) {
+      slug = heading;
+      words.set(slug, 0);
+    } else if (slug && !line.startsWith("Get here:")) {
+      words.set(slug, (words.get(slug) ?? 0) + (line.match(WORD)?.length ?? 0));
+    }
+  }
+  return articles
+    .filter(
+      (a) =>
+        a.text.length >= LONG_ARTICLE_CHARS &&
+        (words.get(a.slug) ?? 0) < MIN_ANSWER_WORDS
+    )
+    .map((a) => a.slug);
+}
+
 const BLOCK_SCALAR = /^[>|][+-]?$/u;
 const INDENTED = /^[ \t]/u;
 
