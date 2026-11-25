@@ -60,6 +60,12 @@ test("asking whether the customer wants a refund, or offering one, is caught, de
     "I'll go ahead and request a refund for the 9 inboxes.",
     "Shall I refund the unfinished inboxes?",
     "Let me know if you'd like a refund for them.",
+    "Do you need a refund for the unfinished inboxes?",
+    "Want me to process a refund for them?",
+    "I can help you request a refund.",
+    "Happy to issue a refund for the 9 inboxes.",
+    "Can we issue a refund for them?",
+    "We can issue a refund today.",
   ]) {
     assert.equal(
       withoutRefundOffers(`Your order finished. ${offer}`),
@@ -76,6 +82,8 @@ test("stating what happened or what the team will do is kept", () => {
     "I can confirm your order was refunded.",
     "I can't confirm that the $9.99 refund has reached your card.",
     "Refunds usually take five to ten days to reach your bank.",
+    "We'll refund the 9 inboxes that couldn't be set up.",
+    "Your order finished.  Two spaces stay as they are. ",
   ]) {
     assert.equal(withoutRefundOffers(kept), kept, kept);
   }

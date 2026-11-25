@@ -21,6 +21,7 @@ import {
 } from "./widget-instructions.js";
 import {
   NO_REFUND_OFFER_CORRECTION,
+  offersRefund,
   withoutRefundOffers,
 } from "./widget-refund-offer.js";
 import { judgeBudgetMs, LIMITATION_POLICY } from "./widget-review.js";
@@ -862,15 +863,15 @@ async function composedReply(
   if (!ticketFiled && withoutTicketClaims(message) !== message) {
     message = settle(await reply(NO_TICKET_CORRECTION));
   }
+  if (offersRefund(message)) {
+    message = settle(await reply(NO_REFUND_OFFER_CORRECTION));
+  }
   const given = reaskedDetails(message, input.question);
   if (given.length > 0) {
     message = settle(await reply(reaskCorrection(given)));
   }
-  if (withoutRefundOffers(message) !== message) {
-    message = withoutRefundOffers(
-      settle(await reply(NO_REFUND_OFFER_CORRECTION))
-    );
-  }
+  // The last word on money: whatever a repair brought back, no offer goes out.
+  message = withoutRefundOffers(message);
   return message;
 }
 
