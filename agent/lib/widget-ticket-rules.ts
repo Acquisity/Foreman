@@ -30,27 +30,10 @@ const endpointSection = (
         ?.sections?.[section] as Record<string, unknown> | null | undefined)
     : undefined;
 
-/**
- * Follow-ups went out before their delay: the campaigns endpoint's
- * `earlyFollowUps` section (ENG-20548), or each campaign's diagnostics from
- * the old hand-written campaigns tool while campaigns is held.
- */
+/** Follow-ups went out before their delay: the campaigns endpoint's `earlyFollowUps` section (ENG-20548). */
 const earlyFollowUpFault = (tool: string, output: unknown) =>
   endpointSection(tool, output, "widget_campaigns", "earlyFollowUps")
-    ?.platformFault === true ||
-  (tool === "widget_outreach_health" &&
-    ((
-      output as {
-        campaigns?: {
-          diagnostics?: {
-            earlyFollowUps?: { platformFault?: boolean } | null;
-          } | null;
-        }[];
-      } | null
-    )?.campaigns?.some(
-      (campaign) => campaign.diagnostics?.earlyFollowUps?.platformFault === true
-    ) ??
-      false));
+    ?.platformFault === true;
 
 /** The billing read names the charges a dispute is about: the billing endpoint's `inboxErrorCharges` section (ENG-20547). */
 const identifiesCharge = (tool: string, output: unknown) =>

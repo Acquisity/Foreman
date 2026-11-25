@@ -185,7 +185,7 @@ export async function readWidgetJobFailures(
     const rows = (result.failures ?? []).slice(0, FAILURE_LIMIT);
     const covered = input.area ? [input.area] : [...AREAS];
     const caveats = [
-      "Campaign sending problems are covered by widget_outreach_health.",
+      "Campaign sending problems are covered by widget_campaigns.",
       "Run and CSV-import step detail cannot be read here; state what remains unknown. Missing detail alone is not a reason for human handoff. No failures here says nothing about campaign dispatch, which this tool does not cover.",
       "runReference is not an Inngest run ID: scrape stores a scrape-provider ID or a submission ID for manual uploads; AI SDR stores an internal execution_runs ID. Provisioning has no run reference. Null error means no message was available, not proof no error occurred.",
     ];
@@ -251,7 +251,7 @@ export const tool = defineTool({
   description:
     "This workspace's recent FAILED background jobs, org-scoped: AI SDR agent runs, domain/inbox provisioning orders, and lead-scrape runs. " +
     "Each failure carries the org's own entity id, a failed/requires_attention status, whether it recorded an error, its bounded sanitized error message when saved, and a typed application run reference (scrape-provider ID or submission ID for scrape; internal execution_runs ID for AI SDR; none for provisioning). These references are not Inngest run IDs. " +
-    "The run itself and import step detail cannot be inspected here: report what the saved row shows and what could not be checked. Campaign-send problems use widget_outreach_health; check here as well when a campaign, inbox order or lead import failed to start or finish. unavailable means the records could not be read, distinct from an empty (no failures) result.",
+    "The run itself and import step detail cannot be inspected here: report what the saved row shows and what could not be checked. Campaign-send problems use widget_campaigns; check here as well when a campaign, inbox order or lead import failed to start or finish. unavailable means the records could not be read, distinct from an empty (no failures) result.",
   execute: (input, ctx) => readWidgetJobFailures(ctx, input),
   inputSchema: widgetJobFailuresInput,
   outputSchema: widgetJobFailuresOutput,

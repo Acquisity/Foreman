@@ -34,7 +34,6 @@ import {
  */
 export const HELD_AREAS: ReadonlySet<string> = new Set([
   "ai-sdr",
-  "campaigns",
   "crm-contact",
   "lead-pipeline",
   "website",
