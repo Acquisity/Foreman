@@ -13,8 +13,9 @@
 // inputs (model, prompt, sidebar, articles), so a rerun calls the model only
 // for the batches whose inputs changed; --full ignores those stored outputs.
 // A run that changes nothing but the commit leaves the file as it was.
-// Needs CLIPROXY_BASE_URL and CLIPROXY_API_KEY for the Claude calls
-// (ENG-15082); since ENG-20607 every call, the limits pass included, is one.
+// Needs AI_GATEWAY_API_KEY or VERCEL_OIDC_TOKEN for the gateway call (the
+// limits pass), and CLIPROXY_BASE_URL and CLIPROXY_API_KEY for the Claude
+// calls (ENG-15082).
 import { execFileSync } from "node:child_process";
 import {
   existsSync,
@@ -75,11 +76,14 @@ import {
 
 const MODEL = "anthropic/claude-sonnet-5.5";
 /**
- * The role and limit pass runs on the distill model: on Gemini Flash it
- * inverted exceptions and merged lines into false limits (ENG-20607).
+ * The role and limit pass runs on Gemini Flash through the gateway. On the
+ * distill model through the CLI Proxy, a full-guide summary spent all 16,000
+ * output tokens reasoning and never answered, which stopped every
+ * regeneration (ENG-20607); its prompt keeps the rules against merging lines
+ * and inverting exceptions.
  */
-const LIMITS_MODEL = MODEL;
-const LIMITS_MAX_TOKENS = 16_000;
+const LIMITS_MODEL = "google/gemini-3.5-flash";
+const LIMITS_MAX_TOKENS = 8000;
 const DOCS = "apps/web/content/docs";
 const CATALOG = "apps/web/lib/sidebar/catalog.ts";
 const FEATURES = "apps/web/lib/features.ts";
@@ -391,6 +395,9 @@ const call = async (
         maxRetries: 0,
         model: modelFor(model),
         prompt,
+        providerOptions: {
+          google: { thinkingConfig: { thinkingLevel: "minimal" } },
+        },
         system,
       }),
       sleep(CALL_TIMEOUT_MS + 5000).then(() => {
