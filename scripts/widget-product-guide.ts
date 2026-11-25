@@ -46,7 +46,13 @@ import {
   splitGuideSections,
 } from "../agent/lib/widget-guide-cache.js";
 import {
+  OPT_IN_NOTE,
+  pageIsOptIn,
+  spellOutOptInGates,
+} from "../agent/lib/widget-guide-gates.js";
+import {
   fromFirstSidebarPage,
+  getHereFor,
   labelsIn,
   parseGuideSidebar,
   parseSettingsMenu,
@@ -274,16 +280,9 @@ const order = (path: string): string[] => {
   });
 };
 
-const FEATURE_GATE = /<FeatureGate\s+feature="([^"]+)"[^>]*>/gu;
-const PAGE_FEATURES = /^features:\s*\[([^\]]*)\]/mu;
-const FEATURE_KEY = /[a-z0-9_]+/gu;
-const turnedOn = (key: string) => GUIDE_SIDEBAR.optInFeatures.has(key);
-/** Said of a page or section behind an opt-in feature (ENG-20607). */
-const OPT_IN_NOTE = "Only on workspaces where it has been turned on.";
-
 /**
  * MDX to plain markdown: components become text, navigation-only lists go. A
- * section behind an opt-in feature gate is introduced with OPT_IN_NOTE.
+ * section behind an opt-in feature gate is spelled out (widget-guide-gates).
  */
 function stripMdx(source: string): {
   body: string;
@@ -292,8 +291,10 @@ function stripMdx(source: string): {
 } {
   const front = source.match(FRONTMATTER);
   const field = (name: string) => frontmatterField(front?.[1] ?? "", name);
-  const body = source
-    .slice(front?.[0].length ?? 0)
+  const body = spellOutOptInGates(
+    source.slice(front?.[0].length ?? 0),
+    GUIDE_SIDEBAR.optInFeatures
+  )
     .replace(/^(import|export) .*$/gmu, "")
     .replace(/<QuestionList[\s\S]*?<\/QuestionList>/gu, "")
     .replace(/<InlineSearchBar[^>]*\/>/gu, "")
@@ -306,18 +307,14 @@ function stripMdx(source: string): {
     .replace(/<Accordion\s+title="([^"]*)"[^>]*>/gu, "\n#### $1\n")
     .replace(/<Tab\s+value="([^"]*)"[^>]*>/gu, "\n$1:\n")
     .replace(/<Callout(?:\s+[^>]*)?>/gu, "\nNote: ")
-    .replace(FEATURE_GATE, (gate, key: string) =>
-      turnedOn(key) ? `\nNote: ${OPT_IN_NOTE}\n` : gate
-    )
     .replace(/<\/?[A-Z][A-Za-z.]*[^>]*>/gu, "")
     .replace(/!\[[^\]]*\]\([^)]*\)/gu, "")
     .replace(/\n{3,}/gu, "\n\n")
     .trim();
   const description = field("description");
-  const pageFeatures = front?.[1].match(PAGE_FEATURES)?.[1] ?? "";
   return {
     body: description ? `${description}\n\n${body}` : body,
-    optIn: (pageFeatures.match(FEATURE_KEY) ?? []).some(turnedOn),
+    optIn: pageIsOptIn(front?.[1] ?? "", GUIDE_SIDEBAR.optInFeatures),
     title: field("title"),
   };
 }
@@ -582,8 +579,9 @@ const linked = slugs.map((slug) => distilled.get(slug)).join("\n\n");
 /**
  * Each section keeps its own "Get here:" line when it is a usable path: it
  * quotes at least one label, every quoted label appears in the article or the
- * navigation above, and it names no help-center section. Otherwise the section
- * takes its nearest parent article's line, or none. A path that starts in the
+ * navigation above, and it names no help-center section. A section that gave
+ * no line takes its nearest parent article's; one whose line was refused, or
+ * that sits below a refused parent, takes none (getHereFor). A path that starts in the
  * sidebar must start at a page the sidebar shows or one of its entry points,
  * so a retired label such as "Website Builder" is refused even when the
  * article's own words contain it ("AI Website Builder"). A sidebar heading
@@ -631,14 +629,6 @@ for (const line of lines) {
     console.log(`  rejected ${current}: ${path}`);
   }
 }
-const inherited = (slug: string): string | undefined => {
-  for (let parent = slug; parent.includes("/"); ) {
-    parent = parent.slice(0, parent.lastIndexOf("/"));
-    if (paths.has(parent)) {
-      return paths.get(parent);
-    }
-  }
-};
 const body = lines
   .flatMap((line) => {
     if (GET_HERE.test(line)) {
@@ -648,8 +638,7 @@ const body = lines
     if (!slug) {
       return [line];
     }
-    const path =
-      paths.get(slug) ?? (refused.has(slug) ? undefined : inherited(slug));
+    const path = getHereFor(slug, paths, refused);
     return [
       line,
       ...(path ? [`Get here: ${path}`] : []),

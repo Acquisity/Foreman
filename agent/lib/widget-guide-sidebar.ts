@@ -380,3 +380,25 @@ export const withoutRetiredStart = (
   }
   return `${path.slice(0, first.at)}"${successors[0]}"${path.slice(path.indexOf('"', first.at + 1) + 1)}`;
 };
+
+/**
+ * A section's Get here path: its own usable one, or, when it gave none, its
+ * nearest parent article's. A section whose own path was refused gets none,
+ * and so does one below a refused parent, since a borrowed path would be a
+ * guess (ENG-20607).
+ */
+export const getHereFor = (
+  slug: string,
+  paths: ReadonlyMap<string, string>,
+  refused: ReadonlySet<string>
+): string | undefined => {
+  if (paths.has(slug) || refused.has(slug)) {
+    return paths.get(slug);
+  }
+  for (let parent = slug; parent.includes("/"); ) {
+    parent = parent.slice(0, parent.lastIndexOf("/"));
+    if (paths.has(parent) || refused.has(parent)) {
+      return paths.get(parent);
+    }
+  }
+};
