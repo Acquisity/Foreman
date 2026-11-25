@@ -1,6 +1,6 @@
 // Capability gaps (ENG-20299): something a widget investigation could not
 // check. Each gap key `<area>: <missing fact>` has one open ENG ticket with the
-// `fixy` label, which Fixy builds without plan approval; every conversation that
+// `fixy` label, which Fixy judges and builds or cancels; every conversation that
 // hits it adds one comment and one to its count. No customer data is written:
 // only the area, the fact, the conversation and run ids, and the reason.
 import { z } from "zod";
@@ -426,7 +426,7 @@ const INTRO = {
 export const gapDescription = (gap: CapabilityGap) =>
   [
     INTRO[gap.source === "reply" ? "reply" : gap.kind],
-    "Each comment below names one support conversation that hit this gap. Fixy builds the fix without plan approval when it only adds or repairs a read or a Help Centre page (Aaron, 2026-11-23); anything that adds an action or moves money still waits for approval. After the fix is live, Fixy reruns the check for each conversation and answers the ones still open.",
+    "Each comment below names one support conversation that hit this gap. Fixy first checks whether this would have changed the reply and can be known from our data, then builds the fix or cancels the ticket with the reason, with no plan card, question card or draft (Aaron, 2026-11-25). A fix that would add an action, write customer data or move money becomes its own ENG ticket without the `fixy` label, linked from this one. After a read or Help Centre fix is live, Fixy reruns the check for each conversation and answers the ones whose question it now answers and that are still waiting.",
     "## Capability gap",
     [
       `- Gap key: ${gapKey(gap)}`,

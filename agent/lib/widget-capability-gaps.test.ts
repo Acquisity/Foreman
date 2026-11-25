@@ -317,6 +317,23 @@ test("the count line takes the given count and nothing else changes", () => {
   assert.equal(counted.replace("Conversations: 3", "Conversations: 1"), stored);
 });
 
+const NO_PLAN_CARD = /with no plan card, question card or draft/;
+const OWN_TICKET =
+  /move money becomes its own ENG ticket without the `fixy` label, linked from this one/;
+const WAITS_FOR_APPROVAL = /waits for approval/;
+
+test("the description tells Fixy's reader no plan card waits and an action fix becomes its own ticket", () => {
+  const text = gapDescription({
+    area: "campaigns",
+    fact: "why a campaign stopped sending",
+    kind: "tool",
+    source: "reply",
+  });
+  assert.match(text, NO_PLAN_CARD);
+  assert.match(text, OWN_TICKET);
+  assert.doesNotMatch(text, WAITS_FOR_APPROVAL);
+});
+
 interface Call {
   name: string;
   variables: Record<string, unknown>;
