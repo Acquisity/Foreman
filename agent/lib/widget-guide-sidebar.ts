@@ -154,7 +154,6 @@ const LABEL_EDGE = /^[\s,.;:]+|[\s,.;:]+$/gu;
 /** The two entry points that have no label to quote. */
 export const UNLABELLED = /\bworkspace name\b|\byour name\b/iu;
 const LEFT_SIDEBAR = /\bsidebar\b/iu;
-const SETTINGS_BEFORE = /"Settings"/u;
 
 /** Each quoted label in a path, without edge punctuation, with where it starts. */
 export const labelsIn = (path: string) =>
@@ -294,29 +293,29 @@ export function parseSettingsMenu(
 
 /**
  * A path that opens at a retired sidebar label, such as `"Cold Email Agent" >
- * "Email Accounts"`, opens instead at the first later label the sidebar shows
- * (in the sidebar's own spelling), or at the page that replaced the retired
- * label. A path whose first label follows "Settings" is a Settings page, such as
- * `"Settings" > "Cold Email Agent"`, and stays as it was.
+ * "Email Accounts"`, opens instead at the later label when it is one of the
+ * pages that replaced the retired one (in the sidebar's own spelling), or at
+ * the first of those pages. A later label is never promoted otherwise, so a
+ * campaign's "Sequences" tab never becomes the CRM's "Sequences" page. Only
+ * the first label is checked, so `"Settings" > "Cold Email Agent"` stays.
  */
 export const withoutRetiredStart = (
-  sidebar: GuideSidebar,
-  retired: ReadonlyMap<string, string>,
+  retired: ReadonlyMap<string, readonly string[]>,
   path: string
 ) => {
   const [first, ...rest] = labelsIn(path);
-  const replacement = first && retired.get(first.label);
-  if (!replacement || SETTINGS_BEFORE.test(path.slice(0, first.at))) {
+  const successors = first && retired.get(first.label);
+  if (!successors?.length) {
     return path;
   }
-  const pages = new Map(
-    [...sidebar.pages].map((page) => [page.toLowerCase(), page])
+  const bySpelling = new Map(
+    successors.map((page) => [page.toLowerCase(), page])
   );
-  const later = rest.find((l) => pages.has(l.label.toLowerCase()));
+  const later = rest.find((l) => bySpelling.has(l.label.toLowerCase()));
   if (later) {
-    const page = pages.get(later.label.toLowerCase()) as string;
+    const page = bySpelling.get(later.label.toLowerCase()) as string;
     const tail = path.slice(later.at).replace(`"${later.label}"`, `"${page}"`);
     return `${path.slice(0, first.at)}${tail}`;
   }
-  return `${path.slice(0, first.at)}"${replacement}"${path.slice(path.indexOf('"', first.at + 1) + 1)}`;
+  return `${path.slice(0, first.at)}"${successors[0]}"${path.slice(path.indexOf('"', first.at + 1) + 1)}`;
 };

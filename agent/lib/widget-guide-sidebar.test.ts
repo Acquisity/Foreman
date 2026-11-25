@@ -243,11 +243,11 @@ test("the settings menu follows the app's grouping, with alternate slots and its
 });
 
 test("a path that opens at a retired sidebar label opens at the real page", () => {
-  const retired = new Map([
-    ["Cold Email Agent", "Campaigns"],
-    ["Dashboard", "Home"],
+  const retired = new Map<string, readonly string[]>([
+    ["Cold Email Agent", ["Campaigns", "Email accounts", "Deliverability"]],
+    ["Dashboard", ["Home"]],
   ]);
-  const fixed = (path: string) => withoutRetiredStart(sidebar, retired, path);
+  const fixed = (path: string) => withoutRetiredStart(retired, path);
   // Foreman#274's guide at 61b34ffa (ENG-20601).
   assert.equal(
     fixed('"Cold Email Agent" > "Deliverability", "Results" tab.'),
@@ -260,6 +260,17 @@ test("a path that opens at a retired sidebar label opens at the real page", () =
   assert.equal(
     fixed('"Cold Email Agent" > campaign > "Leads"'),
     '"Campaigns" > campaign > "Leads"'
+  );
+  // A campaign tab named like a sidebar page elsewhere stays a campaign tab.
+  assert.equal(
+    fixed('"Cold Email Agent" > campaign > "Sequences" tab'),
+    '"Campaigns" > campaign > "Sequences" tab'
+  );
+  assert.equal(
+    fixed(
+      'In the left sidebar, click "Cold Email Agent", open a campaign, then click the "Sequences" tab.'
+    ),
+    'In the left sidebar, click "Campaigns", open a campaign, then click the "Sequences" tab.'
   );
   assert.equal(
     fixed('In the left sidebar, click "Dashboard".'),

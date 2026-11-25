@@ -166,18 +166,19 @@ const ENTRY_POINTS: { starts: string[]; text: string }[] = [
 const SIDEBAR_ENTRIES = new Set(ENTRY_POINTS.flatMap((entry) => entry.starts));
 
 /**
- * Sidebar labels the app no longer shows, and the page that took each one's
- * place (catalog.ts `replaces`, checked on Acquisity main 2026-11-25). A path
- * that still opens at one is rewritten to the real page (ENG-20601).
+ * Sidebar labels the app no longer shows, and the pages that took each one's
+ * place, the first being where it led (catalog.ts `replaces`, checked on
+ * Acquisity main 2026-11-25). A path that still opens at one is rewritten to
+ * the real page (ENG-20601).
  * "Dashboard" is only Client users' name for Home (home-nav.ts), so it is
  * rewritten everywhere but the Client Portal articles.
  */
-const RETIRED_LABELS = new Map([
-  ["Cold Email Agent", "Campaigns"],
-  ["AI SDR Inbox", "AI Inbox"],
-  ["Website Builder", "Sites"],
+const RETIRED_LABELS = new Map<string, readonly string[]>([
+  ["Cold Email Agent", ["Campaigns", "Email accounts", "Deliverability"]],
+  ["AI SDR Inbox", ["AI Inbox"]],
+  ["Website Builder", ["Sites"]],
 ]);
-const RETIRED_FOR_TEAM = new Map([...RETIRED_LABELS, ["Dashboard", "Home"]]);
+const RETIRED_FOR_TEAM = new Map([...RETIRED_LABELS, ["Dashboard", ["Home"]]]);
 const retiredFor = (slug: string) =>
   slug.startsWith("client-portal") ? RETIRED_LABELS : RETIRED_FOR_TEAM;
 
@@ -602,7 +603,6 @@ for (const line of lines) {
   const stripped =
     found &&
     withoutRetiredStart(
-      GUIDE_SIDEBAR,
       retiredFor(current),
       withoutHeadings(GUIDE_SIDEBAR, found)
     );
