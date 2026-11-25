@@ -770,7 +770,12 @@ test("the judge gets the guide section a plainly worded answer relies on", () =>
       []
     )
   );
-  assert.ok(input.productGuide.includes("It reflects warmup traffic only."));
+  // The guide is regenerated from the docs, so this checks the section by its slug, not its wording.
+  assert.ok(
+    input.productGuide.includes(
+      "{slug: cold-email-agent/email-accounts/warmup}"
+    )
+  );
 });
 
 test("a correct handoff answers what was needed, and a missing answer still fails when one was expected", () => {

@@ -46,16 +46,22 @@ import {
   splitGuideSections,
 } from "../agent/lib/widget-guide-cache.js";
 import {
+  fromFirstSidebarPage,
+  labelsIn,
   parseGuideSidebar,
+  parseSettingsMenu,
   startsAtSidebarPage,
+  UNLABELLED,
   withoutHeadings,
 } from "../agent/lib/widget-guide-sidebar.js";
 import { guideSourcePath } from "../agent/lib/widget-guide-source.js";
 import {
+  answerWords,
   assertGuideSections,
   assertOwnAnswers,
   frontmatterField,
   plainDashes,
+  shortAnswers,
 } from "../agent/lib/widget-guide-validation.js";
 
 const MODEL = "anthropic/claude-sonnet-5.5";
@@ -63,6 +69,11 @@ const MODEL = "anthropic/claude-sonnet-5.5";
 const NAV_MODEL = "google/gemini-3.5-flash";
 const DOCS = "apps/web/content/docs";
 const CATALOG = "apps/web/lib/sidebar/catalog.ts";
+const FEATURES = "apps/web/lib/features.ts";
+const SETTINGS_NAV = "apps/web/lib/new-design/settings-nav.ts";
+const SETTINGS_MENU_ITEMS =
+  "apps/web/components/organization/settings-menu-items.tsx";
+const CRM_SETTINGS_ROUTES = "apps/web/lib/crm-v2/settings-routes.ts";
 const MDX = /\.mdx$/u;
 const FRONTMATTER = /^---\n([\s\S]*?)\n---\n?/u;
 const INDEX_PAGE = /(^|\/)index$/u;
@@ -79,6 +90,9 @@ const CONCURRENCY = 6;
 const BATCH_TRIES = 3;
 /** Source characters per distill call. */
 const BATCH_CHARS = 30_000;
+/** Words asked for even the shortest article, so no answer is squeezed out. */
+const MIN_ARTICLE_WORDS = 15;
+const MIN_BATCH_WORDS = 60;
 /**
  * Words asked for per source character. The model writes about twice what it
  * is asked for, so 1.09M source characters come out near 45k tokens.
@@ -95,22 +109,23 @@ const CLIENT_PAGES =
 /**
  * What the app shows depends on the workspace: most features can be switched
  * off per workspace and a few are opt-in (apps/web/lib/features.ts on Acquisity
- * main, checked 2026-10-08). These lines head the guide. Check the app before
+ * main, checked 2026-11-24: Resources is retired and no feature is called
+ * Network Researcher). These lines head the guide. Check the app before
  * changing them.
  */
 const AVAILABILITY = [
   "Deleting a workspace is not available to anyone, owners included. {slug: workspace-settings/general}",
   'The AI Website Builder ("Sites" in the sidebar) is not on every workspace: new workspaces may not get it (ENG-14707). Customers who see "Sites" can use it as described below. {slug: ai-website-builder}',
-  "Network Researcher, a Resources tool, is only on workspaces where it has been turned on, and the help center has no guide for it.",
   "Most features can be turned off for a workspace. When a customer does not see a feature in the sidebar, it may not be on for their workspace or their role.",
   `${CLIENT_PAGES} {slug: client-portal}`,
 ];
 
 /**
- * Places the sidebar catalog does not list, checked in the app as an owner on
- * 2026-10-08 (ENG-14932 round 3) and in the shell's menu components. The
- * Personal pages carry no role check (settings-menu-items.tsx, isVisible: true),
- * and the AI Consultant line is the ai-consultant article's own scope (round 4).
+ * Places the sidebar catalog does not list, checked on Acquisity main on
+ * 2026-11-24 in sidebar-account-menu.tsx and organization-menu-items.tsx
+ * (OrganizationBottomMenuItems). The settings menu itself is read from
+ * settings-nav.ts at the same ref (SETTINGS_MENU), and the AI Consultant line
+ * is the ai-consultant article's own scope (ENG-14932 round 4).
  * Each line lists the labels a sidebar path may start from there (`starts`).
  */
 const ENTRY_POINTS: { starts: string[]; text: string }[] = [
@@ -120,11 +135,11 @@ const ENTRY_POINTS: { starts: string[]; text: string }[] = [
   },
   {
     starts: ["Settings"],
-    text: '"Settings": click "Settings" at the bottom of the sidebar, or click the workspace name in the top-left corner, then "Settings". Its left menu groups pages under "Personal" and "Workspace".',
+    text: '"Settings": click "Settings" at the bottom of the sidebar, or click the workspace name in the top-left corner, then "Settings". Its left menu groups pages as the next line lists them.',
   },
   {
     starts: [],
-    text: 'Settings, "Personal": "Profile", "Appearance", "Security", "Availability", "Email & Calendar", "Conferencing", "Access Tokens". These are each person\'s own settings: every role sees them and can change its own. "Workspace", as an owner sees it on a workspace with every feature on: "General", "Members", "Teams", "Roles & Permissions", "Workspace Snapshots", "Billing", "Payments", "Phone Numbers", "Voice", "Meeting Recordings", "Scheduling", "Cold Email Agent", "AI SDR Agent", "Sales Call Analyzer", "Your Niche & Offer", "Cold Email Blocklist", "Email Templates", "SMS Templates", "Sharing", "CRM Custom Fields", "Call & Meeting Outcomes", "Workflow Notifications", "Connected Apps & API Keys". A page shows only when the workspace has its feature and the role may use it.',
+    text: 'Settings menu, by group, as an owner sees it on a workspace with every feature on: SETTINGS_MENU. "Account" and "Your calendar" hold each person\'s own settings, which they change for themselves. A page shows only when the workspace has its feature and the role may use it.',
   },
   {
     starts: [],
@@ -132,11 +147,11 @@ const ENTRY_POINTS: { starts: string[]; text: string }[] = [
   },
   {
     starts: [],
-    text: 'Account menu: click your name at the bottom of the sidebar. It holds "Feedback" (support chat), "Resources", "Toggle theme", "Edit sidebar" and "Log out".',
+    text: 'Account menu: click your name at the bottom of the sidebar. It holds "Feedback" (support chat, not for Client users), "Light theme" or "Dark theme", "Edit sidebar" (not for Client users) and "Log out".',
   },
   {
     starts: ["Credits", "Add credits", "What's New", "Help Center"],
-    text: 'Bottom of the sidebar, above "Settings": the "Credits" card with "Add credits", then "What\'s New" and "Help Center".',
+    text: 'Bottom of the sidebar, top to bottom: the "What\'s New" card, "Help Center" (not on white-label partner workspaces), "Settings", then the "Credits" card with "Add credits" (not for Client users).',
   },
   {
     starts: ["Chat"],
@@ -194,11 +209,19 @@ execFileSync(
 );
 const root = join(dir, DOCS);
 
-const GUIDE_SIDEBAR = parseGuideSidebar(git("show", `${sha}:${CATALOG}`));
+const GUIDE_SIDEBAR = parseGuideSidebar(
+  git("show", `${sha}:${CATALOG}`),
+  git("show", `${sha}:${FEATURES}`)
+);
+const SETTINGS_MENU = parseSettingsMenu(
+  git("show", `${sha}:${SETTINGS_NAV}`),
+  git("show", `${sha}:${SETTINGS_MENU_ITEMS}`),
+  git("show", `${sha}:${CRM_SETTINGS_ROUTES}`)
+);
 
-const SIDEBAR = `Left sidebar, top to bottom, as a new workspace has it (group headings can be collapsed; a customer clicks the page, not the heading). A page shows only when the workspace has the feature and the role may use it. ${CLIENT_PAGES} Only Client users have "Client Portal" in the sidebar; owners and admins can preview it at the workspace address followed by /client-portal, and invite a client from "Settings" > "Members". A customer can rearrange, hide and add pages with "Edit sidebar" in the account menu, so their sidebar may differ from this.
+const SIDEBAR = `Left sidebar, top to bottom (group headings can be collapsed; a customer clicks the page, not the heading). A page marked "(only where turned on)" is off until it is turned on for the workspace, so a new workspace doesn't have it. A page shows only when the workspace has the feature and the role may use it. ${CLIENT_PAGES} Only Client users have "Client Portal" in the sidebar; owners and admins can preview it at the workspace address followed by /client-portal, and invite a client from "Settings" > "Members". A customer can rearrange, hide and add pages with "Edit sidebar" in the account menu, so their sidebar may differ from this.
 ${GUIDE_SIDEBAR.lines}
-${ENTRY_POINTS.map((entry) => `- ${entry.text}`).join("\n")}`;
+${ENTRY_POINTS.map((entry) => `- ${entry.text.replace("SETTINGS_MENU", SETTINGS_MENU)}`).join("\n")}`;
 console.log(SIDEBAR);
 
 interface Article {
@@ -299,7 +322,7 @@ Never name the outside services behind the product or developer web addresses; t
 
 Keep every condition a fact depends on ("only when", "only for", "unless", "sometimes") and the exact scope it applies to. Never widen a fact to cases the article does not name, never narrow it by adding "only", never turn "can sometimes" into "cannot", and copy every count exactly.
 
-Drop marketing language, motivation, generic advice that is not about Acquisity, repeated explanations, and examples that add no fact. Never add a fact the articles do not state. Plain markdown, no tables, no em dashes. Stay under WORDS words for this batch in total: shorten wording and merge facts an article repeats rather than drop an article or its answer.
+Drop marketing language, motivation, generic advice that is not about Acquisity, repeated explanations, and examples that add no fact. Never add a fact the articles do not state. Plain markdown, no tables, no em dashes. Each article's header gives its word allowance: write about that many words for it, and stay under WORDS words for this batch in total. Shorten wording and merge facts an article repeats rather than drop an article or its answer; never reduce an article with steps, conditions or limits to one line.
 
 SIDEBAR_BLOCK`;
 
@@ -416,6 +439,44 @@ for (const article of pending) {
   }
 }
 
+/** Words asked for one article: its share of the ratio, never below a floor. */
+const allowance = (a: Article) =>
+  Math.max(MIN_ARTICLE_WORDS, Math.round(a.text.length * RATIO));
+
+const distillBatch = (batch: Article[], label: string) =>
+  checkedGuideCall(
+    label,
+    BATCH_TRIES,
+    () =>
+      call(
+        DISTILL_PROMPT.replace(
+          "WORDS",
+          String(
+            Math.max(
+              MIN_BATCH_WORDS,
+              batch.reduce((sum, a) => sum + allowance(a), 0)
+            )
+          )
+        ).replace("SIDEBAR_BLOCK", SIDEBAR),
+        batch
+          .map(
+            (a) =>
+              `ARTICLE title: ${a.title}\nslug: ${a.slug}\nwords: ${allowance(a)}\n\n${a.text}`
+          )
+          .join("\n\n=====\n\n"),
+        32_000
+      ),
+    (text) => {
+      const repaired = relink(text);
+      assertGuideSections(
+        repaired,
+        batch.map((a) => a.slug)
+      );
+      assertOwnAnswers(repaired);
+      return repaired;
+    }
+  );
+
 const startedAt = Date.now();
 const rewritten: string[] = [];
 let next = 0;
@@ -425,34 +486,10 @@ await Promise.all(
       const index = next;
       next += 1;
       const batch = batches[index];
-      const chars = batch.reduce((sum, a) => sum + a.text.length, 0);
-      const words = Math.max(60, Math.round(chars * RATIO));
       // biome-ignore lint/performance/noAwaitInLoops: a fixed pool of workers.
-      const out = await checkedGuideCall(
-        `batch ${index + 1}/${batches.length} ${batch[0].slug}`,
-        BATCH_TRIES,
-        () =>
-          call(
-            DISTILL_PROMPT.replace("WORDS", String(words)).replace(
-              "SIDEBAR_BLOCK",
-              SIDEBAR
-            ),
-            batch
-              .map(
-                (a) => `ARTICLE title: ${a.title}\nslug: ${a.slug}\n\n${a.text}`
-              )
-              .join("\n\n=====\n\n"),
-            32_000
-          ),
-        (text) => {
-          const repaired = relink(text);
-          assertGuideSections(
-            repaired,
-            batch.map((a) => a.slug)
-          );
-          assertOwnAnswers(repaired);
-          return repaired;
-        }
+      const out = await distillBatch(
+        batch,
+        `batch ${index + 1}/${batches.length} ${batch[0].slug}`
       );
       for (const [slug, section] of splitGuideSections(out.text)) {
         distilled.set(slug, section);
@@ -464,6 +501,39 @@ await Promise.all(
     }
   })
 );
+
+/**
+ * A long article a batch answered in a line or two is distilled once more on
+ * its own (ENG-20575). Its section replaces the batch's only when it says
+ * more. One still short is logged and kept, so a rerun with the same docs
+ * leaves the guide as it was. One whose call fails keeps its batch section but
+ * stays out of the cache, so the next run tries it again; it never stops this
+ * run.
+ */
+const retryFailed = new Set<string>();
+const shortened = pending.filter(
+  (a) => shortAnswers(distilled.get(a.slug) ?? "", [a]).length > 0
+);
+for (const article of shortened) {
+  const label = `alone ${article.slug}`;
+  const before = distilled.get(article.slug) ?? "";
+  try {
+    // biome-ignore lint/performance/noAwaitInLoops: a few calls, one at a time.
+    const out = await distillBatch([article], label);
+    const section = splitGuideSections(out.text).get(article.slug);
+    const words = (text: string) => answerWords(text).get(article.slug) ?? 0;
+    if (section && words(section) > words(before)) {
+      distilled.set(article.slug, section);
+      rewritten.push(article.slug);
+    }
+  } catch (error) {
+    retryFailed.add(article.slug);
+    console.log(`  ${label} failed: ${String(error).slice(0, 160)}`);
+  }
+  if (shortAnswers(distilled.get(article.slug) ?? "", [article]).length) {
+    console.log(`  still short ${article.slug}`);
+  }
+}
 
 const linked = slugs.map((slug) => distilled.get(slug)).join("\n\n");
 /**
@@ -478,17 +548,11 @@ const linked = slugs.map((slug) => distilled.get(slug)).join("\n\n");
  */
 const SECTION_HEAD = /^### .*\{slug: ([^}]+)\}$/u;
 const GET_HERE = /^Get here: (.*)$/u;
-const QUOTED = /"([^"]+)"/gu;
-const LABEL_EDGE = /^[\s,.;:]+|[\s,.;:]+$/gu;
-/** The two entry points that have no label to quote. */
-const UNLABELLED = /\bworkspace name\b|\byour name\b/iu;
 const HELP_CENTER_PATH =
   /\bnot stated\b|\bFAQ\b|\bhelp center\b|"Getting Started"|\bsee (?:the )?\S+ section\b/iu;
 const sourceText = new Map(available.map((a) => [a.slug, a.text]));
 const usablePath = (slug: string, path: string): boolean => {
-  const labels = [...path.matchAll(QUOTED)].map((m) =>
-    m[1].replace(LABEL_EDGE, "")
-  );
+  const labels = labelsIn(path).map((l) => l.label);
   const source = `${sourceText.get(slug) ?? ""}\n${SIDEBAR}`;
   return (
     (labels.length > 0 || UNLABELLED.test(path)) &&
@@ -505,7 +569,9 @@ let dropped = 0;
 for (const line of lines) {
   current = line.match(SECTION_HEAD)?.[1] ?? current;
   const found = line.match(GET_HERE)?.[1];
-  const path = found && withoutHeadings(GUIDE_SIDEBAR, found);
+  const stripped = found && withoutHeadings(GUIDE_SIDEBAR, found);
+  const path =
+    stripped && fromFirstSidebarPage(GUIDE_SIDEBAR, SIDEBAR_ENTRIES, stripped);
   if (path && usablePath(current, path)) {
     paths.set(current, path);
   } else if (path) {
@@ -606,7 +672,9 @@ const limits = joinGuideLimits(
   slugs.map((slug) => summarised.get(slug) ?? { cannot: [], who: [] })
 );
 for (const article of available) {
-  cache.set(articleKey(article), distilled.get(article.slug) ?? "");
+  if (!retryFailed.has(article.slug)) {
+    cache.set(articleKey(article), distilled.get(article.slug) ?? "");
+  }
 }
 for (const slug of slugs) {
   cache.set(limitsKey(slug), JSON.stringify(summarised.get(slug)));

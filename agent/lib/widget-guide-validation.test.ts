@@ -1,10 +1,12 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
+  answerWords,
   assertGuideSections,
   assertOwnAnswers,
   frontmatterField,
   plainDashes,
+  shortAnswers,
 } from "./widget-guide-validation.js";
 import {
   PRODUCT_GUIDE,
@@ -97,5 +99,38 @@ test("a section that answers with another article's slug is refused", () => {
   assert.throws(() => assertOwnAnswers(guide), POINTERS);
   assert.doesNotThrow(() =>
     assertOwnAnswers(guide.split("\n").slice(6).join("\n"))
+  );
+});
+
+test("a long article answered in a line is short, and a short article or a full answer is not", () => {
+  // Foreman#274's guide at 30052833: Client Portal came out as "View-only." (ENG-20575).
+  const guide = [
+    "### Client Portal {slug: client-portal}",
+    'Get here: "Client Portal"',
+    "View-only.",
+    "### Voice tone {slug: sca/voice}",
+    "No, text only.",
+    "### Sales Call Analyzer {slug: sca}",
+    'Get here: In the left sidebar, click "Sales Call Analyzer"',
+    "- Upload a recording or paste a transcript of 175 words or more, then",
+    "  read the scores, the summary and the coaching notes for each call.",
+  ].join("\n");
+  const long = "x".repeat(2000);
+  assert.deepEqual(
+    shortAnswers(guide, [
+      { slug: "client-portal", text: long },
+      { slug: "sca/voice", text: "Text only." },
+      { slug: "sca", text: long },
+      { slug: "missing", text: long },
+    ]),
+    ["client-portal", "missing"]
+  );
+  assert.deepEqual(
+    [...answerWords(guide)],
+    [
+      ["client-portal", 1],
+      ["sca/voice", 3],
+      ["sca", 26],
+    ]
   );
 });
