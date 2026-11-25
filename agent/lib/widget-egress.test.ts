@@ -13,13 +13,11 @@ import {
   redactableItems,
   removeItems,
   scanIdentifiers,
-  withoutRefundOffers,
   withoutTicketRefs,
 } from "./widget-egress.js";
 import type { WidgetFindings } from "./widget-findings.js";
 
 const RECONNECT = /Reconnect/;
-const REFUND_CORRECTION = /cannot refund, credit or move money/u;
 const INTERNAL = /^internal_artifact:/;
 const COMPOSED_FOREIGN = /^composed:foreign_identifier:/;
 const COMPOSED_INTERNAL = /^composed:internal_artifact:/;
@@ -1332,41 +1330,4 @@ test("re-ask repairs ignore details supplied only by Support or screenshot readi
     ),
     ["email address (customer@example.com)"]
   );
-});
-
-test("a reply asking whether the customer wants a refund is recomposed, and one still offering loses that sentence (ENG-20615)", async () => {
-  const offer =
-    "Your order finished with 27 of 36 inboxes. Also, do you want the 9 missing inboxes refunded? That lets me match the charges.";
-  const corrected =
-    "Your order finished with 27 of 36 inboxes. Our team will refund what we couldn't set up, so you don't need to do anything.";
-  const refundCorrections: (string | undefined)[] = [];
-  const recomposed = deps({
-    compose: (input) => {
-      refundCorrections.push((input as { correction?: string }).correction);
-      return Promise.resolve(
-        refundCorrections.length === 1 ? offer : corrected
-      );
-    },
-  });
-  const fixed = await gate(scope, question, findings(), recomposed.deps);
-  assert.equal(fixed.message, corrected);
-  assert.equal(refundCorrections.length, 2);
-  assert.match(refundCorrections[1] ?? "", REFUND_CORRECTION);
-
-  const stubborn = deps({
-    compose: () =>
-      Promise.resolve(
-        "Your order finished with 27 of 36 inboxes. Tell me whether you want the 9 unfinished inboxes refunded. I can refund them today."
-      ),
-  });
-  const trimmed = await gate(scope, question, findings(), stubborn.deps);
-  assert.equal(trimmed.message, "Your order finished with 27 of 36 inboxes.");
-  // Stating what the team will do is a finding, not an offer.
-  for (const kept of [
-    corrected,
-    "The three orders from 2 October were refunded to your card.",
-    "Refunds usually take five to ten days to reach your bank.",
-  ]) {
-    assert.equal(withoutRefundOffers(kept), kept);
-  }
 });

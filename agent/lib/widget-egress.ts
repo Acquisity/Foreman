@@ -19,6 +19,10 @@ import {
   customerMessages,
   WIDGET_VOICE,
 } from "./widget-instructions.js";
+import {
+  NO_REFUND_OFFER_CORRECTION,
+  withoutRefundOffers,
+} from "./widget-refund-offer.js";
 import { judgeBudgetMs, LIMITATION_POLICY } from "./widget-review.js";
 import { RECORDING_RULE } from "./widget-router.js";
 import type { WidgetContext } from "./widget-scope.js";
@@ -594,23 +598,6 @@ const NO_TICKET_CORRECTION =
   "No ticket was filed and nothing was reported or passed on to anyone. Rewrite the reply without saying or suggesting that it was reported, filed, escalated or passed to engineering, billing or a person.";
 
 /**
- * A sentence asking the customer whether they want a refund, or offering to
- * make one. The chat moves no money, so a "yes" reaches nobody (ENG-20615:
- * "Also, do you want the 9 missing inboxes refunded?"). The gate recomposes
- * once with NO_REFUND_OFFER_CORRECTION and then deletes any such sentence left.
- * "Our team will refund what we couldn't set up" states a finding and is kept.
- */
-const REFUND_OFFER =
-  /[^.!?\n]*(?:\b(?:do|would|did) you (?:still )?(?:want|like|prefer)\b[^.!?\n]{0,80}?\brefund|\b(?:tell me|let me know|confirm)\b[^.!?\n]{0,40}?\b(?:whether|if) you(?:'|’)?d? (?:still )?(?:want|like)\b[^.!?\n]{0,80}?\brefund|\b(?:shall|should|can|could|may) I\b[^.!?\n]{0,60}?\brefund|\bI(?:'|’)ll\b[^.!?\n]{0,40}?\brefund|\bI can\b[^.!?\n]{0,40}?\brefund)[^.!?\n]*[.!?]?/giu;
-export const withoutRefundOffers = (text: string) =>
-  text
-    .replace(REFUND_OFFER, "")
-    .replace(/[ \t]{2,}/gu, " ")
-    .trim();
-const NO_REFUND_OFFER_CORRECTION =
-  "You cannot refund, credit or move money, and nobody acts on a customer's answer here. Rewrite the reply without asking whether the customer wants a refund and without offering one. When the findings say the team will refund something, say that as the finding it is and that they don't need to do anything.";
-
-/**
  * Details the conversation already holds, by the words a request for each uses.
  * Round 16 re-asked the dates (wrun ...MAF4Z47), the balance (...N35DNCX), the
  * address (...GGP3SS) and the amount and date (...R4N3DC). Each request came
@@ -868,24 +855,23 @@ async function composedReply(
       await compose(correction ? { ...input, correction } : input),
       input.askedForChange === true
     );
-  const message = await reply();
+  // Each repair feeds the next check, so a recomposed reply is checked again.
+  const settle = (text: string) =>
+    ticketFiled ? text : withoutTicketClaims(text);
+  let message = await reply();
   if (!ticketFiled && withoutTicketClaims(message) !== message) {
-    return withoutTicketClaims(await reply(NO_TICKET_CORRECTION));
+    message = settle(await reply(NO_TICKET_CORRECTION));
   }
   const given = reaskedDetails(message, input.question);
-  const settled =
-    given.length === 0
-      ? message
-      : ((again: string) => (ticketFiled ? again : withoutTicketClaims(again)))(
-          await reply(reaskCorrection(given))
-        );
-  if (withoutRefundOffers(settled) === settled) {
-    return settled;
+  if (given.length > 0) {
+    message = settle(await reply(reaskCorrection(given)));
   }
-  const recomposed = await reply(NO_REFUND_OFFER_CORRECTION);
-  return withoutRefundOffers(
-    ticketFiled ? recomposed : withoutTicketClaims(recomposed)
-  );
+  if (withoutRefundOffers(message) !== message) {
+    message = withoutRefundOffers(
+      settle(await reply(NO_REFUND_OFFER_CORRECTION))
+    );
+  }
+  return message;
 }
 
 /** Deterministic identifier check, then the model gate, then the composer. Every failure blocks. */
