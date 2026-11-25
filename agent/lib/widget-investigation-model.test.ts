@@ -12,6 +12,11 @@ import { z } from "zod";
 import { composePrompt } from "./prompts.js";
 import { sessionLane } from "./session-lane.js";
 import { verifiedWidgetContext as scope } from "./widget.fixture.js";
+import {
+  ENDPOINT_TOOL_NAMES,
+  LEGACY_TOOL_AREAS,
+  legacyToolOffered,
+} from "./widget-endpoint-tools.js";
 import { widgetInvestigationMiddleware } from "./widget-investigation-model.js";
 import { widgetNextActionMiddleware } from "./widget-next-action.js";
 import { PRODUCT_GUIDE } from "./widget-product-guide.js";
@@ -64,12 +69,12 @@ describe("widget support investigation model boundary", () => {
       tools: [
         {
           inputSchema: { type: "object" },
-          name: "widget_outreach_health",
+          name: "widget_campaigns",
           type: "function",
         },
         {
           inputSchema: { type: "object" },
-          name: "widget_billing_summary",
+          name: "widget_billing",
           type: "function",
         },
         {
@@ -92,9 +97,39 @@ describe("widget support investigation model boundary", () => {
     });
     assert.deepEqual(
       base.doGenerateCalls[0]?.tools?.map((entry) => entry.name),
-      ["widget_outreach_health", "widget_billing_summary", "widget_file_ticket"]
+      ["widget_campaigns", "widget_billing", "widget_file_ticket"]
     );
     assert.equal(base.doGenerateCalls[0]?.toolChoice, undefined);
+  });
+
+  it("offers each old area tool exactly while its area is held (ENG-20609)", async () => {
+    const base = new MockLanguageModelV4({
+      doGenerate: {
+        content: [{ text: "ok", type: "text" }],
+        finishReason: { raw: "stop", unified: "stop" },
+        usage,
+        warnings: [],
+      },
+    });
+    const model = wrapLanguageModel({
+      middleware: widgetInvestigationMiddleware(),
+      model: base,
+    });
+    const legacy = Object.keys(LEGACY_TOOL_AREAS);
+    await model.doGenerate({
+      prompt: [],
+      tools: legacy.map((name) => ({
+        inputSchema: { type: "object" as const },
+        name,
+        type: "function" as const,
+      })),
+    });
+    assert.deepEqual(
+      base.doGenerateCalls[0]?.tools?.map((entry) => entry.name),
+      legacy.filter(
+        (name) => legacyToolOffered(name) || ENDPOINT_TOOL_NAMES.has(name)
+      )
+    );
   });
 
   for (const name of [
@@ -134,7 +169,7 @@ describe("widget support investigation model boundary", () => {
   }
 
   it("keeps the tools listed and unforced at every point of this turn's budget, counted across steps", async () => {
-    const call = { toolName: "widget_sdr_thread_status", type: "tool-call" };
+    const call = { toolName: "widget_ai_sdr", type: "tool-call" };
     const calls = (count: number) => ({
       content: Array.from({ length: count }, () => call),
       role: "assistant",
@@ -149,7 +184,7 @@ describe("widget support investigation model boundary", () => {
             tools: [
               {
                 inputSchema: { type: "object" },
-                name: "widget_outreach_health",
+                name: "widget_campaigns",
                 type: "function",
               },
             ],
@@ -175,7 +210,7 @@ describe("widget support investigation model boundary", () => {
 
   it("drops the calls of a parallel batch that would pass the budget, before the SDK runs them", async () => {
     const batch = Array.from({ length: 4 }, (_, n) => ({
-      ...toolCall("widget_outreach_health"),
+      ...toolCall("widget_campaigns"),
       toolCallId: `call-${n}`,
     }));
     const generated = await widgetInvestigationMiddleware().wrapGenerate?.({
@@ -203,7 +238,7 @@ for (const mode of ["generate", "stream"] as const) {
     const lines: string[] = [];
     t.mock.method(console, "info", (line: string) => lines.push(line));
     const names = [
-      "widget_outreach_health",
+      "widget_campaigns",
       "widget_help_article",
       "widget_read_help_article",
       "widget_help_article",
@@ -232,14 +267,14 @@ for (const mode of ["generate", "stream"] as const) {
         },
         {
           content: Array.from({ length: 12 }, (_, n) => ({
-            ...toolCall("widget_outreach_health"),
+            ...toolCall("widget_campaigns"),
             input: {},
             toolCallId: `old${n}`,
           })),
           role: "assistant" as const,
         },
       ],
-      toolChoice: { toolName: "widget_outreach_health", type: "tool" as const },
+      toolChoice: { toolName: "widget_campaigns", type: "tool" as const },
       tools: names.slice(0, 3).map((name) => ({
         inputSchema: { type: "object" },
         name,
@@ -280,7 +315,7 @@ for (const mode of ["generate", "stream"] as const) {
 
 for (const mode of ["generate", "stream"] as const) {
   it(`${mode}: keeps the ticket tool after the workspace reads run out, until the budget is spent`, async () => {
-    const names = ["widget_outreach_health", "widget_file_ticket"];
+    const names = ["widget_campaigns", "widget_file_ticket"];
     const base = new MockLanguageModelV4({
       doGenerate: {
         ...result("x"),
@@ -305,7 +340,7 @@ for (const mode of ["generate", "stream"] as const) {
         },
         {
           content: Array.from({ length: used }, (_, n) => ({
-            ...toolCall("widget_billing_summary"),
+            ...toolCall("widget_billing"),
             input: {},
             toolCallId: `old${n}`,
           })),
@@ -361,7 +396,7 @@ for (const mode of ["generate", "stream"] as const) {
       return now;
     });
     const base = new MockLanguageModelV4({
-      doGenerate: result("widget_inbox_health"),
+      doGenerate: result("widget_inboxes"),
     });
     const model = wrapLanguageModel({
       middleware: [
@@ -391,7 +426,7 @@ for (const mode of ["generate", "stream"] as const) {
       .filter((line) => line.event === "widget.investigation.model_call");
     assert.equal(logged.length, 1);
     assert.equal(logged[0].sessionId, "wrun_test");
-    assert.equal(logged[0].tool, "widget_inbox_health");
+    assert.equal(logged[0].tool, "widget_inboxes");
     assert.match(logged[0].message, TIMED_FROM_MOCK);
   });
 }
@@ -503,7 +538,7 @@ for (const mode of ["generate", "stream"] as const) {
         },
         {
           content: Array.from({ length: 14 }, (_, n) => ({
-            ...toolCall("widget_billing_summary"),
+            ...toolCall("widget_billing"),
             input: {},
             toolCallId: `old${n}`,
           })),
@@ -541,8 +576,8 @@ describe("what the CLI Proxy receives for a widget investigation", () => {
   // message, and the last message and last assistant message carry a marker.
   const MARK = { anthropic: { cacheControl: { type: "ephemeral" } } } as const;
   const LISTED = [
-    "widget_account_access",
-    "widget_billing_summary",
+    "widget_account",
+    "widget_billing",
     "widget_file_ticket",
     "widget_help_article",
     "widget_read_help_article",
@@ -555,8 +590,8 @@ describe("what the CLI Proxy receives for a widget investigation", () => {
     ...(n === all.length - 1 ? { providerOptions: MARK } : {}),
   }));
   const READS = [
-    "widget_billing_summary",
-    "widget_account_access",
+    "widget_billing",
+    "widget_account",
     "widget_read_help_article",
   ];
   const eveParams = (userId: string, reads: number, question: string) => {
@@ -692,7 +727,7 @@ describe("what the CLI Proxy receives for a widget investigation", () => {
       questions.map(async (question) => {
         const bodies = await session(
           A,
-          ["widget_billing_summary", "finish"],
+          ["widget_billing", "finish"],
           [0, 1],
           question
         );
@@ -713,7 +748,7 @@ describe("what the CLI Proxy receives for a widget investigation", () => {
     // before the finish on the main model.
     const bodies = await session(
       A,
-      ["widget_billing_summary", "widget_account_access", "finish"],
+      ["widget_billing", "widget_account", "finish"],
       [0, 1, 2, 3]
     );
     assert.deepEqual(
@@ -737,7 +772,7 @@ describe("what the CLI Proxy receives for a widget investigation", () => {
   it("asks for at most four cache breakpoints, none of them on a tool", async () => {
     const bodies = await session(
       A,
-      ["widget_billing_summary", "widget_account_access", "finish"],
+      ["widget_billing", "widget_account", "finish"],
       [0, 1, 2, 3]
     );
     for (const body of bodies) {
@@ -758,7 +793,7 @@ describe("what the CLI Proxy receives for a widget investigation", () => {
       // biome-ignore lint/performance/noAwaitInLoops: compare consecutive steps of each session.
       const bodies = await session(
         userId,
-        ["widget_billing_summary", "widget_account_access", "finish"],
+        ["widget_billing", "widget_account", "finish"],
         [0, 1, 2, 3],
         question
       );

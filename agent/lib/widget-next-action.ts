@@ -3,7 +3,8 @@ import type { LanguageModelMiddleware, wrapLanguageModel } from "ai";
 import { z } from "zod";
 import { logOpsEvent } from "./ops-log.js";
 import { GAP_TOOL } from "./widget-capability-gaps.js";
-import { customerMessages, withoutGuide } from "./widget-instructions.js";
+import { withoutGuide } from "./widget-instructions.js";
+import { ruledTicket } from "./widget-ticket-rules.js";
 
 /**
  * Preview pilot: at the first investigation step and after results, Jev picks the
@@ -612,68 +613,6 @@ const outcomeOf = (decision: string, detail: string) => {
     : "jev";
 };
 
-/** The customer asks for money back or disputes a charge, in their own words. */
-const DISPUTE =
-  /\b(?:refund\w*|reimburs\w*|money back|charge ?back|disput\w*|over-?(?:charg|invoic|bill)\w*|charged (?:me )?twice|double[- ]charg\w*)/iu;
-
-/**
- * The ticket the reads already settle, decided in code before Jev is asked.
- * Jev picked `ticket` 2 times in 60 live runs and missed both clear cases
- * (ENG-15044 round 15): wrun ...MAF4Z47, a refund ask whose billing reading
- * names the inbox charges billed while broken, where it asked which domains;
- * and wrun ...4W6NAN, follow-ups sent days before their delay. A tool marks
- * those readings with a field (`identifiesCharge`, `platformFault`), never text.
- */
-export function ruledTicket(
-  question: string,
-  reads: Pick<Read, "result" | "tool">[]
-): "billing" | "fault" | null {
-  const results = reads.map((read) => {
-    const result = parsed(read.result) as {
-      type?: string;
-      value?: unknown;
-    } | null;
-    return {
-      output: result?.type === "json" ? result.value : result,
-      tool: read.tool,
-    };
-  });
-  if (
-    results.some(
-      ({ tool, output }) =>
-        tool === "widget_outreach_health" &&
-        (
-          output as {
-            campaigns?: {
-              diagnostics?: {
-                earlyFollowUps?: { platformFault?: boolean } | null;
-              } | null;
-            }[];
-          } | null
-        )?.campaigns?.some(
-          (campaign) =>
-            campaign.diagnostics?.earlyFollowUps?.platformFault === true
-        )
-    )
-  ) {
-    return "fault";
-  }
-  // The latest message only: an earlier turn's dispute already had its ticket.
-  return DISPUTE.test(
-    customerMessages(
-      question.slice(0, CONVERSATION_CHARS).split("\nEARLIER TURNS (")[0] ?? ""
-    )
-  ) &&
-    results.some(
-      ({ tool, output }) =>
-        tool === "widget_billing_summary" &&
-        (output as { identifiesCharge?: boolean } | null)?.identifiesCharge ===
-          true
-    )
-    ? "billing"
-    : null;
-}
-
 interface Plan {
   original: Params;
   reads: Read[];
@@ -890,7 +829,9 @@ export function widgetNextActionMiddleware(
     question: string,
     reads: Read[]
   ): Params | null => {
-    const kind = canFile(params, reads) && ruledTicket(question, reads);
+    const kind =
+      canFile(params, reads) &&
+      ruledTicket(question.slice(0, CONVERSATION_CHARS), reads);
     if (!kind) {
       return null;
     }

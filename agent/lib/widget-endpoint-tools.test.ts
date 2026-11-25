@@ -15,9 +15,12 @@ import {
   endpointToolNames,
   endpointToolSet,
   HELD_AREAS,
+  LEGACY_TOOL_AREAS,
+  legacyToolOffered,
   offeredEndpointTools,
 } from "./widget-endpoint-tools.js";
 import { widgetInvestigationMiddleware } from "./widget-investigation-model.js";
+import { judgeToolCapabilities } from "./widget-judge-tools.js";
 import {
   stampedWidgetAttributes,
   widgetAuth,
@@ -25,8 +28,9 @@ import {
 } from "./widget-scope.js";
 
 // Acquisity's serializeForemanManifest() output for two scratch definitions,
-// measured with apps/web/scripts/print-foreman-manifest.mjs (lead-pipeline is
-// held in Foreman, so the offered ones are the scratch areas).
+// measured with apps/web/scripts/print-foreman-manifest.mjs. These tests hold
+// lead-pipeline themselves (FIXTURE_HELD), whatever the rollout has switched,
+// so the offered ones are the scratch areas.
 const inputs = {
   $schema: "https://json-schema.org/draft/2020-12/schema",
   additionalProperties: false,
@@ -99,6 +103,7 @@ const manifest = endpointManifestSchema.parse({
   ],
   formatVersion: 1,
 });
+const FIXTURE_HELD: ReadonlySet<string> = new Set(["lead-pipeline"]);
 const listed = (name: string, version: number, sections: string[]) => ({
   name,
   path: `/api/internal/foreman/${name}${version > 1 ? `/v${version}` : ""}`,
@@ -111,8 +116,8 @@ test("the committed manifest is a valid generated manifest", () => {
 });
 
 test("a session with no endpoint list is offered no endpoint tools", () => {
-  assert.deepEqual(offeredEndpointTools(undefined, manifest), []);
-  assert.deepEqual(offeredEndpointTools([], manifest), []);
+  assert.deepEqual(offeredEndpointTools(undefined, manifest, FIXTURE_HELD), []);
+  assert.deepEqual(offeredEndpointTools([], manifest, FIXTURE_HELD), []);
 });
 
 test("only listed, unheld endpoints are offered, at the highest listed version, with only the listed sections", () => {
@@ -122,7 +127,8 @@ test("only listed, unheld endpoints are offered, at the highest listed version, 
       listed("scratch-area", 1, ["domains"]),
       listed("owned-identifiers", 1, []),
     ],
-    manifest
+    manifest,
+    FIXTURE_HELD
   );
   assert.deepEqual(
     offered.map(({ name, path, version }) => ({ name, path, version })),
@@ -148,7 +154,8 @@ test("only listed, unheld endpoints are offered, at the highest listed version, 
       listed("scratch-area", 2, ["domains", "myDay"]),
       listed("scratch-area", 1, ["domains"]),
     ],
-    manifest
+    manifest,
+    FIXTURE_HELD
   );
   assert.deepEqual(
     both.map(({ path }) => path),
@@ -172,13 +179,13 @@ test("a session gets one tool per offered endpoint, and none outside the widget 
     ...verifiedWidgetContext,
     endpoints: [listed("scratch-area", 2, ["domains"])],
   });
-  const set = endpointToolSet(listedAuth, manifest);
+  const set = endpointToolSet(listedAuth, manifest, FIXTURE_HELD);
   assert.deepEqual(Object.keys(set ?? {}), ["widget_scratch_area"]);
   assert.equal(
-    endpointToolSet(widgetAuth(verifiedWidgetContext), manifest),
+    endpointToolSet(widgetAuth(verifiedWidgetContext), manifest, FIXTURE_HELD),
     null
   );
-  assert.equal(endpointToolSet(null, manifest), null);
+  assert.equal(endpointToolSet(null, manifest, FIXTURE_HELD), null);
   // Listed, but its only manifest entry at that path is a held area.
   assert.equal(
     endpointToolSet(
@@ -186,7 +193,8 @@ test("a session gets one tool per offered endpoint, and none outside the widget 
         ...verifiedWidgetContext,
         endpoints: [listed("lead-pipeline", 1, ["sources"])],
       }),
-      manifest
+      manifest,
+      FIXTURE_HELD
     ),
     null
   );
@@ -440,5 +448,134 @@ test("no offered endpoint tool shares its name with a hand-written tool", () => 
   assert.deepEqual(
     [...new Set(offeredClashes(unheld, ["widget_account.ts", "other.ts"]))],
     ["widget_account"]
+  );
+});
+
+// ENG-20609: one switch decision. Taking an area out of HELD_AREAS offers its
+// endpoint tool and takes its old tool off, with nothing else to edit.
+const AREAS = [
+  ...new Set(
+    WIDGET_ENDPOINT_MANIFEST.endpoints
+      .map(({ name }) => name)
+      .filter((name) => !CODE_ONLY_AREAS.has(name))
+  ),
+];
+const ALL_LISTED = WIDGET_ENDPOINT_MANIFEST.endpoints.map((entry) => ({
+  name: entry.name,
+  path: entry.path,
+  sections: entry.sections.map((section) => section.name),
+  version: entry.version,
+}));
+const HELD_STATES: [string, ReadonlySet<string>][] = [
+  ["every area held", new Set(AREAS)],
+  ["every area switched", new Set()],
+  ["the rollout today", HELD_AREAS],
+  ...AREAS.map((area): [string, ReadonlySet<string>] => [
+    `only ${area} switched`,
+    new Set(AREAS.filter((other) => other !== area)),
+  ]),
+];
+
+test("held and legacy areas are the manifest's own areas", () => {
+  for (const area of HELD_AREAS) {
+    assert.ok(AREAS.includes(area), area);
+  }
+  for (const areas of Object.values(LEGACY_TOOL_AREAS)) {
+    for (const area of areas) {
+      assert.ok(AREAS.includes(area), area);
+    }
+  }
+  assert.deepEqual(
+    AREAS.filter(
+      (area) =>
+        !Object.values(LEGACY_TOOL_AREAS).some((areas) => areas.includes(area))
+    ),
+    []
+  );
+});
+
+for (const [label, held] of HELD_STATES) {
+  test(`${label}: an area offers its endpoint tool exactly when switched, and its old tools exactly while held`, () => {
+    const offered = new Set(
+      offeredEndpointTools(ALL_LISTED, WIDGET_ENDPOINT_MANIFEST, held).map(
+        ({ name }) => name
+      )
+    );
+    for (const area of AREAS) {
+      assert.equal(offered.has(endpointToolName(area)), !held.has(area), area);
+    }
+    for (const [legacy, areas] of Object.entries(LEGACY_TOOL_AREAS)) {
+      assert.equal(
+        legacyToolOffered(legacy, held),
+        areas.some((area) => held.has(area)),
+        legacy
+      );
+    }
+    // The judge sees exactly what the lane offers: no old tool past its area's
+    // switch, every switched endpoint, and no name twice.
+    const judged = judgeToolCapabilities(ALL_LISTED, held).map(
+      ({ name }) => name
+    );
+    assert.equal(new Set(judged).size, judged.length);
+    for (const area of AREAS) {
+      const name = endpointToolName(area);
+      // CRM contact's old tool shares its endpoint tool's name (ENG-20528).
+      assert.equal(
+        judged.includes(name),
+        !held.has(area) ||
+          (name in LEGACY_TOOL_AREAS && legacyToolOffered(name, held)),
+        area
+      );
+    }
+    for (const legacy of Object.keys(LEGACY_TOOL_AREAS)) {
+      if (!(legacyToolOffered(legacy, held) || offered.has(legacy))) {
+        assert.equal(judged.includes(legacy), false, legacy);
+      }
+    }
+  });
+}
+
+test("job failures stays on the lane until orders, lead pipeline and AI generation have all switched", () => {
+  const offered = (held: string[]) =>
+    legacyToolOffered("widget_job_failures", new Set(held));
+  assert.equal(offered(["orders"]), true);
+  assert.equal(offered(["lead-pipeline"]), true);
+  assert.equal(offered(["ai-generation"]), true);
+  assert.equal(offered(["billing", "campaigns"]), false);
+  // A tool that answers for no area is never an area's to take off.
+  assert.equal(legacyToolOffered("widget_help_article", new Set()), true);
+});
+
+test("the judge is given only the endpoint tools the case's own endpoint list offered", () => {
+  const none = new Set<string>();
+  assert.deepEqual(
+    judgeToolCapabilities(undefined, none).filter(({ name }) =>
+      AREAS.some((area) => endpointToolName(area) === name)
+    ),
+    []
+  );
+  const orders = WIDGET_ENDPOINT_MANIFEST.endpoints.find(
+    ({ name }) => name === "orders"
+  );
+  assert.ok(orders && orders.sections.length > 1);
+  const [kept, dropped] = orders.sections;
+  const judged = judgeToolCapabilities(
+    [
+      {
+        name: "orders",
+        path: orders.path,
+        sections: [kept.name],
+        version: orders.version,
+      },
+    ],
+    none
+  );
+  const ordersTool = judged.find(({ name }) => name === "widget_orders");
+  assert.ok(ordersTool);
+  assert.ok(ordersTool.description.includes(`- ${kept.name}: `));
+  assert.equal(ordersTool.description.includes(`- ${dropped.name}: `), false);
+  assert.equal(
+    judged.some(({ name }) => name === "widget_billing"),
+    false
   );
 });

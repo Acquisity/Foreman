@@ -22,7 +22,7 @@ const usage = {
   inputTokens: { cacheRead: 0, cacheWrite: 0, noCache: 1, total: 1 },
   outputTokens: { reasoning: 0, text: 1, total: 1 },
 };
-const TOOLS = ["widget_outreach_health", "widget_inbox_health"].map((name) => ({
+const TOOLS = ["widget_campaigns", "widget_inboxes"].map((name) => ({
   description: `Reads ${name}`,
   inputSchema: { type: "object" as const },
   name,
@@ -89,7 +89,7 @@ async function selector(latest: string, history: Turn[], choice = "finish") {
           {
             input: {},
             toolCallId: "c",
-            toolName: "widget_outreach_health",
+            toolName: "widget_campaigns",
             type: "tool-call",
           },
         ],
@@ -103,7 +103,7 @@ async function selector(latest: string, history: Turn[], choice = "finish") {
               value: { campaigns: ["Spring Promo", "Autumn Promo"] },
             },
             toolCallId: "c",
-            toolName: "widget_outreach_health",
+            toolName: "widget_campaigns",
             type: "tool-result",
           },
         ],
@@ -239,10 +239,10 @@ test("an identifier from another workspace in the conversation widens nothing: t
   const { conversation, sent } = await selector(
     `check workspace ${foreign} as well`,
     [{ role: "customer", text: `my other org is ${foreign}` }],
-    "widget_inbox_health"
+    "widget_inboxes"
   );
   assert.deepEqual(sent.toolChoice, {
-    toolName: "widget_inbox_health",
+    toolName: "widget_inboxes",
     type: "tool",
   });
   // The selector is given the customer's words only; the verified scope is not

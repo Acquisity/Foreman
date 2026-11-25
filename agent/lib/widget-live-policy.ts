@@ -116,6 +116,18 @@ const datedInput = z.object({
 });
 
 export function hasMovingWindow(tool: string, input: unknown) {
+  // The billing endpoint's creditWindow counts days back from now, so every
+  // re-read of it covers a different window.
+  if (tool === "widget_billing") {
+    return true;
+  }
+  if (tool === "widget_campaigns") {
+    const { endDate, startDate } = (input ?? {}) as {
+      endDate?: unknown;
+      startDate?: unknown;
+    };
+    return !(startDate && endDate);
+  }
   if (tool !== "widget_billing_summary" && tool !== "widget_outreach_health") {
     return false;
   }
@@ -135,7 +147,14 @@ export function pinLiveInput(
   input: unknown,
   sentAt: string | undefined
 ): unknown {
-  if (!hasMovingWindow(tool, input)) {
+  // Only the hand-written tools pin their own input; an endpoint tool's window is not pinned.
+  if (
+    !(
+      (tool === "widget_billing_summary" ||
+        tool === "widget_outreach_health") &&
+      hasMovingWindow(tool, input)
+    )
+  ) {
     return input;
   }
   const date = z.iso.datetime().parse(sentAt);

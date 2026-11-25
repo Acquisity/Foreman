@@ -26,9 +26,11 @@ import {
 } from "./widget-scope.js";
 
 /**
- * Areas whose hand-written tool still answers. Each stays off the menu until
- * its switch PR compares the two on real conversations and deletes the old
- * tool; an area missing here is offered as soon as the manifest has it.
+ * Areas whose hand-written tool still answers. Each switch PR (ENG-20534 and
+ * its siblings) takes its area out of this list, which offers the area's
+ * endpoint tool and takes its old tool off the lane (LEGACY_TOOL_AREAS); the
+ * old file stays until the cleanup (ENG-20544). An area missing here is
+ * offered as soon as the manifest has it.
  */
 export const HELD_AREAS: ReadonlySet<string> = new Set([
   "account",
@@ -42,6 +44,31 @@ export const HELD_AREAS: ReadonlySet<string> = new Set([
   "orders",
   "website",
 ]);
+/**
+ * The hand-written widget tools an endpoint area replaces, and the areas each
+ * answers for. Job failures covers three areas, so it stays until all three
+ * have switched.
+ */
+export const LEGACY_TOOL_AREAS: Readonly<Record<string, readonly string[]>> = {
+  widget_account_access: ["account"],
+  widget_billing_summary: ["billing"],
+  widget_crm_contact: ["crm-contact"],
+  widget_generation_diagnostics: ["ai-generation"],
+  widget_inbox_health: ["inboxes"],
+  widget_job_failures: ["orders", "lead-pipeline", "ai-generation"],
+  widget_lead_pipeline_status: ["lead-pipeline"],
+  widget_outreach_health: ["campaigns"],
+  widget_provisioning_status: ["orders"],
+  widget_sdr_thread_status: ["ai-sdr"],
+  widget_website_status: ["website"],
+};
+
+/** A hand-written tool is offered while an area it answers for is held; any other tool is not an area's. */
+export const legacyToolOffered = (
+  tool: string,
+  held: ReadonlySet<string> = HELD_AREAS
+) => LEGACY_TOOL_AREAS[tool]?.some((area) => held.has(area)) ?? true;
+
 /** Endpoints Foreman's own code calls, never offered to the model. */
 export const CODE_ONLY_AREAS: ReadonlySet<string> = new Set([
   "owned-identifiers",
@@ -120,11 +147,12 @@ export interface EndpointTool {
  */
 export function offeredEndpointTools(
   available: readonly AvailableEndpoint[] | undefined,
-  manifest: EndpointManifest = WIDGET_ENDPOINT_MANIFEST
+  manifest: EndpointManifest = WIDGET_ENDPOINT_MANIFEST,
+  held: ReadonlySet<string> = HELD_AREAS
 ): EndpointTool[] {
   const chosen = new Map<string, EndpointTool>();
   for (const entry of manifest.endpoints) {
-    if (HELD_AREAS.has(entry.name) || CODE_ONLY_AREAS.has(entry.name)) {
+    if (held.has(entry.name) || CODE_ONLY_AREAS.has(entry.name)) {
       continue;
     }
     const listed = available?.find(
@@ -209,11 +237,13 @@ export async function callWidgetEndpoint(
  */
 export function endpointToolSet(
   initiator: SessionAuthContext | null,
-  manifest: EndpointManifest = WIDGET_ENDPOINT_MANIFEST
+  manifest: EndpointManifest = WIDGET_ENDPOINT_MANIFEST,
+  held: ReadonlySet<string> = HELD_AREAS
 ) {
   const offered = offeredEndpointTools(
     widgetContext(initiator)?.endpoints,
-    manifest
+    manifest,
+    held
   );
   if (offered.length === 0) {
     return null;

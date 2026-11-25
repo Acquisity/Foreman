@@ -142,6 +142,38 @@ const hasDropped = (value: unknown): boolean =>
     typeof value === "object" &&
     Object.values(value as object).some(hasDropped));
 
+/**
+ * An endpoint body as its sections, with each section it lists in
+ * `unavailable` marked dropped, so a section that could not be read on one
+ * side is pruned from both instead of counted as movement. Any other output
+ * is compared as it is.
+ */
+const comparedOutput = (output: unknown): unknown => {
+  const body = output as {
+    sections?: unknown;
+    unavailable?: unknown;
+  } | null;
+  if (
+    !(
+      body?.sections &&
+      typeof body.sections === "object" &&
+      Array.isArray(body.unavailable)
+    )
+  ) {
+    return output;
+  }
+  const sections: Record<string, unknown> = {
+    ...(body.sections as Record<string, unknown>),
+  };
+  for (const entry of body.unavailable) {
+    const name = (entry as { section?: unknown } | null)?.section;
+    if (typeof name === "string") {
+      sections[name] = { available: false };
+    }
+  }
+  return sections;
+};
+
 export function driftVerdict(
   reads: readonly { recorded: ReadResult; reread: ReadResult; tool: string }[]
 ) {
@@ -155,10 +187,12 @@ export function driftVerdict(
       continue;
     }
     compared += 1;
-    if (!sameState(read.recorded.output, read.reread.output)) {
+    const recorded = comparedOutput(read.recorded.output);
+    const reread = comparedOutput(read.reread.output);
+    if (!sameState(recorded, reread)) {
       changed.push(read.tool);
     }
-    if (hasDropped(read.recorded.output) || hasDropped(read.reread.output)) {
+    if (hasDropped(recorded) || hasDropped(reread)) {
       partial.push(read.tool);
     }
   }
