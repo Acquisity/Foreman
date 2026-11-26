@@ -5,10 +5,7 @@ import {
 } from "ai";
 import { logOpsEvent } from "./ops-log.js";
 import { ticketLinkedModel } from "./ticket-link-model.js";
-import {
-  ENDPOINT_TOOL_NAMES,
-  legacyToolOffered,
-} from "./widget-endpoint-tools.js";
+import { ENDPOINT_TOOL_NAMES } from "./widget-endpoint-tools.js";
 import { cacheGuide } from "./widget-instructions.js";
 import {
   LATE_TOOLS,
@@ -22,44 +19,30 @@ import {
 } from "./widget-next-action.js";
 
 /**
- * Read-only, org-scoped evidence for the in-app support lane: only the curated
- * widget_* tools, each returning a structured, bounded, org-locked object.
- * The raw exploratory tools (planetscale_execute_read_query, widget_provider,
- * describe_table) are deliberately excluded so the model cannot write its own
- * SQL or wander. No web, browser, sandbox, repo, memory, or delegation. The one
- * write is widget_file_ticket, whose target and scope come from the session;
- * report_capability_gap only records a gap, which Foreman's code files.
+ * Read-only, org-scoped evidence for the in-app support lane: the generated
+ * endpoint tools (ENG-20296), each answering for the asking workspace only, and
+ * the few hand-written tools below. No raw SQL, provider calls, web, browser,
+ * sandbox, repo, memory, or delegation. The one write is widget_file_ticket,
+ * whose target and scope come from the session; report_capability_gap only
+ * records a gap, which Foreman's code files.
  */
 const ALLOWED_TOOLS = new Set([
-  "widget_account_access",
   // Registered only while the next-action pilot is on, and offered only by its selector.
   "widget_ask_customer",
-  "widget_billing_summary",
-  "widget_crm_contact",
   "widget_file_ticket",
-  "widget_generation_diagnostics",
   "widget_help_article",
-  "widget_inbox_health",
-  "widget_job_failures",
   "widget_known_issues",
-  "widget_lead_pipeline_status",
-  "widget_outreach_health",
-  "widget_provisioning_status",
   "widget_read_help_article",
   // Registered only on a turn that follows up on a screen recording.
   "widget_read_recording",
-  "widget_sdr_thread_status",
   // Records what no tool returns; Foreman's code files the ticket.
   "report_capability_gap",
 ]);
 const BLOCKED = "Support investigation capability is unavailable.";
 
-// Generated endpoint tools (ENG-20296) are only registered for the sessions
-// the context route listed them for. A hand-written area tool leaves the lane
-// once its area has switched to its endpoint.
+// Endpoint tools are only registered for the sessions the context route listed them for.
 const allowed = (name: string) =>
-  (ALLOWED_TOOLS.has(name) && legacyToolOffered(name)) ||
-  ENDPOINT_TOOL_NAMES.has(name);
+  ALLOWED_TOOLS.has(name) || ENDPOINT_TOOL_NAMES.has(name);
 
 const namedTool = (part: { toolName?: unknown }) =>
   typeof part.toolName === "string" && allowed(part.toolName);

@@ -1,13 +1,10 @@
 import { z } from "zod";
-import {
-  collectRows,
-  DATASET_NAME,
-} from "../tools/widget_generation_diagnostics.js";
 import { readRecording } from "../tools/widget_read_recording.js";
 import { invokeProvider, type ProviderContext } from "./executor/dispatch.js";
 import { mcpResultText } from "./executor/mcp-result.js";
 import { logOpsEvent } from "./ops-log.js";
 import { providerData } from "./support/conversation.js";
+import { collectRows, DATASET_NAME } from "./widget-generation-rows.js";
 import {
   INNGEST_READ,
   inngestRunsInput,

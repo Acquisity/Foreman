@@ -41,7 +41,7 @@ function configure(context: TestContext) {
   }
 }
 
-test("a switched area's recorded read is re-issued through its endpoint with the recorded input and the verified scope", async (context) => {
+test("an area's recorded read is re-issued through its endpoint with the recorded input and the verified scope", async (context) => {
   configure(context);
   const body = { sections: {}, status: "ok", unavailable: [] };
   const requests: { body: unknown; url: string }[] = [];
@@ -54,7 +54,7 @@ test("a switched area's recorded read is re-issued through its endpoint with the
     }
   );
   const ctx = ctxFor();
-  const tool = await liveTool("widget_orders", ctx, new Set());
+  const tool = await liveTool("widget_orders", ctx);
   assert.ok(tool);
   const input = { orderId: "11111111-1111-4111-8111-111111111111" };
   assert.deepEqual(await tool.execute(input, ctx), body);
@@ -66,12 +66,8 @@ test("a switched area's recorded read is re-issued through its endpoint with the
   assert.equal(posted.organizationId, verifiedWidgetContext.organizationId);
 });
 
-test("a held area, or an endpoint the recorded scope never listed, is not re-read through an endpoint", async () => {
-  // Held: the generated name has no file of its own, so the re-read fails and is reported unverifiable.
-  await assert.rejects(
-    liveTool("widget_orders", ctxFor(), new Set(["orders"]))
-  );
-  await assert.rejects(liveTool("widget_orders", ctxFor([]), new Set()));
-  // A held area's old tool still resolves from its file.
-  assert.ok(await liveTool("widget_provisioning_status", ctxFor()));
+test("an endpoint the recorded scope never listed is not re-read, and a hand-written tool resolves from its file", async () => {
+  // The generated name has no file of its own, so the re-read fails and is reported unverifiable.
+  await assert.rejects(liveTool("widget_orders", ctxFor([])));
+  assert.ok(await liveTool("widget_known_issues", ctxFor()));
 });

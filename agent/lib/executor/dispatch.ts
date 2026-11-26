@@ -1,7 +1,5 @@
-import { getToken as getConnectToken } from "@vercel/connect";
 import type { ToolContext } from "eve/tools";
 import { z } from "zod";
-import { PRODUCTION_READ_QUERY_ARGS } from "../lookup-customer.js";
 import {
   filingScope,
   isCancellable,
@@ -21,13 +19,11 @@ import {
   type WidgetContext,
 } from "../widget-scope.js";
 import { WIDGET_SCOPE_NOTICE } from "../widget-ticket-marker.js";
-import { executorAuth, laneConnector } from "./auth.js";
-import { operationPath } from "./bindings.js";
+import { executorAuth } from "./auth.js";
 import {
   DISPUTES_TOOLKIT,
   type ExecutorToolkit,
   FOREMAN_TOOLKIT_SLUG,
-  WIDGET_TOOLKIT,
 } from "./endpoint.js";
 import { ExecutorError, executorTransport } from "./transport.js";
 
@@ -168,37 +164,6 @@ const toolkitFor = (
 ): ExecutorToolkit | undefined =>
   policy?.toolkit ??
   (DISPUTE_WRITE_APP.test(path) ? DISPUTES_TOOLKIT : undefined);
-
-/** The widget egress gate runs outside any eve session: one fixed read under the app principal. */
-export async function readWidgetOwnership(
-  query: string,
-  signal: AbortSignal
-): Promise<unknown> {
-  const connector = laneConnector(WIDGET_TOOLKIT);
-  if (!connector) {
-    throw new Error("Support identifier resolution is unavailable.");
-  }
-  const path = operationPath("planetscale.readQuery");
-  // Defense in depth: this app-principal read runs outside any eve session and
-  // its policy/allowlist, so assert the binding still resolves to the expected
-  // planetscale read before dispatching.
-  if (path !== "planetscale-org.planetscale_execute_read_query") {
-    throw new Error("Unexpected ownership operation binding.");
-  }
-  signal.throwIfAborted();
-  const token = await getConnectToken(connector, { subject: { type: "app" } });
-  signal.throwIfAborted();
-  const result = await executorTransport.call(
-    { signal, token, toolkit: WIDGET_TOOLKIT },
-    path,
-    { ...PRODUCTION_READ_QUERY_ARGS, query, use_replica: false },
-    { maxBytes: 64 * 1024, timeoutMs: 50_000 }
-  );
-  if (!result.ok || (result.http && result.http.status !== 200)) {
-    throw new Error("Support identifier resolution is unavailable.");
-  }
-  return result.data;
-}
 
 async function connection(
   ctx: ProviderContext,

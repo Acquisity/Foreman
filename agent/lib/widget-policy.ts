@@ -16,8 +16,8 @@ export function assertWidgetPath(path: string) {
 
 /**
  * The reads widget_read_recording makes of the customer's own screen recording.
- * They stay off WIDGET_PATHS, so widget_provider cannot reach Jam at all, and
- * the policy below allows them only for the recording bound to the session.
+ * They stay off WIDGET_PATHS, and the policy below allows them only for the
+ * recording bound to the session.
  */
 export const RECORDING_READS = {
   consoleErrors: {

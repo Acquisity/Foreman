@@ -436,32 +436,9 @@ test("an id joined to a domain with hyphens is replaced inside the composite", (
 
 const billing = (output: unknown): WidgetCase => {
   const raw = rawCase(output);
-  raw.cassette[0].tool = "widget_billing_summary";
+  raw.cassette[0].tool = "widget_billing";
   return raw;
 };
-
-test("billing catalog names are product labels, not customer names", () => {
-  const saved = JSON.parse(
-    serializeCase(
-      scrubCase(
-        billing({
-          balances: {
-            domains: { feature: { id: "domains", name: "Domains" } },
-            website_credit: {
-              display: { primary_text: "500 Website Credits" },
-              feature: { id: "website_credit", name: "Website Credit" },
-            },
-          },
-          name: "Spring Promo",
-        }),
-        scope
-      )
-    )
-  ).cassette[0].output;
-  assert.equal(saved.balances.domains.feature.name, "Domains");
-  assert.equal(saved.balances.website_credit.feature.name, "Website Credit");
-  assert.match(saved.name, NAME_PLACEHOLDER);
-});
 
 test("a name inside a fixture value is not a leak, but the name elsewhere still is", () => {
   const scrubbed = scrubCase(
@@ -477,7 +454,7 @@ test("a name inside a fixture value is not a leak, but the name elsewhere still 
   assert.throws(() => serializeCase(scrubbed), NOT_SAVED);
 });
 
-test("a catalog spelling used as a name elsewhere, or outside billing, is still replaced", () => {
+test("a catalog spelling is replaced like any other name, in billing output or anywhere else", () => {
   const saved = JSON.parse(
     serializeCase(
       scrubCase(
@@ -531,20 +508,6 @@ test("provider record ids are replaced consistently and never saved", () => {
   const leaked = scrubCase(rawCase({ ok: true }, "Why?"), scope);
   leaked.case.question = `Refund ${payment}`;
   assert.throws(() => serializeCase(leaked), NOT_SAVED);
-});
-
-test("catalog labels inside JSON-encoded billing output are kept too", () => {
-  const saved = JSON.parse(
-    serializeCase(
-      scrubCase(
-        billing(
-          JSON.stringify({ feature: { id: "domains", name: "Domains" } })
-        ),
-        scope
-      )
-    )
-  ).cassette[0].output;
-  assert.equal(JSON.parse(saved).feature.name, "Domains");
 });
 
 test("a recorded question splits back into the message and its earlier turns", () => {

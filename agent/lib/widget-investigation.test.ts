@@ -1612,19 +1612,19 @@ test("a reading a tool fired reaches the composer even when the write-up set it 
     });
   const outcome = await waitForWidgetInvestigation(
     session([
-      result("widget_outreach_health", {
+      result("widget_campaigns", {
         campaigns: [
           { live: { sendingRules: { reading: startUp } }, name: "Launch" },
           { live: { sendingRules: { reading: null } }, name: "Quiet" },
         ],
       }),
       // A second read of the same campaign states it once.
-      result("widget_outreach_health", {
+      result("widget_campaigns", {
         campaigns: [
           { live: { sendingRules: { reading: startUp } }, name: "Launch" },
         ],
       }),
-      result("widget_inbox_health", { reading: notFound }),
+      result("widget_inboxes", { reading: notFound }),
       event("message.completed", {
         message: "The live read says no sends yet; I'm not relying on it.",
       }),
@@ -1646,8 +1646,8 @@ test("a reading a tool fired reaches the composer even when the write-up set it 
   assert.deepEqual(
     raw.facts.slice(0, 2).map((fact) => fact.evidence),
     [
-      { ref: "reading", tool: "widget_outreach_health" },
-      { ref: "reading", tool: "widget_inbox_health" },
+      { ref: "reading", tool: "widget_campaigns" },
+      { ref: "reading", tool: "widget_inboxes" },
     ]
   );
 });
@@ -1710,7 +1710,7 @@ test("a fired reading leads the composer's facts and a write-up fact calling it 
   const fact = (claim: string, ref = "") => ({
     claim,
     entityIds: [],
-    evidence: { ref, tool: "widget_inbox_health" },
+    evidence: { ref, tool: "widget_inboxes" },
   });
   const notFound =
     "Reconnect failed because the email provider reported the mailbox not found. The mailbox no longer exists at the provider, so Reconnect can't fix it.";
@@ -1920,8 +1920,12 @@ const timedOutStripe = event("action.result", {
   result: {
     callId: "billing",
     kind: "tool-result",
-    output: { available: true, unavailable: ["stripe: timeout"] },
-    toolName: "widget_billing_summary",
+    output: {
+      sections: {},
+      status: "ok",
+      unavailable: [{ reason: "timeout", section: "stripe" }],
+    },
+    toolName: "widget_billing",
   },
 });
 
@@ -2292,7 +2296,7 @@ test("result polls do not rewrite progress already saved by the background watch
   };
   const replay = session([
     event("actions.requested", {
-      actions: [{ callId: "one", toolName: "widget_outreach_health" }],
+      actions: [{ callId: "one", toolName: "widget_campaigns" }],
       sequence: 0,
     }),
     event("action.result", {
@@ -3349,7 +3353,7 @@ test("a write-up that lists what it could not check files one gap per area with 
       callId: "site",
       kind: "tool-result",
       output: { status: "feature_off" },
-      toolName: "widget_website_status",
+      toolName: "widget_website",
     },
   });
   const outcome = await waitForWidgetInvestigation(
@@ -3444,7 +3448,7 @@ test("an area counts as refused only while its latest read refused the whole che
         callId,
         kind: "tool-result",
         output,
-        toolName: "widget_website_status",
+        toolName: "widget_website",
       },
     });
   const retried = await waitForWidgetInvestigation(

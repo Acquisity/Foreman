@@ -12,11 +12,6 @@ import { z } from "zod";
 import { composePrompt } from "./prompts.js";
 import { sessionLane } from "./session-lane.js";
 import { verifiedWidgetContext as scope } from "./widget.fixture.js";
-import {
-  ENDPOINT_TOOL_NAMES,
-  LEGACY_TOOL_AREAS,
-  legacyToolOffered,
-} from "./widget-endpoint-tools.js";
 import { widgetInvestigationMiddleware } from "./widget-investigation-model.js";
 import { widgetNextActionMiddleware } from "./widget-next-action.js";
 import { PRODUCT_GUIDE } from "./widget-product-guide.js";
@@ -102,60 +97,39 @@ describe("widget support investigation model boundary", () => {
     assert.equal(base.doGenerateCalls[0]?.toolChoice, undefined);
   });
 
-  it("refuses widget_website_status, deleted with the website switch (ENG-20540)", async () => {
-    const base = new MockLanguageModelV4({
-      doGenerate: result("widget_website_status"),
+  // ENG-20544: the hand-written area tools are deleted; their names are refused.
+  for (const name of [
+    "widget_account_access",
+    "widget_billing_summary",
+    "widget_generation_diagnostics",
+    "widget_inbox_health",
+    "widget_job_failures",
+    "widget_lead_pipeline_status",
+    "widget_outreach_health",
+    "widget_provider",
+    "widget_provisioning_status",
+    "widget_sdr_thread_status",
+    "widget_website_status",
+  ]) {
+    it(`refuses the deleted ${name}`, async () => {
+      const base = new MockLanguageModelV4({ doGenerate: result(name) });
+      const model = wrapLanguageModel({
+        middleware: widgetInvestigationMiddleware(),
+        model: base,
+      });
+      await assert.rejects(
+        async () =>
+          await model.doGenerate({
+            prompt: [],
+            tools: [
+              { inputSchema: { type: "object" }, name, type: "function" },
+            ],
+          }),
+        BLOCKED
+      );
+      assert.deepEqual(base.doGenerateCalls[0]?.tools, []);
     });
-    const model = wrapLanguageModel({
-      middleware: widgetInvestigationMiddleware(),
-      model: base,
-    });
-    await assert.rejects(
-      async () =>
-        await model.doGenerate({
-          prompt: [],
-          tools: [
-            {
-              inputSchema: { type: "object" },
-              name: "widget_website_status",
-              type: "function",
-            },
-          ],
-        }),
-      BLOCKED
-    );
-    assert.deepEqual(base.doGenerateCalls[0]?.tools, []);
-  });
-
-  it("offers each old area tool exactly while its area is held (ENG-20609)", async () => {
-    const base = new MockLanguageModelV4({
-      doGenerate: {
-        content: [{ text: "ok", type: "text" }],
-        finishReason: { raw: "stop", unified: "stop" },
-        usage,
-        warnings: [],
-      },
-    });
-    const model = wrapLanguageModel({
-      middleware: widgetInvestigationMiddleware(),
-      model: base,
-    });
-    const legacy = Object.keys(LEGACY_TOOL_AREAS);
-    await model.doGenerate({
-      prompt: [],
-      tools: legacy.map((name) => ({
-        inputSchema: { type: "object" as const },
-        name,
-        type: "function" as const,
-      })),
-    });
-    assert.deepEqual(
-      base.doGenerateCalls[0]?.tools?.map((entry) => entry.name),
-      legacy.filter(
-        (name) => legacyToolOffered(name) || ENDPOINT_TOOL_NAMES.has(name)
-      )
-    );
-  });
+  }
 
   for (const name of [
     "web_fetch",

@@ -3,7 +3,6 @@ import { test } from "node:test";
 import {
   type CapabilityGap,
   countedDescription,
-  distinctGaps,
   fileCapabilityGap,
   fileRunGaps,
   type GapFiling,
@@ -66,7 +65,7 @@ test("an endpoint section that failed or timed out is a gap; one whose feature i
 test("a whole check that was unavailable or threw is one gap, named for its area", () => {
   assert.deepEqual(
     gapsFromResult(
-      result("widget_lead_pipeline_status", {
+      result("widget_lead_pipeline", {
         message: "x",
         status: "unavailable",
       })
@@ -96,7 +95,7 @@ test("refusals by design, non-reads and other tools open nothing", () => {
     );
   }
   assert.deepEqual(
-    gapsFromResult(result("widget_website_status", { status: "not_linked" })),
+    gapsFromResult(result("widget_website", { status: "not_linked" })),
     []
   );
   assert.deepEqual(
@@ -139,27 +138,10 @@ test("what report_capability_gap recorded is a gap from the investigator; a refu
   );
 });
 
-test("the hand-written tools' own failure shapes are gaps, by source", () => {
-  // widget_billing_summary: string entries naming the source first.
+test("only an endpoint body's sections are gaps; a source nested in any other answered read is not", () => {
   assert.deepEqual(
     gapsFromResult(
-      result("widget_billing_summary", {
-        available: true,
-        unavailable: [
-          "stripe: timeout",
-          "productDb.creditHistory read unavailable",
-        ],
-      })
-    ).map((found) => [found.area, found.fact]),
-    [
-      ["billing", "the stripe section could not be read"],
-      ["billing", "the productDb.creditHistory section could not be read"],
-    ]
-  );
-  // widget_account_access and widget_generation_diagnostics nest a failed source in an ok result.
-  assert.deepEqual(
-    gapsFromResult(
-      result("widget_account_access", {
+      result("widget_account", {
         status: "ok",
         userErrorSignals: {
           reason: "sentry_unreachable",
@@ -167,80 +149,13 @@ test("the hand-written tools' own failure shapes are gaps, by source", () => {
         },
       })
     ),
-    [
-      {
-        area: "account",
-        fact: "the userErrorSignals section could not be read",
-        kind: "tool",
-        reason: "sentry_unreachable",
-        source: "code",
-      },
-    ]
-  );
-  assert.deepEqual(
-    gapsFromResult(
-      result("widget_generation_diagnostics", {
-        signals: {
-          axiom: {
-            items: [],
-            reason: "provider_failure",
-            status: "unavailable",
-          },
-          sentry: { items: [], status: "ok" },
-        },
-        status: "ok",
-      })
-    ).map((found) => found.fact),
-    ["the signals.axiom section could not be read"]
-  );
-  // Website status reads its sources per project; two projects' renders are one gap.
-  assert.deepEqual(
-    distinctGaps(
-      gapsFromResult(
-        result("widget_website_status", {
-          projects: [
-            {
-              id: "p1",
-              live: { status: "live" },
-              publicCheck: {
-                dns: { A: { status: "unavailable" }, NS: { status: "ok" } },
-                http: { status: "ok" },
-              },
-              render: { status: "unavailable" },
-            },
-            {
-              id: "p2",
-              live: { status: "unavailable" },
-              render: { status: "unavailable" },
-            },
-          ],
-          status: "ok",
-        })
-      )
-    ).map((found) => [found.area, found.fact]),
-    [
-      ["website", "the projects.publicCheck.dns.A section could not be read"],
-      ["website", "the projects.render section could not be read"],
-      ["website", "the projects.live section could not be read"],
-    ]
-  );
-  // Billing read nothing by design: the membership check refused.
-  assert.deepEqual(
-    gapsFromResult(
-      result("widget_billing_summary", {
-        available: false,
-        unavailable: ["workspace could not be verified"],
-      })
-    ),
     []
   );
-  // A list's entries are records, and a record's name is never a source.
   assert.deepEqual(
     gapsFromResult(
-      result("widget_inbox_health", {
-        accounts: [{ status: "unavailable" }],
-        byName: { "Spring Launch": { status: "unavailable" } },
-        status: "ok",
+      result("widget_billing", {
+        available: true,
+        unavailable: ["stripe: timeout"],
       })
     ),
     []
@@ -251,7 +166,7 @@ test("a call the framework refused or whose input was rejected opens nothing", (
   assert.deepEqual(
     gapsFromResult(
       result(
-        "widget_billing_summary",
+        "widget_billing",
         {
           code: "TOOL_EXECUTION_DENIED",
           message: "Support widget investigations only.",
@@ -633,14 +548,18 @@ test("what a reply couldn't check is one gap per area and kind, never a ticket p
 test("a failed read carries the reply's tool facts, a refused read files only its docs facts", () => {
   const failed = gapsFromResult({
     kind: "tool-result",
-    output: { available: true, unavailable: ["stripe: timeout"] },
-    toolName: "widget_billing_summary",
+    output: {
+      sections: {},
+      status: "ok",
+      unavailable: [{ reason: "timeout", section: "invoices" }],
+    },
+    toolName: "widget_billing",
   });
   const website = (output: unknown, extra: object = {}) =>
     readRefusal({
       kind: "tool-result",
       output,
-      toolName: "widget_website_status",
+      toolName: "widget_website",
       ...extra,
     })?.refused;
   // A whole check refused by design, the same refusals gapsFromResult knows.
@@ -652,15 +571,10 @@ test("a failed read carries the reply's tool facts, a refused read files only it
       website({ status: "not_linked" }),
       website({ code: "TOOL_EXECUTION_DENIED" }, { isError: true }),
       website(null, { errorName: "AI_InvalidToolInputError", isError: true }),
-      readRefusal({
-        kind: "tool-result",
-        output: { unavailable: ["workspace could not be verified"] },
-        toolName: "widget_billing_summary",
-      })?.refused,
     ],
-    [true, true, true, true, true, true, true]
+    [true, true, true, true, true, true]
   );
-  // One refused section or project inside an answered read is not the area's refusal.
+  // One refused section inside an answered read is not the area's refusal.
   assert.deepEqual(
     [
       website({
@@ -668,9 +582,8 @@ test("a failed read carries the reply's tool facts, a refused read files only it
         status: "ok",
         unavailable: [{ reason: "feature_off", section: "render" }],
       }),
-      website({ projects: [{ render: { status: "not_linked" } }] }),
     ],
-    [false, false]
+    [false]
   );
   assert.deepEqual(
     readRefusal({
@@ -701,7 +614,7 @@ test("a failed read carries the reply's tool facts, a refused read files only it
       {
         area: "billing",
         details: ["whether an invoice was paid"],
-        fact: "the stripe section could not be read",
+        fact: "the invoices section could not be read",
         source: "code",
       },
       {

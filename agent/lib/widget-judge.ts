@@ -305,10 +305,7 @@ export const judgeInput = (
       tool,
     })),
     widgetAffordances: WIDGET_AFFORDANCES,
-    widgetToolCapabilities: judgeToolCapabilities(
-      recorded.scope.endpoints,
-      recorded.scope.heldAreas ? new Set(recorded.scope.heldAreas) : undefined
-    ),
+    widgetToolCapabilities: judgeToolCapabilities(recorded.scope.endpoints),
   });
 
 const judgeSchema = z.strictObject({

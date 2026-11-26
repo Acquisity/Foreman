@@ -39,21 +39,11 @@ export const widgetProgressSchema = z.object({
 });
 export type WidgetProgress = z.infer<typeof widgetProgressSchema>;
 export type CheckId = WidgetProgress["checks"][number]["id"];
+/** The hand-written tools' checks; an endpoint tool reports its area's check. */
 const checks: Record<string, CheckId> = {
-  widget_account_access: "account",
-  widget_billing_summary: "billing",
-  widget_crm_contact: "crm",
-  widget_generation_diagnostics: "generation",
   widget_help_article: "guides",
-  widget_inbox_health: "inboxes",
-  widget_job_failures: "jobs",
   widget_known_issues: "issues",
-  widget_lead_pipeline_status: "leads",
-  widget_outreach_health: "campaigns",
-  widget_provisioning_status: "orders",
   widget_read_help_article: "guides",
-  widget_sdr_thread_status: "conversations",
-  widget_website_status: "website",
 };
 const eventSchema = z.object({
   data: z.object({
