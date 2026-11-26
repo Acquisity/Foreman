@@ -70,6 +70,54 @@ export interface GateResult {
   refusal?: string;
 }
 
+const refuse = (refusal: string): GateResult => ({ notes: [], refusal });
+
+/** The line for a decision naming a known issue: a refusal while it is open and no join was tried. */
+const knownIssueLine = (
+  known: string,
+  knownIssueState: string | null,
+  join: KnownIssueCheck["join"],
+  also: string
+): string | GateResult => {
+  if (knownIssueState === null) {
+    return `Same outcome as ${known}, whose state could not be read.${also}`;
+  }
+  if (isClosedType(knownIssueState)) {
+    return `Same outcome as ${known}, which is already ${knownIssueState}: check whether this is a regression.${also}`;
+  }
+  if (join?.target !== known) {
+    return refuse(
+      `decide_prior_work found ${known}, an open known issue with the same outcome. Join it with route_ticket (state Duplicate, duplicateOf and inheritAssigneeFrom ${known}) instead of starting a new Fixy run. Hand it to Fixy only if that join is refused. Nothing was written.`
+    );
+  }
+  const why = join.error
+    ? "route_ticket refused the join"
+    : "it has no open master to join";
+  return `Same outcome as open ${known}, but ${why}: join it there if your look agrees.${also}`;
+};
+
+/** The note a recorded decision adds, or a refusal for an open known issue not yet joined. */
+const decisionLine = (
+  decision: PriorWorkDecision,
+  knownIssueState: string | null,
+  join: KnownIssueCheck["join"]
+): string | GateResult | null => {
+  const uncertain = decision.candidates
+    .filter(
+      (candidate) =>
+        candidate.identifier !== decision.knownIssue &&
+        candidate.match === "partial_or_adjacent"
+    )
+    .map((c) => `${c.identifier} (${MATCH_WORDS[c.match]})`)
+    .join(", ");
+  const known = decision.outcome === "known_issue" && decision.knownIssue;
+  if (known) {
+    const also = uncertain ? ` Also related: ${uncertain}.` : "";
+    return knownIssueLine(known, knownIssueState, join, also);
+  }
+  return uncertain ? `Possible known issue: ${uncertain}.` : null;
+};
+
 /**
  * Whether a widget engineering handoff may start Fixy. It refuses until both
  * searches ran for this ticket and, when they found anything, the prior-work
@@ -84,93 +132,41 @@ export const knownIssueGate = (
   knownIssueState: string | null
 ): GateResult => {
   if (ownState === "duplicate" || check?.join?.grouping === "joined") {
-    return {
-      notes: [],
-      refusal: `${issue} already joined ${check?.join?.target ?? "a known issue"} as a duplicate, so Fixy works the known issue and no new run starts for this report. Do not hand it to Fixy.`,
-    };
+    return refuse(
+      `${issue} already joined ${check?.join?.target ?? "a known issue"} as a duplicate, so Fixy works the known issue and no new run starts for this report. Do not hand it to Fixy.`
+    );
   }
   const searches = check?.searches ?? {};
   const missing = (["masters", "duplicates"] as const).filter(
     (scope) => !(scope in searches)
   );
   if (missing.length > 0) {
-    return {
-      notes: [],
-      refusal: `Before a widget bug goes to Fixy, check it against open known issues: call find_related_issues with issue ${issue} and scope ${missing.join(" and ")}, then decide_prior_work with issue ${issue} and the hits. Nothing was written.`,
-    };
+    return refuse(
+      `Before a widget bug goes to Fixy, check it against open known issues: call find_related_issues with issue ${issue} and scope ${missing.join(" and ")}, then decide_prior_work with issue ${issue} and the hits. Nothing was written.`
+    );
   }
-  const failed = Object.values(searches).some((hits) => hits === null);
-  const hits = { ...searches.masters, ...searches.duplicates };
-  delete hits[issue.toUpperCase()];
-  const notes = failed
+  const candidates = Object.keys({
+    ...searches.masters,
+    ...searches.duplicates,
+  }).filter((hit) => hit !== issue.toUpperCase());
+  const notes = Object.values(searches).includes(null)
     ? ["A known-issue search failed, so the report may match an open issue."]
     : [];
-  if (Object.keys(hits).length === 0) {
+  const decision = check?.decision;
+  if (candidates.length === 0) {
     return { notes };
   }
-  const decision = check?.decision;
   if (!decision) {
-    return {
-      notes: [],
-      refusal: `The known-issue searches found ${Object.keys(hits).length} candidate${Object.keys(hits).length === 1 ? "" : "s"}. Call decide_prior_work with issue ${issue}, the report and those hits before handing it to Fixy. Nothing was written.`,
-    };
+    return refuse(
+      `The known-issue searches found ${candidates.length} candidate${candidates.length === 1 ? "" : "s"}. Call decide_prior_work with issue ${issue}, the report and those hits before handing it to Fixy. Nothing was written.`
+    );
   }
-  if ("failed" in decision) {
-    const names = Object.keys(hits).slice(0, 4).join(", ");
-    return {
-      notes: [
-        ...notes,
-        `Known-issue check undecided; possible matches: ${names}.`,
-      ],
-    };
+  const line =
+    "failed" in decision
+      ? `Known-issue check undecided; possible matches: ${candidates.slice(0, 4).join(", ")}.`
+      : decisionLine(decision, knownIssueState, check?.join);
+  if (line !== null && typeof line !== "string") {
+    return line;
   }
-  const uncertain = decision.candidates
-    .filter(
-      (candidate) =>
-        candidate.identifier !== decision.knownIssue &&
-        candidate.match === "partial_or_adjacent"
-    )
-    .map((c) => `${c.identifier} (${MATCH_WORDS[c.match]})`);
-  const known = decision.outcome === "known_issue" && decision.knownIssue;
-  if (!known) {
-    return uncertain.length > 0
-      ? {
-          notes: [...notes, `Possible known issue: ${uncertain.join(", ")}.`],
-        }
-      : { notes };
-  }
-  const also =
-    uncertain.length > 0 ? ` Also related: ${uncertain.join(", ")}.` : "";
-  if (knownIssueState === null) {
-    return {
-      notes: [
-        ...notes,
-        `Same outcome as ${known}, whose state could not be read.${also}`,
-      ],
-    };
-  }
-  if (isClosedType(knownIssueState)) {
-    return {
-      notes: [
-        ...notes,
-        `Same outcome as ${known}, which is already ${knownIssueState}: check whether this is a regression.${also}`,
-      ],
-    };
-  }
-  const join = check?.join?.target === known ? check.join : undefined;
-  if (!join) {
-    return {
-      notes: [],
-      refusal: `decide_prior_work found ${known}, an open known issue with the same outcome. Join it with route_ticket (state Duplicate, duplicateOf and inheritAssigneeFrom ${known}) instead of starting a new Fixy run. Hand it to Fixy only if that join is refused. Nothing was written.`,
-    };
-  }
-  const why = join.error
-    ? "route_ticket refused the join"
-    : "it has no open master to join";
-  return {
-    notes: [
-      ...notes,
-      `Same outcome as open ${known}, but ${why}: join it there if your look agrees.${also}`,
-    ],
-  };
+  return { notes: line ? [...notes, line] : notes };
 };

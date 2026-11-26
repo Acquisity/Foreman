@@ -7,6 +7,13 @@ import {
 } from "./known-issue-gate.js";
 
 process.env.ACQUISITY_ORIGIN ??= "https://app.acquisity.ai";
+const NEEDS_BOTH = /scope masters and duplicates/u;
+const NEEDS_DUPLICATES = /scope duplicates\b/u;
+const NEEDS_DECISION =
+  /found 1 candidate\. Call decide_prior_work with issue ENG-1/u;
+const JOIN_FIRST = /Join it with route_ticket .*ENG-9/u;
+const JOINED = /already joined ENG-9/u;
+const NO_MASTER = /no open master to join/u;
 
 const CHAT =
   "https://app.acquisity.ai/dashboard/admin/support?conversation=7a1e2b3c-4d5e-4f60-8a7b-9c0d1e2f3a4b";
@@ -19,12 +26,12 @@ describe("knownIssueGate", () => {
   it("refuses until both searches ran for the ticket", () => {
     assert.match(
       knownIssueGate("ENG-1", undefined, "triage", null).refusal ?? "",
-      /scope masters and duplicates/u
+      NEEDS_BOTH
     );
     assert.match(
       knownIssueGate("ENG-1", { searches: { masters: {} } }, "triage", null)
         .refusal ?? "",
-      /scope duplicates\b/u
+      NEEDS_DUPLICATES
     );
   });
 
@@ -44,7 +51,7 @@ describe("knownIssueGate", () => {
     assert.match(
       knownIssueGate("ENG-1", searched({ "ENG-9": "started" }), "triage", null)
         .refusal ?? "",
-      /found 1 candidate\. Call decide_prior_work with issue ENG-1/u
+      NEEDS_DECISION
     );
   });
 
@@ -59,7 +66,7 @@ describe("knownIssueGate", () => {
       },
     };
     const gate = knownIssueGate("ENG-1", check, "triage", "started");
-    assert.match(gate.refusal ?? "", /Join it with route_ticket .*ENG-9/u);
+    assert.match(gate.refusal ?? "", JOIN_FIRST);
     // A join to some other issue does not count for this one.
     assert.ok(
       knownIssueGate(
@@ -79,7 +86,7 @@ describe("knownIssueGate", () => {
         "triage",
         null
       ).refusal ?? "",
-      /already joined ENG-9/u
+      JOINED
     );
     assert.ok(knownIssueGate("ENG-1", undefined, "duplicate", null).refusal);
   });
@@ -117,7 +124,7 @@ describe("knownIssueGate", () => {
         "triage",
         "started"
       ).notes[0] ?? "",
-      /no open master to join/u
+      NO_MASTER
     );
   });
 

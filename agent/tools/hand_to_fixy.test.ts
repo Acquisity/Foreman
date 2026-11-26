@@ -32,6 +32,9 @@ const TEAM_ID = "team-san";
 const COMMENT_ID = fixyHandoffCommentId(ISSUE_ID);
 const LANES_LINE = /^Lanes: .*\n/mu;
 const QUERY_NAME = /(?:query|mutation)\s+(\w+)/u;
+const NEEDS_CHECK = /find_related_issues with issue SAN-145/u;
+const JOIN_FIRST = /Join it with route_ticket/u;
+const JOINED = /already joined/u;
 // Measured shape: SAN-124's 'Ask from' link into the receiver sandbox.
 const ASK_URL =
   "https://acquisityworkspace.slack.com/archives/C0BLFDUN6Q7/p1793556157524579";
@@ -909,10 +912,7 @@ describe("hand_to_fixy on a widget bug (ENG-21101)", () => {
     const fake = fakeLinear({ attachments: [CHAT] });
     const result = await handToFixy(input, root, fake.linear, ENV);
     assert.equal(result.success, false);
-    assert.match(
-      result.reason ?? "",
-      /find_related_issues with issue SAN-145/u
-    );
+    assert.match(result.reason ?? "", NEEDS_CHECK);
     assert.deepEqual(fake.names(), ["FixyHandoffIssue"]);
   });
 
@@ -926,7 +926,7 @@ describe("hand_to_fixy on a widget bug (ENG-21101)", () => {
       undefined,
       known("same_outcome")
     );
-    assert.match(open.reason ?? "", /Join it with route_ticket/u);
+    assert.match(open.reason ?? "", JOIN_FIRST);
     const joined = await handToFixy(
       input,
       root,
@@ -935,7 +935,7 @@ describe("hand_to_fixy on a widget bug (ENG-21101)", () => {
       undefined,
       known("same_outcome")
     );
-    assert.match(joined.reason ?? "", /already joined/u);
+    assert.match(joined.reason ?? "", JOINED);
     assert.ok(!fake.names().some((name) => WRITES.includes(name)));
   });
 
@@ -982,15 +982,14 @@ describe("hand_to_fixy on a widget bug (ENG-21101)", () => {
         ["eng"],
       ],
     ];
-    for (const [ticket, lanes] of cases) {
-      const fake = fakeLinear(ticket);
-      const result = await handToFixy(
-        { ...input, lanes },
-        root,
-        fake.linear,
-        ENV
-      );
-      assert.equal(result.success, true, JSON.stringify(ticket));
-    }
+    const results = await Promise.all(
+      cases.map(([ticket, lanes]) =>
+        handToFixy({ ...input, lanes }, root, fakeLinear(ticket).linear, ENV)
+      )
+    );
+    assert.deepEqual(
+      results.map((result) => result.success),
+      [true, true, true]
+    );
   });
 });

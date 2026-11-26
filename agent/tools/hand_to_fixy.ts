@@ -23,6 +23,7 @@ import {
 import { LINEAR_ISSUE_ID_PATTERN } from "#lib/investigation-memory/scope.js";
 import {
   checkFor,
+  type GateResult,
   isWidgetTicket,
   type KnownIssueCheck,
   knownIssueChecks,
@@ -370,20 +371,13 @@ export const handToFixy = async (
   const present = new Set(ticket.labels.nodes.map((label) => label.name));
   // The fixy label is what starts Fixy, so carrying it means handed off.
   const alreadyHandedOff = present.has(FIXY_LABEL);
-  const gate =
-    !alreadyHandedOff &&
-    input.lanes.includes("eng") &&
-    isWidgetTicket({
-      attachments: ticket.attachments.nodes,
-      description: ticket.description,
-    })
-      ? await widgetBugGate(
-          ticket.identifier,
-          ticket.state.type,
-          checks,
-          linear
-        )
-      : { notes: [] };
+  const gate = await widgetBugGate(
+    input,
+    ticket,
+    alreadyHandedOff,
+    checks,
+    linear
+  );
   if (gate.refusal) {
     return refusal(ticket.identifier, gate.refusal);
   }
@@ -422,7 +416,7 @@ export const handToFixy = async (
   const body = renderFixyHandoff({
     expected: input.expected,
     ...work,
-    notes: [...gate.notes, input.notes].filter(Boolean).join(" ") || null,
+    notes: handoffNotes(gate, input.notes),
     reportedAt: reported.at,
     reportedAtSource: reported.source,
     whatHappened: input.whatHappened,
@@ -511,12 +505,32 @@ export const handToFixy = async (
 };
 
 /** The known-issue gate for a widget bug, reading the known issue's state when a decision names one. */
+/** The gate's candidate line first, so truncation never drops it, then the model's notes. */
+const handoffNotes = (gate: GateResult, notes: string | undefined) =>
+  [...gate.notes, notes].filter(Boolean).join(" ") || null;
+
+/**
+ * The known-issue gate (ENG-21101) for an eng handoff of a widget ticket not
+ * yet handed off, reading the known issue's state when a decision names one.
+ */
 const widgetBugGate = async (
-  issue: string,
-  ownState: string,
+  input: HandToFixyInput,
+  ticket: NonNullable<IssueRead["issue"]>,
+  alreadyHandedOff: boolean,
   checks: () => Record<string, KnownIssueCheck>,
   linear: LinearCall
-) => {
+): Promise<GateResult> => {
+  const widgetBug =
+    !alreadyHandedOff &&
+    input.lanes.includes("eng") &&
+    isWidgetTicket({
+      attachments: ticket.attachments.nodes,
+      description: ticket.description,
+    });
+  if (!widgetBug) {
+    return { notes: [] };
+  }
+  const issue = ticket.identifier;
   const check = checkFor(checks(), issue);
   const decision = check?.decision;
   const known =
@@ -533,7 +547,7 @@ const widgetBugGate = async (
         () => null
       )
     : null;
-  return knownIssueGate(issue, check, ownState, knownState);
+  return knownIssueGate(issue, check, ticket.state.type, knownState);
 };
 
 const errorReason = (error: unknown) =>
