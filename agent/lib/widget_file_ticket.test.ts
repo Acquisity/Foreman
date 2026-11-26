@@ -352,7 +352,7 @@ test("a ticket linked to the chat is found without searching descriptions, and i
       readReceipt: async () => null,
       refund: () => Promise.resolve(false),
       report: (identifier, _content, addition) => {
-        reports.push({ addition, identifier });
+        reports.push({ addition: addition.text, identifier });
         return Promise.resolve(true);
       },
       saveReceipt: () => Promise.resolve(),
@@ -443,7 +443,7 @@ test("a second refund ask lands on the chat's refund ticket, which is routed to 
   assert.equal("refund" in filed && filed.refund, true);
 });
 
-test("a run that filed a bug and then asks for a refund files the refund too", async (t) => {
+test("a run files once: its saved receipt is returned before any refund check, and a refund files on the next message", async (t) => {
   t.mock.method(globalThis, "fetch", () =>
     Promise.reject(new Error("unexpected transport"))
   );
@@ -459,20 +459,147 @@ test("a run that filed a bug and then asks for a refund files the refund too", a
     new AbortController().signal,
     "cdcdcdcd-cdcd-4dcd-8dcd-cdcdcdcdcdcd",
     {
-      create: created("ENG-22"),
-      linked: () =>
-        Promise.resolve([linkedTicket("ENG-20", "case")] as LinkedTicket[]),
+      create: () => assert.fail("the run already filed"),
+      linked: () => assert.fail("the run already filed"),
       readReceipt: async () => bug,
-      refund: () => Promise.resolve(true),
-      report: () => Promise.resolve(true),
-      saveReceipt: () => Promise.resolve(),
+      refund: () => assert.fail("a saved receipt is never reclassified"),
+      search: () => assert.fail("the run already filed"),
+    }
+  );
+  assert.deepEqual(filed, bug);
+});
+
+test("the refund check reads only the ask, never the earlier turns in the report", async (t) => {
+  t.mock.method(globalThis, "fetch", () =>
+    Promise.reject(new Error("unexpected transport"))
+  );
+  const asked: unknown[] = [];
+  await fileTicketFor(
+    scope,
+    {
+      ...ask("The campaign stopped sending."),
+      report: ["- Customer: Last month I asked for a refund."],
+    },
+    new AbortController().signal,
+    undefined,
+    {
+      ...noLinks,
+      create: created("ENG-31"),
+      refund: (input) => {
+        asked.push(input);
+        return Promise.resolve(false);
+      },
       search: () =>
         Promise.resolve({ createdAfter: null, issues: [], truncated: false }),
     }
   );
-  assert.equal("identifier" in filed && filed.identifier, "ENG-22");
+  assert.deepEqual(asked, [
+    { summary: "The campaign stopped sending.", title: "Support" },
+  ]);
 });
 
+test("ids the customer pasted stay out of the ticket's title and body", async (t) => {
+  t.mock.method(globalThis, "fetch", () =>
+    Promise.reject(new Error("unexpected transport"))
+  );
+  const sent: { body: string; title: string }[] = [];
+  const pasted = "Campaign 9f8e7d6c-5b4a-4321-8fed-cba987654321 never sends";
+  await fileTicketFor(
+    scope,
+    { ...ask(pasted), title: pasted },
+    new AbortController().signal,
+    undefined,
+    {
+      ...noLinks,
+      create: (_ctx, input) => {
+        sent.push(input);
+        return created("ENG-32")();
+      },
+      refund: () => Promise.resolve(false),
+      search: () =>
+        Promise.resolve({ createdAfter: null, issues: [], truncated: false }),
+    }
+  );
+  assert.equal(
+    sent[0]?.title,
+    "Campaign (id in the Support report) never sends"
+  );
+  assert.ok(!sent[0]?.body.includes("9f8e7d6c"));
+});
+
+const feedbackReport = (message: string): WidgetTicketInput => ({
+  ...ask("It named a Billing tab that isn't there."),
+  entry: "problem",
+  feedback: { message },
+  retryKey: "problem-report:r1",
+});
+
+test("a report on another Foreman reply gets its own ticket; one on the same reply lands on that reply's ticket", async (t) => {
+  t.mock.method(globalThis, "fetch", () =>
+    Promise.reject(new Error("unexpected transport"))
+  );
+  const linked = () =>
+    Promise.resolve([
+      { ...linkedTicket("ENG-40", "feedback"), reported: "reply-a" },
+    ]);
+  const creates: string[] = [];
+  const deps = {
+    create: (_ctx: unknown, input: { kind: string }) => {
+      creates.push(input.kind);
+      return created("ENG-41")();
+    },
+    followUp: () => Promise.resolve(),
+    legacyFeedback: () => assert.fail("no earlier ticket was named"),
+    linked,
+    report: () => Promise.resolve(true),
+    search: () => assert.fail("feedback is never found by description"),
+  };
+  const same = await fileTicketFor(
+    scope,
+    feedbackReport("reply-a"),
+    new AbortController().signal,
+    undefined,
+    deps as never
+  );
+  assert.equal("identifier" in same && same.identifier, "ENG-40");
+  const other = await fileTicketFor(
+    scope,
+    feedbackReport("reply-b"),
+    new AbortController().signal,
+    undefined,
+    deps as never
+  );
+  assert.equal("identifier" in other && other.identifier, "ENG-41");
+  assert.deepEqual(creates, ["feedback"]);
+});
+
+test("a report on a reply Acquisity filed before the change lands on that ticket once it checks out", async (t) => {
+  t.mock.method(globalThis, "fetch", () =>
+    Promise.reject(new Error("unexpected transport"))
+  );
+  const checked: string[] = [];
+  const filed = await fileTicketFor(
+    scope,
+    {
+      ...feedbackReport("reply-a"),
+      feedback: { earlier: "ENG-7", message: "reply-a" },
+    },
+    new AbortController().signal,
+    undefined,
+    {
+      create: () => assert.fail("the reply already has a ticket"),
+      followUp: () => Promise.resolve(),
+      legacyFeedback: (identifier, conversationId, message) => {
+        checked.push(`${identifier} ${conversationId} ${message}`);
+        return Promise.resolve(linkedTicket("ENG-7", "feedback"));
+      },
+      linked: () => Promise.resolve([]),
+      report: () => Promise.resolve(true),
+    }
+  );
+  assert.equal("identifier" in filed && filed.identifier, "ENG-7");
+  assert.deepEqual(checked, [`ENG-7 ${scope.conversationId} reply-a`]);
+});
 test("a bug report never asks the refund check, and a failed Support report still files", async (t) => {
   t.mock.method(globalThis, "fetch", () =>
     Promise.reject(new Error("unexpected transport"))

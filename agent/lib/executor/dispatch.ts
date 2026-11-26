@@ -15,12 +15,14 @@ import { isQuestionsOnly } from "../trust.js";
 import { widgetOperationPolicy } from "../widget-policy.js";
 import { isWidgetSupport, requireWidgetContext } from "../widget-scope.js";
 import {
-  CHAT_WIDGET_PROJECT_ID,
+  REFUND_TICKET,
   SUPPORT_CHAT_TITLE,
   SUPPORT_REPORT_POINTER,
   supportChatUrl,
   type TicketKind,
+  WIDGET_FEEDBACK_PROJECT_ID,
 } from "../widget-support-report.js";
+
 import { executorAuth } from "./auth.js";
 import {
   DISPUTES_TOOLKIT,
@@ -37,15 +39,6 @@ export type ExecutorOutcome = Awaited<
 
 const LINEAR_TICKET_PATH = "linear-foreman.save_issue";
 const LINEAR_TICKET_MAX_BYTES = 64 * 1024;
-
-/**
- * Where a widget refund request lands: the Support project with the Refund
- * label, which is the queue billing triage reads.
- */
-export const REFUND_TICKET = {
-  labels: ["9120e30d-e188-4972-940b-20005b7f6d03"],
-  project: "P-ENG-20",
-} as const;
 
 /** The Foreman Linear agent: delegating a ticket to it opens Foreman's triage session. */
 export const FOREMAN_LINEAR_AGENT = "d5325c6f-fbc8-451e-9fed-358667e58ad3";
@@ -146,7 +139,7 @@ const widgetLinearTicketInput = z.union([
   }),
   z.strictObject({
     ...widgetTicketShape,
-    project: z.literal(CHAT_WIDGET_PROJECT_ID),
+    project: z.literal(WIDGET_FEEDBACK_PROJECT_ID),
   }),
 ]);
 
@@ -301,8 +294,8 @@ export async function describeProvider(ctx: ProviderContext, path: string) {
 const KIND_FIELDS: Record<TicketKind | "bug", Record<string, unknown>> = {
   bug: { labels: [BUG_LABEL] },
   case: {},
-  feedback: { project: CHAT_WIDGET_PROJECT_ID },
-  refund: { ...REFUND_TICKET, labels: [...REFUND_TICKET.labels] },
+  feedback: { project: WIDGET_FEEDBACK_PROJECT_ID },
+  refund: { labels: [...REFUND_TICKET.labels], project: REFUND_TICKET.project },
 };
 
 /**

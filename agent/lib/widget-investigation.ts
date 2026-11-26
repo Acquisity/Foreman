@@ -110,12 +110,15 @@ import {
   type WidgetContext,
   widgetAuth,
 } from "./widget-scope.js";
-import { serviceSecretRefusal } from "./widget-service-secret.js";
+import {
+  noStoreJson,
+  serviceSecretRefusal,
+  widgetUserToken,
+} from "./widget-service-secret.js";
 import { conversationTicketNote, fileTicketFor } from "./widget-ticket.js";
 import type { TicketNote } from "./widget-ticket-followup.js";
 import { readsTimeline, withTimeline } from "./widget-timeline.js";
 
-const bearer = /^Bearer ([A-Za-z0-9_.-]{1,4096})$/;
 const scopeFields = {
   conversation_id: z.uuid(),
   organization_id: z.uuid(),
@@ -262,11 +265,7 @@ export const withScreenshots = (
   input: Extract<WidgetInput, { action: "start" }>
 ): string => [input.question, ...(input.screenshots ?? [])].join("\n\n");
 
-const json = (body: unknown, status = 200) =>
-  Response.json(body, {
-    headers: { "cache-control": "no-store" },
-    status,
-  });
+const json = noStoreJson;
 
 /** Each run gets its own session and verified scope; inbox runs keep their distinct suffix. */
 export const widgetAddress = (
@@ -2077,9 +2076,7 @@ export async function receiveWidgetMessage(
   if (refused) {
     return refused;
   }
-  const userToken = bearer.exec(
-    request.headers.get("authorization") ?? ""
-  )?.[1];
+  const userToken = widgetUserToken(request);
   if (!userToken) {
     return json({ error: "Identity required." }, 401);
   }

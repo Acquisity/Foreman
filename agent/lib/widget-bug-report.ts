@@ -1,6 +1,5 @@
 import { generateObject } from "ai";
 import { z } from "zod";
-import { acquisityOrigin } from "./acquisity-origin.js";
 import { fastCallOptions, modelFor, resolveModel } from "./models.js";
 import {
   type BugReportTurn,
@@ -17,6 +16,7 @@ import {
 import type { WidgetFindings } from "./widget-findings.js";
 import { isLiveActive } from "./widget-live-policy.js";
 import type { WidgetContext } from "./widget-scope.js";
+import { inert, supportChatUrl } from "./widget-support-report.js";
 import {
   appTicketContext,
   conversationTicket,
@@ -72,8 +72,6 @@ export type BugReportDraft = z.infer<typeof draftSchema> & {
 const plainTitle = (title: string) =>
   !title.includes(":") && title.split(WORDS).length <= 10;
 
-const inert = (text: string) =>
-  text.replaceAll("<", "&lt;").replaceAll(">", "&gt;");
 /** Outside text in an evidence line also keeps its brackets literal, so it can't become a link. */
 const plain = (text: string) =>
   inert(text).replaceAll("[", "\\[").replaceAll("]", "\\]");
@@ -366,9 +364,7 @@ export const handoffReport = (facts: HandoffFacts): string[] => [
 
 const conversationLink = (conversationId: string, label: string) => {
   try {
-    const url = new URL("/dashboard/admin/support", acquisityOrigin());
-    url.searchParams.set("conversation", conversationId);
-    return `[${label}](${url})`;
+    return `[${label}](${supportChatUrl(conversationId)})`;
   } catch {
     return `${label} (${conversationId})`;
   }

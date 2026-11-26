@@ -181,13 +181,14 @@ export async function followUpOnTicket(
   summary: string,
   runId: string,
   signal: AbortSignal,
+  intro = "Foreman passed this conversation to the team again from the support chat:",
   request: typeof linearAppRequest = linearAppRequest
 ): Promise<void> {
   if (ticket.stateType === "completed") {
     await reopen(ticket.identifier, signal, request);
   }
   const body = [
-    "Foreman passed this conversation to the team again from the support chat:",
+    intro,
     summary
       .slice(0, 4000)
       .split("\n")

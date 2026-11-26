@@ -71,19 +71,32 @@ test("an ordinary ticket, a quoted notice or a block with text after it is not",
 const linearReturning = (
   description: string | null,
   attachments: { title: string; url: string }[] = [],
-  documents: { content: string | null; title: string }[] = []
-) => ({
-  fetch: (async () =>
-    Response.json({
-      data: {
-        issue: {
-          attachments: { nodes: attachments },
-          description,
-          documents: { nodes: documents },
-        },
-      },
-    })) as typeof fetch,
-});
+  documents: { content: string | null; title: string }[] = [],
+  project: string | null = null,
+  /** Reads after the first answer, when a report lands after the session opens. */
+  later: { content: string | null; title: string }[][] = []
+) => {
+  let reads = 0;
+  return {
+    fetch: (() => {
+      const shown = reads === 0 ? documents : (later[reads - 1] ?? documents);
+      reads += 1;
+      return Promise.resolve(
+        Response.json({
+          data: {
+            issue: {
+              attachments: { nodes: attachments },
+              description,
+              documents: { nodes: shown },
+              project: project ? { id: project } : null,
+            },
+          },
+        })
+      );
+    }) as typeof fetch,
+    reads: () => reads,
+  };
+};
 
 const CONVERSATION = "11111111-1111-4111-8111-111111111111";
 const chatLink = (title = "Support chat") => ({
@@ -134,7 +147,8 @@ test("the intake read marks widget-filed, support-conversation and migration-for
       readAskFrom(
         "issue-1",
         credentials,
-        linearReturning(description, attachments)
+        linearReturning(description, attachments),
+        []
       )
     )
   );
@@ -180,10 +194,71 @@ test("a widget ticket's verified scope comes from its Support report, only when 
   const unlinked = await readAskFrom(
     "issue-1",
     credentials,
-    linearReturning("Inboxes fail.", [], [supportReport])
+    linearReturning("Inboxes fail.", [], [supportReport]),
+    []
   );
   assert.equal(unlinked.supportScope, null);
-  const old = await readAskFrom("issue-1", credentials, linearReturning(filed));
+  const old = await readAskFrom(
+    "issue-1",
+    credentials,
+    linearReturning(filed),
+    []
+  );
   assert.equal(old.supportScope, null);
   assert.equal(old.triageIntake, true);
+});
+
+test("a session that opens before the Support report lands waits for it", async () => {
+  const api = linearReturning("Inboxes fail.", [chatLink()], [], null, [
+    [],
+    [supportReport],
+  ]);
+  const ask = await readAskFrom("issue-1", credentials, api, [1, 1]);
+  assert.equal(api.reads(), 3);
+  assert.ok(
+    ask.supportScope?.includes(
+      "- Workspace ID: 22222222-2222-4222-8222-222222222222"
+    )
+  );
+  // A ticket with no support chat link never waits.
+  const plain = linearReturning("A report");
+  await readAskFrom("issue-1", credentials, plain, [1, 1]);
+  assert.equal(plain.reads(), 1);
+});
+
+test("the longest workspace line still yields the Workspace ID", async () => {
+  const name = "N".repeat(500);
+  const report = {
+    content: supportReport.content.replace(
+      "Trivox AI (trivox)",
+      `${name} (s${"x".repeat(199)})`
+    ),
+    title: "Support report",
+  };
+  const ask = await readAskFrom(
+    "issue-1",
+    credentials,
+    linearReturning("Inboxes fail.", [chatLink()], [report]),
+    []
+  );
+  assert.ok(
+    ask.supportScope?.includes(
+      "- Workspace ID: 22222222-2222-4222-8222-222222222222"
+    )
+  );
+});
+
+test("a customer's report on a Foreman reply is linked to the chat but is not triage intake", async () => {
+  const ask = await readAskFrom(
+    "issue-1",
+    credentials,
+    linearReturning(
+      "Wrong answer.",
+      [chatLink()],
+      [supportReport],
+      "84ab288a-6a7b-4316-ab6f-f67809a40211"
+    ),
+    []
+  );
+  assert.equal(ask.triageIntake, false);
 });

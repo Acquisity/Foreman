@@ -16,10 +16,11 @@ import {
 import { askFromName, isTriageIntakeAsk } from "./linear-context.js";
 import { migrationFiledReport } from "./migration-ticket-scope.js";
 import { withoutReporterUpdates } from "./reporter-updates/copy.js";
-import { WIDGET_FEEDBACK_PROJECT_ID } from "./widget-feedback.js";
 import {
   isSupportChatLink,
+  REPORT_WAITS_MS,
   SUPPORT_REPORT_TITLE,
+  WIDGET_FEEDBACK_PROJECT_ID,
 } from "./widget-support-report.js";
 import { isWidgetFiledDescription } from "./widget-ticket-marker.js";
 
@@ -254,12 +255,15 @@ export function readAllComments(
 const ASK_FROM_QUERY = `query AskFrom($id: String!) {
   issue(id: $id) {
     description
+    project { id }
     attachments(first: 50) { nodes { title url } }
-    documents(first: 20) { nodes { title content } }
+    documents(first: 1, filter: { title: { eq: "${SUPPORT_REPORT_TITLE}" } }) { nodes { title content } }
   }
 }`;
 
-const VERIFIED_SCOPE = /## Verified scope\n\n((?:[-*] [^\n]{1,300}\n?){1,10})/u;
+// A workspace line holds a 500-character name and its slug.
+const VERIFIED_SCOPE =
+  /## Verified scope\n\n((?:[-*] [^\n]{1,1200}\n?){1,10})/u;
 
 /**
  * The verified scope lines from a widget ticket's Support report, which since
@@ -278,6 +282,13 @@ export const supportReportScope = (
   return lines ? lines.trim().replaceAll(/^\* /gmu, "- ") : null;
 };
 
+interface AskFromIssue {
+  attachments: { nodes: { title: string; url: string }[] };
+  description: string | null;
+  documents: { nodes: { content: string | null; title: string }[] };
+  project: { id: string } | null;
+}
+
 /**
  * The intake requester from the issue's 'Ask from <name>' attachment, or null,
  * and whether the ticket is a triage intake ticket: its 'Ask from' link points
@@ -287,45 +298,55 @@ export const supportReportScope = (
 export async function readAskFrom(
   issue: string,
   credentials: LinearChannelCredentials,
-  api?: LinearApiOptions
+  api?: LinearApiOptions,
+  waits: number[] = REPORT_WAITS_MS
 ): Promise<{
   requester: string | null;
   supportScope: string | null;
   triageIntake: boolean;
 }> {
-  const result = await callLinearGraphQL<{
-    issue: {
-      attachments: { nodes: { title: string; url: string }[] };
-      description: string | null;
-      documents: { nodes: { content: string | null; title: string }[] };
-    } | null;
-  }>({
-    api,
-    credentials,
-    query: ASK_FROM_QUERY,
-    queryName: "AskFrom",
-    variables: { id: issue },
-  });
-  const attachments = result.issue?.attachments.nodes ?? [];
-  const description = result.issue?.description ?? null;
+  const read = async () =>
+    (
+      await callLinearGraphQL<{ issue: AskFromIssue | null }>({
+        api,
+        credentials,
+        query: ASK_FROM_QUERY,
+        queryName: "AskFrom",
+        variables: { id: issue },
+      })
+    ).issue;
+  let found = await read();
+  for (const ms of waits) {
+    const linked = found?.attachments.nodes.some(isSupportChatLink);
+    if (!linked || found?.documents.nodes.length) {
+      break;
+    }
+    // biome-ignore lint/performance/noAwaitInLoops: each wait gives the report time to land.
+    await new Promise((resolve) => setTimeout(resolve, ms));
+    found = await read();
+  }
+  const attachments = found?.attachments.nodes ?? [];
+  const description = found?.description ?? null;
   // A ticket file_migration_ticket filed is delegated as it is created, so
   // its session can open before Linear has added the 'Ask from' link; its
   // server-written Slack scope block names the reporter and channel already.
   const migration = migrationFiledReport(description);
+  // A customer's report on a Foreman reply is linked to the chat too, but it
+  // runs the widget-feedback route, not triage intake.
+  const widgetCase =
+    attachments.some(isSupportChatLink) &&
+    found?.project?.id !== WIDGET_FEEDBACK_PROJECT_ID;
   return {
     requester:
       askFromName(attachments.map((node) => node.title)) ??
       migration?.reporter ??
       null,
-    supportScope: supportReportScope(
-      attachments,
-      result.issue?.documents.nodes ?? []
-    ),
+    supportScope: supportReportScope(attachments, found?.documents.nodes ?? []),
     // A widget ticket is linked to its support chat; older ones end their
     // description with the scope block instead.
     triageIntake:
       isTriageIntakeAsk(attachments) ||
-      attachments.some(isSupportChatLink) ||
+      widgetCase ||
       isWidgetFiledDescription(description) ||
       migration !== null,
   };

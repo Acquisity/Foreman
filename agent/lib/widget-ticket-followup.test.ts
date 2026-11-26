@@ -44,6 +44,7 @@ test("a follow-up on an open ticket adds one comment with a fixed id and the sum
     "Still broken.\nSecond line.",
     RUN,
     signal,
+    undefined,
     request
   );
   assert.deepEqual(sent, [
@@ -71,6 +72,7 @@ test("a follow-up on a Done ticket moves it back to Todo before it comments", as
     "It broke again.",
     RUN,
     signal,
+    undefined,
     request
   );
   assert.deepEqual(
@@ -92,6 +94,7 @@ test("a reopen that fails writes no comment, and a retry after a failed comment 
       "x",
       RUN,
       signal,
+      undefined,
       stuck.request
     )
   );
@@ -108,6 +111,7 @@ test("a reopen that fails writes no comment, and a retry after a failed comment 
       "x",
       RUN,
       signal,
+      undefined,
       refused.request
     )
   );
@@ -121,6 +125,7 @@ test("a reopen that fails writes no comment, and a retry after a failed comment 
     "x",
     RUN,
     signal,
+    undefined,
     retried.request
   );
   assert.deepEqual(

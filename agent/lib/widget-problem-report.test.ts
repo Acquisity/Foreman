@@ -188,9 +188,16 @@ test("widget_file_ticket drafts the ticket from the investigator's findings and 
           url: "https://linear.app/acquisity/issue/ENG-51/x",
         });
       },
-      question: (runId) => {
+      turns: (owner, runId) => {
         assert.equal(runId, RUN_ID);
-        return Promise.resolve("My inbox stopped syncing");
+        assert.equal(owner.conversationId, scope.conversationId);
+        return Promise.resolve({
+          history: [
+            { role: "customer", text: "My inbox shows an error." },
+            { role: "assistant", text: "Reconnect it from Settings." },
+          ],
+          question: "I reconnected it and it still fails",
+        });
       },
     }
   );
@@ -202,6 +209,15 @@ test("widget_file_ticket drafts the ticket from the investigator's findings and 
   assert.ok(!input?.body.includes("22222222-2222-4222-8222-222222222222"));
   assert.ok(
     input?.report.join("\n").includes("22222222-2222-4222-8222-222222222222")
+  );
+  // The report keeps the earlier turns, so the team sees what was tried.
+  const sections = input?.report.join("\n") ?? "";
+  assert.ok(
+    sections.includes("- Foreman: Reconnect it from Settings."),
+    sections
+  );
+  assert.ok(
+    sections.includes("- Customer: I reconnected it and it still fails")
   );
   // The refund check still reads the investigator's own words.
   assert.ok(input?.summary.startsWith("Inbox sync failing\n\n"));

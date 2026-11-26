@@ -3,7 +3,6 @@ import { test } from "node:test";
 import {
   createWidgetTicket,
   invokeProvider,
-  REFUND_TICKET,
   WIDGET_TICKET_OWNER,
 } from "./executor/dispatch.js";
 import { WIDGET_TOOLKIT } from "./executor/endpoint.js";
@@ -11,7 +10,10 @@ import { executorTransport } from "./executor/transport.js";
 import { verifiedWidgetContext } from "./widget.fixture.js";
 import { assertWidgetPath, WIDGET_TICKET_PATH } from "./widget-policy.js";
 import { widgetAuth } from "./widget-scope.js";
-import { CHAT_WIDGET_PROJECT_ID } from "./widget-support-report.js";
+import {
+  REFUND_TICKET,
+  WIDGET_FEEDBACK_PROJECT_ID,
+} from "./widget-support-report.js";
 
 process.env.ACQUISITY_ORIGIN ??= "https://app.acquisity.ai";
 const CHAT = `https://app.acquisity.ai/dashboard/admin/support?conversation=${verifiedWidgetContext.conversationId}`;
@@ -143,7 +145,7 @@ test("a report on a Foreman reply goes to the chat widget project", async () => 
     delegate: WIDGET_TICKET_OWNER.delegate,
     description: `Report\n\n${POINTER}`,
     links: link(),
-    project: CHAT_WIDGET_PROJECT_ID,
+    project: WIDGET_FEEDBACK_PROJECT_ID,
     state: "Triage",
     team: "Engineering Team",
     title: "Foreman named the wrong plan",

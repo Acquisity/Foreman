@@ -268,7 +268,7 @@ export const onAgentSession = async (
  * model runs, since its description carries no ids (ENG-21100).
  */
 export const supportScopeLine = (scope: string) =>
-  `This ticket came from the in-app support chat. Its Support report document, written by the server, gives the verified scope below; its Workspace ID is the ticket's Workspace ID.\n${scope}`;
+  `This ticket came from the in-app support chat. Its Support report document, written by the server, gives the verified scope below; its Workspace ID is the ticket's Workspace ID. Read that document before you decide anything: the conversation and the evidence are there, not in the description.\n${scope}`;
 
 /** Whether a Linear event is the session's Stop button (ENG-14608). */
 export const isStopSignal = (event: LinearAgentSessionEvent): boolean =>

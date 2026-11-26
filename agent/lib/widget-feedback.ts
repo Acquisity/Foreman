@@ -3,11 +3,11 @@ import {
   type LinearApiOptions,
   type LinearChannelCredentials,
 } from "eve/channels/linear";
-import { SUPPORT_REPORT_TITLE } from "./widget-support-report.js";
-
-/** Linear project the Acquisity chat widget files its feedback tickets into. */
-export const WIDGET_FEEDBACK_PROJECT_ID =
-  "84ab288a-6a7b-4316-ab6f-f67809a40211";
+import {
+  REPORT_WAITS_MS,
+  SUPPORT_REPORT_TITLE,
+  WIDGET_FEEDBACK_PROJECT_ID,
+} from "./widget-support-report.js";
 
 export interface WidgetFeedbackMarker {
   /** When the report was made (ISO); older tickets predate it. */
@@ -64,7 +64,7 @@ const ISSUE_QUERY = `query WidgetFeedbackIssue($id: String!) {
   issue(id: $id) {
     description
     project { id }
-    documents(first: 20) { nodes { title content } }
+    documents(first: 1, filter: { title: { eq: "${SUPPORT_REPORT_TITLE}" } }) { nodes { title content } }
   }
 }`;
 
@@ -83,25 +83,43 @@ interface IssueResponse {
 export async function widgetFeedbackContext(
   issueId: string,
   credentials: LinearChannelCredentials,
-  api?: LinearApiOptions
+  api?: LinearApiOptions,
+  waits: number[] = REPORT_WAITS_MS
 ): Promise<string | null> {
-  const { issue } = await callLinearGraphQL<IssueResponse>({
-    api,
-    credentials,
-    query: ISSUE_QUERY,
-    queryName: "WidgetFeedbackIssue",
-    variables: { id: issueId },
-  });
+  const read = async () =>
+    (
+      await callLinearGraphQL<IssueResponse>({
+        api,
+        credentials,
+        query: ISSUE_QUERY,
+        queryName: "WidgetFeedbackIssue",
+        variables: { id: issueId },
+      })
+    ).issue;
+  let issue = await read();
   if (issue?.project?.id !== WIDGET_FEEDBACK_PROJECT_ID) {
     return null;
   }
+  // A customer's report is delegated before its Support report lands; a
+  // teammate's, and an older one, carries its line in the description.
+  for (const ms of waits) {
+    if (
+      issue?.documents.nodes.length ||
+      parseWidgetFeedbackMarker(issue?.description ?? "")
+    ) {
+      break;
+    }
+    // biome-ignore lint/performance/noAwaitInLoops: each wait gives the report time to land.
+    await new Promise((resolve) => setTimeout(resolve, ms));
+    issue = (await read()) ?? issue;
+  }
   // Reports filed since ENG-21100 keep the line at the end of their Support
   // report document; older ones end their description with it.
-  const report = issue.documents.nodes.find(
+  const report = issue?.documents.nodes.find(
     (document) => document.title === SUPPORT_REPORT_TITLE
   );
   return widgetFeedbackRoute(
     parseWidgetFeedbackMarker(report?.content ?? "") ??
-      parseWidgetFeedbackMarker(issue.description ?? "")
+      parseWidgetFeedbackMarker(issue?.description ?? "")
   );
 }

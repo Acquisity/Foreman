@@ -7,7 +7,11 @@ import { sniffImage } from "./image.js";
 import { fastCallOptions, modelFor, resolveModel } from "./models.js";
 import { logOpsEvent } from "./ops-log.js";
 import { verifyWidgetContext } from "./widget-context.js";
-import { serviceSecretRefusal } from "./widget-service-secret.js";
+import {
+  noStoreJson,
+  serviceSecretRefusal,
+  widgetUserToken,
+} from "./widget-service-secret.js";
 
 /**
  * Reads a screenshot the customer attached in the support widget, while they
@@ -35,7 +39,6 @@ const MAX_BODY_CHARS = Math.ceil(MAX_IMAGE_BYTES / 3) * 4 + 1024;
 const READ_TIMEOUT_MS = 20_000;
 const HEDGE_AFTER_MS = 4000;
 const BACKUP_MODEL = "google/gemini-3.5-flash-lite";
-const bearer = /^Bearer ([A-Za-z0-9_.-]{1,4096})$/;
 
 const inputSchema = z
   .strictObject({
@@ -170,8 +173,7 @@ export function renderReading(reading: ScreenshotReading): string {
     : text;
 }
 
-const json = (body: unknown, status = 200) =>
-  Response.json(body, { headers: { "cache-control": "no-store" }, status });
+const json = noStoreJson;
 
 export async function receiveWidgetScreenshot(
   request: Request,
@@ -182,9 +184,7 @@ export async function receiveWidgetScreenshot(
   if (refused) {
     return refused;
   }
-  const userToken = bearer.exec(
-    request.headers.get("authorization") ?? ""
-  )?.[1];
+  const userToken = widgetUserToken(request);
   if (!userToken) {
     return json({ error: "Identity required." }, 401);
   }

@@ -13,8 +13,11 @@ import {
 } from "./widget-bug-report.js";
 import { parseFindings, type WidgetFindings } from "./widget-findings.js";
 import type { WidgetDependencies } from "./widget-investigation.js";
+import { isLiveActive } from "./widget-live-policy.js";
 import {
+  assertWidgetRunOwner,
   readWidgetRun,
+  recentWidgetTurns,
   type WidgetOutcome,
   type WidgetRun,
 } from "./widget-run-store.js";
@@ -412,15 +415,19 @@ export const investigatorNote = (note: TicketNote | null) =>
 const investigatorDependencies = {
   draft: draftHandoffTicket,
   file: fileWidgetTicket,
-  question: (runId: string, signal: AbortSignal) =>
-    readWidgetRun(runId, signal).then((run) => run.question),
+  /** The run's own message and the earlier turns, read only for this verified scope. */
+  turns: async (scope: WidgetContext, runId: string, signal: AbortSignal) => {
+    const run = await readWidgetRun(runId, signal);
+    assertWidgetRunOwner(run, scope);
+    return { history: await recentWidgetTurns(run), question: run.question };
+  },
 };
 
 /**
  * widget_file_ticket: the investigator's title and summary are its findings,
- * and the ticket is drafted from them and the customer's message by the same
- * call as every other widget ticket, so its body carries no ids. The
- * summary goes in the Support report as written.
+ * and the ticket is drafted from them and the conversation by the same call
+ * as every other widget ticket, so its body carries no ids. The summary goes
+ * in the Support report as written.
  */
 export async function fileInvestigatorTicket(
   ctx: ProviderContext,
@@ -428,13 +435,22 @@ export async function fileInvestigatorTicket(
   overrides: Partial<typeof investigatorDependencies> = {}
 ) {
   const deps = { ...investigatorDependencies, ...overrides };
+  if (isLiveActive()) {
+    return await deps.file(ctx, {
+      body: input.summary,
+      entry: "tool",
+      report: [],
+      summary: input.summary,
+      title: input.title,
+    });
+  }
   const scope = requireWidgetContext(ctx.session?.auth.initiator);
   const runId = z
     .uuid()
     .optional()
     .safeParse(ctx.session?.auth.current?.attributes?.widgetRunId).data;
-  const question = runId
-    ? await deps.question(runId, ctx.abortSignal).catch((error) => {
+  const turns = runId
+    ? await deps.turns(scope, runId, ctx.abortSignal).catch((error) => {
         if (ctx.abortSignal.aborted) {
           throw error;
         }
@@ -443,7 +459,9 @@ export async function fileInvestigatorTicket(
     : null;
   const facts: HandoffFacts = {
     findings: { recommendation: input.title, report: input.summary },
-    latest: question ?? input.title,
+    ...(turns?.history.length ? { history: turns.history } : {}),
+    latest:
+      turns?.question ?? "(The customer's latest message could not be read.)",
     why: "Foreman's investigation found something the team needs to act on.",
   };
   const draft = await deps.draft(facts, ctx.abortSignal);

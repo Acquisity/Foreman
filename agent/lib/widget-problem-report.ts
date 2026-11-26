@@ -14,7 +14,12 @@ import {
 import { verifyWidgetContext } from "./widget-context.js";
 import { verifyWorkspaceMember } from "./widget-evidence.js";
 import type { WidgetContext } from "./widget-scope.js";
-import { serviceSecretRefusal } from "./widget-service-secret.js";
+import {
+  noStoreJson,
+  serviceSecretRefusal,
+  widgetUserToken,
+} from "./widget-service-secret.js";
+import { inert } from "./widget-support-report.js";
 import { fileTicketFor } from "./widget-ticket.js";
 
 /**
@@ -27,7 +32,6 @@ import { fileTicketFor } from "./widget-ticket.js";
  * Acquisity.
  */
 
-const bearer = /^Bearer ([A-Za-z0-9_.-]{1,4096})$/;
 const TURNS_MAX = 12;
 const TURN_CHARS = 2000;
 const DETAILS_MAX = 2000;
@@ -38,6 +42,11 @@ const inputSchema = z.strictObject({
   browser: z.unknown().optional(),
   conversation_id: z.uuid(),
   details: z.string().trim().max(DETAILS_MAX).optional(),
+  /** The ticket Acquisity filed for this reply before ENG-21100, which this report then lands on. */
+  earlier_ticket: z
+    .string()
+    .regex(/^ENG-\d{1,7}$/u)
+    .optional(),
   /** Customer-visible turns, oldest first, ending at the reported reply. */
   history: z
     .array(
@@ -58,9 +67,6 @@ export type ProblemReport = z.infer<typeof inputSchema>;
 
 const MAX_BODY_CHARS =
   (DETAILS_MAX + TURNS_MAX * TURN_CHARS + MAX_BROWSER_CHARS) * 6 + 4096;
-
-const inert = (text: string) =>
-  text.replaceAll("<", "&lt;").replaceAll(">", "&gt;");
 
 const fenced = (lines: string[]) =>
   lines.length
@@ -138,11 +144,7 @@ export const problemReportDependencies = {
   verify: verifyWidgetContext,
 };
 
-const json = (body: unknown, status = 200) =>
-  Response.json(body, {
-    headers: { "cache-control": "no-store" },
-    status,
-  });
+const json = noStoreJson;
 
 /** POST /internal/widget/report: file the customer's report, or add it to the one this chat already has. */
 export async function receiveProblemReport(
@@ -154,9 +156,7 @@ export async function receiveProblemReport(
   if (refused) {
     return refused;
   }
-  const userToken = bearer.exec(
-    request.headers.get("authorization") ?? ""
-  )?.[1];
+  const userToken = widgetUserToken(request);
   if (!userToken) {
     return json({ error: "Identity required." }, 401);
   }
@@ -196,6 +196,10 @@ export async function receiveProblemReport(
       {
         body: handoffTicketBody(draft, facts, scope, deps.now()),
         entry: "problem",
+        feedback: {
+          ...(input.earlier_ticket ? { earlier: input.earlier_ticket } : {}),
+          message: input.message_id ?? "none",
+        },
         report: problemReportSections(input, browser, reportedAt),
         retryKey: `problem-report:${input.report_id}`,
         summary: facts.latest,

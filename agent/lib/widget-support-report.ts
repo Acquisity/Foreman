@@ -57,8 +57,19 @@ const ENTRY: Record<WidgetEntry, string> = {
   tool: "Foreman's investigation",
 };
 
-const inert = (text: string) =>
+/** Outside text kept literal, so it cannot become markup in a ticket or report. */
+export const inert = (text: string) =>
   text.replaceAll("<", "&lt;").replaceAll(">", "&gt;");
+
+const UUID_ANYWHERE =
+  /\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/giu;
+
+/**
+ * A ticket title or body with record ids taken out: a customer who pastes a
+ * campaign or workspace id gets it in the Support report, never the ticket.
+ */
+export const withoutIds = (text: string) =>
+  text.replace(UUID_ANYWHERE, "(id in the Support report)");
 
 /**
  * The document's opening: who and where, from the server-verified scope
@@ -85,6 +96,25 @@ export const verifiedScopeSection = (
 
 /** Linear's document content bound is generous; this keeps one report readable. */
 const CONTENT_MAX = 60_000;
+const CUT = "\n\n(Earlier text cut to fit.)\n\n";
+/** Always room for the verified scope, which a workspace name and slug can stretch past a thousand characters. */
+const HEAD_KEPT = 2500;
+
+/**
+ * Keeps the opening and the end, cutting from the middle, so the verified
+ * scope and the newest section, whose last line the widget-feedback route
+ * reads, always survive.
+ */
+export const fitReport = (head: string, tail: string) => {
+  if (head.length + tail.length <= CONTENT_MAX) {
+    return `${head}${tail}`;
+  }
+  const kept = Math.min(
+    head.length,
+    Math.max(HEAD_KEPT, CONTENT_MAX - CUT.length - tail.length)
+  );
+  return `${head.slice(0, kept)}${CUT}${tail.slice(-(CONTENT_MAX - CUT.length - kept))}`;
+};
 
 export const supportReportContent = (
   scope: WidgetContext,
@@ -92,9 +122,17 @@ export const supportReportContent = (
   sections: string[],
   runId?: string
 ) =>
-  [verifiedScopeSection(scope, entry, runId), ...sections]
-    .join("\n\n")
-    .slice(0, CONTENT_MAX);
+  fitReport(
+    `${verifiedScopeSection(scope, entry, runId)}\n\n`,
+    sections.join("\n\n")
+  );
+
+/**
+ * A widget ticket is delegated as it is created and its Support report is
+ * written just after, so a session can open first: the pre-model reads wait
+ * for the report a little, inside the 7s gate, before going on without it.
+ */
+export const REPORT_WAITS_MS = [1500, 2000];
 
 /** One fixed document id per ticket, so a retried filing never adds a second report. */
 export const supportReportId = (identifier: string) =>
@@ -112,21 +150,32 @@ const UPDATE = `mutation SupportReportUpdate($id: String!, $input: DocumentUpdat
 // eve's LinearApiError keeps Linear's own errors in `body`; this one means the id is taken.
 const TAKEN = /conflict on insert of Document/u;
 
+/** The line that marks one filing's addition, so a retried filing adds nothing twice. */
+export const additionMark = (key: string) =>
+  `<!-- support-report-addition ${key} -->`;
+
+const unsaved = (conversationId: string) => {
+  logOpsEvent("widget.ticket.report_unsaved", { conversationId }, console.warn);
+  return false;
+};
+
 /**
  * Writes the ticket's Support report with Foreman's own Linear app token, or,
- * when the ticket already has one, adds `addition` to its end. Never throws:
- * the ticket is already filed and linked to its chat, so a failed write is
- * logged and the filing still succeeds.
+ * when the ticket already has one, adds `addition` to its end unless that
+ * filing's mark is already there. Throws only when the caller is aborted: the
+ * ticket is already filed and linked to its chat, so a failed or refused
+ * write is logged and the filing still succeeds.
  */
 export async function saveSupportReport(
   identifier: string,
   content: string,
-  addition: string,
+  addition: { key: string; text: string },
   ids: { conversationId: string },
   signal: AbortSignal,
   request: typeof linearAppRequest = linearAppRequest
 ): Promise<boolean> {
   const id = supportReportId(identifier);
+  const mark = additionMark(addition.key);
   try {
     try {
       const created = await request<{ documentCreate: { success: boolean } }>(
@@ -134,7 +183,7 @@ export async function saveSupportReport(
         CREATE,
         {
           input: {
-            content,
+            content: `${content}\n\n${mark}`,
             id,
             issueId: identifier,
             title: SUPPORT_REPORT_TITLE,
@@ -142,7 +191,7 @@ export async function saveSupportReport(
         },
         signal
       );
-      return created.documentCreate.success;
+      return created.documentCreate.success || unsaved(ids.conversationId);
     } catch (error) {
       const refusal = (error as { body?: unknown } | null)?.body;
       if (signal.aborted || !TAKEN.test(JSON.stringify(refusal ?? null))) {
@@ -152,31 +201,27 @@ export async function saveSupportReport(
     const { document } = await request<{
       document: { content: string | null } | null;
     }>("SupportReportRead", READ, { id }, signal);
+    const existing = document?.content ?? "";
+    if (existing.includes(mark)) {
+      return true;
+    }
     const updated = await request<{ documentUpdate: { success: boolean } }>(
       "SupportReportUpdate",
       UPDATE,
       {
         id,
         input: {
-          content: `${document?.content ?? ""}\n\n${addition}`.slice(
-            0,
-            CONTENT_MAX
-          ),
+          content: fitReport(existing, `\n\n${addition.text}\n\n${mark}`),
         },
       },
       signal
     );
-    return updated.documentUpdate.success;
+    return updated.documentUpdate.success || unsaved(ids.conversationId);
   } catch (error) {
     if (signal.aborted) {
       throw error;
     }
-    logOpsEvent(
-      "widget.ticket.report_unsaved",
-      { conversationId: ids.conversationId },
-      console.warn
-    );
-    return false;
+    return unsaved(ids.conversationId);
   }
 }
 
@@ -184,6 +229,8 @@ export async function saveSupportReport(
 export interface LinkedTicket {
   identifier: string;
   kind: TicketKind;
+  /** On a feedback ticket, the reply its report is about: a message id, or "none" for the whole chat. */
+  reported?: string;
   stateType: string;
   url: string;
 }
@@ -195,28 +242,42 @@ export interface LinkedTicket {
  */
 export type TicketKind = "case" | "feedback" | "refund";
 
-/** REFUND_TICKET's project and label, as Linear returns them on an issue. */
-export const SUPPORT_PROJECT_ID = "4534deb2-6bbc-4e30-ad38-48963f414d14";
-export const REFUND_LABEL_ID = "9120e30d-e188-4972-940b-20005b7f6d03";
+/**
+ * Where a widget refund request lands: the Support project with the Refund
+ * label, which is the queue billing triage reads. `project` is how the ticket
+ * write names it; `projectId` is how Linear returns it on an issue.
+ */
+export const REFUND_TICKET = {
+  labels: ["9120e30d-e188-4972-940b-20005b7f6d03"],
+  project: "P-ENG-20",
+  projectId: "4534deb2-6bbc-4e30-ad38-48963f414d14",
+} as const;
 /** The Acquisity Chat Widget project, where reports on Foreman's replies go. */
-export const CHAT_WIDGET_PROJECT_ID = "84ab288a-6a7b-4316-ab6f-f67809a40211";
+export const WIDGET_FEEDBACK_PROJECT_ID =
+  "84ab288a-6a7b-4316-ab6f-f67809a40211";
 
 export const ticketKind = (issue: {
   labels: { nodes: { id: string }[] };
   project: { id: string } | null;
 }): TicketKind => {
-  if (issue.project?.id === CHAT_WIDGET_PROJECT_ID) {
+  if (issue.project?.id === WIDGET_FEEDBACK_PROJECT_ID) {
     return "feedback";
   }
-  return issue.project?.id === SUPPORT_PROJECT_ID &&
-    issue.labels.nodes.some(({ id }) => id === REFUND_LABEL_ID)
+  return issue.project?.id === REFUND_TICKET.projectId &&
+    issue.labels.nodes.some(({ id }) => id === REFUND_TICKET.labels[0])
     ? "refund"
     : "case";
 };
 
 const LINKED = `query SupportChatTickets($url: String!) {
   attachmentsForURL(url: $url, first: 50) {
-    nodes { title url issue { identifier url state { type } project { id } labels { nodes { id } } } }
+    nodes {
+      title url
+      issue {
+        identifier url state { type } project { id } labels { nodes { id } }
+        documents(first: 1, filter: { title: { eq: "${SUPPORT_REPORT_TITLE}" } }) { nodes { content } }
+      }
+    }
   }
 }`;
 
@@ -226,6 +287,7 @@ interface LinkedResponse {
       title: string;
       url: string;
       issue: {
+        documents: { nodes: { content: string | null }[] };
         identifier: string;
         labels: { nodes: { id: string }[] };
         project: { id: string } | null;
@@ -235,6 +297,10 @@ interface LinkedResponse {
     }[];
   };
 }
+
+/** The chat and reply a feedback report is about, from its first machine line. */
+const FEEDBACK_LINE =
+  /<!-- chat-widget-feedback conversation=([\w-]{1,128}) message=([\w-]{1,128}) /u;
 
 /** Every ticket Foreman linked to this conversation's support chat. */
 export async function linkedTickets(
@@ -254,13 +320,62 @@ export async function linkedTickets(
       return [];
     }
     seen.add(issue.identifier);
+    const kind = ticketKind(issue);
+    const reported = FEEDBACK_LINE.exec(
+      issue.documents.nodes[0]?.content ?? ""
+    )?.[2];
     return [
       {
         identifier: issue.identifier,
-        kind: ticketKind(issue),
+        kind,
+        ...(kind === "feedback" && reported ? { reported } : {}),
         stateType: issue.state.type,
         url: issue.url,
       },
     ];
   });
+}
+
+const LEGACY_FEEDBACK = `query LegacyFeedbackTicket($id: String!) {
+  issue(id: $id) { identifier url description state { type } project { id } }
+}`;
+
+/**
+ * A report ticket Acquisity filed itself before ENG-21100, which the app
+ * still names for the reported reply: it counts only in the Chat Widget
+ * project and when its description's machine line names this chat and reply.
+ */
+export async function legacyFeedbackTicket(
+  identifier: string,
+  conversationId: string,
+  message: string,
+  signal: AbortSignal,
+  request: typeof linearAppRequest = linearAppRequest
+): Promise<LinkedTicket | null> {
+  const { issue } = await request<{
+    issue: {
+      description: string | null;
+      identifier: string;
+      project: { id: string } | null;
+      state: { type: string };
+      url: string;
+    } | null;
+  }>("LegacyFeedbackTicket", LEGACY_FEEDBACK, { id: identifier }, signal);
+  const line = FEEDBACK_LINE.exec(issue?.description ?? "");
+  if (
+    !issue ||
+    issue.project?.id !== WIDGET_FEEDBACK_PROJECT_ID ||
+    line?.[1] !== conversationId ||
+    line[2] !== message ||
+    ["canceled", "duplicate"].includes(issue.state.type)
+  ) {
+    return null;
+  }
+  return {
+    identifier: issue.identifier,
+    kind: "feedback",
+    reported: message,
+    stateType: issue.state.type,
+    url: issue.url,
+  };
 }
