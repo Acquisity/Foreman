@@ -12,7 +12,7 @@ The report is the JSON at the end of the dispatch message. It owns the windows, 
 
 ## Write the summary
 
-Post exactly one message: three short, plain-language lines labelled `Trend:`, `Improvement:` and `Watch:`, and nothing else. Each line names the figures it rests on, with the report's own deltas: count changes as `%`, rate changes as `pp`, one decimal place, except reply rate at two.
+Post exactly one message: three short, plain-language lines labelled `Trend:`, `Improvement:` and `Watch:`, and nothing else. Each line names the figures it rests on, with the report's own deltas: count changes as `%`, rate changes as `pp`, one decimal place, except reply rate at two. A `null` count change is `n/a`, because a zero baseline has no percentage change.
 
 - `Trend:` the week's overall direction, led by booked meetings and booked meeting rate.
 - `Improvement:` the clearest gain on last week or the same week last month.
