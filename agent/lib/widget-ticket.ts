@@ -298,7 +298,9 @@ async function addToTicket(
   key: string | undefined,
   deps: TicketDependencies
 ): Promise<WidgetTicketReceipt> {
-  if (key) {
+  // A retry taking up its own ticket, whose report never landed, has nothing new to say.
+  const adopted = kind === "feedback" && existing.reported === undefined;
+  if (key && !adopted) {
     await deps.followUp(
       // A report on a Foreman reply only adds to its ticket, whatever its state.
       kind === "feedback" ? { ...existing, stateType: "started" } : existing,

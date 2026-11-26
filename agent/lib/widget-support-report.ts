@@ -132,7 +132,7 @@ export const supportReportContent = (
  * written just after, so a session can open first: the pre-model reads wait
  * for the report a little, inside the 7s gate, before going on without it.
  */
-export const REPORT_WAITS_MS = [1000, 1500, 2500];
+export const REPORT_WAITS_MS = [1000, 2000];
 
 /** Whether a description is a widget ticket's body, which ends with the pointer to its Support report. */
 export const isWidgetTicketBody = (description: string | null) =>

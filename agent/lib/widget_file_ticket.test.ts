@@ -651,7 +651,8 @@ test("a report whose evidence could not be saved is not acknowledged, and the re
     undefined,
     {
       create: () => assert.fail("the first ticket is taken up"),
-      followUp: () => Promise.resolve(),
+      followUp: () =>
+        assert.fail("the retry adds no comment to its own ticket"),
       // Linked to the chat, with no Support report yet.
       linked: () => Promise.resolve([linkedTicket("ENG-50", "feedback")]),
       report: (identifier) => {
