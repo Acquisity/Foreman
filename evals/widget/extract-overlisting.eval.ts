@@ -11,15 +11,17 @@ type Unchecked = NonNullable<WidgetFindings["unchecked"]>;
 // tickets the reply never needed (names and domains swapped for neutral ones).
 // Each case's `allowed` says what may come back as unchecked; anything else is over-listing.
 const NOTHING = (unchecked: Unchecked) => unchecked.length === 0;
-const LIST = /\blist\b/iu;
-const TIED = /checkbox|link|relat|caus|connect|behind|same/iu;
+// ENG-20555's reply did say it couldn't check why the list check failed, so only that may file;
+// any tie to the earlier checkbox problem, or any other item, is over-listed.
+const LIST_CHECK_CAUSE =
+  /\b(why|cause|reason)\b.*\blist\b|\blist check\b.*\b(fail|error)/iu;
+const EARLIER = /checkbox|earlier|previous|link|relat|connect|share|same/iu;
+const LIST_CHECK_ONLY = (unchecked: Unchecked) =>
+  unchecked.every(
+    (gap) => LIST_CHECK_CAUSE.test(gap.fact) && !EARLIER.test(gap.fact)
+  );
 const CHARGE = /charge|refund/iu;
 const PARTIAL = /partial/iu;
-
-// ENG-20555's reply did say it couldn't check why the list check failed, so only that may file;
-// any tie to the earlier checkbox problem is the over-listed item.
-const LIST_CHECK_ONLY = (unchecked: Unchecked) =>
-  unchecked.every((gap) => LIST.test(gap.fact) && !TIED.test(gap.fact));
 
 const CASES = [
   {
