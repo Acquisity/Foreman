@@ -167,7 +167,7 @@ const followUpOutcome = (
  */
 const askFrom = (
   event: LinearAgentSessionEvent
-): Promise<{ requester: string | null; triageIntake: boolean } | null> => {
+): Promise<Awaited<ReturnType<typeof readAskFrom>> | null> => {
   const issue = issueOf(event);
   return issue
     ? withinGate(() => readAskFrom(issue, credentials))
@@ -251,6 +251,9 @@ export const onAgentSession = async (
       : auth;
   const context =
     buildLinearContext(event, ask?.requester ?? null, selectedRoute) ?? [];
+  if (ask?.supportScope && context.length) {
+    context.push(supportScopeLine(ask.supportScope));
+  }
   // Only the widget playbook forbids the status move; the front door keeps it.
   return followUpDispatch(
     withRepository,
@@ -259,6 +262,13 @@ export const onAgentSession = async (
     Boolean(route)
   );
 };
+
+/**
+ * A widget ticket's verified scope, read from its Support report before the
+ * model runs, since its description carries no ids (ENG-21100).
+ */
+export const supportScopeLine = (scope: string) =>
+  `This ticket came from the in-app support chat. Its Support report document, written by the server, gives the verified scope below; its Workspace ID is the ticket's Workspace ID. Read that document before you decide anything: the conversation and the evidence are there, not in the description.\n${scope}`;
 
 /** Whether a Linear event is the session's Stop button (ENG-14608). */
 export const isStopSignal = (event: LinearAgentSessionEvent): boolean =>

@@ -1,7 +1,5 @@
 import { generateObject } from "ai";
 import { z } from "zod";
-import { acquisityOrigin } from "./acquisity-origin.js";
-import { widgetScopeBlock } from "./executor/dispatch.js";
 import { fastCallOptions, modelFor, resolveModel } from "./models.js";
 import {
   type BugReportTurn,
@@ -18,6 +16,7 @@ import {
 import type { WidgetFindings } from "./widget-findings.js";
 import { isLiveActive } from "./widget-live-policy.js";
 import type { WidgetContext } from "./widget-scope.js";
+import { inert, supportChatUrl } from "./widget-support-report.js";
 import {
   appTicketContext,
   conversationTicket,
@@ -73,8 +72,6 @@ export type BugReportDraft = z.infer<typeof draftSchema> & {
 const plainTitle = (title: string) =>
   !title.includes(":") && title.split(WORDS).length <= 10;
 
-const inert = (text: string) =>
-  text.replaceAll("<", "&lt;").replaceAll(">", "&gt;");
 /** Outside text in an evidence line also keeps its brackets literal, so it can't become a link. */
 const plain = (text: string) =>
   inert(text).replaceAll("[", "\\[").replaceAll("]", "\\]");
@@ -198,6 +195,8 @@ export interface HandoffFacts {
   /** Earlier turns, oldest first: the customer's messages and the replies that went out. */
   history?: { role: "customer" | "assistant"; text: string }[];
   latest: string;
+  /** The front door already read this as a refund request, so it files in billing's queue. */
+  refund?: true;
   /** Foreman's reply to this message, when it has one. */
   reply?: string;
   /** Why the conversation needs the team, in plain words. */
@@ -209,8 +208,6 @@ const NOTHING_YET = "Nothing yet.";
 export const HANDOFF_DRAFT_MS = 10_000;
 /** The longest summary the ticket filer takes, as `widget_file_ticket` does. */
 const HANDOFF_BODY_MAX = 4000;
-/** Findings cut shorter than this would say nothing useful. */
-const FINDINGS_MIN = 80;
 
 const handoffSchema = z.object({
   open: z.string().trim().min(1).max(500),
@@ -316,9 +313,9 @@ const sentence = (text: string) =>
 
 /**
  * A handoff ticket's body: what the customer wants, what Foreman told them,
- * what is still open, who it hits and the customer's own words, then
- * Foreman's findings, which give up room so the rest always fits. The server
- * appends the Verified scope block after it.
+ * what is still open, who it hits and the customer's own words. Foreman's
+ * findings and the whole conversation go in the Support report instead
+ * (`handoffReport`), because they carry ids.
  */
 export const handoffTicketBody = (
   draft: HandoffDraft,
@@ -327,7 +324,7 @@ export const handoffTicketBody = (
   at: Date
 ) => {
   const prose = (text: string) => (draft.fallback ? text : sentence(text));
-  const body = [
+  return [
     "## What the customer wants",
     prose(draft.wants),
     "## What Foreman told them",
@@ -341,26 +338,41 @@ export const handoffTicketBody = (
     ...(draft.fallback
       ? []
       : ["## What the customer wrote", blockquote(facts.latest)]),
-  ].join("\n\n");
-  const room = HANDOFF_BODY_MAX - body.length;
-  if (!facts.findings || room < FINDINGS_MIN) {
-    return body;
-  }
-  const findings = `\n\n## What Foreman found\n\n${blockquote(`${facts.findings.report}\n\nRecommendation: ${facts.findings.recommendation}`, 4000)}`;
-  return `${body}${clip(findings, room)}`;
+  ]
+    .join("\n\n")
+    .slice(0, HANDOFF_BODY_MAX);
 };
+
+/** The Support report's sections for a handoff: Foreman's findings, then the conversation as it went. */
+export const handoffReport = (facts: HandoffFacts): string[] => [
+  ...(facts.findings
+    ? [
+        "## What Foreman found",
+        blockquote(
+          `${facts.findings.report}\n\nRecommendation: ${facts.findings.recommendation}`,
+          8000
+        ),
+      ]
+    : []),
+  "## Conversation (oldest first)",
+  handoffSaid(facts)
+    .filter(({ speaker }) => !speaker.startsWith("Foreman's findings"))
+    .map(
+      ({ speaker, text }) =>
+        `- ${speaker}: ${inert(clip(text, 2000)).split("\n").join("\n  ")}`
+    )
+    .join("\n"),
+];
 
 const conversationLink = (conversationId: string, label: string) => {
   try {
-    const url = new URL("/dashboard/admin/support", acquisityOrigin());
-    url.searchParams.set("conversation", conversationId);
-    return `[${label}](${url})`;
+    return `[${label}](${supportChatUrl(conversationId)})`;
   } catch {
     return `${label} (${conversationId})`;
   }
 };
 
-/** The verbatim conversation and each evidence source are cut to fit, so the ticket stays inside the 16,000-character description bound. */
+/** The verbatim conversation and each evidence source are cut to keep the Support report readable. */
 const SAID_CHARS = 6000;
 const EVIDENCE_CHARS = 1000;
 /** A plain line is cut to the room left rather than dropped, unless too little is left to say anything. */
@@ -480,24 +492,20 @@ interface TicketInput {
   turn: BugReportTurn;
 }
 
-/** Linear's description bound, which must also hold the Verified scope block the ticket write appends. */
-const DESCRIPTION_MAX = 16_000;
+const ID_SEGMENT =
+  /\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b|(?<=\/)\d{4,}(?=\/|$)/giu;
+
+/** A page path a person can read, with record ids swapped for a placeholder; the exact path is in the Support report. */
+const pageWithoutIds = (page: string) =>
+  plain(page).replaceAll("`", "").replace(ID_SEGMENT, ":id");
 
 /**
- * The team's bug format, ported from Acquisity's bug-report-ticket.ts, with what
- * the lookups found. The verbatim conversation gives up room so the whole
- * description, with its scope block, stays inside Linear's bound.
+ * The team's bug format, ported from Acquisity's bug-report-ticket.ts. The
+ * body reads like any other ticket; what the lookups found, the recordings,
+ * the exact page and the verbatim conversation carry ids, so they go in the
+ * Support report.
  */
 export function bugReportTicket(input: TicketInput) {
-  const room = DESCRIPTION_MAX - `\n\n${widgetScopeBlock(input.scope)}`.length;
-  const full = renderTicket(input, SAID_CHARS);
-  const over = full.description.length - room;
-  const { description, title } =
-    over > 0 ? renderTicket(input, Math.max(0, full.saidChars - over)) : full;
-  return { description, title };
-}
-
-function renderTicket(input: TicketInput, saidChars: number) {
   const { draft, evidence, scope, turn } = input;
   const stated = draft.whatShouldHappen !== NOT_STATED;
   const expected = stated
@@ -507,8 +515,8 @@ function renderTicket(input: TicketInput, saidChars: number) {
     evidence.PostHog.status === "found" ? evidence.PostHog : null;
   const page = turn.browser?.page ?? activity?.page;
   const capture = turn.browser;
-  const said = saidLines(turn, saidChars);
-  const description = [
+  const lastView = turn.browser ? "" : " (their last page view)";
+  const body = [
     "## What's happening",
     draft.whatsHappening,
     ...(stated ? ["## What should happen", draft.whatShouldHappen] : []),
@@ -519,24 +527,30 @@ function renderTicket(input: TicketInput, saidChars: number) {
     ].join(" "),
     "## How to see it",
     [
-      `1. ${page ? `Open \`${inert(page).replaceAll("`", "")}\`, the page the customer was on${turn.browser ? "" : " (their last page view)"}.` : "The page the customer was on is unknown."}`,
+      `1. ${page ? `Open ${pageWithoutIds(page)}, the page the customer was on${lastView}.` : "The page the customer was on is unknown."}`,
       "2. Do what the customer describes above.",
-      `3. ${proof(turn, scope, activity?.recording)}`,
+      "3. The recordings, screenshots and what Foreman's lookups found are in the Support report.",
       "",
       "Not reproduced yet.",
     ].join("\n"),
-    "## What we know so far",
-    whatWeKnow(evidence),
     "## Done when",
     [
       "- [ ] Triage verdict recorded: bug, working as intended, or a how-to question, and the customer gets a reply in the chat.",
       `- [ ] If it's a bug: ${expected} on the customer's workspace, with a test covering it.`,
     ].join("\n"),
-    "<details><summary>For whoever fixes it</summary>",
+  ].join("\n\n");
+  const report = [
+    "## How to see it",
+    [
+      ...(page ? [`Page: ${inert(page)}${lastView}`] : []),
+      proof(turn, scope, activity?.recording),
+    ].join("\n\n"),
+    "## What we know so far",
+    whatWeKnow(evidence),
+    "## For whoever fixes it",
     [
       `- Customer: user ${scope.userId}, ${scope.role}`,
       `- First reported: ${inWords(input.reportedAt)}`,
-      '- Filed from the support chat\'s "I found a bug" button',
       ...(capture
         ? [
             `- Browser: ${inert(capture.browser) || "unknown"}, screen ${inert(capture.screen) || "unknown"}`,
@@ -547,15 +561,10 @@ function renderTicket(input: TicketInput, saidChars: number) {
         ? ["- Written without the AI draft, which failed"]
         : []),
       "- What the customer said (verbatim, oldest first):",
-      ...said,
+      ...saidLines(turn, SAID_CHARS),
     ].join("\n"),
-    "</details>",
-  ].join("\n\n");
-  return {
-    description,
-    saidChars: said.reduce((total, line) => total + line.length, 0),
-    title: draft.title,
-  };
+  ];
+  return { body, report, title: draft.title };
 }
 
 const OUTCOMES = {
@@ -588,7 +597,7 @@ export const bugReportDependencies = {
   evidence: gatherEvidence,
   file: fileTicketFor,
   find: (scope: WidgetContext, signal: AbortSignal) =>
-    conversationTicket(appTicketContext(scope, signal)),
+    conversationTicket(appTicketContext(scope, signal), "case"),
   now: () => new Date(),
 };
 type BugReportDependencies = typeof bugReportDependencies;
@@ -616,7 +625,7 @@ export async function fileBugReport(
     ),
     deps.draft(turn),
   ]);
-  const { description, title } = bugReportTicket({
+  const { body, report, title } = bugReportTicket({
     draft,
     evidence,
     reportedAt,
@@ -625,7 +634,7 @@ export async function fileBugReport(
   });
   const ticket = await deps.file(
     scope,
-    { bug: description, summary: turn.question, title },
+    { body, entry: "bug", report, summary: turn.question, title },
     signal,
     runId
   );

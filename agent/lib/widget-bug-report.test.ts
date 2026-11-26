@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { type TestContext, test } from "node:test";
-import { type ProviderContext, widgetScopeBlock } from "./executor/dispatch.js";
+import type { ProviderContext } from "./executor/dispatch.js";
 import { verifiedWidgetContext } from "./widget.fixture.js";
 import {
   type BugReportTurn,
@@ -26,11 +26,27 @@ import type { WidgetOutcome, WidgetRun } from "./widget-run-store.js";
 import type { WidgetContext } from "./widget-scope.js";
 import { fileTicketFor } from "./widget-ticket.js";
 
+process.env.ACQUISITY_ORIGIN ??= "https://app.acquisity.ai";
+
+/** The ticket as rendered: its body, its Support report sections, and both together for checks that only ask whether something is there. */
+const rendered = (input: Parameters<typeof bugReportTicket>[0]) => {
+  const { body, report, title } = bugReportTicket(input);
+  const sections = report.join("\n\n");
+  return {
+    body,
+    description: `${body}\n\n${sections}`,
+    report: sections,
+    title,
+  };
+};
+
 const SENTRY_SECTION =
   /### Sentry issues\n- \[TypeError: cannot read schedule\]\(https:\/\/acquisity\.sentry\.io\/issues\/123\/\)/u;
 const UUID_V4 =
   /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;
 const SERVICE_SECRET = "s".repeat(40);
+const ANY_URL = /https?:\/\//u;
+const ANY_UUID = /[0-9a-f]{8}-[0-9a-f]{4}-/u;
 const RUN_ID = "44444444-4444-4444-8444-444444444444";
 const MESSAGE_ID = "55555555-5555-4555-8555-555555555555";
 const TICKET = {
@@ -87,8 +103,9 @@ const evidence: Record<EvidenceSource, Evidence> = {
 /** Files through the real one-ticket-per-conversation path, with Linear faked. */
 const linear = (existing: boolean) => {
   const calls = {
-    creates: [] as { bug?: boolean; report: string }[],
+    creates: [] as { body: string; kind: string; title: string }[],
     followUps: [] as { identifier: string; runId: string }[],
+    reports: [] as { content: string; identifier: string }[],
   };
   const file: typeof fileTicketFor = (scope, input, signal, runId) =>
     fileTicketFor(scope, input, signal, runId, {
@@ -109,9 +126,15 @@ const linear = (existing: boolean) => {
         });
         return Promise.resolve();
       },
+      kind: () => Promise.resolve("case" as const),
+      linked: () => Promise.resolve([]),
       owns: () => Promise.resolve(true),
       readReceipt: () => Promise.resolve(null),
       refund: () => assert.fail("a bug report is never a refund"),
+      report: (identifier, content) => {
+        calls.reports.push({ content, identifier });
+        return Promise.resolve(true);
+      },
       saveReceipt: () => Promise.resolve(),
       search: () =>
         Promise.resolve({
@@ -271,8 +294,10 @@ for (const role of ["member", "client"] as const) {
     assert.equal(body.message.includes("TypeError"), false);
     assert.deepEqual(members, [role]);
     assert.equal(calls.creates.length, 1);
-    assert.equal(calls.creates[0].bug, true);
-    assert.match(calls.creates[0].report, SENTRY_SECTION);
+    assert.equal(calls.creates[0].kind, "bug");
+    // The evidence goes in the Support report, never the body.
+    assert.doesNotMatch(calls.creates[0].body, SENTRY_SECTION);
+    assert.match(calls.reports[0]?.content ?? "", SENTRY_SECTION);
   });
 }
 
@@ -350,7 +375,7 @@ test("a bug_report from someone no longer in the workspace is refused and files 
 });
 
 test("What we know so far lists sources that found something, then folds the rest into one line each", () => {
-  const { description, title } = bugReportTicket({
+  const { body, report, title } = rendered({
     draft: fallbackDraft(turn),
     evidence,
     reportedAt: new Date("2026-11-04T10:30:00.000Z"),
@@ -359,63 +384,95 @@ test("What we know so far lists sources that found something, then folds the res
   });
   assert.equal(title, "My campaign stays on Scheduling and never sends.");
   assert.ok(
-    description.includes(
+    report.includes(
       [
         "## What we know so far",
         "### Sentry issues\n- [TypeError: cannot read schedule](https://acquisity.sentry.io/issues/123/)",
         "Checked, nothing found: Axiom.",
         "Couldn't check: Inngest (the lookup failed), PostHog (the lookup failed).",
-        "## Done when",
+        "## For whoever fixes it",
       ].join("\n\n")
     ),
-    description
+    report
   );
   assert.ok(
-    description.startsWith(
+    body.startsWith(
       "## What's happening\n\nThe customer wrote:\n\n> I found a bug"
     )
   );
   assert.ok(
-    description.includes(
+    body.includes(
       "One owner in Aaron Fraga's Workspace, reported from the support chat on 4 November 2026 at 10:30 UTC."
     )
   );
   // Nothing is said about a source the customer or the app sent nothing for.
-  assert.ok(!description.includes("Jam"));
-  assert.ok(!description.includes("Browser"));
+  assert.ok(!`${body}${report}`.includes("Jam"));
+  assert.ok(!`${body}${report}`.includes("Browser"));
 });
 
-test("an unstated expectation leaves out its section, and the page and proof are in How to see it", () => {
-  const { description } = bugReportTicket({
+test("the body reads like any other ticket: no ids, links or code, which all go in the Support report", () => {
+  const { body, report } = rendered({
+    draft: fallbackDraft(turn),
+    evidence,
+    reportedAt: new Date("2026-11-04T10:30:00.000Z"),
+    scope: verifiedWidgetContext,
+    turn: {
+      ...turn,
+      browser: {
+        ...capture,
+        page: "/dashboard/acme/campaigns/9f8e7d6c-5b4a-4321-8fed-cba987654321/settings",
+      },
+      recording: { id: "jam-123" },
+    },
+  });
+  assert.ok(!body.includes("```"));
+  assert.ok(!body.includes("`"));
+  assert.doesNotMatch(body, ANY_URL);
+  assert.doesNotMatch(body, ANY_UUID);
+  assert.ok(!body.includes(verifiedWidgetContext.userId));
+  assert.ok(
+    body.includes(
+      "1. Open /dashboard/acme/campaigns/:id/settings, the page the customer was on."
+    ),
+    body
+  );
+  assert.ok(
+    report.includes(
+      "Page: /dashboard/acme/campaigns/9f8e7d6c-5b4a-4321-8fed-cba987654321/settings"
+    )
+  );
+  assert.ok(
+    report.includes(`- Customer: user ${verifiedWidgetContext.userId}`)
+  );
+  assert.ok(report.includes("https://jam.dev/c/jam-123"));
+});
+
+test("an unstated expectation leaves out its section, and How to see it points to the Support report", () => {
+  const { body, report } = rendered({
     draft: fallbackDraft(turn),
     evidence,
     reportedAt: new Date("2026-11-04T10:30:00.000Z"),
     scope: verifiedWidgetContext,
     turn,
   });
-  assert.ok(!description.includes("Not stated."));
-  assert.ok(!description.includes("## What should happen"));
-  assert.ok(!description.includes("## Evidence"));
+  assert.ok(!body.includes("Not stated."));
+  assert.ok(!body.includes("## What should happen"));
   assert.ok(
-    description.includes(
-      "## How to see it\n\n1. The page the customer was on is unknown.\n2. Do what the customer describes above.\n3. No recording: the app sent no replay and the customer sent no screen recording. No screenshots. Open the support conversation"
+    body.includes(
+      "## How to see it\n\n1. The page the customer was on is unknown.\n2. Do what the customer describes above.\n3. The recordings, screenshots and what Foreman's lookups found are in the Support report.\n\nNot reproduced yet.\n\n## Done when"
     ),
-    description
+    body
   );
   assert.ok(
-    description.includes(").\n\nNot reproduced yet.\n\n## What we know so far")
-  );
-  // The workspace and conversation are in the server's scope block, so the details don't repeat them.
-  assert.ok(!description.includes("- Workspace:"));
-  assert.ok(!description.includes("- Conversation:"));
-  assert.equal(
-    description.split(verifiedWidgetContext.conversationId).length - 1,
-    1
+    report.includes(
+      "## How to see it\n\nNo recording: the app sent no replay and the customer sent no screen recording. No screenshots. [Open the support conversation]"
+    ),
+    report
   );
 });
 
 test("a stated expectation keeps its section", () => {
-  const { description } = bugReportTicket({
+  const { description } = rendered({
     draft: {
       impact: null,
       title: "Campaign stays on Scheduling and never sends",
@@ -475,7 +532,7 @@ test("the browser capture names the page, links the Sentry replay and lists cons
     verifiedWidgetContext,
     captured
   );
-  const { description } = bugReportTicket({
+  const { description } = rendered({
     draft: fallbackDraft(turn),
     evidence: { ...evidence, Browser: found },
     reportedAt: new Date("2026-11-04T10:30:00.000Z"),
@@ -489,7 +546,7 @@ test("the browser capture names the page, links the Sentry replay and lists cons
   });
   assert.ok(
     description.includes(
-      "1. Open `/dashboard/acme/campaigns/42`, the page the customer was on.\n2. Do what the customer describes above.\n3. Watch the [Sentry replay](https://acquisity-ai.sentry.io/replays/a1b2c3d4e5f60718293a4b5c6d7e8f90/) of the minute before they reported it. One screenshot in the support conversation"
+      "## How to see it\n\nPage: /dashboard/acme/campaigns/42\n\nWatch the [Sentry replay](https://acquisity-ai.sentry.io/replays/a1b2c3d4e5f60718293a4b5c6d7e8f90/) of the minute before they reported it. One screenshot in the [support conversation]"
     ),
     description
   );
@@ -520,7 +577,7 @@ test("the browser capture names the page, links the Sentry replay and lists cons
 });
 
 test("with no browser capture, the page comes from the last PostHog page view and a PostHog recording is the proof", () => {
-  const { description } = bugReportTicket({
+  const { description } = rendered({
     draft: fallbackDraft(turn),
     evidence: {
       ...evidence,
@@ -546,7 +603,7 @@ test("with no browser capture, the page comes from the last PostHog page view an
   });
   assert.ok(
     description.includes(
-      "1. Open `/dashboard/acme/crm/tasks`, the page the customer was on (their last page view).\n2. Do what the customer describes above.\n3. Watch the [PostHog recording](https://us.posthog.com/project/12345/replay/01900000-0000-7000-8000-000000000001) of the session."
+      "1. Open /dashboard/acme/crm/tasks, the page the customer was on (their last page view).\n2. Do what the customer describes above.\n3. The recordings, screenshots and what Foreman's lookups found are in the Support report."
     ),
     description
   );
@@ -554,7 +611,7 @@ test("with no browser capture, the page comes from the last PostHog page view an
 
 test("every source with nothing found is one line", () => {
   const empty = { status: "empty" } as const;
-  const { description } = bugReportTicket({
+  const { description } = rendered({
     draft: fallbackDraft(turn),
     evidence: {
       Axiom: empty,
@@ -570,7 +627,7 @@ test("every source with nothing found is one line", () => {
   });
   assert.ok(
     description.includes(
-      "## What we know so far\n\nChecked, nothing found: Browser, Sentry, Axiom, Inngest, PostHog.\n\n## Done when"
+      "## What we know so far\n\nChecked, nothing found: Browser, Sentry, Axiom, Inngest, PostHog.\n\n## For whoever fixes it"
     ),
     description
   );
@@ -578,104 +635,11 @@ test("every source with nothing found is one line", () => {
   assert.ok(!description.includes("###"));
 });
 
-test("the largest report, with its scope block, still fits Linear's 16,000-character description", () => {
-  const long = "x".repeat(2000);
-  // Lines just short enough that every section fills its budget.
-  const full = {
-    items: Array.from({ length: 8 }, (_, i) => ({
-      text: `${i} ${"<".repeat(20)}`,
-      url: `https://acquisity.sentry.io/issues/${i}${"9".repeat(40)}/`,
-    })),
-    page: `/${"p".repeat(299)}`,
-    recording: { text: "r", url: `https://us.posthog.com/${"r".repeat(200)}` },
-    status: "found" as const,
-  };
-  const scope = { ...verifiedWidgetContext, organizationName: "W".repeat(500) };
-  const { description } = bugReportTicket({
-    // The fallback quotes the customer's first words, escaped: up to 6,000 characters.
-    draft: fallbackDraft({ ...turn, history: [], question: "<".repeat(2000) }),
-    evidence: {
-      Axiom: full,
-      Browser: full,
-      Inngest: full,
-      Jam: full,
-      PostHog: full,
-      Sentry: full,
-    },
-    reportedAt: new Date("2026-11-04T10:30:00.000Z"),
-    scope,
-    turn: {
-      ...turn,
-      browser: {
-        browser: "b".repeat(200),
-        consoleErrors: [],
-        failedRequests: [],
-        page: `/${"p".repeat(299)}`,
-        replayId: "r".repeat(64),
-        screen: "s".repeat(20),
-        sentryEventIds: [],
-      },
-      history: Array.from({ length: 20 }, () => ({
-        role: "customer" as const,
-        text: long,
-      })),
-      question: long,
-      recording: { id: "j".repeat(200) },
-      screenshots: [long, long, long],
-    },
-  });
-  const written = `${description}\n\n${widgetScopeBlock(scope)}`;
-  assert.ok(written.length <= 16_000, `${written.length}`);
-  assert.ok(written.length > 15_000, `${written.length}`);
-  // The verbatim conversation is what gives up room.
-  assert.ok(description.includes("  - Customer: xxx"));
-});
-
-test("a conversation whose lines leave slack in their budget is still trimmed to fit", () => {
-  const scope = { ...verifiedWidgetContext, organizationName: "W".repeat(500) };
-  const full = {
-    items: Array.from({ length: 8 }, (_, i) => ({
-      text: `${i} ${"<".repeat(20)}`,
-      url: `https://acquisity.sentry.io/issues/${i}${"9".repeat(40)}/`,
-    })),
-    status: "found" as const,
-  };
-  for (const extra of [0, 50, 150, 400]) {
-    const { description } = bugReportTicket({
-      draft: fallbackDraft({
-        ...turn,
-        history: [],
-        question: "<".repeat(2000),
-      }),
-      evidence: {
-        Axiom: full,
-        Browser: full,
-        Inngest: full,
-        Jam: full,
-        PostHog: full,
-        Sentry: full,
-      },
-      reportedAt: new Date("2026-11-04T10:30:00.000Z"),
-      scope,
-      turn: {
-        ...turn,
-        history: [
-          { role: "customer", text: "a\n".repeat(495).slice(0, 990) },
-          { role: "customer", text: "b".repeat(1490 + extra) },
-        ],
-        question: "c".repeat(210),
-      },
-    });
-    const written = `${description}\n\n${widgetScopeBlock(scope)}`;
-    assert.ok(written.length <= 16_000, `${extra}: ${written.length}`);
-  }
-});
-
 test("a full browser section still shows a console line beside long requests", () => {
   const ids = Array.from({ length: 5 }, (_, i) => `${i}`.repeat(32));
   const failedRequest = (n: number) =>
     `Request failed: 10:21:0${n} POST /${"p".repeat(240)} 500 812ms`;
-  const { description } = bugReportTicket({
+  const { description } = rendered({
     draft: fallbackDraft(turn),
     evidence: {
       ...evidence,
@@ -702,7 +666,7 @@ test("a full browser section still shows a console line beside long requests", (
 
 test("a console line too long for the room left after escaping is cut, not dropped", () => {
   const ids = Array.from({ length: 5 }, (_, i) => `${i}`.repeat(32));
-  const { description } = bugReportTicket({
+  const { description } = rendered({
     draft: fallbackDraft(turn),
     evidence: {
       ...evidence,
@@ -733,7 +697,7 @@ test("a console line too long for the room left after escaping is cut, not dropp
 });
 
 test("outside text in an evidence line can't become a link", () => {
-  const { description } = bugReportTicket({
+  const { description } = rendered({
     draft: fallbackDraft(turn),
     evidence: {
       ...evidence,
@@ -760,7 +724,7 @@ test("outside text in an evidence line can't become a link", () => {
 
 test("a PostHog recording is linked once, under How to see it", () => {
   const url = `https://us.posthog.com/project/12345/replay/${"a".repeat(8)}`;
-  const { description } = bugReportTicket({
+  const { description } = rendered({
     draft: fallbackDraft(turn),
     evidence: {
       ...evidence,
@@ -779,7 +743,7 @@ test("a PostHog recording is linked once, under How to see it", () => {
 });
 
 test("a recording's Jam link is on the ticket", () => {
-  const { description } = bugReportTicket({
+  const { description } = rendered({
     draft: fallbackDraft(turn),
     evidence,
     reportedAt: new Date("2026-11-04T10:30:00.000Z"),
@@ -788,7 +752,7 @@ test("a recording's Jam link is on the ticket", () => {
   });
   assert.ok(
     description.includes(
-      "3. Watch their [Jam screen recording](https://jam.dev/c/jam-123). No screenshots."
+      "Watch their [Jam screen recording](https://jam.dev/c/jam-123). No screenshots."
     ),
     description
   );
@@ -824,7 +788,7 @@ test("filing still happens when every evidence lookup throws", async () => {
   assert.equal(calls.creates.length, 1);
   assert.equal(outcome.findings.ticket?.id, "ENG-901");
   assert.ok(
-    calls.creates[0].report.includes(
+    calls.reports[0]?.content.includes(
       "Couldn't check: Browser (the lookup failed), Sentry (the lookup failed), Axiom (the lookup failed), Inngest (the lookup failed), PostHog (the lookup failed), Jam (the lookup failed)."
     )
   );
@@ -839,7 +803,7 @@ test("the ticket's first-reported time is when the customer tapped I found a bug
     new AbortController().signal,
     { ...fixed, file }
   );
-  assert.match(calls.creates[0].report, FIRST_REPORTED);
+  assert.match(calls.reports[0]?.content ?? "", FIRST_REPORTED);
 });
 
 test("a second bug_report for the same conversation returns the existing ticket, creates nothing and follows up on it once", async () => {
@@ -876,14 +840,8 @@ test("bug_report_addition comments once, and a retry with the same message_id ad
         find: () =>
           Promise.resolve({
             ...TICKET,
-            assignee: null,
-            createdAt: "2026-11-03T18:00:00.000Z",
-            labels: [],
-            matchedPhrases: [],
-            parentIdentifier: null,
-            state: "Triage",
+            kind: "case" as const,
             stateType: "triage",
-            title: "Campaign never sends",
           }),
         now: fixed.now,
       }),

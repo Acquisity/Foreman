@@ -10,10 +10,10 @@ import {
 import { buildLinearContext, LINEAR_TRIAGE_ROUTE } from "./linear-context.js";
 import {
   parseWidgetFeedbackMarker,
-  WIDGET_FEEDBACK_PROJECT_ID,
   widgetFeedbackContext,
   widgetFeedbackRoute,
 } from "./widget-feedback.js";
+import { WIDGET_FEEDBACK_PROJECT_ID } from "./widget-support-report.js";
 
 const LINE =
   "<!-- chat-widget-feedback conversation=conv-1 message=msg-2 run=run-3 replay=abc123 at=2026-09-27T16:45:17.000Z -->";
@@ -33,13 +33,15 @@ ${LINE}
 /** Answers the issue read with a fixed project and description. */
 const linearReturning = (
   project: string | null,
-  description = DESCRIPTION
+  description = DESCRIPTION,
+  documents: { content: string; title: string }[] = []
 ) => ({
   fetch: (async () =>
     Response.json({
       data: {
         issue: {
           description,
+          documents: { nodes: documents },
           project: project === null ? null : { id: project },
         },
       },
@@ -132,13 +134,77 @@ describe("widgetFeedbackContext", () => {
     );
   });
 
+  it("reads the line from the Support report of a report filed since ENG-21100", async () => {
+    const route = await widgetFeedbackContext(
+      "issue-1",
+      credentials,
+      linearReturning(
+        WIDGET_FEEDBACK_PROJECT_ID,
+        "## What the customer wants\n\nA right answer.",
+        [
+          { content: "Notes, not the report", title: "Triage investigation" },
+          {
+            content: `## Verified scope\n\n${DESCRIPTION}`,
+            title: "Support report",
+          },
+        ]
+      )
+    );
+    assert.ok(
+      route?.includes(
+        "conversation conv-1, message msg-2, run run-3, Sentry replay abc123"
+      ),
+      route ?? "no route"
+    );
+    assert.ok(route?.includes("Support report document"));
+  });
+
   it("still routes a widget ticket whose line is missing", async () => {
     const route = await widgetFeedbackContext(
       "issue-1",
       credentials,
-      linearReturning(WIDGET_FEEDBACK_PROJECT_ID, "## Report\n")
+      linearReturning(WIDGET_FEEDBACK_PROJECT_ID, "## Report\n"),
+      [1]
     );
     assert.equal(route, widgetFeedbackRoute(null));
+  });
+
+  it("waits for a customer's report delegated before its Support report landed", async () => {
+    let reads = 0;
+    const api = {
+      fetch: (() => {
+        reads += 1;
+        return Promise.resolve(
+          Response.json({
+            data: {
+              issue: {
+                description: "## What the customer wants\n\nA right answer.",
+                documents: {
+                  nodes:
+                    reads > 1
+                      ? [
+                          {
+                            content: `## Verified scope\n\n${DESCRIPTION}`,
+                            title: "Support report",
+                          },
+                        ]
+                      : [],
+                },
+                project: { id: WIDGET_FEEDBACK_PROJECT_ID },
+              },
+            },
+          })
+        );
+      }) as typeof fetch,
+    };
+    const route = await widgetFeedbackContext(
+      "issue-1",
+      credentials,
+      api,
+      [1, 1]
+    );
+    assert.equal(reads, 2);
+    assert.ok(route?.includes("conversation conv-1, message msg-2"));
   });
 
   it("leaves every other issue on today's path", async () => {

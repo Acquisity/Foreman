@@ -564,6 +564,19 @@ const BROWSER_CONSOLE = 4;
 const SERIALIZED = /[[{][\s\S]*$/u;
 
 /**
+ * A capture's lines as they may be kept: request lines only in their
+ * time-method-path-status shape, and a console line's logged object left out.
+ */
+export const safeCaptureLines = (capture: BugReportBrowser) => ({
+  consoleErrors: capture.consoleErrors.map((text) =>
+    text.replace(SERIALIZED, "[logged object left out]")
+  ),
+  failedRequests: capture.failedRequests.filter((text) =>
+    FAILED_REQUEST.test(text)
+  ),
+});
+
+/**
  * The newest failed requests and console errors, alternating so each kind gets
  * a line before the section's budget runs out, with the Sentry event ids first.
  */
@@ -573,17 +586,15 @@ const browser: Lookup = (_ctx, _scope, turn) => {
     return Promise.resolve({ status: "not_sent" });
   }
   const line = (text: string) => ({ text: clip(text, ITEM_CHARS) });
-  const requests = capture.failedRequests
-    .filter((text) => FAILED_REQUEST.test(text))
+  const safe = safeCaptureLines(capture);
+  const requests = safe.failedRequests
     .slice(-BROWSER_REQUESTS)
     .reverse()
     .map((text) => line(`Request failed: ${text}`));
-  const consoleErrors = capture.consoleErrors
+  const consoleErrors = safe.consoleErrors
     .slice(-BROWSER_CONSOLE)
     .reverse()
-    .map((text) =>
-      line(`Console: ${text.replace(SERIALIZED, "[logged object left out]")}`)
-    );
+    .map((text) => line(`Console: ${text}`));
   const alternating = Array.from(
     { length: Math.max(requests.length, consoleErrors.length) },
     (_, index) => [requests[index], consoleErrors[index]]

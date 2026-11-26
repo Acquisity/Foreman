@@ -20,7 +20,7 @@ Fixy does the investigation. If you find yourself wanting one of these, hand the
 
 ## 1. Read the ticket
 
-Read the full issue through the Linear connection: title, description, attachments, links, comments and labels. Call `read_image` with each screenshot's `uploads.linear.app` url exactly as it appears.
+Read the full issue through the Linear connection: title, description, attachments, links, comments and labels. A ticket from the in-app support chat (its `Support chat` link) keeps the conversation, the recordings and the evidence in its `Support report` document, not the description: read that document too, and pass its conversation to `classify_ask` with the issue text and comments. Call `read_image` with each screenshot's `uploads.linear.app` url exactly as it appears.
 
 Call `classify_ask` once with the issue text and comments, and keep its `sourceLabels`. A money ask: load the billing-triage skill, which replaces this one. Otherwise continue here.
 
@@ -28,7 +28,7 @@ When the ticket already has the `## Fixy handoff` comment, go to step 8. The `fi
 
 ## 2. Find the workspace
 
-A `Workspace ID` already on the ticket wins. Otherwise call `lookup_customer` with the reporter's exact email and pick the one workspace the report is about: one membership is that workspace; with several, the campaign, record, or timing in the report says which. This is identity, not investigation: read nothing else about the account.
+A `Workspace ID` already on the ticket, or in the verified scope the session gives from a widget ticket's Support report, wins. Otherwise call `lookup_customer` with the reporter's exact email and pick the one workspace the report is about: one membership is that workspace; with several, the campaign, record, or timing in the report says which. This is identity, not investigation: read nothing else about the account.
 
 ## 3. How-to or expected behaviour
 

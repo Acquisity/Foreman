@@ -3,10 +3,12 @@ import {
   type LinearApiOptions,
   type LinearChannelCredentials,
 } from "eve/channels/linear";
-
-/** Linear project the Acquisity chat widget files its feedback tickets into. */
-export const WIDGET_FEEDBACK_PROJECT_ID =
-  "84ab288a-6a7b-4316-ab6f-f67809a40211";
+import {
+  REPORT_WAITS_MS,
+  readUntilReport,
+  SUPPORT_REPORT_TITLE,
+  WIDGET_FEEDBACK_PROJECT_ID,
+} from "./widget-support-report.js";
 
 export interface WidgetFeedbackMarker {
   /** When the report was made (ISO); older tickets predate it. */
@@ -55,16 +57,24 @@ export function widgetFeedbackRoute(
 ): string {
   const ids = marker
     ? `The ticket's machine line names conversation ${marker.conversation}, message ${marker.message ?? "none"}, run ${marker.run ?? "none"}, Sentry replay ${marker.replay ?? "none"}, reported at ${marker.at ?? "unknown"}.`
-    : "The ticket's machine line is missing or malformed: take the conversation, reply, and run from the Conversation section, and say in the comment that the line was missing.";
-  return `This issue is chat widget feedback filed into the Acquisity Chat Widget project. Load the widget-feedback skill and follow it instead of triage: diagnose why the widget answered as it did and post exactly one comment on this ticket. Change nothing else. ${ids}`;
+    : "The ticket's machine line is missing or malformed: take the conversation, reply, and run from the Conversation section (in the ticket's Support report document, or the description on a teammate's or older ticket), and say in the comment that the line was missing.";
+  return `This issue is chat widget feedback filed into the Acquisity Chat Widget project. Load the widget-feedback skill and follow it instead of triage: diagnose why the widget answered as it did and post exactly one comment on this ticket. Change nothing else. A customer's report filed since ENG-21100 has the report, transcript and browser capture in its Support report document; a teammate's report from the inbox, and any older ticket, has them in the description instead. ${ids}`;
 }
 
 const ISSUE_QUERY = `query WidgetFeedbackIssue($id: String!) {
-  issue(id: $id) { description project { id } }
+  issue(id: $id) {
+    description
+    project { id }
+    documents(first: 1, filter: { title: { eq: "${SUPPORT_REPORT_TITLE}" } }) { nodes { title content } }
+  }
 }`;
 
 interface IssueResponse {
-  issue: { description: string | null; project: { id: string } | null } | null;
+  issue: {
+    description: string | null;
+    documents: { nodes: { content: string | null; title: string }[] };
+    project: { id: string } | null;
+  } | null;
 }
 
 /**
@@ -74,19 +84,39 @@ interface IssueResponse {
 export async function widgetFeedbackContext(
   issueId: string,
   credentials: LinearChannelCredentials,
-  api?: LinearApiOptions
+  api?: LinearApiOptions,
+  waits: number[] = REPORT_WAITS_MS
 ): Promise<string | null> {
-  const { issue } = await callLinearGraphQL<IssueResponse>({
-    api,
-    credentials,
-    query: ISSUE_QUERY,
-    queryName: "WidgetFeedbackIssue",
-    variables: { id: issueId },
-  });
+  const read = async () =>
+    (
+      await callLinearGraphQL<IssueResponse>({
+        api,
+        credentials,
+        query: ISSUE_QUERY,
+        queryName: "WidgetFeedbackIssue",
+        variables: { id: issueId },
+      })
+    ).issue;
+  // A customer's report is delegated before its Support report lands; a
+  // teammate's, and an older one, carries its line in the description.
+  const issue = await readUntilReport(
+    read,
+    (found) =>
+      found?.project?.id !== WIDGET_FEEDBACK_PROJECT_ID ||
+      found.documents.nodes.length > 0 ||
+      parseWidgetFeedbackMarker(found.description ?? "") !== null,
+    waits
+  );
   if (issue?.project?.id !== WIDGET_FEEDBACK_PROJECT_ID) {
     return null;
   }
+  // Reports filed since ENG-21100 keep the line at the end of their Support
+  // report document; older ones end their description with it.
+  const report = issue.documents.nodes.find(
+    (document) => document.title === SUPPORT_REPORT_TITLE
+  );
   return widgetFeedbackRoute(
-    parseWidgetFeedbackMarker(issue.description ?? "")
+    parseWidgetFeedbackMarker(report?.content ?? "") ??
+      parseWidgetFeedbackMarker(issue.description ?? "")
   );
 }

@@ -20,3 +20,13 @@ export function serviceSecretRefusal(request: Request): Response | null {
     notConfigured: "Support chat is not configured.",
   });
 }
+
+/** A widget route's JSON answer, never cached. */
+export const noStoreJson = (body: unknown, status = 200) =>
+  Response.json(body, { headers: { "cache-control": "no-store" }, status });
+
+const BEARER = /^Bearer ([A-Za-z0-9_.-]{1,4096})$/;
+
+/** The customer's or teammate's identity token Acquisity sends beside the service secret. */
+export const widgetUserToken = (request: Request): string | undefined =>
+  BEARER.exec(request.headers.get("authorization") ?? "")?.[1];

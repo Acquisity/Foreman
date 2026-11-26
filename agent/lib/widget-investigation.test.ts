@@ -2708,7 +2708,7 @@ const asksForPerson = () =>
   Promise.resolve({ asksForHuman: 0.95, source: "jev" as const });
 /** Records each code-filed ticket; `fails` makes Linear refuse it. */
 const ticketFiler = (fails = false) => {
-  const filed: { summary: string; title: string }[] = [];
+  const filed: { body: string; summary: string; title: string }[] = [];
   const fileTicket: NonNullable<WidgetDependencies["fileTicket"]> = (
     _scope,
     input
@@ -2758,8 +2758,8 @@ test("an ask for a person, at any hour, is answered and files the conversation's
     });
     assert.equal(run.outcome?.reason, "ticket_instead_of_handoff");
     assert.equal(filed.length, 1);
-    assert.ok(filed[0].summary.includes("Can I talk to a person?"));
-    assert.ok(filed[0].summary.includes("Connect your calendar first"));
+    assert.ok(filed[0].body.includes("Can I talk to a person?"));
+    assert.ok(filed[0].body.includes("Connect your calendar first"));
   }
 });
 
