@@ -233,7 +233,7 @@ const NEVER_UNCHECKED_RULE =
   /if only the customer could answer it or act on it first, leave it out\. Never list in unchecked a question the investigator asked the customer[^;]*something only the customer can know[^;]*whether two things they saw are linked[^;]*a check that could not run yet only because of something the customer still has to do[^;]*anything the investigator did not itself say it could not check; a read that failed or timed out, or a source reported as unavailable, is still listed/;
 
 test("unchecked never holds a question for the customer, what only they know, or what the investigator did not say it could not check", () => {
-  // ENG-20988: "which site?" and "is the DNS provider right?" were filed as capability gaps.
+  // ENG-20988: "which site is meant" and "whether HTTPS works" on a domain with no public records were filed as capability gaps.
   assert.match(EXTRACT_PROMPT, NEVER_UNCHECKED_RULE);
 });
 

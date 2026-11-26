@@ -9,7 +9,7 @@ type Unchecked = NonNullable<WidgetFindings["unchecked"]>;
 
 // ENG-20988: write-ups rebuilt from five replies whose extraction filed gap
 // tickets the reply never needed (names and domains swapped for neutral ones).
-// Each `files` says what may come back as unchecked; anything else is over-listing.
+// Each case's `allowed` says what may come back as unchecked; anything else is over-listing.
 const NOTHING = (unchecked: Unchecked) => unchecked.length === 0;
 const LINKED =
   /\blink|\brelated\b|\bconnected to\b|\bsame (cause|problem|issue)\b/iu;
@@ -54,14 +54,13 @@ const CASES = [
     question:
       "I'm looking for a contact in my CRM but I only remember her first name starts with Am. Can you find who that is and what email I have saved for her?",
   },
-];
-
-// Controls: a read that failed must still file, in its own area.
-const CONTROLS = [
+  // Control: a read that failed must still file, in its own area.
   {
-    area: "billing",
+    allowed: (unchecked: Unchecked) =>
+      unchecked.some((gap) => gap.area === "billing"),
     investigatorText:
       "I read the workspace's plan: it is on Pro and active. The stripe section could not be read (it timed out), so I couldn't confirm the latest charge or whether a refund was issued.",
+    name: "control: billing read failed",
     question: "Was I charged twice this month?",
   },
 ];
@@ -75,46 +74,23 @@ export default defineEval({
       t.skip("missing AI_GATEWAY_API_KEY or VERCEL_OIDC_TOKEN for the kb slot");
     }
     const misses: string[] = [];
-    const counts = new Map<string, number>();
-    const run = async (
-      name: string,
-      question: string,
-      investigatorText: string,
-      ok: (unchecked: Unchecked) => boolean
-    ) => {
+    for (const c of CASES) {
+      let clean = 0;
       for (let i = 0; i < RUNS; i += 1) {
         // biome-ignore lint/performance/noAwaitInLoops: each run is a separate real extraction, counted one by one.
         const out = await extractWidgetFindings({
-          investigatorText,
-          question,
+          investigatorText: c.investigatorText,
+          question: c.question,
           scope,
         });
         const unchecked = out?.unchecked ?? [];
-        if (out && ok(unchecked)) {
-          counts.set(name, (counts.get(name) ?? 0) + 1);
+        if (out && c.allowed(unchecked)) {
+          clean += 1;
         } else {
-          misses.push(`${name}: ${JSON.stringify(out ? unchecked : null)}`);
+          misses.push(`${c.name}: ${JSON.stringify(out ? unchecked : null)}`);
         }
       }
-    };
-    for (const c of CASES) {
-      // biome-ignore lint/performance/noAwaitInLoops: cases run one after another, like their runs.
-      await run(c.name, c.question, c.investigatorText, c.allowed);
-    }
-    for (const c of CONTROLS) {
-      // biome-ignore lint/performance/noAwaitInLoops: cases run one after another, like their runs.
-      await run(
-        `control: ${c.area} read failed`,
-        c.question,
-        c.investigatorText,
-        (unchecked) => unchecked.some((gap) => gap.area === c.area)
-      );
-    }
-    for (const name of [
-      ...CASES.map((c) => c.name),
-      ...CONTROLS.map((c) => `control: ${c.area} read failed`),
-    ]) {
-      t.log(`${name}: ${counts.get(name) ?? 0} of ${RUNS}`);
+      t.log(`${c.name}: ${clean} of ${RUNS}`);
     }
     for (const miss of misses) {
       t.log(miss);
