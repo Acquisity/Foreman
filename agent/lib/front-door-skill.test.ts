@@ -110,10 +110,15 @@ test("the handoff carries lanes and the fixy label, never Bug or a card", () => 
 
 test("a known issue joins only when open, and a refusal hands off", () => {
   const known = section("4. Known issue");
-  assert.ok(known.includes("that issue is open (not completed or canceled)"));
+  assert.ok(
+    known.includes(
+      "that issue, or a parent above it, is open (not completed or canceled)"
+    )
+  );
   assert.ok(known.includes("`duplicateOf`"));
   assert.ok(known.includes("When `route_ticket` refuses"));
-  assert.ok(known.includes("name the candidate in `notes`"));
+  assert.ok(known.includes('Only when it returns `grouping: "joined"`'));
+  assert.ok(known.includes("`hand_to_fixy` names the candidate in the notes"));
 });
 
 test("the requester is asked once and told nothing on a plain hand-off", () => {
@@ -226,7 +231,7 @@ test("a duplicate retries only missing optional labels once", () => {
       "keeping the valid labels, assignee arguments and duplicate target"
     )
   );
-  assert.ok(known.includes("refuses for another reason or the retry fails"));
+  assert.ok(known.includes("refuses for another reason, the retry fails"));
 });
 
 test("an undecided prior-work call continues without an investigation document", () => {

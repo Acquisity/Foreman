@@ -8,6 +8,7 @@ import {
   SLACK_THREAD_START,
   TICKET_CREATED,
 } from "#lib/fixy-handoff.js";
+import type { JoinAttempt, KnownIssueCheck } from "#lib/known-issue-gate.js";
 import { stampQuestionsOnly, stampTrusted } from "#lib/trust.js";
 import type {
   HandoffSession,
@@ -17,6 +18,7 @@ import type {
 
 // The tool module resolves Foreman's Linear connector as it loads.
 process.env.LINEAR_CONNECTOR ??= "stub/stub";
+process.env.ACQUISITY_ORIGIN ??= "https://app.acquisity.ai";
 const {
   default: tool,
   handToFixy,
@@ -30,6 +32,10 @@ const TEAM_ID = "team-san";
 const COMMENT_ID = fixyHandoffCommentId(ISSUE_ID);
 const LANES_LINE = /^Lanes: .*\n/mu;
 const QUERY_NAME = /(?:query|mutation)\s+(\w+)/u;
+const NEEDS_CHECK = /find_related_issues with issue SAN-145/u;
+const JOIN_FIRST = /Join it with route_ticket/u;
+const ALREADY_DUPLICATE = /already a duplicate/u;
+const RETRY_READ = /Could not read ENG-9's state/u;
 // Measured shape: SAN-124's 'Ask from' link into the receiver sandbox.
 const ASK_URL =
   "https://acquisityworkspace.slack.com/archives/C0BLFDUN6Q7/p1793556157524579";
@@ -78,7 +84,10 @@ const LABELS: LabelRow[] = [
 interface Ticket {
   attachments: { title: string; url: string }[];
   comments: { body: string; id: string }[];
+  description: string;
+  knownIssueState: string | null;
   labels: { id: string; name: string }[];
+  state: string;
   teamKey: string;
 }
 
@@ -96,7 +105,10 @@ const fakeLinear = (
   const state: Ticket = {
     attachments: [],
     comments: [],
+    description: "Step 2 sent nothing.",
+    knownIssueState: "started",
     labels: [],
+    state: "triage",
     teamKey: "SAN",
     ...ticket,
   };
@@ -117,11 +129,19 @@ const fakeLinear = (
                 pageInfo: { hasNextPage: options.hidden ?? false },
               },
               createdAt: "2026-11-01T18:02:40.000Z",
+              description: state.description,
               id: ISSUE_ID,
               identifier: "SAN-145",
               labels: { nodes: state.labels },
+              state: { type: state.state },
               team: { id: TEAM_ID, key: state.teamKey },
             },
+          };
+        case "FixyKnownIssue":
+          return {
+            issue: state.knownIssueState
+              ? { parent: null, state: { type: state.knownIssueState } }
+              : null,
           };
         case "FixyHandoffComment": {
           const found = state.comments.find((c) => c.id === variables.id);
@@ -857,6 +877,88 @@ describe("hand_to_fixy", () => {
     assert.equal(
       handToFixyInputSchema.safeParse({ ...input, card: "refund" }).success,
       false
+    );
+  });
+});
+
+describe("hand_to_fixy on a widget bug (ENG-21101)", () => {
+  const CHAT = {
+    title: "Support chat",
+    url: "https://app.acquisity.ai/dashboard/admin/support?conversation=7a1e2b3c-4d5e-4f60-8a7b-9c0d1e2f3a4b",
+  };
+  const WRITES = [
+    "FixyHandoffCreate",
+    "FixyHandoffUpdate",
+    "FixyHandoffLabels",
+  ];
+  const known =
+    (join?: JoinAttempt): (() => Record<string, KnownIssueCheck>) =>
+    () => ({
+      "SAN-145": {
+        judged: { "ENG-7": "partial_or_adjacent", "ENG-9": "same_outcome" },
+        knownIssues: ["ENG-9"],
+        searches: { duplicates: ["ENG-7"], masters: ["ENG-9"] },
+        ...(join ? { joins: { "ENG-9": join } } : {}),
+      },
+    });
+
+  it("refuses with no known-issue check, an unjoined open known issue, or a ticket already a duplicate, writing nothing", async () => {
+    const unchecked = fakeLinear({ attachments: [CHAT] });
+    const unjoined = fakeLinear({ attachments: [CHAT] });
+    const duplicate = fakeLinear({ attachments: [CHAT], state: "duplicate" });
+    const results = [
+      await handToFixy(input, root, unchecked.linear, ENV),
+      await handToFixy(input, root, unjoined.linear, ENV, undefined, known()),
+      await handToFixy(input, root, duplicate.linear, ENV, undefined, known()),
+    ];
+    assert.deepEqual(
+      results.map((result) => result.success),
+      [false, false, false]
+    );
+    assert.match(results[0]?.reason ?? "", NEEDS_CHECK);
+    assert.match(results[1]?.reason ?? "", JOIN_FIRST);
+    assert.match(results[2]?.reason ?? "", ALREADY_DUPLICATE);
+    for (const fake of [unchecked, unjoined, duplicate]) {
+      assert.ok(!fake.names().some((name) => WRITES.includes(name)));
+    }
+  });
+
+  it("hands off with the candidate before the model's notes when the join was refused", async () => {
+    const fake = fakeLinear({ attachments: [CHAT] });
+    const result = await handToFixy(
+      { ...input, notes: "Started after Friday's import." },
+      root,
+      fake.linear,
+      ENV,
+      undefined,
+      known({ error: "Label missing", grouping: null })
+    );
+    assert.equal(result.success, true);
+    assert.equal(result.fixyNotified, true);
+    assert.equal(
+      parseFixyHandoff(fake.state.comments[0]?.body ?? "")?.notes,
+      "Same outcome as open ENG-9, but route_ticket refused the join: join it there if your look agrees. Also related: ENG-7 (partial match). Started after Friday's import."
+    );
+  });
+
+  it("refuses when the known issue's state can't be read, and still throws on cancellation", async () => {
+    const fake = fakeLinear(
+      { attachments: [CHAT] },
+      { fail: "FixyKnownIssue" }
+    );
+    const result = await handToFixy(
+      input,
+      root,
+      fake.linear,
+      ENV,
+      undefined,
+      known()
+    );
+    assert.match(result.reason ?? "", RETRY_READ);
+    const aborted = new AbortController();
+    aborted.abort();
+    await assert.rejects(
+      handToFixy(input, root, fake.linear, ENV, aborted.signal, known())
     );
   });
 });
