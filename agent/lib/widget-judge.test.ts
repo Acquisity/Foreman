@@ -560,6 +560,33 @@ test("a run that called a retired tool is not judged with the endpoint that repl
   assert.ok(old.includes("widget_outreach_health"));
 });
 
+test("a score result saved during the rollout is judged with its held areas' tools, not their endpoints", () => {
+  const campaigns = WIDGET_ENDPOINT_MANIFEST.endpoints.find(
+    ({ name }) => name === "campaigns"
+  );
+  assert.ok(campaigns);
+  const listed = [
+    {
+      name: campaigns.name,
+      path: campaigns.path,
+      sections: campaigns.sections.map((section) => section.name),
+      version: campaigns.version,
+    },
+  ];
+  const names = judgeToolCapabilities(listed, [], ["campaigns", "orders"]).map(
+    ({ name }) => name
+  );
+  assert.equal(names.includes("widget_campaigns"), false);
+  for (const name of [
+    "widget_outreach_health",
+    "widget_provisioning_status",
+    "widget_job_failures",
+  ]) {
+    assert.ok(names.includes(name), name);
+  }
+  assert.equal(names.includes("widget_billing_summary"), false);
+});
+
 test("a score result saved with the rollout's held areas still loads", () => {
   assert.ok(
     widgetCaseSchema.safeParse({

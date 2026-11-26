@@ -307,7 +307,8 @@ export const judgeInput = (
     widgetAffordances: WIDGET_AFFORDANCES,
     widgetToolCapabilities: judgeToolCapabilities(
       recorded.scope.endpoints,
-      recorded.cassette.map(({ tool }) => tool)
+      recorded.cassette.map(({ tool }) => tool),
+      recorded.scope.heldAreas
     ),
   });
 

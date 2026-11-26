@@ -30,18 +30,21 @@ const handWrittenCapabilities = Object.entries({
 const RETIRED_TOOL =
   "A tool this run had that has since been retired. It was available to the investigator; what it read is in its toolResults.";
 /**
- * The area each retired single-area tool answered for (ENG-20544). A run that
- * called one predates its area's endpoint, so that endpoint tool is left out.
+ * The areas each retired tool answered for (ENG-20544). A run that called a
+ * single-area one predates that area's endpoint, so the endpoint tool is left
+ * out; a score result saved during the rollout records its held areas, whose
+ * retired tools it had and whose endpoints it did not.
  */
-const RETIRED_TOOL_AREAS: Readonly<Record<string, string>> = {
-  widget_account_access: "account",
-  widget_billing_summary: "billing",
-  widget_generation_diagnostics: "ai-generation",
-  widget_inbox_health: "inboxes",
-  widget_lead_pipeline_status: "lead-pipeline",
-  widget_outreach_health: "campaigns",
-  widget_provisioning_status: "orders",
-  widget_sdr_thread_status: "ai-sdr",
+const RETIRED_TOOL_AREAS: Readonly<Record<string, readonly string[]>> = {
+  widget_account_access: ["account"],
+  widget_billing_summary: ["billing"],
+  widget_generation_diagnostics: ["ai-generation"],
+  widget_inbox_health: ["inboxes"],
+  widget_job_failures: ["ai-sdr", "lead-pipeline", "orders"],
+  widget_lead_pipeline_status: ["lead-pipeline"],
+  widget_outreach_health: ["campaigns"],
+  widget_provisioning_status: ["orders"],
+  widget_sdr_thread_status: ["ai-sdr"],
 };
 
 /**
@@ -53,16 +56,26 @@ const RETIRED_TOOL_AREAS: Readonly<Record<string, string>> = {
  */
 export const judgeToolCapabilities = (
   endpoints: readonly AvailableEndpoint[] | undefined,
-  calledTools: readonly string[] = []
+  calledTools: readonly string[] = [],
+  heldAreas: readonly string[] = []
 ) => {
-  const called = new Set(calledTools);
-  const predates = new Set(
-    [...called].flatMap((name) => RETIRED_TOOL_AREAS[name] ?? [])
-  );
+  const held = new Set(heldAreas);
+  for (const name of calledTools) {
+    const areas = RETIRED_TOOL_AREAS[name];
+    if (areas?.length === 1) {
+      held.add(areas[0]);
+    }
+  }
+  const had = new Set([
+    ...calledTools,
+    ...Object.entries(RETIRED_TOOL_AREAS)
+      .filter(([, areas]) => areas.some((area) => held.has(area)))
+      .map(([name]) => name),
+  ]);
   const offered = [
     ...handWrittenCapabilities,
     ...offeredEndpointTools(endpoints)
-      .filter(({ area }) => !predates.has(area))
+      .filter(({ area }) => !held.has(area))
       .map(({ description, inputSchema, name }) => ({
         description,
         inputSchema,
@@ -70,7 +83,7 @@ export const judgeToolCapabilities = (
       })),
   ];
   const known = new Set(offered.map(({ name }) => name));
-  const retired = [...called]
+  const retired = [...had]
     .filter((name) => name.startsWith("widget_") && !known.has(name))
     .map((name) => ({ description: RETIRED_TOOL, inputSchema: {}, name }));
   return [...offered, ...retired];
