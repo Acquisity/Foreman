@@ -1,5 +1,13 @@
 import { logOpsEvent } from "./ops-log.js";
-import { BUG_REPORT_ADDED, BUG_REPORT_LOGGED } from "./widget-bug-report.js";
+import {
+  BUG_REPORT_ADDED,
+  BUG_REPORT_LOGGED,
+  type draftHandoffTicket,
+  fallbackHandoffDraft,
+  HANDOFF_DRAFT_MS,
+  type HandoffFacts,
+  handoffTicketBody,
+} from "./widget-bug-report.js";
 import { parseFindings, type WidgetFindings } from "./widget-findings.js";
 import type { WidgetDependencies } from "./widget-investigation.js";
 import type { WidgetOutcome, WidgetRun } from "./widget-run-store.js";
@@ -20,6 +28,12 @@ export const TICKET_INSTEAD = "ticket_instead_of_handoff";
 export const PERSON_INVITE = "person_invite";
 
 const TICKET_TIMEOUT_MS = 30_000;
+/**
+ * Left for the filing itself when the caller has a deadline, its own reads
+ * and write at their bounds (refund 3s, search 15s, write 15s): the ticket
+ * matters more than its wording, so a draft runs only with this to spare.
+ */
+const FILING_ROOM_MS = 35_000;
 
 /** Fixed wording, so no model promises a person, a time or anything beyond where the answer will arrive. */
 export const ANSWER_HERE =
@@ -61,26 +75,28 @@ type Filed = Exclude<
 
 /**
  * File the conversation's one ticket in place of a handoff (an existing one is
- * reused, commented on and, when Done, reopened). Null when the turn is a
- * teammate's or the ticket could not be filed.
+ * reused, commented on and, when Done, reopened), with a title and body the
+ * bug writer drafts from the facts. Null when the turn is a teammate's or the
+ * ticket could not be filed.
  */
 export async function handoffTicket(
   scope: WidgetContext,
-  ticket: { summary: string; title: string },
+  facts: HandoffFacts,
   ids: { runId: string; sessionId?: string },
   signal: AbortSignal | undefined,
   /** Absent, nothing is filed: only callers wired to Linear file. */
-  file: typeof fileTicketFor | undefined
+  file: typeof fileTicketFor | undefined,
+  /** Absent, the ticket is written from the customer's own words. */
+  draft?: typeof draftHandoffTicket,
+  /** The time left before the caller's deadline, when it has one. */
+  roomMs?: number
 ): Promise<Filed | null> {
   if (!(file && customerTurn(scope))) {
     return null;
   }
   const filed = await file(
     scope,
-    {
-      summary: ticket.summary.slice(0, 4000),
-      title: ticket.title.slice(0, 160),
-    },
+    await handoffInput(scope, facts, signal, draft, roomMs),
     signal
       ? AbortSignal.any([signal, AbortSignal.timeout(TICKET_TIMEOUT_MS)])
       : AbortSignal.timeout(TICKET_TIMEOUT_MS),
@@ -93,6 +109,34 @@ export async function handoffTicket(
     ...ids,
   });
   return ok ? filed : null;
+}
+
+/**
+ * The title and summary the filer gets. A conversation whose history shows
+ * it was filed lands on that ticket as a comment, so it is written without
+ * the model; otherwise the drafter writes it, when the caller's deadline
+ * leaves the filing its room.
+ */
+async function handoffInput(
+  scope: WidgetContext,
+  facts: HandoffFacts,
+  signal: AbortSignal | undefined,
+  draft: typeof draftHandoffTicket | undefined,
+  roomMs: number | undefined
+) {
+  const drafted =
+    draft &&
+    !wasFiledEarlier(facts.history) &&
+    (roomMs ?? Number.POSITIVE_INFINITY) >= HANDOFF_DRAFT_MS + FILING_ROOM_MS
+      ? await draft(facts, signal)
+      : fallbackHandoffDraft(facts);
+  return {
+    summary: handoffTicketBody(drafted, facts, scope, new Date()).slice(
+      0,
+      4000
+    ),
+    title: drafted.title.slice(0, 160),
+  };
 }
 
 /** The filed ticket as the findings record it; Acquisity keeps it on the chat. */
@@ -197,9 +241,12 @@ export async function ticketInsteadOfBlock(
   run: Pick<WidgetRun, "id" | "question" | "scope">,
   result: WidgetOutcome,
   findings: unknown,
+  history: HandoffFacts["history"],
   ids: { runId: string; sessionId?: string },
   signal: AbortSignal | undefined,
-  file: typeof fileTicketFor | undefined
+  file: typeof fileTicketFor | undefined,
+  draft?: typeof draftHandoffTicket,
+  roomMs?: number
 ): Promise<{ findings: unknown; result: WidgetOutcome }> {
   const reason = result.reason ?? "blocked";
   if (
@@ -213,21 +260,16 @@ export async function ticketInsteadOfBlock(
   const filed = await handoffTicket(
     run.scope,
     {
-      summary: [
-        `The customer wrote: ${run.question}`,
-        `Foreman could not answer it (${reason}).`,
-        ...(found
-          ? [
-              `What Foreman found: ${found.report}`,
-              `Recommendation: ${found.recommendation}`,
-            ]
-          : []),
-      ].join("\n\n"),
-      title: `Support chat: ${found?.report ?? run.question}`,
+      findings: found ?? undefined,
+      history,
+      latest: run.question,
+      why: `Foreman could not answer it (${reason}).`,
     },
     ids,
     signal,
-    file
+    file,
+    draft,
+    roomMs
   );
   if (!filed) {
     return { findings, result };
@@ -277,22 +319,21 @@ export const completeInvite = (
  */
 export type FrontDoorTicket = "person" | "member";
 
-/** The front-door ticket's summary and title for the team. */
+/** What the front-door ticket is drafted from. */
 export const frontDoorTicket = (
   why: FrontDoorTicket,
   scope: WidgetContext,
-  latest: string,
+  ask: { latest: string; turns?: HandoffFacts["history"] },
   reply: string
-) =>
-  why === "person"
-    ? {
-        summary: `The customer asked for a person and wrote: ${latest}\n\nForeman's reply: ${reply}`,
-        title: "Support chat: the customer asked for a person",
-      }
-    : {
-        summary: `The customer, a workspace ${scope.role}, needs their workspace looked into, which only an owner or admin can start, and wrote: ${latest}\n\nForeman's reply: ${reply}`,
-        title: `Support chat: a ${scope.role} needs their workspace looked into`,
-      };
+): HandoffFacts => ({
+  history: ask.turns,
+  latest: ask.latest,
+  reply,
+  why:
+    why === "person"
+      ? "The customer asked for a person."
+      : `The customer is a workspace ${scope.role}, and only an owner or admin can start a look into their workspace.`,
+});
 
 /**
  * The investigator's note for a toggled ask for a person whose ticket could
@@ -311,6 +352,14 @@ const FILED_REPLIES = [
   BUG_REPORT_ADDED,
   "a teammate will pick this up",
 ];
+
+/** An earlier reply in the history told the customer their conversation has a ticket. */
+const wasFiledEarlier = (history: Turns) =>
+  history?.some(
+    (turn) =>
+      turn.role === "assistant" &&
+      FILED_REPLIES.some((line) => turn.text.includes(line))
+  ) ?? false;
 
 /**
  * A follow-up reads the conversation's ticket when it was filed: an earlier
@@ -339,11 +388,7 @@ export const followUpNote = async (
   }
   const filed =
     investigating ||
-    input.history?.some(
-      (turn) =>
-        turn.role === "assistant" &&
-        FILED_REPLIES.some((line) => turn.text.includes(line))
-    ) ||
+    wasFiledEarlier(input.history) ||
     (await (deps.wasFiled?.(scope, signal) ?? Promise.resolve(false)).catch(
       () => false
     ));

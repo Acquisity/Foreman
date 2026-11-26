@@ -357,7 +357,7 @@ test("What we know so far lists sources that found something, then folds the res
     scope: verifiedWidgetContext,
     turn,
   });
-  assert.equal(title, "Customer reports a problem from the support chat");
+  assert.equal(title, "My campaign stays on Scheduling and never sends.");
   assert.ok(
     description.includes(
       [

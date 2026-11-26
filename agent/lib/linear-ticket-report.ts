@@ -20,11 +20,19 @@ const writtenIssue = z
 export const confirmedIssue = (data: unknown) =>
   writtenIssue.parse(providerData(data));
 
-export const formatCustomerReport = (summary: string) => {
-  const longestRun = Math.max(
-    0,
-    ...Array.from(summary.matchAll(/`+/g), (match) => match[0].length)
-  );
-  const fence = "`".repeat(Math.max(3, longestRun + 1));
-  return `## Customer report\n\n${fence}text\n${summary}\n${fence}`;
-};
+const FENCE_CHARACTER = /[\\`~]/gu;
+const INDENT = /^[ \t]+/gmu;
+
+/**
+ * A widget ticket's body as the team reads it, with no code block. Backslashes,
+ * backticks and tildes are escaped and line indents dropped, so no text inside can open
+ * a code block that would swallow what follows, the server's Verified scope
+ * block included, and an opening angle bracket stays literal, so it cannot
+ * become markup. A line's `>` still quotes.
+ */
+export const formatCustomerReport = (summary: string) =>
+  summary
+    .trim()
+    .replaceAll(INDENT, "")
+    .replaceAll("<", "&lt;")
+    .replaceAll(FENCE_CHARACTER, (character) => `\\${character}`);
