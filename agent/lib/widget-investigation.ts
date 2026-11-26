@@ -1471,7 +1471,7 @@ function frontDoorReplies(
     if (!why) {
       return null;
     }
-    const facts = frontDoorTicket(why, scope, ask, message);
+    const facts = frontDoorTicket(why, scope, ask, message, route.refund);
     const filed = await ticketInsteadOfHandoff(
       scope,
       facts,

@@ -94,7 +94,21 @@ const filing = () => {
 test("the customer's Report a problem is filed through the one widget filer, with its ids in the Support report", async (t) => {
   enabled(t);
   const { filed, overrides } = filing();
-  const response = await receiveProblemReport(report(), overrides);
+  const response = await receiveProblemReport(
+    report({
+      app_version: "0123456789abcdef",
+      browser: {
+        browser: "Chrome 131",
+        consoleErrors: [],
+        failedRequests: [],
+        page: "/dashboard",
+        replayId: null,
+        screen: "1440x900",
+        sentryEventIds: [],
+      },
+    }),
+    overrides
+  );
   assert.equal(response.status, 200);
   assert.deepEqual(await response.json(), {
     existing: false,
@@ -109,10 +123,15 @@ test("the customer's Report a problem is filed through the one widget filer, wit
     input.title,
     "Foreman sent the customer to a Billing tab that isn't there"
   );
-  assert.equal(input.retryKey, `problem-report:${REPORT_ID}`);
+  // Scoped to the chat and the reply, so a reused form id never collides.
+  assert.equal(
+    input.retryKey,
+    `problem-report:${scope.conversationId}:${REPLY_ID}:${REPORT_ID}`
+  );
   assert.doesNotMatch(input.body, ANY_UUID);
   const sections = input.report.join("\n\n");
   assert.ok(sections.includes(`Reported reply: ${REPLY_ID}`));
+  assert.ok(sections.includes("App version: 0123456789ab"));
   assert.ok(sections.includes("Foreman: Open the Billing tab in Settings."));
   // The widget-feedback route reads its ids from the Support report's last line.
   assert.deepEqual(parseWidgetFeedbackMarker(sections), {

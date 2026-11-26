@@ -38,6 +38,11 @@ const DETAILS_MAX = 2000;
 const REPORT_MS = 45_000;
 
 const inputSchema = z.strictObject({
+  /** The build the customer's app was running. */
+  app_version: z
+    .string()
+    .regex(/^[0-9a-f]{7,40}$/u)
+    .optional(),
   /** The browser capture; an invalid one is dropped, never refused. */
   browser: z.unknown().optional(),
   conversation_id: z.uuid(),
@@ -45,7 +50,7 @@ const inputSchema = z.strictObject({
   /** The ticket Acquisity filed for this reply before ENG-21100, which this report then lands on. */
   earlier_ticket: z
     .string()
-    .regex(/^ENG-\d{1,7}$/u)
+    .regex(/^[A-Z][A-Z0-9]{0,9}-\d{1,7}$/u)
     .optional(),
   /** Customer-visible turns, oldest first, ending at the reported reply. */
   history: z
@@ -73,13 +78,17 @@ const fenced = (lines: string[]) =>
     ? lines.map((line) => `    ${inert(line)}`).join("\n")
     : "(none)";
 
-const browserSection = (browser: BugReportBrowser, reportedAt: string) => {
+const browserSection = (
+  browser: BugReportBrowser,
+  reportedAt: string,
+  appVersion: string | undefined
+) => {
   const org = process.env.WIDGET_SENTRY_ORG_SLUG;
   return [
     "## Browser",
     `Reported at: ${reportedAt}`,
     `Page: ${inert(browser.page)}`,
-    `Browser: ${inert(browser.browser)}   Screen: ${inert(browser.screen)}`,
+    `Browser: ${inert(browser.browser)}   Screen: ${inert(browser.screen)}   App version: ${appVersion?.slice(0, 12) ?? "unknown"}`,
     `Sentry replay: ${browser.replayId && org ? `https://${org}.sentry.io/replays/${browser.replayId}/` : (browser.replayId ?? "none")}`,
     `Sentry errors: ${browser.sentryEventIds.length ? browser.sentryEventIds.join(", ") : "none"}`,
     "### Console errors (newest last)",
@@ -117,7 +126,7 @@ export const problemReportSections = (
         )
         .join("\n\n")
     : "(no messages)",
-  ...(browser ? [browserSection(browser, reportedAt)] : []),
+  ...(browser ? [browserSection(browser, reportedAt, input.app_version)] : []),
   `<!-- chat-widget-feedback conversation=${input.conversation_id} message=${input.message_id ?? "none"} run=${input.run_id ?? "none"} replay=${browser?.replayId ?? "none"} at=${reportedAt} -->`,
 ];
 
@@ -201,7 +210,7 @@ export async function receiveProblemReport(
           message: input.message_id ?? "none",
         },
         report: problemReportSections(input, browser, reportedAt),
-        retryKey: `problem-report:${input.report_id}`,
+        retryKey: `problem-report:${input.conversation_id}:${input.message_id ?? "none"}:${input.report_id}`,
         summary: facts.latest,
         title: draft.title.slice(0, 160),
       },

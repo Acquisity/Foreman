@@ -18,6 +18,7 @@ import { migrationFiledReport } from "./migration-ticket-scope.js";
 import { withoutReporterUpdates } from "./reporter-updates/copy.js";
 import {
   isSupportChatLink,
+  isWidgetTicketBody,
   REPORT_WAITS_MS,
   readUntilReport,
   SUPPORT_REPORT_TITLE,
@@ -262,9 +263,9 @@ const ASK_FROM_QUERY = `query AskFrom($id: String!) {
   }
 }`;
 
-// A workspace line holds a 500-character name and its slug.
+// A workspace line holds a 500-character name, each character escaped to at most four, and its slug.
 const VERIFIED_SCOPE =
-  /## Verified scope\n\n((?:[-*] [^\n]{1,1200}\n?){1,10})/u;
+  /## Verified scope\n\n((?:[-*] [^\n]{1,2500}\n?){1,10})/u;
 
 /**
  * The verified scope lines from a widget ticket's Support report, which since
@@ -319,8 +320,9 @@ export async function readAskFrom(
   const found = await readUntilReport(
     read,
     (answer) =>
-      !answer?.attachments.nodes.some(isSupportChatLink) ||
-      answer.documents.nodes.length > 0,
+      !isWidgetTicketBody(answer?.description ?? null) ||
+      (answer?.attachments.nodes.some(isSupportChatLink) === true &&
+        answer.documents.nodes.length > 0),
     waits
   );
   const attachments = found?.attachments.nodes ?? [];

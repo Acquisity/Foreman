@@ -62,7 +62,7 @@ export const inert = (text: string) =>
   text.replaceAll("<", "&lt;").replaceAll(">", "&gt;");
 
 const UUID_ANYWHERE =
-  /\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/giu;
+  /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/giu;
 
 /**
  * A ticket title or body with record ids taken out: a customer who pastes a
@@ -132,7 +132,11 @@ export const supportReportContent = (
  * written just after, so a session can open first: the pre-model reads wait
  * for the report a little, inside the 7s gate, before going on without it.
  */
-export const REPORT_WAITS_MS = [1500, 2000];
+export const REPORT_WAITS_MS = [1000, 1500, 2500];
+
+/** Whether a description is a widget ticket's body, which ends with the pointer to its Support report. */
+export const isWidgetTicketBody = (description: string | null) =>
+  (description ?? "").trimEnd().endsWith(SUPPORT_REPORT_POINTER);
 
 /** Reads again after each wait until `ready` holds, then returns the last read. */
 export async function readUntilReport<T>(
@@ -168,6 +172,9 @@ const UPDATE = `mutation SupportReportUpdate($id: String!, $input: DocumentUpdat
 // eve's LinearApiError keeps Linear's own errors in `body`; this one means the id is taken.
 const TAKEN = /conflict on insert of Document/u;
 
+/** Create, or read and update: three requests at most. */
+const REPORT_WRITE_MS = 30_000;
+
 /** The line that marks one filing's addition, so a retried filing adds nothing twice. */
 export const additionMark = (key: string) =>
   `<!-- support-report-addition ${key} -->`;
@@ -180,18 +187,19 @@ const unsaved = (conversationId: string) => {
 /**
  * Writes the ticket's Support report with Foreman's own Linear app token, or,
  * when the ticket already has one, adds `addition` to its end unless that
- * filing's mark is already there. Throws only when the caller is aborted: the
- * ticket is already filed and linked to its chat, so a failed or refused
- * write is logged and the filing still succeeds.
+ * filing's mark is already there. Never throws: the ticket is already filed
+ * and linked to its chat, so a failed or refused write is logged and returns
+ * false. It runs under its own deadline, so a cancelled turn cannot turn a
+ * filed ticket into a failure.
  */
 export async function saveSupportReport(
   identifier: string,
   content: string,
   addition: { key: string; text: string },
   ids: { conversationId: string },
-  signal: AbortSignal,
   request: typeof linearAppRequest = linearAppRequest
 ): Promise<boolean> {
+  const signal = AbortSignal.timeout(REPORT_WRITE_MS);
   const id = supportReportId(identifier);
   const mark = additionMark(addition.key);
   try {
@@ -201,7 +209,7 @@ export async function saveSupportReport(
         CREATE,
         {
           input: {
-            content: `${content}\n\n${mark}`,
+            content: `${mark}\n\n${content}`,
             id,
             issueId: identifier,
             title: SUPPORT_REPORT_TITLE,
@@ -229,16 +237,13 @@ export async function saveSupportReport(
       {
         id,
         input: {
-          content: fitReport(existing, `\n\n${addition.text}\n\n${mark}`),
+          content: fitReport(existing, `\n\n${mark}\n\n${addition.text}`),
         },
       },
       signal
     );
     return updated.documentUpdate.success || unsaved(ids.conversationId);
-  } catch (error) {
-    if (signal.aborted) {
-      throw error;
-    }
+  } catch {
     return unsaved(ids.conversationId);
   }
 }
@@ -362,6 +367,7 @@ const LEGACY_FEEDBACK = `query LegacyFeedbackTicket($id: String!) {
  * A report ticket Acquisity filed itself before ENG-21100, which the app
  * still names for the reported reply: it counts only in the Chat Widget
  * project and when its description's machine line names this chat and reply.
+ * Its state does not matter: a repeat report only adds to it, as before.
  */
 export async function legacyFeedbackTicket(
   identifier: string,
@@ -384,8 +390,7 @@ export async function legacyFeedbackTicket(
     !issue ||
     issue.project?.id !== WIDGET_FEEDBACK_PROJECT_ID ||
     line?.[1] !== conversationId ||
-    line[2] !== message ||
-    ["canceled", "duplicate"].includes(issue.state.type)
+    line[2] !== message
   ) {
     return null;
   }

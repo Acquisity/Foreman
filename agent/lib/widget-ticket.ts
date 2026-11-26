@@ -177,23 +177,38 @@ export async function conversationTicket(
     Pick<TicketDependencies, "kind" | "linked" | "owns" | "search">
   > = {}
 ): Promise<ConversationTicket | undefined> {
+  const tickets = await conversationTickets(ctx, kind ?? "case", overrides);
+  for (const wanted of kind ? [kind] : KIND_ORDER) {
+    const found = tickets.find((ticket) => ticket.kind === wanted);
+    if (found) {
+      return found;
+    }
+  }
+  return undefined;
+}
+
+/**
+ * The conversation's open case and refund tickets, linked ones first. Old
+ * tickets are searched only when no linked ticket is of the kind wanted.
+ */
+export async function conversationTickets(
+  ctx: ProviderContext,
+  wanted: Exclude<TicketKind, "feedback">,
+  overrides: Partial<
+    Pick<TicketDependencies, "kind" | "linked" | "owns" | "search">
+  > = {}
+): Promise<ConversationTicket[]> {
   const deps = { ...ticketDependencies, ...overrides };
   const scope = requireWidgetContext(ctx.session?.auth.initiator);
-  const pick = (tickets: ConversationTicket[]) => {
-    const open = tickets.filter(
-      ({ stateType }) => !CLOSED_UNDONE.has(stateType)
+  const open = (tickets: ConversationTicket[]) =>
+    tickets.filter(
+      ({ kind, stateType }) =>
+        kind !== "feedback" && !CLOSED_UNDONE.has(stateType)
     );
-    for (const wanted of kind ? [kind] : KIND_ORDER) {
-      const found = open.find((ticket) => ticket.kind === wanted);
-      if (found) {
-        return found;
-      }
-    }
-  };
-  return (
-    pick(await deps.linked(scope.conversationId, ctx.abortSignal)) ??
-    pick(await legacyTickets(ctx, scope, deps))
-  );
+  const linked = open(await deps.linked(scope.conversationId, ctx.abortSignal));
+  return linked.some(({ kind }) => kind === wanted)
+    ? linked
+    : [...linked, ...open(await legacyTickets(ctx, scope, deps))];
 }
 
 /**
@@ -208,12 +223,14 @@ async function feedbackTicket(
   signal: AbortSignal,
   deps: Pick<TicketDependencies, "legacyFeedback" | "linked">
 ): Promise<ConversationTicket | undefined> {
-  const linked = (await deps.linked(scope.conversationId, signal)).find(
-    (ticket) =>
-      ticket.kind === "feedback" &&
-      ticket.reported === report.message &&
-      !CLOSED_UNDONE.has(ticket.stateType)
+  const feedback = (await deps.linked(scope.conversationId, signal)).filter(
+    ({ kind }) => kind === "feedback"
   );
+  // A ticket whose report never landed is taken up by the next report, which
+  // writes it, so a failed write is repaired rather than filed again.
+  const linked =
+    feedback.find(({ reported }) => reported === report.message) ??
+    feedback.find(({ reported }) => reported === undefined);
   if (linked || !report.earlier) {
     return linked;
   }
@@ -241,6 +258,8 @@ export interface WidgetTicketInput {
    * ENG-21100, when it has one.
    */
   feedback?: { earlier?: string; message: string };
+  /** The caller already knows this is a refund request, so no classifier decides it. */
+  refund?: true;
   /** The Support report's sections after its verified scope: conversation, findings, evidence. */
   report: string[];
   /** Keys a reused ticket's follow-up comment when there is no run, so a retry adds nothing. */
@@ -262,10 +281,64 @@ const filingKind = async (
   if (input.entry === "problem") {
     return "feedback";
   }
+  if (input.refund) {
+    return "refund";
+  }
   // Only the ask itself: the body and report also carry earlier turns.
   const ask = { summary: input.summary, title: input.title };
   return (await refund(ask, signal)) ? "refund" : "case";
 };
+
+/** A follow-up comment on the chat's ticket of this kind, keyed so a retry adds nothing. */
+async function addToTicket(
+  ctx: ProviderContext,
+  input: WidgetTicketInput,
+  existing: ConversationTicket,
+  kind: TicketKind | "bug",
+  key: string | undefined,
+  deps: TicketDependencies
+): Promise<WidgetTicketReceipt> {
+  if (key) {
+    await deps.followUp(
+      // A report on a Foreman reply only adds to its ticket, whatever its state.
+      kind === "feedback" ? { ...existing, stateType: "started" } : existing,
+      withoutIds(input.body),
+      key,
+      ctx.abortSignal,
+      FOLLOW_UP_INTRO[input.entry]
+    );
+  }
+  return existingTicket(existing);
+}
+
+/** A new ticket of this kind, linked to the chat, with no ids in its title or body. */
+async function createTicket(
+  ctx: ProviderContext,
+  input: WidgetTicketInput,
+  kind: TicketKind | "bug",
+  deps: TicketDependencies
+): Promise<WidgetTicketReceipt | { error: string }> {
+  const result = await deps.create(ctx, {
+    body: withoutIds(formatCustomerReport(input.body)),
+    kind,
+    title: withoutIds(input.title),
+  });
+  if (!result.ok) {
+    return { error: "Linear did not accept the ticket." };
+  }
+  try {
+    return {
+      existing: false,
+      refund: kind === "refund",
+      ...confirmedIssue(result.data),
+    };
+  } catch {
+    return {
+      error:
+        "Linear accepted the request but did not return a confirmed ticket. Do not retry automatically.",
+    };
+  }
+}
 
 /**
  * File this verified conversation's ticket for this kind of work, or return
@@ -333,52 +406,27 @@ export async function fileWidgetTicket(
             "\n\n"
           ),
         },
-        scope,
-        ctx.abortSignal
+        scope
       );
     const existing =
       kind === "feedback"
         ? input.feedback &&
           (await feedbackTicket(scope, input.feedback, ctx.abortSignal, deps))
         : await conversationTicket(ctx, kind === "bug" ? "case" : kind, deps);
-    if (existing) {
-      // Without a run or retry key there is no fixed comment id, so nothing is added.
-      if (key) {
-        await deps.followUp(
-          existing,
-          withoutIds(input.body),
-          key,
-          ctx.abortSignal,
-          FOLLOW_UP_INTRO[input.entry]
-        );
-        await report(existing.identifier);
-      }
-      return await confirm(existingTicket(existing));
+    const outcome = existing
+      ? await addToTicket(ctx, input, existing, kind, key, deps)
+      : await createTicket(ctx, input, kind, deps);
+    if ("error" in outcome) {
+      return outcome;
     }
-    const result = await deps.create(ctx, {
-      body: withoutIds(formatCustomerReport(input.body)),
-      kind,
-      title: withoutIds(input.title),
-    });
-    if (!result.ok) {
-      return { error: "Linear did not accept the ticket." };
-    }
-    let filed: { identifier: string; url: string };
-    try {
-      filed = confirmedIssue(result.data);
-    } catch {
-      return {
-        error:
-          "Linear accepted the request but did not return a confirmed ticket. Do not retry automatically.",
-      };
-    }
-    const confirmed = await confirm({
-      existing: false,
-      refund: kind === "refund",
-      ...filed,
-    });
-    await report(filed.identifier);
-    return confirmed;
+    // Without a run or retry key there is no fixed id, so a reused ticket gets nothing added.
+    const confirmed = await confirm(outcome);
+    const unsaved = (!existing || key) && !(await report(outcome.identifier));
+    // A report on a Foreman reply is acknowledged only once its evidence is
+    // stored; the customer's retry takes up this ticket and writes it.
+    return unsaved && kind === "feedback"
+      ? { error: "The report could not be saved." }
+      : confirmed;
   } catch (error) {
     if (ctx.abortSignal.aborted) {
       throw error;
@@ -425,15 +473,33 @@ const NOTE_MS = 5000;
  */
 export async function conversationTicketNote(
   scope: WidgetContext,
-  signal: AbortSignal
+  signal: AbortSignal,
+  deps = { note: ticketNote, tickets: conversationTickets }
 ): Promise<TicketNote | null> {
   if (scope.source !== "widget" || isLiveActive()) {
     return null;
   }
   const bounded = AbortSignal.any([signal, AbortSignal.timeout(NOTE_MS)]);
   try {
-    const ticket = await conversationTicket(appTicketContext(scope, bounded));
-    return ticket ? await ticketNote(ticket.identifier, bounded) : null;
+    const tickets = await deps.tickets(
+      appTicketContext(scope, bounded),
+      "case"
+    );
+    const notes = await Promise.all(
+      KIND_ORDER.flatMap((kind) => {
+        const ticket = tickets.find((found) => found.kind === kind);
+        return ticket ? [deps.note(ticket.identifier, bounded)] : [];
+      })
+    );
+    const [first, second] = notes;
+    if (!(first && second)) {
+      return first ?? second ?? null;
+    }
+    // A chat with a product ticket and a refund hears about each by name.
+    return {
+      forInvestigator: `About the problem they reported: ${first.forInvestigator} About their refund request: ${second.forInvestigator}`,
+      forWriters: `About the problem they reported: ${first.forWriters} About their refund request: ${second.forWriters}`,
+    };
   } catch (error) {
     if (signal.aborted) {
       throw error;

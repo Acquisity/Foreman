@@ -144,8 +144,10 @@ async function handoffInput(
   return {
     body,
     entry: "handoff" as const,
+    ...(facts.refund ? { refund: true as const } : {}),
     report: handoffReport(facts),
-    summary: body,
+    // The refund check reads only this message and why it needs the team.
+    summary: `${facts.latest}\n\n${facts.why}`,
     title: drafted.title.slice(0, 160),
   };
 }
@@ -335,10 +337,12 @@ export const frontDoorTicket = (
   why: FrontDoorTicket,
   scope: WidgetContext,
   ask: { latest: string; turns?: HandoffFacts["history"] },
-  reply: string
+  reply: string,
+  refund = false
 ): HandoffFacts => ({
   history: ask.turns,
   latest: ask.latest,
+  ...(refund ? { refund: true as const } : {}),
   reply,
   why:
     why === "person"

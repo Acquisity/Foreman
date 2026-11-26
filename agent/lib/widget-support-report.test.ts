@@ -50,7 +50,6 @@ test("a first filing creates the report under the ticket's fixed id, marked with
       "## Verified scope",
       ADDITION,
       scope,
-      signal,
       request
     ),
     true
@@ -58,7 +57,7 @@ test("a first filing creates the report under the ticket's fixed id, marked with
   const input = sent[0]?.variables.input as Record<string, string>;
   assert.equal(input.title, "Support report");
   assert.equal(input.issueId, "ENG-1");
-  assert.ok(input.content.endsWith("<!-- support-report-addition run-1 -->"));
+  assert.ok(input.content.startsWith("<!-- support-report-addition run-1 -->"));
 });
 
 test("a later filing appends once: a retry with the same key adds nothing", async () => {
@@ -71,13 +70,61 @@ test("a later filing appends once: a retry with the same key adds nothing", asyn
       return { documentUpdate: { success: true } };
     },
   });
-  await saveSupportReport("ENG-1", "unused", ADDITION, scope, signal, request);
-  await saveSupportReport("ENG-1", "unused", ADDITION, scope, signal, request);
+  await saveSupportReport("ENG-1", "unused", ADDITION, scope, request);
+  await saveSupportReport("ENG-1", "unused", ADDITION, scope, request);
   assert.equal(
     sent.filter(({ name }) => name === "SupportReportUpdate").length,
     1
   );
   assert.equal(stored.split("- Customer: again").length - 1, 1);
+});
+
+test("what is stored keeps the feedback line last, so the widget-feedback route still finds it after a retry and a second report", async () => {
+  let stored = "";
+  const { request } = linear({
+    SupportReportCreate: (variables: Record<string, unknown>) => {
+      if (stored) {
+        throw taken;
+      }
+      stored = (variables.input as { content: string }).content;
+      return { documentCreate: { success: true } };
+    },
+    SupportReportRead: () => ({ document: { content: stored } }),
+    SupportReportUpdate: (variables: Record<string, unknown>) => {
+      stored = (variables.input as { content: string }).content;
+      return { documentUpdate: { success: true } };
+    },
+  });
+  const line = (message: string) =>
+    `<!-- chat-widget-feedback conversation=${scope.conversationId} message=${message} run=none replay=none at=2026-11-26T12:00:00.000Z -->`;
+  const content = supportReportContent(scope, "problem", [
+    "## Report",
+    line("reply-a"),
+  ]);
+  await saveSupportReport(
+    "ENG-1",
+    content,
+    { key: "r1", text: "unused" },
+    scope,
+    request
+  );
+  assert.equal(parseWidgetFeedbackMarker(stored)?.message, "reply-a");
+  await saveSupportReport(
+    "ENG-1",
+    content,
+    { key: "r2", text: `## Added\n\n${line("reply-a")}` },
+    scope,
+    request
+  );
+  await saveSupportReport(
+    "ENG-1",
+    content,
+    { key: "r2", text: `## Added\n\n${line("reply-a")}` },
+    scope,
+    request
+  );
+  assert.equal(parseWidgetFeedbackMarker(stored)?.message, "reply-a");
+  assert.equal(stored.split("support-report-addition r2").length - 1, 1);
 });
 
 test("a refused write is logged and the filing goes on", async (t) => {
@@ -87,7 +134,7 @@ test("a refused write is logged and the filing goes on", async (t) => {
     SupportReportCreate: { documentCreate: { success: false } },
   });
   assert.equal(
-    await saveSupportReport("ENG-1", "x", ADDITION, scope, signal, request),
+    await saveSupportReport("ENG-1", "x", ADDITION, scope, request),
     false
   );
   assert.equal(warned.length, 1);
@@ -195,10 +242,13 @@ test("an earlier feedback ticket counts only in the Chat Widget project, for thi
     await check(issue(line(scope.conversationId, "reply-a"), "other-project")),
     null
   );
+  // A repeat only adds to it, whatever its state, as before.
   assert.equal(
-    await check(
-      issue(line(scope.conversationId, "reply-a"), undefined, "canceled")
-    ),
-    null
+    (
+      await check(
+        issue(line(scope.conversationId, "reply-a"), undefined, "canceled")
+      )
+    )?.identifier,
+    "ENG-7"
   );
 });

@@ -209,7 +209,9 @@ test("a widget ticket's verified scope comes from its Support report, only when 
 });
 
 test("a session that opens before the Support report lands waits for it", async () => {
-  const api = linearReturning("Inboxes fail.", [chatLink()], [], null, [
+  const body =
+    "Inboxes fail.\n\nThe conversation, the verified workspace and the ids are in the Support report document attached to this ticket.";
+  const api = linearReturning(body, [chatLink()], [], null, [
     [],
     [supportReport],
   ]);
@@ -220,14 +222,15 @@ test("a session that opens before the Support report lands waits for it", async 
       "- Workspace ID: 22222222-2222-4222-8222-222222222222"
     )
   );
-  // A ticket with no support chat link never waits.
-  const plain = linearReturning("A report");
+  // Any other ticket, linked or not, never waits.
+  const plain = linearReturning("A report", [chatLink()]);
   await readAskFrom("issue-1", credentials, plain, [1, 1]);
   assert.equal(plain.reads(), 1);
 });
 
 test("the longest workspace line still yields the Workspace ID", async () => {
-  const name = "N".repeat(500);
+  // Every opening angle bracket is escaped to four characters in the report.
+  const name = "&lt;".repeat(500);
   const report = {
     content: supportReport.content.replace(
       "Trivox AI (trivox)",

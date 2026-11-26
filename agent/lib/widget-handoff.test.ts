@@ -555,3 +555,27 @@ test("a follow-up reads the ticket after a filing reply, the old after-hours pic
   );
   assert.equal(reads.length, 5);
 });
+
+test("a member's refund ask the front door recognised is filed as a refund, read from this message alone", async () => {
+  const inputs: { refund?: true; summary: string }[] = [];
+  const file = ((
+    _scope: unknown,
+    input: { refund?: true; summary: string }
+  ) => {
+    inputs.push(input);
+    return Promise.resolve(filed);
+  }) as never;
+  const facts = frontDoorTicket(
+    "member",
+    { ...scope, role: "member" },
+    {
+      latest: "I want my money back for November.",
+      turns: [{ role: "customer", text: "Earlier my campaign broke." }],
+    },
+    "",
+    true
+  );
+  await ticketInsteadOfHandoff(scope, facts, ids, undefined, file);
+  assert.equal(inputs[0]?.refund, true);
+  assert.ok(!inputs[0]?.summary.includes("Earlier my campaign broke."));
+});

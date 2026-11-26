@@ -195,6 +195,8 @@ export interface HandoffFacts {
   /** Earlier turns, oldest first: the customer's messages and the replies that went out. */
   history?: { role: "customer" | "assistant"; text: string }[];
   latest: string;
+  /** The front door already read this as a refund request, so it files in billing's queue. */
+  refund?: true;
   /** Foreman's reply to this message, when it has one. */
   reply?: string;
   /** Why the conversation needs the team, in plain words. */

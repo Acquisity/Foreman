@@ -6,6 +6,7 @@ import type { WidgetContext } from "./widget-scope.js";
 import type { LinkedTicket } from "./widget-support-report.js";
 import {
   appTicketContext,
+  conversationTicketNote,
   existingTicket,
   fileTicketFor,
   fileWidgetTicket,
@@ -624,4 +625,127 @@ test("a bug report never asks the refund check, and a failed Support report stil
   );
   assert.deepEqual(kinds, ["bug"]);
   assert.equal("identifier" in filed && filed.identifier, "ENG-30");
+});
+
+test("a report whose evidence could not be saved is not acknowledged, and the retry takes up that ticket and writes it", async (t) => {
+  t.mock.method(globalThis, "fetch", () =>
+    Promise.reject(new Error("unexpected transport"))
+  );
+  const failed = await fileTicketFor(
+    scope,
+    feedbackReport("reply-a"),
+    new AbortController().signal,
+    undefined,
+    {
+      create: created("ENG-50"),
+      linked: () => Promise.resolve([]),
+      report: () => Promise.resolve(false),
+    }
+  );
+  assert.ok("error" in failed);
+  const written: string[] = [];
+  const retried = await fileTicketFor(
+    scope,
+    feedbackReport("reply-a"),
+    new AbortController().signal,
+    undefined,
+    {
+      create: () => assert.fail("the first ticket is taken up"),
+      followUp: () => Promise.resolve(),
+      // Linked to the chat, with no Support report yet.
+      linked: () => Promise.resolve([linkedTicket("ENG-50", "feedback")]),
+      report: (identifier) => {
+        written.push(identifier);
+        return Promise.resolve(true);
+      },
+    }
+  );
+  assert.equal("identifier" in retried && retried.identifier, "ENG-50");
+  assert.deepEqual(written, ["ENG-50"]);
+});
+
+test("a refund the front door already recognised files in billing's queue without asking the classifier", async (t) => {
+  t.mock.method(globalThis, "fetch", () =>
+    Promise.reject(new Error("unexpected transport"))
+  );
+  const kinds: string[] = [];
+  const filed = await fileTicketFor(
+    scope,
+    { ...ask("Refund my last charge please."), refund: true },
+    new AbortController().signal,
+    undefined,
+    {
+      ...noLinks,
+      create: (_ctx, input) => {
+        kinds.push(input.kind);
+        return created("ENG-51")();
+      },
+      linked: () => Promise.resolve([linkedTicket("ENG-20", "case")]),
+      refund: () => assert.fail("the front door already decided"),
+      search: () =>
+        Promise.resolve({ createdAfter: null, issues: [], truncated: false }),
+    }
+  );
+  assert.deepEqual(kinds, ["refund"]);
+  assert.equal("refund" in filed && filed.refund, true);
+});
+
+test("an id pasted inside a longer identifier is taken out too", async (t) => {
+  t.mock.method(globalThis, "fetch", () =>
+    Promise.reject(new Error("unexpected transport"))
+  );
+  const sent: { body: string; title: string }[] = [];
+  const pasted = "campaign_9f8e7d6c-5b4a-4321-8fed-cba987654321 stalls";
+  await fileTicketFor(
+    scope,
+    { ...ask(pasted), title: pasted },
+    new AbortController().signal,
+    undefined,
+    {
+      ...noLinks,
+      create: (_ctx, input) => {
+        sent.push(input);
+        return created("ENG-52")();
+      },
+      refund: () => Promise.resolve(false),
+      search: () =>
+        Promise.resolve({ createdAfter: null, issues: [], truncated: false }),
+    }
+  );
+  assert.ok(!`${sent[0]?.title}${sent[0]?.body}`.includes("9f8e7d6c"));
+});
+
+test("a follow-up in a chat with a product ticket and a refund hears about each by name", async () => {
+  const note = (status: string) => ({
+    forInvestigator: `${status} (investigator)`,
+    forWriters: status,
+  });
+  const both = await conversationTicketNote(
+    scope,
+    new AbortController().signal,
+    {
+      note: (identifier) =>
+        Promise.resolve(
+          note(identifier === "ENG-21" ? "refund pending" : "bug started")
+        ),
+      tickets: () =>
+        Promise.resolve([
+          linkedTicket("ENG-21", "refund"),
+          linkedTicket("ENG-20", "case"),
+        ]),
+    }
+  );
+  assert.equal(
+    both?.forWriters,
+    "About the problem they reported: bug started About their refund request: refund pending"
+  );
+  const one = await conversationTicketNote(
+    scope,
+    new AbortController().signal,
+    {
+      note: () => Promise.resolve(note("refund pending")),
+      tickets: () => Promise.resolve([linkedTicket("ENG-21", "refund")]),
+    }
+  );
+  assert.equal(one?.forWriters, "refund pending");
 });
