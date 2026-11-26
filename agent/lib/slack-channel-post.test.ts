@@ -17,10 +17,13 @@ describe("postSlackChannelMessage", () => {
     globalThis.fetch = realFetch;
   });
 
-  test("posts the text into the channel and resolves when Slack accepts it", async () => {
+  test("posts the text into the channel and resolves to the message ts when Slack accepts it", async () => {
     const sent: URLSearchParams[] = [];
-    respondWith(200, '{"ok":true}', sent);
-    await postSlackChannelMessage("C123", { text: "hello" }, token);
+    respondWith(200, '{"ok":true,"ts":"1795438861.817009"}', sent);
+    assert.equal(
+      await postSlackChannelMessage("C123", { text: "hello" }, token),
+      "1795438861.817009"
+    );
     assert.equal(sent[0]?.get("channel"), "C123");
     assert.equal(sent[0]?.get("text"), "hello");
     assert.equal(sent[0]?.get("blocks"), null);
@@ -31,6 +34,7 @@ describe("postSlackChannelMessage", () => {
     ["ok: false", 200, '{"ok":false,"error":"channel_not_found"}'],
     ["a non-JSON body", 200, "<html>gateway</html>"],
     ["a null body", 200, "null"],
+    ["ok with no ts", 200, '{"ok":true}'],
   ] as const) {
     test(`throws the fixed error, never the body, on ${name}`, async () => {
       respondWith(status, body, []);

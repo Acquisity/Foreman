@@ -16,14 +16,15 @@ const appSlackBotToken = (): Promise<string> =>
 
 /**
  * Posts one message into a channel as the app's Slack bot, with no model
- * turn. Throws a fixed error, never the Slack response body, so a caller's
- * log line cannot carry provider text.
+ * turn, and resolves to its `ts` so a caller can thread under it. Throws a
+ * fixed error, never the Slack response body, so a caller's log line cannot
+ * carry provider text.
  */
 export const postSlackChannelMessage = async (
   channel: string,
   message: SlackChannelMessage,
   botToken: () => Promise<string> = appSlackBotToken
-): Promise<void> => {
+): Promise<string> => {
   const token = await botToken();
   const response = await fetch("https://slack.com/api/chat.postMessage", {
     body: new URLSearchParams({
@@ -42,15 +43,21 @@ export const postSlackChannelMessage = async (
     signal: AbortSignal.timeout(20_000),
   });
   const body = await response.text();
-  if (!(response.ok && body.length <= 1_000_000 && slackAccepted(body))) {
+  const ts =
+    response.ok && body.length <= 1_000_000 ? acceptedTs(body) : undefined;
+  if (ts === undefined) {
     throw new Error("Slack refused the channel message.");
   }
+  return ts;
 };
 
-const slackAccepted = (body: string): boolean => {
+const acceptedTs = (body: string): string | undefined => {
   try {
-    return (JSON.parse(body) as { ok?: unknown } | null)?.ok === true;
+    const parsed = JSON.parse(body) as { ok?: unknown; ts?: unknown } | null;
+    return parsed?.ok === true && typeof parsed.ts === "string"
+      ? parsed.ts
+      : undefined;
   } catch {
-    return false;
+    return undefined;
   }
 };

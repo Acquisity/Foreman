@@ -1,33 +1,29 @@
 ---
-description: "Weekly AI SDR performance report: render the deterministic metrics the schedule passes in as Slack-native tables plus a short summary. Load for every ai-sdr-report schedule dispatch."
+description: "Weekly AI SDR performance report: write the three-line summary in the thread under the charts and tables the schedule already posted. Load for every ai-sdr-report schedule dispatch."
 ---
 
 # AI SDR weekly report
 
-Produce the weekly AI SDR performance report for the channel the schedule dispatched to.
+The schedule has already read the report and posted it as charts and tables in the AI SDR channel. You're in that post's thread. Write the summary readers look for under it.
 
-## Get the report
+## Read the report
 
-The schedule reads the report before dispatching and puts it, as JSON, at the end of the dispatch message. It owns the report windows, fixed production queries, AI SDR booking boundary, arithmetic, and deltas. Render only that JSON. Do not call any tool and do not recalculate the returned values. A failed read never reaches this skill, because the schedule posts the failure line itself.
+The report is the JSON at the end of the dispatch message. It owns the windows, figures and deltas, so use its values as given. Do not call any tool. A failed read never reaches this skill, because the schedule posts the failure line itself.
 
-## Render the report
+## Write the summary
 
-Post exactly one message. Start with the report window from `windows.report`. Use unfenced Markdown tables so Slack converts them to native table blocks. Do not use code fences or manually aligned plain text.
+Post exactly one message: three short, plain-language lines labelled `Trend:`, `Improvement:` and `Watch:`, and nothing else. Each line names the figures it rests on, with the report's own deltas: count changes as `%`, rate changes as `pp`, one decimal place, except reply rate at two.
 
-Every table uses these columns in this order:
+- `Trend:` the week's overall direction, led by booked meetings and booked meeting rate.
+- `Improvement:` the clearest gain on last week or the same week last month.
+- `Watch:` the clearest drop or risk, such as a falling lifecycle step or campaign type.
 
-`Metric | This wk | Last wk | Δ WoW | Same wk last month | Δ MoM`
+Completed meetings lag because a meeting only completes after its date, so a low completed count is not a Watch item on its own.
 
-Render count deltas from `wowPercent` and `momPercent` with a `%` suffix. Render `null` count deltas as `n/a` because a zero baseline has no meaningful percentage change. Render rate deltas from `wowPercentagePoints` and `momPercentagePoints` with a `pp` suffix. Rates and deltas use one decimal place, except reply rate and its deltas use two decimal places. Counts can use compact `k` or `M` notation when helpful.
+Example (the 16 to 20 Nov 2026 report):
 
-Use these five sections in order:
+Trend: Booked meetings rose 7.4% on last week and 69.1% on the same week last month, and the booked meeting rate held near 18%, down 1.0pp on the week.
+Improvement: Podcast's booked meeting rate is up 5.3pp and direct's 2.1pp on the same week last month, and replies grew 10.0% on the week.
+Watch: Booked per slots sent fell 5.8pp, no response grew 40.4% on the week, and interview's booked meeting rate is down 5.7pp on last month.
 
-1. `Volume and booked meetings`: Emails sent, Replies, Positive replies (Instantly), Booked meetings.
-2. `Conversion rates`: Reply rate, Positive reply rate, Booked meeting rate. Add one plain line that booked meeting rate uses AI SDR booked meetings divided by Instantly positive replies.
-3. `Booked meeting rate by campaign type`: podcast, direct, interview, lead-magnet. The primary value is each method's `bookedMeetingRate`; do not combine methods. Add one plain line that remaining types are too small to read a trend from.
-4. `AI SDR lifecycle, every stage`: Replied, Slots sent, Booked, Completed, Declined, No response.
-5. `Lifecycle step conversion`: Slots sent / replied, Booked / slots sent, Completed / booked.
-
-After the lifecycle tables, add this exact meaning in one plain line: Completed lags because a meeting only completes after its date, so recent weeks fill in late.
-
-End with `Summary` and exactly three short, plain-language lines labeled `Trend:`, `Improvement:`, and `Watch:`. Base them only on the returned values. No em dashes and no bold for emphasis.
+No headings, tables, code fences, bold or em dashes.
