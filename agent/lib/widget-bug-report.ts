@@ -308,10 +308,10 @@ export const draftHandoffTicket = (
   );
 };
 
-const BLOCK_MARKER = /^[#>|=+*-]/u;
-/** A drafted sentence on one line, with a leading block marker escaped, so model text cannot open a block of its own. */
+const BLOCK_MARKER = /^[#>|=+*-]+\s*/u;
+/** A drafted sentence on one line, with any leading block marker dropped, so model text cannot open a block of its own. */
 const sentence = (text: string) =>
-  text.replaceAll(WHITESPACE, " ").trim().replace(BLOCK_MARKER, "\\$&");
+  text.replaceAll(WHITESPACE, " ").trim().replace(BLOCK_MARKER, "");
 
 /**
  * A handoff ticket's body: what the customer wants, what Foreman told them,

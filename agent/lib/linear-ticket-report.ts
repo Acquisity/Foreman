@@ -20,12 +20,12 @@ const writtenIssue = z
 export const confirmedIssue = (data: unknown) =>
   writtenIssue.parse(providerData(data));
 
-const FENCE_CHARACTER = /[`~]/gu;
+const FENCE_CHARACTER = /[\\`~]/gu;
 const INDENT = /^[ \t]+/gmu;
 
 /**
- * A widget ticket's body as the team reads it, with no code block. Backticks
- * and tildes are escaped and line indents dropped, so no text inside can open
+ * A widget ticket's body as the team reads it, with no code block. Backslashes,
+ * backticks and tildes are escaped and line indents dropped, so no text inside can open
  * a code block that would swallow what follows, the server's Verified scope
  * block included, and an opening angle bracket stays literal, so it cannot
  * become markup. A line's `>` still quotes.

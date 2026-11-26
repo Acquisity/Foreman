@@ -1292,7 +1292,9 @@ async function settleResultRun(
       { runId: run.id, sessionId },
       undefined,
       deps.fileTicket,
-      deps.draftTicket
+      deps.draftTicket,
+      // Already overdue: the ticket is written without waiting on a draft.
+      0
     );
     logGateDecision(
       { conversationId: run.scope.conversationId, runId: run.id, sessionId },

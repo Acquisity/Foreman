@@ -105,7 +105,7 @@ const initiator = widgetAuth(scope);
  */
 const fileForReal = () => {
   const writes: { description: string; title: string }[] = [];
-  const file: typeof fileTicketFor = async (_scope, input) => {
+  const file: typeof fileTicketFor = async (_scope, input, signal) => {
     const original = executorTransport.call;
     const connector = process.env.EXECUTOR_MCP_CONNECTOR_SUPPORT;
     process.env.EXECUTOR_MCP_CONNECTOR_SUPPORT = "executor.test/widget";
@@ -122,7 +122,7 @@ const fileForReal = () => {
     try {
       return await fileWidgetTicket(
         {
-          abortSignal: AbortSignal.timeout(1000),
+          abortSignal: signal,
           getToken: async () => ({ token: "test-token" }),
           session: { auth: { current: initiator, initiator } },
         } as never,
@@ -382,7 +382,7 @@ test("a long pasted log and model text starting with a heading still fit, with t
   const [{ description }] = writes;
   const report = description.slice(0, description.indexOf("## Verified scope"));
   assert.ok(report.length <= 4002, String(report.length));
-  assert.ok(report.includes("## What's still open\n\n\\## open word"));
+  assert.ok(report.includes("## What's still open\n\nopen word"));
   assert.ok(report.includes("## What the customer wrote\n\n> x\n> x"));
   assertScopeParses(description);
 });
