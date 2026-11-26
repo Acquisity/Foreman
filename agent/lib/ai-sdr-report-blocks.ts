@@ -116,16 +116,27 @@ const reportWindow = ({ start, end }: Report["windows"]["report"]): string => {
   return `${day(start)} to ${endLabel}`;
 };
 
+/** One table as readable lines, because screen readers read only the message text. */
+const textSection = (heading: string, rows: string[][]): string =>
+  [
+    `${heading}:`,
+    ...rows.map(
+      ([label, thisWeek, lastWeek, wow, lastMonth, mom]) =>
+        `${label}: ${thisWeek} this week, ${lastWeek} last week (${wow}), ${lastMonth} same week last month (${mom}).`
+    ),
+  ].join("\n");
+
 /**
  * The weekly AI SDR report as Slack blocks: native bar charts and tables,
- * rendered in code so every figure is the report's own. The model's
- * written summary goes in the thread under this message.
+ * rendered in code so every figure is the report's own. The message text
+ * carries the same rows as lines, for screen readers. The model's written
+ * summary goes in the thread under this message.
  */
 export const renderAiSdrReportBlocks = (
   report: Report
 ): { blocks: unknown[]; text: string } => {
   const { conversion, volume, lifecycleConversion } = report;
-  const window = reportWindow(report.windows.report);
+  const title = `AI SDR weekly report, ${reportWindow(report.windows.report)}`;
   const booked = volume.bookedMeetings;
   const headline =
     `*${count(booked.report)} booked meetings*, ${countDelta(booked.wowPercent)} on last week and ${countDelta(booked.momPercent)} on the same week last month.\n` +
@@ -138,23 +149,28 @@ export const renderAiSdrReportBlocks = (
     label: STAGE_LABELS[stage.stage] ?? stage.stage,
     value: stage.count,
   }));
+  const volumeRows = [
+    countRow("Emails sent", volume.emailsSent),
+    countRow("Replies", volume.replies),
+    countRow("Positive replies", volume.positiveReplies),
+    countRow("Booked meetings", volume.bookedMeetings),
+    rateRow("Reply rate", conversion.replyRate, 2),
+    rateRow("Positive reply rate", conversion.positiveReplyRate),
+    rateRow("Booked meeting rate", conversion.bookedMeetingRate),
+  ];
+  const methodRows = methods.map(({ label, value }) => rateRow(label, value));
+  const lifecycleRows = [
+    ...stages.map(({ label, value }) => countRow(label, value)),
+    rateRow("Slots sent / replied", lifecycleConversion.slotsSentPerReplied),
+    rateRow("Booked / slots sent", lifecycleConversion.bookedPerSlotsSent),
+    rateRow("Completed / booked", lifecycleConversion.completedPerBooked),
+  ];
   return {
     blocks: [
-      {
-        text: { text: `AI SDR weekly report, ${window}`, type: "plain_text" },
-        type: "header",
-      },
+      { text: { text: title, type: "plain_text" }, type: "header" },
       section(headline),
       section("*Volume and conversion*"),
-      table([
-        countRow("Emails sent", volume.emailsSent),
-        countRow("Replies", volume.replies),
-        countRow("Positive replies", volume.positiveReplies),
-        countRow("Booked meetings", volume.bookedMeetings),
-        rateRow("Reply rate", conversion.replyRate, 2),
-        rateRow("Positive reply rate", conversion.positiveReplyRate),
-        rateRow("Booked meeting rate", conversion.bookedMeetingRate),
-      ]),
+      table(volumeRows),
       context(
         "Booked meeting rate is AI SDR booked meetings over positive replies."
       ),
@@ -164,23 +180,20 @@ export const renderAiSdrReportBlocks = (
         "% of positive replies",
         methods
       ),
-      table(methods.map(({ label, value }) => rateRow(label, value))),
+      table(methodRows),
       context("Remaining types are too small to read a trend from."),
       section("*AI SDR lifecycle, every stage*"),
       barChart("AI SDR lifecycle, every stage", "Leads", stages),
-      table([
-        ...stages.map(({ label, value }) => countRow(label, value)),
-        rateRow(
-          "Slots sent / replied",
-          lifecycleConversion.slotsSentPerReplied
-        ),
-        rateRow("Booked / slots sent", lifecycleConversion.bookedPerSlotsSent),
-        rateRow("Completed / booked", lifecycleConversion.completedPerBooked),
-      ]),
+      table(lifecycleRows),
       context(
         "Completed lags because a meeting only completes after its date, so recent weeks fill in late. The summary is in the thread."
       ),
     ],
-    text: `AI SDR weekly report, ${window}: ${count(booked.report)} booked meetings, ${countDelta(booked.wowPercent)} on last week. Booked meeting rate ${conversion.bookedMeetingRate.report.toFixed(1)}%.`,
+    text: [
+      `${title}. ${headline.replaceAll("*", "")}`,
+      textSection("Volume and conversion", volumeRows),
+      textSection("Booked meeting rate by campaign type", methodRows),
+      textSection("AI SDR lifecycle", lifecycleRows),
+    ].join("\n\n"),
   };
 };

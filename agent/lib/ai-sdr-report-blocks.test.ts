@@ -48,6 +48,12 @@ describe("renderAiSdrReportBlocks", () => {
       "+0.10pp",
     ]);
     assert.ok(text.startsWith("AI SDR weekly report, 16 to 20 Nov 2026"));
+    assert.ok(
+      text.includes(
+        "Interview: 15.6% this week, 16.2% last week (-0.6pp), 21.3% same week last month (-5.7pp)."
+      ),
+      "the message text carries every table row for screen readers"
+    );
   });
 
   test("shows n/a for a change from a zero baseline", () => {
