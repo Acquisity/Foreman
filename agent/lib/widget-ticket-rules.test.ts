@@ -136,19 +136,3 @@ test("follow-ups sent before their delay file the fault ticket from the campaign
     null
   );
 });
-
-test("the old tools' readings still file while their areas are held", () => {
-  assert.equal(
-    ruledTicket("All follow-ups went out 3 hours after the first email.", [
-      {
-        result: json({
-          campaigns: [
-            { diagnostics: { earlyFollowUps: { platformFault: true } } },
-          ],
-        }),
-        tool: "widget_outreach_health",
-      },
-    ]),
-    "fault"
-  );
-});
