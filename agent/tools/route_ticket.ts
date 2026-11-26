@@ -5,7 +5,7 @@ import { linearAuth } from "#lib/constants.js";
 import { executorClient } from "#lib/executor/client.js";
 import { questionsOnlyPolicy } from "#lib/github/approval.js";
 import { LINEAR_ISSUE_ID_PATTERN } from "#lib/investigation-memory/scope.js";
-import { isDuplicateState, recordJoin } from "#lib/known-issue-gate.js";
+import { recordJoin } from "#lib/known-issue-gate.js";
 import { masterCreatedAfter } from "#lib/linear-api.js";
 import { masterWindow } from "#lib/master-window.js";
 import { logOpsEvent } from "#lib/ops-log.js";
@@ -48,21 +48,19 @@ const picksMaster = (input: {
   );
 
 /**
- * Before a Duplicate join: the report's Support chat links, and the ids of the
- * match's own, so the repair after it removes only a copy the join made. Empty
- * for any other route; null when a read failed.
+ * Before a route with duplicateOf (whose duplicate relation moves attachments
+ * whatever state it sets): the report's Support chat links, and the ids of the
+ * match's own, so the repair after it removes only a copy the route made.
+ * Empty for any other route; null when a read failed.
  */
 const chatsBeforeJoin = async (
-  input: { duplicateOf?: string; issue: string; state?: string },
+  input: { duplicateOf?: string; issue: string },
   linear: LinearRead
 ): Promise<{
   chats: Awaited<ReturnType<typeof supportChatsOf>>;
   matchHad: Set<string>;
 } | null> => {
-  if (
-    !(input.duplicateOf && isDuplicateState(input.state)) ||
-    isTriageReplay()
-  ) {
+  if (!input.duplicateOf || isTriageReplay()) {
     return { chats: [], matchHad: new Set() };
   }
   try {
@@ -131,7 +129,7 @@ export default defineTool({
         return joined({ error: reopen.reason, routed: false as const });
       }
     }
-    // A Duplicate join moves the case's Support chat link onto the match; read it first to put it back.
+    // A duplicate relation moves the case's Support chat link onto the match; read it first to put it back.
     const before = await chatsBeforeJoin(input, linear);
     if (before === null) {
       ctx.abortSignal.throwIfAborted();
