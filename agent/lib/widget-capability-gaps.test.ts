@@ -457,6 +457,39 @@ test("a first comment that failed leaves the ticket without its kind label until
   assert.deepEqual(linear.issues[0]?.labels, ["label-Capability Gap"]);
 });
 
+test("the find reads closed tickets by closure time and never treats Duplicate as open", async () => {
+  const queries: string[] = [];
+  const linear = fakeLinear();
+  await fileCapabilityGap(
+    gap,
+    { conversationId: "conv-1", organizationId: CUSTOMER_ORG, runId: "run-1" },
+    signal,
+    ((name: string, query: string, variables?: Record<string, unknown>) => {
+      queries.push(query);
+      return linear.request(name, query, variables);
+    }) as never
+  );
+  const [find] = queries;
+  assert.match(find ?? "", /nin: \["completed", "canceled", "duplicate"\]/u);
+  assert.match(
+    find ?? "",
+    /or: \[\{ completedAt: \{ gt: \$since \} \}, \{ canceledAt: \{ gt: \$since \} \}\]/u
+  );
+  assert.doesNotMatch(find ?? "", /updatedAt/u);
+});
+
+test("an open ticket still takes the conversation when Linear returns no kind label", async () => {
+  const linear = fakeLinear();
+  await fileWith(linear)("conv-1", "run-1");
+  const without = fakeLinear([]);
+  without.issues.push(...linear.issues);
+  assert.deepEqual(await fileWith(without)("conv-2", "run-2"), {
+    identifier: "ENG-1",
+    outcome: "counted",
+  });
+  assert.equal(linear.issues[0]?.comments.length, 2);
+});
+
 test("a ticket closed more than 30 days ago no longer holds its conversations back", async () => {
   const linear = fakeLinear();
   const file = fileWith(linear);

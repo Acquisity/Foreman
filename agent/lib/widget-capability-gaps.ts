@@ -479,13 +479,6 @@ export async function fileCapabilityGap(
   const kindLabel = found.issueLabels.nodes.find(
     (node) => node.name === LABELS[gap.kind]
   )?.id;
-  const teamId = found.teams.nodes[0]?.id;
-  if (!(teamId && kindLabel)) {
-    return {
-      outcome: "failed",
-      reason: `Linear has no ${teamKey} team or ${LABELS[gap.kind]} label.`,
-    };
-  }
   const commentId = (issueId: string) =>
     commentIdFor(`capability-gap:${issueId}:${seen.conversationId}`);
   const record = (issueId: string) =>
@@ -523,13 +516,20 @@ export async function fileCapabilityGap(
         id: open.id,
       });
     }
-    if (!open.labels.nodes.some(({ id }) => id === kindLabel)) {
+    if (kindLabel && !open.labels.nodes.some(({ id }) => id === kindLabel)) {
       await write("CapabilityGapLabel", ADD_LABEL, {
         id: open.id,
         label: kindLabel,
       });
     }
     return { identifier: open.identifier, outcome: added ? "counted" : "seen" };
+  }
+  const teamId = found.teams.nodes[0]?.id;
+  if (!(teamId && kindLabel)) {
+    return {
+      outcome: "failed",
+      reason: `Linear has no ${teamKey} team or ${LABELS[gap.kind]} label.`,
+    };
   }
   const created = await request<{
     issueCreate: { issue: { id: string; identifier: string } | null };
