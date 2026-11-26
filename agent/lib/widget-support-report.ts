@@ -101,19 +101,15 @@ const CUT = "\n\n(Earlier text cut to fit.)\n\n";
 const HEAD_KEPT = 2500;
 
 /**
- * Keeps the opening and the end, cutting from the middle, so the verified
- * scope and the newest section, whose last line the widget-feedback route
- * reads, always survive.
+ * Keeps the opening and the end, cutting the oldest text from the middle, so
+ * the verified scope, the newest additions with their retry marks, and the
+ * last line the widget-feedback route reads always survive.
  */
 export const fitReport = (head: string, tail: string) => {
-  if (head.length + tail.length <= CONTENT_MAX) {
-    return `${head}${tail}`;
-  }
-  const kept = Math.min(
-    head.length,
-    Math.max(HEAD_KEPT, CONTENT_MAX - CUT.length - tail.length)
-  );
-  return `${head.slice(0, kept)}${CUT}${tail.slice(-(CONTENT_MAX - CUT.length - kept))}`;
+  const whole = `${head}${tail}`;
+  return whole.length <= CONTENT_MAX
+    ? whole
+    : `${whole.slice(0, HEAD_KEPT)}${CUT}${whole.slice(-(CONTENT_MAX - CUT.length - HEAD_KEPT))}`;
 };
 
 export const supportReportContent = (

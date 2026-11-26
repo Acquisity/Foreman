@@ -193,7 +193,8 @@ export async function conversationTicket(
  */
 export async function conversationTickets(
   ctx: ProviderContext,
-  wanted: Exclude<TicketKind, "feedback">,
+  /** The kind a filing needs; absent, as for a follow-up note, old tickets of either kind are read too. */
+  wanted: Exclude<TicketKind, "feedback"> | undefined,
   overrides: Partial<
     Pick<TicketDependencies, "kind" | "linked" | "owns" | "search">
   > = {}
@@ -206,9 +207,15 @@ export async function conversationTickets(
         kind !== "feedback" && !CLOSED_UNDONE.has(stateType)
     );
   const linked = open(await deps.linked(scope.conversationId, ctx.abortSignal));
-  return linked.some(({ kind }) => kind === wanted)
-    ? linked
-    : [...linked, ...open(await legacyTickets(ctx, scope, deps))];
+  if (wanted && linked.some(({ kind }) => kind === wanted)) {
+    return linked;
+  }
+  const seen = new Set(linked.map(({ identifier }) => identifier));
+  const legacy = open(await legacyTickets(ctx, scope, deps));
+  return [
+    ...linked,
+    ...legacy.filter(({ identifier }) => !seen.has(identifier)),
+  ];
 }
 
 /**
@@ -484,7 +491,7 @@ export async function conversationTicketNote(
   try {
     const tickets = await deps.tickets(
       appTicketContext(scope, bounded),
-      "case"
+      undefined
     );
     const notes = await Promise.all(
       KIND_ORDER.flatMap((kind) => {

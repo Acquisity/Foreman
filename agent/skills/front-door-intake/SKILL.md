@@ -20,7 +20,7 @@ Fixy does the investigation. If you find yourself wanting one of these, hand the
 
 ## 1. Read the ticket
 
-Read the full issue through the Linear connection: title, description, attachments, links, comments and labels. A ticket from the in-app support chat (its `Support chat` link) keeps the conversation, the recordings and the evidence in its `Support report` document, not the description: read that document too before you classify. Call `read_image` with each screenshot's `uploads.linear.app` url exactly as it appears.
+Read the full issue through the Linear connection: title, description, attachments, links, comments and labels. A ticket from the in-app support chat (its `Support chat` link) keeps the conversation, the recordings and the evidence in its `Support report` document, not the description: read that document too, and pass its conversation to `classify_ask` with the issue text and comments. Call `read_image` with each screenshot's `uploads.linear.app` url exactly as it appears.
 
 Call `classify_ask` once with the issue text and comments, and keep its `sourceLabels`. A money ask: load the billing-triage skill, which replaces this one. Otherwise continue here.
 

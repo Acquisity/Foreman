@@ -7,6 +7,7 @@ import type { LinkedTicket } from "./widget-support-report.js";
 import {
   appTicketContext,
   conversationTicketNote,
+  conversationTickets,
   existingTicket,
   fileTicketFor,
   fileWidgetTicket,
@@ -776,4 +777,29 @@ test("a reply's own earlier ticket wins over taking up another ticket whose repo
     }
   );
   assert.equal("identifier" in filed && filed.identifier, "ENG-7");
+});
+
+test("a follow-up note reads an old refund ticket too when the chat's case is linked", async (t) => {
+  t.mock.method(globalThis, "fetch", () =>
+    Promise.reject(new Error("unexpected transport"))
+  );
+  const tickets = await conversationTickets(
+    appTicketContext(scope, new AbortController().signal),
+    undefined,
+    {
+      kind: () => Promise.resolve("refund" as const),
+      linked: () => Promise.resolve([linkedTicket("ENG-20", "case")]),
+      owns: () => Promise.resolve(true),
+      search: () =>
+        Promise.resolve({
+          createdAfter: null,
+          issues: [hit("ENG-5", "started"), hit("ENG-20", "started")],
+          truncated: false,
+        }),
+    }
+  );
+  assert.deepEqual(
+    tickets.map(({ identifier, kind }) => `${identifier} ${kind}`),
+    ["ENG-20 case", "ENG-5 refund"]
+  );
 });

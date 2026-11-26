@@ -252,3 +252,18 @@ test("an earlier feedback ticket counts only in the Chat Widget project, for thi
     "ENG-7"
   );
 });
+
+test("a long report cut to fit loses its oldest text, never the newest additions' marks", () => {
+  const scopeHead = "## Verified scope\n\n- Workspace ID: x\n\n";
+  const existing = `${scopeHead}<!-- support-report-addition old -->\n\n${"o".repeat(40_000)}\n\n<!-- support-report-addition newest -->\n\n${"n".repeat(15_000)}`;
+  const kept = fitReport(
+    existing,
+    `\n\n<!-- support-report-addition next -->\n\n${"x".repeat(10_000)}`
+  );
+  assert.ok(kept.length <= 60_000);
+  assert.ok(kept.startsWith(scopeHead));
+  assert.ok(kept.includes("support-report-addition newest"));
+  assert.ok(kept.includes("support-report-addition next"));
+  // The oldest addition's text is what gives way.
+  assert.ok(kept.split("o").length - 1 < 40_000);
+});
