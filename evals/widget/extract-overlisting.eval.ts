@@ -11,8 +11,15 @@ type Unchecked = NonNullable<WidgetFindings["unchecked"]>;
 // tickets the reply never needed (names and domains swapped for neutral ones).
 // Each case's `allowed` says what may come back as unchecked; anything else is over-listing.
 const NOTHING = (unchecked: Unchecked) => unchecked.length === 0;
-const LINKED =
-  /\blink|\brelated\b|\bconnected to\b|\bsame (cause|problem|issue)\b/iu;
+const LIST = /\blist\b/iu;
+const TIED = /checkbox|link|relat|caus|connect|behind|same/iu;
+const CHARGE = /charge|refund/iu;
+const PARTIAL = /partial/iu;
+
+// ENG-20555's reply did say it couldn't check why the list check failed, so only that may file;
+// any tie to the earlier checkbox problem is the over-listed item.
+const LIST_CHECK_ONLY = (unchecked: Unchecked) =>
+  unchecked.every((gap) => LIST.test(gap.fact) && !TIED.test(gap.fact));
 
 const CASES = [
   {
@@ -23,8 +30,7 @@ const CASES = [
     question: "Can I send an email to support?",
   },
   {
-    allowed: (unchecked: Unchecked) =>
-      !unchecked.some((gap) => LINKED.test(gap.fact)),
+    allowed: LIST_CHECK_ONLY,
     investigatorText:
       'The customer hit a "We couldn\'t check your list (Something went wrong on our side. Try again in a moment.)" error on the CSV import preview, after earlier being unable to tick the "Include leads already emailed in previous campaigns" checkbox. Nothing from this attempt was saved: I see no import runs or failed jobs in the last 7 days, no leads stored in the campaign, and no lead credits used. No known issue matches. I couldn\'t see why the list check failed. I told them to wait about a minute and press "Try again"; if it still fails, go back to "Review values", click "Preview import" again, and import a small test file of 10 to 20 rows to see whether the file or the check is the problem. If both fail, they should send the exact wording on the screen or a new screenshot.',
     name: "ENG-20555 list check failed after an earlier checkbox problem",
@@ -54,20 +60,31 @@ const CASES = [
     question:
       "I'm looking for a contact in my CRM but I only remember her first name starts with Am. Can you find who that is and what email I have saved for her?",
   },
-  // Control: a read that failed must still file, in its own area.
+  // Controls: a read that failed, and a product question the Help Centre doesn't explain, still file.
   {
     allowed: (unchecked: Unchecked) =>
-      unchecked.some((gap) => gap.area === "billing"),
+      unchecked.some(
+        (gap) =>
+          gap.area === "billing" && gap.kind === "tool" && CHARGE.test(gap.fact)
+      ),
     investigatorText:
       "I read the workspace's plan: it is on Pro and active. The stripe section could not be read (it timed out), so I couldn't confirm the latest charge or whether a refund was issued.",
     name: "control: billing read failed",
     question: "Was I charged twice this month?",
   },
+  {
+    allowed: (unchecked: Unchecked) =>
+      unchecked.some((gap) => gap.kind === "docs" && PARTIAL.test(gap.fact)),
+    investigatorText:
+      "I read the order: 3 of its 5 domains are active and 2 are still being set up, and the order shows as partial. The Help Centre doesn't explain what a partial domain order means, so I couldn't tell the customer what partial means or whether they need to do anything.",
+    name: "control: Help Centre doesn't explain it",
+    question: "What does partial mean on my domain order?",
+  },
 ];
 
 export default defineEval({
   description:
-    "ENG-20988: the extraction pass lists no question the reply asked the customer, nothing only the customer knows and nothing the investigator did not say it couldn't check, in 10 of 10 runs of five replayed write-ups, while a failed read still files in its area in 10 of 10.",
+    "ENG-20988: the extraction pass lists no question the reply asked the customer, nothing only the customer knows and nothing the investigator did not say it couldn't check, in 10 of 10 runs of five replayed write-ups, while a failed read and a Help Centre gap still file in 10 of 10.",
   tags: ["widget"],
   async test(t) {
     if (!(process.env.AI_GATEWAY_API_KEY || process.env.VERCEL_OIDC_TOKEN)) {
@@ -99,7 +116,7 @@ export default defineEval({
       misses.length === 0,
       satisfies(
         Boolean,
-        "no over-listed item in the five cases, and every failed read still files"
+        "no over-listed item in the five cases, and every control still files"
       )
     );
   },
