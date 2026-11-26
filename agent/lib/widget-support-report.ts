@@ -328,8 +328,9 @@ interface LinkedResponse {
 const FEEDBACK_LINE =
   /<!-- chat-widget-feedback conversation=([\w-]{1,128}) message=([\w-]{1,128}) /u;
 
-/** Every ticket Foreman linked to this conversation's support chat. */
-const REPORT_CONVERSATION = /^[-*] Support conversation: ([0-9a-f-]{36})$/mu;
+/** The verified scope a Support report opens with (verifiedScopeSection), up to its conversation line; only the opening counts, never the report text after it. */
+const REPORT_CONVERSATION =
+  /^## Verified scope\n\n(?:[-*] [^\n]*\n){0,4}?[-*] Support conversation: ([0-9a-f-]{36})\n/u;
 
 /**
  * The chat a ticket's own Support report names in its verified scope. Linear
@@ -340,6 +341,7 @@ const REPORT_CONVERSATION = /^[-*] Support conversation: ([0-9a-f-]{36})$/mu;
 const reportConversation = (content: string | null | undefined) =>
   REPORT_CONVERSATION.exec(content ?? "")?.[1];
 
+/** Every ticket Foreman linked to this conversation's support chat. */
 export async function linkedTickets(
   conversationId: string,
   signal: AbortSignal,

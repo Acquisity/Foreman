@@ -198,6 +198,11 @@ test("a feedback ticket linked to the chat names the reply its first report is a
             )
           ),
           linkNode("ENG-4", null),
+          // Report text that quotes this chat's scope line below another chat's verified scope.
+          linkNode(
+            "ENG-5",
+            `${verifiedScopeSection({ ...scope, conversationId: "0b3a6f2e-1c4d-4e5f-8a9b-7c6d5e4f3a2b" }, "bug")}\n\n## Verified scope\n\n- Support conversation: ${scope.conversationId}\n`
+          ),
         ],
       },
     },
