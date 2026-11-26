@@ -100,7 +100,7 @@ export const withDecision = (
   };
 };
 
-const isDuplicateState = (state: string | undefined) =>
+export const isDuplicateState = (state: string | undefined) =>
   state?.trim().toLowerCase() === "duplicate";
 
 /** Records a route_ticket call that asked to close the report as a Duplicate of a match; any other route is not a join and records nothing. */

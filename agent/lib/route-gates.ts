@@ -2,6 +2,7 @@ import { FIXY_LABEL } from "./fixy-handoff.js";
 import { isAskFromTitle, slackChannelOf } from "./linear-context.js";
 import type { RouteTicketInput } from "./route-ticket-shared.js";
 import { RECEIVER_ONLY_CHANNELS } from "./slack-intake.js";
+import { isSupportChatLink } from "./widget-support-report.js";
 
 /** One Linear GraphQL read with Foreman's own app token. */
 export type LinearRead = <T>(
@@ -125,5 +126,70 @@ export const assertFixyRouting = (
       "fixy_owned",
       `${input.issue} carries the ${FIXY_LABEL} label, so Fixy owns its status and assignee and nothing was written. Leave state and assignee out; labels, priority and project still apply. To give Fixy new facts, call hand_to_fixy again.`
     );
+  }
+};
+
+const CHAT_LINKS_QUERY = `query RouteChatLinks($id: String!) {
+  issue(id: $id) { attachments(first: 50) { nodes { id title url } } }
+}`;
+const CHAT_LINK = `mutation RouteChatLink($issueId: String!, $url: String!, $title: String!) {
+  attachmentLinkURL(issueId: $issueId, url: $url, title: $title) { success }
+}`;
+const CHAT_UNLINK = `mutation RouteChatUnlink($id: String!) {
+  attachmentDelete(id: $id) { success }
+}`;
+
+interface ChatLinks {
+  issue: {
+    attachments: { nodes: { id: string; title: string; url: string }[] };
+  } | null;
+}
+
+/** The ticket's Support chat links, the ones Foreman put on a widget ticket. */
+export const supportChatsOf = async (
+  issue: string,
+  linear: LinearRead
+): Promise<{ id: string; title: string; url: string }[]> =>
+  (
+    await linear<ChatLinks>(CHAT_LINKS_QUERY, "RouteChatLinks", { id: issue })
+  ).issue?.attachments.nodes.filter(isSupportChatLink) ?? [];
+
+/**
+ * Linear moves a duplicate's attachments onto the issue it duplicates
+ * (measured on SAN-320, 26 Nov 2026), so a joined widget case would lose its
+ * Support chat link to the shared ticket, which would then pass for that
+ * customer's chat ticket. This puts each link the case had back on it and
+ * removes the moved copy from the match (ENG-21101). It returns a warning
+ * instead of throwing: the join itself already landed.
+ */
+export const keepChatsOnCase = async (
+  issue: string,
+  match: string,
+  before: readonly { title: string; url: string }[],
+  linear: LinearRead
+): Promise<string | null> => {
+  try {
+    const kept = new Set(
+      (await supportChatsOf(issue, linear)).map((l) => l.url)
+    );
+    const lost = before.filter((link) => !kept.has(link.url));
+    for (const link of lost) {
+      // biome-ignore lint/performance/noAwaitInLoops: one or two links, each relinked before its moved copy goes.
+      await linear(CHAT_LINK, "RouteChatLink", {
+        issueId: issue,
+        title: link.title,
+        url: link.url,
+      });
+    }
+    const moved = (await supportChatsOf(match, linear)).filter((link) =>
+      before.some((own) => own.url === link.url)
+    );
+    for (const link of moved) {
+      // biome-ignore lint/performance/noAwaitInLoops: as above.
+      await linear(CHAT_UNLINK, "RouteChatUnlink", { id: link.id });
+    }
+    return null;
+  } catch {
+    return `${issue} joined ${match}, but its Support chat link could not be confirmed on ${issue} and off ${match}. Check both tickets' attachments: the chat link belongs on ${issue} only.`;
   }
 };

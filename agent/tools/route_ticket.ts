@@ -5,14 +5,16 @@ import { linearAuth } from "#lib/constants.js";
 import { executorClient } from "#lib/executor/client.js";
 import { questionsOnlyPolicy } from "#lib/github/approval.js";
 import { LINEAR_ISSUE_ID_PATTERN } from "#lib/investigation-memory/scope.js";
-import { recordJoin } from "#lib/known-issue-gate.js";
+import { isDuplicateState, recordJoin } from "#lib/known-issue-gate.js";
 import { masterCreatedAfter } from "#lib/linear-api.js";
 import { masterWindow } from "#lib/master-window.js";
 import { logOpsEvent } from "#lib/ops-log.js";
 import {
+  keepChatsOnCase,
   type LinearRead,
   RouteGateError,
   reopenRefusal,
+  supportChatsOf,
 } from "#lib/route-gates.js";
 import { routeTicket } from "#lib/route-ticket.js";
 import {
@@ -74,22 +76,22 @@ export default defineTool({
     if (refusal) {
       return joined({ error: refusal, routed: false as const });
     }
+    // Not through Executor: its RouteIssue read has no state type or attachments, and it has no attachment delete.
+    const linear: LinearRead = async (query, queryName, variables) => {
+      const { token } = await ctx.getToken(linearAuth);
+      const signal = AbortSignal.any([
+        ctx.abortSignal,
+        AbortSignal.timeout(LINEAR_TIMEOUT_MS),
+      ]);
+      return await callLinearGraphQL({
+        api: { fetch: (url, init) => fetch(url, { ...init, signal }) },
+        credentials: { accessToken: token },
+        query,
+        queryName,
+        variables,
+      });
+    };
     if (input.state !== undefined && !isTriageReplay()) {
-      // Not through Executor: its RouteIssue read has no state type or attachments.
-      const linear: LinearRead = async (query, queryName, variables) => {
-        const { token } = await ctx.getToken(linearAuth);
-        const signal = AbortSignal.any([
-          ctx.abortSignal,
-          AbortSignal.timeout(LINEAR_TIMEOUT_MS),
-        ]);
-        return await callLinearGraphQL({
-          api: { fetch: (url, init) => fetch(url, { ...init, signal }) },
-          credentials: { accessToken: token },
-          query,
-          queryName,
-          variables,
-        });
-      };
       const reopen = await reopenRefusal(input.issue, input.state, linear);
       if (reopen) {
         ctx.abortSignal.throwIfAborted();
@@ -101,6 +103,11 @@ export default defineTool({
         return joined({ error: reopen.reason, routed: false as const });
       }
     }
+    // A Duplicate join moves the case's Support chat link onto the match; read it first to put it back.
+    const chats =
+      input.duplicateOf && isDuplicateState(input.state) && !isTriageReplay()
+        ? await supportChatsOf(input.issue, linear).catch(() => [])
+        : [];
     try {
       const mastersWindow = picksMaster(input)
         ? await masterWindow(ctx.session.auth)
@@ -116,6 +123,21 @@ export default defineTool({
         ),
         signal: ctx.abortSignal,
       });
+      if (
+        ticket.grouping === "joined" &&
+        input.duplicateOf &&
+        chats.length > 0
+      ) {
+        const lost = await keepChatsOnCase(
+          input.issue,
+          input.duplicateOf,
+          chats,
+          linear
+        );
+        if (lost) {
+          ticket.warnings.push(lost);
+        }
+      }
       logOpsEvent("triage.decision", {
         ...routeDecisionEvent(triageDecisions.get(), {
           ...input,
