@@ -1033,6 +1033,7 @@ const startGapFiling = (
   gaps?.length && fileGaps
     ? fileGaps([...gaps], {
         conversationId: run.scope.conversationId,
+        organizationId: run.scope.organizationId,
         runId: run.id,
       }).catch(() => undefined)
     : undefined;
