@@ -102,11 +102,15 @@ const firstDetails = (turn: BugReportTurn) =>
     .map((entry) => ("text" in entry ? entry.text : entry.question).trim())
     .find(Boolean) ?? null;
 
+/** Clipped after quoting, so a text of many short lines cannot outgrow its room. */
 const blockquote = (text: string, max = 1500) =>
-  clip(inert(text), max)
-    .split("\n")
-    .map((line) => `> ${line}`)
-    .join("\n");
+  clip(
+    inert(text)
+      .split("\n")
+      .map((line) => `> ${line}`)
+      .join("\n"),
+    max
+  );
 const quoted = (text: string) => `The customer wrote:\n\n${blockquote(text)}`;
 
 export const fallbackDraft = (turn: BugReportTurn): BugReportDraft => {
@@ -275,7 +279,7 @@ export const fallbackHandoffDraft = (facts: HandoffFacts): HandoffDraft => {
           ""
         )
     ),
-    told: told ? blockquote(clip(told, 500)) : NOTHING_YET,
+    told: told ? blockquote(told, 500) : NOTHING_YET,
     wants: said.length ? quoted(said.join("\n\n")) : NOT_STATED,
   };
 };
@@ -283,10 +287,9 @@ export const fallbackHandoffDraft = (facts: HandoffFacts): HandoffDraft => {
 /** A handoff ticket's title and plain-language parts, from the same drafting call as a bug ticket's. */
 export const draftHandoffTicket = (
   facts: HandoffFacts,
-  signal?: AbortSignal,
-  ms = HANDOFF_DRAFT_MS
+  signal?: AbortSignal
 ): Promise<HandoffDraft> => {
-  const timeout = AbortSignal.timeout(ms);
+  const timeout = AbortSignal.timeout(HANDOFF_DRAFT_MS);
   return draftTicket(
     HANDOFF_PROMPT,
     handoffSchema,
@@ -296,8 +299,10 @@ export const draftHandoffTicket = (
   );
 };
 
-/** A drafted sentence on one line, so model text cannot open a block of its own. */
-const sentence = (text: string) => text.replaceAll(WHITESPACE, " ").trim();
+const BLOCK_MARKER = /^[#>|=+*-]/u;
+/** A drafted sentence on one line, with a leading block marker escaped, so model text cannot open a block of its own. */
+const sentence = (text: string) =>
+  text.replaceAll(WHITESPACE, " ").trim().replace(BLOCK_MARKER, "\\$&");
 
 /**
  * A handoff ticket's body: what the customer wants, what Foreman told them,
@@ -334,19 +339,6 @@ export const handoffTicketBody = (
   const findings = `\n\n## What Foreman found\n\n${blockquote(`${facts.findings.report}\n\nRecommendation: ${facts.findings.recommendation}`, 4000)}`;
   return `${body}${clip(findings, room)}`;
 };
-
-/** A repeat handoff on the conversation's ticket: only the new message, what Foreman said and why. */
-export const handoffFollowUp = (facts: HandoffFacts) =>
-  [
-    quoted(facts.latest),
-    ...(facts.reply ? [`Foreman replied:\n\n${blockquote(facts.reply)}`] : []),
-    ...(facts.findings
-      ? [
-          `What Foreman found:\n\n${blockquote(`${facts.findings.report}\n\nRecommendation: ${facts.findings.recommendation}`)}`,
-        ]
-      : []),
-    facts.why,
-  ].join("\n\n");
 
 const conversationLink = (conversationId: string, label: string) => {
   try {

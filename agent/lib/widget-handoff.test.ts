@@ -192,7 +192,7 @@ test("a front-door ticket is titled and written by the drafter, reads as a plain
     await ticketInsteadOfHandoff(scope, facts, ids, undefined, file, draft),
     { id: "ENG-1", url: "https://linear.app/acquisity/issue/ENG-1/ticket" }
   );
-  assert.deepEqual(calls, [{ facts, ms: 10_000 }]);
+  assert.deepEqual(calls, [{ facts, ms: undefined }]);
   const [{ description, title }] = writes;
   assert.equal(title, DRAFT.title);
   for (const section of [
@@ -314,28 +314,22 @@ test("a blocked reply's ticket carries the conversation, Foreman's findings and 
   assertScopeParses(description);
 });
 
-test("the draft gets only the time the filing can spare, and a conversation already filed gets a short follow-up with no draft", async () => {
+test("the draft runs only when the deadline leaves the filing its room, and a conversation already filed is written without it, still as a full ticket", async () => {
   const facts = {
     latest: "Still broken.",
     why: "The customer asked for a person.",
   };
-  for (const [roomMs, ms] of [
-    [60_000, 10_000],
-    [20_000, 5000],
-    [10_000, undefined],
+  for (const [roomMs, drafts] of [
+    [undefined, 1],
+    [45_000, 1],
+    [44_000, 0],
   ] as const) {
     const { calls, draft } = drafter();
     const { file, writes } = fileForReal();
     // biome-ignore lint/performance/noAwaitInLoops: each case checks its own draft.
     await handoffTicket(scope, facts, ids, undefined, file, draft, roomMs);
-    assert.deepEqual(
-      calls.map((call) => call.ms),
-      ms === undefined ? [] : [ms]
-    );
-    assert.equal(
-      writes[0]?.title,
-      ms === undefined ? "Still broken." : DRAFT.title
-    );
+    assert.equal(calls.length, drafts, String(roomMs));
+    assert.equal(writes[0]?.title, drafts ? DRAFT.title : "Still broken.");
   }
   const { calls, draft } = drafter();
   const { file, writes } = fileForReal();
@@ -344,7 +338,7 @@ test("the draft gets only the time the filing can spare, and a conversation alre
     {
       ...facts,
       history: [
-        { role: "customer", text: "Inbox broken." },
+        { role: "customer", text: "My inbox stopped sending yesterday." },
         { role: "assistant", text: `Checking. ${ANSWER_HERE}` },
       ],
       reply: "I've passed this on again.",
@@ -355,12 +349,41 @@ test("the draft gets only the time the filing can spare, and a conversation alre
     draft
   );
   assert.deepEqual(calls, []);
-  const [{ description }] = writes;
-  assert.ok(!description.includes("## What Foreman told them"));
-  assert.ok(description.startsWith("The customer wrote:\n\n> Still broken."));
-  assert.ok(
-    description.includes("Foreman replied:\n\n> I've passed this on again.")
+  const [{ description, title }] = writes;
+  assert.equal(title, "My inbox stopped sending yesterday.");
+  for (const section of [
+    "## What the customer wants\n\nThe customer wrote:\n\n> My inbox stopped sending yesterday.\n> \n> Still broken.",
+    "## What Foreman told them\n\n> I've passed this on again.",
+    "## What's still open\n\nThe customer asked for a person.",
+  ]) {
+    assert.ok(description.includes(section), section);
+  }
+  assertScopeParses(description);
+});
+
+test("a long pasted log and model text starting with a heading still fit, with the customer's words kept and no block opened", async () => {
+  const log = "x\n".repeat(750);
+  const long = (word: string) => `${word} ${"word ".repeat(98)}`.trim();
+  const { file, writes } = fileForReal();
+  await handoffTicket(
+    scope,
+    { latest: log, why: "The customer asked for a person." },
+    ids,
+    undefined,
+    file,
+    () =>
+      Promise.resolve({
+        open: long("## open"),
+        title: "Customer pasted an error log",
+        told: long("told"),
+        wants: long("wants"),
+      })
   );
+  const [{ description }] = writes;
+  const report = description.slice(0, description.indexOf("## Verified scope"));
+  assert.ok(report.length <= 4002, String(report.length));
+  assert.ok(report.includes("## What's still open\n\n\\## open word"));
+  assert.ok(report.includes("## What the customer wrote\n\n> x\n> x"));
   assertScopeParses(description);
 });
 

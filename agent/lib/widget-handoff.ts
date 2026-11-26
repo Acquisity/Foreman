@@ -6,7 +6,6 @@ import {
   fallbackHandoffDraft,
   HANDOFF_DRAFT_MS,
   type HandoffFacts,
-  handoffFollowUp,
   handoffTicketBody,
 } from "./widget-bug-report.js";
 import { parseFindings, type WidgetFindings } from "./widget-findings.js";
@@ -29,10 +28,12 @@ export const TICKET_INSTEAD = "ticket_instead_of_handoff";
 export const PERSON_INVITE = "person_invite";
 
 const TICKET_TIMEOUT_MS = 30_000;
-/** Left for the filing itself when the caller has a deadline: the ticket matters more than its wording. */
-const FILING_ROOM_MS = 15_000;
-/** A draft given less than this would only fall back. */
-const DRAFT_MIN_MS = 2000;
+/**
+ * Left for the filing itself when the caller has a deadline, its own reads
+ * and write at their bounds (refund 3s, search 15s, write 15s): the ticket
+ * matters more than its wording, so a draft runs only with this to spare.
+ */
+const FILING_ROOM_MS = 35_000;
 
 /** Fixed wording, so no model promises a person, a time or anything beyond where the answer will arrive. */
 export const ANSWER_HERE =
@@ -112,9 +113,9 @@ export async function handoffTicket(
 
 /**
  * The title and summary the filer gets. A conversation whose history shows
- * it was filed lands on that ticket as a comment, so it gets a short
- * follow-up and no draft; otherwise the drafter writes it, given only the
- * time the filing can spare.
+ * it was filed lands on that ticket as a comment, so it is written without
+ * the model; otherwise the drafter writes it, when the caller's deadline
+ * leaves the filing its room.
  */
 async function handoffInput(
   scope: WidgetContext,
@@ -123,19 +124,11 @@ async function handoffInput(
   draft: typeof draftHandoffTicket | undefined,
   roomMs: number | undefined
 ) {
-  if (wasFiledEarlier(facts.history)) {
-    return {
-      summary: handoffFollowUp(facts).slice(0, 4000),
-      title: fallbackHandoffDraft(facts).title,
-    };
-  }
-  const draftMs = Math.min(
-    HANDOFF_DRAFT_MS,
-    (roomMs ?? Number.POSITIVE_INFINITY) - FILING_ROOM_MS
-  );
   const drafted =
-    draft && draftMs >= DRAFT_MIN_MS
-      ? await draft(facts, signal, draftMs)
+    draft &&
+    !wasFiledEarlier(facts.history) &&
+    (roomMs ?? Number.POSITIVE_INFINITY) >= HANDOFF_DRAFT_MS + FILING_ROOM_MS
+      ? await draft(facts, signal)
       : fallbackHandoffDraft(facts);
   return {
     summary: handoffTicketBody(drafted, facts, scope, new Date()).slice(

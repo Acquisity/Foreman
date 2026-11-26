@@ -38,7 +38,9 @@ test("a customer report is the plain Markdown body, never wrapped in a code bloc
 
 test("text in a customer report cannot open a code block, so an unclosed fence never swallows the scope block after it", () => {
   assert.equal(
-    formatCustomerReport("Try this:\n```\nsteps\n~~~ and `code`"),
-    "Try this:\n\\`\\`\\`\nsteps\n\\~\\~\\~ and \\`code\\`"
+    formatCustomerReport(
+      "Try this:\n```\nsteps\n~~~ and `code`\n\n    indented log line"
+    ),
+    "Try this:\n\\`\\`\\`\nsteps\n\\~\\~\\~ and \\`code\\`\n\nindented log line"
   );
 });
