@@ -1,5 +1,12 @@
 import { logOpsEvent } from "./ops-log.js";
-import { BUG_REPORT_ADDED, BUG_REPORT_LOGGED } from "./widget-bug-report.js";
+import {
+  BUG_REPORT_ADDED,
+  BUG_REPORT_LOGGED,
+  type draftHandoffTicket,
+  fallbackHandoffDraft,
+  type HandoffFacts,
+  handoffTicketBody,
+} from "./widget-bug-report.js";
 import { parseFindings, type WidgetFindings } from "./widget-findings.js";
 import type { WidgetDependencies } from "./widget-investigation.js";
 import type { WidgetOutcome, WidgetRun } from "./widget-run-store.js";
@@ -61,25 +68,34 @@ type Filed = Exclude<
 
 /**
  * File the conversation's one ticket in place of a handoff (an existing one is
- * reused, commented on and, when Done, reopened). Null when the turn is a
- * teammate's or the ticket could not be filed.
+ * reused, commented on and, when Done, reopened), with a title and body the
+ * bug writer drafts from the facts. Null when the turn is a teammate's or the
+ * ticket could not be filed.
  */
 export async function handoffTicket(
   scope: WidgetContext,
-  ticket: { summary: string; title: string },
+  facts: HandoffFacts,
   ids: { runId: string; sessionId?: string },
   signal: AbortSignal | undefined,
   /** Absent, nothing is filed: only callers wired to Linear file. */
-  file: typeof fileTicketFor | undefined
+  file: typeof fileTicketFor | undefined,
+  /** Absent, the ticket is written from the customer's own words. */
+  draft?: typeof draftHandoffTicket
 ): Promise<Filed | null> {
   if (!(file && customerTurn(scope))) {
     return null;
   }
+  const drafted = draft
+    ? await draft(facts, signal)
+    : fallbackHandoffDraft(facts);
   const filed = await file(
     scope,
     {
-      summary: ticket.summary.slice(0, 4000),
-      title: ticket.title.slice(0, 160),
+      summary: handoffTicketBody(drafted, facts, scope, new Date()).slice(
+        0,
+        4000
+      ),
+      title: drafted.title.slice(0, 160),
     },
     signal
       ? AbortSignal.any([signal, AbortSignal.timeout(TICKET_TIMEOUT_MS)])
@@ -199,7 +215,8 @@ export async function ticketInsteadOfBlock(
   findings: unknown,
   ids: { runId: string; sessionId?: string },
   signal: AbortSignal | undefined,
-  file: typeof fileTicketFor | undefined
+  file: typeof fileTicketFor | undefined,
+  draft?: typeof draftHandoffTicket
 ): Promise<{ findings: unknown; result: WidgetOutcome }> {
   const reason = result.reason ?? "blocked";
   if (
@@ -213,21 +230,14 @@ export async function ticketInsteadOfBlock(
   const filed = await handoffTicket(
     run.scope,
     {
-      summary: [
-        `The customer wrote: ${run.question}`,
-        `Foreman could not answer it (${reason}).`,
-        ...(found
-          ? [
-              `What Foreman found: ${found.report}`,
-              `Recommendation: ${found.recommendation}`,
-            ]
-          : []),
-      ].join("\n\n"),
-      title: `Support chat: ${found?.report ?? run.question}`,
+      findings: found ?? undefined,
+      latest: run.question,
+      why: `Foreman could not answer it (${reason}).`,
     },
     ids,
     signal,
-    file
+    file,
+    draft
   );
   if (!filed) {
     return { findings, result };
@@ -277,22 +287,21 @@ export const completeInvite = (
  */
 export type FrontDoorTicket = "person" | "member";
 
-/** The front-door ticket's summary and title for the team. */
+/** What the front-door ticket is drafted from. */
 export const frontDoorTicket = (
   why: FrontDoorTicket,
   scope: WidgetContext,
-  latest: string,
+  ask: { latest: string; turns?: HandoffFacts["history"] },
   reply: string
-) =>
-  why === "person"
-    ? {
-        summary: `The customer asked for a person and wrote: ${latest}\n\nForeman's reply: ${reply}`,
-        title: "Support chat: the customer asked for a person",
-      }
-    : {
-        summary: `The customer, a workspace ${scope.role}, needs their workspace looked into, which only an owner or admin can start, and wrote: ${latest}\n\nForeman's reply: ${reply}`,
-        title: `Support chat: a ${scope.role} needs their workspace looked into`,
-      };
+): HandoffFacts => ({
+  history: ask.turns,
+  latest: ask.latest,
+  reply,
+  why:
+    why === "person"
+      ? "The customer asked for a person."
+      : `The customer is a workspace ${scope.role}, and only an owner or admin can start a look into their workspace.`,
+});
 
 /**
  * The investigator's note for a toggled ask for a person whose ticket could

@@ -5,7 +5,11 @@ import { readRequestBody } from "./bounded-body.js";
 import { logOpsEvent } from "./ops-log.js";
 import { askedAtLine } from "./widget-asked-at.js";
 import { bugReportBrowser, MAX_BROWSER_CHARS } from "./widget-bug-evidence.js";
-import { addToBugReport, fileBugReport } from "./widget-bug-report.js";
+import {
+  addToBugReport,
+  draftHandoffTicket,
+  fileBugReport,
+} from "./widget-bug-report.js";
 import {
   type CapabilityGap,
   fileRunGaps,
@@ -616,6 +620,8 @@ export const defaultWidgetDependencies = {
   claim: claimWidgetRun,
   claimFinish: claimWidgetFinish,
   complete: completeWidgetRun,
+  /** Drafts the title and body of a ticket filed in place of a handoff. */
+  draftTicket: draftHandoffTicket,
   expire: expireSessionlessWidgetRun,
   expireAll: expireSessionlessWidgetRuns,
   extract: extractWidgetFindings,
@@ -650,6 +656,7 @@ export type WidgetDependencies = Omit<
   | "bugReport"
   | "bugReportAddition"
   | "changeRequested"
+  | "draftTicket"
   | "fileGaps"
   | "fileTicket"
   | "inboxHistory"
@@ -668,6 +675,7 @@ export type WidgetDependencies = Omit<
       | "bugReport"
       | "bugReportAddition"
       | "changeRequested"
+      | "draftTicket"
       | "fileGaps"
       | "fileTicket"
       | "inboxHistory"
@@ -893,7 +901,7 @@ async function withHandoffTicket(
   findings: WidgetFindings | null,
   run: Pick<WidgetRun, "id" | "question" | "scope">,
   sessionId: string,
-  file: WidgetDependencies["fileTicket"],
+  deps: Partial<Pick<WidgetDependencies, "draftTicket" | "fileTicket">>,
   signal?: AbortSignal
 ): Promise<{ filed?: HandoffTicketRef; structured: WidgetFindings | null }> {
   if (!findings?.needsHuman) {
@@ -902,12 +910,14 @@ async function withHandoffTicket(
   const filed = await ticketInsteadOfHandoff(
     run.scope,
     {
-      summary: `The customer wrote: ${run.question}\n\nWhat Foreman found: ${findings.report}\n\nRecommendation: ${findings.recommendation}`,
-      title: `Support chat: ${findings.report}`,
+      findings,
+      latest: run.question,
+      why: "Foreman's investigation found something only the team can settle.",
     },
     { runId: run.id, sessionId },
     signal,
-    file
+    deps.fileTicket,
+    deps.draftTicket
   );
   return filed
     ? // The ticket joins the findings after the gate, in `withAnswerLine`: a
@@ -923,7 +933,9 @@ async function structureWriteUp(
   outcome: Extract<WaitOutcome, { status: "completed" }>,
   conversation: string,
   deps: Pick<WidgetDependencies, "extract"> &
-    Partial<Pick<WidgetDependencies, "fileTicket" | "handoffEligible">>,
+    Partial<
+      Pick<WidgetDependencies, "draftTicket" | "fileTicket" | "handoffEligible">
+    >,
   signal?: AbortSignal
 ): Promise<{
   filed?: HandoffTicketRef;
@@ -992,7 +1004,7 @@ async function structureWriteUp(
       ),
       run,
       sessionId,
-      deps.fileTicket,
+      deps,
       signal
     )),
   };
@@ -1055,6 +1067,7 @@ export async function finishWidgetRun(
       Pick<
         WidgetDependencies,
         | "changeRequested"
+        | "draftTicket"
         | "fileGaps"
         | "fileTicket"
         | "handoffEligible"
@@ -1203,7 +1216,8 @@ export async function finishWidgetRun(
     findings,
     { runId: run.id, sessionId },
     clock.timeout(Math.max(0, finishCutoff(run, claimedAt) - clock.now())),
-    deps.fileTicket
+    deps.fileTicket,
+    deps.draftTicket
   ));
   logGateDecision(
     { conversationId: run.scope.conversationId, runId: run.id, sessionId },
@@ -1258,7 +1272,8 @@ async function settleResultRun(
       handoff.findings,
       { runId: run.id, sessionId },
       undefined,
-      deps.fileTicket
+      deps.fileTicket,
+      deps.draftTicket
     );
     logGateDecision(
       { conversationId: run.scope.conversationId, runId: run.id, sessionId },
@@ -1436,18 +1451,19 @@ function frontDoorReplies(
     if (!why) {
       return null;
     }
-    const ticket = frontDoorTicket(why, scope, ask.latest, message);
+    const facts = frontDoorTicket(why, scope, ask, message);
     const filed = await ticketInsteadOfHandoff(
       scope,
-      ticket,
+      facts,
       log,
       signal,
-      deps.fileTicket
+      deps.fileTicket,
+      deps.draftTicket
     );
     return filed
       ? {
           findings: handoffFindings(
-            `Foreman filed the conversation's ticket: ${ticket.title}`,
+            `Foreman filed the conversation's ticket. ${facts.why}`,
             filed
           ),
         }
@@ -1780,12 +1796,14 @@ async function toggledPersonAsk(
   const filed = await ticketInsteadOfHandoff(
     scope,
     {
-      summary: `The customer asked for a person and wrote: ${ask.latest}\n\nAn investigation of their workspace is running for this message.`,
-      title: "Support chat: the customer asked for a person",
+      history: ask.turns,
+      latest: ask.latest,
+      why: "The customer asked for a person. Foreman is looking into their workspace for this message.",
     },
     { runId: run.id },
     signal,
-    deps.fileTicket
+    deps.fileTicket,
+    deps.draftTicket
   );
   return filed ? CONFIRMED_TICKET_NOTE : UNFILED_PERSON_NOTE;
 }
@@ -2141,10 +2159,10 @@ export async function receiveWidgetMessage(
 export async function failWidgetRun(
   runId: string | null,
   sessionId: string,
-  deps: Pick<
-    WidgetDependencies,
-    "complete" | "fileTicket" | "read"
-  > = liveDependencies(defaultWidgetDependencies)
+  deps: Pick<WidgetDependencies, "complete" | "fileTicket" | "read"> &
+    Partial<Pick<WidgetDependencies, "draftTicket">> = liveDependencies(
+    defaultWidgetDependencies
+  )
 ) {
   if (!runId) {
     return;
@@ -2159,6 +2177,7 @@ export async function failWidgetRun(
         {
           claimFinish: claimWidgetFinish,
           complete: deps.complete,
+          draftTicket: deps.draftTicket,
           extract: extractWidgetFindings,
           fileTicket: deps.fileTicket ?? fileTicketFor,
           gate: egressGate,

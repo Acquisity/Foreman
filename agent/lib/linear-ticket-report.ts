@@ -20,11 +20,10 @@ const writtenIssue = z
 export const confirmedIssue = (data: unknown) =>
   writtenIssue.parse(providerData(data));
 
-export const formatCustomerReport = (summary: string) => {
-  const longestRun = Math.max(
-    0,
-    ...Array.from(summary.matchAll(/`+/g), (match) => match[0].length)
-  );
-  const fence = "`".repeat(Math.max(3, longestRun + 1));
-  return `## Customer report\n\n${fence}text\n${summary}\n${fence}`;
-};
+/**
+ * A widget ticket's body as the team reads it, with no code block. An opening
+ * angle bracket stays literal, so customer text cannot become markup, while a
+ * line's `>` still quotes; the server appends the Verified scope block after it.
+ */
+export const formatCustomerReport = (summary: string) =>
+  summary.trim().replaceAll("<", "&lt;");

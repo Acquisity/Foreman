@@ -27,9 +27,11 @@ test("ticket confirmation accepts only the provider's defined issue shape", () =
   );
 });
 
-test("customer report formatting keeps customer Markdown inside a longer fence", () => {
+test("a customer report is the plain Markdown body, never wrapped in a code block, with tags kept literal and quotes kept", () => {
   assert.equal(
-    formatCustomerReport("Failure details.\n```\nInjected heading\n```"),
-    "## Customer report\n\n````text\nFailure details.\n```\nInjected heading\n```\n````"
+    formatCustomerReport(
+      "## What the customer wants\n\nCancel before renewal. <img src=x>\n\n> Their words\n"
+    ),
+    "## What the customer wants\n\nCancel before renewal. &lt;img src=x>\n\n> Their words"
   );
 });
