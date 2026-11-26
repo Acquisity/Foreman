@@ -282,7 +282,7 @@ export const supportReportScope = (
  * The intake requester from the issue's 'Ask from <name>' attachment, or null,
  * and whether the ticket is a triage intake ticket: its 'Ask from' link points
  * at a triage ask channel, Foreman linked it to a support chat, or the widget or
- * file_migration_ticket filed it, and a widget ticket's verified scope.
+ * file_migration_ticket filed it; and a widget ticket's verified scope.
  */
 export async function readAskFrom(
   issue: string,

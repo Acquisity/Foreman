@@ -19,8 +19,7 @@ import { fileTicketFor } from "./widget-ticket.js";
 
 /**
  * The customer's "Report a problem" on a Foreman reply, or on the whole
- * conversation (ENG-21100). Acquisity used to file it into Linear itself;
- * now it comes here and is filed like every other widget ticket: the same
+ * conversation (ENG-21100), filed like every other widget ticket: the same
  * drafting call, the same Support chat link, and the ids, transcript and
  * browser capture in its Support report, ending with the machine line the
  * widget-feedback route reads. Only the customer's own report comes here; a

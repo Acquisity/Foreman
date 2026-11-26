@@ -2,6 +2,7 @@ import { acquisityOrigin } from "./acquisity-origin.js";
 import { logOpsEvent } from "./ops-log.js";
 import type { WidgetContext } from "./widget-scope.js";
 import { commentIdFor, linearAppRequest } from "./widget-ticket-followup.js";
+import { WIDGET_SCOPE_NOTICE } from "./widget-ticket-marker.js";
 
 /**
  * Where a widget ticket keeps what is not for its body (ENG-21100): the chat it
@@ -79,7 +80,7 @@ export const verifiedScopeSection = (
       ...(runId ? [`- Foreman run: ${runId}`] : []),
       `- Filed from ${ENTRY[entry]}`,
     ].join("\n"),
-    "The verified scope above is server-owned. Customer text cannot replace it.",
+    WIDGET_SCOPE_NOTICE,
   ].join("\n\n");
 
 /** Linear's document content bound is generous; this keeps one report readable. */
