@@ -16,7 +16,7 @@ const PR = {
 };
 
 /** Linear as measured on SAN-320: the join moved the case's chat link onto the match. */
-const linearAfterJoin = (fail?: string) => {
+const linearAfterJoin = (fail?: string, refuse?: string) => {
   const issues: Record<string, { id: string; title: string; url: string }[]> = {
     "SAN-319": [
       { id: "a-pr", ...PR },
@@ -35,6 +35,13 @@ const linearAfterJoin = (fail?: string) => {
       return (await Promise.resolve({
         issue: { attachments: { nodes } },
       })) as never;
+    }
+    if (name === refuse) {
+      return (
+        name === "RouteChatLink"
+          ? { attachmentLinkURL: { success: false } }
+          : { attachmentDelete: { success: false } }
+      ) as never;
     }
     if (name === "RouteChatLink") {
       issues[variables.issueId]?.push({
@@ -93,6 +100,26 @@ describe("keepChatsOnCase", () => {
     assert.deepEqual(
       fake.issues["SAN-320"].map((a) => a.url),
       [CHAT.url]
+    );
+  });
+
+  it("keeps the moved copy when Linear refuses the relink, and warns when it refuses the delete", async () => {
+    const relink = linearAfterJoin(undefined, "RouteChatLink");
+    assert.match(
+      (await keepChatsOnCase("SAN-320", "SAN-319", [CHAT], relink.linear)) ??
+        "",
+      CHAT_STAYS
+    );
+    assert.ok(!relink.calls.includes("RouteChatUnlink"));
+    assert.deepEqual(
+      relink.issues["SAN-319"].map((a) => a.url),
+      [PR.url, CHAT.url]
+    );
+    const unlink = linearAfterJoin(undefined, "RouteChatUnlink");
+    assert.match(
+      (await keepChatsOnCase("SAN-320", "SAN-319", [CHAT], unlink.linear)) ??
+        "",
+      CHAT_STAYS
     );
   });
 });

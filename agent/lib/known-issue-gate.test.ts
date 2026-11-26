@@ -343,6 +343,18 @@ describe("round 3 cases", () => {
   });
 });
 
+describe("a retried batch", () => {
+  it("adds no undecided note once every hit is judged", () => {
+    const check = withDecision(
+      withDecision(searched(["ENG-9"]), null),
+      decision([{ identifier: "ENG-9", match: "not_relevant" }])
+    );
+    assert.deepEqual(knownIssueGate("ENG-1", check, "triage", {}), {
+      notes: [],
+    });
+  });
+});
+
 describe("recordJoin", () => {
   it("records only a route that asked for Duplicate under a match", (t) => {
     let state: Checks = {};

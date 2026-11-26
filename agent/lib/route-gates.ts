@@ -2,7 +2,10 @@ import { FIXY_LABEL } from "./fixy-handoff.js";
 import { isAskFromTitle, slackChannelOf } from "./linear-context.js";
 import type { RouteTicketInput } from "./route-ticket-shared.js";
 import { RECEIVER_ONLY_CHANNELS } from "./slack-intake.js";
-import { isSupportChatLink } from "./widget-support-report.js";
+import {
+  isSupportChatLink,
+  SUPPORT_CHAT_TITLE,
+} from "./widget-support-report.js";
 
 /** One Linear GraphQL read with Foreman's own app token. */
 export type LinearRead = <T>(
@@ -130,7 +133,7 @@ export const assertFixyRouting = (
 };
 
 const CHAT_LINKS_QUERY = `query RouteChatLinks($id: String!) {
-  issue(id: $id) { attachments(first: 50) { nodes { id title url } } }
+  issue(id: $id) { attachments(first: 50, filter: { title: { eq: "${SUPPORT_CHAT_TITLE}" } }) { nodes { id title url } } }
 }`;
 const CHAT_LINK = `mutation RouteChatLink($issueId: String!, $url: String!, $title: String!) {
   attachmentLinkURL(issueId: $issueId, url: $url, title: $title) { success }
@@ -159,8 +162,9 @@ export const supportChatsOf = async (
  * (measured on SAN-320, 26 Nov 2026), so a joined widget case would lose its
  * Support chat link to the shared ticket, which would then pass for that
  * customer's chat ticket. This puts each link the case had back on it and
- * removes the moved copy from the match (ENG-21101). It returns a warning
- * instead of throwing: the join itself already landed.
+ * removes the moved copy from the match (ENG-21101). It also runs after a
+ * join that failed partway, since the relation alone can move the link, and
+ * does nothing when nothing moved. It returns a warning instead of throwing.
  */
 export const keepChatsOnCase = async (
   issue: string,
@@ -175,18 +179,31 @@ export const keepChatsOnCase = async (
     const lost = before.filter((link) => !kept.has(link.url));
     for (const link of lost) {
       // biome-ignore lint/performance/noAwaitInLoops: one or two links, each relinked before its moved copy goes.
-      await linear(CHAT_LINK, "RouteChatLink", {
+      const relinked = await linear<{
+        attachmentLinkURL: { success: boolean };
+      }>(CHAT_LINK, "RouteChatLink", {
         issueId: issue,
         title: link.title,
         url: link.url,
       });
+      // A link not back on the case keeps its moved copy, so it is never lost.
+      if (!relinked.attachmentLinkURL.success) {
+        throw new Error("relink refused");
+      }
     }
     const moved = (await supportChatsOf(match, linear)).filter((link) =>
       before.some((own) => own.url === link.url)
     );
     for (const link of moved) {
       // biome-ignore lint/performance/noAwaitInLoops: as above.
-      await linear(CHAT_UNLINK, "RouteChatUnlink", { id: link.id });
+      const removed = await linear<{ attachmentDelete: { success: boolean } }>(
+        CHAT_UNLINK,
+        "RouteChatUnlink",
+        { id: link.id }
+      );
+      if (!removed.attachmentDelete.success) {
+        throw new Error("delete refused");
+      }
     }
     return null;
   } catch {

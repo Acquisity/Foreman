@@ -45,7 +45,13 @@ A report that says something went wrong is not a how-to: an error, missing or wr
 
 Call `find_related_issues` with `issue` set to this ticket and `scope: "masters"`, and again with `scope: "duplicates"`, each with 2 to 4 phrasings of what went wrong: the failure the customer saw and its error text, not only the feature name. Read the hits, then call `decide_prior_work` with `issue`, the report and the hits, at most 8 at a time. When it returns `decided: false`, continue to missing details or handoff, and create no investigation document.
 
-On a ticket from the in-app support chat, `hand_to_fixy` checks this step was done: it refuses an `eng` handoff until both searches ran for this ticket and, when they found anything, `decide_prior_work` judged some of the hits, and while a known issue any batch named is open (it, or a parent above it) and no Duplicate join to it was tried. It adds any uncertain candidate to the handoff notes itself.
+On a ticket from the in-app support chat, `hand_to_fixy` checks this step was done. It refuses an `eng` handoff:
+
+- until both searches ran for this ticket;
+- when they found anything, until `decide_prior_work` judged at least one of the hits;
+- while a known issue is open (it, or a parent above it) and no Duplicate join to it was tried.
+
+It adds any uncertain candidate to the handoff notes itself.
 
 When it returns `known_issue` and that issue, or a parent above it, is open (not completed or canceled). An open report Fixy is already working counts, even with no master: the report joins it.
 

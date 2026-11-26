@@ -267,11 +267,14 @@ const uncertainLines = (
   hits: string[],
   uncertain: string
 ): string[] => {
-  const unjudged = hits.filter((hit) => !(hit in check.judged));
+  // A failed batch a later one retried leaves nothing unjudged, so it adds no note.
+  const unjudged = check.undecided
+    ? hits.filter((hit) => !(hit in check.judged))
+    : [];
   return [
-    ...(check.undecided
+    ...(unjudged.length > 0
       ? [
-          `Known-issue check partly undecided; unjudged matches: ${unjudged.slice(0, NOTE_CANDIDATES).join(", ") || "none"}.`,
+          `Known-issue check partly undecided; unjudged matches: ${unjudged.slice(0, NOTE_CANDIDATES).join(", ")}.`,
         ]
       : []),
     ...(uncertain ? [`Possible known issue: ${uncertain}.`] : []),

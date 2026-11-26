@@ -47,6 +47,20 @@ const picksMaster = (input: {
       (input.parent && input.state?.trim().toLowerCase() === "duplicate")
   );
 
+/** The report's Support chat links before a Duplicate join (none for any other route), or null when they could not be read. */
+const chatsBeforeJoin = async (
+  input: { duplicateOf?: string; issue: string; state?: string },
+  linear: LinearRead
+): Promise<Awaited<ReturnType<typeof supportChatsOf>> | null> => {
+  if (
+    !(input.duplicateOf && isDuplicateState(input.state)) ||
+    isTriageReplay()
+  ) {
+    return [];
+  }
+  return await supportChatsOf(input.issue, linear).catch(() => null);
+};
+
 export default defineTool({
   approval: questionsOnlyPolicy,
   description:
@@ -104,10 +118,19 @@ export default defineTool({
       }
     }
     // A Duplicate join moves the case's Support chat link onto the match; read it first to put it back.
-    const chats =
-      input.duplicateOf && isDuplicateState(input.state) && !isTriageReplay()
-        ? await supportChatsOf(input.issue, linear).catch(() => [])
-        : [];
+    const chats = await chatsBeforeJoin(input, linear);
+    if (chats === null) {
+      ctx.abortSignal.throwIfAborted();
+      return joined({
+        error: `Could not read ${input.issue}'s Support chat links, so the join was not written. Call route_ticket again.`,
+        routed: false as const,
+      });
+    }
+    // Runs after a failed route too: the relation alone can move the link.
+    const keepChats = () =>
+      input.duplicateOf && chats.length > 0
+        ? keepChatsOnCase(input.issue, input.duplicateOf, chats, linear)
+        : Promise.resolve(null);
     try {
       const mastersWindow = picksMaster(input)
         ? await masterWindow(ctx.session.auth)
@@ -123,20 +146,9 @@ export default defineTool({
         ),
         signal: ctx.abortSignal,
       });
-      if (
-        ticket.grouping === "joined" &&
-        input.duplicateOf &&
-        chats.length > 0
-      ) {
-        const lost = await keepChatsOnCase(
-          input.issue,
-          input.duplicateOf,
-          chats,
-          linear
-        );
-        if (lost) {
-          ticket.warnings.push(lost);
-        }
+      const lost = await keepChats();
+      if (lost) {
+        ticket.warnings.push(lost);
       }
       logOpsEvent("triage.decision", {
         ...routeDecisionEvent(triageDecisions.get(), {
@@ -150,6 +162,7 @@ export default defineTool({
       if (ctx.abortSignal.aborted) {
         throw error;
       }
+      const lost = await keepChats();
       if (error instanceof RouteGateError) {
         logOpsEvent("triage.route_refused", {
           code: error.code,
@@ -157,8 +170,10 @@ export default defineTool({
           sessionId: ctx.session.id,
         });
       }
+      const message =
+        error instanceof Error ? error.message : "Routing failed.";
       return joined({
-        error: error instanceof Error ? error.message : "Routing failed.",
+        error: lost ? `${message} ${lost}` : message,
         routed: false as const,
       });
     }
