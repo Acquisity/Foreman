@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { test } from "node:test";
 import { tool as helpArticleTool } from "../tools/widget_help_article.js";
 import { type WidgetCase, widgetCaseSchema } from "./widget-case.js";
+import { WIDGET_ENDPOINT_MANIFEST } from "./widget-endpoint-manifest.js";
 import {
   citedArticles,
   claimsFor,
@@ -25,6 +26,7 @@ import {
   saveRecord,
   scorecard,
 } from "./widget-judge.js";
+import { judgeToolCapabilities } from "./widget-judge-tools.js";
 import { SUPPORT_GUIDE } from "./widget-support-guide.js";
 
 const present = <T>(value: T | undefined): T => {
@@ -534,6 +536,28 @@ test("a retired tool the run called is listed as available to it", () => {
     judgeInput({ ...recorded, cassette: [] }, "Answer.", claims)
   ).widgetToolCapabilities.map((tool: { name: string }) => tool.name);
   assert.equal(today.includes("widget_outreach_health"), false);
+});
+
+test("a run that called a retired tool is not judged with the endpoint that replaced it", () => {
+  const campaigns = WIDGET_ENDPOINT_MANIFEST.endpoints.find(
+    ({ name }) => name === "campaigns"
+  );
+  assert.ok(campaigns);
+  const listed = [
+    {
+      name: campaigns.name,
+      path: campaigns.path,
+      sections: campaigns.sections.map((section) => section.name),
+      version: campaigns.version,
+    },
+  ];
+  const names = (tools: string[]) =>
+    judgeToolCapabilities(listed, tools).map(({ name }) => name);
+  assert.ok(names([]).includes("widget_campaigns"));
+  assert.ok(names(["widget_campaigns"]).includes("widget_campaigns"));
+  const old = names(["widget_outreach_health"]);
+  assert.equal(old.includes("widget_campaigns"), false);
+  assert.ok(old.includes("widget_outreach_health"));
 });
 
 test("a score result saved with the rollout's held areas still loads", () => {

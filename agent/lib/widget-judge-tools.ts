@@ -29,29 +29,48 @@ const handWrittenCapabilities = Object.entries({
 
 const RETIRED_TOOL =
   "A tool this run had that has since been retired. It was available to the investigator; what it read is in its toolResults.";
+/**
+ * The area each retired single-area tool answered for (ENG-20544). A run that
+ * called one predates its area's endpoint, so that endpoint tool is left out.
+ */
+const RETIRED_TOOL_AREAS: Readonly<Record<string, string>> = {
+  widget_account_access: "account",
+  widget_billing_summary: "billing",
+  widget_generation_diagnostics: "ai-generation",
+  widget_inbox_health: "inboxes",
+  widget_lead_pipeline_status: "lead-pipeline",
+  widget_outreach_health: "campaigns",
+  widget_provisioning_status: "orders",
+  widget_sdr_thread_status: "ai-sdr",
+};
 
 /**
  * What the investigator could call in this case: the hand-written tools, the
  * endpoint tools the case's own endpoint list offered (none when the case
- * recorded no list), and any other widget tool the run itself called, so a
- * reply recorded before a tool was retired is judged against the tools it had.
+ * recorded no list), and any other widget tool the run itself called. A run
+ * recorded before a tool was retired is judged with that tool, by name only,
+ * and without the endpoint that later replaced it.
  */
 export const judgeToolCapabilities = (
   endpoints: readonly AvailableEndpoint[] | undefined,
   calledTools: readonly string[] = []
 ) => {
+  const called = new Set(calledTools);
+  const predates = new Set(
+    [...called].flatMap((name) => RETIRED_TOOL_AREAS[name] ?? [])
+  );
   const offered = [
     ...handWrittenCapabilities,
-    ...offeredEndpointTools(endpoints).map(
-      ({ description, inputSchema, name }) => ({
+    ...offeredEndpointTools(endpoints)
+      .filter(({ area }) => !predates.has(area))
+      .map(({ description, inputSchema, name }) => ({
         description,
         inputSchema,
         name,
-      })
-    ),
+      })),
   ];
   const known = new Set(offered.map(({ name }) => name));
-  const retired = [...new Set(calledTools)]
+  const retired = [...called]
     .filter((name) => name.startsWith("widget_") && !known.has(name))
     .map((name) => ({ description: RETIRED_TOOL, inputSchema: {}, name }));
   return [...offered, ...retired];
