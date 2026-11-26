@@ -750,3 +750,30 @@ test("a follow-up in a chat with a product ticket and a refund hears about each 
   );
   assert.equal(one?.forWriters, "refund pending");
 });
+
+test("a reply's own earlier ticket wins over taking up another ticket whose report never landed", async (t) => {
+  t.mock.method(globalThis, "fetch", () =>
+    Promise.reject(new Error("unexpected transport"))
+  );
+  const filed = await fileTicketFor(
+    scope,
+    {
+      ...feedbackReport("reply-a"),
+      feedback: { earlier: "ENG-7", message: "reply-a" },
+    },
+    new AbortController().signal,
+    undefined,
+    {
+      create: () => assert.fail("the reply already has a ticket"),
+      followUp: () => Promise.resolve(),
+      legacyFeedback: () =>
+        Promise.resolve({
+          ...linkedTicket("ENG-7", "feedback"),
+          reported: "reply-a",
+        }),
+      linked: () => Promise.resolve([linkedTicket("ENG-60", "feedback")]),
+      report: () => Promise.resolve(true),
+    }
+  );
+  assert.equal("identifier" in filed && filed.identifier, "ENG-7");
+});

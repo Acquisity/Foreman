@@ -226,21 +226,20 @@ async function feedbackTicket(
   const feedback = (await deps.linked(scope.conversationId, signal)).filter(
     ({ kind }) => kind === "feedback"
   );
+  const named = feedback.find(({ reported }) => reported === report.message);
+  const earlier =
+    !named && report.earlier
+      ? await deps.legacyFeedback(
+          report.earlier,
+          scope.conversationId,
+          report.message,
+          signal
+        )
+      : null;
   // A ticket whose report never landed is taken up by the next report, which
   // writes it, so a failed write is repaired rather than filed again.
-  const linked =
-    feedback.find(({ reported }) => reported === report.message) ??
-    feedback.find(({ reported }) => reported === undefined);
-  if (linked || !report.earlier) {
-    return linked;
-  }
   return (
-    (await deps.legacyFeedback(
-      report.earlier,
-      scope.conversationId,
-      report.message,
-      signal
-    )) ?? undefined
+    named ?? earlier ?? feedback.find(({ reported }) => reported === undefined)
   );
 }
 
