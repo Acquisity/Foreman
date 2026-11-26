@@ -15,7 +15,7 @@ Nothing else. Do not change code, push a branch, or open a pull request. Do not 
 
 ## 1. Read the ticket
 
-Read the full issue with the Linear connection, and its documents. A customer's report filed since ENG-21100 has a plain description written for people, a Support chat link, and a `Support report` document that opens with `## Verified scope` (workspace, workspace id, conversation, user) and then follows the layout below. A teammate's report from the inbox, and any older report, has that layout in the description instead:
+Read the full issue with the Linear connection, and its documents. A customer's report filed since ENG-21100 has a plain description written for people, a Support chat link, and a `Support report` document that opens with `## Verified scope` (workspace, workspace id, conversation, user and their role) and then follows the layout below. A teammate's report from the inbox, and any older report, has that layout in the description instead:
 
 - `## Report`: who reported it (Customer, or Support team with a name) and what they say went wrong.
 - `## Conversation`: the reported reply id, the Foreman run id, and the transcript, oldest first. A `Screenshot reading:` line under a customer turn is what the widget understood from that customer's screenshot.

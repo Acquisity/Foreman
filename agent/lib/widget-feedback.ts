@@ -57,8 +57,8 @@ export function widgetFeedbackRoute(
 ): string {
   const ids = marker
     ? `The ticket's machine line names conversation ${marker.conversation}, message ${marker.message ?? "none"}, run ${marker.run ?? "none"}, Sentry replay ${marker.replay ?? "none"}, reported at ${marker.at ?? "unknown"}.`
-    : "The ticket's machine line is missing or malformed: take the conversation, reply, and run from the Conversation section (in the ticket's Support report document, or the description on older tickets), and say in the comment that the line was missing.";
-  return `This issue is chat widget feedback filed into the Acquisity Chat Widget project. Load the widget-feedback skill and follow it instead of triage: diagnose why the widget answered as it did and post exactly one comment on this ticket. Change nothing else. The report, transcript and browser capture are in the ticket's Support report document; older tickets have them in the description instead. ${ids}`;
+    : "The ticket's machine line is missing or malformed: take the conversation, reply, and run from the Conversation section (in the ticket's Support report document, or the description on a teammate's or older ticket), and say in the comment that the line was missing.";
+  return `This issue is chat widget feedback filed into the Acquisity Chat Widget project. Load the widget-feedback skill and follow it instead of triage: diagnose why the widget answered as it did and post exactly one comment on this ticket. Change nothing else. A customer's report filed since ENG-21100 has the report, transcript and browser capture in its Support report document; a teammate's report from the inbox, and any older ticket, has them in the description instead. ${ids}`;
 }
 
 const ISSUE_QUERY = `query WidgetFeedbackIssue($id: String!) {

@@ -497,7 +497,7 @@ const ID_SEGMENT =
 
 /** A page path a person can read, with record ids swapped for a placeholder; the exact path is in the Support report. */
 const pageWithoutIds = (page: string) =>
-  inert(page).replaceAll("`", "").replace(ID_SEGMENT, ":id");
+  plain(page).replaceAll("`", "").replace(ID_SEGMENT, ":id");
 
 /**
  * The team's bug format, ported from Acquisity's bug-report-ticket.ts. The

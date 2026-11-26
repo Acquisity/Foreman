@@ -132,7 +132,11 @@ test("the customer's Report a problem is filed through the one widget filer, wit
   const sections = input.report.join("\n\n");
   assert.ok(sections.includes(`Reported reply: ${REPLY_ID}`));
   assert.ok(sections.includes("App version: 0123456789ab"));
-  assert.ok(sections.includes("Foreman: Open the Billing tab in Settings."));
+  // Customer text is quoted, so it cannot open a heading of its own.
+  assert.ok(sections.includes("Customer:\n\n> How do I change my plan?"));
+  assert.ok(
+    sections.includes("Foreman:\n\n> Open the Billing tab in Settings.")
+  );
   // The widget-feedback route reads its ids from the Support report's last line.
   assert.deepEqual(parseWidgetFeedbackMarker(sections), {
     at: "2026-11-26T12:00:00.000Z",
@@ -150,6 +154,9 @@ test("a report without the service secret, identity or workspace files nothing",
     (await receiveProblemReport(report({}, "wrong"), overrides)).status,
     403
   );
+  const anonymous = report();
+  anonymous.headers.delete("authorization");
+  assert.equal((await receiveProblemReport(anonymous, overrides)).status, 401);
   const denied = await receiveProblemReport(report(), {
     ...overrides,
     member: () => Promise.reject(new Error("not a member")),
@@ -240,4 +247,33 @@ test("widget_file_ticket drafts the ticket from the investigator's findings and 
   );
   // The refund check still reads the investigator's own words.
   assert.ok(input?.summary.startsWith("Inbox sync failing\n\n"));
+});
+
+test("a long turn is cut rather than refused, and only safe capture lines reach the report", async (t) => {
+  enabled(t);
+  const { filed, overrides } = filing();
+  const response = await receiveProblemReport(
+    report({
+      browser: {
+        browser: "Chrome 131",
+        consoleErrors: ['10:00:01 error Failed {"token":"x"}'],
+        failedRequests: [
+          "10:00:02 POST /api/trpc/x 500 120ms",
+          "10:00:03 GET /api/x?secret=1 500 9ms",
+        ],
+        page: "/dashboard",
+        replayId: null,
+        screen: "1440x900",
+        sentryEventIds: [],
+      },
+      history: [{ role: "assistant", text: "y".repeat(5000) }],
+    }),
+    overrides
+  );
+  assert.equal(response.status, 200);
+  const sections = filed[0]?.input.report.join("\n") ?? "";
+  assert.ok(sections.includes("POST /api/trpc/x 500 120ms"));
+  assert.ok(!sections.includes("secret=1"));
+  assert.ok(!sections.includes('"token"'));
+  assert.ok(!sections.includes("y".repeat(2001)));
 });

@@ -98,6 +98,8 @@ const linearReturning = (
   };
 };
 
+process.env.ACQUISITY_ORIGIN ??= "https://app.acquisity.ai";
+
 const CONVERSATION = "11111111-1111-4111-8111-111111111111";
 const chatLink = (title = "Support chat") => ({
   title,
@@ -264,4 +266,33 @@ test("a customer's report on a Foreman reply is linked to the chat but is not tr
     []
   );
   assert.equal(ask.triageIntake, false);
+});
+
+test("a link on another host, or a report naming another chat, gives no verified scope", async () => {
+  const elsewhere = {
+    title: "Support chat",
+    url: `https://evil.example/dashboard/admin/support?conversation=${CONVERSATION}`,
+  };
+  const spoofed = await readAskFrom(
+    "issue-1",
+    credentials,
+    linearReturning("Inboxes fail.", [elsewhere], [supportReport]),
+    []
+  );
+  assert.equal(spoofed.supportScope, null);
+  assert.equal(spoofed.triageIntake, false);
+  const otherChat = {
+    content: supportReport.content.replace(
+      CONVERSATION,
+      "99999999-9999-4999-8999-999999999999"
+    ),
+    title: "Support report",
+  };
+  const mismatched = await readAskFrom(
+    "issue-1",
+    credentials,
+    linearReturning("Inboxes fail.", [chatLink()], [otherChat]),
+    []
+  );
+  assert.equal(mismatched.supportScope, null);
 });

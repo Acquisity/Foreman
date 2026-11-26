@@ -5,6 +5,7 @@ import {
   type BugReportBrowser,
   bugReportBrowser,
   MAX_BROWSER_CHARS,
+  safeCaptureLines,
 } from "./widget-bug-evidence.js";
 import {
   draftHandoffTicket,
@@ -57,21 +58,32 @@ const inputSchema = z.strictObject({
     .array(
       z.strictObject({
         role: z.enum(["customer", "assistant"]),
-        text: z.string().max(TURN_CHARS),
+        // A longer turn is cut, never refused, so one long reply cannot fail the report.
+        text: z
+          .string()
+          .max(TURN_CHARS * 10)
+          .transform((text) => text.slice(0, TURN_CHARS)),
       })
     )
     .max(TURNS_MAX),
   /** The reported Foreman reply; absent for a report on the whole conversation. */
   message_id: z.uuid().optional(),
   organization_id: z.uuid(),
-  /** The same on every retry of one report, so a slow write is not doubled. */
+  /** The same on every retry of one report: it keys the follow-up comment and the report's addition, so a retry adds neither twice. */
   report_id: z.uuid(),
   run_id: z.uuid().optional(),
 });
 export type ProblemReport = z.infer<typeof inputSchema>;
 
 const MAX_BODY_CHARS =
-  (DETAILS_MAX + TURNS_MAX * TURN_CHARS + MAX_BROWSER_CHARS) * 6 + 4096;
+  (DETAILS_MAX + TURNS_MAX * TURN_CHARS * 10 + MAX_BROWSER_CHARS) * 6 + 4096;
+
+/** Outside text as a quote, line by line, so it cannot open a heading or block of its own. */
+const quoteLines = (text: string) =>
+  inert(text)
+    .split("\n")
+    .map((line) => `> ${line.trimStart()}`)
+    .join("\n");
 
 const fenced = (lines: string[]) =>
   lines.length
@@ -92,9 +104,9 @@ const browserSection = (
     `Sentry replay: ${browser.replayId && org ? `https://${org}.sentry.io/replays/${browser.replayId}/` : (browser.replayId ?? "none")}`,
     `Sentry errors: ${browser.sentryEventIds.length ? browser.sentryEventIds.join(", ") : "none"}`,
     "### Console errors (newest last)",
-    fenced(browser.consoleErrors),
+    fenced(safeCaptureLines(browser).consoleErrors),
     "### Failed network calls (newest last)",
-    fenced(browser.failedRequests),
+    fenced(safeCaptureLines(browser).failedRequests),
   ].join("\n\n");
 };
 
@@ -110,7 +122,7 @@ export const problemReportSections = (
   "## Report",
   [
     "Reported by: Customer",
-    `What went wrong: ${input.details ? inert(input.details) : "(no details given)"}`,
+    `What went wrong:\n\n${input.details ? quoteLines(input.details) : "> (no details given)"}`,
   ].join("\n\n"),
   "## Conversation",
   [
@@ -122,7 +134,7 @@ export const problemReportSections = (
     ? input.history
         .map(
           ({ role, text }) =>
-            `${role === "customer" ? "Customer" : "Foreman"}: ${inert(text)}`
+            `${role === "customer" ? "Customer" : "Foreman"}:\n\n${quoteLines(text)}`
         )
         .join("\n\n")
     : "(no messages)",

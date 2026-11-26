@@ -8,6 +8,7 @@ import {
   linkedTickets,
   saveSupportReport,
   supportReportContent,
+  supportReportId,
 } from "./widget-support-report.js";
 
 process.env.ACQUISITY_ORIGIN ??= "https://app.acquisity.ai";
@@ -55,6 +56,7 @@ test("a first filing creates the report under the ticket's fixed id, marked with
     true
   );
   const input = sent[0]?.variables.input as Record<string, string>;
+  assert.equal(input.id, supportReportId("ENG-1"));
   assert.equal(input.title, "Support report");
   assert.equal(input.issueId, "ENG-1");
   assert.ok(input.content.startsWith("<!-- support-report-addition run-1 -->"));

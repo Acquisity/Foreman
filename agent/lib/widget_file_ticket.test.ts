@@ -445,7 +445,7 @@ test("a second refund ask lands on the chat's refund ticket, which is routed to 
   assert.equal("refund" in filed && filed.refund, true);
 });
 
-test("a run files once: its saved receipt is returned before any refund check, and a refund files on the next message", async (t) => {
+test("a run files once: its saved receipt is returned before any refund check", async (t) => {
   t.mock.method(globalThis, "fetch", () =>
     Promise.reject(new Error("unexpected transport"))
   );

@@ -19,6 +19,7 @@ import { withoutReporterUpdates } from "./reporter-updates/copy.js";
 import {
   isSupportChatLink,
   isWidgetTicketBody,
+  linkedConversation,
   REPORT_WAITS_MS,
   readUntilReport,
   SUPPORT_REPORT_TITLE,
@@ -267,6 +268,8 @@ const ASK_FROM_QUERY = `query AskFrom($id: String!) {
 const VERIFIED_SCOPE =
   /## Verified scope\n\n((?:[-*] [^\n]{1,2500}\n?){1,10})/u;
 
+const REPORT_CONVERSATION = /^- Support conversation: ([0-9a-f-]{36})$/mu;
+
 /**
  * The verified scope lines from a widget ticket's Support report, which since
  * ENG-21100 hold the workspace id the description no longer carries. Only a
@@ -276,12 +279,18 @@ export const supportReportScope = (
   attachments: { title: string; url: string }[],
   documents: { content: string | null; title: string }[]
 ): string | null => {
-  if (!attachments.some(isSupportChatLink)) {
-    return null;
-  }
+  const chats = new Set(
+    attachments
+      .filter(isSupportChatLink)
+      .map(({ url }) => linkedConversation(url))
+  );
   const report = documents.find(({ title }) => title === SUPPORT_REPORT_TITLE);
-  const lines = VERIFIED_SCOPE.exec(report?.content ?? "")?.[1];
-  return lines ? lines.trim().replaceAll(/^\* /gmu, "- ") : null;
+  const lines = VERIFIED_SCOPE.exec(report?.content ?? "")?.[1]
+    ?.trim()
+    .replaceAll(/^\* /gmu, "- ");
+  // The report's conversation must be the chat Foreman linked the ticket to.
+  const conversation = REPORT_CONVERSATION.exec(lines ?? "")?.[1];
+  return lines && conversation && chats.has(conversation) ? lines : null;
 };
 
 interface AskFromIssue {

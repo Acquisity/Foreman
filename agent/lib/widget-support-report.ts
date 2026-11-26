@@ -28,11 +28,18 @@ export const supportChatUrl = (conversationId: string) => {
 const SUPPORT_CHAT_PATH = "/dashboard/admin/support";
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu;
 
-/** The conversation a support chat link names, or null for any other URL. */
+/** The conversation a support chat link on this deployment's Acquisity names, or null for any other URL. */
 export const linkedConversation = (url: string): string | null => {
   const parsed = URL.parse(url);
   const conversation = parsed?.searchParams.get("conversation") ?? null;
-  return parsed?.pathname === SUPPORT_CHAT_PATH &&
+  let origin: string | null = null;
+  try {
+    origin = acquisityOrigin();
+  } catch {
+    return null;
+  }
+  return parsed?.origin === origin &&
+    parsed.pathname === SUPPORT_CHAT_PATH &&
     conversation &&
     UUID.test(conversation)
     ? conversation
