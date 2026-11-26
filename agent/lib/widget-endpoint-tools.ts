@@ -32,9 +32,7 @@ import {
  * old file stays until the cleanup (ENG-20544). An area missing here is
  * offered as soon as the manifest has it.
  */
-export const HELD_AREAS: ReadonlySet<string> = new Set([
-  "crm-contact",
-]);
+export const HELD_AREAS: ReadonlySet<string> = new Set(["crm-contact"]);
 /**
  * The hand-written widget tools an endpoint area replaces, and the areas each
  * answers for. Job failures reads failed AI SDR runs, provisioning orders and
