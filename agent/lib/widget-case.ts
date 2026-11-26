@@ -344,12 +344,6 @@ const recorderNames = (draft: unknown, organizationName: string) =>
     ([, recorder]) => recorder
   );
 
-const countInto = (counts: Map<string, number>, values: string[]) => {
-  for (const value of values) {
-    counts.set(value, (counts.get(value) ?? 0) + 1);
-  }
-};
-
 /** Our own domain stays: replacing it would also rewrite every help-center link. */
 const ownDomain = (host: string, replace: (host: string) => string) =>
   PUBLIC_HOSTS.has(host.toLowerCase()) ? host : replace(host);
@@ -367,7 +361,7 @@ const isSafeIdentifier = (value: string) =>
  */
 export function scrubCase(raw: WidgetCase, scope: RunScope): ScrubbedCase {
   const found = {
-    names: new Map<string, number>(),
+    names: new Set<string>(),
     phones: new Set<string>(),
   };
   const draft = mapStrings(
@@ -377,7 +371,7 @@ export function scrubCase(raw: WidgetCase, scope: RunScope): ScrubbedCase {
         if (PHONE_KEY.test(key)) {
           found.phones.add(text);
         } else if (NAME_KEY.test(key)) {
-          found.names.set(text, (found.names.get(text) ?? 0) + 1);
+          found.names.add(text);
         }
       }
       return text;
@@ -385,7 +379,9 @@ export function scrubCase(raw: WidgetCase, scope: RunScope): ScrubbedCase {
     true
   );
   // After the first pass, so dropped media is never serialized.
-  countInto(found.names, recorderNames(draft, scope.organizationName));
+  for (const name of recorderNames(draft, scope.organizationName)) {
+    found.names.add(name);
+  }
   const replacements = new Map<string, string>([
     [scope.organizationName.toLowerCase(), fixture.organizationName],
     [scope.organizationSlug.toLowerCase(), fixture.organizationSlug],
@@ -463,13 +459,13 @@ export function scrubCase(raw: WidgetCase, scope: RunScope): ScrubbedCase {
         : `https://internal.example/${next("link")}`;
     });
   }
-  for (const name of found.names.keys()) {
+  for (const name of found.names) {
     addName(name, add, () => `Name ${next("name")}`, replacements);
   }
   // A reply shortens a long name with an ellipsis ("Information Technology…"):
   // the shown prefix takes the name's own placeholder, so it is neither kept nor
   // read as a different name.
-  addShortenedNames(decoded, found.names.keys(), replacements);
+  addShortenedNames(decoded, found.names, replacements);
   for (const phone of found.phones) {
     add(phone, () => `Phone ${next("phone")}`);
   }

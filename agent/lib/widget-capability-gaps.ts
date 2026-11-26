@@ -185,7 +185,8 @@ const WHOLE_REFUSALS = new Set([
  * One widget read's area and whether the whole check was refused by design:
  * its own status is denied, feature_off, invalid_input or not_linked, or the
  * framework refused the call or rejected its input. A refused section inside
- * an otherwise answered read is not a refusal of the area. Null for anything that isn't a widget read.
+ * an otherwise answered read is not a refusal of the area. Null for anything
+ * that isn't a widget read.
  */
 export function readRefusal(
   result: unknown
