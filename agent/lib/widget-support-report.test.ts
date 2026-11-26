@@ -9,6 +9,7 @@ import {
   saveSupportReport,
   supportReportContent,
   supportReportId,
+  verifiedScopeSection,
 } from "./widget-support-report.js";
 
 process.env.ACQUISITY_ORIGIN ??= "https://app.acquisity.ai";
@@ -175,16 +176,28 @@ const linkNode = (
   url: `https://app.acquisity.ai/dashboard/admin/support?conversation=${scope.conversationId}`,
 });
 
-test("a feedback ticket linked to the chat names the reply its first report is about; a teammate's inbox link is not Foreman's", async () => {
+test("a feedback ticket linked to the chat names the reply its first report is about; a teammate's inbox link, or a link with no Support report of this chat, is not Foreman's", async () => {
   const { request, sent } = linear({
     SupportChatTickets: {
       attachmentsForURL: {
         nodes: [
           linkNode(
             "ENG-1",
-            `x\n<!-- chat-widget-feedback conversation=${scope.conversationId} message=reply-a run=none -->\nlater\n<!-- chat-widget-feedback conversation=${scope.conversationId} message=reply-a run=none -->`
+            `${verifiedScopeSection(scope, "problem")}\n\nx\n<!-- chat-widget-feedback conversation=${scope.conversationId} message=reply-a run=none -->\nlater\n<!-- chat-widget-feedback conversation=${scope.conversationId} message=reply-a run=none -->`
           ),
           linkNode("ENG-2", null, "Support conversation · someone"),
+          // A link Linear moved onto a shared ticket when another customer's case was marked its duplicate.
+          linkNode(
+            "ENG-3",
+            verifiedScopeSection(
+              {
+                ...scope,
+                conversationId: "0b3a6f2e-1c4d-4e5f-8a9b-7c6d5e4f3a2b",
+              },
+              "bug"
+            )
+          ),
+          linkNode("ENG-4", null),
         ],
       },
     },
