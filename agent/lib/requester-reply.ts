@@ -19,6 +19,7 @@ import { withoutReporterUpdates } from "./reporter-updates/copy.js";
 import {
   isSupportChatLink,
   REPORT_WAITS_MS,
+  readUntilReport,
   SUPPORT_REPORT_TITLE,
   WIDGET_FEEDBACK_PROJECT_ID,
 } from "./widget-support-report.js";
@@ -315,16 +316,13 @@ export async function readAskFrom(
         variables: { id: issue },
       })
     ).issue;
-  let found = await read();
-  for (const ms of waits) {
-    const linked = found?.attachments.nodes.some(isSupportChatLink);
-    if (!linked || found?.documents.nodes.length) {
-      break;
-    }
-    // biome-ignore lint/performance/noAwaitInLoops: each wait gives the report time to land.
-    await new Promise((resolve) => setTimeout(resolve, ms));
-    found = await read();
-  }
+  const found = await readUntilReport(
+    read,
+    (answer) =>
+      !answer?.attachments.nodes.some(isSupportChatLink) ||
+      answer.documents.nodes.length > 0,
+    waits
+  );
   const attachments = found?.attachments.nodes ?? [];
   const description = found?.description ?? null;
   // A ticket file_migration_ticket filed is delegated as it is created, so

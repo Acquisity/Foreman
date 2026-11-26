@@ -134,6 +134,24 @@ export const supportReportContent = (
  */
 export const REPORT_WAITS_MS = [1500, 2000];
 
+/** Reads again after each wait until `ready` holds, then returns the last read. */
+export async function readUntilReport<T>(
+  read: () => Promise<T>,
+  ready: (value: T) => boolean,
+  waits: number[]
+): Promise<T> {
+  let value = await read();
+  for (const ms of waits) {
+    if (ready(value)) {
+      break;
+    }
+    // biome-ignore lint/performance/noAwaitInLoops: each wait gives the report time to land.
+    await new Promise((resolve) => setTimeout(resolve, ms));
+    value = await read();
+  }
+  return value;
+}
+
 /** One fixed document id per ticket, so a retried filing never adds a second report. */
 export const supportReportId = (identifier: string) =>
   commentIdFor(`support-report:${identifier}`);

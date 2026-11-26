@@ -5,6 +5,7 @@ import {
 } from "eve/channels/linear";
 import {
   REPORT_WAITS_MS,
+  readUntilReport,
   SUPPORT_REPORT_TITLE,
   WIDGET_FEEDBACK_PROJECT_ID,
 } from "./widget-support-report.js";
@@ -96,30 +97,26 @@ export async function widgetFeedbackContext(
         variables: { id: issueId },
       })
     ).issue;
-  let issue = await read();
+  // A customer's report is delegated before its Support report lands; a
+  // teammate's, and an older one, carries its line in the description.
+  const issue = await readUntilReport(
+    read,
+    (found) =>
+      found?.project?.id !== WIDGET_FEEDBACK_PROJECT_ID ||
+      found.documents.nodes.length > 0 ||
+      parseWidgetFeedbackMarker(found.description ?? "") !== null,
+    waits
+  );
   if (issue?.project?.id !== WIDGET_FEEDBACK_PROJECT_ID) {
     return null;
   }
-  // A customer's report is delegated before its Support report lands; a
-  // teammate's, and an older one, carries its line in the description.
-  for (const ms of waits) {
-    if (
-      issue?.documents.nodes.length ||
-      parseWidgetFeedbackMarker(issue?.description ?? "")
-    ) {
-      break;
-    }
-    // biome-ignore lint/performance/noAwaitInLoops: each wait gives the report time to land.
-    await new Promise((resolve) => setTimeout(resolve, ms));
-    issue = (await read()) ?? issue;
-  }
   // Reports filed since ENG-21100 keep the line at the end of their Support
   // report document; older ones end their description with it.
-  const report = issue?.documents.nodes.find(
+  const report = issue.documents.nodes.find(
     (document) => document.title === SUPPORT_REPORT_TITLE
   );
   return widgetFeedbackRoute(
     parseWidgetFeedbackMarker(report?.content ?? "") ??
-      parseWidgetFeedbackMarker(issue?.description ?? "")
+      parseWidgetFeedbackMarker(issue.description ?? "")
   );
 }
