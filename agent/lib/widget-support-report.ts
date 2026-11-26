@@ -367,7 +367,7 @@ const LEGACY_FEEDBACK = `query LegacyFeedbackTicket($id: String!) {
  * A report ticket Acquisity filed itself before ENG-21100, which the app
  * still names for the reported reply: it counts only in the Chat Widget
  * project and when its description's machine line names this chat and reply.
- * Its state does not matter: a repeat report only adds to it, as before.
+ * Its state does not matter: a repeat report only adds to it.
  */
 export async function legacyFeedbackTicket(
   identifier: string,
