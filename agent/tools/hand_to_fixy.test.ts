@@ -8,7 +8,7 @@ import {
   SLACK_THREAD_START,
   TICKET_CREATED,
 } from "#lib/fixy-handoff.js";
-import type { KnownIssueCheck } from "#lib/known-issue-gate.js";
+import type { JoinAttempt, KnownIssueCheck } from "#lib/known-issue-gate.js";
 import { stampQuestionsOnly, stampTrusted } from "#lib/trust.js";
 import type {
   HandoffSession,
@@ -892,13 +892,13 @@ describe("hand_to_fixy on a widget bug (ENG-21101)", () => {
     "FixyHandoffLabels",
   ];
   const known =
-    (join?: KnownIssueCheck["join"]): (() => Record<string, KnownIssueCheck>) =>
+    (join?: JoinAttempt): (() => Record<string, KnownIssueCheck>) =>
     () => ({
       "SAN-145": {
         judged: { "ENG-7": "partial_or_adjacent", "ENG-9": "same_outcome" },
         knownIssues: ["ENG-9"],
         searches: { duplicates: ["ENG-7"], masters: ["ENG-9"] },
-        ...(join ? { join } : {}),
+        ...(join ? { joins: { "ENG-9": join } } : {}),
       },
     });
 
@@ -931,7 +931,7 @@ describe("hand_to_fixy on a widget bug (ENG-21101)", () => {
       fake.linear,
       ENV,
       undefined,
-      known({ error: "Label missing", grouping: null, target: "ENG-9" })
+      known({ error: "Label missing", grouping: null })
     );
     assert.equal(result.success, true);
     assert.equal(result.fixyNotified, true);

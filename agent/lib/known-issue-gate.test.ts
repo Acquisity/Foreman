@@ -117,7 +117,7 @@ describe("knownIssueGate", () => {
     );
     const other: KnownIssueCheck = {
       ...knownOpen,
-      join: { error: "no", grouping: null, target: "ENG-8" },
+      joins: { "ENG-8": { error: "no", grouping: null } },
     };
     assert.match(
       knownIssueGate("ENG-1", other, "triage", { "ENG-9": "open" }).refusal ??
@@ -141,7 +141,7 @@ describe("knownIssueGate", () => {
         "ENG-1",
         {
           ...check,
-          join: { error: "Label missing", grouping: null, target: "ENG-9" },
+          joins: { "ENG-9": { error: "Label missing", grouping: null } },
         },
         "triage",
         { "ENG-9": "open" }
@@ -154,7 +154,7 @@ describe("knownIssueGate", () => {
     );
     const ungrouped: KnownIssueCheck = {
       ...check,
-      join: { grouping: "needs-grouping", target: "ENG-9" },
+      joins: { "ENG-9": { grouping: "needs-grouping" } },
     };
     assert.deepEqual(
       knownIssueGate("ENG-1", ungrouped, "triage", { "ENG-9": "open" }).notes,
@@ -277,6 +277,72 @@ describe("the recorded sequence", () => {
   });
 });
 
+describe("round 3 cases", () => {
+  it("treats every same-outcome candidate as a known issue and needs a join to each open one", () => {
+    const check = withDecision(
+      searched(["ENG-8", "ENG-9"]),
+      decision(
+        [
+          { identifier: "ENG-8", match: "same_outcome" },
+          { identifier: "ENG-9", match: "same_outcome" },
+        ],
+        "ENG-8"
+      )
+    );
+    assert.deepEqual(check.knownIssues, ["ENG-8", "ENG-9"]);
+    const states = { "ENG-8": "closed", "ENG-9": "open" } as const;
+    assert.match(
+      knownIssueGate("ENG-1", check, "triage", states).refusal ?? "",
+      JOIN_FIRST
+    );
+    const twoOpen = { "ENG-8": "open", "ENG-9": "open" } as const;
+    const firstRefused: KnownIssueCheck = {
+      ...check,
+      joins: { "ENG-8": { error: "refused", grouping: null } },
+    };
+    assert.match(
+      knownIssueGate("ENG-1", firstRefused, "triage", twoOpen).refusal ?? "",
+      JOIN_FIRST
+    );
+  });
+
+  it("keeps earlier hits when a narrowed search finds fewer, and a failure after a success keeps the success", (t) => {
+    let state: Checks = {};
+    t.mock.method(
+      knownIssueChecks,
+      "update",
+      (change: (all: Checks) => Checks) => {
+        state = change(state);
+      }
+    );
+    recordSearch("ENG-1", "masters", ["ENG-9"]);
+    recordSearch("ENG-1", "masters", ["ENG-1"]);
+    recordSearch("ENG-1", "masters", null);
+    recordSearch("ENG-1", "duplicates", null);
+    assert.deepEqual(state["ENG-1"].searches, {
+      duplicates: null,
+      masters: ["ENG-9", "ENG-1"],
+    });
+  });
+
+  it("names a failed batch's unjudged hits beside a closed known issue", () => {
+    const check = withDecision(
+      withDecision(
+        searched(["ENG-9", "ENG-6"]),
+        decision([{ identifier: "ENG-9", match: "same_outcome" }], "ENG-9")
+      ),
+      null
+    );
+    assert.deepEqual(
+      knownIssueGate("ENG-1", check, "triage", { "ENG-9": "closed" }).notes,
+      [
+        "Same outcome as ENG-9, which is closed with no open master above it: check whether this is a regression.",
+        "Known-issue check partly undecided; unjudged matches: ENG-6.",
+      ]
+    );
+  });
+});
+
 describe("recordJoin", () => {
   it("records only a route that asked for Duplicate under a match", (t) => {
     let state: Checks = {};
@@ -297,10 +363,8 @@ describe("recordJoin", () => {
       { duplicateOf: "eng-9", issue: "eng-1", state: "Duplicate" },
       { grouping: "needs-grouping" }
     );
-    assert.deepEqual(state["ENG-1"].join, {
-      error: undefined,
-      grouping: "needs-grouping",
-      target: "ENG-9",
+    assert.deepEqual(state["ENG-1"].joins, {
+      "ENG-9": { error: undefined, grouping: "needs-grouping" },
     });
   });
 });

@@ -11,13 +11,14 @@ import { isWidgetFiledDescription } from "./widget-ticket-marker.js";
  * customers reporting one bug join its open issue instead of each starting a
  * Fixy run.
  */
+export interface JoinAttempt {
+  error?: string;
+  grouping: "joined" | "needs-grouping" | null;
+}
+
 export interface KnownIssueCheck {
-  /** A route_ticket call that asked for Duplicate under a match: its error when it was refused, and its grouping. */
-  join?: {
-    error?: string;
-    grouping: "joined" | "needs-grouping" | null;
-    target: string;
-  };
+  /** Each route_ticket call that asked for Duplicate under a match, by the match: its error when it was refused, and its grouping. */
+  joins?: Record<string, JoinAttempt>;
   /** Every candidate judged, across decide_prior_work batches. */
   judged: Record<string, CandidateMatch>;
   /** Every known issue a batch named, first first, so a later fresh batch never hides one. */
@@ -57,13 +58,18 @@ export const recordSearch = (
   scope: "duplicates" | "masters",
   hits: readonly string[] | null
 ) =>
-  recordKnownIssueCheck(issue, (check) => ({
-    ...check,
-    searches: {
-      ...check.searches,
-      [scope]: hits?.map((hit) => hit.toUpperCase()) ?? null,
-    },
-  }));
+  recordKnownIssueCheck(issue, (check) => {
+    // A narrowed search adds to what an earlier one found, and a failure after a success keeps it, so a refined
+    // search never drops a match already judged.
+    const before = check.searches[scope];
+    const found = hits?.map((hit) => hit.toUpperCase());
+    const merged =
+      found && before ? [...new Set([...before, ...found])] : (found ?? before);
+    return {
+      ...check,
+      searches: { ...check.searches, [scope]: merged ?? null },
+    };
+  });
 
 /** Adds one decide_prior_work batch to the judgments already recorded. */
 export const withDecision = (
@@ -73,10 +79,15 @@ export const withDecision = (
   if (!decision) {
     return { ...check, undecided: true };
   }
-  const known =
-    decision.outcome === "known_issue" && decision.knownIssue
-      ? decision.knownIssue.toUpperCase()
-      : null;
+  // Jev names one known issue a batch; every same-outcome candidate counts, so a closed one named never hides an open one.
+  const named = [
+    ...(decision.outcome === "known_issue" && decision.knownIssue
+      ? [decision.knownIssue]
+      : []),
+    ...decision.candidates
+      .filter((c) => c.match === "same_outcome")
+      .map((c) => c.identifier),
+  ].map((id) => id.toUpperCase());
   return {
     ...check,
     judged: {
@@ -85,10 +96,7 @@ export const withDecision = (
         decision.candidates.map((c) => [c.identifier.toUpperCase(), c.match])
       ),
     },
-    knownIssues:
-      known && !check.knownIssues.includes(known)
-        ? [...check.knownIssues, known]
-        : check.knownIssues,
+    knownIssues: [...new Set([...check.knownIssues, ...named])],
   };
 };
 
@@ -106,13 +114,15 @@ export const recordJoin = (
   const target = input.duplicateOf.toUpperCase();
   recordKnownIssueCheck(input.issue, (check) => ({
     ...check,
-    join: {
-      error: result.error,
-      grouping:
-        result.grouping === "joined" || result.grouping === "needs-grouping"
-          ? result.grouping
-          : null,
-      target,
+    joins: {
+      ...check.joins,
+      [target]: {
+        error: result.error,
+        grouping:
+          result.grouping === "joined" || result.grouping === "needs-grouping"
+            ? result.grouping
+            : null,
+      },
     },
   }));
 };
@@ -149,25 +159,20 @@ const refuse = (refusal: string): GateResult => ({ notes: [], refusal });
  */
 export type KnownIssueState = "closed" | "missing" | "open";
 
-/** The line for the known issue: a refusal while it is open and no Duplicate join was tried. */
+/** The note for the known issue the handoff goes ahead beside. */
 const knownIssueLine = (
   known: string,
   state: KnownIssueState,
-  join: KnownIssueCheck["join"],
+  join: JoinAttempt | undefined,
   also: string
-): string | GateResult => {
+): string => {
   if (state === "missing") {
     return `decide_prior_work named ${known}, which Linear no longer finds.${also}`;
   }
   if (state === "closed") {
     return `Same outcome as ${known}, which is closed with no open master above it: check whether this is a regression.${also}`;
   }
-  if (join?.target !== known) {
-    return refuse(
-      `decide_prior_work found ${known}, an open known issue with the same outcome. Join it with route_ticket (state Duplicate, duplicateOf and inheritAssigneeFrom ${known}) instead of starting a new Fixy run. Hand it to Fixy only if that join is refused. Nothing was written.`
-    );
-  }
-  const why = join.error
+  const why = join?.error
     ? "route_ticket refused the join"
     : "it has no open master to join";
   return `Same outcome as open ${known}, but ${why}: join it there if your look agrees.${also}`;
@@ -228,25 +233,35 @@ export const knownIssueGate = (
       `The known-issue searches found ${hits.length} candidate${hits.length === 1 ? "" : "s"}. Call decide_prior_work with issue ${issue}, the report and those hits (at most 8 a call) before handing it to Fixy. Nothing was written.`
     );
   }
-  // An open known issue wins over a closed one a batch named first.
-  const known =
-    check.knownIssues.find((id) => knownIssueStates[id] === "open") ??
-    check.knownIssues[0];
+  // Every open known issue needs its Duplicate join tried; an open one wins over a closed one named first.
+  const open = check.knownIssues.filter(
+    (id) => knownIssueStates[id] === "open"
+  );
+  const untried = open.find((id) => !check.joins?.[id]);
+  if (untried) {
+    return refuse(
+      `decide_prior_work found ${untried}, an open known issue with the same outcome. Join it with route_ticket (state Duplicate, duplicateOf and inheritAssigneeFrom ${untried}) instead of starting a new Fixy run. Hand it to Fixy only if that join is refused. Nothing was written.`
+    );
+  }
+  const known = open[0] ?? check.knownIssues[0];
+  const knownState = known ? knownIssueStates[known] : undefined;
   const uncertain = Object.entries(check.judged)
-    .filter(([id, match]) => id !== known && match === "partial_or_adjacent")
+    .filter(
+      ([id, match]) =>
+        !check.knownIssues.includes(id) && match === "partial_or_adjacent"
+    )
     .slice(0, NOTE_CANDIDATES)
     .map(([id, match]) => `${id} (${MATCH_WORDS[match]})`)
     .join(", ");
-  const knownState = known ? knownIssueStates[known] : undefined;
   if (known && knownState) {
     const also = uncertain ? ` Also related: ${uncertain}.` : "";
-    const line = knownIssueLine(known, knownState, check.join, also);
-    return typeof line === "string" ? { notes: [...notes, line] } : line;
+    const line = knownIssueLine(known, knownState, check.joins?.[known], also);
+    return { notes: [...notes, line, ...uncertainLines(check, hits, "")] };
   }
   return { notes: [...notes, ...uncertainLines(check, hits, uncertain)] };
 };
 
-/** The note lines for a check with no known issue: unjudged hits after a failed batch, then partial matches. */
+/** Unjudged hits after a failed batch, then the partial matches when no known-issue line names them. */
 const uncertainLines = (
   check: KnownIssueCheck,
   hits: string[],
