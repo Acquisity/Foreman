@@ -27,20 +27,32 @@ const handWrittenCapabilities = Object.entries({
   };
 });
 
+const RETIRED_TOOL =
+  "A tool this run had that has since been retired. It was available to the investigator; what it read is in its toolResults.";
+
 /**
- * What the investigator could call in this case: the hand-written tools, and
- * the endpoint tools the case's own endpoint list offered (none when the case
- * recorded no list).
+ * What the investigator could call in this case: the hand-written tools, the
+ * endpoint tools the case's own endpoint list offered (none when the case
+ * recorded no list), and any other widget tool the run itself called, so a
+ * reply recorded before a tool was retired is judged against the tools it had.
  */
 export const judgeToolCapabilities = (
-  endpoints: readonly AvailableEndpoint[] | undefined
-) => [
-  ...handWrittenCapabilities,
-  ...offeredEndpointTools(endpoints).map(
-    ({ description, inputSchema, name }) => ({
-      description,
-      inputSchema,
-      name,
-    })
-  ),
-];
+  endpoints: readonly AvailableEndpoint[] | undefined,
+  calledTools: readonly string[] = []
+) => {
+  const offered = [
+    ...handWrittenCapabilities,
+    ...offeredEndpointTools(endpoints).map(
+      ({ description, inputSchema, name }) => ({
+        description,
+        inputSchema,
+        name,
+      })
+    ),
+  ];
+  const known = new Set(offered.map(({ name }) => name));
+  const retired = [...new Set(calledTools)]
+    .filter((name) => name.startsWith("widget_") && !known.has(name))
+    .map((name) => ({ description: RETIRED_TOOL, inputSchema: {}, name }));
+  return [...offered, ...retired];
+};

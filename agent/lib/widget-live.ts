@@ -6,18 +6,12 @@ import { normalize } from "./widget-normalize.js";
  */
 
 /**
- * Widget tools that accept an absolute date: the re-run asks for the original
- * conversation date on these. Campaigns takes `startDate` and `endDate`; the
- * billing endpoint's `creditWindow` counts days back from now, so it cannot be
- * pinned, and every other tool has no date input.
+ * The original message with a teammate's note pinning dated reads to the day
+ * it was sent. Only the campaigns endpoint takes absolute dates; the billing
+ * endpoint's `creditWindow` counts days back from now, so it cannot be pinned.
  */
-export const DATED_TOOLS: Readonly<Record<string, string>> = {
-  widget_campaigns: "startDate and endDate",
-};
-
-/** The original message with a teammate's note pinning dated reads to the day it was sent. */
 export const pinnedQuestion = (question: string, sentAt: string) =>
-  `${question}\n\n(Team re-run: the customer sent this on ${sentAt.slice(0, 10)}. Where a read accepts a date window (${Object.keys(DATED_TOOLS).join(", ")}), ask about that date.)`;
+  `${question}\n\n(Team re-run: the customer sent this on ${sentAt.slice(0, 10)}. Where a read accepts a date window (widget_campaigns), ask about that date.)`;
 
 const SENTENCE_BREAK = /(?<=[.!?])\s+|\n+/;
 const UNCONFIRMED =

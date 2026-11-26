@@ -522,6 +522,29 @@ const scoredSample = () => {
   };
 };
 
+// ENG-20544: a reply recorded before a tool was retired is judged against the tools its run had.
+test("a retired tool the run called is listed as available to it", () => {
+  const input = JSON.parse(judgeInput(recorded, "Answer.", claims));
+  const names = input.widgetToolCapabilities.map(
+    (tool: { name: string }) => tool.name
+  );
+  assert.ok(names.includes("widget_outreach_health"));
+  assert.equal(new Set(names).size, names.length);
+  const today = JSON.parse(
+    judgeInput({ ...recorded, cassette: [] }, "Answer.", claims)
+  ).widgetToolCapabilities.map((tool: { name: string }) => tool.name);
+  assert.equal(today.includes("widget_outreach_health"), false);
+});
+
+test("a score result saved with the rollout's held areas still loads", () => {
+  assert.ok(
+    widgetCaseSchema.safeParse({
+      ...smoke,
+      scope: { ...smoke.scope, heldAreas: ["billing"] },
+    }).success
+  );
+});
+
 test("gap judging receives authoritative tool schemas and ranks unused capabilities separately", () => {
   const input = JSON.parse(judgeInput(recorded, "Answer.", claims));
   const help = input.widgetToolCapabilities.find(

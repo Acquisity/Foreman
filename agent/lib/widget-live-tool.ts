@@ -9,7 +9,9 @@ export interface LiveTool {
  * The tool a `widget:live` re-read calls for a recorded read (ENG-20609): an
  * area's generated endpoint tool from the one endpoint map, resolved for the
  * recorded scope's own endpoint list, or else the hand-written tool eve
- * resolves from its file. Null when neither resolves for this scope.
+ * resolves from its file. Rejects for a tool with neither, such as one retired
+ * since the run was recorded (ENG-20544); the runner counts that read
+ * unverifiable.
  */
 export async function liveTool(
   tool: string,

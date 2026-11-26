@@ -70,4 +70,6 @@ test("an endpoint the recorded scope never listed is not re-read, and a hand-wri
   // The generated name has no file of its own, so the re-read fails and is reported unverifiable.
   await assert.rejects(liveTool("widget_orders", ctxFor([])));
   assert.ok(await liveTool("widget_known_issues", ctxFor()));
+  // A tool retired since the run was recorded has no file left to resolve.
+  await assert.rejects(liveTool("widget_outreach_health", ctxFor()));
 });
