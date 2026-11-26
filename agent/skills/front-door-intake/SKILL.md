@@ -43,7 +43,9 @@ A report that says something went wrong is not a how-to: an error, missing or wr
 
 ## 4. Known issue
 
-Call `find_related_issues` with `scope: "masters"` and again with `scope: "duplicates"`, each with 2 to 4 phrasings of what went wrong. Read the hits, then call `decide_prior_work` with the report and the hits, at most 8 at a time. When it returns `decided: false`, continue to missing details or handoff, keep any useful candidate in `notes`, and create no investigation document.
+Call `find_related_issues` with `issue` set to this ticket and `scope: "masters"`, and again with `scope: "duplicates"`, each with 2 to 4 phrasings of what went wrong: the failure the customer saw and its error text, not only the feature name. Read the hits, then call `decide_prior_work` with `issue`, the report and the hits, at most 8 at a time. When it returns `decided: false`, continue to missing details or handoff, and create no investigation document.
+
+On a ticket from the in-app support chat, `hand_to_fixy` checks this step was done: it refuses an `eng` handoff until both searches ran for this ticket and, when they found anything, `decide_prior_work` did too, and while an open known issue has not been joined. It adds any uncertain candidate to the handoff notes itself.
 
 When it returns `known_issue` and that issue is open (not completed or canceled):
 
@@ -72,7 +74,7 @@ Call `hand_to_fixy` once with:
 - `stepsToReproduce`: 1 to 10 short steps a person could follow, from the report and its screenshots. Needed when `lanes` includes `eng`.
 - No `card`: Fixy matches the playbook card from its own playbook.
 - `reportedAt` and `reportedAtSource` only when the ticket has no 'Ask from' Slack link and the report says when it was first raised. The tool takes the time from the Slack link itself.
-- `notes`: one line, only when there is something Fixy needs, such as a known issue `route_ticket` refused to join.
+- `notes`: one line, only when there is something else Fixy needs. A candidate known issue from step 4 is added for you.
 
 The tool writes the handoff comment first and then adds the `fixy` label, which starts Fixy's run, and a `lane:` label for each lane. From then on Fixy owns the ticket's state and assignee. `success` false with a reason names what to fix; fix it and call again. When it names a label missing from Linear, a person must create it: end the session saying so in one line, without retrying. Calling again updates the same comment.
 

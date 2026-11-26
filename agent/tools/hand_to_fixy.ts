@@ -21,6 +21,13 @@ import {
   questionsOnlyPolicy,
 } from "#lib/github/approval.js";
 import { LINEAR_ISSUE_ID_PATTERN } from "#lib/investigation-memory/scope.js";
+import {
+  checkFor,
+  isWidgetTicket,
+  type KnownIssueCheck,
+  knownIssueChecks,
+  knownIssueGate,
+} from "#lib/known-issue-gate.js";
 import { logOpsEvent } from "#lib/ops-log.js";
 import { isTriageReplay } from "#lib/triage-replay/mode.js";
 
@@ -28,12 +35,16 @@ const LINEAR_TIMEOUT_MS = 15_000;
 
 const ISSUE_QUERY = `query FixyHandoffIssue($id: String!) {
   issue(id: $id) {
-    id identifier createdAt
+    id identifier createdAt description
+    state { type }
     team { id key }
     labels(first: 100) { nodes { id name } }
     attachments(first: 50) { nodes { title url } }
     comments(first: 100) { nodes { id body } pageInfo { hasNextPage } }
   }
+}`;
+const KNOWN_ISSUE_QUERY = `query FixyKnownIssue($id: String!) {
+  issue(id: $id) { state { type } }
 }`;
 const COMMENT_QUERY = `query FixyHandoffComment($id: String!) {
   comment(id: $id) { id body }
@@ -61,9 +72,11 @@ interface IssueRead {
       pageInfo: { hasNextPage: boolean };
     };
     createdAt: string;
+    description: string | null;
     id: string;
     identifier: string;
     labels: { nodes: { id: string; name: string }[] };
+    state: { type: string };
     team: { id: string; key: string };
   } | null;
 }
@@ -327,7 +340,8 @@ export const handToFixy = async (
   session: HandoffSession,
   linear: LinearCall,
   env: NodeJS.ProcessEnv = process.env,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  checks: () => Record<string, KnownIssueCheck> = () => ({})
 ): Promise<HandToFixyResult> => {
   const { issue } = input;
   if (!isFixyTriageIssue(issue, env)) {
@@ -352,6 +366,26 @@ export const handToFixy = async (
       issue,
       `${issue} is now on team ${ticket.team.key}, which is not in FIXY_TRIAGE_TEAMS. Use the triage skill instead.`
     );
+  }
+  const present = new Set(ticket.labels.nodes.map((label) => label.name));
+  // The fixy label is what starts Fixy, so carrying it means handed off.
+  const alreadyHandedOff = present.has(FIXY_LABEL);
+  const gate =
+    !alreadyHandedOff &&
+    input.lanes.includes("eng") &&
+    isWidgetTicket({
+      attachments: ticket.attachments.nodes,
+      description: ticket.description,
+    })
+      ? await widgetBugGate(
+          ticket.identifier,
+          ticket.state.type,
+          checks,
+          linear
+        )
+      : { notes: [] };
+  if (gate.refusal) {
+    return refusal(ticket.identifier, gate.refusal);
   }
   const commentId = fixyHandoffCommentId(ticket.id);
   const existing =
@@ -388,7 +422,7 @@ export const handToFixy = async (
   const body = renderFixyHandoff({
     expected: input.expected,
     ...work,
-    notes: input.notes ?? null,
+    notes: [...gate.notes, input.notes].filter(Boolean).join(" ") || null,
     reportedAt: reported.at,
     reportedAtSource: reported.source,
     whatHappened: input.whatHappened,
@@ -412,9 +446,6 @@ export const handToFixy = async (
   }
   await writeHandoff(linear, ticket.id, commentId, body, existing);
   const done = { ...times, commentId, fixyNotified: false, warnings };
-  const present = new Set(ticket.labels.nodes.map((label) => label.name));
-  // The fixy label is what starts Fixy, so carrying it means handed off.
-  const alreadyHandedOff = present.has(FIXY_LABEL);
   const wanted = [FIXY_LABEL, ...work.lanes.map(laneLabel)].filter(
     (name) => !present.has(name)
   );
@@ -479,6 +510,32 @@ export const handToFixy = async (
   }
 };
 
+/** The known-issue gate for a widget bug, reading the known issue's state when a decision names one. */
+const widgetBugGate = async (
+  issue: string,
+  ownState: string,
+  checks: () => Record<string, KnownIssueCheck>,
+  linear: LinearCall
+) => {
+  const check = checkFor(checks(), issue);
+  const decision = check?.decision;
+  const known =
+    decision && !("failed" in decision) && decision.outcome === "known_issue"
+      ? decision.knownIssue
+      : undefined;
+  const knownState = known
+    ? await linear<{ issue: { state: { type: string } } | null }>(
+        KNOWN_ISSUE_QUERY,
+        "FixyKnownIssue",
+        { id: known }
+      ).then(
+        (read) => read.issue?.state.type ?? null,
+        () => null
+      )
+    : null;
+  return knownIssueGate(issue, check, ownState, knownState);
+};
+
 const errorReason = (error: unknown) =>
   error instanceof Error ? error.message : "Linear call failed.";
 
@@ -500,7 +557,8 @@ export default defineTool({
   approval: questionsOnlyPolicy,
   description:
     "Hand this session's report ticket on a Fixy triage team to Fixy, which owns its status from then on. Writes one top-level '## Fixy handoff' comment with the workspace id, the original report time, what happened, what was expected, the lanes, the card (always none for now) and any steps to reproduce, then adds the fixy label, which starts Fixy's run, and a lane:<name> label for each lane. " +
-    "Only for teams in FIXY_TRIAGE_TEAMS; anywhere else it refuses and the triage skill applies. The report time comes from the ticket's 'Ask from' Slack link when there is one, else from reportedAt, else from the existing handoff, else from ticket creation. " +
+    "Only for teams in FIXY_TRIAGE_TEAMS; anywhere else it refuses and the triage skill applies. " +
+    "An eng handoff of a ticket the support widget filed is refused, writing nothing, until find_related_issues (both scopes) and, when they found anything, decide_prior_work ran for this issue, and while decide_prior_work names an open known issue that route_ticket has not tried to join; it is refused once the report joined one. An uncertain match passes with the candidate added to the notes. The report time comes from the ticket's 'Ask from' Slack link when there is one, else from reportedAt, else from the existing handoff, else from ticket creation. " +
     "Calling it again updates the same comment and never adds a second one; it adds only lane labels the ticket lacks. alreadyHandedOff true means the fixy label was already on and fixyNotified false means no run was notified. success false with a reason names what to fix, including any label missing from Linear. It posts nothing to the requester.",
   async execute(input, ctx) {
     const linear: LinearCall = async (query, queryName, variables) => {
@@ -524,7 +582,8 @@ export default defineTool({
         ctx.session,
         linear,
         process.env,
-        ctx.abortSignal
+        ctx.abortSignal,
+        () => knownIssueChecks.get()
       );
     } catch (error) {
       if (ctx.abortSignal.aborted) {

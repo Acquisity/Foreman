@@ -8,6 +8,7 @@ import {
   SLACK_THREAD_START,
   TICKET_CREATED,
 } from "#lib/fixy-handoff.js";
+import type { KnownIssueCheck } from "#lib/known-issue-gate.js";
 import { stampQuestionsOnly, stampTrusted } from "#lib/trust.js";
 import type {
   HandoffSession,
@@ -17,6 +18,7 @@ import type {
 
 // The tool module resolves Foreman's Linear connector as it loads.
 process.env.LINEAR_CONNECTOR ??= "stub/stub";
+process.env.ACQUISITY_ORIGIN ??= "https://app.acquisity.ai";
 const {
   default: tool,
   handToFixy,
@@ -78,7 +80,10 @@ const LABELS: LabelRow[] = [
 interface Ticket {
   attachments: { title: string; url: string }[];
   comments: { body: string; id: string }[];
+  description: string;
+  knownIssueState: string | null;
   labels: { id: string; name: string }[];
+  state: string;
   teamKey: string;
 }
 
@@ -96,7 +101,10 @@ const fakeLinear = (
   const state: Ticket = {
     attachments: [],
     comments: [],
+    description: "Step 2 sent nothing.",
+    knownIssueState: "started",
     labels: [],
+    state: "triage",
     teamKey: "SAN",
     ...ticket,
   };
@@ -117,11 +125,19 @@ const fakeLinear = (
                 pageInfo: { hasNextPage: options.hidden ?? false },
               },
               createdAt: "2026-11-01T18:02:40.000Z",
+              description: state.description,
               id: ISSUE_ID,
               identifier: "SAN-145",
               labels: { nodes: state.labels },
+              state: { type: state.state },
               team: { id: TEAM_ID, key: state.teamKey },
             },
+          };
+        case "FixyKnownIssue":
+          return {
+            issue: state.knownIssueState
+              ? { state: { type: state.knownIssueState } }
+              : null,
           };
         case "FixyHandoffComment": {
           const found = state.comments.find((c) => c.id === variables.id);
@@ -858,5 +874,123 @@ describe("hand_to_fixy", () => {
       handToFixyInputSchema.safeParse({ ...input, card: "refund" }).success,
       false
     );
+  });
+});
+
+describe("hand_to_fixy on a widget bug (ENG-21101)", () => {
+  const CHAT = {
+    title: "Support chat",
+    url: "https://app.acquisity.ai/dashboard/admin/support?conversation=7a1e2b3c-4d5e-4f60-8a7b-9c0d1e2f3a4b",
+  };
+  const WRITES = [
+    "FixyHandoffCreate",
+    "FixyHandoffUpdate",
+    "FixyHandoffLabels",
+  ];
+  const known =
+    (
+      match: "partial_or_adjacent" | "same_outcome",
+      join?: { error?: string; target: string }
+    ): (() => Record<string, KnownIssueCheck>) =>
+    () => ({
+      "SAN-145": {
+        decision: {
+          candidates: [{ identifier: "ENG-9", match }],
+          ...(match === "same_outcome" ? { knownIssue: "ENG-9" } : {}),
+          notes: [],
+          outcome: match === "same_outcome" ? "known_issue" : "fresh",
+        },
+        ...(join ? { join } : {}),
+        searches: { duplicates: {}, masters: { "ENG-9": "started" } },
+      },
+    });
+
+  it("refuses with no known-issue check and writes nothing", async () => {
+    const fake = fakeLinear({ attachments: [CHAT] });
+    const result = await handToFixy(input, root, fake.linear, ENV);
+    assert.equal(result.success, false);
+    assert.match(
+      result.reason ?? "",
+      /find_related_issues with issue SAN-145/u
+    );
+    assert.deepEqual(fake.names(), ["FixyHandoffIssue"]);
+  });
+
+  it("refuses an open known issue it has not tried to join, and one it joined", async () => {
+    const fake = fakeLinear({ attachments: [CHAT] });
+    const open = await handToFixy(
+      input,
+      root,
+      fake.linear,
+      ENV,
+      undefined,
+      known("same_outcome")
+    );
+    assert.match(open.reason ?? "", /Join it with route_ticket/u);
+    const joined = await handToFixy(
+      input,
+      root,
+      fakeLinear({ attachments: [CHAT], state: "duplicate" }).linear,
+      ENV,
+      undefined,
+      known("same_outcome")
+    );
+    assert.match(joined.reason ?? "", /already joined/u);
+    assert.ok(!fake.names().some((name) => WRITES.includes(name)));
+  });
+
+  it("hands off with the candidate in Notes when the join was refused or the match uncertain", async () => {
+    const refused = fakeLinear({ attachments: [CHAT] });
+    const result = await handToFixy(
+      { ...input, notes: "Started after Friday's import." },
+      root,
+      refused.linear,
+      ENV,
+      undefined,
+      known("same_outcome", { error: "Label missing", target: "ENG-9" })
+    );
+    assert.equal(result.success, true);
+    assert.equal(result.fixyNotified, true);
+    assert.equal(
+      parseFixyHandoff(refused.state.comments[0]?.body ?? "")?.notes,
+      "Same outcome as open ENG-9, but route_ticket refused the join: join it there if your look agrees. Started after Friday's import."
+    );
+    const partial = fakeLinear({ attachments: [CHAT] });
+    await handToFixy(
+      input,
+      root,
+      partial.linear,
+      ENV,
+      undefined,
+      known("partial_or_adjacent")
+    );
+    assert.equal(
+      parseFixyHandoff(partial.state.comments[0]?.body ?? "")?.notes,
+      "Possible known issue: ENG-9 (partial match)."
+    );
+  });
+
+  it("leaves other tickets, other lanes and an earlier handoff alone", async () => {
+    const cases: [Partial<Ticket>, HandToFixyInput["lanes"]][] = [
+      [{}, ["eng"]],
+      [{ attachments: [CHAT] }, ["billing"]],
+      [
+        {
+          attachments: [CHAT],
+          labels: [{ id: "fixy-workspace", name: "fixy" }],
+        },
+        ["eng"],
+      ],
+    ];
+    for (const [ticket, lanes] of cases) {
+      const fake = fakeLinear(ticket);
+      const result = await handToFixy(
+        { ...input, lanes },
+        root,
+        fake.linear,
+        ENV
+      );
+      assert.equal(result.success, true, JSON.stringify(ticket));
+    }
   });
 });

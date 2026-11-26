@@ -1,6 +1,8 @@
 import { defineTool } from "eve/tools";
 import { z } from "zod";
 import { executorClient } from "#lib/executor/client.js";
+import { LINEAR_ISSUE_ID_PATTERN } from "#lib/investigation-memory/scope.js";
+import { recordKnownIssueCheck } from "#lib/known-issue-gate.js";
 import { findRelatedIssues } from "#lib/linear-api.js";
 import { masterWindow } from "#lib/master-window.js";
 
@@ -22,18 +24,34 @@ export default defineTool({
     "Search Linear with fixed queries. scope duplicates: every team, closed and archived included, for prior reports and investigations of the same symptom. " +
     "scope masters: Engineering Team issues eligible to own a root cause; in an intake-only Slack session or a Linear session only issues created in the last 30 days are eligible, elsewhere there is no cutoff, and createdAfter reports which applied. " +
     "Pass 2 to 4 phrasings: the customer outcome, the visible error text, the feature or object name, and for masters the root cause and code path. " +
-    "Each hit lists the phrases that matched it. truncated true means candidates were dropped, so narrow the phrases. Read every hit before deciding; a keyword match is not a duplicate.",
-  async execute(input, ctx) {
+    "Each hit lists the phrases that matched it. truncated true means candidates were dropped, so narrow the phrases. Read every hit before deciding; a keyword match is not a duplicate. " +
+    "Pass issue, the report being checked, so hand_to_fixy can see the check ran.",
+  async execute({ issue, ...input }, ctx) {
+    const record = (hits: Record<string, string> | null) => {
+      if (issue) {
+        recordKnownIssueCheck(issue, (check) => ({
+          ...check,
+          searches: { ...check.searches, [input.scope]: hits },
+        }));
+      }
+    };
     try {
       const { now, windowed } = await masterWindow(ctx.session.auth);
-      return await findRelatedIssues(
+      const result = await findRelatedIssues(
         { ...input, windowed },
         { client: executorClient(ctx), now, signal: ctx.abortSignal }
       );
+      record(
+        Object.fromEntries(
+          result.issues.map((hit) => [hit.identifier, hit.stateType])
+        )
+      );
+      return result;
     } catch (error) {
       if (ctx.abortSignal.aborted) {
         throw error;
       }
+      record(null);
       return {
         createdAfter: null,
         error: error instanceof Error ? error.message : "Linear search failed.",
@@ -43,6 +61,14 @@ export default defineTool({
     }
   },
   inputSchema: z.object({
+    issue: z
+      .string()
+      .trim()
+      .regex(LINEAR_ISSUE_ID_PATTERN)
+      .optional()
+      .describe(
+        "The report being checked against known issues, such as ENG-123."
+      ),
     phrases: z
       .array(z.string().trim().min(3).max(120))
       .min(1)

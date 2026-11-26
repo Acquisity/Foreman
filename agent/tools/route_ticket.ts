@@ -5,6 +5,7 @@ import { linearAuth } from "#lib/constants.js";
 import { executorClient } from "#lib/executor/client.js";
 import { questionsOnlyPolicy } from "#lib/github/approval.js";
 import { LINEAR_ISSUE_ID_PATTERN } from "#lib/investigation-memory/scope.js";
+import { recordKnownIssueCheck } from "#lib/known-issue-gate.js";
 import { masterCreatedAfter } from "#lib/linear-api.js";
 import { masterWindow } from "#lib/master-window.js";
 import { logOpsEvent } from "#lib/ops-log.js";
@@ -57,6 +58,27 @@ export default defineTool({
     "The fixy label is reserved: only hand_to_fixy adds it and only a person removes it. On a ticket carrying the fixy label, Fixy owns state and assignee: a call that sets either fails before any write. A Done or Canceled ticket from an Asks channel is never moved back to an open state; a move to another closed state still works. " +
     "routed true with warnings means the ticket was updated but a link or the read-back after it failed; read the warning before retrying only that part.",
   async execute(input, ctx) {
+    // hand_to_fixy reads whether a join to a known issue landed.
+    const joined = <T extends { error?: string; grouping?: unknown }>(
+      result: T
+    ): T => {
+      const target = input.duplicateOf?.toUpperCase();
+      if (target) {
+        recordKnownIssueCheck(input.issue, (check) => ({
+          ...check,
+          join: {
+            error: result.error,
+            grouping:
+              result.grouping === "joined" ||
+              result.grouping === "needs-grouping"
+                ? result.grouping
+                : null,
+            target,
+          },
+        }));
+      }
+      return result;
+    };
     const refusal = routeRefusal(
       triageDecisions.get(),
       criticRounds.get(),
@@ -64,7 +86,7 @@ export default defineTool({
       { statusRequest: isStatusFollowUp(ctx.session.auth.current) }
     );
     if (refusal) {
-      return { error: refusal, routed: false as const };
+      return joined({ error: refusal, routed: false as const });
     }
     if (input.state !== undefined && !isTriageReplay()) {
       // Not through Executor: its RouteIssue read has no state type or attachments.
@@ -90,7 +112,7 @@ export default defineTool({
           issue: input.issue,
           sessionId: ctx.session.id,
         });
-        return { error: reopen.reason, routed: false as const };
+        return joined({ error: reopen.reason, routed: false as const });
       }
     }
     try {
@@ -115,7 +137,7 @@ export default defineTool({
         }),
         sessionId: ctx.session.id,
       });
-      return { routed: true as const, ...ticket };
+      return joined({ routed: true as const, ...ticket });
     } catch (error) {
       if (ctx.abortSignal.aborted) {
         throw error;
@@ -127,10 +149,10 @@ export default defineTool({
           sessionId: ctx.session.id,
         });
       }
-      return {
+      return joined({
         error: error instanceof Error ? error.message : "Routing failed.",
         routed: false as const,
-      };
+      });
     }
   },
   inputSchema: z.object({
