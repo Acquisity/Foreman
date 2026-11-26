@@ -308,8 +308,9 @@ export const draftHandoffTicket = (
   );
 };
 
-const BLOCK_MARKER = /^[#>|=+*-]+\s*/u;
-/** A drafted sentence on one line, with any leading block marker dropped, so model text cannot open a block of its own. */
+/** Only what Markdown reads as a block: a heading, list item or quote marker with its space. */
+const BLOCK_MARKER = /^(?:(?:#{1,6}|[-+*]|\d{1,9}[.)])\s+|>\s*)+/u;
+/** A drafted sentence on one line, with a leading block marker dropped, so model text cannot open a block of its own. */
 const sentence = (text: string) =>
   text.replaceAll(WHITESPACE, " ").trim().replace(BLOCK_MARKER, "");
 

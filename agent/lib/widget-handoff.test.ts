@@ -375,7 +375,7 @@ test("a long pasted log and model text starting with a heading still fit, with t
       Promise.resolve({
         open: long("## open"),
         title: "Customer pasted an error log",
-        told: long("told"),
+        told: long("-$20 told"),
         wants: long("wants"),
       })
   );
@@ -383,6 +383,7 @@ test("a long pasted log and model text starting with a heading still fit, with t
   const report = description.slice(0, description.indexOf("## Verified scope"));
   assert.ok(report.length <= 4002, String(report.length));
   assert.ok(report.includes("## What's still open\n\nopen word"));
+  assert.ok(report.includes("## What Foreman told them\n\n-$20 told word"));
   assert.ok(report.includes("## What the customer wrote\n\n> x\n> x"));
   assertScopeParses(description);
 });
