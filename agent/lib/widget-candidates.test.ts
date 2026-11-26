@@ -8,7 +8,6 @@ const TEST_ORG = "22222222-2222-4222-8222-222222222222";
 test("excluded test workspaces are parsed strictly", () => {
   const excluded = parseExcludedOrgs(` ${TEST_ORG.toUpperCase()} ,`);
   assert.ok(excluded.has(TEST_ORG));
-  assert.equal(parseExcludedOrgs(undefined).size, 5);
   // The scorer and capability-gap filing share one internal list.
   assert.deepEqual([...parseExcludedOrgs(undefined)], [...INTERNAL_ORGS]);
   assert.throws(() => parseExcludedOrgs("acme-test"));

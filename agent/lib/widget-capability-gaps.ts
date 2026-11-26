@@ -388,15 +388,15 @@ export const withDetails = (
 // Linear's Duplicate state has its own type, `duplicate`.
 const FIND = `query CapabilityGapFind($team: String!, $title: String!, $since: DateTimeOrDuration!, $seen: String!) {
   issues(first: 5, filter: { team: { key: { eq: $team } }, title: { eqIgnoreCase: $title }, state: { type: { nin: ["completed", "canceled", "duplicate"] } } }) {
-    nodes { id identifier description comments(first: 250) { nodes { id body } } }
+    nodes { id identifier description labels { nodes { id } } comments(first: 250) { nodes { id body } } }
   }
-  judged: issues(first: 50, orderBy: updatedAt, filter: { team: { key: { eq: $team } }, title: { eqIgnoreCase: $title }, state: { type: { in: ["completed", "canceled", "duplicate"] } }, updatedAt: { gt: $since } }) {
-    nodes { identifier comments(first: 1, filter: { body: { startsWith: $seen } }) { nodes { id } } }
+  judged: issues(first: 1, filter: { team: { key: { eq: $team } }, title: { eqIgnoreCase: $title }, state: { type: { in: ["completed", "canceled", "duplicate"] } }, or: [{ completedAt: { gt: $since } }, { canceledAt: { gt: $since } }], comments: { some: { body: { startsWith: $seen } } } }) {
+    nodes { identifier }
   }
   teams(filter: { key: { eq: $team } }) { nodes { id } }
   issueLabels(first: 20, filter: { name: { in: ["Capability Gap", "Docs Gap"] }, or: [{ team: { key: { eq: $team } } }, { team: { null: true } }] }) { nodes { id name } }
 }`;
-/** How far back a closed ticket still counts as having judged its conversations. */
+/** How long after closing a ticket still counts as having judged its conversations; Duplicate sets canceledAt. */
 const JUDGED_WINDOW = "-P30D";
 const CREATE = `mutation CapabilityGapCreate($input: IssueCreateInput!) {
   issueCreate(input: $input) { issue { id identifier } }
@@ -407,6 +407,9 @@ const COUNT = `mutation CapabilityGapCount($id: String!, $description: String!) 
 const UPDATE_COMMENT = `mutation CapabilityGapDetails($id: String!, $body: String!) {
   commentUpdate(id: $id, input: { body: $body }) { success }
 }`;
+const ADD_LABEL = `mutation CapabilityGapLabel($id: String!, $label: String!) {
+  issueAddLabel(id: $id, labelId: $label) { success }
+}`;
 
 interface Found {
   issueLabels: { nodes: { id: string; name: string }[] };
@@ -416,11 +419,10 @@ interface Found {
       description: string | null;
       id: string;
       identifier: string;
+      labels: { nodes: { id: string }[] };
     }[];
   };
-  judged: {
-    nodes: { comments: { nodes: { id: string }[] }; identifier: string }[];
-  };
+  judged: { nodes: { identifier: string }[] };
   teams: { nodes: { id: string }[] };
 }
 
@@ -434,9 +436,11 @@ export type GapFiling =
  * so it is counted once however often it hits the gap, and the count is
  * read back from those comments. A conversation already on a ticket with
  * this title that closed in the last 30 days has been judged: nothing is
- * written. The `fixy` label is never added here; Fixy's daily triage adds it
- * to what it builds. Every write is checked and every call reconciles the
- * open ticket, so a retry repairs a count an earlier failure left behind.
+ * written. The kind label goes on last, after the ticket holds what Fixy's
+ * daily triage reads, because the triage picks tickets up by that label; the
+ * `fixy` label is never added here. Every write is checked and every call
+ * reconciles the open ticket, so a retry repairs a count or label an earlier
+ * failure left behind.
  */
 export async function fileCapabilityGap(
   gap: CapabilityGap,
@@ -457,9 +461,7 @@ export async function fileCapabilityGap(
     },
     signal
   );
-  const judged = found.judged.nodes.find(
-    (closed) => closed.comments.nodes.length > 0
-  );
+  const [judged] = found.judged.nodes;
   if (judged) {
     return { identifier: judged.identifier, outcome: "judged" };
   }
@@ -474,8 +476,16 @@ export async function fileCapabilityGap(
       throw new Error(`Linear did not confirm ${name}.`);
     }
   };
-  const label = (name: string) =>
-    found.issueLabels.nodes.find((node) => node.name === name)?.id;
+  const kindLabel = found.issueLabels.nodes.find(
+    (node) => node.name === LABELS[gap.kind]
+  )?.id;
+  const teamId = found.teams.nodes[0]?.id;
+  if (!(teamId && kindLabel)) {
+    return {
+      outcome: "failed",
+      reason: `Linear has no ${teamKey} team or ${LABELS[gap.kind]} label.`,
+    };
+  }
   const commentId = (issueId: string) =>
     commentIdFor(`capability-gap:${issueId}:${seen.conversationId}`);
   const record = (issueId: string) =>
@@ -513,15 +523,13 @@ export async function fileCapabilityGap(
         id: open.id,
       });
     }
+    if (!open.labels.nodes.some(({ id }) => id === kindLabel)) {
+      await write("CapabilityGapLabel", ADD_LABEL, {
+        id: open.id,
+        label: kindLabel,
+      });
+    }
     return { identifier: open.identifier, outcome: added ? "counted" : "seen" };
-  }
-  const teamId = found.teams.nodes[0]?.id;
-  const kindLabel = label(LABELS[gap.kind]);
-  if (!(teamId && kindLabel)) {
-    return {
-      outcome: "failed",
-      reason: `Linear has no ${teamKey} team or ${LABELS[gap.kind]} label.`,
-    };
   }
   const created = await request<{
     issueCreate: { issue: { id: string; identifier: string } | null };
@@ -531,7 +539,6 @@ export async function fileCapabilityGap(
     {
       input: {
         description: gapDescription(gap),
-        labelIds: [kindLabel],
         teamId,
         title,
       },
@@ -543,6 +550,10 @@ export async function fileCapabilityGap(
     return { outcome: "failed", reason: "Linear did not confirm the ticket." };
   }
   await record(issue.id);
+  await write("CapabilityGapLabel", ADD_LABEL, {
+    id: issue.id,
+    label: kindLabel,
+  });
   return { identifier: issue.identifier, outcome: "filed" };
 }
 

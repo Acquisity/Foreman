@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import { INTERNAL_ORGS } from "./internal-orgs.js";
 import {
   type CapabilityGap,
   countedDescription,
@@ -257,7 +258,8 @@ interface Call {
   variables: Record<string, unknown>;
 }
 interface FakeIssue {
-  closed?: boolean;
+  /** Days since the ticket was closed; open when unset. */
+  closedDaysAgo?: number;
   comments: { body: string; id: string }[];
   description: string;
   id: string;
@@ -310,7 +312,7 @@ const fakeLinear = (labels = ["Capability Gap", "Docs Gap"]) => {
           description: String(input?.description),
           id: `issue-${issues.length + 1}`,
           identifier: `ENG-${issues.length + 1}`,
-          labels: [...(input as { labelIds: string[] }).labelIds],
+          labels: [...((input?.labelIds as string[] | undefined) ?? [])],
         };
         issues.push(issue);
         return { issueCreate: { issue } };
@@ -330,7 +332,7 @@ const fakeLinear = (labels = ["Capability Gap", "Docs Gap"]) => {
         },
         issues: {
           nodes: issues
-            .filter((issue) => !issue.closed)
+            .filter((issue) => issue.closedDaysAgo === undefined)
             .slice(0, 1)
             .map((issue) => ({
               ...issue,
@@ -340,18 +342,21 @@ const fakeLinear = (labels = ["Capability Gap", "Docs Gap"]) => {
         },
         judged: {
           nodes: issues
-            .filter((issue) => issue.closed)
-            .map((issue) => ({
-              comments: {
-                nodes: issue.comments
-                  .filter((c) => c.body.startsWith(String(variables.seen)))
-                  .slice(0, 1),
-              },
-              identifier: issue.identifier,
-            })),
+            .filter(
+              ({ closedDaysAgo, comments }) =>
+                closedDaysAgo !== undefined &&
+                closedDaysAgo <= 30 &&
+                comments.some((c) => c.body.startsWith(String(variables.seen)))
+            )
+            .slice(0, 1)
+            .map(({ identifier }) => ({ identifier })),
         },
         teams: { nodes: [{ id: "team-eng" }] },
       }),
+      CapabilityGapLabel: () => {
+        issueOf(variables.id)?.labels.push(String(variables.label));
+        return { issueAddLabel: { success: true } };
+      },
       WidgetTicketComment: () => {
         const issue = issueOf(input?.issueId);
         const id = String(input?.id);
@@ -379,8 +384,6 @@ const gap: CapabilityGap = {
 };
 const { signal } = new AbortController();
 const CUSTOMER_ORG = "11111111-1111-4111-8111-111111111111";
-// Trivox AI, the seeded demo workspace.
-const DEMO_ORG = "5a30d304-32ab-4ee0-b7ea-c5605aa34ce5";
 const fileWith =
   (linear: ReturnType<typeof fakeLinear>, filed: CapabilityGap = gap) =>
   (conversationId: string, runId: string) =>
@@ -391,7 +394,7 @@ const fileWith =
       linear.request as never
     );
 
-test("a new gap files one ticket with its kind label and comments for the conversation, never adding fixy", async () => {
+test("a new gap files one ticket, comments for the conversation, then adds its kind label last and never fixy", async () => {
   const linear = fakeLinear();
   assert.deepEqual(await fileWith(linear)("conv-1", "run-1"), {
     identifier: "ENG-1",
@@ -399,14 +402,19 @@ test("a new gap files one ticket with its kind label and comments for the conver
   });
   assert.deepEqual(
     linear.calls.map((call) => call.name),
-    ["CapabilityGapFind", "CapabilityGapCreate", "WidgetTicketComment"]
+    [
+      "CapabilityGapFind",
+      "CapabilityGapCreate",
+      "WidgetTicketComment",
+      "CapabilityGapLabel",
+    ]
   );
   const create = linear.calls[1]?.variables.input as Record<string, unknown>;
   assert.equal(
     create.title,
     "Capability gap: billing: the stripe section could not be read"
   );
-  assert.deepEqual(create.labelIds, ["label-Capability Gap"]);
+  assert.equal(create.labelIds, undefined);
   assert.deepEqual(linear.issues[0]?.labels, ["label-Capability Gap"]);
   assert.equal(
     linear.issues[0]?.comments[0]?.body,
@@ -434,6 +442,35 @@ test("a second conversation counts once on the open ticket; the same conversatio
   assert.match(linear.issues[0]?.description ?? "", COUNT_TWO);
 });
 
+test("a first comment that failed leaves the ticket without its kind label until a retry saves it", async () => {
+  const linear = fakeLinear();
+  const file = fileWith(linear);
+  linear.failing.add("WidgetTicketComment");
+  await assert.rejects(file("conv-1", "run-1"));
+  assert.deepEqual(linear.issues[0]?.labels, []);
+  assert.deepEqual(await file("conv-1", "run-2"), {
+    identifier: "ENG-1",
+    outcome: "counted",
+  });
+  assert.equal(linear.issues.length, 1);
+  assert.equal(linear.issues[0]?.comments.length, 1);
+  assert.deepEqual(linear.issues[0]?.labels, ["label-Capability Gap"]);
+});
+
+test("a ticket closed more than 30 days ago no longer holds its conversations back", async () => {
+  const linear = fakeLinear();
+  const file = fileWith(linear);
+  await file("conv-1", "run-1");
+  const [first] = linear.issues;
+  if (first) {
+    first.closedDaysAgo = 31;
+  }
+  assert.deepEqual(await file("conv-1", "run-2"), {
+    identifier: "ENG-2",
+    outcome: "filed",
+  });
+});
+
 test("a count that failed to update is set from the comments on the next call", async () => {
   const linear = fakeLinear();
   const file = fileWith(linear);
@@ -454,7 +491,7 @@ test("a conversation a closed ticket already judged writes nothing; a new conver
   await file("conv-1", "run-1");
   const [first] = linear.issues;
   if (first) {
-    first.closed = true;
+    first.closedDaysAgo = 1;
   }
   const calls = linear.calls.length;
   assert.deepEqual(await file("conv-1", "run-2"), {
@@ -530,32 +567,37 @@ test("a run in an internal workspace files nothing and logs each gap skipped_int
   };
   let filed = 0;
   try {
-    await fileRunGaps(
-      [gap, { ...gap, area: "orders" }],
-      {
-        conversationId: "conv-1",
-        organizationId: DEMO_ORG.toUpperCase(),
-        runId: "run-1",
-      },
-      signal,
-      () => {
-        filed += 1;
-        return Promise.resolve({ identifier: "ENG-1", outcome: "filed" });
-      }
-    );
+    for (const organizationId of INTERNAL_ORGS) {
+      // biome-ignore lint/performance/noAwaitInLoops: one run per workspace, in order.
+      await fileRunGaps(
+        [gap, { ...gap, area: "orders" }],
+        {
+          conversationId: "conv-1",
+          organizationId: organizationId.toUpperCase(),
+          runId: "run-1",
+        },
+        signal,
+        () => {
+          filed += 1;
+          return Promise.resolve({ identifier: "ENG-1", outcome: "filed" });
+        }
+      );
+    }
   } finally {
     console.info = info;
   }
   assert.equal(filed, 0);
   assert.deepEqual(
     lines.map((line) => JSON.parse(line)),
-    ["billing", "orders"].map((tool) => ({
-      conversationId: "conv-1",
-      event: "widget.capability_gap",
-      outcome: "skipped_internal",
-      runId: "run-1",
-      tool,
-    }))
+    [...INTERNAL_ORGS].flatMap(() =>
+      ["billing", "orders"].map((tool) => ({
+        conversationId: "conv-1",
+        event: "widget.capability_gap",
+        outcome: "skipped_internal",
+        runId: "run-1",
+        tool,
+      }))
+    )
   );
 });
 
