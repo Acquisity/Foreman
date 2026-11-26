@@ -51,6 +51,20 @@ export const checkFor = (
   issue: string
 ): KnownIssueCheck | undefined => checks[key(issue)];
 
+/** Records one find_related_issues scope for the issue: the identifiers it found, or null when it failed. */
+export const recordSearch = (
+  issue: string,
+  scope: "duplicates" | "masters",
+  hits: readonly string[] | null
+) =>
+  recordKnownIssueCheck(issue, (check) => ({
+    ...check,
+    searches: {
+      ...check.searches,
+      [scope]: hits?.map((hit) => hit.toUpperCase()) ?? null,
+    },
+  }));
+
 /** Adds one decide_prior_work batch to the judgments already recorded. */
 export const withDecision = (
   check: KnownIssueCheck,
@@ -159,7 +173,7 @@ const knownIssueLine = (
   return `Same outcome as open ${known}, but ${why}: join it there if your look agrees.${also}`;
 };
 
-/** A refusal for a report already a duplicate, or one whose searches have not both run. */
+/** A refusal for a report already a duplicate, or one whose searches have not both run, or both failed. */
 const uncheckedRefusal = (
   issue: string,
   check: KnownIssueCheck | undefined,
@@ -171,6 +185,9 @@ const uncheckedRefusal = (
   const missing = (["masters", "duplicates"] as const).filter(
     (scope) => !(check && scope in check.searches)
   );
+  if (check?.searches.masters === null && check.searches.duplicates === null) {
+    return `Both known-issue searches failed, so ${issue} was not checked against open known issues. Call find_related_issues again for both scopes. Nothing was written.`;
+  }
   return missing.length > 0
     ? `Before a widget bug goes to Fixy, check it against open known issues: call find_related_issues with issue ${issue} and scope ${missing.join(" and ")}, then decide_prior_work with issue ${issue} and the hits. Nothing was written.`
     : null;
@@ -188,7 +205,7 @@ export const knownIssueGate = (
   issue: string,
   check: KnownIssueCheck | undefined,
   ownState: string,
-  knownIssueState: KnownIssueState | null
+  knownIssueStates: Record<string, KnownIssueState>
 ): GateResult => {
   const unchecked = uncheckedRefusal(issue, check, ownState);
   if (unchecked || !check) {
@@ -205,32 +222,45 @@ export const knownIssueGate = (
   if (hits.length === 0) {
     return { notes };
   }
-  const judged = Object.keys(check.judged).length > 0;
-  if (!(judged || check.undecided)) {
+  // A failed batch (Jev down) never blocks the customer; judgments of issues the searches never found don't count.
+  if (!(hits.some((hit) => hit in check.judged) || check.undecided)) {
     return refuse(
       `The known-issue searches found ${hits.length} candidate${hits.length === 1 ? "" : "s"}. Call decide_prior_work with issue ${issue}, the report and those hits (at most 8 a call) before handing it to Fixy. Nothing was written.`
     );
   }
-  const [known] = check.knownIssues;
+  // An open known issue wins over a closed one a batch named first.
+  const known =
+    check.knownIssues.find((id) => knownIssueStates[id] === "open") ??
+    check.knownIssues[0];
   const uncertain = Object.entries(check.judged)
     .filter(([id, match]) => id !== known && match === "partial_or_adjacent")
     .slice(0, NOTE_CANDIDATES)
     .map(([id, match]) => `${id} (${MATCH_WORDS[match]})`)
     .join(", ");
-  if (known && knownIssueState) {
+  const knownState = known ? knownIssueStates[known] : undefined;
+  if (known && knownState) {
     const also = uncertain ? ` Also related: ${uncertain}.` : "";
-    const line = knownIssueLine(known, knownIssueState, check.join, also);
+    const line = knownIssueLine(known, knownState, check.join, also);
     return typeof line === "string" ? { notes: [...notes, line] } : line;
   }
-  if (check.undecided) {
-    const unjudged = hits.filter((hit) => !(hit in check.judged));
-    notes.push(
-      `Known-issue check partly undecided; unjudged matches: ${unjudged.slice(0, NOTE_CANDIDATES).join(", ") || "none"}.`
-    );
-  }
-  return uncertain
-    ? { notes: [...notes, `Possible known issue: ${uncertain}.`] }
-    : { notes };
+  return { notes: [...notes, ...uncertainLines(check, hits, uncertain)] };
+};
+
+/** The note lines for a check with no known issue: unjudged hits after a failed batch, then partial matches. */
+const uncertainLines = (
+  check: KnownIssueCheck,
+  hits: string[],
+  uncertain: string
+): string[] => {
+  const unjudged = hits.filter((hit) => !(hit in check.judged));
+  return [
+    ...(check.undecided
+      ? [
+          `Known-issue check partly undecided; unjudged matches: ${unjudged.slice(0, NOTE_CANDIDATES).join(", ") || "none"}.`,
+        ]
+      : []),
+    ...(uncertain ? [`Possible known issue: ${uncertain}.`] : []),
+  ];
 };
 
 /** The ticket as hand_to_fixy reads it. */
@@ -247,10 +277,17 @@ const CLOSED_TYPES = new Set(["canceled", "completed", "duplicate"]);
 /** Reads the known issue's state and up to three parents' states, its own first; null when Linear has no such issue. A failed read throws. */
 export type ReadChain = (identifier: string) => Promise<string[] | null>;
 
+const stateOf = (chain: string[] | null): KnownIssueState => {
+  if (chain === null) {
+    return "missing";
+  }
+  return chain.some((type) => !CLOSED_TYPES.has(type)) ? "open" : "closed";
+};
+
 /**
  * The known-issue gate (ENG-21101) for an eng handoff of a widget ticket not
- * yet handed off. A failed read of the known issue refuses, since the
- * handoff can't tell whether it would start a second run.
+ * yet handed off. It reads every known issue a decision named; a failed read
+ * refuses, since the handoff can't tell whether it would start a second run.
  */
 export const widgetBugGate = async (
   lanes: readonly string[],
@@ -263,20 +300,18 @@ export const widgetBugGate = async (
     return { notes: [] };
   }
   const check = checkFor(checks(), ticket.identifier);
-  const known = check?.knownIssues[0];
-  let state: KnownIssueState | null = null;
-  if (known) {
-    const chain = await readChain(known).catch(() => undefined);
-    if (chain === undefined) {
-      return refuse(
-        `Could not read ${known}'s state, so the handoff was not written. Call hand_to_fixy again.`
-      );
-    }
-    if (chain === null) {
-      state = "missing";
-    } else {
-      state = chain.some((type) => !CLOSED_TYPES.has(type)) ? "open" : "closed";
-    }
+  const known = check?.knownIssues ?? [];
+  const chains = await Promise.all(
+    known.map((id) => readChain(id).catch(() => undefined))
+  );
+  const unread = known.filter((_, index) => chains[index] === undefined);
+  if (unread.length > 0) {
+    return refuse(
+      `Could not read ${unread.join(", ")}'s state, so the handoff was not written. Call hand_to_fixy again.`
+    );
   }
-  return knownIssueGate(ticket.identifier, check, ticket.state.type, state);
+  const states = Object.fromEntries(
+    known.map((id, index) => [id, stateOf(chains[index] ?? null)])
+  );
+  return knownIssueGate(ticket.identifier, check, ticket.state.type, states);
 };

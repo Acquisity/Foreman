@@ -2,7 +2,7 @@ import { defineTool } from "eve/tools";
 import { z } from "zod";
 import { executorClient } from "#lib/executor/client.js";
 import { LINEAR_ISSUE_ID_PATTERN } from "#lib/investigation-memory/scope.js";
-import { recordKnownIssueCheck } from "#lib/known-issue-gate.js";
+import { recordSearch } from "#lib/known-issue-gate.js";
 import { findRelatedIssues } from "#lib/linear-api.js";
 import { masterWindow } from "#lib/master-window.js";
 
@@ -29,10 +29,7 @@ export default defineTool({
   async execute({ issue, ...input }, ctx) {
     const record = (hits: string[] | null) => {
       if (issue) {
-        recordKnownIssueCheck(issue, (check) => ({
-          ...check,
-          searches: { ...check.searches, [input.scope]: hits },
-        }));
+        recordSearch(issue, input.scope, hits);
       }
     };
     try {
@@ -41,7 +38,7 @@ export default defineTool({
         { ...input, windowed },
         { client: executorClient(ctx), now, signal: ctx.abortSignal }
       );
-      record(result.issues.map((hit) => hit.identifier.toUpperCase()));
+      record(result.issues.map((hit) => hit.identifier));
       return result;
     } catch (error) {
       if (ctx.abortSignal.aborted) {
