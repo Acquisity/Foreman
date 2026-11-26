@@ -5,13 +5,19 @@ import {
   invokeProvider,
   REFUND_TICKET,
   WIDGET_TICKET_OWNER,
-  widgetScopeBlock,
 } from "./executor/dispatch.js";
 import { WIDGET_TOOLKIT } from "./executor/endpoint.js";
 import { executorTransport } from "./executor/transport.js";
 import { verifiedWidgetContext } from "./widget.fixture.js";
 import { assertWidgetPath, WIDGET_TICKET_PATH } from "./widget-policy.js";
 import { widgetAuth } from "./widget-scope.js";
+import { CHAT_WIDGET_PROJECT_ID } from "./widget-support-report.js";
+
+process.env.ACQUISITY_ORIGIN ??= "https://app.acquisity.ai";
+const CHAT = `https://app.acquisity.ai/dashboard/admin/support?conversation=${verifiedWidgetContext.conversationId}`;
+const POINTER =
+  "The conversation, the verified workspace and the ids are in the Support report document attached to this ticket.";
+const link = (url = CHAT) => [{ title: "Support chat", url }];
 
 const initiator = widgetAuth(verifiedWidgetContext);
 const ctx = () =>
@@ -50,16 +56,21 @@ const assertWidgetWire = (call: unknown[] | undefined) => {
   assert.equal(wire?.token, "test-token");
 };
 
-test("the widget ticket is Aaron's, delegated to Foreman, with team, state and scope from the session", async () => {
+test("the widget ticket is Aaron's, delegated to Foreman, linked to the session's chat, with no ids in its body", async () => {
   const [call] = await withTransport(() =>
-    createWidgetTicket(ctx(), { report: "Report", title: "Inbox fails" })
+    createWidgetTicket(ctx(), {
+      body: "Report",
+      kind: "case",
+      title: "Inbox fails",
+    })
   );
   assert.equal(call?.[1], WIDGET_TICKET_PATH);
   assertWidgetWire(call);
   assert.deepEqual(call?.[2], {
     assignee: "Aaron Fraga",
     delegate: WIDGET_TICKET_OWNER.delegate,
-    description: `Report\n\n${widgetScopeBlock(verifiedWidgetContext)}`,
+    description: `Report\n\n${POINTER}`,
+    links: link(),
     state: "Triage",
     team: "Engineering Team",
     title: "Inbox fails",
@@ -67,11 +78,10 @@ test("the widget ticket is Aaron's, delegated to Foreman, with team, state and s
 });
 
 test("a refund ticket goes to the billing queue, and only in that exact shape", async () => {
-  const scope = widgetScopeBlock(verifiedWidgetContext);
   const [call] = await withTransport(() =>
     createWidgetTicket(ctx(), {
-      refund: true,
-      report: "Report",
+      body: "Report",
+      kind: "refund",
       title: "Refund request",
     })
   );
@@ -79,8 +89,9 @@ test("a refund ticket goes to the billing queue, and only in that exact shape", 
   assert.deepEqual(call?.[2], {
     assignee: "Aaron Fraga",
     delegate: WIDGET_TICKET_OWNER.delegate,
-    description: `Report\n\n${scope}`,
+    description: `Report\n\n${POINTER}`,
     labels: [...REFUND_TICKET.labels],
+    links: link(),
     project: REFUND_TICKET.project,
     state: "Triage",
     team: "Engineering Team",
@@ -93,8 +104,9 @@ test("a refund ticket goes to the billing queue, and only in that exact shape", 
     await assert.rejects(
       invokeProvider(ctx(), WIDGET_TICKET_PATH, {
         ...WIDGET_TICKET_OWNER,
-        description: `x\n\n${scope}`,
+        description: "x",
         labels: [...REFUND_TICKET.labels],
+        links: link(),
         state: "Triage",
         team: "Engineering Team",
         title: "Unsafe",
@@ -105,8 +117,9 @@ test("a refund ticket goes to the billing queue, and only in that exact shape", 
       invokeProvider(ctx(), WIDGET_TICKET_PATH, {
         ...REFUND_TICKET,
         ...WIDGET_TICKET_OWNER,
-        description: `x\n\n${scope}`,
+        description: "x",
         labels: ["Bug"],
+        links: link(),
         state: "Triage",
         team: "Engineering Team",
         title: "Unsafe",
@@ -117,28 +130,73 @@ test("a refund ticket goes to the billing queue, and only in that exact shape", 
   assert.equal(calls.length, 0);
 });
 
+test("a report on a Foreman reply goes to the chat widget project", async () => {
+  const [call] = await withTransport(() =>
+    createWidgetTicket(ctx(), {
+      body: "Report",
+      kind: "feedback",
+      title: "Foreman named the wrong plan",
+    })
+  );
+  assert.deepEqual(call?.[2], {
+    assignee: "Aaron Fraga",
+    delegate: WIDGET_TICKET_OWNER.delegate,
+    description: `Report\n\n${POINTER}`,
+    links: link(),
+    project: CHAT_WIDGET_PROJECT_ID,
+    state: "Triage",
+    team: "Engineering Team",
+    title: "Foreman named the wrong plan",
+  });
+});
+
 test("a widget session cannot shape the ticket write itself", async () => {
-  const scope = widgetScopeBlock(verifiedWidgetContext);
   const refused = (error: { code?: string; dispatched?: unknown }) =>
     error.code === "customer_scope_required" && error.dispatched === false;
   const calls = await withTransport(async () => {
-    // No server-written scope block.
+    // No support chat link.
     await assert.rejects(
       invokeProvider(ctx(), WIDGET_TICKET_PATH, {
         ...WIDGET_TICKET_OWNER,
-        description: "No scope",
+        description: "No link",
         state: "Triage",
         team: "Engineering Team",
         title: "Unsafe",
       }),
       refused
     );
-    // Right scope block, but a field the lane does not own.
+    // Another conversation's chat, or a second link beside this one.
+    await assert.rejects(
+      invokeProvider(ctx(), WIDGET_TICKET_PATH, {
+        ...WIDGET_TICKET_OWNER,
+        description: "x",
+        links: link(
+          "https://app.acquisity.ai/dashboard/admin/support?conversation=00000000-0000-4000-8000-000000000000"
+        ),
+        state: "Triage",
+        team: "Engineering Team",
+        title: "Unsafe",
+      }),
+      refused
+    );
+    await assert.rejects(
+      invokeProvider(ctx(), WIDGET_TICKET_PATH, {
+        ...WIDGET_TICKET_OWNER,
+        description: "x",
+        links: [...link(), { title: "Other", url: "https://example.com" }],
+        state: "Triage",
+        team: "Engineering Team",
+        title: "Unsafe",
+      }),
+      refused
+    );
+    // Right link, but a field the lane does not own.
     await assert.rejects(
       invokeProvider(ctx(), WIDGET_TICKET_PATH, {
         ...WIDGET_TICKET_OWNER,
         assignee: "Someone",
-        description: `x\n\n${scope}`,
+        description: "x",
+        links: link(),
         state: "Triage",
         team: "Engineering Team",
         title: "Unsafe",
@@ -149,7 +207,8 @@ test("a widget session cannot shape the ticket write itself", async () => {
     await assert.rejects(
       invokeProvider(ctx(), WIDGET_TICKET_PATH, {
         assignee: WIDGET_TICKET_OWNER.assignee,
-        description: `x\n\n${scope}`,
+        description: "x",
+        links: link(),
         state: "Triage",
         team: "Engineering Team",
         title: "Unsafe",

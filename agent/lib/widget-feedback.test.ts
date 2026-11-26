@@ -33,13 +33,15 @@ ${LINE}
 /** Answers the issue read with a fixed project and description. */
 const linearReturning = (
   project: string | null,
-  description = DESCRIPTION
+  description = DESCRIPTION,
+  documents: { content: string; title: string }[] = []
 ) => ({
   fetch: (async () =>
     Response.json({
       data: {
         issue: {
           description,
+          documents: { nodes: documents },
           project: project === null ? null : { id: project },
         },
       },
@@ -130,6 +132,31 @@ describe("widgetFeedbackContext", () => {
         "conversation conv-1, message msg-2, run run-3, Sentry replay abc123, reported at 2026-09-27T16:45:17.000Z"
       )
     );
+  });
+
+  it("reads the line from the Support report of a report filed since ENG-21100", async () => {
+    const route = await widgetFeedbackContext(
+      "issue-1",
+      credentials,
+      linearReturning(
+        WIDGET_FEEDBACK_PROJECT_ID,
+        "## What the customer wants\n\nA right answer.",
+        [
+          { content: "Notes, not the report", title: "Triage investigation" },
+          {
+            content: `## Verified scope\n\n${DESCRIPTION}`,
+            title: "Support report",
+          },
+        ]
+      )
+    );
+    assert.ok(
+      route?.includes(
+        "conversation conv-1, message msg-2, run run-3, Sentry replay abc123"
+      ),
+      route ?? "no route"
+    );
+    assert.ok(route?.includes("Support report document"));
   });
 
   it("still routes a widget ticket whose line is missing", async () => {

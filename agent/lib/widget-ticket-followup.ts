@@ -92,7 +92,9 @@ const ASTERISK_ITEM = /^\* /u;
  * Whether a description ends with the conversation's own server-written scope
  * block: the trailing block `isWidgetFiledDescription` recognises, naming this
  * workspace and conversation. A ticket that quotes those lines elsewhere, or
- * ends with another conversation's block, is not this conversation's.
+ * ends with another conversation's block, is not this conversation's. Only
+ * tickets filed before ENG-21100 carry the block; newer ones are found by
+ * their support chat link.
  */
 export const ownsDescription = (
   description: string | null,
@@ -192,7 +194,8 @@ export async function followUpOnTicket(
       .map((line) => `> ${line}`)
       .join("\n"),
   ].join("\n\n");
-  await commentOnTicket(
+  // A retried filing finds its comment already there.
+  await commentOnce(
     ticket.identifier,
     body,
     commentIdFor(`widget-follow-up:${runId}`),

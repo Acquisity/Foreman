@@ -13,12 +13,14 @@ import { supportOperationPolicy } from "../support/policy.js";
 import { isTriageReplay } from "../triage-replay/mode.js";
 import { isQuestionsOnly } from "../trust.js";
 import { widgetOperationPolicy } from "../widget-policy.js";
+import { isWidgetSupport, requireWidgetContext } from "../widget-scope.js";
 import {
-  isWidgetSupport,
-  requireWidgetContext,
-  type WidgetContext,
-} from "../widget-scope.js";
-import { WIDGET_SCOPE_NOTICE } from "../widget-ticket-marker.js";
+  CHAT_WIDGET_PROJECT_ID,
+  SUPPORT_CHAT_TITLE,
+  SUPPORT_REPORT_POINTER,
+  supportChatUrl,
+  type TicketKind,
+} from "../widget-support-report.js";
 import { executorAuth } from "./auth.js";
 import {
   DISPUTES_TOOLKIT,
@@ -74,6 +76,9 @@ const triageTicketShape = {
 const widgetTicketShape = {
   ...triageTicketShape,
   assignee: z.literal(WIDGET_TICKET_OWNER.assignee),
+  links: z.tuple([
+    z.strictObject({ title: z.literal(SUPPORT_CHAT_TITLE), url: z.string() }),
+  ]),
 };
 /** The migration lane's ticket: the shared shape, its owner, and the thread link. */
 const migrationLinearTicketInput = z.strictObject({
@@ -139,6 +144,10 @@ const widgetLinearTicketInput = z.union([
     ...widgetTicketShape,
     labels: z.tuple([z.literal(BUG_LABEL)]),
   }),
+  z.strictObject({
+    ...widgetTicketShape,
+    project: z.literal(CHAT_WIDGET_PROJECT_ID),
+  }),
 ]);
 
 /** The dispute write apps, live and sandbox; only the foreman-disputes connection holds them. */
@@ -182,9 +191,6 @@ async function connection(
   };
 }
 
-export const widgetScopeBlock = (scope: WidgetContext) =>
-  `## Verified scope\n\n- Workspace: ${scope.organizationName} (${scope.organizationSlug})\n- Organization ID: ${scope.organizationId}\n- Support conversation: ${scope.conversationId}\n\n${WIDGET_SCOPE_NOTICE}`;
-
 // A Linear MCP tool that changes something, or the authored GraphQL write API.
 const LINEAR_WRITE_PATH =
   /^(?:foreman-linear-write-api\.|linear-foreman\.(?:save|create|delete|update|archive|unarchive)_)/u;
@@ -205,7 +211,7 @@ function assertLaneOperation(
   ) {
     throw new ExecutorError("questions_only", 403, { dispatched: false });
   }
-  // The widget lane's only write: a ticket whose scope block the server wrote.
+  // The widget lane's only write: a ticket linked to its own verified chat.
   if (
     isWidgetSupport(ctx.session?.auth.initiator) &&
     path === LINEAR_TICKET_PATH
@@ -215,7 +221,7 @@ function assertLaneOperation(
     if (
       !(
         parsed.success &&
-        parsed.data.description.endsWith(widgetScopeBlock(scope))
+        parsed.data.links[0].url === supportChatUrl(scope.conversationId)
       )
     ) {
       throw new ExecutorError("customer_scope_required", 403, {
@@ -291,22 +297,36 @@ export async function describeProvider(ctx: ProviderContext, path: string) {
   return executorTransport.describe(wire, path);
 }
 
-/** The widget lane's one provider write. Team, state and scope come only from the session initiator. */
+/** Where each kind of widget ticket lands, beside the team, state and owner every one shares. */
+const KIND_FIELDS: Record<TicketKind | "bug", Record<string, unknown>> = {
+  bug: { labels: [BUG_LABEL] },
+  case: {},
+  feedback: { project: CHAT_WIDGET_PROJECT_ID },
+  refund: { ...REFUND_TICKET, labels: [...REFUND_TICKET.labels] },
+};
+
+/**
+ * The widget lane's one provider write. Team, state and the chat it is
+ * linked to come only from the session initiator; the body carries no ids.
+ */
 export async function createWidgetTicket(
   ctx: ProviderContext,
-  input: { bug?: boolean; refund?: boolean; report: string; title: string }
+  input: { body: string; kind: TicketKind | "bug"; title: string }
 ): Promise<ExecutorOutcome> {
   const scope = requireWidgetContext(ctx.session?.auth.initiator);
   return await invokeProvider(
     ctx,
     LINEAR_TICKET_PATH,
     {
-      ...(input.refund
-        ? { ...REFUND_TICKET, labels: [...REFUND_TICKET.labels] }
-        : {}),
-      ...(input.bug ? { labels: [BUG_LABEL] } : {}),
+      ...KIND_FIELDS[input.kind],
       ...WIDGET_TICKET_OWNER,
-      description: `${input.report}\n\n${widgetScopeBlock(scope)}`,
+      description: `${input.body}\n\n${SUPPORT_REPORT_POINTER}`,
+      links: [
+        {
+          title: SUPPORT_CHAT_TITLE,
+          url: supportChatUrl(scope.conversationId),
+        },
+      ],
       state: "Triage",
       team: "Engineering Team",
       title: input.title,

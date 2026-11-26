@@ -28,7 +28,7 @@ When the ticket already has the `## Fixy handoff` comment, go to step 8. The `fi
 
 ## 2. Find the workspace
 
-A `Workspace ID` already on the ticket wins. Otherwise call `lookup_customer` with the reporter's exact email and pick the one workspace the report is about: one membership is that workspace; with several, the campaign, record, or timing in the report says which. This is identity, not investigation: read nothing else about the account.
+A `Workspace ID` already on the ticket, or in the verified scope the session gives from a widget ticket's Support report, wins. Otherwise call `lookup_customer` with the reporter's exact email and pick the one workspace the report is about: one membership is that workspace; with several, the campaign, record, or timing in the report says which. This is identity, not investigation: read nothing else about the account.
 
 ## 3. How-to or expected behaviour
 

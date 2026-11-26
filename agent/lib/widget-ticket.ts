@@ -4,13 +4,11 @@ import { executorClient } from "./executor/client.js";
 import {
   createWidgetTicket,
   type ProviderContext,
-  REFUND_TICKET,
 } from "./executor/dispatch.js";
 import {
   findRelatedIssues,
   type LinearGraphqlOptions,
   linearGraphql,
-  type RelatedIssue,
 } from "./linear-api.js";
 import {
   confirmedIssue,
@@ -30,14 +28,20 @@ import {
   widgetAuth,
 } from "./widget-scope.js";
 import {
+  type LinkedTicket,
+  linkedTickets,
+  saveSupportReport,
+  supportReportContent,
+  type TicketKind,
+  ticketKind,
+  type WidgetEntry,
+} from "./widget-support-report.js";
+import {
   followUpOnTicket,
   ownsConversation,
   type TicketNote,
   ticketNote,
 } from "./widget-ticket-followup.js";
-
-/** REFUND_TICKET.project (P-ENG-20, "Support") as the id Linear returns for an issue's project. */
-const SUPPORT_PROJECT_ID = "4534deb2-6bbc-4e30-ad38-48963f414d14";
 
 interface RoutedIssue {
   issue: {
@@ -47,131 +51,173 @@ interface RoutedIssue {
 }
 
 /**
- * Whether an existing ticket already sits in the queue billing triage reads:
- * the Support project with the Refund label, the destination REFUND_TICKET
- * files to. A ticket that cannot be read counts as not routed.
+ * The kind of work an old ticket holds, read from its project and labels. A
+ * ticket that cannot be read counts as a case, so a refund is never folded
+ * into it.
  */
-export async function inRefundQueue(
+export async function legacyKind(
   identifier: string,
   opts: LinearGraphqlOptions
-): Promise<boolean> {
+): Promise<TicketKind> {
   try {
     const { issue } = await linearGraphql<RoutedIssue>(
       "RouteIssue",
       { id: identifier },
       opts
     );
-    return Boolean(
-      issue?.project?.id === SUPPORT_PROJECT_ID &&
-        issue.labels.nodes.some(({ id }) => id === REFUND_TICKET.labels[0])
-    );
+    return issue ? ticketKind(issue) : "case";
   } catch (error) {
     if (opts.signal?.aborted) {
       throw error;
     }
-    return false;
+    return "case";
   }
 }
 
 /**
- * A conversation's existing ticket is returned instead of a second one. It
- * counts as routed to billing only when it is verified in the refund queue;
- * an ordinary ticket reused for a refund leaves the handoff to a person.
+ * A conversation's existing ticket of the same kind is returned instead of a
+ * second one. A refund lands only on a ticket in billing's refund queue, so it
+ * is routed to billing by construction.
  */
 export const existingTicket = (
-  issue: Pick<RelatedIssue, "identifier" | "url">,
-  routedRefund: boolean
+  issue: Pick<ConversationTicket, "identifier" | "kind" | "url">
 ) => ({
   existing: true,
   identifier: issue.identifier,
-  refund: routedRefund,
+  refund: issue.kind === "refund",
   url: issue.url,
 });
 
 export type WidgetTicketResult = WidgetTicketReceipt | { error: string };
 
+/** A ticket this conversation owns, with the kind of work it holds. */
+export type ConversationTicket = LinkedTicket;
+
 const ticketDependencies = {
   create: createWidgetTicket,
   followUp: followUpOnTicket,
+  kind: legacyKind,
+  linked: linkedTickets,
   owns: ownsConversation,
   readReceipt: readWidgetTicketReceipt,
   refund: isRefundTicket,
+  report: saveSupportReport,
   saveReceipt: saveWidgetTicketReceipt,
   search: findRelatedIssues,
 };
+type TicketDependencies = typeof ticketDependencies;
 
 /**
- * One ticket per conversation: every widget ticket carries the conversation id
- * in its server-written scope block, so an earlier one is found by it. The
- * search matches the id anywhere, so a hit counts only once its description
- * shows that block. A ticket someone cancelled no longer covers this
- * conversation.
+ * Tickets filed before ENG-21100 carry the conversation id in a
+ * server-written scope block at the end of the description instead of a
+ * support chat link. The search matches the id anywhere, so a hit counts only
+ * once its description shows that block.
  */
-export async function conversationTicket(
+async function legacyTickets(
   ctx: ProviderContext,
-  search: typeof findRelatedIssues = findRelatedIssues,
-  owns: typeof ownsConversation = ownsConversation
-): Promise<RelatedIssue | undefined> {
-  const scope = requireWidgetContext(ctx.session?.auth.initiator);
-  const earlier = await search(
+  scope: WidgetContext,
+  deps: Pick<TicketDependencies, "kind" | "owns" | "search">
+): Promise<ConversationTicket[]> {
+  const opts = { client: executorClient(ctx), signal: ctx.abortSignal };
+  const earlier = await deps.search(
     {
       phrases: [scope.conversationId],
       scope: "duplicates",
       windowed: false,
     },
-    { client: executorClient(ctx), signal: ctx.abortSignal }
+    opts
   );
+  const owned: ConversationTicket[] = [];
   for (const issue of earlier.issues) {
     if (
-      issue.stateType !== "canceled" &&
-      // biome-ignore lint/performance/noAwaitInLoops: the first owned hit wins, and there is almost always one.
-      (await owns(issue.identifier, scope, ctx.abortSignal))
+      CLOSED_UNDONE.has(issue.stateType) ||
+      // biome-ignore lint/performance/noAwaitInLoops: almost always one hit.
+      !(await deps.owns(issue.identifier, scope, ctx.abortSignal))
     ) {
-      return issue;
+      continue;
     }
+    owned.push({
+      identifier: issue.identifier,
+      kind: await deps.kind(issue.identifier, opts),
+      stateType: issue.stateType,
+      url: issue.url,
+    });
   }
-  return undefined;
+  return owned;
 }
 
-/** `bug` is a whole description in the bug format, filed with the Bug label instead of the customer-report block. */
+/** A ticket someone cancelled or closed as a duplicate no longer covers this conversation. */
+const CLOSED_UNDONE = new Set(["canceled", "duplicate"]);
+
+/**
+ * The conversation's ticket for one kind of work, or for any work but
+ * feedback when no kind is named: first the tickets linked to its support
+ * chat, then the old ones whose description ends with its scope block.
+ */
+export async function conversationTicket(
+  ctx: ProviderContext,
+  kind?: TicketKind,
+  overrides: Partial<
+    Pick<TicketDependencies, "kind" | "linked" | "owns" | "search">
+  > = {}
+): Promise<ConversationTicket | undefined> {
+  const deps = { ...ticketDependencies, ...overrides };
+  const scope = requireWidgetContext(ctx.session?.auth.initiator);
+  const wanted = (ticket: ConversationTicket) =>
+    !CLOSED_UNDONE.has(ticket.stateType) &&
+    (kind ? ticket.kind === kind : ticket.kind !== "feedback");
+  const linked = (
+    await deps.linked(scope.conversationId, ctx.abortSignal)
+  ).find(wanted);
+  if (linked || kind === "feedback") {
+    return linked;
+  }
+  return (await legacyTickets(ctx, scope, deps)).find(wanted);
+}
+
+/**
+ * One widget ticket, as every entry point hands it over: a title and plain
+ * body from the one drafting call, and what goes in its Support report.
+ */
 export interface WidgetTicketInput {
-  bug?: string;
+  /** The plain body, with no ids and no code block. */
+  body: string;
+  entry: WidgetEntry;
+  /** The Support report's sections after its verified scope: conversation, findings, evidence. */
+  report: string[];
+  /** Keys a reused ticket's follow-up comment when there is no run, so a retry adds nothing. */
+  retryKey?: string;
+  /** What the refund check reads beside the title. */
   summary: string;
   title: string;
 }
 
-/**
- * The conversation's existing ticket, for a turn that needs the team again:
- * it lands on the ticket its owner already holds. Without a run there is no
- * fixed comment id, so nothing is added.
- */
-async function reuseTicket(
-  ctx: ProviderContext,
-  existing: RelatedIssue,
+/** The kind a filing is, before anything is read: a bug, a report on a reply, or a refund or other case. */
+const filingKind = async (
   input: WidgetTicketInput,
-  refund: boolean,
-  runId: string | undefined,
-  followUp: typeof followUpOnTicket
-) {
-  if (runId) {
-    await followUp(existing, input.summary, runId, ctx.abortSignal);
+  refund: TicketDependencies["refund"],
+  signal: AbortSignal
+): Promise<TicketKind | "bug"> => {
+  if (input.entry === "bug") {
+    return "bug";
   }
-  const opts = { client: executorClient(ctx), signal: ctx.abortSignal };
-  return existingTicket(
-    existing,
-    refund && (await inRefundQueue(existing.identifier, opts))
-  );
-}
+  if (input.entry === "problem") {
+    return "feedback";
+  }
+  return (await refund(input, signal)) ? "refund" : "case";
+};
 
 /**
- * File this verified conversation's one ticket, or return the one it already
- * has. widget_file_ticket runs it in the investigator session; the handoff
- * rule and the bug report run it with `appTicketContext` instead.
+ * File this verified conversation's ticket for this kind of work, or return
+ * the one it already has. Every widget ticket is filed here: the
+ * investigator's widget_file_ticket, the handoff and blocked replies, the bug
+ * button, refunds and the customer's Report a problem. A chat with a bug and
+ * a refund gets a ticket for each, both linked to the chat.
  */
 export async function fileWidgetTicket(
   ctx: ProviderContext,
   input: WidgetTicketInput,
-  overrides: Partial<typeof ticketDependencies> = {}
+  overrides: Partial<TicketDependencies> = {}
 ): Promise<WidgetTicketResult> {
   const deps = { ...ticketDependencies, ...overrides };
   if (isLiveActive() && !overrides.readReceipt && !overrides.saveReceipt) {
@@ -190,7 +236,7 @@ export async function fileWidgetTicket(
     const saved = runId
       ? await deps.readReceipt(scope, runId, ctx.abortSignal)
       : null;
-    if (saved) {
+    if (saved && isLiveActive()) {
       return saved;
     }
     // The ticket exists once Linear confirms it, so a failed receipt save
@@ -214,39 +260,59 @@ export async function fileWidgetTicket(
     if (isLiveActive()) {
       return await confirm(LIVE_TICKET);
     }
-    const refund = input.bug
-      ? false
-      : await deps.refund(input, ctx.abortSignal);
-    const existing = await conversationTicket(ctx, deps.search, deps.owns);
-    if (existing) {
-      return await confirm(
-        await reuseTicket(ctx, existing, input, refund, runId, deps.followUp)
+    const kind = await filingKind(input, deps.refund, ctx.abortSignal);
+    // A run that asks for a bug and then a refund files each once.
+    if (
+      saved &&
+      (!("refund" in saved) || saved.refund === (kind === "refund"))
+    ) {
+      return saved;
+    }
+    const report = (identifier: string, addition: string[]) =>
+      deps.report(
+        identifier,
+        supportReportContent(scope, input.entry, input.report, runId),
+        [`## Added ${new Date().toISOString()}`, ...addition].join("\n\n"),
+        scope,
+        ctx.abortSignal
       );
+    const existing = await conversationTicket(
+      ctx,
+      kind === "bug" ? "case" : kind,
+      deps
+    );
+    if (existing) {
+      const key = runId ?? input.retryKey;
+      // Without a run or retry key there is no fixed comment id, so nothing is added.
+      if (key) {
+        await deps.followUp(existing, input.body, key, ctx.abortSignal);
+        await report(existing.identifier, input.report);
+      }
+      return await confirm(existingTicket(existing));
     }
     const result = await deps.create(ctx, {
-      bug: Boolean(input.bug),
-      refund,
-      report: input.bug ?? formatCustomerReport(input.summary),
+      body: formatCustomerReport(input.body),
+      kind,
       title: input.title,
     });
     if (!result.ok) {
       return { error: "Linear did not accept the ticket." };
     }
+    let filed: { identifier: string; url: string };
     try {
-      return await confirm({
-        existing: false,
-        refund,
-        ...confirmedIssue(result.data),
-      });
-    } catch (error) {
-      if (ctx.abortSignal.aborted) {
-        throw error;
-      }
+      filed = confirmedIssue(result.data);
+    } catch {
       return {
         error:
           "Linear accepted the request but did not return a confirmed ticket. Do not retry automatically.",
       };
     }
+    await report(filed.identifier, input.report);
+    return await confirm({
+      existing: false,
+      refund: kind === "refund",
+      ...filed,
+    });
   } catch (error) {
     if (ctx.abortSignal.aborted) {
       throw error;

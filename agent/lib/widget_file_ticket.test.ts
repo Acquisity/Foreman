@@ -3,21 +3,36 @@ import { test } from "node:test";
 import { verifiedWidgetContext as scope } from "./widget.fixture.js";
 import type { WidgetTicketReceipt } from "./widget-run-store.js";
 import type { WidgetContext } from "./widget-scope.js";
+import type { LinkedTicket } from "./widget-support-report.js";
 import {
   appTicketContext,
   existingTicket,
   fileTicketFor,
   fileWidgetTicket,
-  inRefundQueue,
+  legacyKind,
+  type WidgetTicketInput,
 } from "./widget-ticket.js";
+
+process.env.ACQUISITY_ORIGIN ??= "https://app.acquisity.ai";
 
 const SUPPORT = "4534deb2-6bbc-4e30-ad38-48963f414d14";
 const REFUND_LABEL = "9120e30d-e188-4972-940b-20005b7f6d03";
+const CHAT_WIDGET = "84ab288a-6a7b-4316-ab6f-f67809a40211";
+const BROKE_AGAIN = /- Customer: It broke again\./u;
+const OPENS_WITH_SCOPE = /^## Verified scope/u;
+
+const ask = (summary: string): WidgetTicketInput => ({
+  body: summary,
+  entry: "handoff",
+  report: ["## Conversation (oldest first)", `- Customer: ${summary}`],
+  summary,
+  title: "Support",
+});
 
 const reading = (
   project: string | null,
   labels: string[]
-): Parameters<typeof inRefundQueue>[1] => ({
+): Parameters<typeof legacyKind>[1] => ({
   client: () =>
     Promise.resolve({
       data: {
@@ -40,42 +55,44 @@ const reading = (
     }),
 });
 
-test("a reused ticket counts as routed to billing only in the Support project with the Refund label", async () => {
+test("an old ticket holds a refund only in the Support project with the Refund label", async () => {
   assert.equal(
-    await inRefundQueue("ENG-1", reading(SUPPORT, [REFUND_LABEL])),
-    true
+    await legacyKind("ENG-1", reading(SUPPORT, [REFUND_LABEL])),
+    "refund"
   );
   // Moved to a product project but still labelled Refund.
   assert.equal(
-    await inRefundQueue("ENG-1", reading("other-project", [REFUND_LABEL])),
-    false
+    await legacyKind("ENG-1", reading("other-project", [REFUND_LABEL])),
+    "case"
   );
-  assert.equal(await inRefundQueue("ENG-1", reading(SUPPORT, [])), false);
+  assert.equal(await legacyKind("ENG-1", reading(SUPPORT, [])), "case");
+  assert.equal(await legacyKind("ENG-1", reading(CHAT_WIDGET, [])), "feedback");
   assert.equal(
-    await inRefundQueue("ENG-1", reading(null, [REFUND_LABEL])),
-    false
-  );
-  assert.equal(
-    await inRefundQueue("ENG-1", {
+    await legacyKind("ENG-1", {
       client: () => Promise.resolve({ data: null, status: 500 }),
     }),
-    false
+    "case"
   );
 });
 
-test("the reused ticket keeps the one-ticket result and carries only the verified refund routing", () => {
+test("a reused ticket is routed to billing exactly when it is the chat's refund ticket", () => {
   const issue = {
     identifier: "ENG-1",
     url: "https://linear.app/acquisity/issue/ENG-1",
   };
-  assert.deepEqual(existingTicket(issue, false), {
+  assert.deepEqual(existingTicket({ ...issue, kind: "case" }), {
     existing: true,
     identifier: "ENG-1",
     refund: false,
     url: "https://linear.app/acquisity/issue/ENG-1",
   });
-  assert.equal(existingTicket(issue, true).refund, true);
+  assert.equal(existingTicket({ ...issue, kind: "refund" }).refund, true);
 });
+
+const noLinks = {
+  linked: () => Promise.resolve([] as LinkedTicket[]),
+  report: () => Promise.resolve(true),
+};
 
 test("code filing then a tool call in one run reuses the confirmed receipt despite an empty Linear search", async (t) => {
   t.mock.method(globalThis, "fetch", () =>
@@ -85,11 +102,9 @@ test("code filing then a tool call in one run reuses the confirmed receipt despi
   let writes = 0;
   let searches = 0;
   const runId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
-  const input = {
-    summary: "The customer asked for a person.",
-    title: "Support",
-  };
+  const input = ask("The customer asked for a person.");
   const deps = {
+    ...noLinks,
     create: () => {
       writes += 1;
       return Promise.resolve({
@@ -140,10 +155,11 @@ test("a confirmed ticket stays confirmed when its receipt cannot be saved", asyn
   const { signal } = new AbortController();
   const filed = await fileTicketFor(
     scope,
-    { summary: "The customer asked for a person.", title: "Support" },
+    ask("The customer asked for a person."),
     signal,
     runId,
     {
+      ...noLinks,
       create: () =>
         Promise.resolve({
           data: {
@@ -171,10 +187,11 @@ test("an abort during the receipt save propagates instead of becoming a ticket e
   await assert.rejects(
     fileTicketFor(
       scope,
-      { summary: "The customer asked for a person.", title: "Support" },
+      ask("The customer asked for a person."),
       controller.signal,
       "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
       {
+        ...noLinks,
         create: () =>
           Promise.resolve({
             data: {
@@ -220,10 +237,11 @@ test("a search hit that only mentions the conversation is skipped: the follow-up
   const { signal } = new AbortController();
   const filed = await fileTicketFor(
     scope,
-    { summary: "It broke again.", title: "Support" },
+    ask("It broke again."),
     signal,
     runId,
     {
+      ...noLinks,
       create: () => assert.fail("the conversation already has a ticket"),
       followUp: (ticket, _summary, followUpRun) => {
         followed.push({
@@ -233,6 +251,7 @@ test("a search hit that only mentions the conversation is skipped: the follow-up
         });
         return Promise.resolve();
       },
+      kind: () => Promise.resolve("case" as const),
       owns: (identifier, owner) => {
         checked.push(identifier);
         assert.equal(owner.conversationId, scope.conversationId);
@@ -267,12 +286,14 @@ test("a follow-up that Linear refuses fails the filing, so nothing tells the cus
   const { signal } = new AbortController();
   const filed = await fileTicketFor(
     scope,
-    { summary: "It broke again.", title: "Support" },
+    ask("It broke again."),
     signal,
     "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
     {
+      ...noLinks,
       create: () => assert.fail("the conversation already has a ticket"),
       followUp: () => Promise.reject(new Error("Linear did not create it.")),
+      kind: () => Promise.resolve("case" as const),
       owns: () => Promise.resolve(true),
       readReceipt: async () => null,
       refund: () => Promise.resolve(false),
@@ -286,4 +307,194 @@ test("a follow-up that Linear refuses fails the filing, so nothing tells the cus
     }
   );
   assert.ok("error" in filed);
+});
+
+const linkedTicket = (
+  identifier: string,
+  kind: LinkedTicket["kind"],
+  stateType = "started"
+): LinkedTicket => ({
+  identifier,
+  kind,
+  stateType,
+  url: `https://linear.app/acquisity/issue/${identifier}/x`,
+});
+
+const created = (identifier: string) => () =>
+  Promise.resolve({
+    data: {
+      id: identifier,
+      url: `https://linear.app/acquisity/issue/${identifier}/x`,
+    },
+    ok: true as const,
+  });
+
+test("a ticket linked to the chat is found without searching descriptions, and its report gets the follow-up", async (t) => {
+  t.mock.method(globalThis, "fetch", () =>
+    Promise.reject(new Error("unexpected transport"))
+  );
+  const reports: { identifier: string; addition: string }[] = [];
+  const filed = await fileTicketFor(
+    scope,
+    ask("It broke again."),
+    new AbortController().signal,
+    "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
+    {
+      create: () => assert.fail("the chat already has a ticket"),
+      followUp: () => Promise.resolve(),
+      linked: (conversationId) => {
+        assert.equal(conversationId, scope.conversationId);
+        return Promise.resolve([
+          linkedTicket("ENG-8", "case", "canceled"),
+          linkedTicket("ENG-9", "case"),
+        ]);
+      },
+      readReceipt: async () => null,
+      refund: () => Promise.resolve(false),
+      report: (identifier, _content, addition) => {
+        reports.push({ addition, identifier });
+        return Promise.resolve(true);
+      },
+      saveReceipt: () => Promise.resolve(),
+      search: () => assert.fail("a linked ticket needs no search"),
+    }
+  );
+  assert.equal("identifier" in filed && filed.identifier, "ENG-9");
+  assert.equal(reports.length, 1);
+  assert.equal(reports[0]?.identifier, "ENG-9");
+  assert.match(reports[0]?.addition ?? "", BROKE_AGAIN);
+});
+
+test("a refund beside the chat's bug ticket gets its own ticket in billing's queue, linked to the same chat", async (t) => {
+  t.mock.method(globalThis, "fetch", () =>
+    Promise.reject(new Error("unexpected transport"))
+  );
+  const writes: { kind: string; body: string }[] = [];
+  const contents: string[] = [];
+  const filed = await fileTicketFor(
+    scope,
+    ask("I was charged twice in November and want one charge back."),
+    new AbortController().signal,
+    "ffffffff-ffff-4fff-8fff-ffffffffffff",
+    {
+      create: (_ctx, input) => {
+        writes.push({ body: input.body, kind: input.kind });
+        return created("ENG-21")();
+      },
+      followUp: () => assert.fail("the bug ticket is not the refund's"),
+      linked: () => Promise.resolve([linkedTicket("ENG-20", "case")]),
+      readReceipt: async () => null,
+      refund: () => Promise.resolve(true),
+      report: (identifier, content) => {
+        assert.equal(identifier, "ENG-21");
+        contents.push(content);
+        return Promise.resolve(true);
+      },
+      saveReceipt: () => Promise.resolve(),
+      search: () =>
+        Promise.resolve({ createdAfter: null, issues: [], truncated: false }),
+    }
+  );
+  assert.deepEqual(filed, {
+    existing: false,
+    identifier: "ENG-21",
+    refund: true,
+    url: "https://linear.app/acquisity/issue/ENG-21/x",
+  });
+  assert.deepEqual(writes, [
+    {
+      body: "I was charged twice in November and want one charge back.",
+      kind: "refund",
+    },
+  ]);
+  // The new ticket's Support report carries the verified scope.
+  assert.match(contents[0] ?? "", OPENS_WITH_SCOPE);
+  assert.ok(contents[0]?.includes(`- Workspace ID: ${scope.organizationId}`));
+  assert.ok(
+    contents[0]?.includes(`- Support conversation: ${scope.conversationId}`)
+  );
+});
+
+test("a second refund ask lands on the chat's refund ticket, which is routed to billing", async (t) => {
+  t.mock.method(globalThis, "fetch", () =>
+    Promise.reject(new Error("unexpected transport"))
+  );
+  const filed = await fileTicketFor(
+    scope,
+    ask("Any news on my refund?"),
+    new AbortController().signal,
+    "abababab-abab-4bab-8bab-abababababab",
+    {
+      create: () => assert.fail("the chat already has a refund ticket"),
+      followUp: () => Promise.resolve(),
+      linked: () =>
+        Promise.resolve([
+          linkedTicket("ENG-20", "case"),
+          linkedTicket("ENG-21", "refund"),
+        ]),
+      readReceipt: async () => null,
+      refund: () => Promise.resolve(true),
+      report: () => Promise.resolve(true),
+      saveReceipt: () => Promise.resolve(),
+      search: () => assert.fail("a linked ticket needs no search"),
+    }
+  );
+  assert.equal("identifier" in filed && filed.identifier, "ENG-21");
+  assert.equal("refund" in filed && filed.refund, true);
+});
+
+test("a run that filed a bug and then asks for a refund files the refund too", async (t) => {
+  t.mock.method(globalThis, "fetch", () =>
+    Promise.reject(new Error("unexpected transport"))
+  );
+  const bug: WidgetTicketReceipt = {
+    existing: false,
+    identifier: "ENG-20",
+    refund: false,
+    url: "https://linear.app/acquisity/issue/ENG-20/x",
+  };
+  const filed = await fileTicketFor(
+    scope,
+    ask("And I want my money back for the failed month."),
+    new AbortController().signal,
+    "cdcdcdcd-cdcd-4dcd-8dcd-cdcdcdcdcdcd",
+    {
+      create: created("ENG-22"),
+      linked: () =>
+        Promise.resolve([linkedTicket("ENG-20", "case")] as LinkedTicket[]),
+      readReceipt: async () => bug,
+      refund: () => Promise.resolve(true),
+      report: () => Promise.resolve(true),
+      saveReceipt: () => Promise.resolve(),
+      search: () =>
+        Promise.resolve({ createdAfter: null, issues: [], truncated: false }),
+    }
+  );
+  assert.equal("identifier" in filed && filed.identifier, "ENG-22");
+});
+
+test("a bug report never asks the refund check, and a failed Support report still files", async (t) => {
+  t.mock.method(globalThis, "fetch", () =>
+    Promise.reject(new Error("unexpected transport"))
+  );
+  const kinds: string[] = [];
+  const filed = await fileTicketFor(
+    scope,
+    { ...ask("The campaign never sends."), entry: "bug" },
+    new AbortController().signal,
+    undefined,
+    {
+      create: (_ctx, input) => {
+        kinds.push(input.kind);
+        return created("ENG-30")();
+      },
+      ...noLinks,
+      refund: () => assert.fail("a bug is never a refund"),
+      report: () => Promise.resolve(false),
+      search: () =>
+        Promise.resolve({ createdAfter: null, issues: [], truncated: false }),
+    }
+  );
+  assert.deepEqual(kinds, ["bug"]);
+  assert.equal("identifier" in filed && filed.identifier, "ENG-30");
 });

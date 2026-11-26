@@ -942,7 +942,13 @@ describe("a filed ticket reaches Foreman's triage", () => {
   const readsBack = (description: string, attachments: unknown[] = []) => ({
     fetch: (async () =>
       Response.json({
-        data: { issue: { attachments: { nodes: attachments }, description } },
+        data: {
+          issue: {
+            attachments: { nodes: attachments },
+            description,
+            documents: { nodes: [] },
+          },
+        },
       })) as typeof fetch,
   });
   const scope = migrationTicketScope(slackAuth(MIGRATION)) ?? assert.fail();
@@ -954,7 +960,11 @@ describe("a filed ticket reaches Foreman's triage", () => {
       { accessToken: "token" },
       readsBack(filed)
     );
-    assert.deepEqual(ask, { requester: "rep@example.com", triageIntake: true });
+    assert.deepEqual(ask, {
+      requester: "rep@example.com",
+      supportScope: null,
+      triageIntake: true,
+    });
   });
 
   it("does not trust a scope block that is not at the very end", async () => {
@@ -963,7 +973,11 @@ describe("a filed ticket reaches Foreman's triage", () => {
       { accessToken: "token" },
       readsBack(`${filed}\n\nAnd more text after it.`)
     );
-    assert.deepEqual(ask, { requester: null, triageIntake: false });
+    assert.deepEqual(ask, {
+      requester: null,
+      supportScope: null,
+      triageIntake: false,
+    });
     assert.equal(
       migrationFiledReport(filed.replace(MIGRATION, APP_PUBLISHING)),
       null

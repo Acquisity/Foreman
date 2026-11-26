@@ -1,18 +1,25 @@
+import { z } from "zod";
+import type { ProviderContext } from "./executor/dispatch.js";
 import { logOpsEvent } from "./ops-log.js";
 import {
   BUG_REPORT_ADDED,
   BUG_REPORT_LOGGED,
-  type draftHandoffTicket,
+  draftHandoffTicket,
   fallbackHandoffDraft,
   HANDOFF_DRAFT_MS,
   type HandoffFacts,
+  handoffReport,
   handoffTicketBody,
 } from "./widget-bug-report.js";
 import { parseFindings, type WidgetFindings } from "./widget-findings.js";
 import type { WidgetDependencies } from "./widget-investigation.js";
-import type { WidgetOutcome, WidgetRun } from "./widget-run-store.js";
-import type { WidgetContext } from "./widget-scope.js";
-import type { fileTicketFor } from "./widget-ticket.js";
+import {
+  readWidgetRun,
+  type WidgetOutcome,
+  type WidgetRun,
+} from "./widget-run-store.js";
+import { requireWidgetContext, type WidgetContext } from "./widget-scope.js";
+import { type fileTicketFor, fileWidgetTicket } from "./widget-ticket.js";
 import type { TicketNote } from "./widget-ticket-followup.js";
 
 /**
@@ -130,11 +137,12 @@ async function handoffInput(
     (roomMs ?? Number.POSITIVE_INFINITY) >= HANDOFF_DRAFT_MS + FILING_ROOM_MS
       ? await draft(facts, signal)
       : fallbackHandoffDraft(facts);
+  const body = handoffTicketBody(drafted, facts, scope, new Date());
   return {
-    summary: handoffTicketBody(drafted, facts, scope, new Date()).slice(
-      0,
-      4000
-    ),
+    body,
+    entry: "handoff" as const,
+    report: handoffReport(facts),
+    summary: body,
     title: drafted.title.slice(0, 160),
   };
 }
@@ -400,3 +408,50 @@ export const investigatorNote = (note: TicketNote | null) =>
   note
     ? `\n\nNOTE FROM THE APP, not written by the customer: ${note.forInvestigator}`
     : "";
+
+const investigatorDependencies = {
+  draft: draftHandoffTicket,
+  file: fileWidgetTicket,
+  question: (runId: string, signal: AbortSignal) =>
+    readWidgetRun(runId, signal).then((run) => run.question),
+};
+
+/**
+ * widget_file_ticket: the investigator's title and summary are its findings,
+ * and the ticket is drafted from them and the customer's message by the same
+ * call as every other widget ticket, so its body carries no ids. The
+ * summary goes in the Support report as written.
+ */
+export async function fileInvestigatorTicket(
+  ctx: ProviderContext,
+  input: { summary: string; title: string },
+  overrides: Partial<typeof investigatorDependencies> = {}
+) {
+  const deps = { ...investigatorDependencies, ...overrides };
+  const scope = requireWidgetContext(ctx.session?.auth.initiator);
+  const runId = z
+    .uuid()
+    .optional()
+    .safeParse(ctx.session?.auth.current?.attributes?.widgetRunId).data;
+  const question = runId
+    ? await deps.question(runId, ctx.abortSignal).catch((error) => {
+        if (ctx.abortSignal.aborted) {
+          throw error;
+        }
+        return null;
+      })
+    : null;
+  const facts: HandoffFacts = {
+    findings: { recommendation: input.title, report: input.summary },
+    latest: question ?? input.title,
+    why: "Foreman's investigation found something the team needs to act on.",
+  };
+  const draft = await deps.draft(facts, ctx.abortSignal);
+  return await deps.file(ctx, {
+    body: handoffTicketBody(draft, facts, scope, new Date()),
+    entry: "tool",
+    report: handoffReport(facts),
+    summary: `${input.title}\n\n${input.summary}`,
+    title: draft.title.slice(0, 160),
+  });
+}

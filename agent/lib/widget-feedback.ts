@@ -3,6 +3,7 @@ import {
   type LinearApiOptions,
   type LinearChannelCredentials,
 } from "eve/channels/linear";
+import { SUPPORT_REPORT_TITLE } from "./widget-support-report.js";
 
 /** Linear project the Acquisity chat widget files its feedback tickets into. */
 export const WIDGET_FEEDBACK_PROJECT_ID =
@@ -55,16 +56,24 @@ export function widgetFeedbackRoute(
 ): string {
   const ids = marker
     ? `The ticket's machine line names conversation ${marker.conversation}, message ${marker.message ?? "none"}, run ${marker.run ?? "none"}, Sentry replay ${marker.replay ?? "none"}, reported at ${marker.at ?? "unknown"}.`
-    : "The ticket's machine line is missing or malformed: take the conversation, reply, and run from the Conversation section, and say in the comment that the line was missing.";
-  return `This issue is chat widget feedback filed into the Acquisity Chat Widget project. Load the widget-feedback skill and follow it instead of triage: diagnose why the widget answered as it did and post exactly one comment on this ticket. Change nothing else. ${ids}`;
+    : "The ticket's machine line is missing or malformed: take the conversation, reply, and run from the Conversation section (in the ticket's Support report document, or the description on older tickets), and say in the comment that the line was missing.";
+  return `This issue is chat widget feedback filed into the Acquisity Chat Widget project. Load the widget-feedback skill and follow it instead of triage: diagnose why the widget answered as it did and post exactly one comment on this ticket. Change nothing else. The report, transcript and browser capture are in the ticket's Support report document; older tickets have them in the description instead. ${ids}`;
 }
 
 const ISSUE_QUERY = `query WidgetFeedbackIssue($id: String!) {
-  issue(id: $id) { description project { id } }
+  issue(id: $id) {
+    description
+    project { id }
+    documents(first: 20) { nodes { title content } }
+  }
 }`;
 
 interface IssueResponse {
-  issue: { description: string | null; project: { id: string } | null } | null;
+  issue: {
+    description: string | null;
+    documents: { nodes: { content: string | null; title: string }[] };
+    project: { id: string } | null;
+  } | null;
 }
 
 /**
@@ -86,7 +95,13 @@ export async function widgetFeedbackContext(
   if (issue?.project?.id !== WIDGET_FEEDBACK_PROJECT_ID) {
     return null;
   }
+  // Reports filed since ENG-21100 keep the line at the end of their Support
+  // report document; older ones end their description with it.
+  const report = issue.documents.nodes.find(
+    (document) => document.title === SUPPORT_REPORT_TITLE
+  );
   return widgetFeedbackRoute(
-    parseWidgetFeedbackMarker(issue.description ?? "")
+    parseWidgetFeedbackMarker(report?.content ?? "") ??
+      parseWidgetFeedbackMarker(issue.description ?? "")
   );
 }

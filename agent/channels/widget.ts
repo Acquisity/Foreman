@@ -4,6 +4,7 @@ import {
   receiveWidgetMessage,
 } from "../lib/widget-investigation.js";
 import { isLiveActive, LIVE_PROTOCOL } from "../lib/widget-live-policy.js";
+import { receiveProblemReport } from "../lib/widget-problem-report.js";
 import { receiveWidgetScreenshot } from "../lib/widget-screenshot.js";
 import { serviceSecretRefusal } from "../lib/widget-service-secret.js";
 
@@ -27,6 +28,7 @@ export default defineChannel({
       );
     }),
     POST("/internal/widget/message", receiveWidgetMessage),
+    POST("/internal/widget/report", (request) => receiveProblemReport(request)),
     POST("/internal/widget/image", (request) =>
       receiveWidgetScreenshot(request)
     ),
