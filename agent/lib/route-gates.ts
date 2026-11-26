@@ -2,6 +2,10 @@ import { FIXY_LABEL } from "./fixy-handoff.js";
 import { isAskFromTitle, slackChannelOf } from "./linear-context.js";
 import type { RouteTicketInput } from "./route-ticket-shared.js";
 import { RECEIVER_ONLY_CHANNELS } from "./slack-intake.js";
+import {
+  isSupportChatLink,
+  SUPPORT_CHAT_TITLE,
+} from "./widget-support-report.js";
 
 /** One Linear GraphQL read with Foreman's own app token. */
 export type LinearRead = <T>(
@@ -125,5 +129,88 @@ export const assertFixyRouting = (
       "fixy_owned",
       `${input.issue} carries the ${FIXY_LABEL} label, so Fixy owns its status and assignee and nothing was written. Leave state and assignee out; labels, priority and project still apply. To give Fixy new facts, call hand_to_fixy again.`
     );
+  }
+};
+
+const CHAT_LINKS_QUERY = `query RouteChatLinks($id: String!) {
+  issue(id: $id) { attachments(first: 50, filter: { title: { eq: "${SUPPORT_CHAT_TITLE}" } }) { nodes { id title url } } }
+}`;
+const CHAT_LINK = `mutation RouteChatLink($issueId: String!, $url: String!, $title: String!) {
+  attachmentLinkURL(issueId: $issueId, url: $url, title: $title) { success }
+}`;
+const CHAT_UNLINK = `mutation RouteChatUnlink($id: String!) {
+  attachmentDelete(id: $id) { success }
+}`;
+
+interface ChatLinks {
+  issue: {
+    attachments: { nodes: { id: string; title: string; url: string }[] };
+  } | null;
+}
+
+/** The ticket's Support chat links, the ones Foreman put on a widget ticket. */
+export const supportChatsOf = async (
+  issue: string,
+  linear: LinearRead
+): Promise<{ id: string; title: string; url: string }[]> =>
+  (
+    await linear<ChatLinks>(CHAT_LINKS_QUERY, "RouteChatLinks", { id: issue })
+  ).issue?.attachments.nodes.filter(isSupportChatLink) ?? [];
+
+/**
+ * Linear moves a duplicate's attachments onto the issue it duplicates
+ * (measured on SAN-320, 26 Nov 2026), so a joined widget case would lose its
+ * Support chat link to the shared ticket, which would then pass for that
+ * customer's chat ticket. This puts each link the case had back on it and
+ * removes the copy that appeared on the match, never a link the match had
+ * before the route (ENG-21101). It also runs after a
+ * join that failed partway, since the relation alone can move the link, and
+ * does nothing when nothing moved. It returns a warning instead of throwing.
+ */
+export const keepChatsOnCase = async (
+  issue: string,
+  match: string,
+  before: readonly { title: string; url: string }[],
+  matchHad: ReadonlySet<string>,
+  linear: LinearRead
+): Promise<string | null> => {
+  try {
+    const kept = new Set(
+      (await supportChatsOf(issue, linear)).map((l) => l.url)
+    );
+    const lost = before.filter((link) => !kept.has(link.url));
+    for (const link of lost) {
+      // biome-ignore lint/performance/noAwaitInLoops: one or two links, each relinked before its moved copy goes.
+      const relinked = await linear<{
+        attachmentLinkURL: { success: boolean };
+      }>(CHAT_LINK, "RouteChatLink", {
+        issueId: issue,
+        title: link.title,
+        url: link.url,
+      });
+      // A link not back on the case keeps its moved copy, so it is never lost.
+      if (!relinked.attachmentLinkURL.success) {
+        throw new Error("relink refused");
+      }
+    }
+    // Only a copy that appeared on the match during this route; a link it already had is its own.
+    const moved = (await supportChatsOf(match, linear)).filter(
+      (link) =>
+        !matchHad.has(link.id) && before.some((own) => own.url === link.url)
+    );
+    for (const link of moved) {
+      // biome-ignore lint/performance/noAwaitInLoops: as above.
+      const removed = await linear<{ attachmentDelete: { success: boolean } }>(
+        CHAT_UNLINK,
+        "RouteChatUnlink",
+        { id: link.id }
+      );
+      if (!removed.attachmentDelete.success) {
+        throw new Error("delete refused");
+      }
+    }
+    return null;
+  } catch {
+    return `After routing ${issue} toward ${match}, ${issue}'s Support chat link could not be confirmed on ${issue} and off ${match}. Check both tickets' attachments: the chat link belongs on ${issue} only.`;
   }
 };

@@ -112,6 +112,24 @@ describe("route_ticket never closes a bare duplicate (ENG-17138)", () => {
     assert.equal(result.grouping, "needs-grouping");
   });
 
+  it("joins a second report to an open report Fixy is working, as its master (ENG-21101)", async () => {
+    const fake = linear({
+      issues: {
+        ...ISSUES,
+        "ENG-50": { createdAt: FRESH, labels: ["Bug", "fixy"] },
+      },
+      ticketLabels: CLASSIFIED["User Error"],
+    });
+    const result = await routeTicket(
+      { duplicateOf: "ENG-50", issue: "ENG-1", state: "Duplicate" },
+      { client: fake.fetchStub }
+    );
+    assert.deepEqual(fake.relationTypes, ["duplicate"]);
+    assert.equal(updateOf(fake)?.parentId, "i-ENG-50");
+    assert.equal(updateOf(fake)?.stateId, "s-duplicate");
+    assert.equal(result.grouping, "joined");
+  });
+
   it("closes a duplicate under an open master and reads the parent back before success", async () => {
     const fake = linear({ ticketLabels: CLASSIFIED["User Error"] });
     const result = await routeTicket(

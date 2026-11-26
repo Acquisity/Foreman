@@ -5,13 +5,16 @@ import { linearAuth } from "#lib/constants.js";
 import { executorClient } from "#lib/executor/client.js";
 import { questionsOnlyPolicy } from "#lib/github/approval.js";
 import { LINEAR_ISSUE_ID_PATTERN } from "#lib/investigation-memory/scope.js";
+import { recordJoin } from "#lib/known-issue-gate.js";
 import { masterCreatedAfter } from "#lib/linear-api.js";
 import { masterWindow } from "#lib/master-window.js";
 import { logOpsEvent } from "#lib/ops-log.js";
 import {
+  keepChatsOnCase,
   type LinearRead,
   RouteGateError,
   reopenRefusal,
+  supportChatsOf,
 } from "#lib/route-gates.js";
 import { routeTicket } from "#lib/route-ticket.js";
 import {
@@ -44,6 +47,32 @@ const picksMaster = (input: {
       (input.parent && input.state?.trim().toLowerCase() === "duplicate")
   );
 
+/**
+ * Before a route with duplicateOf (whose duplicate relation moves attachments
+ * whatever state it sets): the report's Support chat links, and the ids of the
+ * match's own, so the repair after it removes only a copy the route made.
+ * Empty for any other route; null when a read failed.
+ */
+const chatsBeforeJoin = async (
+  input: { duplicateOf?: string; issue: string },
+  linear: LinearRead
+): Promise<{
+  chats: Awaited<ReturnType<typeof supportChatsOf>>;
+  matchHad: Set<string>;
+} | null> => {
+  if (!input.duplicateOf || isTriageReplay()) {
+    return { chats: [], matchHad: new Set() };
+  }
+  try {
+    const chats = await supportChatsOf(input.issue, linear);
+    const had =
+      chats.length > 0 ? await supportChatsOf(input.duplicateOf, linear) : [];
+    return { chats, matchHad: new Set(had.map((link) => link.id)) };
+  } catch {
+    return null;
+  }
+};
+
 export default defineTool({
   approval: questionsOnlyPolicy,
   description:
@@ -57,6 +86,13 @@ export default defineTool({
     "The fixy label is reserved: only hand_to_fixy adds it and only a person removes it. On a ticket carrying the fixy label, Fixy owns state and assignee: a call that sets either fails before any write. A Done or Canceled ticket from an Asks channel is never moved back to an open state; a move to another closed state still works. " +
     "routed true with warnings means the ticket was updated but a link or the read-back after it failed; read the warning before retrying only that part.",
   async execute(input, ctx) {
+    // hand_to_fixy reads whether a join to a known issue was tried.
+    const joined = <T extends { error?: string; grouping?: string | null }>(
+      result: T
+    ): T => {
+      recordJoin(input, result);
+      return result;
+    };
     const refusal = routeRefusal(
       triageDecisions.get(),
       criticRounds.get(),
@@ -64,24 +100,24 @@ export default defineTool({
       { statusRequest: isStatusFollowUp(ctx.session.auth.current) }
     );
     if (refusal) {
-      return { error: refusal, routed: false as const };
+      return joined({ error: refusal, routed: false as const });
     }
+    // Not through Executor: its RouteIssue read has no state type or attachments, and it has no attachment delete.
+    const linear: LinearRead = async (query, queryName, variables) => {
+      const { token } = await ctx.getToken(linearAuth);
+      const signal = AbortSignal.any([
+        ctx.abortSignal,
+        AbortSignal.timeout(LINEAR_TIMEOUT_MS),
+      ]);
+      return await callLinearGraphQL({
+        api: { fetch: (url, init) => fetch(url, { ...init, signal }) },
+        credentials: { accessToken: token },
+        query,
+        queryName,
+        variables,
+      });
+    };
     if (input.state !== undefined && !isTriageReplay()) {
-      // Not through Executor: its RouteIssue read has no state type or attachments.
-      const linear: LinearRead = async (query, queryName, variables) => {
-        const { token } = await ctx.getToken(linearAuth);
-        const signal = AbortSignal.any([
-          ctx.abortSignal,
-          AbortSignal.timeout(LINEAR_TIMEOUT_MS),
-        ]);
-        return await callLinearGraphQL({
-          api: { fetch: (url, init) => fetch(url, { ...init, signal }) },
-          credentials: { accessToken: token },
-          query,
-          queryName,
-          variables,
-        });
-      };
       const reopen = await reopenRefusal(input.issue, input.state, linear);
       if (reopen) {
         ctx.abortSignal.throwIfAborted();
@@ -90,9 +126,29 @@ export default defineTool({
           issue: input.issue,
           sessionId: ctx.session.id,
         });
-        return { error: reopen.reason, routed: false as const };
+        return joined({ error: reopen.reason, routed: false as const });
       }
     }
+    // A duplicate relation moves the case's Support chat link onto the match; read it first to put it back.
+    const before = await chatsBeforeJoin(input, linear);
+    if (before === null) {
+      ctx.abortSignal.throwIfAborted();
+      return joined({
+        error: `Could not read ${input.issue}'s Support chat links, so the join was not written. Call route_ticket again.`,
+        routed: false as const,
+      });
+    }
+    // Runs after a failed route too: the relation alone can move the link.
+    const keepChats = () =>
+      input.duplicateOf && before.chats.length > 0
+        ? keepChatsOnCase(
+            input.issue,
+            input.duplicateOf,
+            before.chats,
+            before.matchHad,
+            linear
+          )
+        : Promise.resolve(null);
     try {
       const mastersWindow = picksMaster(input)
         ? await masterWindow(ctx.session.auth)
@@ -108,6 +164,10 @@ export default defineTool({
         ),
         signal: ctx.abortSignal,
       });
+      const lost = await keepChats();
+      if (lost) {
+        ticket.warnings.push(lost);
+      }
       logOpsEvent("triage.decision", {
         ...routeDecisionEvent(triageDecisions.get(), {
           ...input,
@@ -115,11 +175,12 @@ export default defineTool({
         }),
         sessionId: ctx.session.id,
       });
-      return { routed: true as const, ...ticket };
+      return joined({ routed: true as const, ...ticket });
     } catch (error) {
       if (ctx.abortSignal.aborted) {
         throw error;
       }
+      const lost = await keepChats();
       if (error instanceof RouteGateError) {
         logOpsEvent("triage.route_refused", {
           code: error.code,
@@ -127,10 +188,12 @@ export default defineTool({
           sessionId: ctx.session.id,
         });
       }
-      return {
-        error: error instanceof Error ? error.message : "Routing failed.",
+      const message =
+        error instanceof Error ? error.message : "Routing failed.";
+      return joined({
+        error: lost ? `${message} ${lost}` : message,
         routed: false as const,
-      };
+      });
     }
   },
   inputSchema: z.object({

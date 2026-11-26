@@ -328,6 +328,19 @@ interface LinkedResponse {
 const FEEDBACK_LINE =
   /<!-- chat-widget-feedback conversation=([\w-]{1,128}) message=([\w-]{1,128}) /u;
 
+/** The verified scope a Support report opens with (verifiedScopeSection), up to its conversation line; only the opening counts, never the report text after it. */
+const REPORT_CONVERSATION =
+  /^## Verified scope\n\n(?:[-*] [^\n]*\n){0,4}?[-*] Support conversation: ([0-9a-f-]{36})\n/u;
+
+/**
+ * The chat a ticket's own Support report names in its verified scope. Linear
+ * moves or copies a duplicate's attachments onto the issue it duplicates,
+ * whoever marks it (ENG-21101), so a Support chat link alone can sit on a
+ * shared ticket that belongs to another customer; the report stays put.
+ */
+const reportConversation = (content: string | null | undefined) =>
+  REPORT_CONVERSATION.exec(content ?? "")?.[1];
+
 /** Every ticket Foreman linked to this conversation's support chat. */
 export async function linkedTickets(
   conversationId: string,
@@ -342,7 +355,11 @@ export async function linkedTickets(
   );
   const seen = new Set<string>();
   return attachmentsForURL.nodes.flatMap(({ issue, ...link }) => {
-    if (!(issue && isSupportChatLink(link)) || seen.has(issue.identifier)) {
+    if (
+      !(issue && isSupportChatLink(link)) ||
+      seen.has(issue.identifier) ||
+      reportConversation(issue.documents.nodes[0]?.content) !== conversationId
+    ) {
       return [];
     }
     seen.add(issue.identifier);

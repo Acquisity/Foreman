@@ -2,6 +2,7 @@ import { defineTool } from "eve/tools";
 import { z } from "zod";
 import { LINEAR_ISSUE_ID_PATTERN } from "#lib/investigation-memory/scope.js";
 import { decidePriorWork } from "#lib/jev-decisions.js";
+import { recordKnownIssueCheck, withDecision } from "#lib/known-issue-gate.js";
 import { logOpsEvent } from "#lib/ops-log.js";
 
 const identifier = z.string().trim().regex(LINEAR_ISSUE_ID_PATTERN);
@@ -19,12 +20,16 @@ export default defineTool({
     "Code makes a ticket already attached to a master a known issue of that master. " +
     "outcome continuation means reuse the existing investigation. known_issue names the master or same-outcome ticket in knownIssue. fresh means investigate from scratch. " +
     "Each candidate's match is same_outcome, partial_or_adjacent, stale_or_superseded, or not_relevant. " +
-    "decided false means Jev could not answer: decide by the skill's rules and say so in the document.",
-  async execute(input, ctx) {
+    "decided false means Jev could not answer: decide by the skill's rules and say so in the document. " +
+    "Pass issue, the report being decided, so hand_to_fixy can see the decision.",
+  async execute({ issue, ...input }, ctx) {
     try {
       const decision = await decidePriorWork(input, {
         signal: ctx.abortSignal,
       });
+      if (issue) {
+        recordKnownIssueCheck(issue, (check) => withDecision(check, decision));
+      }
       logOpsEvent("jev.decision", {
         outcome: decision.outcome,
         sessionId: ctx.session.id,
@@ -34,6 +39,9 @@ export default defineTool({
     } catch (error) {
       if (ctx.abortSignal.aborted) {
         throw error;
+      }
+      if (issue) {
+        recordKnownIssueCheck(issue, (check) => withDecision(check, null));
       }
       logOpsEvent("jev.decision", {
         outcome: "failed",
@@ -56,6 +64,9 @@ export default defineTool({
       .describe(
         "This ticket's existing investigation findings, when one exists."
       ),
+    issue: identifier
+      .optional()
+      .describe("The report being decided, such as ENG-123."),
     parent: ticket
       .optional()
       .describe("The master ticket this ticket is attached to, when set."),
