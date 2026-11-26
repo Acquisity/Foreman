@@ -26,11 +26,11 @@ export default defineSchedule({
     const ctx = appProviderContext(AbortSignal.timeout(REPORT_TIMEOUT_MS));
     waitUntil(
       deliverAiSdrReport({
-        dispatch: (prompt) =>
-          to(slack, { channelId: AI_SDR_CHANNEL }).send(prompt, {
+        dispatch: (prompt, threadTs) =>
+          to(slack, { channelId: AI_SDR_CHANNEL, threadTs }).send(prompt, {
             auth: stampUnattended(appAuth),
           }),
-        post: (text) => postSlackChannelMessage(AI_SDR_CHANNEL, { text }),
+        post: (message) => postSlackChannelMessage(AI_SDR_CHANNEL, message),
         read: () =>
           readAiSdrWeeklyReport(new Date(), (query) =>
             callPlanetscaleReadQuery(ctx, {
