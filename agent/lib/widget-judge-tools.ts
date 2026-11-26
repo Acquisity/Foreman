@@ -28,7 +28,7 @@ const handWrittenCapabilities = Object.entries({
 });
 
 const RETIRED_TOOL =
-  "A tool this run had that has since been retired. It was available to the investigator; what it read is in its toolResults.";
+  "A tool this run had that has since been retired. It was available to the investigator; anything it read is in toolResults.";
 /**
  * The areas each retired tool answered for (ENG-20544). A run that called a
  * single-area one predates that area's endpoint, so the endpoint tool is left

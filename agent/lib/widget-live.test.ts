@@ -172,7 +172,7 @@ test("a sub-object marked unavailable on purpose is left out, and the rest is st
   assert.deepEqual(oneSided.changed, []);
 });
 
-test("a live re-run files nothing: the ticket tool returns the simulated ticket", async (t) => {
+test("a live re-run's ticket tool returns the simulated ticket", async (t) => {
   const previous = process.env.WIDGET_LIVE;
   process.env.WIDGET_LIVE = "1";
   t.after(() => {

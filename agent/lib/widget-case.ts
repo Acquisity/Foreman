@@ -46,7 +46,7 @@ export const widgetCaseSchema = z.strictObject({
   scope: z.strictObject({
     /** The support endpoints the context route listed for the run (ENG-20296); absent on cases recorded before it. */
     endpoints: z.array(availableEndpointSchema).max(50).optional(),
-    /** Written on score results saved before ENG-20544 and ignored; kept so those still load. */
+    /** The areas still held when a rollout-era run was scored (written before ENG-20544); the judge leaves their endpoint tools out. */
     heldAreas: z.array(z.string().max(100)).max(50).optional(),
     role: z.enum(["owner", "admin", "member", "client"]),
     workspace: z.string().min(1),
