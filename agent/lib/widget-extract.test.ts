@@ -10,7 +10,7 @@ import {
 import type { WidgetFindings } from "./widget-findings.js";
 
 const UNCHECKED_RULE =
-  /list in unchecked each thing the investigator said it could not check/;
+  /list in unchecked each thing the investigator said it could not check, verify or see because of something on our side \(a read that failed, timed out or was unavailable, something our data should hold that it had no way to read, or a product question the Help Centre does not explain\)/;
 const FAILED_STEP_RULE =
   /a documented step the customer already tried that failed are filed as a ticket, not handed to a person[^)]*never tells them to repeat that step or wait it out/;
 
@@ -227,6 +227,14 @@ test("what the investigator could not check comes back as unchecked facts for th
     { area: "inboxes", fact: "why sam@acme.com is disconnected", kind: "tool" },
   ]);
   assert.match(EXTRACT_PROMPT, UNCHECKED_RULE);
+});
+
+const NEVER_UNCHECKED_RULE =
+  /if only the customer could answer it or act on it first, leave it out\. Never list in unchecked a question the investigator asked the customer[^;]*something only the customer can know[^;]*whether two things they saw are linked[^;]*a check that could not run yet only because of something the customer still has to do[^;]*a decision still with a person[^;]*anything the investigator did not itself say it could not check; a read that failed or timed out, a source reported as unavailable, and a product question the Help Centre does not explain \(kind docs\) are still listed/;
+
+test("unchecked never holds a question for the customer, what only they know, or what the investigator did not say it could not check", () => {
+  // ENG-20988: "which site is meant" and "whether HTTPS works" on a domain with no public records were filed as capability gaps.
+  assert.match(EXTRACT_PROMPT, NEVER_UNCHECKED_RULE);
 });
 
 const SEPARATE_RECORDS_RULE =
