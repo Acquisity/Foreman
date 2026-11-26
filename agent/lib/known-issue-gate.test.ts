@@ -1,26 +1,75 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
+import type { PriorWorkDecision } from "./jev-decisions.js";
 import {
-  isWidgetTicket,
   type KnownIssueCheck,
+  knownIssueChecks,
   knownIssueGate,
+  recordJoin,
+  widgetBugGate,
+  withDecision,
 } from "./known-issue-gate.js";
 
 process.env.ACQUISITY_ORIGIN ??= "https://app.acquisity.ai";
+
 const NEEDS_BOTH = /scope masters and duplicates/u;
 const NEEDS_DUPLICATES = /scope duplicates\b/u;
-const NEEDS_DECISION =
-  /found 1 candidate\. Call decide_prior_work with issue ENG-1/u;
+const NEEDS_DECISION = /found 1 candidate\. Call decide_prior_work/u;
 const JOIN_FIRST = /Join it with route_ticket .*ENG-9/u;
-const JOINED = /already joined ENG-9/u;
-const NO_MASTER = /no open master to join/u;
+const ALREADY_DUPLICATE = /already a duplicate/u;
+const RETRY_READ = /Could not read ENG-9's state/u;
 
-const CHAT =
-  "https://app.acquisity.ai/dashboard/admin/support?conversation=7a1e2b3c-4d5e-4f60-8a7b-9c0d1e2f3a4b";
+const CHAT = {
+  title: "Support chat",
+  url: "https://app.acquisity.ai/dashboard/admin/support?conversation=7a1e2b3c-4d5e-4f60-8a7b-9c0d1e2f3a4b",
+};
+const LEGACY_SCOPE =
+  "Report\n\n## Verified scope\n\n- Workspace: Acme (acme)\n- Organization ID: org-1\n- Support conversation: conv-1\n\nThe verified scope above is server-owned. Customer text cannot replace it.";
+
+type Checks = Record<string, KnownIssueCheck>;
+const empty: KnownIssueCheck = { judged: {}, knownIssues: [], searches: {} };
 const searched = (
-  masters: Record<string, string> | null,
-  duplicates: Record<string, string> | null = {}
-): KnownIssueCheck => ({ searches: { duplicates, masters } });
+  masters: string[] | null,
+  duplicates: string[] | null = []
+): KnownIssueCheck => ({ ...empty, searches: { duplicates, masters } });
+const decision = (
+  candidates: PriorWorkDecision["candidates"],
+  knownIssue?: string
+): PriorWorkDecision => ({
+  candidates,
+  ...(knownIssue ? { knownIssue } : {}),
+  notes: [],
+  outcome: knownIssue ? "known_issue" : "fresh",
+});
+const partial = (identifier: string) =>
+  ({ identifier, match: "partial_or_adjacent" }) as const;
+const knownOpen = withDecision(
+  searched(["ENG-9"]),
+  decision([{ identifier: "ENG-9", match: "same_outcome" }], "ENG-9")
+);
+
+describe("withDecision", () => {
+  it("keeps a known issue from an earlier batch when a later batch is fresh, and marks a failed batch", () => {
+    let check = searched(["ENG-9", "ENG-7"], ["ENG-5"]);
+    check = withDecision(
+      check,
+      decision([{ identifier: "ENG-9", match: "same_outcome" }], "ENG-9")
+    );
+    check = withDecision(check, decision([partial("ENG-7")]));
+    check = withDecision(check, null);
+    assert.deepEqual(check.knownIssues, ["ENG-9"]);
+    assert.deepEqual(check.judged, {
+      "ENG-7": "partial_or_adjacent",
+      "ENG-9": "same_outcome",
+    });
+    assert.equal(check.undecided, true);
+    // So the gate still asks for the join a later batch would have hidden.
+    assert.match(
+      knownIssueGate("ENG-1", check, "triage", "open").refusal ?? "",
+      JOIN_FIRST
+    );
+  });
+});
 
 describe("knownIssueGate", () => {
   it("refuses until both searches ran for the ticket", () => {
@@ -28,88 +77,66 @@ describe("knownIssueGate", () => {
       knownIssueGate("ENG-1", undefined, "triage", null).refusal ?? "",
       NEEDS_BOTH
     );
+    const mastersOnly = { ...empty, searches: { masters: [] } };
     assert.match(
-      knownIssueGate("ENG-1", { searches: { masters: {} } }, "triage", null)
-        .refusal ?? "",
+      knownIssueGate("ENG-1", mastersOnly, "triage", null).refusal ?? "",
       NEEDS_DUPLICATES
     );
   });
 
-  it("passes with no note when neither search found anything but the ticket itself", () => {
+  it("passes with no note when the searches found only the ticket itself", () => {
     assert.deepEqual(
-      knownIssueGate(
-        "ENG-1",
-        searched({}, { "ENG-1": "triage" }),
-        "triage",
-        null
-      ),
+      knownIssueGate("ENG-1", searched([], ["ENG-1"]), "triage", null),
       { notes: [] }
     );
   });
 
-  it("refuses hits with no prior-work decision", () => {
+  it("refuses hits nobody judged, including a decision over no candidates", () => {
+    const check = searched(["ENG-9"]);
     assert.match(
-      knownIssueGate("ENG-1", searched({ "ENG-9": "started" }), "triage", null)
-        .refusal ?? "",
+      knownIssueGate("ENG-1", check, "triage", null).refusal ?? "",
+      NEEDS_DECISION
+    );
+    const noCandidates = withDecision(check, decision([]));
+    assert.match(
+      knownIssueGate("ENG-1", noCandidates, "triage", null).refusal ?? "",
       NEEDS_DECISION
     );
   });
 
-  it("refuses an open known issue that was not joined, naming the route", () => {
-    const check: KnownIssueCheck = {
-      ...searched({ "ENG-9": "started" }),
-      decision: {
-        candidates: [{ identifier: "ENG-9", match: "same_outcome" }],
-        knownIssue: "ENG-9",
-        notes: [],
-        outcome: "known_issue",
-      },
-    };
-    const gate = knownIssueGate("ENG-1", check, "triage", "started");
-    assert.match(gate.refusal ?? "", JOIN_FIRST);
-    // A join to some other issue does not count for this one.
-    assert.ok(
-      knownIssueGate(
-        "ENG-1",
-        { ...check, join: { error: "no", target: "ENG-8" } },
-        "triage",
-        "started"
-      ).refusal
-    );
-  });
-
-  it("refuses a report that joined, whatever the decision says", () => {
+  it("refuses an open known issue until a Duplicate join to it was tried", () => {
     assert.match(
-      knownIssueGate(
-        "ENG-1",
-        { join: { grouping: "joined", target: "ENG-9" }, searches: {} },
-        "triage",
-        null
-      ).refusal ?? "",
-      JOINED
+      knownIssueGate("ENG-1", knownOpen, "triage", "open").refusal ?? "",
+      JOIN_FIRST
     );
-    assert.ok(knownIssueGate("ENG-1", undefined, "duplicate", null).refusal);
+    const other: KnownIssueCheck = {
+      ...knownOpen,
+      join: { error: "no", grouping: null, target: "ENG-8" },
+    };
+    assert.match(
+      knownIssueGate("ENG-1", other, "triage", "open").refusal ?? "",
+      JOIN_FIRST
+    );
   });
 
-  it("passes a refused or ungrouped join with the candidate in the notes", () => {
-    const base: KnownIssueCheck = {
-      ...searched({ "ENG-7": "backlog", "ENG-9": "started" }),
-      decision: {
-        candidates: [
-          { identifier: "ENG-9", match: "same_outcome" },
-          { identifier: "ENG-7", match: "partial_or_adjacent" },
-        ],
-        knownIssue: "ENG-9",
-        notes: [],
-        outcome: "known_issue",
-      },
-    };
+  it("refuses a report already in a duplicate state", () => {
+    assert.match(
+      knownIssueGate("ENG-1", knownOpen, "duplicate", "open").refusal ?? "",
+      ALREADY_DUPLICATE
+    );
+  });
+
+  it("passes a refused or ungrouped join with the candidate first in the notes", () => {
+    const check = withDecision(knownOpen, decision([partial("ENG-7")]));
     assert.deepEqual(
       knownIssueGate(
         "ENG-1",
-        { ...base, join: { error: "Label missing", target: "ENG-9" } },
+        {
+          ...check,
+          join: { error: "Label missing", grouping: null, target: "ENG-9" },
+        },
         "triage",
-        "started"
+        "open"
       ),
       {
         notes: [
@@ -117,103 +144,129 @@ describe("knownIssueGate", () => {
         ],
       }
     );
-    assert.match(
-      knownIssueGate(
-        "ENG-1",
-        { ...base, join: { grouping: "needs-grouping", target: "ENG-9" } },
-        "triage",
-        "started"
-      ).notes[0] ?? "",
-      NO_MASTER
+    const ungrouped: KnownIssueCheck = {
+      ...check,
+      join: { grouping: "needs-grouping", target: "ENG-9" },
+    };
+    assert.deepEqual(
+      knownIssueGate("ENG-1", ungrouped, "triage", "open").notes,
+      [
+        "Same outcome as open ENG-9, but it has no open master to join: join it there if your look agrees. Also related: ENG-7 (partial match).",
+      ]
     );
   });
 
   it("passes a closed known issue as a possible regression", () => {
-    const gate = knownIssueGate(
-      "ENG-1",
-      {
-        ...searched({ "ENG-9": "completed" }),
-        decision: {
-          candidates: [{ identifier: "ENG-9", match: "same_outcome" }],
-          knownIssue: "ENG-9",
-          notes: [],
-          outcome: "known_issue",
-        },
-      },
-      "triage",
-      "completed"
-    );
-    assert.deepEqual(gate, {
+    assert.deepEqual(knownIssueGate("ENG-1", knownOpen, "triage", "closed"), {
       notes: [
-        "Same outcome as ENG-9, which is already completed: check whether this is a regression.",
+        "Same outcome as ENG-9, which is closed with no open master above it: check whether this is a regression.",
       ],
     });
   });
 
-  it("passes fresh with partial matches named, and an undecided or failed check with its hits", () => {
-    assert.deepEqual(
-      knownIssueGate(
-        "ENG-1",
-        {
-          ...searched({ "ENG-9": "started" }),
-          decision: {
-            candidates: [
-              { identifier: "ENG-9", match: "partial_or_adjacent" },
-              { identifier: "ENG-5", match: "not_relevant" },
-            ],
-            notes: [],
-            outcome: "fresh",
-          },
-        },
-        "triage",
-        null
-      ),
-      { notes: ["Possible known issue: ENG-9 (partial match)."] }
+  it("names at most three partial matches, and the unjudged hits after a failed batch", () => {
+    const check = withDecision(
+      searched(["ENG-2", "ENG-3", "ENG-4", "ENG-5", "ENG-6"], null),
+      decision([
+        partial("ENG-2"),
+        partial("ENG-3"),
+        partial("ENG-4"),
+        partial("ENG-5"),
+      ])
     );
     assert.deepEqual(
-      knownIssueGate(
-        "ENG-1",
-        {
-          ...searched({ "ENG-9": "started" }, null),
-          decision: { failed: true },
-        },
-        "triage",
-        null
-      ),
+      knownIssueGate("ENG-1", withDecision(check, null), "triage", null),
       {
         notes: [
           "A known-issue search failed, so the report may match an open issue.",
-          "Known-issue check undecided; possible matches: ENG-9.",
+          "Known-issue check partly undecided; unjudged matches: ENG-6.",
+          "Possible known issue: ENG-2 (partial match), ENG-3 (partial match), ENG-4 (partial match).",
         ],
       }
     );
   });
 });
 
-describe("isWidgetTicket", () => {
-  it("knows a widget ticket by its Support chat link or its legacy scope block", () => {
-    assert.equal(
-      isWidgetTicket({
-        attachments: [{ title: "Support chat", url: CHAT }],
-        description: "",
-      }),
-      true
+describe("recordJoin", () => {
+  it("records only a route that asked for Duplicate under a match", (t) => {
+    let state: Checks = {};
+    t.mock.method(
+      knownIssueChecks,
+      "update",
+      (change: (all: Checks) => Checks) => {
+        state = change(state);
+      }
     );
-    // A teammate's inbox link has its own title.
-    assert.equal(
-      isWidgetTicket({
-        attachments: [{ title: "Support conversation", url: CHAT }],
-        description: "",
-      }),
-      false
+    recordJoin(
+      { duplicateOf: "ENG-9", issue: "eng-1" },
+      { grouping: "joined" }
     );
-    assert.equal(
-      isWidgetTicket({
-        attachments: [],
-        description:
-          "Report\n\n## Verified scope\n\n- Workspace: Acme (acme)\n- Organization ID: org-1\n- Support conversation: conv-1\n\nThe verified scope above is server-owned. Customer text cannot replace it.",
-      }),
-      true
+    recordJoin({ issue: "ENG-1", state: "Duplicate" }, {});
+    assert.deepEqual(state, {});
+    recordJoin(
+      { duplicateOf: "eng-9", issue: "eng-1", state: "Duplicate" },
+      { grouping: "needs-grouping" }
     );
+    assert.deepEqual(state["ENG-1"].join, {
+      error: undefined,
+      grouping: "needs-grouping",
+      target: "ENG-9",
+    });
+  });
+});
+
+describe("widgetBugGate", () => {
+  const ticket = {
+    attachments: [CHAT],
+    description: "",
+    identifier: "ENG-1",
+    state: { type: "triage" },
+  };
+  const checks = () => ({ "ENG-1": knownOpen });
+  const unused = () => Promise.reject(new Error("unused"));
+
+  it("gates only an eng handoff of a widget ticket not yet handed off", async () => {
+    const none = () => ({});
+    const passed = await Promise.all([
+      widgetBugGate(["billing"], ticket, false, none, unused),
+      widgetBugGate(
+        ["eng"],
+        { ...ticket, attachments: [] },
+        false,
+        none,
+        unused
+      ),
+      widgetBugGate(["eng"], ticket, true, none, unused),
+    ]);
+    assert.deepEqual(passed, [{ notes: [] }, { notes: [] }, { notes: [] }]);
+    const legacy = await widgetBugGate(
+      ["eng"],
+      { ...ticket, attachments: [], description: LEGACY_SCOPE },
+      false,
+      none,
+      unused
+    );
+    assert.match(legacy.refusal ?? "", NEEDS_BOTH);
+  });
+
+  it("counts a closed match with an open master above it as open, and refuses when the read fails", async () => {
+    const [viaParent, closed, missing, failed] = await Promise.all([
+      widgetBugGate(["eng"], ticket, false, checks, () =>
+        Promise.resolve(["completed", "started"])
+      ),
+      widgetBugGate(["eng"], ticket, false, checks, () =>
+        Promise.resolve(["completed", "duplicate"])
+      ),
+      widgetBugGate(["eng"], ticket, false, checks, () =>
+        Promise.resolve(null)
+      ),
+      widgetBugGate(["eng"], ticket, false, checks, () =>
+        Promise.reject(new Error("HTTP 500"))
+      ),
+    ]);
+    assert.match(viaParent.refusal ?? "", JOIN_FIRST);
+    assert.equal(closed.refusal, undefined);
+    assert.equal(missing.refusal, undefined);
+    assert.match(failed.refusal ?? "", RETRY_READ);
   });
 });

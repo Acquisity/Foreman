@@ -27,7 +27,7 @@ export default defineTool({
     "Each hit lists the phrases that matched it. truncated true means candidates were dropped, so narrow the phrases. Read every hit before deciding; a keyword match is not a duplicate. " +
     "Pass issue, the report being checked, so hand_to_fixy can see the check ran.",
   async execute({ issue, ...input }, ctx) {
-    const record = (hits: Record<string, string> | null) => {
+    const record = (hits: string[] | null) => {
       if (issue) {
         recordKnownIssueCheck(issue, (check) => ({
           ...check,
@@ -41,11 +41,7 @@ export default defineTool({
         { ...input, windowed },
         { client: executorClient(ctx), now, signal: ctx.abortSignal }
       );
-      record(
-        Object.fromEntries(
-          result.issues.map((hit) => [hit.identifier, hit.stateType])
-        )
-      );
+      record(result.issues.map((hit) => hit.identifier.toUpperCase()));
       return result;
     } catch (error) {
       if (ctx.abortSignal.aborted) {

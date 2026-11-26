@@ -22,12 +22,10 @@ import {
 } from "#lib/github/approval.js";
 import { LINEAR_ISSUE_ID_PATTERN } from "#lib/investigation-memory/scope.js";
 import {
-  checkFor,
   type GateResult,
-  isWidgetTicket,
   type KnownIssueCheck,
   knownIssueChecks,
-  knownIssueGate,
+  widgetBugGate,
 } from "#lib/known-issue-gate.js";
 import { logOpsEvent } from "#lib/ops-log.js";
 import { isTriageReplay } from "#lib/triage-replay/mode.js";
@@ -45,7 +43,10 @@ const ISSUE_QUERY = `query FixyHandoffIssue($id: String!) {
   }
 }`;
 const KNOWN_ISSUE_QUERY = `query FixyKnownIssue($id: String!) {
-  issue(id: $id) { state { type } }
+  issue(id: $id) {
+    state { type }
+    parent { state { type } parent { state { type } parent { state { type } } } }
+  }
 }`;
 const COMMENT_QUERY = `query FixyHandoffComment($id: String!) {
   comment(id: $id) { id body }
@@ -372,12 +373,13 @@ export const handToFixy = async (
   // The fixy label is what starts Fixy, so carrying it means handed off.
   const alreadyHandedOff = present.has(FIXY_LABEL);
   const gate = await widgetBugGate(
-    input,
-    ticket,
+    input.lanes,
+    { ...ticket, attachments: ticket.attachments.nodes },
     alreadyHandedOff,
     checks,
-    linear
+    (id) => readChain(linear, id)
   );
+  signal?.throwIfAborted();
   if (gate.refusal) {
     return refusal(ticket.identifier, gate.refusal);
   }
@@ -504,50 +506,38 @@ export const handToFixy = async (
   }
 };
 
-/** The known-issue gate for a widget bug, reading the known issue's state when a decision names one. */
 /** The gate's candidate line first, so truncation never drops it, then the model's notes. */
 const handoffNotes = (gate: GateResult, notes: string | undefined) =>
   [...gate.notes, notes].filter(Boolean).join(" ") || null;
 
-/**
- * The known-issue gate (ENG-21101) for an eng handoff of a widget ticket not
- * yet handed off, reading the known issue's state when a decision names one.
- */
-const widgetBugGate = async (
-  input: HandToFixyInput,
-  ticket: NonNullable<IssueRead["issue"]>,
-  alreadyHandedOff: boolean,
-  checks: () => Record<string, KnownIssueCheck>,
-  linear: LinearCall
-): Promise<GateResult> => {
-  const widgetBug =
-    !alreadyHandedOff &&
-    input.lanes.includes("eng") &&
-    isWidgetTicket({
-      attachments: ticket.attachments.nodes,
-      description: ticket.description,
-    });
-  if (!widgetBug) {
-    return { notes: [] };
+interface ChainNode {
+  parent: ChainNode | null;
+  state: { type: string };
+}
+
+/** The known issue's state type and its parents', nearest first; null when Linear has no such issue. */
+const readChain = async (
+  linear: LinearCall,
+  id: string
+): Promise<string[] | null> => {
+  const read = await linear<{ issue: ChainNode | null }>(
+    KNOWN_ISSUE_QUERY,
+    "FixyKnownIssue",
+    { id }
+  ).catch((error: unknown) => {
+    if (isNotFound(error)) {
+      return { issue: null };
+    }
+    throw error;
+  });
+  const types: string[] = [];
+  let node: ChainNode | null = read.issue;
+  while (node) {
+    types.push(node.state.type);
+    node = node.parent;
   }
-  const issue = ticket.identifier;
-  const check = checkFor(checks(), issue);
-  const decision = check?.decision;
-  const known =
-    decision && !("failed" in decision) && decision.outcome === "known_issue"
-      ? decision.knownIssue
-      : undefined;
-  const knownState = known
-    ? await linear<{ issue: { state: { type: string } } | null }>(
-        KNOWN_ISSUE_QUERY,
-        "FixyKnownIssue",
-        { id: known }
-      ).then(
-        (read) => read.issue?.state.type ?? null,
-        () => null
-      )
-    : null;
-  return knownIssueGate(issue, check, ticket.state.type, knownState);
+  // Every issue has a state, so no types means Linear has no such issue.
+  return types.length > 0 ? types : null;
 };
 
 const errorReason = (error: unknown) =>

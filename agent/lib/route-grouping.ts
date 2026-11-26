@@ -1,3 +1,4 @@
+import { FIXY_LABEL } from "./fixy-handoff.js";
 import type { IssueNode, IssuesData } from "./linear-api.js";
 import {
   APPROVED_LABEL,
@@ -28,9 +29,10 @@ import {
 /**
  * What marks a master (ENG-16608): engineering-handoff writes every master
  * from its template, whose Regression seam section no customer report has; a
- * master made by hand is known by already parenting an issue. Labels cannot
- * mark one: masters carry no marker label, and a report on the unproven
- * branch keeps no labels either, so having none proves nothing.
+ * master made by hand is known by already parenting an issue, and a report
+ * Fixy is working by its fixy label. No other label marks one: masters carry
+ * no marker label, and a report on the unproven branch keeps no labels
+ * either, so having none proves nothing.
  */
 export const MASTER_MARKER = "## Regression seam";
 
@@ -153,7 +155,9 @@ interface MasterFacts {
  * The master's creation time and whether it is still open, or null when the
  * issue is no master. A master carries the master marker (engineering-handoff
  * writes it), or was made by hand and already parents an issue, as reused
- * masters do; a lone report has neither.
+ * masters do, or carries the fixy label: Fixy is already working it, so a
+ * second report of the same failure joins it instead of starting another
+ * run (ENG-21101). A lone report has none of these.
  */
 export async function masterFacts(
   gql: Gql,
@@ -164,13 +168,17 @@ export async function masterFacts(
     description: { contains: MASTER_MARKER },
     id: { eq: id },
   });
-  const child = marked
-    ? undefined
-    : await relatedOne(gql, { parent: { id: { eq: id } } });
-  if (!(marked || child)) {
+  const node = marked ?? (await relatedOne(gql, { id: { eq: id } }));
+  const fixyOwned = node?.labels.nodes.some(
+    (label) => label.name.toLowerCase() === FIXY_LABEL
+  );
+  const child =
+    marked || fixyOwned
+      ? undefined
+      : await relatedOne(gql, { parent: { id: { eq: id } } });
+  if (!(marked || fixyOwned || child)) {
     return null;
   }
-  const node = marked ?? (await relatedOne(gql, { id: { eq: id } }));
   if (!node) {
     throw new Error(
       `Could not read when ${identifier} was created, so nothing was written.`

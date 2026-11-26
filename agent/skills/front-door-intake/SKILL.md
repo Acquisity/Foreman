@@ -45,14 +45,14 @@ A report that says something went wrong is not a how-to: an error, missing or wr
 
 Call `find_related_issues` with `issue` set to this ticket and `scope: "masters"`, and again with `scope: "duplicates"`, each with 2 to 4 phrasings of what went wrong: the failure the customer saw and its error text, not only the feature name. Read the hits, then call `decide_prior_work` with `issue`, the report and the hits, at most 8 at a time. When it returns `decided: false`, continue to missing details or handoff, and create no investigation document.
 
-On a ticket from the in-app support chat, `hand_to_fixy` checks this step was done: it refuses an `eng` handoff until both searches ran for this ticket and, when they found anything, `decide_prior_work` did too, and while an open known issue has not been joined. It adds any uncertain candidate to the handoff notes itself.
+On a ticket from the in-app support chat, `hand_to_fixy` checks this step was done: it refuses an `eng` handoff until both searches ran for this ticket and, when they found anything, `decide_prior_work` judged some of the hits, and while a known issue any batch named is open (it, or a parent above it) and no Duplicate join to it was tried. It adds any uncertain candidate to the handoff notes itself.
 
-When it returns `known_issue` and that issue is open (not completed or canceled):
+When it returns `known_issue` and that issue, or a parent above it, is open (not completed or canceled). An open report Fixy is already working counts, even with no master: the report joins it.
 
 1. Route the report as a duplicate with one `route_ticket` call: state `Duplicate`, `duplicateOf` and `inheritAssigneeFrom` set to the known issue, `assignee: "Aaron Fraga"` as the support fallback, and the `sourceLabels`. The tool inherits the known issue's assignee when eligible and otherwise uses that fallback. Do not add Bug to permit developer assignment.
-2. Tell the requester in one `reply_to_requester` message that their report joined a known issue the team is already working on.
+2. Only when it returns `grouping: "joined"`, tell the requester in one `reply_to_requester` message that their report joined a known issue the team is already working on. Fixy tells the customer when that issue is fixed.
 
-When `route_ticket` refuses only because optional labels are missing, retry once without precisely those missing labels, keeping the valid labels, assignee arguments and duplicate target. When `route_ticket` refuses for another reason or the retry fails, or the known issue is completed or canceled, hand the report to Fixy in step 6 and name the candidate in `notes`.
+When `route_ticket` refuses only because optional labels are missing, retry once without precisely those missing labels, keeping the valid labels, assignee arguments and duplicate target. When `route_ticket` refuses for another reason, the retry fails, it returns `grouping: "needs-grouping"`, or the known issue and every parent above it are closed, hand the report to Fixy in step 6; `hand_to_fixy` names the candidate in the notes.
 
 ## 5. Missing details
 

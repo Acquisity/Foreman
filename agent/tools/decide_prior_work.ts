@@ -2,7 +2,7 @@ import { defineTool } from "eve/tools";
 import { z } from "zod";
 import { LINEAR_ISSUE_ID_PATTERN } from "#lib/investigation-memory/scope.js";
 import { decidePriorWork } from "#lib/jev-decisions.js";
-import { recordKnownIssueCheck } from "#lib/known-issue-gate.js";
+import { recordKnownIssueCheck, withDecision } from "#lib/known-issue-gate.js";
 import { logOpsEvent } from "#lib/ops-log.js";
 
 const identifier = z.string().trim().regex(LINEAR_ISSUE_ID_PATTERN);
@@ -28,7 +28,7 @@ export default defineTool({
         signal: ctx.abortSignal,
       });
       if (issue) {
-        recordKnownIssueCheck(issue, (check) => ({ ...check, decision }));
+        recordKnownIssueCheck(issue, (check) => withDecision(check, decision));
       }
       logOpsEvent("jev.decision", {
         outcome: decision.outcome,
@@ -41,10 +41,7 @@ export default defineTool({
         throw error;
       }
       if (issue) {
-        recordKnownIssueCheck(issue, (check) => ({
-          ...check,
-          decision: { failed: true },
-        }));
+        recordKnownIssueCheck(issue, (check) => withDecision(check, null));
       }
       logOpsEvent("jev.decision", {
         outcome: "failed",
