@@ -896,12 +896,19 @@ const survivingQuestion: GateDeps["compose"] = ({ findings }) => {
   return Promise.resolve(validAsk(findings.recommendation) ?? "");
 };
 
+/** What a finish's handoff ticket is written with: the conversation so far and the time left before the finish cutoff. */
+interface HandoffContext {
+  history: { role: "customer" | "assistant"; text: string }[];
+  roomMs: () => number;
+}
+
 /** Findings that still need a person file the conversation's ticket instead, and the reply says the answer will come here. */
 async function withHandoffTicket(
   findings: WidgetFindings | null,
   run: Pick<WidgetRun, "id" | "question" | "scope">,
   sessionId: string,
   deps: Partial<Pick<WidgetDependencies, "draftTicket" | "fileTicket">>,
+  context: HandoffContext,
   signal?: AbortSignal
 ): Promise<{ filed?: HandoffTicketRef; structured: WidgetFindings | null }> {
   if (!findings?.needsHuman) {
@@ -911,13 +918,15 @@ async function withHandoffTicket(
     run.scope,
     {
       findings,
+      history: context.history,
       latest: run.question,
       why: "Foreman's investigation found something only the team can settle.",
     },
     { runId: run.id, sessionId },
     signal,
     deps.fileTicket,
-    deps.draftTicket
+    deps.draftTicket,
+    context.roomMs()
   );
   return filed
     ? // The ticket joins the findings after the gate, in `withAnswerLine`: a
@@ -936,6 +945,7 @@ async function structureWriteUp(
     Partial<
       Pick<WidgetDependencies, "draftTicket" | "fileTicket" | "handoffEligible">
     >,
+  context: HandoffContext,
   signal?: AbortSignal
 ): Promise<{
   filed?: HandoffTicketRef;
@@ -1005,6 +1015,7 @@ async function structureWriteUp(
       run,
       sessionId,
       deps,
+      context,
       signal
     )),
   };
@@ -1109,6 +1120,7 @@ export async function finishWidgetRun(
   }
   let result: WidgetOutcome;
   let findings: unknown = null;
+  let history: HandoffContext["history"] = [];
   if (outcome.status === "failed") {
     result = blockedOutcome("session_failed", "failed");
   } else {
@@ -1118,7 +1130,7 @@ export async function finishWidgetRun(
     // conversation, so a reply continues the thread instead of starting over.
     // A failed read costs only that context, never the reply. The judge still
     // gets the question alone: it rules on the findings, not the conversation.
-    const history = await deps.history(run).catch(() => []);
+    history = await deps.history(run).catch(() => []);
     const conversation = withHistory(run.question, history);
     // Asked alongside the write-up passes, so it costs no wait.
     const changeAsked = (
@@ -1134,6 +1146,7 @@ export async function finishWidgetRun(
       outcome,
       conversation,
       deps,
+      { history, roomMs: () => cutoff - clock.now() },
       deadline
     );
     writtenGapsFiled = startReplyGapFiling(
@@ -1210,14 +1223,17 @@ export async function finishWidgetRun(
       result = blockedOutcome("invalid_findings", "completed");
     }
   }
+  const roomMs = Math.max(0, finishCutoff(run, claimedAt) - clock.now());
   ({ findings, result } = await ticketInsteadOfBlock(
     run,
     result,
     findings,
+    history,
     { runId: run.id, sessionId },
-    clock.timeout(Math.max(0, finishCutoff(run, claimedAt) - clock.now())),
+    clock.timeout(roomMs),
     deps.fileTicket,
-    deps.draftTicket
+    deps.draftTicket,
+    roomMs
   ));
   logGateDecision(
     { conversationId: run.scope.conversationId, runId: run.id, sessionId },
@@ -1270,6 +1286,7 @@ async function settleResultRun(
       run,
       handoff.result,
       handoff.findings,
+      undefined,
       { runId: run.id, sessionId },
       undefined,
       deps.fileTicket,

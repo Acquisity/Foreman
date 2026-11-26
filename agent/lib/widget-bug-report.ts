@@ -39,6 +39,7 @@ export const BUG_REPORT_ADDED = "Thanks, I've added that to your report.";
 
 const DRAFT_MS = 20_000;
 const WORDS = /\s+/u;
+const WHITESPACE = /\s+/gu;
 const CAPITALISED = /^[A-Z][a-z]/u;
 const TRAILING_PERIOD = /\.$/u;
 
@@ -47,7 +48,7 @@ const FALLBACK_TITLE = "Customer reports a problem from the support chat";
 const TITLE_CHARS = 80;
 
 /** The customer's own words as a title, for a draft that failed: never a fixed sentence when they said something. */
-export const excerptTitle = (text: string | null) => {
+const excerptTitle = (text: string | null) => {
   const words = (text ?? "").replaceAll(":", " ").trim().split(WORDS);
   let title = "";
   for (const word of words) {
@@ -101,8 +102,8 @@ const firstDetails = (turn: BugReportTurn) =>
     .map((entry) => ("text" in entry ? entry.text : entry.question).trim())
     .find(Boolean) ?? null;
 
-const blockquote = (text: string) =>
-  clip(inert(text), 1500)
+const blockquote = (text: string, max = 1500) =>
+  clip(inert(text), max)
     .split("\n")
     .map((line) => `> ${line}`)
     .join("\n");
@@ -134,6 +135,16 @@ Write in plain words a non-engineer would use, naming screens and buttons the wa
 - "whatShouldHappen": one sentence on what the customer expected instead. Write exactly "${NOT_STATED}" when the customer didn't say.
 - "impact": one sentence on what this costs the customer (for example, emails not going out), only if the conversation says so; otherwise null.`;
 
+/** The model lookup reads Blob under its own deadline, so the draft's bound is raced against it. */
+const untilAborted = <T>(work: Promise<T>, signal: AbortSignal) =>
+  new Promise<T>((resolve, reject) => {
+    signal.throwIfAborted();
+    signal.addEventListener("abort", () => reject(signal.reason), {
+      once: true,
+    });
+    work.then(resolve, reject);
+  });
+
 /**
  * The one drafting call every widget ticket's plain-language parts come from,
  * on the fast slot. A failure, or a title that is not plain, returns the
@@ -147,7 +158,7 @@ async function draftTicket<T extends { title: string }>(
   signal: AbortSignal
 ): Promise<T> {
   try {
-    const model = await resolveModel("kb");
+    const model = await untilAborted(resolveModel("kb"), signal);
     const { object } = await generateObject({
       abortSignal: signal,
       model: modelFor(model),
@@ -180,6 +191,7 @@ export const draftBugReport = (turn: BugReportTurn): Promise<BugReportDraft> =>
 export interface HandoffFacts {
   /** Foreman's internal findings, never shown to the customer. */
   findings?: { recommendation: string; report: string };
+  /** Earlier turns, oldest first: the customer's messages and the replies that went out. */
   history?: { role: "customer" | "assistant"; text: string }[];
   latest: string;
   /** Foreman's reply to this message, when it has one. */
@@ -190,7 +202,11 @@ export interface HandoffFacts {
 
 const NOTHING_YET = "Nothing yet.";
 /** The customer may be waiting on the reply this filing comes before. */
-const HANDOFF_DRAFT_MS = 10_000;
+export const HANDOFF_DRAFT_MS = 10_000;
+/** The longest summary the ticket filer takes, as `widget_file_ticket` does. */
+const HANDOFF_BODY_MAX = 4000;
+/** Findings cut shorter than this would say nothing useful. */
+const FINDINGS_MIN = 80;
 
 const handoffSchema = z.object({
   open: z.string().trim().min(1).max(500),
@@ -206,9 +222,9 @@ const HANDOFF_PROMPT = `You are writing an internal Linear ticket for the suppor
 ${DATA_ONLY}
 
 Write in plain words, naming screens and buttons the way the customer sees them. State only what the conversation says. Never invent steps, causes or details. Do not include the customer's name, email, workspace, domains or any id.
-- "title": ${PLAIN_TITLE} Name the customer's actual problem or request, never only that they asked for a person or for help. Example: "Customer wants their workspace cancelled before tomorrow's renewal".
+- "title": ${PLAIN_TITLE} Name the customer's actual problem or request, taken from the whole conversation, never only that they asked for a person or for help. Example: "Customer wants their workspace cancelled before tomorrow's renewal".
 - "wants": one or two sentences on what the customer wants.
-- "told": one or two sentences summarising what Foreman's reply told the customer. Write exactly "${NOTHING_YET}" when there is no reply from Foreman to this message.
+- "told": one or two sentences summarising what Foreman has told the customer in this conversation, its earlier replies included. Write exactly "${NOTHING_YET}" only when Foreman has not replied at all.
 - "open": one or two sentences on what the team still has to answer or do, using the note and Foreman's findings.`;
 
 const handoffSaid = (facts: HandoffFacts): Said[] => [
@@ -229,20 +245,48 @@ const handoffSaid = (facts: HandoffFacts): Said[] => [
   { speaker: "Note from the app", text: facts.why },
 ];
 
-export const fallbackHandoffDraft = (facts: HandoffFacts): HandoffDraft => ({
-  fallback: true,
-  open: facts.why,
-  title: excerptTitle(facts.latest),
-  told: facts.reply ? clip(facts.reply, 500) : NOTHING_YET,
-  wants: facts.latest.trim() ? quoted(facts.latest) : NOT_STATED,
-});
+const customerWords = (facts: HandoffFacts) => [
+  ...(facts.history ?? [])
+    .filter(({ role }) => role === "customer")
+    .map(({ text }) => text),
+  facts.latest,
+];
+
+/** The newest thing Foreman told the customer: this message's reply, else its last earlier one. */
+const lastToldTheCustomer = (facts: HandoffFacts) =>
+  facts.reply ||
+  (facts.history ?? []).filter(({ role }) => role === "assistant").at(-1)?.text;
+
+/**
+ * Written without the model: titled from Foreman's findings, else from the
+ * customer's longest message, which names the problem more often than a
+ * closing "can I talk to a person?".
+ */
+export const fallbackHandoffDraft = (facts: HandoffFacts): HandoffDraft => {
+  const said = customerWords(facts).filter((text) => text.trim());
+  const told = lastToldTheCustomer(facts);
+  return {
+    fallback: true,
+    open: facts.why,
+    title: excerptTitle(
+      facts.findings?.report ||
+        said.reduce(
+          (longest, text) => (text.length > longest.length ? text : longest),
+          ""
+        )
+    ),
+    told: told ? blockquote(clip(told, 500)) : NOTHING_YET,
+    wants: said.length ? quoted(said.join("\n\n")) : NOT_STATED,
+  };
+};
 
 /** A handoff ticket's title and plain-language parts, from the same drafting call as a bug ticket's. */
 export const draftHandoffTicket = (
   facts: HandoffFacts,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  ms = HANDOFF_DRAFT_MS
 ): Promise<HandoffDraft> => {
-  const timeout = AbortSignal.timeout(HANDOFF_DRAFT_MS);
+  const timeout = AbortSignal.timeout(ms);
   return draftTicket(
     HANDOFF_PROMPT,
     handoffSchema,
@@ -252,36 +296,56 @@ export const draftHandoffTicket = (
   );
 };
 
+/** A drafted sentence on one line, so model text cannot open a block of its own. */
+const sentence = (text: string) => text.replaceAll(WHITESPACE, " ").trim();
+
 /**
- * A handoff ticket's body: what the customer wants, what Foreman told them
- * and what is still open, then Foreman's findings and the customer's own
- * words. The server appends the Verified scope block after it.
+ * A handoff ticket's body: what the customer wants, what Foreman told them,
+ * what is still open, who it hits and the customer's own words, then
+ * Foreman's findings, which give up room so the rest always fits. The server
+ * appends the Verified scope block after it.
  */
 export const handoffTicketBody = (
   draft: HandoffDraft,
   facts: HandoffFacts,
   scope: WidgetContext,
   at: Date
-) =>
-  [
+) => {
+  const prose = (text: string) => (draft.fallback ? text : sentence(text));
+  const body = [
     "## What the customer wants",
-    draft.wants,
+    prose(draft.wants),
     "## What Foreman told them",
-    draft.told,
+    prose(draft.told),
     "## What's still open",
-    draft.open,
-    ...(facts.findings
-      ? [
-          "## What Foreman found",
-          `${facts.findings.report}\n\nRecommendation: ${facts.findings.recommendation}`,
-        ]
-      : []),
+    prose(draft.open),
     "## Who it hits",
-    `One ${scope.role} in ${scope.organizationName}, from the support chat on ${inWords(at)}. ${facts.why}`,
+    // The fallback's open section is already the reason it was filed.
+    `One ${scope.role} in ${inert(scope.organizationName)}, from the support chat on ${inWords(at)}.${draft.fallback ? "" : ` ${facts.why}`}`,
     // The fallback already quotes the customer in full.
     ...(draft.fallback
       ? []
       : ["## What the customer wrote", blockquote(facts.latest)]),
+  ].join("\n\n");
+  const room = HANDOFF_BODY_MAX - body.length;
+  if (!facts.findings || room < FINDINGS_MIN) {
+    return body;
+  }
+  const findings = `\n\n## What Foreman found\n\n${blockquote(`${facts.findings.report}\n\nRecommendation: ${facts.findings.recommendation}`, 4000)}`;
+  return `${body}${clip(findings, room)}`;
+};
+
+/** A repeat handoff on the conversation's ticket: only the new message, what Foreman said and why. */
+export const handoffFollowUp = (facts: HandoffFacts) =>
+  [
+    quoted(facts.latest),
+    ...(facts.reply ? [`Foreman replied:\n\n${blockquote(facts.reply)}`] : []),
+    ...(facts.findings
+      ? [
+          `What Foreman found:\n\n${blockquote(`${facts.findings.report}\n\nRecommendation: ${facts.findings.recommendation}`)}`,
+        ]
+      : []),
+    facts.why,
   ].join("\n\n");
 
 const conversationLink = (conversationId: string, label: string) => {

@@ -20,10 +20,17 @@ const writtenIssue = z
 export const confirmedIssue = (data: unknown) =>
   writtenIssue.parse(providerData(data));
 
+const FENCE_CHARACTER = /[`~]/gu;
+
 /**
- * A widget ticket's body as the team reads it, with no code block. An opening
- * angle bracket stays literal, so customer text cannot become markup, while a
- * line's `>` still quotes; the server appends the Verified scope block after it.
+ * A widget ticket's body as the team reads it, with no code block. Backticks
+ * and tildes are escaped, so no text inside can open a code block that would
+ * swallow what follows, the server's Verified scope block included, and an
+ * opening angle bracket stays literal, so it cannot become markup. A line's
+ * `>` still quotes.
  */
 export const formatCustomerReport = (summary: string) =>
-  summary.trim().replaceAll("<", "&lt;");
+  summary
+    .trim()
+    .replaceAll("<", "&lt;")
+    .replaceAll(FENCE_CHARACTER, (character) => `\\${character}`);

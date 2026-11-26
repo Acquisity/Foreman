@@ -35,3 +35,10 @@ test("a customer report is the plain Markdown body, never wrapped in a code bloc
     "## What the customer wants\n\nCancel before renewal. &lt;img src=x>\n\n> Their words"
   );
 });
+
+test("text in a customer report cannot open a code block, so an unclosed fence never swallows the scope block after it", () => {
+  assert.equal(
+    formatCustomerReport("Try this:\n```\nsteps\n~~~ and `code`"),
+    "Try this:\n\\`\\`\\`\nsteps\n\\~\\~\\~ and \\`code\\`"
+  );
+});
