@@ -102,6 +102,31 @@ describe("widget support investigation model boundary", () => {
     assert.equal(base.doGenerateCalls[0]?.toolChoice, undefined);
   });
 
+  it("refuses widget_website_status, deleted with the website switch (ENG-20540)", async () => {
+    const base = new MockLanguageModelV4({
+      doGenerate: result("widget_website_status"),
+    });
+    const model = wrapLanguageModel({
+      middleware: widgetInvestigationMiddleware(),
+      model: base,
+    });
+    await assert.rejects(
+      async () =>
+        await model.doGenerate({
+          prompt: [],
+          tools: [
+            {
+              inputSchema: { type: "object" },
+              name: "widget_website_status",
+              type: "function",
+            },
+          ],
+        }),
+      BLOCKED
+    );
+    assert.deepEqual(base.doGenerateCalls[0]?.tools, []);
+  });
+
   it("offers each old area tool exactly while its area is held (ENG-20609)", async () => {
     const base = new MockLanguageModelV4({
       doGenerate: {

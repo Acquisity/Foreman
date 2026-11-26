@@ -49,7 +49,6 @@ const ALLOWED_TOOLS = new Set([
   // Registered only on a turn that follows up on a screen recording.
   "widget_read_recording",
   "widget_sdr_thread_status",
-  "widget_website_status",
   // Records what no tool returns; Foreman's code files the ticket.
   "report_capability_gap",
 ]);

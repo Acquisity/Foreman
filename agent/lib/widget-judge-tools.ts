@@ -15,7 +15,6 @@ import { tool as provisioning_status } from "../tools/widget_provisioning_status
 import { tool as read_help_article } from "../tools/widget_read_help_article.js";
 import { tool as read_recording } from "../tools/widget_read_recording.js";
 import { tool as sdr_thread_status } from "../tools/widget_sdr_thread_status.js";
-import { tool as website_status } from "../tools/widget_website_status.js";
 import type { AvailableEndpoint } from "./widget-endpoint-schema.js";
 import {
   HELD_AREAS,
@@ -41,7 +40,6 @@ const handWrittenCapabilities = Object.entries({
   widget_read_help_article: read_help_article,
   widget_read_recording: read_recording,
   widget_sdr_thread_status: sdr_thread_status,
-  widget_website_status: website_status,
 }).map(([name, tool]) => {
   if (!(tool.inputSchema instanceof z.ZodType)) {
     throw new Error(`Judge capability schema is not Zod: ${name}`);
