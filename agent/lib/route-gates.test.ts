@@ -69,6 +69,7 @@ describe("keepChatsOnCase", () => {
       "SAN-320",
       "SAN-319",
       [CHAT],
+      new Set(),
       fake.linear
     );
     assert.equal(warning, null);
@@ -88,6 +89,7 @@ describe("keepChatsOnCase", () => {
       "SAN-320",
       "SAN-319",
       [CHAT],
+      new Set(),
       fake.linear
     );
     assert.match(warning ?? "", CHAT_STAYS);
@@ -106,8 +108,13 @@ describe("keepChatsOnCase", () => {
   it("keeps the moved copy when Linear refuses the relink, and warns when it refuses the delete", async () => {
     const relink = linearAfterJoin(undefined, "RouteChatLink");
     assert.match(
-      (await keepChatsOnCase("SAN-320", "SAN-319", [CHAT], relink.linear)) ??
-        "",
+      (await keepChatsOnCase(
+        "SAN-320",
+        "SAN-319",
+        [CHAT],
+        new Set(),
+        relink.linear
+      )) ?? "",
       CHAT_STAYS
     );
     assert.ok(!relink.calls.includes("RouteChatUnlink"));
@@ -117,9 +124,41 @@ describe("keepChatsOnCase", () => {
     );
     const unlink = linearAfterJoin(undefined, "RouteChatUnlink");
     assert.match(
-      (await keepChatsOnCase("SAN-320", "SAN-319", [CHAT], unlink.linear)) ??
-        "",
+      (await keepChatsOnCase(
+        "SAN-320",
+        "SAN-319",
+        [CHAT],
+        new Set(),
+        unlink.linear
+      )) ?? "",
       CHAT_STAYS
+    );
+    assert.deepEqual(unlink.calls, [
+      "RouteChatLinks",
+      "RouteChatLink",
+      "RouteChatLinks",
+      "RouteChatUnlink",
+    ]);
+    assert.deepEqual(
+      unlink.issues["SAN-319"].map((a) => a.url),
+      [PR.url, CHAT.url]
+    );
+  });
+
+  it("never deletes a chat link the match had before the route", async () => {
+    const fake = linearAfterJoin();
+    const warning = await keepChatsOnCase(
+      "SAN-320",
+      "SAN-319",
+      [CHAT],
+      new Set(["a-moved"]),
+      fake.linear
+    );
+    assert.equal(warning, null);
+    assert.ok(!fake.calls.includes("RouteChatUnlink"));
+    assert.deepEqual(
+      fake.issues["SAN-319"].map((a) => a.url),
+      [PR.url, CHAT.url]
     );
   });
 });

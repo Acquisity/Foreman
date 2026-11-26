@@ -162,7 +162,8 @@ export const supportChatsOf = async (
  * (measured on SAN-320, 26 Nov 2026), so a joined widget case would lose its
  * Support chat link to the shared ticket, which would then pass for that
  * customer's chat ticket. This puts each link the case had back on it and
- * removes the moved copy from the match (ENG-21101). It also runs after a
+ * removes the copy that appeared on the match, never a link the match had
+ * before the route (ENG-21101). It also runs after a
  * join that failed partway, since the relation alone can move the link, and
  * does nothing when nothing moved. It returns a warning instead of throwing.
  */
@@ -170,6 +171,7 @@ export const keepChatsOnCase = async (
   issue: string,
   match: string,
   before: readonly { title: string; url: string }[],
+  matchHad: ReadonlySet<string>,
   linear: LinearRead
 ): Promise<string | null> => {
   try {
@@ -191,8 +193,10 @@ export const keepChatsOnCase = async (
         throw new Error("relink refused");
       }
     }
-    const moved = (await supportChatsOf(match, linear)).filter((link) =>
-      before.some((own) => own.url === link.url)
+    // Only a copy that appeared on the match during this route; a link it already had is its own.
+    const moved = (await supportChatsOf(match, linear)).filter(
+      (link) =>
+        !matchHad.has(link.id) && before.some((own) => own.url === link.url)
     );
     for (const link of moved) {
       // biome-ignore lint/performance/noAwaitInLoops: as above.
@@ -207,6 +211,6 @@ export const keepChatsOnCase = async (
     }
     return null;
   } catch {
-    return `${issue} joined ${match}, but its Support chat link could not be confirmed on ${issue} and off ${match}. Check both tickets' attachments: the chat link belongs on ${issue} only.`;
+    return `After routing ${issue} toward ${match}, ${issue}'s Support chat link could not be confirmed on ${issue} and off ${match}. Check both tickets' attachments: the chat link belongs on ${issue} only.`;
   }
 };

@@ -47,18 +47,32 @@ const picksMaster = (input: {
       (input.parent && input.state?.trim().toLowerCase() === "duplicate")
   );
 
-/** The report's Support chat links before a Duplicate join (none for any other route), or null when they could not be read. */
+/**
+ * Before a Duplicate join: the report's Support chat links, and the ids of the
+ * match's own, so the repair after it removes only a copy the join made. Empty
+ * for any other route; null when a read failed.
+ */
 const chatsBeforeJoin = async (
   input: { duplicateOf?: string; issue: string; state?: string },
   linear: LinearRead
-): Promise<Awaited<ReturnType<typeof supportChatsOf>> | null> => {
+): Promise<{
+  chats: Awaited<ReturnType<typeof supportChatsOf>>;
+  matchHad: Set<string>;
+} | null> => {
   if (
     !(input.duplicateOf && isDuplicateState(input.state)) ||
     isTriageReplay()
   ) {
-    return [];
+    return { chats: [], matchHad: new Set() };
   }
-  return await supportChatsOf(input.issue, linear).catch(() => null);
+  try {
+    const chats = await supportChatsOf(input.issue, linear);
+    const had =
+      chats.length > 0 ? await supportChatsOf(input.duplicateOf, linear) : [];
+    return { chats, matchHad: new Set(had.map((link) => link.id)) };
+  } catch {
+    return null;
+  }
 };
 
 export default defineTool({
@@ -118,8 +132,8 @@ export default defineTool({
       }
     }
     // A Duplicate join moves the case's Support chat link onto the match; read it first to put it back.
-    const chats = await chatsBeforeJoin(input, linear);
-    if (chats === null) {
+    const before = await chatsBeforeJoin(input, linear);
+    if (before === null) {
       ctx.abortSignal.throwIfAborted();
       return joined({
         error: `Could not read ${input.issue}'s Support chat links, so the join was not written. Call route_ticket again.`,
@@ -128,8 +142,14 @@ export default defineTool({
     }
     // Runs after a failed route too: the relation alone can move the link.
     const keepChats = () =>
-      input.duplicateOf && chats.length > 0
-        ? keepChatsOnCase(input.issue, input.duplicateOf, chats, linear)
+      input.duplicateOf && before.chats.length > 0
+        ? keepChatsOnCase(
+            input.issue,
+            input.duplicateOf,
+            before.chats,
+            before.matchHad,
+            linear
+          )
         : Promise.resolve(null);
     try {
       const mastersWindow = picksMaster(input)
