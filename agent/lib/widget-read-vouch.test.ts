@@ -133,7 +133,7 @@ test("only a successful read of the workspace vouches, and never its diagnosis-o
   assert.match(text(knowledgeBase), YOUTUBE);
   assert.match(
     text(
-      read("widget_generation_diagnostics", {
+      read("widget_ai_generation", {
         knowledgeBase: "youtube.com",
         status: "ok",
       })
@@ -142,17 +142,7 @@ test("only a successful read of the workspace vouches, and never its diagnosis-o
   );
   for (const notRead of [
     okRead("widget_known_issues", { text: "x.com" }),
-    okRead("widget_billing_summary", {
-      stripe: { invoices: [{ line: "x.com" }] },
-    }),
     okRead("widget_billing", { sections: { charges: "x.com" } }),
-    okRead("widget_account_access", {
-      userErrorSignals: { classes: ["x.com"] },
-    }),
-    okRead("widget_job_failures", { error_message: "x.com" }),
-    okRead("widget_sdr_thread_status", { host: { email: "h@x.com" } }),
-    okRead("widget_website_status", { live: { buildLog: "x.com" } }),
-    okRead("widget_provider", { rows: ["x.com"] }),
     okRead("widget_new_tool", { site: "x.com" }),
     okRead("widget_help_article", { url: "x.com" }),
     okRead("widget_file_ticket", { url: "x.com" }),

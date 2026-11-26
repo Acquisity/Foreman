@@ -9,33 +9,13 @@ import { ENDPOINT_TOOL_NAMES } from "./widget-endpoint-tools.js";
 import type { IdentifierCandidates } from "./widget-evidence.js";
 
 /**
- * Hand-written tools whose every query is filtered to the verified
- * organization, so their result holds only its data. Left out on purpose:
- * widget_account_access (its Sentry read is per user, across workspaces),
- * widget_billing_summary (a billing account can cover sibling workspaces),
- * widget_job_failures (raw error text), widget_sdr_thread_status (the host's
- * calendars from other workspaces), widget_website_status (build logs and
- * public DNS), widget_provider (any query), and known issues, help articles,
- * recordings and ticket filing. A new tool vouches for nothing until it is
- * added here.
- */
-const SCOPED_TOOLS: ReadonlySet<string> = new Set([
-  "widget_crm_contact",
-  "widget_generation_diagnostics",
-  "widget_inbox_health",
-  "widget_lead_pipeline_status",
-  "widget_outreach_health",
-  "widget_provisioning_status",
-]);
-
-/**
  * Acquisity's endpoint tools are scoped to the verified workspace by its
- * handler. Billing reads by billing account, which can cover sibling
- * workspaces, so it vouches for nothing.
+ * handler, so their results vouch. Billing reads by billing account, which can
+ * cover sibling workspaces, so it vouches for nothing, and neither do known
+ * issues, help articles, recordings or ticket filing.
  */
 const vouchesFor = (tool: string) =>
-  SCOPED_TOOLS.has(tool) ||
-  (ENDPOINT_TOOL_NAMES.has(tool) && tool !== "widget_billing");
+  ENDPOINT_TOOL_NAMES.has(tool) && tool !== "widget_billing";
 
 export const NOTHING_VOUCHED: Required<IdentifierCandidates> = {
   domains: [],

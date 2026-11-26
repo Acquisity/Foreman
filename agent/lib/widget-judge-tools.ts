@@ -1,43 +1,21 @@
 import { z } from "zod";
-import { tool as account_access } from "../tools/widget_account_access.js";
 import { tool as ask_customer } from "../tools/widget_ask_customer.js";
-import { tool as billing_summary } from "../tools/widget_billing_summary.js";
 import { tool as file_ticket } from "../tools/widget_file_ticket.js";
-import { tool as generation_diagnostics } from "../tools/widget_generation_diagnostics.js";
 import { tool as help_article } from "../tools/widget_help_article.js";
-import { tool as inbox_health } from "../tools/widget_inbox_health.js";
-import { tool as job_failures } from "../tools/widget_job_failures.js";
 import { tool as known_issues } from "../tools/widget_known_issues.js";
-import { tool as lead_pipeline_status } from "../tools/widget_lead_pipeline_status.js";
-import { tool as outreach_health } from "../tools/widget_outreach_health.js";
-import { tool as provisioning_status } from "../tools/widget_provisioning_status.js";
 import { tool as read_help_article } from "../tools/widget_read_help_article.js";
 import { tool as read_recording } from "../tools/widget_read_recording.js";
-import { tool as sdr_thread_status } from "../tools/widget_sdr_thread_status.js";
 import type { AvailableEndpoint } from "./widget-endpoint-schema.js";
-import {
-  HELD_AREAS,
-  legacyToolOffered,
-  offeredEndpointTools,
-} from "./widget-endpoint-tools.js";
+import { offeredEndpointTools } from "./widget-endpoint-tools.js";
 
 /** The investigator's actual definitions, including selector and recording-only tools. No callbacks run. */
 const handWrittenCapabilities = Object.entries({
-  widget_account_access: account_access,
   widget_ask_customer: ask_customer,
-  widget_billing_summary: billing_summary,
   widget_file_ticket: file_ticket,
-  widget_generation_diagnostics: generation_diagnostics,
   widget_help_article: help_article,
-  widget_inbox_health: inbox_health,
-  widget_job_failures: job_failures,
   widget_known_issues: known_issues,
-  widget_lead_pipeline_status: lead_pipeline_status,
-  widget_outreach_health: outreach_health,
-  widget_provisioning_status: provisioning_status,
   widget_read_help_article: read_help_article,
   widget_read_recording: read_recording,
-  widget_sdr_thread_status: sdr_thread_status,
 }).map(([name, tool]) => {
   if (!(tool.inputSchema instanceof z.ZodType)) {
     throw new Error(`Judge capability schema is not Zod: ${name}`);
@@ -49,23 +27,64 @@ const handWrittenCapabilities = Object.entries({
   };
 });
 
+const RETIRED_TOOL =
+  "A tool this run had that has since been retired. It was available to the investigator; anything it read is in toolResults.";
 /**
- * What the investigator could call in this case: the hand-written tools the
- * lane still offers, and the endpoint tools the case's own endpoint list
- * offered (none when the case recorded no list).
+ * The areas each retired tool answered for (ENG-20544). A run that called a
+ * single-area one predates that area's endpoint, so the endpoint tool is left
+ * out; a score result saved during the rollout records its held areas, whose
+ * retired tools it had and whose endpoints it did not.
+ */
+const RETIRED_TOOL_AREAS: Readonly<Record<string, readonly string[]>> = {
+  widget_account_access: ["account"],
+  widget_billing_summary: ["billing"],
+  widget_generation_diagnostics: ["ai-generation"],
+  widget_inbox_health: ["inboxes"],
+  widget_job_failures: ["ai-sdr", "lead-pipeline", "orders"],
+  widget_lead_pipeline_status: ["lead-pipeline"],
+  widget_outreach_health: ["campaigns"],
+  widget_provisioning_status: ["orders"],
+  widget_sdr_thread_status: ["ai-sdr"],
+};
+
+/**
+ * What the investigator could call in this case: the hand-written tools, the
+ * endpoint tools the case's own endpoint list offered (none when the case
+ * recorded no list), and any other widget tool the run itself called. A run
+ * recorded before a tool was retired is judged with that tool, by name only,
+ * and without the endpoint that later replaced it.
  */
 export const judgeToolCapabilities = (
   endpoints: readonly AvailableEndpoint[] | undefined,
-  held: ReadonlySet<string> = HELD_AREAS
-) => [
-  ...handWrittenCapabilities.filter(({ name }) =>
-    legacyToolOffered(name, held)
-  ),
-  ...offeredEndpointTools(endpoints, undefined, held).map(
-    ({ description, inputSchema, name }) => ({
-      description,
-      inputSchema,
-      name,
-    })
-  ),
-];
+  calledTools: readonly string[] = [],
+  heldAreas: readonly string[] = []
+) => {
+  const held = new Set(heldAreas);
+  for (const name of calledTools) {
+    const areas = RETIRED_TOOL_AREAS[name];
+    if (areas?.length === 1) {
+      held.add(areas[0]);
+    }
+  }
+  const had = new Set([
+    ...calledTools,
+    ...Object.entries(RETIRED_TOOL_AREAS)
+      .filter(([, areas]) => areas.some((area) => held.has(area)))
+      .map(([name]) => name),
+  ]);
+  const offered = [
+    ...handWrittenCapabilities,
+    ...offeredEndpointTools(endpoints)
+      .filter(({ area }) => !held.has(area))
+      .map(({ description, inputSchema, name }) => ({
+        description,
+        inputSchema,
+        name,
+      })),
+  ];
+  const known = new Set(offered.map(({ name }) => name));
+  const retired = [...had]
+    .filter((name) => name.startsWith("widget_") && !known.has(name))
+    .map((name) => ({ description: RETIRED_TOOL, inputSchema: {}, name }));
+  return [...offered, ...retired];
+};

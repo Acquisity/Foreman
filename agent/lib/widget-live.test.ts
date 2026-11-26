@@ -1,15 +1,12 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import billingDefinition from "../tools/widget_billing_summary.js";
 import ticketDefinition from "../tools/widget_file_ticket.js";
-import outreachDefinition from "../tools/widget_outreach_health.js";
-import { executorTransport } from "./executor/transport.js";
 import { verifiedWidgetContext as fixture } from "./widget.fixture.js";
 import { filedTicketResult } from "./widget-investigation.js";
 import {
-  datedTools,
   driftVerdict,
   gapSentences,
+  pinnedQuestion,
   readResult,
   replyElapsed,
 } from "./widget-live.js";
@@ -20,8 +17,6 @@ import {
   LIVE_TICKET,
   liveContext,
   liveServerUrl,
-  liveToolInput,
-  pinLiveInput,
   verifyLiveServer,
 } from "./widget-live-policy.js";
 import { widgetAuth } from "./widget-scope.js";
@@ -75,7 +70,7 @@ test("zero comparable reads are unverifiable and never permit cause grading", ()
       {
         recorded: readResult({ available: false }),
         reread: readResult({ available: true, balance: 1 }),
-        tool: "widget_billing_summary",
+        tool: "widget_billing",
       },
     ],
   ]) {
@@ -151,14 +146,14 @@ test("a sub-object marked unavailable on purpose is left out, and the rest is st
   const read = (recorded: unknown, reread: unknown) => ({
     recorded: readResult(recorded),
     reread: readResult(reread),
-    tool: "widget_outreach_health",
+    tool: "widget_campaigns",
   });
   // The dropped part may be a nested source that failed, so equality is not steady.
   assert.deepEqual(driftVerdict([read(listing(true), listing(true))]), {
     causeGradeAllowed: false,
     changed: [],
     compared: 1,
-    partial: ["widget_outreach_health"],
+    partial: ["widget_campaigns"],
     unverifiable: [],
     verdict: "unverifiable",
   });
@@ -177,7 +172,7 @@ test("a sub-object marked unavailable on purpose is left out, and the rest is st
   assert.deepEqual(oneSided.changed, []);
 });
 
-test("live tool boundary enforces historical date windows and preserves explicit windows", async (t) => {
+test("a live re-run's ticket tool returns the simulated ticket", async (t) => {
   const previous = process.env.WIDGET_LIVE;
   process.env.WIDGET_LIVE = "1";
   t.after(() => {
@@ -198,62 +193,7 @@ test("live tool boundary enforces historical date windows and preserves explicit
     getToken: () => Promise.resolve({ token: "test-token" }),
     session: { auth: { current: auth, initiator: auth } },
   } as never;
-  for (const [key, value] of Object.entries({
-    EXECUTOR_MCP_CONNECTOR_SUPPORT: "executor.test/widget",
-    EXECUTOR_OPERATION_BINDINGS: JSON.stringify({
-      "planetscale.readQuery": {
-        path: "planetscale-org.planetscale_execute_read_query",
-      },
-    }),
-  })) {
-    const old = process.env[key];
-    process.env[key] = value;
-    t.after(() => {
-      if (old === undefined) {
-        Reflect.deleteProperty(process.env, key);
-      } else {
-        process.env[key] = old;
-      }
-    });
-  }
-  const queries: string[] = [];
-  t.mock.method(
-    executorTransport,
-    "call",
-    (_wire: unknown, _path: string, input: { query?: string }) => {
-      const query = input.query ?? "";
-      queries.push(query);
-      let rows: unknown[] = [];
-      if (query.includes('as "observedAt"')) {
-        rows = [
-          {
-            authorized: false,
-            inboxes: null,
-            observedAt: "2026-10-09T00:00:00Z",
-            records: [],
-          },
-        ];
-      } else if (query.includes(" as authorized")) {
-        rows = [{ authorized: true }];
-      } else if (query.includes("from organization o")) {
-        rows = [{ id: fixture.organizationId }];
-      }
-      return Promise.resolve({
-        data: {
-          content: [
-            { text: JSON.stringify({ rows, success: true }), type: "text" },
-          ],
-        },
-        ok: true,
-      });
-    }
-  );
-  const resolveTool = (
-    definition:
-      | typeof billingDefinition
-      | typeof outreachDefinition
-      | typeof ticketDefinition
-  ) => {
+  const resolveTool = (definition: typeof ticketDefinition) => {
     const events = definition.events as Record<
       string,
       (event: unknown, context: unknown) => unknown
@@ -262,70 +202,6 @@ test("live tool boundary enforces historical date windows and preserves explicit
       execute: (input: unknown, context: unknown) => Promise<unknown>;
     };
   };
-  const billing = {
-    execute: (input: unknown, _ctx: unknown) =>
-      Promise.resolve(
-        liveToolInput("widget_billing_summary", input, scope.liveAsOf)
-      ),
-  };
-  assert.deepEqual(await billing.execute({}, ctx), {
-    creditWindow: {
-      from: "2026-10-09T00:00:00.000Z",
-      to: "2026-10-10T00:00:00.000Z",
-    },
-  });
-  const explicit = {
-    creditWindow: { from: "2026-09-01T00:00:00Z", to: "2026-09-02T00:00:00Z" },
-  };
-  assert.deepEqual(await billing.execute(explicit, ctx), explicit);
-  const outreach = {
-    execute: (input: unknown, _ctx: unknown) =>
-      Promise.resolve(
-        liveToolInput("widget_outreach_health", input, scope.liveAsOf)
-      ),
-  };
-  assert.deepEqual(
-    await outreach.execute({ campaignId: fixture.organizationId }, ctx),
-    {
-      campaignId: fixture.organizationId,
-      endDate: "2026-10-09",
-      startDate: "2026-10-03",
-    }
-  );
-  const window = {
-    campaignId: fixture.organizationId,
-    endDate: "2026-09-07",
-    startDate: "2026-09-01",
-  };
-  assert.deepEqual(await outreach.execute(window, ctx), window);
-  assert.deepEqual(await outreach.execute({}, ctx), {
-    endDate: "2026-10-09",
-    startDate: "2026-10-03",
-  });
-  await resolveTool(billingDefinition).execute({}, ctx);
-  assert.equal(
-    queries.some(
-      (query) =>
-        query.includes("created_at >= '2026-10-09T00:00:00.000Z'") &&
-        query.includes("created_at < '2026-10-10T00:00:00.000Z'")
-    ),
-    true
-  );
-  await resolveTool(outreachDefinition).execute(
-    { campaignId: fixture.organizationId },
-    ctx
-  );
-  assert.equal(
-    queries.some(
-      (query) =>
-        query.includes("'2026-10-03'::date") &&
-        query.includes("'2026-10-09'::date")
-    ),
-    true
-  );
-  assert.equal(hasMovingWindow("widget_outreach_health", {}), true);
-  assert.equal(hasMovingWindow("widget_billing_summary", explicit), false);
-  assert.equal(hasMovingWindow("widget_outreach_health", window), false);
   assert.deepEqual(
     await resolveTool(ticketDefinition).execute(
       { summary: "s", title: "t" },
@@ -430,15 +306,7 @@ test("billing endpoint reads always cover a moving window, and campaigns ones do
     }),
     false
   );
-  // An endpoint tool's input is never rewritten: only the hand-written tools pin.
-  assert.deepEqual(
-    pinLiveInput(
-      "widget_billing",
-      { creditWindow: 30 },
-      "2026-11-01T10:00:00.000Z"
-    ),
-    { creditWindow: 30 }
-  );
+  assert.equal(hasMovingWindow("widget_orders", {}), false);
 });
 
 test("an endpoint's whole-read refusal is unverifiable, never steady or movement", () => {
@@ -462,12 +330,10 @@ test("an endpoint's whole-read refusal is unverifiable, never steady or movement
   }
 });
 
-test("the re-run's date note names each dated tool the rollout offers", () => {
-  assert.deepEqual(datedTools(new Set(["billing", "campaigns"])), {
-    widget_billing_summary: "creditWindow",
-    widget_outreach_health: "startDate and endDate",
-  });
-  assert.deepEqual(datedTools(new Set()), {
-    widget_campaigns: "startDate and endDate",
-  });
+test("the re-run's date note names the campaigns tool, the one read that takes dates", () => {
+  assert.ok(
+    pinnedQuestion("Why did sends drop?", "2026-10-09T15:00:00Z").endsWith(
+      "(Team re-run: the customer sent this on 2026-10-09. Where a read accepts a date window (widget_campaigns), ask about that date.)"
+    )
+  );
 });

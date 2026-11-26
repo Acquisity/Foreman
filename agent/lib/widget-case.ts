@@ -46,7 +46,7 @@ export const widgetCaseSchema = z.strictObject({
   scope: z.strictObject({
     /** The support endpoints the context route listed for the run (ENG-20296); absent on cases recorded before it. */
     endpoints: z.array(availableEndpointSchema).max(50).optional(),
-    /** The areas still held when the run happened; absent means today's (agent/lib/widget-endpoint-tools.ts). */
+    /** The areas still held when a rollout-era run was scored (written before ENG-20544); the judge leaves their endpoint tools out. */
     heldAreas: z.array(z.string().max(100)).max(50).optional(),
     role: z.enum(["owner", "admin", "member", "client"]),
     workspace: z.string().min(1),
@@ -89,8 +89,6 @@ const NAME_KEY = /(?:name|workspace|company)$/i;
 /** A name part worth its own placeholder: three or more characters, at least one a letter. */
 const NAMED_PART = /^(?=.*\p{L}).{3,}$/u;
 const PHONE_KEY = /phone(?:_?number)?$/i;
-/** A catalog entry's own id ("website_credit"): a name spelling one ("Website Credit") labels a product, not a customer. */
-const CATALOG_ID = /^[a-z_]+$/;
 /** An email is at most 320 characters; anything longer is not an identifier to map. */
 const MAX_LITERAL = 320;
 const REGEX_SPECIAL = /[.*+?^${}()|[\]\\]/g;
@@ -145,51 +143,6 @@ const FIXTURE_VALUES = new Set(
 const DROPPED = "[binary content dropped]";
 
 const literal = (value: string) => value.replace(REGEX_SPECIAL, "\\$&");
-
-/**
- * Names of billing catalog entries ({ id: "website_credit", name: "Website Credit" })
- * in widget_billing_summary results, counted per spelling. Only these objects are
- * product labels; the same spelling anywhere else is still a name to replace.
- */
-const billingCatalogNames = (raw: WidgetCase) => {
-  const counts = new Map<string, number>();
-  const walk = (item: unknown, depth: number): void => {
-    if (typeof item === "string") {
-      const decoded = structuredText(item);
-      if (decoded) {
-        walk(decoded, depth + 1);
-      }
-      return;
-    }
-    if (depth > MAX_DEPTH || !item || typeof item !== "object") {
-      return;
-    }
-    if (Array.isArray(item)) {
-      for (const child of item) {
-        walk(child, depth + 1);
-      }
-      return;
-    }
-    const { id, name } = item as Record<string, unknown>;
-    if (
-      typeof id === "string" &&
-      typeof name === "string" &&
-      CATALOG_ID.test(id) &&
-      name.toLowerCase().replaceAll(" ", "_") === id
-    ) {
-      counts.set(name, (counts.get(name) ?? 0) + 1);
-    }
-    for (const child of Object.values(item)) {
-      walk(child, depth + 1);
-    }
-  };
-  for (const call of raw.cassette) {
-    if (call.tool === "widget_billing_summary") {
-      walk(call.output, 0);
-    }
-  }
-  return counts;
-};
 
 /**
  * One bounded alternation of escaped literals, matched as whole words: a hyphen
@@ -393,12 +346,6 @@ const recorderNames = (draft: unknown, organizationName: string) =>
     ([, recorder]) => recorder
   );
 
-const countInto = (counts: Map<string, number>, values: string[]) => {
-  for (const value of values) {
-    counts.set(value, (counts.get(value) ?? 0) + 1);
-  }
-};
-
 /** Our own domain stays: replacing it would also rewrite every help-center link. */
 const ownDomain = (host: string, replace: (host: string) => string) =>
   PUBLIC_HOSTS.has(host.toLowerCase()) ? host : replace(host);
@@ -416,7 +363,7 @@ const isSafeIdentifier = (value: string) =>
  */
 export function scrubCase(raw: WidgetCase, scope: RunScope): ScrubbedCase {
   const found = {
-    names: new Map<string, number>(),
+    names: new Set<string>(),
     phones: new Set<string>(),
   };
   const draft = mapStrings(
@@ -426,7 +373,7 @@ export function scrubCase(raw: WidgetCase, scope: RunScope): ScrubbedCase {
         if (PHONE_KEY.test(key)) {
           found.phones.add(text);
         } else if (NAME_KEY.test(key)) {
-          found.names.set(text, (found.names.get(text) ?? 0) + 1);
+          found.names.add(text);
         }
       }
       return text;
@@ -434,7 +381,9 @@ export function scrubCase(raw: WidgetCase, scope: RunScope): ScrubbedCase {
     true
   );
   // After the first pass, so dropped media is never serialized.
-  countInto(found.names, recorderNames(draft, scope.organizationName));
+  for (const name of recorderNames(draft, scope.organizationName)) {
+    found.names.add(name);
+  }
   const replacements = new Map<string, string>([
     [scope.organizationName.toLowerCase(), fixture.organizationName],
     [scope.organizationSlug.toLowerCase(), fixture.organizationSlug],
@@ -512,18 +461,13 @@ export function scrubCase(raw: WidgetCase, scope: RunScope): ScrubbedCase {
         : `https://internal.example/${next("link")}`;
     });
   }
-  const catalogNames = billingCatalogNames(raw);
-  for (const [name, count] of found.names) {
-    // Kept only when every occurrence is a billing catalog label.
-    if (catalogNames.get(name) === count) {
-      continue;
-    }
+  for (const name of found.names) {
     addName(name, add, () => `Name ${next("name")}`, replacements);
   }
   // A reply shortens a long name with an ellipsis ("Information Technology…"):
   // the shown prefix takes the name's own placeholder, so it is neither kept nor
   // read as a different name.
-  addShortenedNames(decoded, found.names.keys(), replacements);
+  addShortenedNames(decoded, found.names, replacements);
   for (const phone of found.phones) {
     add(phone, () => `Phone ${next("phone")}`);
   }

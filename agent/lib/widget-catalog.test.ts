@@ -22,3 +22,11 @@ test("the widget lane carries no Raindrop operation", () => {
     false
   );
 });
+
+// ENG-20544: investigations go through Acquisity's endpoint tools, never raw production SQL.
+test("the widget lane carries no production SQL operation", () => {
+  assert.deepEqual(
+    WIDGET_PATHS.filter((path) => path.startsWith("planetscale-org.")),
+    []
+  );
+});

@@ -809,7 +809,7 @@ describe("widget tools", () => {
     const names = tools.map((tool) => tool.name);
     for (const name of [
       "widget_file_ticket",
-      "widget_inbox_health",
+      "widget_help_article",
       "widget_read_help_article",
       "widget_read_recording",
     ]) {

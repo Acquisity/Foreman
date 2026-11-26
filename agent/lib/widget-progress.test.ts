@@ -9,7 +9,7 @@ const start = (sequence: number, ids: string[]) => ({
     actions: ids.map((callId) => ({
       callId,
       input: { secret: "private" },
-      toolName: "widget_outreach_health",
+      toolName: "widget_campaigns",
     })),
     sequence,
   },
@@ -71,7 +71,7 @@ test("checks that ran lead in start order; guesses still waiting follow in their
   assert.deepEqual(
     reduce({
       data: {
-        actions: [{ callId: "b", toolName: "widget_billing_summary" }],
+        actions: [{ callId: "b", toolName: "widget_billing" }],
         sequence: 2,
       },
       type: "actions.requested",

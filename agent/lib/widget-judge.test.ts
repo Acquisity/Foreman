@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { test } from "node:test";
 import { tool as helpArticleTool } from "../tools/widget_help_article.js";
 import { type WidgetCase, widgetCaseSchema } from "./widget-case.js";
+import { WIDGET_ENDPOINT_MANIFEST } from "./widget-endpoint-manifest.js";
 import {
   citedArticles,
   claimsFor,
@@ -25,6 +26,7 @@ import {
   saveRecord,
   scorecard,
 } from "./widget-judge.js";
+import { judgeToolCapabilities } from "./widget-judge-tools.js";
 import { SUPPORT_GUIDE } from "./widget-support-guide.js";
 
 const present = <T>(value: T | undefined): T => {
@@ -521,6 +523,78 @@ const scoredSample = () => {
     },
   };
 };
+
+// ENG-20544: a reply recorded before a tool was retired is judged against the tools its run had.
+test("a retired tool the run called is listed as available to it", () => {
+  const input = JSON.parse(judgeInput(recorded, "Answer.", claims));
+  const names = input.widgetToolCapabilities.map(
+    (tool: { name: string }) => tool.name
+  );
+  assert.ok(names.includes("widget_outreach_health"));
+  assert.equal(new Set(names).size, names.length);
+  const today = JSON.parse(
+    judgeInput({ ...recorded, cassette: [] }, "Answer.", claims)
+  ).widgetToolCapabilities.map((tool: { name: string }) => tool.name);
+  assert.equal(today.includes("widget_outreach_health"), false);
+});
+
+test("a run that called a retired tool is not judged with the endpoint that replaced it", () => {
+  const campaigns = WIDGET_ENDPOINT_MANIFEST.endpoints.find(
+    ({ name }) => name === "campaigns"
+  );
+  assert.ok(campaigns);
+  const listed = [
+    {
+      name: campaigns.name,
+      path: campaigns.path,
+      sections: campaigns.sections.map((section) => section.name),
+      version: campaigns.version,
+    },
+  ];
+  const names = (tools: string[]) =>
+    judgeToolCapabilities(listed, tools).map(({ name }) => name);
+  assert.ok(names([]).includes("widget_campaigns"));
+  assert.ok(names(["widget_campaigns"]).includes("widget_campaigns"));
+  const old = names(["widget_outreach_health"]);
+  assert.equal(old.includes("widget_campaigns"), false);
+  assert.ok(old.includes("widget_outreach_health"));
+});
+
+test("a score result saved during the rollout is judged with its held areas' tools, not their endpoints", () => {
+  const campaigns = WIDGET_ENDPOINT_MANIFEST.endpoints.find(
+    ({ name }) => name === "campaigns"
+  );
+  assert.ok(campaigns);
+  const listed = [
+    {
+      name: campaigns.name,
+      path: campaigns.path,
+      sections: campaigns.sections.map((section) => section.name),
+      version: campaigns.version,
+    },
+  ];
+  const names = judgeToolCapabilities(listed, [], ["campaigns", "orders"]).map(
+    ({ name }) => name
+  );
+  assert.equal(names.includes("widget_campaigns"), false);
+  for (const name of [
+    "widget_outreach_health",
+    "widget_provisioning_status",
+    "widget_job_failures",
+  ]) {
+    assert.ok(names.includes(name), name);
+  }
+  assert.equal(names.includes("widget_billing_summary"), false);
+});
+
+test("a score result saved with the rollout's held areas still loads", () => {
+  assert.ok(
+    widgetCaseSchema.safeParse({
+      ...smoke,
+      scope: { ...smoke.scope, heldAreas: ["billing"] },
+    }).success
+  );
+});
 
 test("gap judging receives authoritative tool schemas and ranks unused capabilities separately", () => {
   const input = JSON.parse(judgeInput(recorded, "Answer.", claims));

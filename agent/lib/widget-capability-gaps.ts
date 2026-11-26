@@ -86,53 +86,12 @@ const NOT_READS = new Set([
   "widget_known_issues",
   "widget_read_recording",
 ]);
-/**
- * Each hand-written tool's support endpoint area (the parent ticket's handoff),
- * so a gap keeps its key when the area switches to its endpoint. Job failures
- * are split across AI SDR, orders and lead pipeline there, so its key
- * changes when it goes.
- */
-const TOOL_AREAS: Readonly<Record<string, string>> = {
-  widget_account_access: "account",
-  widget_billing_summary: "billing",
-  widget_crm_contact: "crm-contact",
-  widget_generation_diagnostics: "ai-generation",
-  widget_inbox_health: "inboxes",
-  widget_job_failures: "jobs",
-  widget_lead_pipeline_status: "lead-pipeline",
-  widget_outreach_health: "campaigns",
-  widget_provisioning_status: "orders",
-  widget_sdr_thread_status: "ai-sdr",
-  widget_website_status: "website",
-};
 const toolArea = (tool: string) =>
-  TOOL_AREAS[tool] ?? tool.slice("widget_".length).replaceAll("_", "-");
+  tool.slice("widget_".length).replaceAll("_", "-");
 const READ_FAILED = new Set(["error", "timeout"]);
 const unavailableSections = z.array(
   z.looseObject({ reason: z.string(), section: z.string().max(100) })
 );
-/** widget_billing_summary names each failed source first: `stripe: <reason>`, `productDb.creditHistory read unavailable`. */
-const billingSources = z.array(z.string().max(500));
-const SOURCE = /^[a-z][a-zA-Z]{0,40}(?:\.[a-z][a-zA-Z]{0,40})?/u;
-/** Billing's answers when it read nothing by design: the membership check refused, or no such workspace. */
-const BILLING_REFUSALS = new Set([
-  "workspace could not be verified",
-  "productDb: organization not found",
-]);
-/**
- * The one list whose entries carry sources: website status reads live
- * hosting, the public check and the render per project. Other lists hold
- * records whose own status says nothing about a read.
- */
-const SOURCE_LISTS: Readonly<Record<string, string>> = {
-  widget_website_status: "projects",
-};
-// A nested key is a field name the tool wrote, never a record's name; the
-// all-caps ones are the public check's DNS record types (A, AAAA, CNAME, NS).
-const FIELD = /^(?:[a-z][a-zA-Z0-9]{0,40}|[A-Z]{1,5})$/u;
-const REASON = /^[a-z][a-z_]{0,40}$/u;
-// projects.publicCheck.dns.A is the deepest source a tool reports.
-const NESTED_DEPTH = 4;
 /** eve's result for a call the framework refused, or whose input failed validation, before any read ran. */
 const NOT_RUN =
   /^(?:AI_)?(?:InvalidToolInput|InvalidArgument|TypeValidation|NoSuchTool)Error$|^ZodError$/u;
@@ -207,61 +166,12 @@ export function gapsFromResult(result: unknown): CapabilityGap[] {
   });
   const endpoint = unavailableSections.safeParse(output?.unavailable);
   // Only an endpoint body carries sections; its own section data is not walked.
-  if (endpoint.success && output && "sections" in output) {
-    return endpoint.data
-      .filter((entry) => READ_FAILED.has(entry.reason))
-      .map((entry) => section(entry.section, entry.reason));
-  }
-  const billing = billingSources.safeParse(output?.unavailable);
-  return [
-    ...(billing.success
-      ? billing.data.flatMap((entry) => {
-          const name = BILLING_REFUSALS.has(entry)
-            ? undefined
-            : SOURCE.exec(entry)?.[0];
-          return name ? [section(name, "unavailable")] : [];
-        })
-      : []),
-    ...nestedUnavailable(output, "", SOURCE_LISTS[tool]).map(
-      ({ path, reason }) => section(path, reason)
-    ),
-  ];
-}
-
-/**
- * A source a hand-written tool reports as `{ status: "unavailable" }` inside
- * a result that is otherwise ok (account's Sentry signals, generation's
- * error sources, website's render), named by its field path. Only the
- * tool's source list is walked, and its entries share one path, so no
- * record's id or name reaches the key.
- */
-function nestedUnavailable(
-  value: unknown,
-  path: string,
-  list: string | undefined,
-  depth = 0
-): { path: string; reason: string }[] {
-  if (Array.isArray(value)) {
-    return path === list
-      ? value.flatMap((entry) => nestedUnavailable(entry, path, list, depth))
-      : [];
-  }
-  if (!value || typeof value !== "object") {
+  if (!(endpoint.success && output && "sections" in output)) {
     return [];
   }
-  const node = value as Record<string, unknown>;
-  if (path && node.status === "unavailable") {
-    const reason = typeof node.reason === "string" ? node.reason : "";
-    return [{ path, reason: REASON.test(reason) ? reason : "unavailable" }];
-  }
-  if (depth >= NESTED_DEPTH) {
-    return [];
-  }
-  return Object.entries(node).flatMap(([key, child]) =>
-    FIELD.test(key)
-      ? nestedUnavailable(child, path ? `${path}.${key}` : key, list, depth + 1)
-      : []
-  );
+  return endpoint.data
+    .filter((entry) => READ_FAILED.has(entry.reason))
+    .map((entry) => section(entry.section, entry.reason));
 }
 
 const WHOLE_REFUSALS = new Set([
@@ -273,10 +183,10 @@ const WHOLE_REFUSALS = new Set([
 
 /**
  * One widget read's area and whether the whole check was refused by design:
- * its own status is denied, feature_off, invalid_input or not_linked, the
- * framework refused the call or rejected its input, or billing refused it.
- * A refused section or project inside an otherwise answered read is not a
- * refusal of the area. Null for anything that isn't a widget read.
+ * its own status is denied, feature_off, invalid_input or not_linked, or the
+ * framework refused the call or rejected its input. A refused section inside
+ * an otherwise answered read is not a refusal of the area. Null for anything
+ * that isn't a widget read.
  */
 export function readRefusal(
   result: unknown
@@ -301,18 +211,14 @@ export function readRefusal(
   const output = action.output as {
     code?: unknown;
     status?: unknown;
-    unavailable?: unknown;
   } | null;
   const notRun =
     action.isError === true &&
     (output?.code === "TOOL_EXECUTION_DENIED" ||
       (typeof action.errorName === "string" && NOT_RUN.test(action.errorName)));
-  const billing = billingSources.safeParse(output?.unavailable);
   const refused =
     notRun ||
-    (typeof output?.status === "string" && WHOLE_REFUSALS.has(output.status)) ||
-    (billing.success &&
-      billing.data.some((entry) => BILLING_REFUSALS.has(entry)));
+    (typeof output?.status === "string" && WHOLE_REFUSALS.has(output.status));
   return { area: toolArea(tool), refused };
 }
 

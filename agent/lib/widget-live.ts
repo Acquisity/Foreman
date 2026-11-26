@@ -1,4 +1,3 @@
-import { HELD_AREAS } from "./widget-endpoint-tools.js";
 import { normalize } from "./widget-normalize.js";
 
 /**
@@ -7,26 +6,12 @@ import { normalize } from "./widget-normalize.js";
  */
 
 /**
- * Widget tools that accept an absolute date today, for the rollout's held
- * areas: the re-run asks for the original conversation date on these. The
- * old billing tool takes a `creditWindow` with dates; the billing endpoint's
- * `creditWindow` counts days back from now, like widget_job_failures and
- * widget_generation_diagnostics (`since`), widget_lead_pipeline_status
- * (`sinceDays`) and widget_sdr_thread_status (a fixed 30 days), so those
- * cannot be pinned. Campaigns takes `startDate` and `endDate` on both its old
- * tool and its endpoint. Every other tool has no date input.
+ * The original message with a teammate's note pinning dated reads to the day
+ * it was sent. Only the campaigns endpoint takes absolute dates; the billing
+ * endpoint's `creditWindow` counts days back from now, so it cannot be pinned.
  */
-export const datedTools = (
-  held: ReadonlySet<string> = HELD_AREAS
-): Readonly<Record<string, string>> => ({
-  ...(held.has("billing") ? { widget_billing_summary: "creditWindow" } : {}),
-  [held.has("campaigns") ? "widget_outreach_health" : "widget_campaigns"]:
-    "startDate and endDate",
-});
-
-/** The original message with a teammate's note pinning dated reads to the day it was sent. */
 export const pinnedQuestion = (question: string, sentAt: string) =>
-  `${question}\n\n(Team re-run: the customer sent this on ${sentAt.slice(0, 10)}. Where a read accepts a date window (${Object.keys(datedTools()).join(", ")}), ask about that date.)`;
+  `${question}\n\n(Team re-run: the customer sent this on ${sentAt.slice(0, 10)}. Where a read accepts a date window (widget_campaigns), ask about that date.)`;
 
 const SENTENCE_BREAK = /(?<=[.!?])\s+|\n+/;
 const UNCONFIRMED =

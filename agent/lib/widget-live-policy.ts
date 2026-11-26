@@ -1,5 +1,4 @@
 import { z } from "zod";
-import { creditWindowRequestSchema } from "./billing-account.js";
 import { type WidgetContext, widgetContextSchema } from "./widget-scope.js";
 
 /** Live investigations require the local Workflow world and local file storage. */
@@ -108,86 +107,18 @@ export async function verifyLiveServer(
   }
 }
 
-const datedInput = z.object({
-  campaignId: z.uuid().nullish(),
-  creditWindow: creditWindowRequestSchema.optional(),
-  endDate: z.iso.date().nullish(),
-  startDate: z.iso.date().nullish(),
-});
-
 export function hasMovingWindow(tool: string, input: unknown) {
   // The billing endpoint's creditWindow counts days back from now, so every
   // re-read of it covers a different window.
   if (tool === "widget_billing") {
     return true;
   }
-  if (tool === "widget_campaigns") {
-    const { endDate, startDate } = (input ?? {}) as {
-      endDate?: unknown;
-      startDate?: unknown;
-    };
-    return !(startDate && endDate);
-  }
-  if (tool !== "widget_billing_summary" && tool !== "widget_outreach_health") {
+  if (tool !== "widget_campaigns") {
     return false;
   }
-  const parsed = datedInput.parse(input);
-  return tool === "widget_billing_summary"
-    ? !parsed.creditWindow
-    : !(parsed.startDate && parsed.endDate);
-}
-
-/**
- * Preserve explicit windows. Otherwise billing reads the original UTC day
- * [midnight, next midnight); campaign metrics read seven calendar days ending
- * on that day, inclusive, for a selected campaign and for the listing's daily sends.
- */
-export function pinLiveInput(
-  tool: string,
-  input: unknown,
-  sentAt: string | undefined
-): unknown {
-  // Only the hand-written tools pin their own input; an endpoint tool's window is not pinned.
-  if (
-    !(
-      (tool === "widget_billing_summary" ||
-        tool === "widget_outreach_health") &&
-      hasMovingWindow(tool, input)
-    )
-  ) {
-    return input;
-  }
-  const date = z.iso.datetime().parse(sentAt);
-  const day = date.slice(0, 10);
-  const midnight = Date.parse(`${day}T00:00:00.000Z`);
-  const parsed = datedInput.parse(input);
-  if (tool === "widget_billing_summary") {
-    return {
-      ...(input as object),
-      creditWindow: {
-        from: new Date(midnight).toISOString(),
-        to: new Date(midnight + 86_400_000).toISOString(),
-      },
-    };
-  }
-  if (parsed.startDate || parsed.endDate) {
-    throw new Error("A historical campaign window must include both dates.");
-  }
-  return {
-    ...(input as object),
-    endDate: day,
-    startDate: new Date(midnight - 6 * 86_400_000).toISOString().slice(0, 10),
+  const { endDate, startDate } = (input ?? {}) as {
+    endDate?: unknown;
+    startDate?: unknown;
   };
-}
-
-/** The authored tool boundary calls this; flag-free customer reads keep their exact inputs. */
-export function liveToolInput<T>(
-  tool: string,
-  input: T,
-  sentAt: string | undefined
-): T {
-  assertLiveAllowed();
-  return process.env.WIDGET_LIVE === "1"
-    ? (pinLiveInput(tool, input, sentAt) as T)
-    : input;
+  return !(startDate && endDate);
 }
