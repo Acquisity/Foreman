@@ -426,6 +426,9 @@ interface Found {
   teams: { nodes: { id: string }[] };
 }
 
+const occurrences = (comments: readonly { body: string }[]) =>
+  comments.filter((comment) => comment.body.startsWith(OCCURRENCE)).length;
+
 export type GapFiling =
   | { identifier: string; outcome: "counted" | "filed" | "judged" | "seen" }
   | { outcome: "failed"; reason: string };
@@ -504,10 +507,7 @@ export async function fileCapabilityGap(
         id: mine.id,
       });
     }
-    const count =
-      open.comments.nodes.filter((comment) =>
-        comment.body.startsWith(OCCURRENCE)
-      ).length + (added ? 1 : 0);
+    const count = occurrences(open.comments.nodes) + Number(added);
     const description = open.description ?? "";
     const counted = countedDescription(description, count);
     if (counted !== description) {

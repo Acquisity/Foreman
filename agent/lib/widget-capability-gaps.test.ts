@@ -384,6 +384,10 @@ const gap: CapabilityGap = {
 };
 const { signal } = new AbortController();
 const CUSTOMER_ORG = "11111111-1111-4111-8111-111111111111";
+const DUPLICATE_NOT_OPEN = /nin: \["completed", "canceled", "duplicate"\]/u;
+const CLOSED_BY_CLOSURE_TIME =
+  /or: \[\{ completedAt: \{ gt: \$since \} \}, \{ canceledAt: \{ gt: \$since \} \}\]/u;
+const UPDATED_AT = /updatedAt/u;
 const fileWith =
   (linear: ReturnType<typeof fakeLinear>, filed: CapabilityGap = gap) =>
   (conversationId: string, runId: string) =>
@@ -470,12 +474,9 @@ test("the find reads closed tickets by closure time and never treats Duplicate a
     }) as never
   );
   const [find] = queries;
-  assert.match(find ?? "", /nin: \["completed", "canceled", "duplicate"\]/u);
-  assert.match(
-    find ?? "",
-    /or: \[\{ completedAt: \{ gt: \$since \} \}, \{ canceledAt: \{ gt: \$since \} \}\]/u
-  );
-  assert.doesNotMatch(find ?? "", /updatedAt/u);
+  assert.match(find ?? "", DUPLICATE_NOT_OPEN);
+  assert.match(find ?? "", CLOSED_BY_CLOSURE_TIME);
+  assert.doesNotMatch(find ?? "", UPDATED_AT);
 });
 
 test("an open ticket still takes the conversation when Linear returns no kind label", async () => {
