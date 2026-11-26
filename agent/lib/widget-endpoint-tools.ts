@@ -32,7 +32,7 @@ import {
  * old file stays until the cleanup (ENG-20544). An area missing here is
  * offered as soon as the manifest has it.
  */
-export const HELD_AREAS: ReadonlySet<string> = new Set(["crm-contact"]);
+export const HELD_AREAS: ReadonlySet<string> = new Set<string>();
 /**
  * The hand-written widget tools an endpoint area replaces, and the areas each
  * answers for. Job failures reads failed AI SDR runs, provisioning orders and
@@ -42,7 +42,6 @@ export const HELD_AREAS: ReadonlySet<string> = new Set(["crm-contact"]);
 export const LEGACY_TOOL_AREAS: Readonly<Record<string, readonly string[]>> = {
   widget_account_access: ["account"],
   widget_billing_summary: ["billing"],
-  widget_crm_contact: ["crm-contact"],
   widget_generation_diagnostics: ["ai-generation"],
   widget_inbox_health: ["inboxes"],
   widget_job_failures: ["ai-sdr", "lead-pipeline", "orders"],
