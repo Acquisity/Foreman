@@ -352,7 +352,7 @@ test("the draft runs only when the deadline leaves the filing its room, and a co
   const [{ description, title }] = writes;
   assert.equal(title, "My inbox stopped sending yesterday.");
   for (const section of [
-    "## What the customer wants\n\nThe customer wrote:\n\n> My inbox stopped sending yesterday.\n> \n> Still broken.",
+    "## What the customer wants\n\nThe customer wrote:\n\n> Still broken.\n\nEarlier they wrote:\n\n> My inbox stopped sending yesterday.",
     "## What Foreman told them\n\n> I've passed this on again.",
     "## What's still open\n\nThe customer asked for a person.",
   ]) {
@@ -385,6 +385,46 @@ test("a long pasted log and model text starting with a heading still fit, with t
   assert.ok(report.includes("## What's still open\n\n\\## open word"));
   assert.ok(report.includes("## What the customer wrote\n\n> x\n> x"));
   assertScopeParses(description);
+});
+
+test("a fallback quotes the latest message first, keeps an indented log out of code, and titles from findings only when the customer said too little", async () => {
+  const { file, writes } = fileForReal();
+  await handoffTicket(
+    scope,
+    {
+      history: [
+        { role: "customer", text: `Log:\n\n    ${"ERROR 500 ".repeat(300)}` },
+      ],
+      latest: "Please refund last month's charge.",
+      why: "The customer asked for a person.",
+    },
+    ids,
+    undefined,
+    file
+  );
+  const [{ description }] = writes;
+  assert.ok(
+    description.includes(
+      "The customer wrote:\n\n> Please refund last month's charge.\n\nEarlier they wrote:\n\n> Log:\n> \n> ERROR 500"
+    )
+  );
+  assertScopeParses(description);
+  const short = fileForReal();
+  await handoffTicket(
+    scope,
+    {
+      findings: {
+        recommendation: "Reconnect the inbox.",
+        report: "The inbox disconnected on 3 November",
+      },
+      latest: "human agent",
+      why: "Foreman could not answer it (deadline).",
+    },
+    ids,
+    undefined,
+    short.file
+  );
+  assert.equal(short.writes[0]?.title, "The inbox disconnected on 3 November");
 });
 
 test("a ticket that cannot be filed returns no ticket", async () => {

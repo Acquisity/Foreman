@@ -102,12 +102,12 @@ const firstDetails = (turn: BugReportTurn) =>
     .map((entry) => ("text" in entry ? entry.text : entry.question).trim())
     .find(Boolean) ?? null;
 
-/** Clipped after quoting, so a text of many short lines cannot outgrow its room. */
+/** Clipped after quoting, so a text of many short lines cannot outgrow its room; indents are dropped, so a quoted line cannot become code. */
 const blockquote = (text: string, max = 1500) =>
   clip(
     inert(text)
       .split("\n")
-      .map((line) => `> ${line}`)
+      .map((line) => `> ${line.trimStart()}`)
       .join("\n"),
     max
   );
@@ -249,12 +249,13 @@ const handoffSaid = (facts: HandoffFacts): Said[] => [
   { speaker: "Note from the app", text: facts.why },
 ];
 
-const customerWords = (facts: HandoffFacts) => [
-  ...(facts.history ?? [])
-    .filter(({ role }) => role === "customer")
-    .map(({ text }) => text),
-  facts.latest,
-];
+const earlierWords = (facts: HandoffFacts) =>
+  (facts.history ?? [])
+    .filter(({ role, text }) => role === "customer" && text.trim())
+    .map(({ text }) => text);
+
+/** Below this a message rarely names a problem ("human agent", "still broken"). */
+const NAMING_WORDS = 4;
 
 /** The newest thing Foreman told the customer: this message's reply, else its last earlier one. */
 const lastToldTheCustomer = (facts: HandoffFacts) =>
@@ -262,25 +263,33 @@ const lastToldTheCustomer = (facts: HandoffFacts) =>
   (facts.history ?? []).filter(({ role }) => role === "assistant").at(-1)?.text;
 
 /**
- * Written without the model: titled from Foreman's findings, else from the
- * customer's longest message, which names the problem more often than a
- * closing "can I talk to a person?".
+ * Written without the model. Titled from the customer's longest message,
+ * which names the problem more often than a closing "can I talk to a
+ * person?", or from Foreman's findings when the customer said too little to
+ * name one. The latest message is quoted first, so earlier pastes cannot
+ * crowd it out.
  */
 export const fallbackHandoffDraft = (facts: HandoffFacts): HandoffDraft => {
-  const said = customerWords(facts).filter((text) => text.trim());
+  const earlier = earlierWords(facts);
+  const longest = [...earlier, facts.latest].reduce((most, text) =>
+    text.trim().length > most.trim().length ? text : most
+  );
   const told = lastToldTheCustomer(facts);
   return {
     fallback: true,
     open: facts.why,
     title: excerptTitle(
-      facts.findings?.report ||
-        said.reduce(
-          (longest, text) => (text.length > longest.length ? text : longest),
-          ""
-        )
+      longest.trim().split(WORDS).length < NAMING_WORDS && facts.findings
+        ? facts.findings.report
+        : longest
     ),
     told: told ? blockquote(told, 500) : NOTHING_YET,
-    wants: said.length ? quoted(said.join("\n\n")) : NOT_STATED,
+    wants: [
+      facts.latest.trim() ? quoted(facts.latest) : NOT_STATED,
+      ...(earlier.length
+        ? [`Earlier they wrote:\n\n${blockquote(earlier.join("\n\n"), 1000)}`]
+        : []),
+    ].join("\n\n"),
   };
 };
 
