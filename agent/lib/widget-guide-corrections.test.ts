@@ -811,6 +811,10 @@ test("correct clear-out wordings pass, so a regeneration can finish", () => {
     ),
     section(
       CLEAR_OUT,
+      "- When it pauses a campaign, no matter how much space you have, it can remove that campaign's bounced leads."
+    ),
+    section(
+      CLEAR_OUT,
       "- It removes old leads when you have fewer than 2,000 free slots, and bounced leads when it pauses a campaign."
     ),
     section(
@@ -841,6 +845,8 @@ test("a pause case that keeps bounced leads or needs low space is refused", () =
     "- When it pauses a campaign, it never queues removal of its bounced leads.",
     "- When it pauses a campaign, it does not ever remove bounced leads.",
     "- When the agent pauses a campaign, it cannot remove that campaign's bounced leads, whatever your space.",
+    "- When it pauses a campaign, it removes no bounced leads.",
+    "- When it pauses a campaign, it removes its bounced leads only when you have under 2k free slots.",
     "- When the agent pauses a campaign, it can remove its bounced leads only if you have fewer than 2,000 free slots.",
     "- When it pauses a campaign, it can remove that campaign's bounced leads.\n- Pausing a campaign removes bounced leads only when you have under 2,000 free slots.",
     "- When it pauses a campaign it removes bounced leads, even when space is low, but only under 2,000 free slots.",
@@ -866,12 +872,14 @@ test("a pause case that keeps bounced leads or needs low space is refused", () =
 
 test("the log of a refused distillation shows each refused section's text", () => {
   const bad = section(CLEAR_OUT, "- Leads are never deleted.");
+  const badMeet = section(MEET, "- Skipped leads can be re-added.");
   const sections = new Map([
     [CLEAR_OUT, bad],
-    [MEET, section(MEET, "- Use Google Meet.")],
+    [MEET, badMeet],
+    [SPLIT, section(SPLIT, "- No one can split an invoice.")],
   ]);
   assert.equal(
-    refusedSections([CLEAR_OUT, MEET], sections),
-    `  refused section ${CLEAR_OUT}:\n${bad}`
+    refusedSections([CLEAR_OUT, SPLIT, MEET], sections),
+    `  refused section ${CLEAR_OUT}:\n${bad}\n  refused section ${MEET}:\n${badMeet}`
   );
 });

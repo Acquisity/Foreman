@@ -613,11 +613,11 @@ const distillBatch = (batch: Article[], label: string, main?: MainReference) =>
         batch.map((a) => a.slug)
       );
       assertOwnAnswers(repaired);
-      const slugs = batch.map((a) => a.slug);
+      const batchSlugs = batch.map((a) => a.slug);
       const sections = splitGuideSections(repaired);
-      const problems = batchProblems(slugs, sections);
+      const problems = batchProblems(batchSlugs, sections);
       if (problems.length) {
-        console.log(refusedSections(slugs, sections));
+        console.log(refusedSections(batchSlugs, sections));
         throw new Error(`corrections refused: ${problems.join("; ")}`);
       }
       return repaired;
