@@ -75,8 +75,10 @@ const CANT = String.raw`\b(?:can[’']?t|cannot|can not|unable|not able|don[’'
 /** The agent pausing a campaign, not a campaign that is already paused. */
 const PAUSES = String.raw`\b(?:pauses|pausing)\b`;
 const LOW_SPACE = String.raw`(?:\b2,?000\b|\b2k\b|\bfree (?:lead )?(?:slots|space)\b|\b(?:running out of|short (?:of|on)|low on) (?:lead )?(?:space|slots|room)\b|\b(?:space|room) is (?:tight|short|low|running out)\b)`;
-/** Limited to low space, as Foreman#374 said of "Clear out old leads". */
-const ONLY_LOW_SPACE = String.raw`[^.;\n]*(?<!\bnot )\bonly\b[^.;\n]*${LOW_SPACE}`;
+/** Too little space for more leads: under 2,000 free slots, or nearly full. */
+const TOO_LITTLE_SPACE = String.raw`(?:\b(?:under|below|fewer than|less than)\s+2,?000\b|\b(?:running out of|short (?:of|on)|low on) (?:lead )?(?:space|slots|room)\b|\b(?:space|room|storage) is (?:tight|short|low|full|running out)\b)`;
+/** Limited to too little space, as Foreman#374 said of "Clear out old leads". */
+const ONLY_LOW_SPACE = String.raw`[^.;\n]*(?<!\b(?:even|not|not just|not only) )\b(?:only|when|if|once|while|as long as)\b[^.;\n]{0,40}?${TOO_LITTLE_SPACE}`;
 
 export const GUIDE_CORRECTIONS: readonly GuideCorrection[] = [
   {
@@ -260,13 +262,14 @@ export const GUIDE_CORRECTIONS: readonly GuideCorrection[] = [
     ],
     rejectSummary: [
       new RegExp(String.raw`^(?![^{\n]*${PAUSES})[^{\n]*${LOW_SPACE}`, "iu"),
+      /\b(?:remov|delet|clear)[^{\n]*\bonly\b[^{\n]*\bstorage is full\b/iu,
     ],
     require: [
       new RegExp(
         CLAUSE +
           IN_CLAUSE(PAUSES) +
           IN_CLAUSE(
-            String.raw`(?<!\b(?:never|not|no|[a-z]+n[’']t|keeps?|rather than)\b[^.;\n]*)\b(?:remov|delet|clear)`
+            String.raw`(?<!\b(?:never|not|no|cannot|unable to|[a-z]+n[’']t|keeps?|rather than)\b[^.;\n]*)\b(?:remov|delet|clear)`
           ) +
           IN_CLAUSE(String.raw`\bbounc`) +
           `(?!${ONLY_LOW_SPACE})`,
@@ -334,6 +337,19 @@ export const batchProblems = (
   sections: Map<string, string>
 ): string[] =>
   slugs.flatMap((slug) => sectionProblems(slug, sections.get(slug) ?? ""));
+
+/** Each refused section's text, for the log of a refused distillation. */
+export const refusedSections = (
+  slugs: readonly string[],
+  sections: Map<string, string>
+): string =>
+  slugs
+    .filter((slug) => sectionProblems(slug, sections.get(slug) ?? "").length)
+    .map(
+      (slug) =>
+        `  refused section ${slug}:\n${sections.get(slug) ?? "(missing)"}`
+    )
+    .join("\n");
 
 const lineRefused = (line: string) =>
   [...line.matchAll(GUIDE_CITATION)].some((m) => {
