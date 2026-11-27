@@ -19,13 +19,7 @@ export type EscalationReason = (typeof ESCALATION_REASONS)[number];
 export const findingsSchema = z.strictObject({
   confidence: z.enum(["low", "medium", "high"]),
   // Acquisity hands the chat to Fixy and files nothing for the escalation.
-  escalate: z
-    .strictObject({
-      reason: z.enum(ESCALATION_REASONS),
-      // One plain line naming the problem, for Fixy's top post.
-      summary: z.string().min(1).max(200).optional(),
-    })
-    .optional(),
+  escalate: z.strictObject({ reason: z.enum(ESCALATION_REASONS) }).optional(),
   facts: z
     .array(
       z.strictObject({

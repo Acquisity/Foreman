@@ -208,7 +208,7 @@ const QUESTIONS = {
   // refund does (ENG-21094).
   asks_to_cancel: {
     instructions:
-      "The customer asks to cancel their subscription, plan or account, to stop being billed, or to downgrade, or the latest message continues such a request from the earlier turns. Asking how cancelling works or what happens if they cancel, without asking to cancel, is NOT this. Cancelling or pausing a campaign, sequence, inbox or other item inside the product is NOT this.",
+      "The customer asks to cancel their subscription, plan or account, or to stop being billed, or the latest message continues such a request from the earlier turns. Asking how cancelling works or what happens if they cancel, without asking to cancel, is NOT this. Switching to another paid plan is NOT this. Cancelling or pausing a campaign, sequence, inbox or other item inside the product is NOT this.",
     type: "noul",
   },
   // Asked in the same request, so it costs nothing. Like reports_bug, it only

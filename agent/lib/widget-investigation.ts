@@ -1270,7 +1270,8 @@ export async function finishWidgetRun(
     clock.timeout(roomMs),
     deps.fileTicket,
     deps.draftTicket,
-    roomMs
+    roomMs,
+    deps.readTicket
   ));
   logGateDecision(
     { conversationId: run.scope.conversationId, runId: run.id, sessionId },
@@ -1329,7 +1330,8 @@ async function settleResultRun(
       deps.fileTicket,
       deps.draftTicket,
       // Already overdue: the ticket is written without waiting on a draft.
-      0
+      0,
+      deps.readTicket
     );
     logGateDecision(
       { conversationId: run.scope.conversationId, runId: run.id, sessionId },
@@ -1595,9 +1597,7 @@ async function answerFromKnowledgeBase(
   const person = asksForPerson(route);
   const needs = teamAsk(scope, route, { helpCenterOnly, needsLook, person });
   // A front-door refund goes to Fixy for every role: nothing here investigates it.
-  const escalation = escalationFor(scope, needs, route, ask.latest, {
-    refund: true,
-  });
+  const escalation = escalationFor(scope, needs, route, { refund: true });
   if (escalation) {
     drafting.abort();
     return completeEscalation(deps.complete, run.id, scope, escalation);
@@ -1827,12 +1827,12 @@ async function toggledPersonAsk(
   deps: WidgetDependencies
 ): Promise<string | WidgetRun | null> {
   const person = asksForPerson(route);
-  // An owner's toggled refund keeps investigating: the investigator files it in billing's queue.
+  // An owner's toggled refund keeps investigating, an ask for a person with
+  // it too: the investigator reads billing and files it in billing's queue.
   const escalation = escalationFor(
     scope,
-    person ? "person" : null,
+    person && !route.refund ? "person" : null,
     route,
-    ask.latest,
     { refund: false }
   );
   if (escalation) {

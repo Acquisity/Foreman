@@ -52,26 +52,9 @@ export const teamAsk = (
     : null;
 };
 
-/** Fewer words than this cannot name a problem ("Yes, last Friday"), so no summary is sent. */
-const SUMMARY_WORDS = 6;
-
-/** The customer's message on one line, when it says enough to name the problem, for Fixy's top post. */
-const escalationSummary = (text: string | undefined) => {
-  const line = text?.replace(/\s+/gu, " ").trim() ?? "";
-  return line.split(" ").length >= SUMMARY_WORDS
-    ? line.slice(0, 200)
-    : undefined;
-};
-
-const summaryOf = (text: string | undefined) => {
-  const summary = escalationSummary(text);
-  return summary ? { summary } : {};
-};
-
 export interface Escalation {
   reason: EscalationReason;
   report: string;
-  summary?: string;
 }
 
 /**
@@ -85,7 +68,6 @@ export const escalationFor = (
   scope: WidgetContext,
   ask: TeamAsk | null,
   route: WidgetRoute,
-  latest: string,
   { refund }: { refund: boolean }
 ): Escalation | null => {
   if (!(escalatesToFixy() && customerTurn(scope))) {
@@ -94,7 +76,6 @@ export const escalationFor = (
   const escalate = (reason: EscalationReason, report: string) => ({
     reason,
     report,
-    ...summaryOf(latest),
   });
   if (route.cancel) {
     return escalate("cancel", "The customer asked to cancel.");
@@ -121,21 +102,21 @@ export const escalationFor = (
 export function escalated(
   escalation: Escalation,
   found: WidgetFindings | null | undefined,
-  ids: { conversationId: string; runId: string; sessionId?: string }
+  ids: { conversationId: string; runId: string; sessionId?: string },
+  /** A ticket this turn filed that `found` does not carry. */
+  filed?: WidgetFindings["ticket"]
 ): { findings: WidgetFindings | null; result: WidgetOutcome } {
+  const ticket = found?.ticket ?? filed;
   logOpsEvent("widget.handoff.escalate", {
     ...ids,
     decision: escalation.reason,
   });
   return {
     findings: teamFindings(escalation.report, found, {
-      escalate: {
-        reason: escalation.reason,
-        ...(escalation.summary ? { summary: escalation.summary } : {}),
-      },
+      escalate: { reason: escalation.reason },
       recommendation: found?.recommendation ?? escalation.report,
       ...(found?.needsWrite ? { needsWrite: found.needsWrite } : {}),
-      ...(found?.ticket ? { ticket: found.ticket } : {}),
+      ...(ticket ? { ticket } : {}),
     }),
     result: {
       citations: [],
@@ -164,7 +145,6 @@ export const needsTheTeam = (
       reason: "cant_check",
       report:
         "Foreman's investigation found something only the team can settle and handed the chat to Fixy.",
-      ...summaryOf(run.question),
     },
     found,
     { conversationId: run.scope.conversationId, runId: run.id, sessionId }
@@ -182,31 +162,29 @@ export const couldNotStart = (run: RunIds) =>
           reason: "blocked",
           report:
             "Foreman's investigation could not start, so the chat was handed to Fixy.",
-          ...summaryOf(run.question),
         },
         null,
         { conversationId: run.scope.conversationId, runId: run.id }
       )
     : null;
 
-/** A block a resend cannot fix, handed to Fixy. Null for a teammate's run and while escalation is off. */
+/** A block a resend cannot fix, handed to Fixy, with any ticket the turn filed before it stopped. */
 export const blockedForCustomer = (
   run: RunIds,
   reason: string,
   found: WidgetFindings | null,
-  ids: { runId: string; sessionId?: string }
+  ids: { runId: string; sessionId?: string },
+  filed?: WidgetFindings["ticket"]
 ) =>
-  escalatesToFixy() && customerTurn(run.scope)
-    ? escalated(
-        {
-          reason: "blocked",
-          report: `Foreman could not answer this (${reason}) and handed the chat to Fixy.`,
-          ...summaryOf(run.question),
-        },
-        found,
-        { conversationId: run.scope.conversationId, ...ids }
-      )
-    : null;
+  escalated(
+    {
+      reason: "blocked",
+      report: `Foreman could not answer this (${reason}) and handed the chat to Fixy.`,
+    },
+    found,
+    { conversationId: run.scope.conversationId, ...ids },
+    filed
+  );
 
 /**
  * Complete a front-door or toggled turn by handing the chat to Fixy. No

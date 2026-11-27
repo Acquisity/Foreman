@@ -150,17 +150,11 @@ const escalateOf = (run: WidgetRun) =>
 
 test("an ask for a person, a cancel or a refund hands the chat to Fixy with no reply and no ticket, the most specific need first", async (t) => {
   enable(t);
-  for (const [route, question, reason, summary] of [
+  for (const [route, question, reason] of [
     [{ asksForHuman: 0.95, noNeed: true }, "human agent", "asked_for_human"],
-    [{ asksForHuman: 0.95 }, PROBLEM, "asked_for_human", PROBLEM],
-    [{ asksForHuman: 0.95, refund: true }, PROBLEM, "refund", PROBLEM],
-    [
-      { asksForHuman: 0.95, cancel: true, refund: true },
-      PROBLEM,
-      "cancel",
-      PROBLEM,
-    ],
-    // A follow-up that only supplies a detail names no problem, so no summary.
+    [{ asksForHuman: 0.95 }, PROBLEM, "asked_for_human"],
+    [{ asksForHuman: 0.95, refund: true }, PROBLEM, "refund"],
+    [{ asksForHuman: 0.95, cancel: true, refund: true }, PROBLEM, "cancel"],
     [{ asksForHuman: 0, refund: true }, "Yes, last Friday", "refund"],
   ] as const) {
     const { deps, filed, run } = harness(route);
@@ -170,9 +164,8 @@ test("an ask for a person, a cancel or a refund hands the chat to Fixy with no r
     assert.equal(body.decision, "allow");
     assert.equal(body.message, null);
     assert.equal(run.outcome?.reason, `escalated_to_fixy ${reason}`);
-    const expected = { reason, ...(summary ? { summary } : {}) };
-    assert.deepEqual(escalateOf(run), expected);
-    assert.deepEqual((body.findings as WidgetFindings).escalate, expected);
+    assert.deepEqual(escalateOf(run), { reason });
+    assert.deepEqual((body.findings as WidgetFindings).escalate, { reason });
     assert.equal(filed.length, 0);
   }
 });
@@ -191,15 +184,18 @@ test("a toggled ask for a person or a cancel escalates, while an owner's toggled
   }
   // The refund goes on to the investigation; this one fails to start, so it
   // escalates as blocked instead of leaving the customer at a dead end.
-  const { deps, run } = harness({ asksForHuman: 0, refund: true });
-  let started = false;
-  const response = await send(deps, { mode: "investigate" }, scope, () => {
-    started = true;
-    throw new Error("session unavailable");
-  });
-  assert.ok(started, "the refund reached the investigation");
-  assert.equal(response.status, 200);
-  assert.equal(run.outcome?.reason, "escalated_to_fixy blocked");
+  for (const asksForHuman of [0, 0.95]) {
+    const { deps, run } = harness({ asksForHuman, refund: true });
+    let started = false;
+    // biome-ignore lint/performance/noAwaitInLoops: each case needs its own fresh run.
+    const response = await send(deps, { mode: "investigate" }, scope, () => {
+      started = true;
+      throw new Error("session unavailable");
+    });
+    assert.ok(started, "the refund reached the investigation");
+    assert.equal(response.status, 200);
+    assert.equal(run.outcome?.reason, "escalated_to_fixy blocked");
+  }
 });
 
 test("a member who needs a look escalates as cant_check; a teammate's run never escalates", async (t) => {
@@ -211,10 +207,10 @@ test("a member who needs a look escalates as cant_check; a teammate's run never 
     assert.equal(run.outcome?.reason, "escalated_to_fixy cant_check");
     assert.equal(filed.length, 0);
   }
-  const { deps, run } = harness({ asksForHuman: 0.95, refund: true });
+  const { deps, run } = harness({ asksForHuman: 0.95, cancel: true });
   const response = await send(
     deps,
-    { staff: true },
+    { mode: "investigate", staff: true },
     { ...scope, source: "inbox" },
     () => {
       throw new Error("session unavailable");
@@ -248,10 +244,7 @@ test("findings that need a person escalate as cant_check, keep the ticket the in
   const body = widgetRunResponse(run) as Record<string, unknown>;
   assert.equal(body.message, null);
   const returned = body.findings as WidgetFindings;
-  assert.deepEqual(returned.escalate, {
-    reason: "cant_check",
-    summary: PROBLEM,
-  });
+  assert.deepEqual(returned.escalate, { reason: "cant_check" });
   assert.deepEqual(returned.ticket, {
     id: "ENG-7",
     url: "https://linear.app/acquisity/issue/ENG-7/bug",
@@ -268,6 +261,13 @@ test("a blocked finish and an overdue investigation escalate as blocked; a retry
     const { deps, filed, run } = harness();
     deps.gate = () =>
       Promise.resolve({ decision: "block", findings, message: null, reason });
+    deps.readTicket = () =>
+      Promise.resolve({
+        existing: false,
+        identifier: "ENG-9",
+        refund: true,
+        url: "https://linear.app/acquisity/issue/ENG-9/refund",
+      });
     // biome-ignore lint/performance/noAwaitInLoops: each case needs its own fresh run.
     await finishWidgetRun(
       run,
@@ -281,6 +281,9 @@ test("a blocked finish and an overdue investigation escalate as blocked; a retry
       escalated ? "escalated_to_fixy blocked" : reason
     );
     assert.equal(escalateOf(run)?.reason, escalated ? "blocked" : undefined);
+    if (escalated) {
+      assert.equal((run.findings as WidgetFindings).ticket?.id, "ENG-9");
+    }
   }
   // An overdue investigation would likely run out of time again on a resend,
   // so a poll that finds it overdue hands the chat on, as it filed before.

@@ -11,7 +11,11 @@ import {
   handoffReport,
   handoffTicketBody,
 } from "./widget-bug-report.js";
-import { blockedForCustomer, customerTurn } from "./widget-escalation.js";
+import {
+  blockedForCustomer,
+  customerTurn,
+  escalatesToFixy,
+} from "./widget-escalation.js";
 import {
   parseFindings,
   teamFindings,
@@ -45,6 +49,7 @@ export const TICKET_INSTEAD = "ticket_instead_of_handoff";
 export const PERSON_INVITE = "person_invite";
 
 const TICKET_TIMEOUT_MS = 30_000;
+const RECEIPT_READ_MS = 5000;
 /**
  * Left for the filing itself when the caller has a deadline, its own reads
  * and write at their bounds (refund 3s, search 15s, write 15s): the ticket
@@ -255,7 +260,8 @@ export async function ticketInsteadOfBlock(
   signal: AbortSignal | undefined,
   file: typeof fileTicketFor | undefined,
   draft?: typeof draftHandoffTicket,
-  roomMs?: number
+  roomMs?: number,
+  read?: WidgetDependencies["readTicket"]
 ): Promise<{ findings: unknown; result: WidgetOutcome }> {
   const reason = result.reason ?? "blocked";
   if (
@@ -266,9 +272,21 @@ export async function ticketInsteadOfBlock(
     return { findings, result };
   }
   const found = parseFindings(findings);
-  const handed = blockedForCustomer(run, reason, found, ids);
-  if (handed) {
-    return handed;
+  if (escalatesToFixy() && customerTurn(run.scope)) {
+    // A ticket the turn filed before it stopped stays with the chat. Its own
+    // bound: the finish deadline may already be spent, and the read is local.
+    const receipt = await read?.(
+      run.scope,
+      run.id,
+      AbortSignal.timeout(RECEIPT_READ_MS)
+    ).catch(() => null);
+    return blockedForCustomer(
+      run,
+      reason,
+      found,
+      ids,
+      receipt ? ticketRef(receipt) : undefined
+    );
   }
   const filed = await handoffTicket(
     run.scope,
