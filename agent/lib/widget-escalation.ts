@@ -28,7 +28,7 @@ export const customerTurn = (scope: WidgetContext) => scope.source === "widget";
  * carry (ENG-21099).
  */
 export const PERSON_HERE_RULE =
-  'When the customer needs a person, tell them they can ask for one right here in this chat at any time, and Support will answer here. Never tell them to type a set phrase such as "human agent", to contact support anywhere else, or to wait for support hours, and never give support hours, even where the help center says so.';
+  'When the customer needs a person, tell them they can ask for one right here in this chat at any time, and Support will answer here. Never tell them to type a set phrase such as "human agent", to contact support as a step or anywhere else, or to wait for support hours, and never give support hours, even where the help center says so.';
 
 /** An earlier Foreman reply offered the magnifying glass; Foreman words it one way. */
 export const offeredGlass = (

@@ -275,7 +275,7 @@ export const groundPrompt = (customer: KbCustomer | undefined) =>
   customer?.escalates
     ? `${GROUND_PROMPT}
 
-The customer can ask for a person right here in this chat at any time, and Support will answer here: a reply saying that is supported, not a promise of follow-up. A reply telling the customer to type a set phrase such as "human agent", to contact support anywhere else, or to wait for support hours, or giving support hours, is unsupported even when an article says it.`
+The customer can ask for a person right here in this chat at any time, and Support will answer here: a reply saying that is supported, not a promise of follow-up. A reply telling the customer to type a set phrase such as "human agent", to contact support as a step or anywhere else, or to wait for support hours, or giving support hours, is unsupported even when an article says it.`
     : GROUND_PROMPT;
 
 /** REPLY_PROMPT's own next step for an answer the articles do not give. */
