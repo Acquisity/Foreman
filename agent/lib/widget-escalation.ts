@@ -21,8 +21,7 @@ export const escalatesToFixy = (env: NodeJS.ProcessEnv = process.env) =>
 /** A customer's own turn. A teammate's inbox run is team-only and never files or escalates. */
 export const customerTurn = (scope: WidgetContext) => scope.source === "widget";
 
-/** The outcome reason prefix of a turn that handed the chat to Fixy. */
-export const ESCALATED = "escalated_to_fixy";
+const ESCALATED = "escalated_to_fixy";
 
 /**
  * Why a customer's turn needs the team: they asked for a person, or they are a
@@ -57,14 +56,13 @@ export const teamAsk = (
 const SUMMARY_WORDS = 6;
 
 /** The customer's message on one line, when it says enough to name the problem, for Fixy's top post. */
-export const escalationSummary = (text: string | undefined) => {
+const escalationSummary = (text: string | undefined) => {
   const line = text?.replace(/\s+/gu, " ").trim() ?? "";
   return line.split(" ").length >= SUMMARY_WORDS
     ? line.slice(0, 200)
     : undefined;
 };
 
-/** The summary field, when the message names a problem. */
 const summaryOf = (text: string | undefined) => {
   const summary = escalationSummary(text);
   return summary ? { summary } : {};
@@ -117,7 +115,7 @@ export const escalationFor = (
 
 /**
  * The findings and outcome of a turn that hands the chat to Fixy: no message,
- * because Fixy sends the one acknowledgement, and no ticket. A ticket the turn
+ * because Fixy sends the one acknowledgement, and nothing filed. A ticket the turn
  * already filed stays on the findings, so Acquisity keeps it on the chat.
  */
 export function escalated(
