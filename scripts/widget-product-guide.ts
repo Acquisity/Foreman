@@ -46,6 +46,11 @@ import {
   splitGuideSections,
 } from "../agent/lib/widget-guide-cache.js";
 import {
+  correctionNote,
+  sectionProblems,
+  summaryLinesKept,
+} from "../agent/lib/widget-guide-corrections.js";
+import {
   OPT_IN_NOTE,
   pageIsOptIn,
   spellOutOptInGates,
@@ -430,12 +435,34 @@ const relink = (text: string) =>
   });
 
 /**
+ * A correction's note goes with its article to the model and into the cache
+ * key, so a new correction redoes only its own article (widget-guide-corrections).
+ */
+const noted = (slug: string): string[] => {
+  const note = correctionNote(slug);
+  return note ? [note] : [];
+};
+const reviewNote = (slug: string) =>
+  noted(slug).map(
+    (note) =>
+      `\n\nREVIEW NOTE for ${slug} (not part of the article; a past version got this wrong, so follow the article): ${note}`
+  );
+
+/**
  * Each article's section is stored under a key of its own inputs, so a rerun
  * distills only the articles that changed and leaves every other section as
  * it was, word for word.
  */
 const articleKey = (a: Article) =>
-  guideCallKey(MODEL, DISTILL_PROMPT, SIDEBAR, a.title, a.slug, a.text);
+  guideCallKey(
+    MODEL,
+    DISTILL_PROMPT,
+    SIDEBAR,
+    a.title,
+    a.slug,
+    a.text,
+    ...noted(a.slug)
+  );
 const distilled = new Map<string, string>();
 const pending = available.filter((a) => {
   const text = cachedGuideText(
@@ -496,7 +523,7 @@ const distillBatch = (batch: Article[], label: string) =>
         batch
           .map(
             (a) =>
-              `ARTICLE title: ${a.title}\nslug: ${a.slug}\nwords: ${allowance(a)}\n\n${a.text}`
+              `ARTICLE title: ${a.title}\nslug: ${a.slug}\nwords: ${allowance(a)}\n\n${a.text}${reviewNote(a.slug).join("")}`
           )
           .join("\n\n=====\n\n"),
         32_000
@@ -508,6 +535,13 @@ const distillBatch = (batch: Article[], label: string) =>
         batch.map((a) => a.slug)
       );
       assertOwnAnswers(repaired);
+      const sections = splitGuideSections(repaired);
+      const problems = batch.flatMap((a) =>
+        sectionProblems(a.slug, sections.get(a.slug) ?? "")
+      );
+      if (problems.length) {
+        throw new Error(`corrections refused: ${problems.join("; ")}`);
+      }
       return repaired;
     }
   );
@@ -658,7 +692,12 @@ assertGuideSections(body, slugs);
  */
 const finished = splitGuideSections(body);
 const limitsKey = (slug: string) =>
-  guideCallKey(LIMITS_MODEL, LIMITS_PROMPT, finished.get(slug) ?? "");
+  guideCallKey(
+    LIMITS_MODEL,
+    LIMITS_PROMPT,
+    finished.get(slug) ?? "",
+    ...noted(slug)
+  );
 const summarised = new Map<string, GuideLimits>();
 const stale = slugs.filter((slug) => {
   const text = cachedGuideText(
@@ -694,7 +733,7 @@ if (stale.length) {
               "About 2,000 words in total.",
               "Write nothing for an article that states no role limit or unsupported thing."
             ),
-        whole ? body : stale.map((slug) => finished.get(slug)).join("\n\n"),
+        `${whole ? body : stale.map((slug) => finished.get(slug)).join("\n\n")}${stale.flatMap(reviewNote).join("")}`,
         LIMITS_MAX_TOKENS,
         LIMITS_MODEL,
         false
@@ -712,7 +751,16 @@ if (stale.length) {
     console.log(`  summary line cites no summarised article: ${line}`);
   }
   for (const [slug, summary] of limits) {
-    summarised.set(slug, summary);
+    const kept = {
+      cannot: summaryLinesKept(slug, summary.cannot),
+      who: summaryLinesKept(slug, summary.who),
+    };
+    for (const line of [...summary.who, ...summary.cannot]) {
+      if (![...kept.who, ...kept.cannot].includes(line)) {
+        console.log(`  summary line refused by a correction: ${line}`);
+      }
+    }
+    summarised.set(slug, kept);
   }
 }
 const limits = joinGuideLimits(
