@@ -37,9 +37,9 @@ describe("renderAiSdrReportBlocks", () => {
       "1.52M",
       "+3.1%",
       "1.30M",
-      "+21.0%",
+      "+20.8%",
     ]);
-    assert.deepEqual(volume[5], [
+    assert.deepEqual(volume[6], [
       "Reply rate",
       "1.25%",
       "1.17%",
@@ -50,7 +50,7 @@ describe("renderAiSdrReportBlocks", () => {
     assert.ok(text.startsWith("AI SDR weekly report, 16 to 20 Nov 2026"));
     assert.ok(
       text.includes(
-        "Interview: 15.6% this week, 16.2% last week (-0.6pp), 21.3% same week last month (-5.7pp)."
+        "Interview: 16.7% this week, 21.4% last week (-4.6pp), 25.4% same week last month (-8.7pp)."
       ),
       "the message text carries every table row for screen readers"
     );

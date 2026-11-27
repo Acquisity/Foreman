@@ -44,8 +44,11 @@ const metricsRowSchema = z.object({
 const bookingRowSchema = z.object({
   method: z.string(),
   month_booked: finiteNumber,
+  month_lost: finiteNumber,
   previous_booked: finiteNumber,
+  previous_lost: finiteNumber,
   report_booked: finiteNumber,
+  report_lost: finiteNumber,
 });
 const lifecycleRowSchema = z.looseObject({
   month: finiteNumber.optional().default(0),
@@ -103,6 +106,7 @@ export const aiSdrWeeklyReportResultSchema = z.discriminatedUnion("success", [
     volume: z.object({
       bookedMeetings: countComparisonSchema,
       emailsSent: countComparisonSchema,
+      lostMeetings: countComparisonSchema,
       positiveReplies: countComparisonSchema,
       replies: countComparisonSchema,
     }),
@@ -175,6 +179,15 @@ const windowSums = (
 ): string =>
   `coalesce(sum(${field}) filter (where ${dateField} >= ${sqlLiteral(window.start)} and ${dateField} < ${sqlLiteral(window.endExclusive)}), 0) as ${alias}`;
 
+const windowFilter = (field: string, window: ReportWindow): string =>
+  `${field} >= ${timestampLiteral(window.start)} and ${field} < ${timestampLiteral(window.endExclusive)}`;
+
+const windowBookings = (window: ReportWindow, prefix: string): string =>
+  [
+    `count(distinct a.guest_key) filter (where ${windowFilter("a.created_at", window)}) as ${prefix}_booked,`,
+    `count(distinct a.guest_key) filter (where ${windowFilter("a.created_at", window)}) - count(distinct a.guest_key) filter (where ${windowFilter("a.created_at", window)} and a.status = 'scheduled') as ${prefix}_lost`,
+  ].join("\n");
+
 /** The three fixed production queries used by the report tool. */
 export function aiSdrWeeklyReportQueries(
   windows: AiSdrReportWindows
@@ -206,13 +219,20 @@ export function aiSdrWeeklyReportQueries(
     // email matches an attendee in the same organization who is not the
     // organiser, the appointment owner or an active workspace member, nearest by
     // last_message_at.
+    // Every booking made counts, whatever its status now, so a week's count
+    // doesn't fall as its meetings are later cancelled or declined. A guest
+    // (the non-organiser attendees) booked twice in one window counts once.
     [
       "with appointments as (",
-      "  select a.id, a.organization_id, a.user_id, a.created_at, a.attendees",
+      "  select a.id, a.organization_id, a.user_id, a.created_at, a.attendees, a.status,",
+      "    a.organization_id::text || ':' || coalesce((",
+      "      select string_agg(distinct lower(guest->>'email'), ',' order by lower(guest->>'email'))",
+      "      from jsonb_array_elements(a.attendees) guest",
+      "      where coalesce((guest->>'isOrganizer')::boolean, false) = false",
+      "    ), a.id::text) as guest_key",
       "  from scheduling_appointment a",
       "  where a.origin = 'ai_sdr'",
       "    and a.deleted_at is null",
-      "    and a.status = 'scheduled'",
       `    and a.created_at >= ${timestampLiteral(month.start)} and a.created_at < ${timestampLiteral(report.endExclusive)}`,
       "), linked_campaign as (",
       "  select distinct on (t.appointment_id)",
@@ -246,9 +266,9 @@ export function aiSdrWeeklyReportQueries(
       "  select appointment_id, method from attendee_campaign",
       ")",
       "select case when grouping(ac.method) = 1 then '__total__' else coalesce(ac.method, '__unclassified__') end as method,",
-      `${windowCounts("a.created_at", report, "report_booked")},`,
-      `${windowCounts("a.created_at", previous, "previous_booked")},`,
-      windowCounts("a.created_at", month, "month_booked"),
+      `${windowBookings(report, "report")},`,
+      `${windowBookings(previous, "previous")},`,
+      windowBookings(month, "month"),
       "from appointments a",
       "left join appointment_campaign ac on ac.appointment_id = a.id",
       "group by grouping sets ((), (ac.method))",
@@ -285,11 +305,12 @@ const metricValues = (
 });
 
 const bookingValues = (
-  row: z.infer<typeof bookingRowSchema> | undefined
+  row: z.infer<typeof bookingRowSchema> | undefined,
+  metric: "booked" | "lost" = "booked"
 ): ThreeValues => ({
-  previous: row?.previous_booked ?? 0,
-  report: row?.report_booked ?? 0,
-  sameWeekLastMonth: row?.month_booked ?? 0,
+  previous: row?.[`previous_${metric}`] ?? 0,
+  report: row?.[`report_${metric}`] ?? 0,
+  sameWeekLastMonth: row?.[`month_${metric}`] ?? 0,
 });
 
 const lifecycleValues = (
@@ -383,6 +404,7 @@ export async function readAiSdrWeeklyReport(
       volume: {
         bookedMeetings: countComparison(booked),
         emailsSent: countComparison(sent),
+        lostMeetings: countComparison(bookingValues(totalBookings, "lost")),
         positiveReplies: countComparison(positive),
         replies: countComparison(replies),
       },
