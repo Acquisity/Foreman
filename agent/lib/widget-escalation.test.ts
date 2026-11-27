@@ -496,3 +496,207 @@ test("on, the front-door writer is told asking here reaches a person and gets no
     });
   }
 });
+
+test("an owner's toggled refund marks the run for the finish, only with escalation on", async (t) => {
+  for (const [on, route, marks] of [
+    [true, { asksForHuman: 0, refund: true }, 1],
+    [true, { asksForHuman: 0 }, 0],
+    [false, { asksForHuman: 0, refund: true }, 0],
+  ] as const) {
+    // biome-ignore lint/performance/noAwaitInLoops: each case needs its own fresh run.
+    await t.test(
+      `${on ? "on" : "off"}, refund ${"refund" in route}`,
+      async (st) => {
+        enable(st, on);
+        const { deps } = harness(route);
+        const marked: string[] = [];
+        deps.markRefund = (id) => {
+          marked.push(id);
+          return Promise.resolve();
+        };
+        await send(deps, { mode: "investigate" }, scope, () => {
+          throw new Error("session unavailable");
+        });
+        assert.deepEqual(marked, marks ? [runId] : []);
+      }
+    );
+  }
+});
+
+test("a marked refund whose investigation filed no refund ticket escalates as refund with what Foreman read; a filed refund ticket replies as before", async (t) => {
+  enable(t);
+  const read: WidgetFindings = {
+    ...findings,
+    facts: [
+      {
+        claim:
+          "Two $252.00 charges for domains and inboxes in October; one is refunded.",
+        entityIds: [],
+        evidence: { ref: "", tool: "billing summary" },
+      },
+    ],
+    recommendation: "Ask which charge they want back, then pass it to billing.",
+  };
+  const asked = {
+    findings: null,
+    status: "completed" as const,
+    text: "Which charge do you want back?",
+  };
+  const { deps, gated, run } = harness();
+  run.findings = { refundAsked: true };
+  deps.extract = () => Promise.resolve(read);
+  await finishWidgetRun(run, "widget-session-refund", asked, deps);
+  assert.equal(gated.length, 0, "nothing is composed");
+  assert.equal(run.outcome?.message, null);
+  assert.equal(run.outcome?.reason, "escalated_to_fixy refund");
+  const returned = run.findings as WidgetFindings;
+  assert.deepEqual(returned.escalate, { reason: "refund" });
+  assert.deepEqual(returned.facts, read.facts);
+
+  const filed = harness();
+  filed.run.findings = { refundAsked: true };
+  filed.deps.extract = () => Promise.resolve(read);
+  await finishWidgetRun(
+    filed.run,
+    "widget-session-refund-filed",
+    {
+      ...asked,
+      ticket: {
+        id: "ENG-9",
+        refund: true,
+        url: "https://linear.app/acquisity/issue/ENG-9/refund",
+      },
+    },
+    filed.deps
+  );
+  assert.equal(filed.gated.length, 1, "the reply is composed as before");
+  assert.equal(escalateOf(filed.run), undefined);
+
+  const unmarked = harness();
+  unmarked.deps.extract = () => Promise.resolve(read);
+  await finishWidgetRun(
+    unmarked.run,
+    "widget-session-plain",
+    asked,
+    unmarked.deps
+  );
+  assert.equal(escalateOf(unmarked.run), undefined);
+});
+
+test("a marked refund counts the run's saved refund receipt, and a write-up the extractor cannot structure still escalates as refund", async (t) => {
+  enable(t);
+  const prose = {
+    findings: null,
+    status: "completed" as const,
+    text: "Two $252 charges in October, one refunded. Which charge do they want back?",
+  };
+  const saved = harness();
+  saved.run.findings = { refundAsked: true };
+  saved.deps.readTicket = () =>
+    Promise.resolve({
+      existing: false,
+      identifier: "ENG-9",
+      refund: true,
+      url: "https://linear.app/acquisity/issue/ENG-9/refund",
+    });
+  await finishWidgetRun(saved.run, "widget-session-receipt", prose, saved.deps);
+  assert.equal(escalateOf(saved.run), undefined);
+  assert.equal(saved.gated.length, 1, "the reply is composed as before");
+
+  const unstructured = harness();
+  unstructured.run.findings = { refundAsked: true };
+  unstructured.deps.extract = () => Promise.resolve(null);
+  await finishWidgetRun(
+    unstructured.run,
+    "widget-session-prose-refund",
+    prose,
+    unstructured.deps
+  );
+  assert.equal(unstructured.run.outcome?.reason, "escalated_to_fixy refund");
+  assert.equal(
+    (unstructured.run.findings as WidgetFindings).recommendation,
+    prose.text
+  );
+});
+
+test("a toggled refund in a conversation that already has a refund ticket is not marked", async (t) => {
+  enable(t);
+  const { deps } = harness({ asksForHuman: 0, refund: true });
+  const marked: string[] = [];
+  deps.markRefund = (id) => {
+    marked.push(id);
+    return Promise.resolve();
+  };
+  deps.ticketNote = () =>
+    Promise.resolve({
+      forInvestigator: "The refund ticket is with billing.",
+      forWriters: "The refund ticket is with billing.",
+      refund: true,
+    });
+  await send(deps, { mode: "investigate" }, scope, () => {
+    throw new Error("session unavailable");
+  });
+  assert.deepEqual(marked, []);
+});
+
+test("a marked refund that blocks still reaches Fixy as a refund, and a question-only turn carries the write-up", async (t) => {
+  enable(t);
+  const failed = harness();
+  failed.run.findings = { refundAsked: true };
+  await finishWidgetRun(
+    failed.run,
+    "widget-session-failed",
+    { status: "failed" },
+    failed.deps
+  );
+  assert.equal(failed.run.outcome?.reason, "escalated_to_fixy refund");
+
+  const { deps, run } = harness({ asksForHuman: 0, refund: true });
+  deps.markRefund = () => Promise.resolve();
+  await send(deps, { mode: "investigate" }, scope, () => {
+    throw new Error("session unavailable");
+  });
+  assert.equal(run.outcome?.reason, "escalated_to_fixy refund");
+
+  setEnv(t, "WIDGET_NEXT_ACTION", "jev");
+  const asked = harness();
+  asked.run.findings = { refundAsked: true };
+  asked.deps.extract = () => Promise.resolve(null);
+  const text =
+    "Billing shows two $252 charges in October, one refunded. Which charge do they mean?";
+  await finishWidgetRun(
+    asked.run,
+    "widget-session-asked",
+    {
+      afterReads: true,
+      asked: "Which charge do you mean?",
+      findings: null,
+      status: "completed",
+      text,
+    },
+    asked.deps
+  );
+  assert.equal(asked.run.outcome?.reason, "escalated_to_fixy refund");
+  assert.equal((asked.run.findings as WidgetFindings).recommendation, text);
+});
+
+test("a marked refund that blocks after filing its refund ticket keeps the ticket and stays blocked", async (t) => {
+  enable(t);
+  const { deps, run } = harness();
+  run.findings = { refundAsked: true };
+  deps.readTicket = () =>
+    Promise.resolve({
+      existing: false,
+      identifier: "ENG-9",
+      refund: true,
+      url: "https://linear.app/acquisity/issue/ENG-9/refund",
+    });
+  await finishWidgetRun(
+    run,
+    "widget-session-failed-filed",
+    { status: "failed" },
+    deps
+  );
+  assert.equal(run.outcome?.reason, "escalated_to_fixy blocked");
+  assert.equal((run.findings as WidgetFindings).ticket?.id, "ENG-9");
+});

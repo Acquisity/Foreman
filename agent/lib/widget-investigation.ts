@@ -31,7 +31,10 @@ import {
   customerTurn,
   escalatesToFixy,
   escalationFor,
+  type FiledTicket,
+  markToggledRefund,
   needsTheTeam,
+  refundHandoff,
   teamAsk,
 } from "./widget-escalation.js";
 import {
@@ -108,6 +111,7 @@ import {
   expireSessionlessWidgetRuns,
   FINISH_CLAIM_SECONDS,
   latestWidgetScope,
+  markWidgetRefund,
   readWidgetRun,
   readWidgetTicketReceipt,
   recentInboxTurns,
@@ -331,7 +335,6 @@ const messageText = (data: unknown): string | null => {
 };
 
 /** `refund` is ours alone: the findings contract carries only the id and url. */
-type FiledTicket = NonNullable<WidgetFindings["ticket"]> & { refund?: true };
 const TICKET_URL =
   /^https:\/\/linear\.app\/acquisity\/issue\/(ENG-\d+)(?:[/?#]|$)/u;
 const ticketOutput = z.object({
@@ -655,6 +658,8 @@ export const defaultWidgetDependencies = {
   history: recentWidgetTurns,
   inboxHistory: recentInboxTurns,
   latestScope: latestWidgetScope,
+  /** Marks an owner's toggled refund, so a finish that filed none hands it to Fixy. */
+  markRefund: markWidgetRefund,
   plan: planWidgetChecks,
   progress: saveWidgetProgress,
   read: readWidgetRun,
@@ -681,6 +686,7 @@ export type WidgetDependencies = Omit<
   | "fileGaps"
   | "fileTicket"
   | "inboxHistory"
+  | "markRefund"
   | "plan"
   | "progress"
   | "requestRecording"
@@ -700,6 +706,7 @@ export type WidgetDependencies = Omit<
       | "fileGaps"
       | "fileTicket"
       | "inboxHistory"
+      | "markRefund"
       | "plan"
       | "progress"
       | "requestRecording"
@@ -1092,6 +1099,15 @@ const startReplyGapFiling = (
     )
   );
 
+/** What a refund handed to Fixy carries: the findings, or the write-up as written when nothing structured came of it. */
+const refundFindings = (
+  structured: WidgetFindings | null,
+  text: string | null
+) => {
+  const written = text ? (humanHandoff(text, "")?.findings ?? null) : null;
+  return structured?.facts.length ? structured : (written ?? structured);
+};
+
 /**
  * A finish that skips the gate: findings that need a person hand the chat to
  * Fixy when escalation is on, and a write-up with no structured findings still
@@ -1122,7 +1138,12 @@ const settledWithoutGate = (
 export async function finishWidgetRun(
   run: Pick<
     WidgetRun,
-    "created_at" | "id" | "question" | "recording_requested" | "scope"
+    | "created_at"
+    | "findings"
+    | "id"
+    | "question"
+    | "recording_requested"
+    | "scope"
   >,
   sessionId: string,
   outcome: WaitOutcome,
@@ -1218,14 +1239,25 @@ export async function finishWidgetRun(
     const structured =
       written.structured && withoutUnchecked(written.structured);
     const extractMs = Date.now() - extractStartedAt;
-    const handoff = settledWithoutGate(
-      run,
-      sessionId,
-      structured,
-      written.escalate,
-      outcome.text,
-      outcome.ticket
-    );
+    const handoff =
+      (await refundHandoff(
+        run,
+        sessionId,
+        { read: deps.readTicket, signal: deadline, ticket: outcome.ticket },
+        (ticket) =>
+          withReadings(
+            outcome.readings,
+            withFiledTicket(ticket, refundFindings(structured, outcome.text))
+          )
+      )) ??
+      settledWithoutGate(
+        run,
+        sessionId,
+        structured,
+        written.escalate,
+        outcome.text,
+        outcome.ticket
+      );
     if (handoff) {
       ({ findings, result } = handoff);
     } else if (structured) {
@@ -2096,6 +2128,7 @@ async function answerFreshRun(
       return json(widgetRunResponse(person ?? (await deps.read(run.id))));
     }
     personNote = person;
+    await markToggledRefund(run, scope, route, note, deps.markRefund);
     if (!input.recording) {
       await offerRecording(run, route, ask, deps);
     }

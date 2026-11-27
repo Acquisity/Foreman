@@ -252,7 +252,8 @@ export const RETRYABLE_BLOCK =
  * could not be filed keep the block.
  */
 export async function ticketInsteadOfBlock(
-  run: Pick<WidgetRun, "id" | "question" | "scope">,
+  run: Pick<WidgetRun, "id" | "question" | "scope"> &
+    Partial<Pick<WidgetRun, "findings">>,
   result: WidgetOutcome,
   findings: unknown,
   history: HandoffFacts["history"],
@@ -285,7 +286,8 @@ export async function ticketInsteadOfBlock(
       reason,
       found,
       ids,
-      receipt ? ticketRef(receipt) : undefined
+      receipt ? ticketRef(receipt) : undefined,
+      Boolean(receipt && "refund" in receipt && receipt.refund)
     );
   }
   const filed = await handoffTicket(

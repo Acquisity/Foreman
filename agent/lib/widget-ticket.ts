@@ -500,13 +500,18 @@ export async function conversationTicketNote(
       })
     );
     const [first, second] = notes;
+    const refund = tickets.some((found) => found.kind === "refund")
+      ? { refund: true as const }
+      : {};
     if (!(first && second)) {
-      return first ?? second ?? null;
+      const only = first ?? second;
+      return only ? { ...only, ...refund } : null;
     }
     // A chat with a product ticket and a refund hears about each by name.
     return {
       forInvestigator: `About the problem they reported: ${first.forInvestigator} About their refund request: ${second.forInvestigator}`,
       forWriters: `About the problem they reported: ${first.forWriters} About their refund request: ${second.forWriters}`,
+      ...refund,
     };
   } catch (error) {
     if (signal.aborted) {

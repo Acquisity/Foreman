@@ -219,6 +219,16 @@ export function liveRunStore(directory = `${ROOT}/runs`) {
           entries.filter((entry) => conversation(entry, scope)).at(-1)?.run
             .scope ?? null
       ),
+    markRefund: (id) =>
+      access((entries) => {
+        const { run } = owned(entries, id);
+        if (!run.outcome) {
+          run.findings = {
+            ...(run.findings as Record<string, unknown> | null),
+            refundAsked: true,
+          };
+        }
+      }),
     progress: (id, sessionId, progress) =>
       access((entries) => {
         const { run } = owned(entries, id);
@@ -262,6 +272,7 @@ export function liveRunStore(directory = `${ROOT}/runs`) {
           throw new Error("Local ticket ownership mismatch.");
         }
         run.findings = {
+          ...(run.findings as Record<string, unknown> | null),
           ticketReceipt: widgetTicketReceiptSchema.parse(receipt),
         };
       }),
@@ -276,6 +287,7 @@ export function liveRunStore(directory = `${ROOT}/runs`) {
     | "complete"
     | "progress"
     | "cancel"
+    | "markRefund"
     | "requestRecording"
     | "expire"
     | "expireAll"

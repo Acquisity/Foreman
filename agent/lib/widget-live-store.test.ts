@@ -14,6 +14,7 @@ import {
 } from "./widget-investigation.js";
 import { LIVE_TICKET } from "./widget-live-policy.js";
 import { liveDependencies, liveRunStore } from "./widget-live-store.js";
+import { refundAsked } from "./widget-run-store.js";
 
 const secret = "s".repeat(40);
 const findings: WidgetFindings = {
@@ -216,7 +217,7 @@ test("full live staff lifecycle persists locally without SQL or external writes"
   assert.equal(liveDependencies(base, directory), base);
 });
 
-test("a reconstructed local run retains its server filing receipt without SQL or provider writes", async (t) => {
+test("a reconstructed local run retains its server filing receipt and its refund mark without SQL or provider writes", async (t) => {
   const directory = `.eve/widget-live/receipt-${randomUUID()}`;
   t.after(() => rm(directory, { force: true, recursive: true }));
   const previous = process.env.WIDGET_LIVE;
@@ -238,9 +239,11 @@ test("a reconstructed local run retains its server filing receipt without SQL or
     "Can I speak to a person?"
   );
   const receipt = LIVE_TICKET;
+  await store.markRefund(run.id);
   await store.saveTicket(fixture, run.id, receipt);
   const recovered = liveRunStore(directory);
   assert.deepEqual(await recovered.readTicket(fixture, run.id), receipt);
+  assert.equal(refundAsked((await recovered.read(run.id)).findings), true);
   await assert.rejects(
     recovered.readTicket({ ...fixture, conversationId: randomUUID() }, run.id)
   );
