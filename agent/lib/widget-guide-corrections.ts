@@ -31,22 +31,26 @@ const NEVER =
   "(?:never|don['’]?t|doesn['’]?t|do not|does not|won['’]?t|will not|aren['’]?t meant to)";
 
 /**
- * A credit never expiring or resetting. Not resetting on the billing or
- * renewal date is true of every credit, so that claim is left alone.
+ * A credit never expiring or resetting. Not resetting when the plan renews or
+ * on the billing date is true of every credit, so that claim is left alone.
  */
-const NEVER_ENDS = String.raw`(?:\b${NEVER} expire|(?<!\b(?:renews|renewal|billing date)\b[^.;\n]*)\b${NEVER} reset(?![^.;\n]*\b(?:billing|renewal) date))`;
+const RENEWAL = String.raw`\b(?:renews|renewal|billing date)\b`;
+const NEVER_ENDS = String.raw`(?:\b${NEVER} expire|(?<!${RENEWAL}[^.;\n]*)\b${NEVER} reset(?![^.;\n]*${RENEWAL}))`;
 
 const ONLY_PLAN_AND_ONE_TIME = String.raw`\b(?:plan(?:-included)? credits|plan and one-time|one-time|one-off|top-?ups?)\b`;
 
+/** Each claim is judged by its own clause, never by another on the line. */
 const CREDITS_CHECKS = {
   reject: [
     new RegExp(
-      String.raw`^(?!#)(?=.*${NEVER_ENDS})(?!.*${ONLY_PLAN_AND_ONE_TIME}[^.;\n]*${NEVER_ENDS}).*$`,
+      String.raw`(?<!^#[^\n]*)(?<!${ONLY_PLAN_AND_ONE_TIME}[^.;\n]*)${NEVER_ENDS}`,
       "imu"
     ),
     new RegExp(String.raw`\bmonthly\b[^.;\n]*${NEVER_ENDS}`, "iu"),
   ],
-  require: [/\bend with (?:it|the pack)\b/iu],
+  require: [
+    new RegExp(String.raw`(?<!\b${NEVER} )\bend with (?:it|the pack)\b`, "iu"),
+  ],
 };
 
 export const GUIDE_CORRECTIONS: readonly GuideCorrection[] = [
@@ -62,11 +66,14 @@ export const GUIDE_CORRECTIONS: readonly GuideCorrection[] = [
   {
     note: CREDITS_NOTE,
     ...CREDITS_CHECKS,
-    slugs: ["cold-email-agent/concepts/credits"],
+    slugs: [
+      "cold-email-agent/concepts/credits",
+      "workspace-settings/faq/billing-subscriptions/when-do-my-credits-reset",
+    ],
   },
   {
     note: 'No one can split an invoice, the Owner included. Only the Owner sees "Invoices" and "Payment method".',
-    reject: [/\bcan split\b/iu],
+    reject: [/(?<!\b(?:no one|nobody|not)\s)\bcan split\b/iu],
     slugs: [
       "workspace-settings/faq/billing-subscriptions/can-i-split-an-invoice-into-two",
     ],

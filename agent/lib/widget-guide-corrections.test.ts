@@ -26,6 +26,8 @@ const BILLING = "workspace-settings/billing";
 const CREDITS = "cold-email-agent/concepts/credits";
 const SPLIT =
   "workspace-settings/faq/billing-subscriptions/can-i-split-an-invoice-into-two";
+const RESET_FAQ =
+  "workspace-settings/faq/billing-subscriptions/when-do-my-credits-reset";
 const MEET = "sales-call-analyzer/faq/can-i-use-google-meet-or-teams";
 
 const section = (slug: string, ...lines: string[]) =>
@@ -290,6 +292,7 @@ test("credits never expiring is said only of plan credits and one-time packs", (
       "- Plan credits never expire, and monthly-pack credits never expire either.",
       "- Credits aren’t meant to reset.",
       "- Credits doesn't expire.",
+      "- Plan credits never expire. Credits never expire or reset.",
     ].map((line): [string, string] => [
       CREDITS,
       section(CREDITS, line, exception),
@@ -311,6 +314,14 @@ test("credits never expiring is said only of plan credits and one-time packs", (
         "- Domains $18/year, inboxes $8/month."
       ),
     ],
+    [
+      CREDITS,
+      section(
+        CREDITS,
+        "- Plan credits and one-time packs never expire.",
+        "- If the pack ends, its credits don't end with it."
+      ),
+    ],
   ];
   for (const [slug, text] of wrong) {
     assert.notDeepEqual(sectionProblems(slug, text), [], text);
@@ -323,6 +334,7 @@ test("credits never expiring is said only of plan credits and one-time packs", (
         "- Plan badges: Active, Trial.",
         "- Plan credits and one-time packs never expire. Monthly-pack credits carry over while the pack is active. If the pack ends, its credits end with it.",
         "- Credits don't reset on your billing date.",
+        "- Credits don't reset when your plan renews.",
         "- Pre-warmed domains $18/year, inboxes $8/month."
       ),
     ],
@@ -343,11 +355,12 @@ test("credits never expiring is said only of plan credits and one-time packs", (
     `- Credits never expire or reset. {${BILLING}}`,
     `- Credits never reset. {${CREDITS}}`,
     `- When your plan renews, credits never expire. {${CREDITS}}`,
+    `- Credits never reset. {${RESET_FAQ}}`,
     `- Plan and one-time pack credits never reset. {${BILLING}}`,
   ];
   assert.deepEqual(refuseSummaryLines({ cannot: lines, who: [] }), {
-    kept: { cannot: [lines[3]], who: [] },
-    refused: lines.slice(0, 3),
+    kept: { cannot: [lines[4]], who: [] },
+    refused: lines.slice(0, 4),
   });
 });
 
@@ -356,6 +369,7 @@ test("summary lines Foreman#370 kept from main's guide are dropped", () => {
     `- Only the Owner can split or manage invoice payment actions here; Admins lack the "Invoices" and "Payment method" permissions. {${SPLIT}}`,
     `- Client users can't dismiss the "leads were skipped during upload" notification. {${MEET}}`,
     `- An invoice can't be split into two. {${SPLIT}}`,
+    `- No one can split an invoice, the Owner included. {${SPLIT}}`,
     `- Client users can't dismiss the skipped leads card. {cold-email-agent/faq/lead-search/how-do-i-hide-the-leads-were-skipped-during-upload-notification}`,
   ];
   assert.deepEqual(refuseSummaryLines({ cannot: lines, who: [] }), {
