@@ -19,6 +19,11 @@ export interface GuideCorrection {
   path?: string;
   /** Neither the article's section nor a summary line citing it may match these. */
   reject?: RegExp[];
+  /**
+   * A summary line citing the article may not match these. A summary line
+   * stands alone, so it must carry a rule the section can split over lines.
+   */
+  rejectSummary?: RegExp[];
   /** The article's section, and only the section, must match each of these. */
   require?: RegExp[];
   slugs: string[];
@@ -55,6 +60,22 @@ const CREDITS_CHECKS = {
     ),
   ],
 };
+
+/**
+ * A claim is judged within its clause, which starts a line or follows "." or
+ * ";": `CLAUSE + IN_CLAUSE(a) + IN_CLAUSE(b)` needs a and b in one clause.
+ */
+const CLAUSE = "(?:^|[.;])";
+const IN_CLAUSE = (pattern: string) => String.raw`(?=[^.;\n]*${pattern})`;
+
+const BILLING_PLANS = String.raw`\bBilling"?\s*(?:>|→)\s*"?View plans`;
+const OTHER_ROLES = String.raw`\b(?:admins?|members?|clients?|everyone|anyone|all (?:roles|users))\b`;
+const CANT = String.raw`\b(?:can[’']?t|cannot|can not|unable|not able|don[’']?t|do not)\b`;
+
+/** The agent pausing a campaign, not a campaign that is already paused. */
+const PAUSES = String.raw`\b(?:pauses|pausing)\b`;
+const ANY_SPACE = String.raw`(?:\b(?:however much|no matter how much|any amount of)\b|\b(?:whatever|regardless of) (?:\S+ ){0,3}?(?:\S+-)?(?:space|room|storage|slots?|check)\b)`;
+const LOW_SPACE = String.raw`(?:\b2,?000\b|\b2k\b|\bfree (?:lead )?(?:slots|space)\b|\b(?:running out of|short (?:of|on)|low on) (?:lead )?(?:space|slots|room)\b|\b(?:space|room|storage) is (?:tight|short|low|full|running out)\b|\bworkspace is (?:nearly |almost )?full\b)`;
 
 export const GUIDE_CORRECTIONS: readonly GuideCorrection[] = [
   {
@@ -180,6 +201,87 @@ export const GUIDE_CORRECTIONS: readonly GuideCorrection[] = [
     ],
     slugs: ["ai-website-builder/domains"],
   },
+  {
+    note: 'While storage is full, existing campaigns can still send, and hitting the limit deletes nothing on its own; say both. "Settings" > "Billing" > "View plans" is for workspace owners only: give it to owners alone, in its own sentence. Then say, a sentence each: owners and admins can use "View plans" in the campaign-lead warning; members use "Compare plans" there; Client users can\'t change the plan.',
+    reject: [
+      new RegExp(
+        String.raw`${CLAUSE}(?:(?![^.;\n]*\bowners?\b)|${IN_CLAUSE(OTHER_ROLES)})[^.;\n]*${BILLING_PLANS}`,
+        "imu"
+      ),
+      new RegExp(
+        CLAUSE +
+          IN_CLAUSE(String.raw`\bmembers?\b`) +
+          `(?![^.;\\n]*(?:Compare plans|${CANT}))` +
+          IN_CLAUSE("View plans"),
+        "imu"
+      ),
+      new RegExp(
+        String.raw`${CLAUSE}(?:(?!\b(?:doesn[’']?t|does not|don[’']?t|do not|won[’']?t|will not|never|not|no)\b)[^.;\n])*?\bstop(?:s|ped)? sending\b|\b(?:can[’']?t|cannot|can not|won[’']?t|will not|no longer|unable to|blocked from) (?:\w+ )?send(?:s|ing)?\b|\bstill not send(?:s|ing)?\b|\b(?:aren[’']?t|are not|isn[’']?t|is not) sending\b`,
+        "imu"
+      ),
+    ],
+    require: [
+      new RegExp(
+        CLAUSE +
+          IN_CLAUSE(String.raw`\bowners?\b`) +
+          `(?![^.;\\n]*${OTHER_ROLES})` +
+          IN_CLAUSE(BILLING_PLANS),
+        "imu"
+      ),
+      /^(?!#)[^\n]*(?:\bstill\b[^.\n]*\bsend|\bsend(?:ing)?\b[^.\n]*\bstill\b|\bkeeps? sending\b|\bcontinues? (?:to send|sending)\b)/imu,
+      /\b(?:nothing|no leads?)\b[^.;\n]*\b(?:auto(?:matically)?[- ]?deleted|deleted automatically)|\b(?:doesn[’']?t|does not|never|won[’']?t|will not)\b[^.;\n]*\bauto(?:matically)?[- ]?delete|\bdeletes? (?:nothing|no leads)\b/iu,
+      new RegExp(
+        CLAUSE +
+          IN_CLAUSE(String.raw`\badmins?\b`) +
+          IN_CLAUSE("View plans") +
+          IN_CLAUSE(String.raw`\b(?:warning|prompt)\b`),
+        "imu"
+      ),
+      new RegExp(
+        CLAUSE +
+          IN_CLAUSE(String.raw`\bmembers?\b`) +
+          IN_CLAUSE("Compare plans"),
+        "imu"
+      ),
+      new RegExp(
+        CLAUSE + IN_CLAUSE(String.raw`\bClients?\b`) + IN_CLAUSE(CANT),
+        "imu"
+      ),
+    ],
+    slugs: [
+      "cold-email-agent/faq/lead-search/why-does-the-lead-limit-prompt-block-sending-when-i-have-leads-and-credits",
+    ],
+  },
+  {
+    note: "\"Clear out old leads\" removes leads in two cases. Clearing space: when a check finds fewer than 2,000 free lead slots, it removes people who got every email or whose email bounced, from paused or completed campaigns at least 90 days old that haven't changed for 30 days. Pausing a campaign: when the agent pauses a campaign, it can remove that campaign's bounced leads, however much space you have. A summary line about when it removes leads names both cases.",
+    reject: [
+      new RegExp(
+        CLAUSE +
+          IN_CLAUSE(PAUSES) +
+          `(?![^.;\\n]*${ANY_SPACE})` +
+          IN_CLAUSE(LOW_SPACE),
+        "imu"
+      ),
+    ],
+    rejectSummary: [
+      new RegExp(String.raw`^(?![^\n]*${PAUSES})[^\n]*${LOW_SPACE}`, "iu"),
+    ],
+    require: [
+      new RegExp(
+        CLAUSE +
+          IN_CLAUSE(PAUSES) +
+          String.raw`(?![^.;\n]*\b(?:never|not|doesn[’']?t|won[’']?t|keeps?)\b)` +
+          IN_CLAUSE(String.raw`\b(?:remov|delet|clear)`) +
+          IN_CLAUSE(String.raw`\bbounc`) +
+          IN_CLAUSE(ANY_SPACE),
+        "imu"
+      ),
+      /\b30[- ]days?\b/iu,
+    ],
+    slugs: [
+      "cold-email-agent/faq/campaigns/does-acquisity-delete-my-leads-automatically",
+    ],
+  },
 ];
 
 const bySlug = new Map(
@@ -199,7 +301,7 @@ export const correctionNotes = (slug: string): string[] => {
  */
 export const correctionKeyInputs = (slug: string): string[] => {
   const c = bySlug.get(slug);
-  if (!(c?.note || c?.reject || c?.require)) {
+  if (!(c?.note || c?.reject || c?.rejectSummary || c?.require)) {
     return [];
   }
   return [
@@ -207,6 +309,9 @@ export const correctionKeyInputs = (slug: string): string[] => {
       note: c.note ?? "",
       reject: (c.reject ?? []).map(String),
       require: (c.require ?? []).map(String),
+      ...(c.rejectSummary && {
+        rejectSummary: c.rejectSummary.map(String),
+      }),
     }),
   ];
 };
@@ -236,11 +341,12 @@ export const batchProblems = (
   slugs.flatMap((slug) => sectionProblems(slug, sections.get(slug) ?? ""));
 
 const lineRefused = (line: string) =>
-  [...line.matchAll(GUIDE_CITATION)].some((m) =>
-    (bySlug.get(m[1].trim())?.reject ?? []).some((pattern) =>
+  [...line.matchAll(GUIDE_CITATION)].some((m) => {
+    const c = bySlug.get(m[1].trim());
+    return [...(c?.reject ?? []), ...(c?.rejectSummary ?? [])].some((pattern) =>
       pattern.test(line)
-    )
-  );
+    );
+  });
 
 /**
  * Summary lines split into those kept and those refused: a line is refused
