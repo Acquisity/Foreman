@@ -136,6 +136,41 @@ export const GUIDE_CORRECTIONS: readonly GuideCorrection[] = [
     require: [/\b(?:team|teammate)\b/iu],
     slugs: ["account-settings/faq/i-didnt-receive-the-forgot-password-email"],
   },
+  {
+    note: 'Clients lose only workspace settings, "Members", "Billing" and credits. They keep personal settings (Profile, Appearance, Security, Availability, Email & Calendar, Conferencing), so say "workspace settings", never just "settings".',
+    reject: [
+      /\b(?:never|no|not|can[’']?t|cannot)(?: (?:see|open|change|access|use|get))?(?: access to)?(?: any)? settings\b/iu,
+    ],
+    slugs: ["client-portal"],
+  },
+  {
+    note: 'Anyone can top up AI Website Builder credits from the prompt. Only the "Settings" > "Billing" > "Buy credits" route is for workspace owners, so never say only owners can buy or top up credits.',
+    reject: [
+      /\bonly (?:workspace )?owners?\b(?![^\n]*\bprompt)[^.;\n]*\b(?:buy|top[- ]?up|purchase)/iu,
+      /\bowners?[- ]only\b(?![^\n]*\bprompt)/iu,
+    ],
+    slugs: ["ai-website-builder/credits-and-limits"],
+  },
+  {
+    note: "Only a DFY inbox still warming up can't be added to a live campaign. Say warming up on any line about DFY inboxes and live campaigns.",
+    reject: [
+      /^(?!#)(?![^{\n]*\bwarm)(?=[^{\n]*\b(?:DFY|done-for-you)\b)(?=[^{\n]*\b(?:live|running|active|launched) campaign).*$/imu,
+    ],
+    slugs: [
+      "cold-email-agent/faq/email-accounts",
+      "cold-email-agent/email-accounts/dfy-warmup-and-reconnect-errors",
+    ],
+  },
+  {
+    note: 'A domain can be assigned to one website at a time; this does not limit a website to one domain. You change or disconnect a domain yourself under "Manage domain" ("Change website", "Disconnect"), with no support needed. This article says nothing about counties or lead location.',
+    reject: [
+      /\bone domain (?:per|for each|a) website\b/iu,
+      /\b(?:each|a|one|per) website\b[^.;\n]{0,30}\bone domain\b/iu,
+      /\bwithout (?:contacting |asking )?support\b/iu,
+      /\bcount(?:y|ies)\b/iu,
+    ],
+    slugs: ["ai-website-builder/domains"],
+  },
 ];
 
 const bySlug = new Map(

@@ -487,7 +487,7 @@ test("the sections Foreman#370 got wrong are refused, the right ones pass", () =
       SITE_DOMAINS,
       section(
         SITE_DOMAINS,
-        "Assign: click \"Connect website\" on the row, pick the website. A domain goes to one website at a time.",
+        'Assign: click "Connect website" on the row, pick the website. A domain goes to one website at a time.',
         '"Manage domain": "Change website", "Disconnect", renewal settings, DNS records.'
       ),
     ],
