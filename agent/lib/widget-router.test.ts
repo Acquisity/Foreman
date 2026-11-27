@@ -187,7 +187,7 @@ describe("routeWidgetMessage", () => {
     }
   });
 
-  it("marks a queued turn when any of its messages is a bare ask, with a need when another says more", async () => {
+  it("marks a queued turn only when every message is a bare ask", async () => {
     const route = (question: string) =>
       routeWidgetMessage(question, {
         apiKey: "test-key",
@@ -196,9 +196,32 @@ describe("routeWidgetMessage", () => {
     const bare = await route("Human agent\n\nI need to speak to a live agent");
     assert.equal(bare.personAsk, true);
     assert.equal(bare.noNeed, true);
-    const more = await route("Human agent\n\nMy campaign stopped sending");
-    assert.equal(more.personAsk, true);
-    assert.equal(more.noNeed, undefined);
+    for (const question of [
+      "Human agent\n\nMy campaign stopped sending",
+      "Agent\n\nMy agent stopped replying to leads",
+    ]) {
+      // biome-ignore lint/performance/noAwaitInLoops: one fake call per question.
+      assert.equal((await route(question)).personAsk, undefined, question);
+    }
+  });
+
+  it("states no need on a failed call only when no earlier customer turn said more", async () => {
+    const route = (turns: { role: "customer" | "assistant"; text: string }[]) =>
+      routeWidgetMessage(
+        { latest: "human agent", turns },
+        { apiKey: "test-key", fetch: () => Promise.reject(new Error("boom")) }
+      );
+    const described = await route([
+      { role: "customer", text: "My campaign stopped sending" },
+      { role: "assistant", text: "Check the campaign's schedule." },
+    ]);
+    assert.equal(described.personAsk, true);
+    assert.equal(described.noNeed, undefined);
+    const bare = await route([
+      { role: "customer", text: "Live agent" },
+      { role: "assistant", text: "Tell me what you need help with." },
+    ]);
+    assert.equal(bare.noNeed, true);
   });
 
   it("leaves a message that only mentions a person or says more to Jev", async () => {

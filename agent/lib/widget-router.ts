@@ -341,27 +341,32 @@ interface RouteOptions {
 }
 
 /**
- * Jev's route, plus `personAsk` when any message in the turn (queued ones are
- * joined by blank lines) is only an ask for a person. A fallback route has no
- * need score, so a turn of nothing but such asks states no need.
+ * Jev's route, plus `personAsk` when the turn is nothing but asks for a person
+ * (queued messages are joined by blank lines, so each part must be one). A
+ * fallback route has no need score, so it states no need only when no earlier
+ * customer turn says more than such an ask either.
  */
 export async function routeWidgetMessage(
   ask: string | WidgetAsk,
   opts?: RouteOptions
 ): Promise<WidgetRoute> {
   const route = await scoreWidgetMessage(ask, opts);
-  const messages = toAsk(ask)
-    .latest.split(QUEUED_MESSAGES)
-    .filter((message) => message.trim());
-  if (!messages.some(bareAsk)) {
+  const { latest, turns = [] } = toAsk(ask);
+  const onlyAsks = (text: string) =>
+    text
+      .split(QUEUED_MESSAGES)
+      .filter((part) => part.trim())
+      .every(bareAsk);
+  if (!(latest.trim() && onlyAsks(latest))) {
     return route;
   }
+  const saidMore = turns.some(
+    (turn) => turn.role === "customer" && !onlyAsks(turn.text)
+  );
   return {
     ...route,
     personAsk: true,
-    ...(route.source === "fallback" && messages.every(bareAsk)
-      ? { noNeed: true }
-      : {}),
+    ...(route.source === "fallback" && !saidMore ? { noNeed: true } : {}),
   };
 }
 
