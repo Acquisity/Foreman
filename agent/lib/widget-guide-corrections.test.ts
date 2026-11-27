@@ -56,6 +56,24 @@ test("the sections Foreman#353 got wrong are refused, reworded too", () => {
     [CALLING, section(CALLING, "- iMessage lines: US-only.")],
     [CALLING, section(CALLING, "- Do not contact blocks texts only.")],
     [
+      CALLING,
+      section(
+        CALLING,
+        "- Do not contact status and the do-not-contact list block texts only."
+      ),
+    ],
+    [
+      CALLING,
+      section(CALLING, '- Pick "Phone line" or "iMessage line". US only.'),
+    ],
+    [
+      IMPORT,
+      section(
+        IMPORT,
+        '- Use "Delete selected" to force-add duplicates or blocked leads.'
+      ),
+    ],
+    [
       IMPORT,
       section(
         IMPORT,

@@ -40,7 +40,7 @@ export const GUIDE_CORRECTIONS: readonly GuideCorrection[] = [
   {
     note: 'The force-add workaround ("Delete selected" in the other campaign, then re-import) is only for a lead skipped as a duplicate of another campaign. Say so in the same line, and never put it after a list that includes blocked or do-not-contact leads.',
     reject: [
-      /(?:blocked|do.not.contact)[^\n]*(?:force-add|Delete selected)/iu,
+      /^(?=.*(?:blocked|do.not.contact))(?=.*(?:force-add|Delete selected)).*$/imu,
       /^(?!#)(?!.*duplicate)(?=.*(?:force-add|Delete selected[^\n]*re-?import)).*$/imu,
     ],
     slugs: ["cold-email-agent/campaigns/managing-campaigns/import-leads"],
@@ -62,11 +62,11 @@ export const GUIDE_CORRECTIONS: readonly GuideCorrection[] = [
   {
     note: '"US numbers only" is said of the phone line search, not of iMessage lines. Do not contact status and the do-not-contact list block calls and texts; only a STOP reply leaves calls unaffected.',
     reject: [
-      /iMessage lines?"?\s*[(:]?\s*(?:are\s+)?US[- ](?:numbers\s+)?only/iu,
+      /iMessage lines?"?[\s.(:]*(?:are\s+)?US[- ](?:numbers\s+)?only/iu,
       /US[- ]only iMessage/iu,
       /\bUS (?:numbers?|only)[^.;\n]{0,30}\bfor iMessage/iu,
       /(?<!calls and )texts? (?:are )?blocked by (?:Do not contact|do-not-contact)/iu,
-      /(?:Do not contact|do-not-contact)(?: status| list)? blocks? (?:only texts|texts only)/iu,
+      /(?:Do not contact|do-not-contact)(?:(?!STOP)[^.;\n])*\bblocks? (?:only texts|texts only)/iu,
     ],
     slugs: ["crm/calling-and-texting"],
   },
