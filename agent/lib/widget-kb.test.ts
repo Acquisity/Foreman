@@ -912,8 +912,9 @@ test("the legacy writer's ticket note replaces the no-notification rule while it
 });
 
 test("with escalation on, the legacy writer points a person ask to this chat in place of the no-notification rule", async () => {
-  const { GROUND_PROMPT, groundPrompt, replyPrompt, writerCustomer } =
-    await import("./widget-kb.js");
+  const { groundPrompt, replyPrompt, writerCustomer } = await import(
+    "./widget-kb.js"
+  );
   const customer = {
     canInvestigate: true,
     escalates: true as const,
