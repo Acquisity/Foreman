@@ -416,6 +416,12 @@ test("wrong summary lines from Foreman#370 are dropped", () => {
     `- Done-for-you inboxes cannot join a running campaign. {${DFY}}`,
     `- Website Builder top-ups are owner only. {${SITE_CREDITS}}`,
     `- Each website can have one domain at a time. {${SITE_DOMAINS}}`,
+    `- Clients never see "Settings", "Members" or "Billing". {${PORTAL}}`,
+    `- Clients can't open the settings. {${PORTAL}}`,
+    `- Clients see only "Client Portal", "Dashboard", CRM (unless off) and partner-enabled campaigns; never workspace settings, "Members", "Billing". {${PORTAL}}`,
+    `- Only Owners buy credits for AI Website Builder. A prompt appears when your balance runs low. {${SITE_CREDITS}}`,
+    `- DFY inboxes can't be added to a live campaign. Check the warm-up status first. {${INBOX_FAQ}}`,
+    `- You can't add DFY inboxes to a running campaign. {${DFY}}`,
   ];
   const right = [
     `- Client role has Client Portal, view-only; clients never see campaigns/AI SDR unless partner enables. {${PORTAL}}`,
@@ -423,6 +429,12 @@ test("wrong summary lines from Foreman#370 are dropped", () => {
     `- Only Owners buy Website Builder credits from "Settings" > "Billing"; anyone can top up from the prompt. {${SITE_CREDITS}}`,
     `- A DFY inbox still warming up can't be added to a live campaign. {${DFY}}`,
     `- A domain can be assigned to one website at a time. {${SITE_DOMAINS}}`,
+    `- Clients see only "Client Portal", "Dashboard", CRM and personal settings; never workspace settings. {${PORTAL}}`,
+    `- Only workspace owners can buy credits through "Settings" > "Billing". {${SITE_CREDITS}}`,
+    `- Low balance: top up from the prompt; only owners can also buy in "Settings" > "Billing". {${SITE_CREDITS}}`,
+    `- A DFY inbox marked "Ready to send" can be added to a live campaign. {${DFY}}`,
+    `- Each website can have more than one domain. {${SITE_DOMAINS}}`,
+    `- You can change or disconnect a domain under "Manage domain" without contacting support. {${SITE_DOMAINS}}`,
   ];
   assert.deepEqual(refuseSummaryLines({ cannot: wrong, who: right }), {
     kept: { cannot: [], who: right },
@@ -465,7 +477,7 @@ test("the sections Foreman#370 got wrong are refused, the right ones pass", () =
       SITE_CREDITS,
       section(
         SITE_CREDITS,
-        'Get here: "Settings" > "Billing" > "Buy credits" (owners).',
+        'Get here: "Settings" > "Billing" > "Buy credits" (owners only).',
         "Low balance: top up from the prompt, resend."
       ),
     ],

@@ -137,24 +137,25 @@ export const GUIDE_CORRECTIONS: readonly GuideCorrection[] = [
     slugs: ["account-settings/faq/i-didnt-receive-the-forgot-password-email"],
   },
   {
-    note: 'Clients lose only workspace settings, "Members", "Billing" and credits. They keep personal settings (Profile, Appearance, Security, Availability, Email & Calendar, Conferencing), so say "workspace settings", never just "settings".',
+    note: 'Clients lose only workspace settings, "Members", "Billing" and credits. They keep personal settings (Profile, Appearance, Security, Availability, Email & Calendar, Conferencing), so say "workspace settings", never just "settings", and list personal settings whenever you list what Clients see.',
     reject: [
-      /\b(?:never|no|not|can[’']?t|cannot)(?: (?:see|open|change|access|use|get))?(?: access to)?(?: any)? settings\b/iu,
+      /\b(?:never|no|not|can[’']?t|cannot)(?: (?:see|open|change|access|use|get|have))?(?: access to)?(?: (?:any|the))? "?settings\b/iu,
+      /^(?!#)(?![^{\n]*\bpersonal)[^{\n]*(?:\b(?:sees?|gets?) only\b|\bonly (?:sees?|gets?)\b).*$/imu,
     ],
     slugs: ["client-portal"],
   },
   {
-    note: 'Anyone can top up AI Website Builder credits from the prompt. Only the "Settings" > "Billing" > "Buy credits" route is for workspace owners, so never say only owners can buy or top up credits.',
+    note: 'Anyone can top up AI Website Builder credits from the prompt. Only the "Settings" > "Billing" > "Buy credits" route is for workspace owners, so any line saying only owners buy credits names that route in the same sentence.',
     reject: [
-      /\bonly (?:workspace )?owners?\b(?![^\n]*\bprompt)[^.;\n]*\b(?:buy|top[- ]?up|purchase)/iu,
-      /\bowners?[- ]only\b(?![^\n]*\bprompt)/iu,
+      /(?:^|[.;])(?![^.;\n]*\b(?:in|via|through|from|under|on) (?:the )?"?(?:Settings|Billing)\b)[^.;\n]*\bonly (?:workspace )?owners?\b[^.;\n]*\b(?:buy|top[- ]?up|purchase)/imu,
+      /(?:^|[.;])(?![^.;\n]*\b(?:Settings|Billing)\b)[^.;\n]*\bowners?[- ]only\b/imu,
     ],
     slugs: ["ai-website-builder/credits-and-limits"],
   },
   {
-    note: "Only a DFY inbox still warming up can't be added to a live campaign. Say warming up on any line about DFY inboxes and live campaigns.",
+    note: "Only a DFY inbox still warming up can't be added to a live campaign. Say warming up in the same sentence as any line saying a DFY inbox can't join a live campaign.",
     reject: [
-      /^(?!#)(?![^{\n]*\bwarm)(?=[^{\n]*\b(?:DFY|done-for-you)\b)(?=[^{\n]*\b(?:live|running|active|launched) campaign).*$/imu,
+      /(?:^|[.;])(?![^.;{\n]*\bwarm)[^.;{\n]*(?:\b(?:DFY|done-for-you)\b[^.;{\n]*\b(?:can[’']?t|cannot|not)\b|\b(?:can[’']?t|cannot)\s+(?:add|use)\s+(?:any |a )?(?:DFY|done-for-you)\b)[^.;{\n]*\b(?:live|running|active|launched) campaign/imu,
     ],
     slugs: [
       "cold-email-agent/faq/email-accounts",
@@ -162,11 +163,12 @@ export const GUIDE_CORRECTIONS: readonly GuideCorrection[] = [
     ],
   },
   {
-    note: 'A domain can be assigned to one website at a time; this does not limit a website to one domain. You change or disconnect a domain yourself under "Manage domain" ("Change website", "Disconnect"), with no support needed. This article says nothing about counties or lead location.',
+    note: 'A domain can be assigned to one website at a time. You change or disconnect a domain yourself under "Manage domain" ("Change website", "Disconnect"). This article says nothing about support, counties or lead location.',
     reject: [
       /\bone domain (?:per|for each|a) website\b/iu,
-      /\b(?:each|a|one|per) website\b[^.;\n]{0,30}\bone domain\b/iu,
-      /\bwithout (?:contacting |asking )?support\b/iu,
+      /\b(?:each|a|one|per) website\b[^.;\n]{0,30}(?<!more than |than )\bone domain\b/iu,
+      /\b(?:no|can[’']?t|cannot|not)\b[^.;\n]*\bwithout (?:contacting |asking )?support\b/iu,
+      /\b(?:ask|contact|needs?|requires?)\b[^.;\n]{0,10}\bsupport\b/iu,
       /\bcount(?:y|ies)\b/iu,
     ],
     slugs: ["ai-website-builder/domains"],
