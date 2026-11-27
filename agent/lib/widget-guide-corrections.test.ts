@@ -524,38 +524,46 @@ const LEAD_LIMIT =
 const CLEAR_OUT =
   "cold-email-agent/faq/campaigns/does-acquisity-delete-my-leads-automatically";
 
-// Wrong lines are Foreman#374's at 7eea8f8e (ENG-21344). Right lines are
-// written to the Help Centre at Acquisity 9b42bbafe194.
+const LEAD_LIMIT_HEADING = `### Why can’t I add campaign leads when I still have credits? {slug: ${LEAD_LIMIT}}`;
+const ROUTES =
+  '- Plans: owners use "Settings" > "Billing" > "View plans"; admins use "View plans" in the warning; members "Compare plans"; Client users can\'t change plans.';
+const STILL_SENDS =
+  "- At 5,000, adding or importing is blocked. Existing campaigns can still send. Nothing is deleted automatically.";
+
+// Wrong lines are Foreman#374's at 7eea8f8e (ENG-21344) or the same claims
+// reworded in review. Right lines are written to the Help Centre at Acquisity
+// 9b42bbafe194.
 test("wrong summary lines from Foreman#374 are dropped", () => {
   const wrong = [
     `- "Clear out old leads" keeps repliers, and targets campaigns 90+ days old only when you have under 2,000 free slots. {${CLEAR_OUT}}`,
     `- Clear out old leads runs only when your workspace is running out of lead space. {${CLEAR_OUT}}`,
     `- "Clear out old leads" removes bounced leads from paused campaigns 90+ days old when under 2,000 free slots. {${CLEAR_OUT}}`,
+    `- Clear out old leads only runs when space is tight. {${CLEAR_OUT}}`,
+    `- When the agent pauses a campaign, Clear out old leads removes its bounced leads only when you have under 2,000 free slots. {${CLEAR_OUT}}`,
     `- Change plans in "Settings" > "Billing" > "View plans". {${LEAD_LIMIT}}`,
+    `- Owners and admins change plans in "Settings" > "Billing" > "View plans". {${LEAD_LIMIT}}`,
+    `- At the limit, existing campaigns stop sending. {${LEAD_LIMIT}}`,
   ];
   const right = [
-    `- "Clear out old leads" removes bounced or fully emailed leads from campaigns 90+ days old under 2,000 free slots, and a paused campaign's bounced leads however much space you have. {${CLEAR_OUT}}`,
+    `- "Clear out old leads" removes finished leads from campaigns 90+ days old under 2,000 free slots, and when it pauses a campaign, that campaign's bounced leads however much space you have. {${CLEAR_OUT}}`,
     `- Leads are deleted only when someone deletes them or via the agent's "Clear out old leads". {${CLEAR_OUT}}`,
     `- Only owners use "Settings" > "Billing" > "View plans"; admins use "View plans" in the warning. {${LEAD_LIMIT}}`,
     `- Credits and campaign-lead storage are separate. {${LEAD_LIMIT}}`,
+    `- Full storage doesn't stop sending. {${LEAD_LIMIT}}`,
   ];
   assert.deepEqual(
     refuseSummaryLines({ cannot: [...wrong, ...right], who: [] }),
-    {
-      kept: { cannot: right, who: [] },
-      refused: wrong,
-    }
+    { kept: { cannot: right, who: [] }, refused: wrong }
   );
 });
 
 test("the sections Foreman#374 got wrong are refused, the right ones pass", () => {
-  const wrong: [string, string][] = [
+  const wrong: string[][] = [
     [
       LEAD_LIMIT,
       section(
         LEAD_LIMIT,
         "- Credits and campaign-lead storage are separate.",
-        "- Growth stores 5,000 leads (warning at 4,000, blocked at 5,000). Pro stores 25,000.",
         '- Click "Export", then delete leads or use "Delete all".',
         '- Plans: "Settings" > "Billing" > "View plans".'
       ),
@@ -564,7 +572,7 @@ test("the sections Foreman#374 got wrong are refused, the right ones pass", () =
       LEAD_LIMIT,
       section(
         LEAD_LIMIT,
-        "- At 5,000, adding or importing is blocked. Existing campaigns can still send. Nothing is deleted automatically.",
+        STILL_SENDS,
         '- Plans: Settings → Billing → View plans; members "Compare plans" in the warning; Client users can\'t change plans.'
       ),
     ],
@@ -572,16 +580,34 @@ test("the sections Foreman#374 got wrong are refused, the right ones pass", () =
       LEAD_LIMIT,
       section(
         LEAD_LIMIT,
-        "- At 5,000, adding or importing is blocked. Nothing is deleted automatically.",
-        '- Plans: owners use "Settings" > "Billing" > "View plans"; admins use "View plans" in the warning; members "Compare plans"; Client users can\'t change plans.'
+        STILL_SENDS,
+        '- Owners and admins: "Settings" > "Billing" > "View plans". Members "Compare plans". Client users can\'t change the plan.'
       ),
     ],
     [
       LEAD_LIMIT,
+      section(
+        LEAD_LIMIT,
+        STILL_SENDS,
+        '- Owners: "Settings" > "Billing" > "View plans". Admins and members use "Compare plans" in the warning. Client users can change their plan.'
+      ),
+    ],
+    [
+      LEAD_LIMIT,
+      section(
+        LEAD_LIMIT,
+        "- At capacity, existing campaigns still cannot send. Nothing is deleted automatically.",
+        ROUTES
+      ),
+    ],
+    // The real heading says "still" and its slug "sending", so it must not
+    // count as the sending line.
+    [
+      LEAD_LIMIT,
       [
-        `### Why can’t I add campaign leads when I still have credits? {slug: ${LEAD_LIMIT}}`,
+        LEAD_LIMIT_HEADING,
         "- At 5,000, adding or importing is blocked. Nothing is deleted automatically.",
-        '- Plans: owners use "Settings" > "Billing" > "View plans"; admins use "View plans" in the warning; members "Compare plans"; Client users can\'t change plans.',
+        ROUTES,
       ].join("\n"),
     ],
     [
@@ -592,26 +618,41 @@ test("the sections Foreman#374 got wrong are refused, the right ones pass", () =
         '- Set it to "Never" to stop it. Deletion is permanent.'
       ),
     ],
+    [
+      CLEAR_OUT,
+      section(
+        CLEAR_OUT,
+        "- Under 2,000 free slots it removes finished leads from old campaigns.",
+        "- When the agent pauses a campaign, it keeps the bounced leads."
+      ),
+    ],
+    [
+      CLEAR_OUT,
+      section(
+        CLEAR_OUT,
+        "- When the agent pauses a campaign, it removes its bounced leads only when you have under 2,000 free slots."
+      ),
+    ],
   ];
   for (const [slug, text] of wrong) {
     assert.notDeepEqual(sectionProblems(slug, text), [], text);
   }
-  const right: [string, string][] = [
+  const right: string[][] = [
     [
       LEAD_LIMIT,
-      section(
-        LEAD_LIMIT,
+      [
+        LEAD_LIMIT_HEADING,
         "- Sourcing credits and campaign-lead storage are separate; credits add no room.",
         "- Growth warns at 4,000. At 5,000, adding or importing (CSV, lead database, CRM) is blocked. Sending, viewing, replies, export and delete still work. Nothing is auto-deleted.",
-        '- Plans: owners use "Settings" > "Billing" > "View plans"; admins use "View plans" in the warning; members "Compare plans"; Client users can\'t change plans.'
-      ),
+        ROUTES,
+      ].join("\n"),
     ],
     [
       LEAD_LIMIT,
       section(
         LEAD_LIMIT,
-        "- Existing campaigns can still send, and nothing is deleted automatically.",
-        '- Workspace owners: Settings → Billing → View plans. Owners and admins: "View plans" in the campaign-lead warning. Members: "Compare plans" there. Client users cannot change the plan.'
+        "- Existing campaigns keep sending. The limit does not automatically delete anything.",
+        '- Workspace owners: Settings → Billing → View plans. Owners and admins: "View plans" in the campaign-lead warning. Members: "Compare plans" there. Clients cannot change plans.'
       ),
     ],
     [
@@ -619,7 +660,23 @@ test("the sections Foreman#374 got wrong are refused, the right ones pass", () =
       section(
         CLEAR_OUT,
         "- No. Acquisity never deletes campaign leads on its own to make room.",
-        "- The agent's \"Clear out old leads\": under 2,000 free slots it removes fully emailed or bounced leads from paused or completed campaigns 90+ days old; when it pauses a campaign it can remove that campaign's bounced leads, however much space you have. Repliers are kept."
+        "- The agent's \"Clear out old leads\": under 2,000 free slots it removes fully emailed or bounced leads from paused or completed campaigns 90+ days old and unchanged for 30 days; when it pauses a campaign it can remove that campaign's bounced leads, however much space you have. Repliers are kept."
+      ),
+    ],
+    [
+      CLEAR_OUT,
+      section(
+        CLEAR_OUT,
+        '- Not on its own. The one exception is the agent\'s "Clear out old leads", when your workspace is running out of lead space.',
+        "- Clearing space: under 2,000 free lead slots, it removes people who got every email or bounced, from paused or completed campaigns 90+ days old and unchanged for 30 days.",
+        "- Pausing a campaign: when it pauses a campaign, it can also remove that campaign's bounced leads, however much space you have."
+      ),
+    ],
+    [
+      CLEAR_OUT,
+      section(
+        CLEAR_OUT,
+        "- It can remove bounced leads of campaigns it pauses, whatever your space."
       ),
     ],
   ];
