@@ -69,6 +69,7 @@ const CLAUSE = "(?:^|[.;])";
 const IN_CLAUSE = (pattern: string) => String.raw`(?=[^.;\n]*${pattern})`;
 
 const BILLING_PLANS = String.raw`\bBilling"?\s*(?:>|→)\s*"?View plans`;
+const OTHER_ROLES = String.raw`\b(?:admins?|members?|clients?|everyone|anyone|all (?:roles|users))\b`;
 const CANT = String.raw`\b(?:can[’']?t|cannot|can not|unable|not able|don[’']?t|do not)\b`;
 
 /** The agent pausing a campaign, not a campaign that is already paused. */
@@ -198,7 +199,7 @@ export const GUIDE_CORRECTIONS: readonly GuideCorrection[] = [
     note: 'While storage is full, existing campaigns can still send, and hitting the limit deletes nothing on its own; say both. "Settings" > "Billing" > "View plans" is for workspace owners only: give it to owners alone, in its own sentence. Then say, a sentence each: owners and admins can use "View plans" in the campaign-lead warning; members use "Compare plans" there; Client users can\'t change the plan.',
     reject: [
       new RegExp(
-        String.raw`${CLAUSE}(?:(?![^.;\n]*\bowners?\b)|${IN_CLAUSE(String.raw`\b(?:admins?|members?|clients?|everyone|anyone|all (?:roles|users))\b`)})[^.;\n]*${BILLING_PLANS}`,
+        String.raw`${CLAUSE}(?:(?![^.;\n]*\bowners?\b)|${IN_CLAUSE(OTHER_ROLES)})[^.;\n]*${BILLING_PLANS}`,
         "imu"
       ),
       new RegExp(
@@ -210,7 +211,7 @@ export const GUIDE_CORRECTIONS: readonly GuideCorrection[] = [
       new RegExp(
         CLAUSE +
           IN_CLAUSE(String.raw`\bowners?\b`) +
-          "(?![^.;\\n]*\\b(?:admins?|members?|clients?)\\b)" +
+          `(?![^.;\\n]*${OTHER_ROLES})` +
           IN_CLAUSE(BILLING_PLANS),
         "imu"
       ),
