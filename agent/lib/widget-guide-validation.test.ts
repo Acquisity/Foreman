@@ -209,6 +209,21 @@ test("a section that drops a label the page still names, or most of main's words
   );
 });
 
+test("a label is kept whatever punctuation sits inside its closing quote", () => {
+  const main = [
+    "### Calling and Texting {slug: crm/calling-and-texting}",
+    '- Texts: "Send later". Use "Allow texts."',
+  ].join("\n");
+  const regenerated = [
+    "### Calling and Texting {slug: crm/calling-and-texting}",
+    '- Click "Send later." Then "Allow texts", done.',
+  ].join("\n");
+  const sources = new Map([
+    ["crm/calling-and-texting", "Click **Send later**, then **Allow texts**."],
+  ]);
+  assert.deepEqual(answerLosses(regenerated, main, sources)[0].dropped, []);
+});
+
 test("a retry is kept when it drops fewer of main's labels, or as many in more words, and never a label the earlier one kept", () => {
   const thin = { dropped: ["Send later", "Power dialler"], now: 107 };
   assert.equal(retryKeeps(thin, { dropped: ["Power dialler"], now: 90 }), true);

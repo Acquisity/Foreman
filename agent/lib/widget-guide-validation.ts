@@ -101,7 +101,10 @@ export function shortAnswers(
 
 /** A regenerated section keeping less than this share of main's words has shrunk. */
 export const SHRUNK_SHARE = 0.8;
-const QUOTED = /"([^"\n]+)"/gu;
+/** A quoted label, without punctuation written inside its closing quote. */
+const QUOTED = /"([^"\n]*?[^"\n.,;:!?])[.,;:!?]*"/gu;
+const quotedLabels = (text: string) =>
+  new Set([...text.matchAll(QUOTED)].map((m) => m[1]));
 
 /** Each section's fact lines, without its heading and "Get here:" line. */
 function factLines(text: string): Map<string, string> {
@@ -146,10 +149,9 @@ export function answerLosses(
       return [];
     }
     const source = sources.get(slug) ?? "";
-    const dropped = [
-      ...new Set([...main.matchAll(QUOTED)].map((m) => m[1])),
-    ].filter(
-      (label) => source.includes(label) && !facts.includes(`"${label}"`)
+    const kept = quotedLabels(facts);
+    const dropped = [...quotedLabels(main)].filter(
+      (label) => source.includes(label) && !kept.has(label)
     );
     return [
       {

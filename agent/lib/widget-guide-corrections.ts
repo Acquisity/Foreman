@@ -131,6 +131,7 @@ export const GUIDE_CORRECTIONS: readonly GuideCorrection[] = [
     ],
     require: [
       /\bassigned number\b/iu,
+      /"My phone"/u,
       /"Record outgoing calls by default"/u,
       /\bowners?\b[^\n]*"Dialling speed"|"Dialling speed"[^\n]*\b(?:owners?|admins?)\b/iu,
     ],

@@ -186,7 +186,7 @@ test("right wording for the same articles passes", () => {
         CALLING,
         '- Owners/admins: "Request number" > "Phone line" (US numbers only) or "iMessage line".',
         "- Calls and texts are blocked for Do not contact status and the do-not-contact list. A STOP reply blocks texts only; calls are not affected.",
-        '- Caller ID: the assigned number or a verified mobile. Owners/admins: "Record outgoing calls by default" on "Calling"; "Dialling speed" tab.'
+        '- Caller ID: the assigned number or a mobile verified on "My phone". Owners/admins: "Record outgoing calls by default" on "Calling"; "Dialling speed" tab.'
       ),
     ],
     [
@@ -199,7 +199,7 @@ test("right wording for the same articles passes", () => {
         "- Calls and texts are blocked by Do not contact status or the do-not-contact list; a STOP reply blocks texts only (calls unaffected).",
         "- Calls and texts are blocked by Do not contact status, and a STOP reply blocks texts only (calls unaffected).",
         "- Do not contact blocks calls and texts, while STOP leaves calls unaffected.",
-        '- Caller ID: the assigned number or a verified mobile. Owners/admins: "Record outgoing calls by default" on "Calling"; "Dialling speed" tab.'
+        '- Caller ID: the assigned number or a mobile verified on "My phone". Owners/admins: "Record outgoing calls by default" on "Calling"; "Dialling speed" tab.'
       ),
     ],
     [
