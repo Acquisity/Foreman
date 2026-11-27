@@ -22,6 +22,8 @@ const DOMAINS =
   "workspace-settings/faq/billing-subscriptions/what-happens-to-my-domains-if-i-cancel";
 const CALLING = "crm/calling-and-texting";
 const FORGOT = "account-settings/faq/i-didnt-receive-the-forgot-password-email";
+const BILLING = "workspace-settings/billing";
+const CREDITS = "cold-email-agent/concepts/credits";
 
 const section = (slug: string, ...lines: string[]) =>
   [`### Title {slug: ${slug}}`, ...lines].join("\n");
@@ -251,4 +253,75 @@ test("wrong summary lines from Foreman#353 are dropped, the rest kept", () => {
     kept: { cannot: untouched, who: [] },
     refused: [],
   });
+});
+
+// Wrong lines are Foreman#370's at 4bf4c290 (ENG-21282). Right lines follow
+// the Help Centre at Acquisity 5a844527333d: plan credits and one-time packs
+// never expire, and monthly-pack credits carry over only while the pack is
+// active.
+test("credits never expiring is said only of plan credits and one-time packs", () => {
+  const wrong: [string, string][] = [
+    [
+      BILLING,
+      section(
+        BILLING,
+        '- Credits never expire or reset. "Buy credits" > "One time" or "Every month" > pack > "Buy for".',
+        "- Monthly-pack credits carry over while the pack is active."
+      ),
+    ],
+    [
+      CREDITS,
+      section(
+        CREDITS,
+        "- Credits never reset. Monthly packs add on top.",
+        "- If the pack ends, its credits end with it."
+      ),
+    ],
+    [
+      CREDITS,
+      section(
+        CREDITS,
+        "- Credits don't expire, even when your plan renews. If the pack ends, its credits end with it."
+      ),
+    ],
+    [
+      BILLING,
+      section(BILLING, "- Plan credits and one-time packs never expire."),
+    ],
+  ];
+  for (const [slug, text] of wrong) {
+    assert.notDeepEqual(sectionProblems(slug, text), [], text);
+  }
+  const right: [string, string][] = [
+    [
+      BILLING,
+      section(
+        BILLING,
+        "- Plan Active badge.",
+        "- Plan credits and one-time packs never expire. Monthly-pack credits carry over while the pack is active; if the pack ends, its credits end with it.",
+        "- Pre-warmed domains $18/year, inboxes $8/month."
+      ),
+    ],
+    [
+      CREDITS,
+      section(
+        CREDITS,
+        "- Plan-included and one-time credits never reset or expire.",
+        "- Monthly packs add on top each month and carry over while the pack is active."
+      ),
+    ],
+  ];
+  for (const [slug, text] of right) {
+    assert.deepEqual(sectionProblems(slug, text), [], text);
+  }
+  const lines = [
+    `- Credits never expire or reset. {${BILLING}}`,
+    `- Credits never reset. {${CREDITS}}`,
+    `- Plan and one-time pack credits never reset. {${BILLING}}`,
+  ];
+  assert.deepEqual(refuseSummaryLines({ cannot: lines, who: [] }), {
+    kept: { cannot: [lines[2]], who: [] },
+    refused: lines.slice(0, 2),
+  });
+  assert.match(correctionNotes(BILLING)[0], /Pre-warmed/u);
 });
