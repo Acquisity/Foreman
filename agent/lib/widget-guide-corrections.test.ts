@@ -1,10 +1,10 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
-  correctionNote,
+  correctionNotes,
   GUIDE_CORRECTIONS,
+  refuseSummaryLines,
   sectionProblems,
-  summaryLinesKept,
 } from "./widget-guide-corrections.js";
 import { PRODUCT_GUIDE_ARTICLES } from "./widget-product-guide.js";
 
@@ -150,7 +150,7 @@ test("main's right wording for the same articles passes", () => {
 
 test("an article with no correction is never refused", () => {
   assert.deepEqual(sectionProblems("crm/deals", '- Text "US only".'), []);
-  assert.equal(correctionNote("crm/deals"), "");
+  assert.deepEqual(correctionNotes("crm/deals"), []);
 });
 
 test("wrong summary lines from Foreman#353 are dropped, the rest kept", () => {
@@ -161,8 +161,19 @@ test("wrong summary lines from Foreman#353 are dropped, the rest kept", () => {
     `- Texts are blocked by Do not contact status, list, or STOP (calls unaffected). {${CALLING}}`,
     `- A STOP reply blocks texts only; calls are not affected. {${CALLING}}`,
   ];
-  const kept = summaryLinesKept(AI_SDR_FAQ, lines.slice(0, 2));
-  assert.deepEqual(kept, [lines[1]]);
-  assert.deepEqual(summaryLinesKept(CALLING, lines.slice(2)), [lines[4]]);
-  assert.deepEqual(summaryLinesKept("crm/deals", lines), lines);
+  assert.deepEqual(
+    refuseSummaryLines(AI_SDR_FAQ, { cannot: lines.slice(0, 2), who: [] }),
+    { kept: { cannot: [lines[1]], who: [] }, refused: [lines[0]] }
+  );
+  assert.deepEqual(
+    refuseSummaryLines(CALLING, { cannot: lines.slice(2, 4), who: [lines[4]] }),
+    { kept: { cannot: [], who: [lines[4]] }, refused: [lines[2], lines[3]] }
+  );
+  assert.deepEqual(
+    refuseSummaryLines("crm/deals", { cannot: lines, who: [] }),
+    {
+      kept: { cannot: lines, who: [] },
+      refused: [],
+    }
+  );
 });

@@ -1,3 +1,5 @@
+import type { GuideLimits } from "./widget-guide-cache.js";
+
 /**
  * Lines a guide regeneration got wrong that the Help Centre gets right
  * (ENG-21059). Each output is cached under a hash of its inputs, so a wrong
@@ -80,9 +82,11 @@ export const GUIDE_CORRECTIONS: readonly GuideCorrection[] = [
 
 const bySlug = new Map(GUIDE_CORRECTIONS.map((c) => [c.slug, c]));
 
-/** The article's correction note, or "" when it has none. */
-export const correctionNote = (slug: string): string =>
-  bySlug.get(slug)?.note ?? "";
+/** The article's correction note, as a list empty when it has none. */
+export const correctionNotes = (slug: string): string[] => {
+  const note = bySlug.get(slug)?.note;
+  return note ? [note] : [];
+};
 
 /** Why an article's distilled section is refused; empty when it passes. */
 export function sectionProblems(slug: string, section: string): string[] {
@@ -100,8 +104,23 @@ export function sectionProblems(slug: string, section: string): string[] {
   ];
 }
 
-/** An article's summary lines without those its correction refuses. */
-export const summaryLinesKept = (slug: string, lines: string[]): string[] => {
+/** An article's summary lines split into those kept and those refused. */
+export function refuseSummaryLines(
+  slug: string,
+  limits: GuideLimits
+): { kept: GuideLimits; refused: string[] } {
   const reject = bySlug.get(slug)?.reject ?? [];
-  return lines.filter((line) => !reject.some((pattern) => pattern.test(line)));
-};
+  const refused: string[] = [];
+  const keep = (lines: string[]) =>
+    lines.filter((line) => {
+      const wrong = reject.some((pattern) => pattern.test(line));
+      if (wrong) {
+        refused.push(line);
+      }
+      return !wrong;
+    });
+  return {
+    kept: { cannot: keep(limits.cannot), who: keep(limits.who) },
+    refused,
+  };
+}

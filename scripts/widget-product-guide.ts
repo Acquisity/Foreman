@@ -46,9 +46,9 @@ import {
   splitGuideSections,
 } from "../agent/lib/widget-guide-cache.js";
 import {
-  correctionNote,
+  correctionNotes,
+  refuseSummaryLines,
   sectionProblems,
-  summaryLinesKept,
 } from "../agent/lib/widget-guide-corrections.js";
 import {
   OPT_IN_NOTE,
@@ -438,12 +438,8 @@ const relink = (text: string) =>
  * A correction's note goes with its article to the model and into the cache
  * key, so a new correction redoes only its own article (widget-guide-corrections).
  */
-const noted = (slug: string): string[] => {
-  const note = correctionNote(slug);
-  return note ? [note] : [];
-};
 const reviewNote = (slug: string) =>
-  noted(slug).map(
+  correctionNotes(slug).map(
     (note) =>
       `\n\nREVIEW NOTE for ${slug} (not part of the article; a past version got this wrong, so follow the article): ${note}`
   );
@@ -461,7 +457,7 @@ const articleKey = (a: Article) =>
     a.title,
     a.slug,
     a.text,
-    ...noted(a.slug)
+    ...correctionNotes(a.slug)
   );
 const distilled = new Map<string, string>();
 const pending = available.filter((a) => {
@@ -696,7 +692,7 @@ const limitsKey = (slug: string) =>
     LIMITS_MODEL,
     LIMITS_PROMPT,
     finished.get(slug) ?? "",
-    ...noted(slug)
+    ...correctionNotes(slug)
   );
 const summarised = new Map<string, GuideLimits>();
 const stale = slugs.filter((slug) => {
@@ -751,14 +747,9 @@ if (stale.length) {
     console.log(`  summary line cites no summarised article: ${line}`);
   }
   for (const [slug, summary] of limits) {
-    const kept = {
-      cannot: summaryLinesKept(slug, summary.cannot),
-      who: summaryLinesKept(slug, summary.who),
-    };
-    for (const line of [...summary.who, ...summary.cannot]) {
-      if (![...kept.who, ...kept.cannot].includes(line)) {
-        console.log(`  summary line refused by a correction: ${line}`);
-      }
+    const { kept, refused } = refuseSummaryLines(slug, summary);
+    for (const line of refused) {
+      console.log(`  summary line refused by a correction: ${line}`);
     }
     summarised.set(slug, kept);
   }
