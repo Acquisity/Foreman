@@ -58,6 +58,8 @@ function enabled(t: TestContext) {
   for (const [key, value] of [
     ["SUPPORT_CHAT_ENABLED", "true"],
     ["FOREMAN_DIAGNOSTICS_SECRET", SERVICE_SECRET],
+    // A real bug still files its ticket when chats escalate to Fixy (ENG-21094).
+    ["WIDGET_ESCALATE_TO_FIXY", "on"],
   ] as const) {
     const previous = process.env[key];
     process.env[key] = value;

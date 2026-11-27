@@ -11,7 +11,16 @@ import {
   handoffReport,
   handoffTicketBody,
 } from "./widget-bug-report.js";
-import { parseFindings, type WidgetFindings } from "./widget-findings.js";
+import {
+  blockedForCustomer,
+  customerTurn,
+  escalatesToFixy,
+} from "./widget-escalation.js";
+import {
+  parseFindings,
+  teamFindings,
+  type WidgetFindings,
+} from "./widget-findings.js";
 import type { WidgetDependencies } from "./widget-investigation.js";
 import { isLiveActive } from "./widget-live-policy.js";
 import {
@@ -26,9 +35,11 @@ import { type fileTicketFor, fileWidgetTicket } from "./widget-ticket.js";
 import type { TicketNote } from "./widget-ticket-followup.js";
 
 /**
- * Nobody takes a support chat over (ENG-20283, decision 5). Whatever would
- * have handed the chat to a person files the conversation's one ticket
- * instead, the team answers it, and the answer is posted back into this chat.
+ * Whatever would have handed the chat to a person hands it to Fixy when
+ * escalation is on (ENG-21094, `widget-escalation.ts`), with no ticket for the
+ * escalation. With it off, nobody takes a support chat over (ENG-20283,
+ * decision 5): those turns file the conversation's one ticket instead, the
+ * team answers it, and the answer is posted back into this chat.
  */
 
 /** The outcome reason, or its prefix, of a reply that filed the conversation's ticket in place of a handoff. */
@@ -38,6 +49,7 @@ export const TICKET_INSTEAD = "ticket_instead_of_handoff";
 export const PERSON_INVITE = "person_invite";
 
 const TICKET_TIMEOUT_MS = 30_000;
+const RECEIPT_READ_MS = 5000;
 /**
  * Left for the filing itself when the caller has a deadline, its own reads
  * and write at their bounds (refund 3s, search 15s, write 15s): the ticket
@@ -52,9 +64,6 @@ export const ANSWER_HERE =
 /** Fixed wording after an answer whose filing failed, so the customer knows nothing was passed on. */
 export const UNFILED_LINE =
   "I couldn't pass this to our team just now. Send your message again and I'll try once more.";
-
-/** A customer's own turn. A teammate's inbox run is team-only and never files. */
-export const customerTurn = (scope: WidgetContext) => scope.source === "widget";
 
 type Turns = { role: "customer" | "assistant"; text: string }[] | undefined;
 
@@ -177,15 +186,7 @@ export const handoffFindings = (
   report: string,
   ticket: HandoffTicketRef,
   found?: WidgetFindings | null
-) =>
-  parseFindings({
-    confidence: found?.confidence ?? "low",
-    facts: found?.facts ?? [],
-    needsHuman: false,
-    recommendation: ANSWER_HERE,
-    report: (found?.report ?? report).slice(0, 1000),
-    ticket,
-  });
+) => teamFindings(report, found, { recommendation: ANSWER_HERE, ticket });
 
 /**
  * The answer-comes-here line is fixed text added after the gate, to an allowed
@@ -245,10 +246,10 @@ export const RETRYABLE_BLOCK =
   /^(?:deadline$|gate_unavailable$|bug_report_unfiled$|(?:composed:)?(?:foreign_identifier|internal_artifact):)/u;
 
 /**
- * Nobody takes a blocked chat over, so a block the customer cannot fix by
- * sending again files the conversation's ticket and says the team's answer
- * will come here. A teammate's run, a retryable block and a ticket that could
- * not be filed keep the block.
+ * A block the customer cannot fix by sending again hands the chat to Fixy, or
+ * with escalation off files the conversation's ticket and says the team's
+ * answer will come here. A teammate's run, a retryable block and a ticket that
+ * could not be filed keep the block.
  */
 export async function ticketInsteadOfBlock(
   run: Pick<WidgetRun, "id" | "question" | "scope">,
@@ -259,7 +260,8 @@ export async function ticketInsteadOfBlock(
   signal: AbortSignal | undefined,
   file: typeof fileTicketFor | undefined,
   draft?: typeof draftHandoffTicket,
-  roomMs?: number
+  roomMs?: number,
+  read?: WidgetDependencies["readTicket"]
 ): Promise<{ findings: unknown; result: WidgetOutcome }> {
   const reason = result.reason ?? "blocked";
   if (
@@ -270,6 +272,22 @@ export async function ticketInsteadOfBlock(
     return { findings, result };
   }
   const found = parseFindings(findings);
+  if (escalatesToFixy() && customerTurn(run.scope)) {
+    // A ticket the turn filed before it stopped stays with the chat. Its own
+    // bound: the finish deadline may already be spent, and the read is local.
+    const receipt = await read?.(
+      run.scope,
+      run.id,
+      AbortSignal.timeout(RECEIPT_READ_MS)
+    ).catch(() => null);
+    return blockedForCustomer(
+      run,
+      reason,
+      found,
+      ids,
+      receipt ? ticketRef(receipt) : undefined
+    );
+  }
   const filed = await handoffTicket(
     run.scope,
     {

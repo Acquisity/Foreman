@@ -26,6 +26,15 @@ import {
   logGateDecision,
 } from "./widget-egress.js";
 import {
+  completeEscalation,
+  couldNotStart,
+  customerTurn,
+  escalatesToFixy,
+  escalationFor,
+  needsTheTeam,
+  teamAsk,
+} from "./widget-escalation.js";
+import {
   type IdentifierCandidates,
   resolveOwnedIdentifiers,
   verifyWorkspaceMember,
@@ -36,7 +45,6 @@ import { parseFindings, type WidgetFindings } from "./widget-findings.js";
 import {
   ANSWER_HERE,
   completeInvite,
-  customerTurn,
   type FrontDoorTicket,
   followUpNote,
   frontDoorTicket,
@@ -300,6 +308,16 @@ export type WaitOutcome =
       /** What the turn's workspace reads returned, which vouches for its identifiers (ENG-20659). */
       vouched?: Required<IdentifierCandidates>;
     };
+
+/** The investigator's structured findings. Only Foreman's code escalates, so an `escalate` it claims is dropped. */
+const investigatorFindings = (value: unknown): WidgetFindings | null => {
+  const parsed = parseFindings(value);
+  if (!parsed) {
+    return null;
+  }
+  const { escalate: _claimed, ...reported } = parsed;
+  return reported;
+};
 
 const TEXT_MAX = 4000;
 const messageText = (data: unknown): string | null => {
@@ -590,7 +608,7 @@ export async function waitForWidgetInvestigation(
       } else if (event.type === "action.result") {
         so = recorded(event.data.result, so);
       } else if (event.type === "result.completed") {
-        findings = parseFindings(event.data.result);
+        findings = investigatorFindings(event.data.result);
       } else if (event.type === "message.completed") {
         text = messageText(event.data) ?? text;
       } else if (event.type === "turn.completed") {
@@ -901,7 +919,7 @@ interface HandoffContext {
   roomMs: () => number;
 }
 
-/** Findings that still need a person file the conversation's ticket instead, and the reply says the answer will come here. */
+/** Findings that still need a person hand the chat to Fixy, or with escalation off file the conversation's ticket, and the reply says the answer will come here. */
 async function withHandoffTicket(
   findings: WidgetFindings | null,
   run: Pick<WidgetRun, "id" | "question" | "scope">,
@@ -909,9 +927,16 @@ async function withHandoffTicket(
   deps: Partial<Pick<WidgetDependencies, "draftTicket" | "fileTicket">>,
   context: HandoffContext,
   signal?: AbortSignal
-): Promise<{ filed?: HandoffTicketRef; structured: WidgetFindings | null }> {
+): Promise<{
+  escalate?: true;
+  filed?: HandoffTicketRef;
+  structured: WidgetFindings | null;
+}> {
   if (!findings?.needsHuman) {
     return { structured: findings };
+  }
+  if (escalatesToFixy() && customerTurn(run.scope)) {
+    return { escalate: true, structured: findings };
   }
   const filed = await ticketInsteadOfHandoff(
     run.scope,
@@ -947,6 +972,7 @@ async function structureWriteUp(
   context: HandoffContext,
   signal?: AbortSignal
 ): Promise<{
+  escalate?: true;
   filed?: HandoffTicketRef;
   gateDeps: GateDeps | undefined;
   structured: WidgetFindings | null;
@@ -1062,6 +1088,32 @@ const startReplyGapFiling = (
     )
   );
 
+/**
+ * A finish that skips the gate: findings that need a person hand the chat to
+ * Fixy when escalation is on, and a write-up with no structured findings still
+ * hands the teammate a note. Null when the findings go through the gate.
+ */
+const settledWithoutGate = (
+  run: Pick<WidgetRun, "id" | "question" | "scope">,
+  sessionId: string,
+  structured: WidgetFindings | null,
+  escalate: true | undefined,
+  text: string | null,
+  ticket: FiledTicket | null | undefined
+) => {
+  if (structured) {
+    return escalate ? needsTheTeam(run, sessionId, structured) : null;
+  }
+  const handoff = text && humanHandoff(text, "no_structured_findings");
+  // A ticket the turn filed rides along, so a block handed to Fixy keeps it.
+  return handoff
+    ? {
+        ...handoff,
+        findings: withFiledTicket(ticket, handoff.findings) ?? handoff.findings,
+      }
+    : null;
+};
+
 /** Gate, then persist. Runs once per session outcome; a replay finds the fenced row unchanged. */
 export async function finishWidgetRun(
   run: Pick<
@@ -1162,12 +1214,17 @@ export async function finishWidgetRun(
     const structured =
       written.structured && withoutUnchecked(written.structured);
     const extractMs = Date.now() - extractStartedAt;
-    const handoff = structured
-      ? null
-      : (outcome.text &&
-          humanHandoff(outcome.text, "no_structured_findings")) ||
-        null;
-    if (structured) {
+    const handoff = settledWithoutGate(
+      run,
+      sessionId,
+      structured,
+      written.escalate,
+      outcome.text,
+      outcome.ticket
+    );
+    if (handoff) {
+      ({ findings, result } = handoff);
+    } else if (structured) {
       findings = structured;
       const gated = await deps.gate(
         run.scope,
@@ -1219,8 +1276,6 @@ export async function finishWidgetRun(
         deadline,
         history
       ));
-    } else if (handoff) {
-      ({ findings, result } = handoff);
     } else {
       result = blockedOutcome("invalid_findings", "completed");
     }
@@ -1235,7 +1290,8 @@ export async function finishWidgetRun(
     clock.timeout(roomMs),
     deps.fileTicket,
     deps.draftTicket,
-    roomMs
+    roomMs,
+    deps.readTicket
   ));
   logGateDecision(
     { conversationId: run.scope.conversationId, runId: run.id, sessionId },
@@ -1294,7 +1350,8 @@ async function settleResultRun(
       deps.fileTicket,
       deps.draftTicket,
       // Already overdue: the ticket is written without waiting on a draft.
-      0
+      0,
+      deps.readTicket
     );
     logGateDecision(
       { conversationId: run.scope.conversationId, runId: run.id, sessionId },
@@ -1412,33 +1469,6 @@ interface FrontDoorOptions {
   needsLook?: boolean;
   note?: TicketNote | null;
 }
-
-/**
- * Whether this front-door turn files the conversation's ticket: a customer's
- * ask for a person, or a member or client who needs their workspace looked
- * into (the magnifying glass, a bug, a refund or a ticket) and cannot start
- * an investigation (ENG-20283 default). A teammate's run never files.
- */
-const frontDoorTicketReason = (
-  scope: WidgetContext,
-  route: WidgetRoute,
-  helpCenterOnly: boolean,
-  needsLook: boolean,
-  /** No filer wired, as in a replay harness: a member's turn stays an ordinary answer. */
-  filer: boolean
-): FrontDoorTicket | null => {
-  if (!customerTurn(scope)) {
-    return null;
-  }
-  if (asksForPerson(route)) {
-    return "person";
-  }
-  return filer &&
-    helpCenterOnly &&
-    (needsLook || route.bug || route.refund || route.ticket)
-    ? "member"
-    : null;
-};
 
 /**
  * How a front-door turn completes: as is, or, when it files the
@@ -1585,17 +1615,20 @@ async function answerFromKnowledgeBase(
     route
   );
   const person = asksForPerson(route);
-  if (person && route.noNeed && customerTurn(scope)) {
+  const needs = teamAsk(scope, route, { helpCenterOnly, needsLook, person });
+  // A front-door refund goes to Fixy for every role: nothing here investigates it.
+  const escalation = escalationFor(scope, needs, route, { refund: true });
+  if (escalation) {
+    drafting.abort();
+    return completeEscalation(deps.complete, run.id, scope, escalation);
+  }
+  if (needs === "person" && route.noNeed) {
     drafting.abort();
     return completeInvite(run, scope, deps);
   }
-  const why = frontDoorTicketReason(
-    scope,
-    route,
-    helpCenterOnly,
-    needsLook,
-    Boolean(deps.fileTicket)
-  );
+  // No filer wired, as in a replay harness: a member's turn stays an ordinary answer.
+  const why: FrontDoorTicket | null =
+    needs === "member" && !deps.fileTicket ? null : needs;
   if (why && !(route.refund || route.ticket)) {
     // Only a turn that files and answers gets the notification exception. Every other draft is unchanged.
     drafting.abort();
@@ -1719,14 +1752,18 @@ async function startInvestigation(
       clearTimeout(timeout);
     }
   } catch (error) {
-    await deps
+    const handed = couldNotStart({ ...run, scope });
+    const saved = await deps
       .complete(
         run.id,
-        blockedOutcome("session_unavailable", "failed"),
-        null,
+        handed?.result ?? blockedOutcome("session_unavailable", "failed"),
+        handed?.findings ?? null,
         sessionId ?? run.id
       )
-      .catch(() => undefined);
+      .catch(() => null);
+    if (handed && saved) {
+      return saved;
+    }
     throw error;
   }
 }
@@ -1780,22 +1817,29 @@ async function investigationDenied(
       const answered = await helpCenter();
       return json(widgetRunResponse(answered ?? (await deps.read(run.id))));
     }
-    await deps
+    // An outage, not a denial: a customer goes to Fixy, as when the
+    // investigation itself cannot start; access stays closed either way.
+    const handed = couldNotStart({ ...run, scope });
+    const saved = await deps
       .complete(
         run.id,
-        blockedOutcome("workspace_access_denied", "failed"),
-        null,
+        handed?.result ?? blockedOutcome("workspace_access_denied", "failed"),
+        handed?.findings ?? null,
         run.id
       )
-      .catch(() => undefined);
+      .catch(() => null);
+    if (handed && saved) {
+      return json(widgetRunResponse(saved));
+    }
     return json({ error: "Workspace could not be verified." }, 403);
   }
 }
 
 /**
- * A toggled ask for a person. One that states no need gets an invitation and
- * no ticket; otherwise the conversation's ticket is filed now, its receipt
- * supplies the answer-comes-here line and the findings' ticket at finish,
+ * A toggled ask for a person or a cancel hands the chat to Fixy when
+ * escalation is on. With it off, an ask for a person that states no need
+ * gets an invitation and no ticket; otherwise the conversation's ticket is
+ * filed now, its receipt supplies the answer-comes-here line and the findings' ticket at finish,
  * and a note tells the investigator not to hand off. Unfiled, the note asks
  * the investigator to hand off, so the finish files it. An empty note
  * continues the investigation.
@@ -1808,7 +1852,20 @@ async function toggledPersonAsk(
   signal: AbortSignal,
   deps: WidgetDependencies
 ): Promise<string | WidgetRun | null> {
-  if (!asksForPerson(route)) {
+  const person = asksForPerson(route);
+  // An owner's toggled refund keeps investigating, an ask for a person with
+  // it too: the investigator reads billing and files it in billing's queue.
+  const escalation = escalationFor(
+    scope,
+    person && !route.refund ? "person" : null,
+    route,
+    { refund: false }
+  );
+  if (escalation) {
+    return completeEscalation(deps.complete, run.id, scope, escalation);
+  }
+  // A refund beside it files through the investigator, never the old filer.
+  if (!person || (escalatesToFixy() && route.refund)) {
     return "";
   }
   if (route.noNeed) {
@@ -2201,6 +2258,7 @@ export async function failWidgetRun(
           fileTicket: deps.fileTicket ?? fileTicketFor,
           gate: egressGate,
           history: recentWidgetTurns,
+          readTicket: readWidgetTicketReceipt,
         }
       );
     }
