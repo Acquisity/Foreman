@@ -173,9 +173,9 @@ interface RunIds {
   scope: WidgetContext;
 }
 
-/** A marked refund that blocks still reaches Fixy as a refund (ENG-21231). */
-const blockedReason = (run: RunIds): EscalationReason =>
-  refundAsked(run.findings) ? "refund" : "blocked";
+/** A marked refund that blocks before filing its refund ticket still reaches Fixy as a refund (ENG-21231). */
+const blockedReason = (run: RunIds, refundFiled = false): EscalationReason =>
+  refundAsked(run.findings) && !refundFiled ? "refund" : "blocked";
 
 /** Findings that still need a person after the investigation, handed to Fixy as cant_check. */
 export const needsTheTeam = (
@@ -317,11 +317,12 @@ export const blockedForCustomer = (
   reason: string,
   found: WidgetFindings | null,
   ids: { runId: string; sessionId?: string },
-  filed?: WidgetFindings["ticket"]
+  filed?: WidgetFindings["ticket"],
+  refundFiled = false
 ) =>
   escalated(
     {
-      reason: blockedReason(run),
+      reason: blockedReason(run, refundFiled),
       report: `Foreman could not answer this (${reason}) and handed the chat to Fixy.`,
     },
     found,

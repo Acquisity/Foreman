@@ -286,7 +286,8 @@ export async function ticketInsteadOfBlock(
       reason,
       found,
       ids,
-      receipt ? ticketRef(receipt) : undefined
+      receipt ? ticketRef(receipt) : undefined,
+      Boolean(receipt && "refund" in receipt && receipt.refund)
     );
   }
   const filed = await handoffTicket(

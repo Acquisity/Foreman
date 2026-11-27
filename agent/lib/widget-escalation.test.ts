@@ -679,3 +679,24 @@ test("a marked refund that blocks still reaches Fixy as a refund, and a question
   assert.equal(asked.run.outcome?.reason, "escalated_to_fixy refund");
   assert.equal((asked.run.findings as WidgetFindings).recommendation, text);
 });
+
+test("a marked refund that blocks after filing its refund ticket keeps the ticket and stays blocked", async (t) => {
+  enable(t);
+  const { deps, run } = harness();
+  run.findings = { refundAsked: true };
+  deps.readTicket = () =>
+    Promise.resolve({
+      existing: false,
+      identifier: "ENG-9",
+      refund: true,
+      url: "https://linear.app/acquisity/issue/ENG-9/refund",
+    });
+  await finishWidgetRun(
+    run,
+    "widget-session-failed-filed",
+    { status: "failed" },
+    deps
+  );
+  assert.equal(run.outcome?.reason, "escalated_to_fixy blocked");
+  assert.equal((run.findings as WidgetFindings).ticket?.id, "ENG-9");
+});

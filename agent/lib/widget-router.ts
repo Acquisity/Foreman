@@ -226,12 +226,12 @@ const QUESTIONS = {
       "The customer reports something in the product not working as it should: an error message, a page or button that does nothing or breaks, something that fails to load, save, send or generate, or a result that is wrong. A how-to question, a billing or refund request, a request for a change, or a message that only answers a question Support just asked is NOT this.",
     type: "noul",
   },
-  // Asked in the same request, so it costs nothing. With escalation on it counts
-  // as a refund, so a double charge reaches Fixy before the customer has asked
-  // for the money back (ENG-21231).
+  // Asked in the same request, and only with escalation on, where it counts as
+  // a refund, so a double charge reaches Fixy before the customer has asked for
+  // the money back (ENG-21231).
   reports_double_charge: {
     instructions:
-      "The customer says they were charged or billed twice, or more than once, for the same thing, in the latest message or earlier in the conversation, whether or not they ask for the money back. A question about what a single charge was for is NOT this.",
+      "In the latest message the customer says they were charged or billed twice, or more than once, for the same thing, or the latest message continues such a report from the earlier turns, whether or not they ask for the money back. A question about what a single charge was for is NOT this, and neither is a latest message about something else.",
     type: "noul",
   },
   // Asked in the same request, so it costs nothing. It only decides what an
@@ -242,6 +242,9 @@ const QUESTIONS = {
     type: "noul",
   },
 } as const;
+
+const { reports_double_charge: _onlyEscalating, ...WITHOUT_DOUBLE_CHARGE } =
+  QUESTIONS;
 
 const responseSchema = z.object({
   answers: z.object({
@@ -338,7 +341,7 @@ export async function routeWidgetMessage(
   const startedAt = Date.now();
   try {
     const response = await askJev(
-      QUESTIONS,
+      escalatesToFixy() ? QUESTIONS : WITHOUT_DOUBLE_CHARGE,
       routerInput(ask).slice(0, MAX_STATE_CHARS),
       apiKey,
       {

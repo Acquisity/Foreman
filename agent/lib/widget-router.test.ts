@@ -43,7 +43,6 @@ describe("routeWidgetMessage", () => {
       "asks_to_cancel",
       "offers_recording",
       "reports_bug",
-      "reports_double_charge",
       "states_need",
     ]);
     // A question about when a person is available is a need, not a bare ask (ENG-15262).
@@ -79,6 +78,17 @@ describe("routeWidgetMessage", () => {
       });
     process.env.WIDGET_ESCALATE_TO_FIXY = "on";
     assert.equal((await route()).refund, true);
+    let asked: string[] = [];
+    await routeWidgetMessage("you charged me twice", {
+      apiKey: "test-key",
+      fetch: (_url, init) => {
+        asked = Object.keys(
+          JSON.parse((init as { body: string }).body).questions
+        );
+        return Promise.resolve(jevReply());
+      },
+    });
+    assert.ok(asked.includes("reports_double_charge"));
     Reflect.deleteProperty(process.env, "WIDGET_ESCALATE_TO_FIXY");
     assert.equal((await route()).refund, undefined);
   });
