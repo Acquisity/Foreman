@@ -62,6 +62,14 @@ test("the sections Foreman#353 got wrong are refused, reworded too", () => {
     ],
     [CALLING, section(CALLING, "- iMessage lines: US-only.")],
     [CALLING, section(CALLING, "- Do not contact blocks texts only.")],
+    // Main's section at b0deaf42 gave one Caller ID option (ENG-21319).
+    [
+      CALLING,
+      section(
+        CALLING,
+        '- Caller ID: own mobile verified on "My phone" tab. Owners/admins: "Record outgoing calls by default"; "Dialling speed" tab.'
+      ),
+    ],
     [
       CALLING,
       section(
@@ -177,7 +185,8 @@ test("right wording for the same articles passes", () => {
       section(
         CALLING,
         '- Owners/admins: "Request number" > "Phone line" (US numbers only) or "iMessage line".',
-        "- Calls and texts are blocked for Do not contact status and the do-not-contact list. A STOP reply blocks texts only; calls are not affected."
+        "- Calls and texts are blocked for Do not contact status and the do-not-contact list. A STOP reply blocks texts only; calls are not affected.",
+        '- Caller ID: the assigned number or a mobile verified on "My phone". Owners/admins: "Record outgoing calls by default" on "Calling"; "Dialling speed" tab.'
       ),
     ],
     [
@@ -189,7 +198,8 @@ test("right wording for the same articles passes", () => {
         "- Do not contact status and the do-not-contact list block calls and texts; only a STOP reply leaves calls unaffected.",
         "- Calls and texts are blocked by Do not contact status or the do-not-contact list; a STOP reply blocks texts only (calls unaffected).",
         "- Calls and texts are blocked by Do not contact status, and a STOP reply blocks texts only (calls unaffected).",
-        "- Do not contact blocks calls and texts, while STOP leaves calls unaffected."
+        "- Do not contact blocks calls and texts, while STOP leaves calls unaffected.",
+        '- Caller ID: the assigned number or a mobile verified on "My phone". Owners/admins: "Record outgoing calls by default" on "Calling"; "Dialling speed" tab.'
       ),
     ],
     [

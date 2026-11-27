@@ -70,20 +70,13 @@ const STEP = /^\s*\d+\. /gmu;
 export const numberedSteps = (text: string) => text.match(STEP)?.length ?? 0;
 
 /** Each section's fact words, not counting its heading and "Get here:" line. */
-export function answerWords(text: string): Map<string, number> {
-  const words = new Map<string, number>();
-  let slug = "";
-  for (const line of text.split("\n")) {
-    const heading = SECTION.exec(line)?.[1];
-    if (heading) {
-      slug = heading;
-      words.set(slug, 0);
-    } else if (slug && !line.startsWith("Get here:")) {
-      words.set(slug, (words.get(slug) ?? 0) + (line.match(WORD)?.length ?? 0));
-    }
-  }
-  return words;
-}
+export const answerWords = (text: string): Map<string, number> =>
+  new Map(
+    [...factLines(text)].map(([slug, facts]) => [
+      slug,
+      facts.match(WORD)?.length ?? 0,
+    ])
+  );
 
 /**
  * The slugs whose section answers a long article in fewer than
@@ -105,6 +98,86 @@ export function shortAnswers(
     })
     .map((a) => a.slug);
 }
+
+/** A regenerated section keeping less than this share of main's words has shrunk. */
+export const SHRUNK_SHARE = 0.8;
+/** A quoted label, without punctuation written inside its closing quote. */
+const QUOTED = /"([^"\n]*?[^"\n.,;:!?])[.,;:!?]*"/gu;
+const quotedLabels = (text: string) =>
+  new Set([...text.matchAll(QUOTED)].map((m) => m[1]));
+
+/** Each section's fact lines, without its heading and "Get here:" line. */
+function factLines(text: string): Map<string, string> {
+  const facts = new Map<string, string[]>();
+  let slug = "";
+  for (const line of text.split("\n")) {
+    const heading = SECTION.exec(line)?.[1];
+    if (heading) {
+      slug = heading;
+      facts.set(slug, []);
+    } else if (slug && !line.startsWith("Get here:")) {
+      facts.get(slug)?.push(line);
+    }
+  }
+  return new Map([...facts].map(([key, lines]) => [key, lines.join("\n")]));
+}
+
+export interface AnswerLoss {
+  /** Labels main's section quotes that the article still has and this one lacks. */
+  dropped: string[];
+  now: number;
+  slug: string;
+  was: number;
+}
+
+/**
+ * Each section of `text` measured against the same article's section in
+ * `previous`, the guide on main: its fact words, main's, and the UI labels it
+ * dropped. A model that keeps to a long article's word allowance can drop half
+ * its facts (ENG-21319); a label counts as dropped only while the article in
+ * `sources` still names it. Articles main doesn't have are left out.
+ */
+export function answerLosses(
+  text: string,
+  previous: string,
+  sources: ReadonlyMap<string, string>
+): AnswerLoss[] {
+  const before = factLines(previous);
+  return [...factLines(text)].flatMap(([slug, facts]) => {
+    const main = before.get(slug);
+    if (main === undefined) {
+      return [];
+    }
+    const source = sources.get(slug) ?? "";
+    const kept = quotedLabels(facts);
+    const dropped = [...quotedLabels(main)].filter(
+      (label) => source.includes(label) && !kept.has(label)
+    );
+    return [
+      {
+        dropped,
+        now: facts.match(WORD)?.length ?? 0,
+        slug,
+        was: main.match(WORD)?.length ?? 0,
+      },
+    ];
+  });
+}
+
+/** A section that dropped one of main's labels or most of main's words. */
+export const lostGround = (loss: AnswerLoss): boolean =>
+  loss.dropped.length > 0 || loss.now < loss.was * SHRUNK_SHARE;
+
+/**
+ * A retry's section replaces the earlier one when it drops no label the
+ * earlier one kept, and drops fewer of main's labels or as many in more words.
+ */
+export const retryKeeps = (
+  before: Pick<AnswerLoss, "dropped" | "now">,
+  after: Pick<AnswerLoss, "dropped" | "now">
+): boolean =>
+  after.dropped.every((label) => before.dropped.includes(label)) &&
+  (after.dropped.length < before.dropped.length || after.now > before.now);
 
 const BLOCK_SCALAR = /^[>|][+-]?$/u;
 const INDENTED = /^[ \t]/u;

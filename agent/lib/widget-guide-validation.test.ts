@@ -1,11 +1,14 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
+  answerLosses,
   answerWords,
   assertGuideSections,
   assertOwnAnswers,
   frontmatterField,
+  lostGround,
   plainDashes,
+  retryKeeps,
   shortAnswers,
 } from "./widget-guide-validation.js";
 import {
@@ -156,4 +159,83 @@ test("a how-to with many steps answered in a line is short, even when its page i
     ]),
     ["porkbun"]
   );
+});
+
+test("a section that drops a label the page still names, or most of main's words, has lost ground", () => {
+  // Foreman#374 at dc68cdb2 dropped "Send later" and "Power dialler" from
+  // Calling and Texting while the page still has both (ENG-21319).
+  const main = [
+    "### Calling and Texting {slug: crm/calling-and-texting}",
+    'Get here: "Settings" > "Phone"',
+    '- Texts: "Send later". With no funds, texts sent now wait.',
+    '- Only where turned on: "Power dialler" on a saved view. "Retired label".',
+    "### People {slug: crm/people}",
+    "one two three four five six seven eight nine ten",
+    "### Deals {slug: crm/deals}",
+    "one two three four five six seven eight nine ten",
+  ].join("\n");
+  const regenerated = [
+    "### Calling and Texting {slug: crm/calling-and-texting}",
+    'Get here: "People"',
+    '- Texts wait when phone funds are empty. Use "Send later" to schedule.',
+    "- Calls ring the assigned member.",
+    "### People {slug: crm/people}",
+    "one two three four five six seven eight",
+    "### Deals {slug: crm/deals}",
+    "one two three four five six seven",
+    "### Dialling speed {slug: crm/dialling}",
+    "one",
+  ].join("\n");
+  const sources = new Map([
+    [
+      "crm/calling-and-texting",
+      "Click **Send later**. Open **Power dialler** from **Settings**.",
+    ],
+  ]);
+  const losses = answerLosses(regenerated, main, sources);
+  assert.deepEqual(losses, [
+    {
+      dropped: ["Power dialler"],
+      now: 19,
+      slug: "crm/calling-and-texting",
+      was: 24,
+    },
+    { dropped: [], now: 8, slug: "crm/people", was: 10 },
+    { dropped: [], now: 7, slug: "crm/deals", was: 10 },
+  ]);
+  assert.deepEqual(
+    losses.filter(lostGround).map((loss) => loss.slug),
+    ["crm/calling-and-texting", "crm/deals"]
+  );
+});
+
+test("a label is kept whatever punctuation sits inside its closing quote", () => {
+  const main = [
+    "### Calling and Texting {slug: crm/calling-and-texting}",
+    '- Texts: "Send later". Use "Allow texts."',
+  ].join("\n");
+  const regenerated = [
+    "### Calling and Texting {slug: crm/calling-and-texting}",
+    '- Click "Send later." Then "Allow texts", done.',
+  ].join("\n");
+  const sources = new Map([
+    ["crm/calling-and-texting", "Click **Send later**, then **Allow texts**."],
+  ]);
+  assert.deepEqual(answerLosses(regenerated, main, sources)[0].dropped, []);
+});
+
+test("a retry is kept when it drops fewer of main's labels, or as many in more words, and never a label the earlier one kept", () => {
+  const thin = { dropped: ["Send later", "Power dialler"], now: 107 };
+  assert.equal(retryKeeps(thin, { dropped: ["Power dialler"], now: 90 }), true);
+  assert.equal(retryKeeps(thin, { dropped: [], now: 224 }), true);
+  assert.equal(retryKeeps(thin, { dropped: ["Allow texts"], now: 183 }), false);
+  assert.equal(
+    retryKeeps(thin, {
+      dropped: ["Send later", "Allow texts", "Load more"],
+      now: 300,
+    }),
+    false
+  );
+  assert.equal(retryKeeps(thin, { ...thin, now: 108 }), true);
+  assert.equal(retryKeeps(thin, thin), false);
 });
