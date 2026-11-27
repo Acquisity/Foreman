@@ -161,7 +161,8 @@ test("a how-to with many steps answered in a line is short, even when its page i
 
 test("a section with under four fifths of main's words has shrunk, and a new or near-equal one has not", () => {
   // Foreman#374 at dc68cdb2: Calling and Texting went from 216 words to 107 (ENG-21319).
-  const words = (count: number) => Array.from({ length: count }, () => "w").join(" ");
+  const words = (count: number) =>
+    Array.from({ length: count }, () => "w").join(" ");
   const main = [
     "### Calling and Texting {slug: crm/calling-and-texting}",
     'Get here: "People"',

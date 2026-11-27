@@ -106,6 +106,25 @@ export function shortAnswers(
     .map((a) => a.slug);
 }
 
+/** A regenerated section keeping less than this share of main's words has shrunk. */
+export const SHRUNK_SHARE = 0.8;
+
+/**
+ * The sections of `text` that say less than SHRUNK_SHARE of the words the same
+ * article's section says in `previous`, the guide on main. A model that keeps
+ * to a long article's word allowance can drop half its facts (ENG-21319).
+ */
+export function shrunkAnswers(
+  text: string,
+  previous: string
+): { now: number; slug: string; was: number }[] {
+  const before = answerWords(previous);
+  return [...answerWords(text)].flatMap(([slug, now]) => {
+    const was = before.get(slug) ?? 0;
+    return now < was * SHRUNK_SHARE ? [{ now, slug, was }] : [];
+  });
+}
+
 const BLOCK_SCALAR = /^[>|][+-]?$/u;
 const INDENTED = /^[ \t]/u;
 

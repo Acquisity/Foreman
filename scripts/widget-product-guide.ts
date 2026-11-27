@@ -79,7 +79,9 @@ import {
   numberedSteps,
   plainDashes,
   shortAnswers,
+  shrunkAnswers,
 } from "../agent/lib/widget-guide-validation.js";
+import { PRODUCT_GUIDE as MAIN_GUIDE } from "../agent/lib/widget-product-guide.js";
 
 const MODEL = "anthropic/claude-sonnet-5.5";
 /**
@@ -491,17 +493,35 @@ for (const article of pending) {
   }
 }
 
+/** Main's sections as distilled: the opt-in note is added after this step. */
+const mainSections = MAIN_GUIDE.replaceAll(`\n- ${OPT_IN_NOTE}`, "");
+/** Main's section and its words, for an article distilled again because it shrank. */
+const shrunkFrom = new Map<string, { section: string; words: number }>();
+/**
+ * Main's section goes with an article distilled again for saying much less,
+ * so the retry keeps the facts the page still states (ENG-21319).
+ */
+const previousNote = (slug: string) => {
+  const section = shrunkFrom.get(slug)?.section;
+  return section
+    ? `\n\nPREVIOUS SECTION for ${slug} (not part of the article; your last version dropped facts this one kept): keep every fact below that the article still states, and add what the article states that it lacks.\n${section}`
+    : "";
+};
+
 /**
  * Words asked for one article: its share of the ratio, never below a floor,
  * and enough for every numbered step and every bold UI label it names, so a
- * how-to or settings page keeps its steps and settings (ENG-20601).
+ * how-to or settings page keeps its steps and settings (ENG-20601), and never
+ * less than main's section when it is distilled again for saying much less
+ * (ENG-21319).
  */
 const allowance = (a: Article) =>
   Math.max(
     MIN_ARTICLE_WORDS,
     Math.round(a.text.length * RATIO),
     numberedSteps(a.text) * WORDS_PER_STEP,
-    new Set(a.text.match(BOLD_LABEL)).size * WORDS_PER_LABEL
+    new Set(a.text.match(BOLD_LABEL)).size * WORDS_PER_LABEL,
+    shrunkFrom.get(a.slug)?.words ?? 0
   );
 
 const distillBatch = (batch: Article[], label: string) =>
@@ -522,7 +542,7 @@ const distillBatch = (batch: Article[], label: string) =>
         batch
           .map(
             (a) =>
-              `ARTICLE title: ${a.title}\nslug: ${a.slug}\nwords: ${allowance(a)}\n\n${a.text}${reviewNote(a.slug).join("")}`
+              `ARTICLE title: ${a.title}\nslug: ${a.slug}\nwords: ${allowance(a)}\n\n${a.text}${reviewNote(a.slug).join("")}${previousNote(a.slug)}`
           )
           .join("\n\n=====\n\n"),
         32_000
@@ -572,15 +592,27 @@ await Promise.all(
 
 /**
  * A long article a batch answered in a line or two is distilled once more on
- * its own (ENG-20575). Its section replaces the batch's only when it says
- * more. One still short is logged and kept, so a rerun with the same docs
- * leaves the guide as it was. One whose call fails keeps its batch section but
- * stays out of the cache, so the next run tries it again; it never stops this
- * run.
+ * its own (ENG-20575), and so is any section, stored ones included, that says
+ * much less than main's, asking for at least main's length (ENG-21319). Its
+ * section replaces the earlier one only when it says more. One still short is
+ * logged and kept, so a rerun with the same docs leaves the guide as it was.
+ * One whose call fails keeps its earlier section but stays out of the cache,
+ * so the next run tries it again; it never stops this run.
  */
 const retryFailed = new Set<string>();
-const shortened = pending.filter(
-  (a) => shortAnswers(distilled.get(a.slug) ?? "", [a]).length > 0
+const distilledText = () =>
+  slugs.map((slug) => distilled.get(slug)).join("\n\n");
+const mainBySlug = splitGuideSections(mainSections);
+for (const { slug, was } of shrunkAnswers(distilledText(), mainSections)) {
+  // Without its heading, so the retry heads the article once.
+  const section = (mainBySlug.get(slug) ?? "").split("\n").slice(1).join("\n");
+  shrunkFrom.set(slug, { section, words: was });
+}
+const shortened = available.filter(
+  (a) =>
+    shrunkFrom.has(a.slug) ||
+    (pending.includes(a) &&
+      shortAnswers(distilled.get(a.slug) ?? "", [a]).length > 0)
 );
 for (const article of shortened) {
   const label = `alone ${article.slug}`;
@@ -602,8 +634,11 @@ for (const article of shortened) {
     console.log(`  still short ${article.slug}`);
   }
 }
+const shrunk = shrunkAnswers(distilledText(), mainSections).map(
+  ({ now, slug, was }) => `${slug} (${was} words on main, ${now} now)`
+);
 
-const linked = slugs.map((slug) => distilled.get(slug)).join("\n\n");
+const linked = distilledText();
 /**
  * Each section keeps its own "Get here:" line when it is a usable path: it
  * quotes at least one label, every quoted label appears in the article or the
@@ -837,6 +872,7 @@ if (
 const tokens = Math.round(plain.length / 4);
 const getHere = (body.match(/^Get here:/gmu) ?? []).length;
 console.log(`regenerated=${regenerated.join(",") || "none"}`);
+console.log(`shrunk=${shrunk.join(",")}`);
 console.log(
   `successful_calls=${stats.successfulCalls} attempts=${stats.attempts} get_here=${getHere} rejected=${dropped} headed=${slugs.filter((slug) => headed.has(slug)).length} articles=${articles.length} distilled=${available.length} batches=${batches.length} source_chars=${available.reduce((s, a) => s + a.text.length, 0)} guide_chars=${plain.length} ~tokens=${tokens} unpriced_calls=${unpriced} s=${Math.round((Date.now() - startedAt) / 1000)}`
 );
