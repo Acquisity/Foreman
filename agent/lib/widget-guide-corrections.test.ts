@@ -549,6 +549,7 @@ test("wrong summary lines from Foreman#374 are dropped", () => {
     `- At the limit, existing campaigns stop sending, so you won't reach new leads. {${LEAD_LIMIT}}`,
     `- Existing campaigns are no longer sending at the limit. {${LEAD_LIMIT}}`,
     `- Existing campaigns are still unable to send at the limit. {${LEAD_LIMIT}}`,
+    `- Members use "View plans" in the warning. {${LEAD_LIMIT}}`,
   ];
   const right = [
     `- "Clear out old leads" removes finished leads from campaigns 90+ days old under 2,000 free slots, and when it pauses a campaign, that campaign's bounced leads however much space you have. {${CLEAR_OUT}}`,
@@ -628,6 +629,15 @@ test("the sections Foreman#374 got wrong are refused, the right ones pass", () =
         LEAD_LIMIT,
         STILL_SENDS,
         '- Admins use "View plans" in the warning; members "Compare plans"; Client users can\'t change plans.'
+      ),
+    ],
+    [
+      LEAD_LIMIT,
+      section(
+        LEAD_LIMIT,
+        STILL_SENDS,
+        ROUTES,
+        '- Members use "View plans" in the warning.'
       ),
     ],
     // The real heading says "still" and its slug "sending", so it must not
@@ -713,6 +723,7 @@ test("the sections Foreman#374 got wrong are refused, the right ones pass", () =
       section(
         LEAD_LIMIT,
         "- Existing campaigns keep sending. The limit does not automatically delete anything. Full storage does not cause existing campaigns to stop sending.",
+        "- Members can't use View plans; an owner or admin makes the change.",
         '- Workspace owners: Settings → Billing → View plans. Owners and admins: "View plans" in the campaign-lead warning. Members: "Compare plans" there. Clients cannot change plans.'
       ),
     ],

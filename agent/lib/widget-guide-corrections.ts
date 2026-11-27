@@ -203,6 +203,13 @@ export const GUIDE_CORRECTIONS: readonly GuideCorrection[] = [
         "imu"
       ),
       new RegExp(
+        CLAUSE +
+          IN_CLAUSE(String.raw`\bmembers?\b`) +
+          `(?![^.;\\n]*(?:Compare plans|${CANT}))` +
+          IN_CLAUSE("View plans"),
+        "imu"
+      ),
+      new RegExp(
         String.raw`${CLAUSE}(?:(?!\b(?:doesn[’']?t|does not|don[’']?t|do not|won[’']?t|will not|never|not|no)\b)[^.;\n])*?\bstop(?:s|ped)? sending\b|\b(?:can[’']?t|cannot|can not|won[’']?t|will not|no longer|unable to|blocked from) (?:\w+ )?send(?:s|ing)?\b|\bstill not send(?:s|ing)?\b|\b(?:aren[’']?t|are not|isn[’']?t|is not) sending\b`,
         "imu"
       ),
