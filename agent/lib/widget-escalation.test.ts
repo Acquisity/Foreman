@@ -185,7 +185,7 @@ test("a toggled ask for a person or a cancel escalates, while an owner's toggled
   // The refund goes on to the investigation; this one fails to start, so it
   // escalates as blocked instead of leaving the customer at a dead end.
   for (const asksForHuman of [0, 0.95]) {
-    const { deps, run } = harness({ asksForHuman, refund: true });
+    const { deps, filed, run } = harness({ asksForHuman, refund: true });
     let started = false;
     // biome-ignore lint/performance/noAwaitInLoops: each case needs its own fresh run.
     const response = await send(deps, { mode: "investigate" }, scope, () => {
@@ -195,7 +195,18 @@ test("a toggled ask for a person or a cancel escalates, while an owner's toggled
     assert.ok(started, "the refund reached the investigation");
     assert.equal(response.status, 200);
     assert.equal(run.outcome?.reason, "escalated_to_fixy blocked");
+    assert.equal(
+      filed.length,
+      0,
+      "the investigator files it, not the old filer"
+    );
   }
+  // An outage of the access check, unlike a denial, hands the chat on too.
+  const { deps, run } = harness({ asksForHuman: 0, refund: true });
+  deps.verifyAccess = () => Promise.reject(new Error("unavailable"));
+  const response = await send(deps, { mode: "investigate" });
+  assert.equal(response.status, 200);
+  assert.equal(run.outcome?.reason, "escalated_to_fixy blocked");
 });
 
 test("a member who needs a look escalates as cant_check; a teammate's run never escalates", async (t) => {
@@ -250,6 +261,28 @@ test("findings that need a person escalate as cant_check, keep the ticket the in
     url: "https://linear.app/acquisity/issue/ENG-7/bug",
   });
   assert.equal(returned.report, findings.report);
+});
+
+test("a write-up with no structured findings escalates as blocked and keeps the ticket the turn filed", async (t) => {
+  enable(t);
+  const { deps, run } = harness();
+  deps.extract = () => Promise.resolve(null);
+  await finishWidgetRun(
+    run,
+    "widget-session-prose",
+    {
+      findings: null,
+      status: "completed",
+      text: "Prose only.",
+      ticket: {
+        id: "ENG-7",
+        url: "https://linear.app/acquisity/issue/ENG-7/bug",
+      },
+    },
+    deps
+  );
+  assert.equal(run.outcome?.reason, "escalated_to_fixy blocked");
+  assert.equal((run.findings as WidgetFindings).ticket?.id, "ENG-7");
 });
 
 test("a blocked finish and an overdue investigation escalate as blocked; a retryable block stays a resend", async (t) => {

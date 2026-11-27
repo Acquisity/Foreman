@@ -1087,12 +1087,20 @@ const settledWithoutGate = (
   sessionId: string,
   structured: WidgetFindings | null,
   escalate: true | undefined,
-  text: string | null
+  text: string | null,
+  ticket: FiledTicket | null | undefined
 ) => {
   if (structured) {
     return escalate ? needsTheTeam(run, sessionId, structured) : null;
   }
-  return (text && humanHandoff(text, "no_structured_findings")) || null;
+  const handoff = text && humanHandoff(text, "no_structured_findings");
+  // A ticket the turn filed rides along, so a block handed to Fixy keeps it.
+  return handoff
+    ? {
+        ...handoff,
+        findings: withFiledTicket(ticket, handoff.findings) ?? handoff.findings,
+      }
+    : null;
 };
 
 /** Gate, then persist. Runs once per session outcome; a replay finds the fenced row unchanged. */
@@ -1200,7 +1208,8 @@ export async function finishWidgetRun(
       sessionId,
       structured,
       written.escalate,
-      outcome.text
+      outcome.text,
+      outcome.ticket
     );
     if (handoff) {
       ({ findings, result } = handoff);
@@ -1797,14 +1806,20 @@ async function investigationDenied(
       const answered = await helpCenter();
       return json(widgetRunResponse(answered ?? (await deps.read(run.id))));
     }
-    await deps
+    // An outage, not a denial: a customer goes to Fixy, as when the
+    // investigation itself cannot start; access stays closed either way.
+    const handed = couldNotStart({ ...run, scope });
+    const saved = await deps
       .complete(
         run.id,
-        blockedOutcome("workspace_access_denied", "failed"),
-        null,
+        handed?.result ?? blockedOutcome("workspace_access_denied", "failed"),
+        handed?.findings ?? null,
         run.id
       )
-      .catch(() => undefined);
+      .catch(() => null);
+    if (handed && saved) {
+      return json(widgetRunResponse(saved));
+    }
     return json({ error: "Workspace could not be verified." }, 403);
   }
 }
@@ -1838,7 +1853,8 @@ async function toggledPersonAsk(
   if (escalation) {
     return completeEscalation(deps.complete, run.id, scope, escalation);
   }
-  if (!person) {
+  // A refund beside it files through the investigator, never the old filer.
+  if (!person || (escalatesToFixy() && route.refund)) {
     return "";
   }
   if (route.noNeed) {
@@ -1880,14 +1896,20 @@ async function answerBugReport(
   try {
     await (deps.verifyMember ?? defaultWidgetDependencies.verifyMember)(scope);
   } catch {
-    await deps
+    // An outage, not a denial: a customer goes to Fixy, as when the
+    // investigation itself cannot start; access stays closed either way.
+    const handed = couldNotStart({ ...run, scope });
+    const saved = await deps
       .complete(
         run.id,
-        blockedOutcome("workspace_access_denied", "failed"),
-        null,
+        handed?.result ?? blockedOutcome("workspace_access_denied", "failed"),
+        handed?.findings ?? null,
         run.id
       )
-      .catch(() => undefined);
+      .catch(() => null);
+    if (handed && saved) {
+      return json(widgetRunResponse(saved));
+    }
     return json({ error: "Workspace could not be verified." }, 403);
   }
   const report =
@@ -2231,6 +2253,7 @@ export async function failWidgetRun(
           fileTicket: deps.fileTicket ?? fileTicketFor,
           gate: egressGate,
           history: recentWidgetTurns,
+          readTicket: readWidgetTicketReceipt,
         }
       );
     }
