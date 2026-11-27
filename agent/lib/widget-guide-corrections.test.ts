@@ -323,5 +323,5 @@ test("credits never expiring is said only of plan credits and one-time packs", (
     kept: { cannot: [lines[2]], who: [] },
     refused: lines.slice(0, 2),
   });
-  assert.match(correctionNotes(BILLING)[0], /Pre-warmed/u);
+  assert.ok(correctionNotes(BILLING)[0].includes("Pre-warmed"));
 });

@@ -24,7 +24,29 @@ export interface GuideCorrection {
   slugs: string[];
 }
 
+const CREDITS_NOTE =
+  "Only plan credits and one-time packs never expire or reset. Monthly-pack credits carry over only while the pack is active: if the pack ends, its credits end with it. Never write that credits never expire or reset without naming plan credits and one-time packs, and say what happens to monthly-pack credits.";
+
+const CREDITS_CHECKS = {
+  reject: [
+    /^(?!#)(?=.*\b(?:never|don'?t|do not|won'?t) (?:expire|reset))(?!.*\b(?:plan|one-time|one-off|top-?ups?)\b[^.;\n]*\b(?:never|don'?t|do not|won'?t) (?:expire|reset)).*$/imu,
+  ],
+  require: [
+    /\bpack (?:is |stays |remains )?active|\bpack ends|\bend with (?:it|the pack)/iu,
+  ],
+};
+
 export const GUIDE_CORRECTIONS: readonly GuideCorrection[] = [
+  {
+    note: `${CREDITS_NOTE} Domains are $18/year only when pre-warmed, so keep "Pre-warmed" on that price.`,
+    ...CREDITS_CHECKS,
+    slugs: ["workspace-settings/billing"],
+  },
+  {
+    note: CREDITS_NOTE,
+    ...CREDITS_CHECKS,
+    slugs: ["cold-email-agent/concepts/credits"],
+  },
   {
     note: "This article is about the AI SDR only. The Acquisity Agent is a different feature and can update a deal when asked, so write no line about the Acquisity Agent from this article.",
     reject: [/Acquisity Agent/iu],
