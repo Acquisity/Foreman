@@ -76,9 +76,9 @@ const CANT = String.raw`\b(?:can[’']?t|cannot|can not|unable|not able|don[’'
 const PAUSES = String.raw`\b(?:pauses|pausing)\b`;
 const LOW_SPACE = String.raw`(?:\b2,?000\b|\b2k\b|\bfree (?:lead )?(?:slots|space)\b|\b(?:running out of|short (?:of|on)|low on) (?:lead )?(?:space|slots|room)\b|\b(?:space|room) is (?:tight|short|low|running out)\b)`;
 /** Too little space for more leads: under 2,000 free slots, or nearly full. */
-const TOO_LITTLE_SPACE = String.raw`(?:\b(?:under|below|fewer than|less than)\s+2,?000\b|\b(?:running out of|short (?:of|on)|low on) (?:lead )?(?:space|slots|room)\b|\b(?:space|room|storage) is (?:tight|short|low|full|running out)\b)`;
+const TOO_LITTLE_SPACE = String.raw`(?:\b(?:under|below|fewer than|less than)\s+2,?000\b|\b(?:running out of|short (?:of|on)|low on) (?:lead )?(?:space|slots|room)\b|\b(?:space|room|storage) is (?:tight|short|low|full|running (?:out|low))\b|\bworkspace is (?:nearly |almost )?full\b)`;
 /** Limited to too little space, as Foreman#374 said of "Clear out old leads". */
-const ONLY_LOW_SPACE = String.raw`[^.;\n]*(?<!\b(?:even|not|not just|not only) )\b(?:only|when|if|once|while|as long as)\b[^.;\n]{0,40}?${TOO_LITTLE_SPACE}`;
+const ONLY_LOW_SPACE = String.raw`[^.;\n]*(?<!\bnot )\bonly (?:(?:when|if|once|while|with)\b[^.;\n]{0,40}?)?${TOO_LITTLE_SPACE}`;
 
 export const GUIDE_CORRECTIONS: readonly GuideCorrection[] = [
   {
@@ -262,7 +262,10 @@ export const GUIDE_CORRECTIONS: readonly GuideCorrection[] = [
     ],
     rejectSummary: [
       new RegExp(String.raw`^(?![^{\n]*${PAUSES})[^{\n]*${LOW_SPACE}`, "iu"),
-      /\b(?:remov|delet|clear)[^{\n]*\bonly\b[^{\n]*\bstorage is full\b/iu,
+      new RegExp(
+        String.raw`\b(?:remov|delet|clear)[^{\n]*\bonly\b[^{\n]*${TOO_LITTLE_SPACE}`,
+        "iu"
+      ),
     ],
     require: [
       new RegExp(
