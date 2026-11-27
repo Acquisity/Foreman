@@ -220,30 +220,27 @@ export function aiSdrWeeklyReportQueries(
     // organiser, the appointment owner or an active workspace member, nearest by
     // last_message_at.
     // Every booking made counts, whatever its status now, so a week's count
-    // doesn't fall as its meetings are later cancelled or declined. A guest
-    // (the non-organiser attendees) booked twice in one window counts once.
+    // doesn't fall as its meetings are later cancelled or declined. A guest is
+    // the prospect email of the campaign thread the booking resolves to, so a
+    // rebooking counts once in its window even when its attendee list changes
+    // or it resolves to another of that prospect's threads.
     [
       "with appointments as (",
-      "  select a.id, a.organization_id, a.user_id, a.created_at, a.attendees, a.status,",
-      "    a.organization_id::text || ':' || coalesce((",
-      "      select string_agg(distinct lower(guest->>'email'), ',' order by lower(guest->>'email'))",
-      "      from jsonb_array_elements(a.attendees) guest",
-      "      where coalesce((guest->>'isOrganizer')::boolean, false) = false",
-      "    ), a.id::text) as guest_key",
+      "  select a.id, a.organization_id, a.user_id, a.created_at, a.attendees, a.status",
       "  from scheduling_appointment a",
       "  where a.origin = 'ai_sdr'",
       "    and a.deleted_at is null",
       `    and a.created_at >= ${timestampLiteral(month.start)} and a.created_at < ${timestampLiteral(report.endExclusive)}`,
       "), linked_campaign as (",
       "  select distinct on (t.appointment_id)",
-      `    t.appointment_id, ${NORMALIZED_CAMPAIGN_METHOD} as method`,
+      `    t.appointment_id, lower(t.prospect_email) as prospect_email, ${NORMALIZED_CAMPAIGN_METHOD} as method`,
       "  from appointments a",
       "  join crm_message_thread t on t.appointment_id = a.id and t.organization_id = a.organization_id",
       "  join outreach_campaign c on c.id = t.campaign_id and c.organization_id = t.organization_id",
       "  order by t.appointment_id, t.created_at, t.id",
       "), attendee_campaign as (",
       "  select distinct on (a.id)",
-      "    a.id as appointment_id, nearest.method",
+      "    a.id as appointment_id, lower(attendee->>'email') as prospect_email, nearest.method",
       "  from appointments a",
       "  cross join lateral jsonb_array_elements(a.attendees) attendee",
       "  cross join lateral (",
@@ -261,17 +258,20 @@ export function aiSdrWeeklyReportQueries(
       "    and not exists (select 1 from linked_campaign l where l.appointment_id = a.id)",
       "  order by a.id, nearest.distance, nearest.id",
       "), appointment_campaign as (",
-      "  select appointment_id, method from linked_campaign",
+      "  select appointment_id, prospect_email, method from linked_campaign",
       "  union all",
-      "  select appointment_id, method from attendee_campaign",
+      "  select appointment_id, prospect_email, method from attendee_campaign",
+      "), bookings as (",
+      "  select a.created_at, a.status, ac.method, a.organization_id::text || ':' || coalesce(ac.prospect_email, a.id::text) as guest_key",
+      "  from appointments a",
+      "  left join appointment_campaign ac on ac.appointment_id = a.id",
       ")",
-      "select case when grouping(ac.method) = 1 then '__total__' else coalesce(ac.method, '__unclassified__') end as method,",
+      "select case when grouping(a.method) = 1 then '__total__' else coalesce(a.method, '__unclassified__') end as method,",
       `${windowBookings(report, "report")},`,
       `${windowBookings(previous, "previous")},`,
       windowBookings(month, "month"),
-      "from appointments a",
-      "left join appointment_campaign ac on ac.appointment_id = a.id",
-      "group by grouping sets ((), (ac.method))",
+      "from bookings a",
+      "group by grouping sets ((), (a.method))",
       "order by method",
     ].join("\n"),
     [

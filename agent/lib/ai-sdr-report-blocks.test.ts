@@ -35,7 +35,7 @@ describe("renderAiSdrReportBlocks", () => {
       "Emails sent",
       "1.57M",
       "1.52M",
-      "+3.1%",
+      "+3.0%",
       "1.30M",
       "+20.8%",
     ]);
@@ -50,7 +50,7 @@ describe("renderAiSdrReportBlocks", () => {
     assert.ok(text.startsWith("AI SDR weekly report, 16 to 20 Nov 2026"));
     assert.ok(
       text.includes(
-        "Interview: 16.7% this week, 21.4% last week (-4.6pp), 25.4% same week last month (-8.7pp)."
+        "Interview: 16.7% this week, 21.0% last week (-4.3pp), 25.4% same week last month (-8.7pp)."
       ),
       "the message text carries every table row for screen readers"
     );

@@ -24,7 +24,7 @@ Booked meetings count every AI SDR booking made in the week, once per guest, inc
 
 Example (the 16 to 20 Nov 2026 report):
 
-Trend: Booked meetings rose 2.6% on last week and 58.1% on the same week last month, but the booked meeting rate fell 2.2pp on the week to 21.4%.
+Trend: Booked meetings rose 2.8% on last week and 58.1% on the same week last month, but the booked meeting rate fell 2.1pp on the week to 21.4%.
 Improvement: Podcast's booked meeting rate is up 5.2pp and direct's 1.8pp on the same week last month, and replies grew 9.9% on the week.
 Watch: Interview's booked meeting rate is down 8.7pp on last month, and no response grew 40.4% on the week.
 

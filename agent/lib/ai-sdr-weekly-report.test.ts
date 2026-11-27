@@ -35,6 +35,12 @@ describe("aiSdrWeeklyReportQueries", () => {
     assert.ok(bookingQuery.includes("a.deleted_at is null"));
     assert.ok(bookingQuery.includes("count(distinct a.guest_key)"));
     assert.ok(
+      bookingQuery.includes(
+        "a.organization_id::text || ':' || coalesce(ac.prospect_email, a.id::text) as guest_key"
+      ),
+      "a guest is the prospect email, not the attendee list"
+    );
+    assert.ok(
       bookingQuery.includes("and a.status = 'scheduled') as report_lost")
     );
     assert.ok(bookingQuery.includes("select distinct on (t.appointment_id)"));
