@@ -50,6 +50,7 @@ import {
   correctionKeyInputs,
   correctionNotes,
   correctionPath,
+  refusedSections,
   refuseSummaryLines,
 } from "../agent/lib/widget-guide-corrections.js";
 import {
@@ -612,11 +613,11 @@ const distillBatch = (batch: Article[], label: string, main?: MainReference) =>
         batch.map((a) => a.slug)
       );
       assertOwnAnswers(repaired);
-      const problems = batchProblems(
-        batch.map((a) => a.slug),
-        splitGuideSections(repaired)
-      );
+      const batchSlugs = batch.map((a) => a.slug);
+      const sections = splitGuideSections(repaired);
+      const problems = batchProblems(batchSlugs, sections);
       if (problems.length) {
+        console.log(refusedSections(batchSlugs, sections));
         throw new Error(`corrections refused: ${problems.join("; ")}`);
       }
       return repaired;

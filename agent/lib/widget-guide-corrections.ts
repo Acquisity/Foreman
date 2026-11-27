@@ -74,8 +74,11 @@ const CANT = String.raw`\b(?:can[’']?t|cannot|can not|unable|not able|don[’'
 
 /** The agent pausing a campaign, not a campaign that is already paused. */
 const PAUSES = String.raw`\b(?:pauses|pausing)\b`;
-const ANY_SPACE = String.raw`(?:\b(?:however much|no matter how much|any amount of)\b|\b(?:whatever|regardless of) (?:\S+ ){0,3}?(?:\S+-)?(?:space|room|storage|slots?|check)\b)`;
-const LOW_SPACE = String.raw`(?:\b2,?000\b|\b2k\b|\bfree (?:lead )?(?:slots|space)\b|\b(?:running out of|short (?:of|on)|low on) (?:lead )?(?:space|slots|room)\b|\b(?:space|room|storage) is (?:tight|short|low|full|running out)\b|\bworkspace is (?:nearly |almost )?full\b)`;
+const LOW_SPACE = String.raw`(?:\b2,?000\b|\b2k\b|\bfree (?:lead )?(?:slots|space)\b|\b(?:running out of|short (?:of|on)|low on) (?:lead )?(?:space|slots|room)\b|\b(?:space|room) is (?:tight|short|low|running out)\b)`;
+/** Too little space for more leads: under 2,000 free slots, or nearly full. */
+const TOO_LITTLE_SPACE = String.raw`(?:\b(?:under|below|fewer than|less than)\s+(?:2,?000|2k)\b|\b(?:running out of|short (?:of|on)|low on) (?:lead )?(?:space|slots|room)\b|\b(?:space|room|storage) is (?:tight|short|low|full|running (?:out|low))\b|\bworkspace is (?:nearly |almost )?full\b)`;
+/** Limited to too little space, as Foreman#374 said of "Clear out old leads". */
+const ONLY_LOW_SPACE = String.raw`[^.;\n]*(?<!\bnot )\bonly (?:(?:when|if|once|while|with)\b[^.;\n]{0,40}?)?${TOO_LITTLE_SPACE}`;
 
 export const GUIDE_CORRECTIONS: readonly GuideCorrection[] = [
   {
@@ -255,28 +258,26 @@ export const GUIDE_CORRECTIONS: readonly GuideCorrection[] = [
   {
     note: "\"Clear out old leads\" removes leads in two cases. Clearing space: when a check finds fewer than 2,000 free lead slots, it removes people who got every email or whose email bounced, from paused or completed campaigns at least 90 days old that haven't changed for 30 days. Pausing a campaign: when the agent pauses a campaign, it can remove that campaign's bounced leads, however much space you have. A summary line about when it removes leads names both cases.",
     reject: [
-      new RegExp(
-        CLAUSE +
-          IN_CLAUSE(PAUSES) +
-          `(?![^.;\\n]*${ANY_SPACE})` +
-          IN_CLAUSE(LOW_SPACE),
-        "imu"
-      ),
+      new RegExp(`${CLAUSE}${IN_CLAUSE(PAUSES)}(?=${ONLY_LOW_SPACE})`, "imu"),
     ],
     rejectSummary: [
-      new RegExp(String.raw`^(?![^\n]*${PAUSES})[^\n]*${LOW_SPACE}`, "iu"),
+      new RegExp(String.raw`^(?![^{\n]*${PAUSES})[^{\n]*${LOW_SPACE}`, "iu"),
+      new RegExp(
+        String.raw`\b(?:remov|delet|clear)[^{\n]*\bonly\b[^{\n]*${TOO_LITTLE_SPACE}`,
+        "iu"
+      ),
     ],
     require: [
       new RegExp(
         CLAUSE +
           IN_CLAUSE(PAUSES) +
-          String.raw`(?![^.;\n]*\b(?:never|not|doesn[’']?t|won[’']?t|keeps?)\b)` +
-          IN_CLAUSE(String.raw`\b(?:remov|delet|clear)`) +
+          IN_CLAUSE(
+            String.raw`(?<!\b(?:never|not|no(?! matter)|cannot|unable to|[a-z]+n[’']t|keeps?|rather than)\b[^.;\n]*)\b(?:remov|delet|clear)(?!\w*\s+(?:no|none of)\b)`
+          ) +
           IN_CLAUSE(String.raw`\bbounc`) +
-          IN_CLAUSE(ANY_SPACE),
+          `(?!${ONLY_LOW_SPACE})`,
         "imu"
       ),
-      /\b30[- ]days?\b/iu,
     ],
     slugs: [
       "cold-email-agent/faq/campaigns/does-acquisity-delete-my-leads-automatically",
@@ -339,6 +340,19 @@ export const batchProblems = (
   sections: Map<string, string>
 ): string[] =>
   slugs.flatMap((slug) => sectionProblems(slug, sections.get(slug) ?? ""));
+
+/** Each refused section's text, for the log of a refused distillation. */
+export const refusedSections = (
+  slugs: readonly string[],
+  sections: Map<string, string>
+): string =>
+  slugs
+    .filter((slug) => sectionProblems(slug, sections.get(slug) ?? "").length)
+    .map(
+      (slug) =>
+        `  refused section ${slug}:\n${sections.get(slug) ?? "(missing)"}`
+    )
+    .join("\n");
 
 const lineRefused = (line: string) =>
   [...line.matchAll(GUIDE_CITATION)].some((m) => {

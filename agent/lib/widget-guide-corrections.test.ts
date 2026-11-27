@@ -7,6 +7,7 @@ import {
   correctionNotes,
   correctionPath,
   GUIDE_CORRECTIONS,
+  refusedSections,
   refuseSummaryLines,
   sectionProblems,
 } from "./widget-guide-corrections.js";
@@ -706,14 +707,6 @@ test("the sections Foreman#374 got wrong are refused, the right ones pass", () =
         "- When the agent pauses a campaign, it removes its bounced leads only when you have under 2,000 free slots, regardless of plan."
       ),
     ],
-    [
-      CLEAR_OUT,
-      section(
-        CLEAR_OUT,
-        "- Under 2,000 free slots it clears finished leads from paused or completed campaigns 90+ days old.",
-        "- When it pauses a campaign, it can remove that campaign's bounced leads, however much space you have."
-      ),
-    ],
   ];
   for (const [slug, text] of wrong) {
     assert.notDeepEqual(sectionProblems(slug, text), [], text);
@@ -774,4 +767,119 @@ test("the sections Foreman#374 got wrong are refused, the right ones pass", () =
   for (const [slug, text] of right) {
     assert.deepEqual(sectionProblems(slug, text), [], text);
   }
+});
+
+// The run after Foreman#377 refused the clear-out section three times and
+// stopped (Foreman run 46032903138): twice on a pause clause that named low
+// space, once on a missing pause clause. Its log didn't show the section, so
+// the right lines are the model's own from Foreman#374 at df7fe03a and
+// rewordings of the same rule, not that run's output.
+test("correct clear-out wordings pass, so a regeneration can finish", () => {
+  const right: string[] = [
+    section(
+      CLEAR_OUT,
+      '- Leads go only when someone in your workspace deletes them (e.g. "Delete all" on the "Leads" tab), or when the Cold Email Agent\'s "Clear out old leads" action runs.',
+      '- "Clear out old leads" exists where "Settings" > "Cold Email Agent" shows "Agent mode":',
+      '  - "Clearing space:" with under 2,000 free lead slots, it can queue removal of leads who got every email or bounced, from paused or completed campaigns at least 90 days old and unchanged for 30 days, oldest first.',
+      '  - "Pausing a campaign:" it can also remove that campaign\'s bounced leads, whatever your space.',
+      '  - "Never removed:" repliers, leads mid-sequence, leads not yet emailed.'
+    ),
+    section(
+      CLEAR_OUT,
+      "- Under 2,000 free lead slots it removes finished or bounced leads from old paused or completed campaigns.",
+      "- When it pauses a campaign, it can also remove that campaign's bounced leads, even when there is plenty of free space."
+    ),
+    section(
+      CLEAR_OUT,
+      "- When it pauses a campaign, it can also remove that campaign's bounced leads (not repliers)."
+    ),
+    section(
+      CLEAR_OUT,
+      "- When it pauses a campaign, it can remove that campaign's bounced leads, even with more than 2,000 free slots."
+    ),
+    section(
+      CLEAR_OUT,
+      "- When it pauses a campaign, it can remove its bounced leads, not only when you have under 2,000 free slots."
+    ),
+    section(
+      CLEAR_OUT,
+      "- When pausing a campaign, the agent can remove only that campaign's bounced leads, regardless of remaining space, even above 2,000 free slots."
+    ),
+    section(
+      CLEAR_OUT,
+      "- When it pauses a campaign, even with 5,000 free slots, it can remove that campaign's bounced leads."
+    ),
+    section(
+      CLEAR_OUT,
+      "- When it pauses a campaign, no matter how much space you have, it can remove that campaign's bounced leads."
+    ),
+    section(
+      CLEAR_OUT,
+      "- It removes old leads when you have fewer than 2,000 free slots, and bounced leads when it pauses a campaign."
+    ),
+    section(
+      CLEAR_OUT,
+      "- When it pauses a campaign, it removes its bounced leads, and when you have fewer than 2,000 free slots it also clears old finished leads."
+    ),
+  ];
+  for (const text of right) {
+    assert.deepEqual(sectionProblems(CLEAR_OUT, text), [], text);
+  }
+  const kept = [
+    `- If lead storage is full, adding or importing leads is blocked until there is room. {${CLEAR_OUT}}`,
+    `- "Clear out old leads" removes old leads under 2,000 free slots, and bounced leads when the agent pauses a campaign. {${CLEAR_OUT}}`,
+  ];
+  assert.deepEqual(refuseSummaryLines({ cannot: kept, who: [] }), {
+    kept: { cannot: kept, who: [] },
+    refused: [],
+  });
+});
+
+test("a pause case that keeps bounced leads or needs low space is refused", () => {
+  const first =
+    "- Under 2,000 free slots it clears finished leads from old campaigns.";
+  const wrong = [
+    "- When it pauses a campaign, its bounced leads won't be removed.",
+    "- When it pauses a campaign, bounced leads aren't deleted.",
+    "- When it pauses a campaign, it keeps bounced leads rather than removing them.",
+    "- When it pauses a campaign, it never queues removal of its bounced leads.",
+    "- When it pauses a campaign, it does not ever remove bounced leads.",
+    "- When the agent pauses a campaign, it cannot remove that campaign's bounced leads, whatever your space.",
+    "- When it pauses a campaign, it removes no bounced leads.",
+    "- When it pauses a campaign, it removes its bounced leads only when you have under 2k free slots.",
+    "- When the agent pauses a campaign, it can remove its bounced leads only if you have fewer than 2,000 free slots.",
+    "- When it pauses a campaign, it can remove that campaign's bounced leads.\n- Pausing a campaign removes bounced leads only when you have under 2,000 free slots.",
+    "- When it pauses a campaign it removes bounced leads, even when space is low, but only under 2,000 free slots.",
+  ];
+  for (const line of wrong) {
+    const text = section(CLEAR_OUT, first, line);
+    assert.notDeepEqual(sectionProblems(CLEAR_OUT, text), [], text);
+  }
+  const summaries = [
+    `- Leads are only cleared when you have under 2,000 free slots. {${CLEAR_OUT}}`,
+    `- The agent's clean-up targets campaigns 90+ days old only when you have under 2,000 free slots. {${CLEAR_OUT}}`,
+    `- The Cold Email Agent prunes leads from campaigns 90+ days old only when you have under 2,000 free slots. {${CLEAR_OUT}}`,
+    `- Old leads are removed only under 2,000 free slots, even if your plan has room to upgrade. {${CLEAR_OUT}}`,
+    `- "Clear out old leads" removes leads only when lead storage is full. {${CLEAR_OUT}}`,
+    `- "Clear out old leads" removes leads only when your workspace is nearly full. {${CLEAR_OUT}}`,
+    `- "Clear out old leads" removes leads only when storage is running low. {${CLEAR_OUT}}`,
+  ];
+  assert.deepEqual(refuseSummaryLines({ cannot: summaries, who: [] }), {
+    kept: { cannot: [], who: [] },
+    refused: summaries,
+  });
+});
+
+test("the log of a refused distillation shows each refused section's text", () => {
+  const bad = section(CLEAR_OUT, "- Leads are never deleted.");
+  const badMeet = section(MEET, "- Skipped leads can be re-added.");
+  const sections = new Map([
+    [CLEAR_OUT, bad],
+    [MEET, badMeet],
+    [SPLIT, section(SPLIT, "- No one can split an invoice.")],
+  ]);
+  assert.equal(
+    refusedSections([CLEAR_OUT, SPLIT, MEET], sections),
+    `  refused section ${CLEAR_OUT}:\n${bad}\n  refused section ${MEET}:\n${badMeet}`
+  );
 });
