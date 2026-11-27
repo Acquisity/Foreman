@@ -56,6 +56,9 @@ const CREDITS_CHECKS = {
   ],
 };
 
+/** "Clear out old leads" removing a paused campaign's bounced leads, whatever the space. */
+const PAUSE_CASE = String.raw`(?:\b(?:pauses|pausing) (?:a|the|that|your) campaign\b|\bhowever much\b)`;
+
 export const GUIDE_CORRECTIONS: readonly GuideCorrection[] = [
   {
     note: `${CREDITS_NOTE} Domains are $18/year only when pre-warmed, so keep "Pre-warmed" on that price.`,
@@ -193,9 +196,12 @@ export const GUIDE_CORRECTIONS: readonly GuideCorrection[] = [
   {
     note: '"Clear out old leads" removes leads in two cases: under 2,000 free lead slots, from paused or completed campaigns 90+ days old; and when the agent pauses a campaign, that campaign\'s bounced leads, however much space you have. Any line about when it removes leads says both cases in that line.',
     reject: [
-      /^(?!#)(?![^\n]*\b(?:paus|bounc))[^\n]*(?:\b2,?000\b|\b2k\b|\bfree (?:lead )?(?:slots|space)\b|\b(?:running out of|short (?:of|on)|low on) (?:lead )?(?:space|slots|room)\b)/imu,
+      new RegExp(
+        String.raw`^(?!#)(?![^\n]*${PAUSE_CASE})[^\n]*(?:\b2,?000\b|\b2k\b|\bfree (?:lead )?(?:slots|space)\b|\b(?:running out of|short (?:of|on)|low on) (?:lead )?(?:space|slots|room)\b)`,
+        "imu"
+      ),
     ],
-    require: [/\bpaus[^\n]*\bbounc|\bbounc[^\n]*\bpaus/iu],
+    require: [new RegExp(PAUSE_CASE, "iu")],
     slugs: [
       "cold-email-agent/faq/campaigns/does-acquisity-delete-my-leads-automatically",
     ],

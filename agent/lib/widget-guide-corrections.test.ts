@@ -530,6 +530,7 @@ test("wrong summary lines from Foreman#374 are dropped", () => {
   const wrong = [
     `- "Clear out old leads" keeps repliers, and targets campaigns 90+ days old only when you have under 2,000 free slots. {${CLEAR_OUT}}`,
     `- Clear out old leads runs only when your workspace is running out of lead space. {${CLEAR_OUT}}`,
+    `- "Clear out old leads" removes bounced leads from paused campaigns 90+ days old when under 2,000 free slots. {${CLEAR_OUT}}`,
     `- Change plans in "Settings" > "Billing" > "View plans". {${LEAD_LIMIT}}`,
   ];
   const right = [
