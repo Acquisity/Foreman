@@ -73,3 +73,21 @@ export function parseFindings(value: unknown): WidgetFindings | null {
   const parsed = findingsSchema.safeParse(value);
   return parsed.success ? parsed.data : null;
 }
+
+/**
+ * Findings for a turn that hands the conversation on, to the team or to Fixy:
+ * what the turn found, when it found anything, stays for the team-only note.
+ */
+export const teamFindings = (
+  report: string,
+  found: WidgetFindings | null | undefined,
+  fields: Pick<WidgetFindings, "recommendation"> &
+    Partial<Pick<WidgetFindings, "escalate" | "needsWrite" | "ticket">>
+) =>
+  parseFindings({
+    confidence: found?.confidence ?? "low",
+    facts: found?.facts ?? [],
+    needsHuman: false,
+    report: (found?.report ?? report).slice(0, 1000),
+    ...fields,
+  });

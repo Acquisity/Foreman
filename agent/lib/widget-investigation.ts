@@ -26,6 +26,15 @@ import {
   logGateDecision,
 } from "./widget-egress.js";
 import {
+  completeEscalation,
+  couldNotStart,
+  customerTurn,
+  escalatesToFixy,
+  escalationFor,
+  needsTheTeam,
+  teamAsk,
+} from "./widget-escalation.js";
+import {
   type IdentifierCandidates,
   resolveOwnedIdentifiers,
   verifyWorkspaceMember,
@@ -35,14 +44,7 @@ import { extractWidgetFindings } from "./widget-extract.js";
 import { parseFindings, type WidgetFindings } from "./widget-findings.js";
 import {
   ANSWER_HERE,
-  completeEscalation,
   completeInvite,
-  customerTurn,
-  type Escalation,
-  escalatedOutcome,
-  escalatesToFixy,
-  escalationFindings,
-  escalationSummary,
   type FrontDoorTicket,
   followUpNote,
   frontDoorTicket,
@@ -1081,23 +1083,14 @@ const startReplyGapFiling = (
  * hands the teammate a note. Null when the findings go through the gate.
  */
 const settledWithoutGate = (
-  run: Pick<WidgetRun, "question">,
+  run: Pick<WidgetRun, "id" | "question" | "scope">,
+  sessionId: string,
   structured: WidgetFindings | null,
   escalate: true | undefined,
   text: string | null
 ) => {
   if (structured) {
-    return escalate
-      ? {
-          findings: escalationFindings(
-            "cant_check",
-            "Foreman's investigation found something only the team can settle and handed the chat to Fixy.",
-            escalationSummary(run.question),
-            structured
-          ),
-          result: escalatedOutcome("cant_check"),
-        }
-      : null;
+    return escalate ? needsTheTeam(run, sessionId, structured) : null;
   }
   return (text && humanHandoff(text, "no_structured_findings")) || null;
 };
@@ -1204,6 +1197,7 @@ export async function finishWidgetRun(
     const extractMs = Date.now() - extractStartedAt;
     const handoff = settledWithoutGate(
       run,
+      sessionId,
       structured,
       written.escalate,
       outcome.text
@@ -1455,71 +1449,6 @@ interface FrontDoorOptions {
 }
 
 /**
- * Whether this front-door turn files the conversation's ticket: a customer's
- * ask for a person, or a member or client who needs their workspace looked
- * into (the magnifying glass, a bug, a refund or a ticket) and cannot start
- * an investigation (ENG-20283 default). A teammate's run never files.
- */
-const frontDoorTicketReason = (
-  scope: WidgetContext,
-  route: WidgetRoute,
-  helpCenterOnly: boolean,
-  needsLook: boolean,
-  /** No filer wired, as in a replay harness: a member's turn stays an ordinary answer. */
-  filer: boolean
-): FrontDoorTicket | null => {
-  if (!customerTurn(scope)) {
-    return null;
-  }
-  if (asksForPerson(route)) {
-    return "person";
-  }
-  return filer &&
-    helpCenterOnly &&
-    (needsLook || route.bug || route.refund || route.ticket)
-    ? "member"
-    : null;
-};
-
-/**
- * Why a customer's turn hands the chat to Fixy (ENG-21094): an ask for a
- * person (a bare one too: Fixy asks what they need), a refund or a cancel, or
- * a member or client whose workspace needs a look they cannot start. Null for
- * a teammate's run and every other message, and while escalation is off.
- */
-const escalationFor = (
-  scope: WidgetContext,
-  route: WidgetRoute,
-  ask: WidgetAsk,
-  helpCenterOnly: boolean,
-  needsLook: boolean
-): Escalation | null => {
-  if (!(escalatesToFixy() && customerTurn(scope))) {
-    return null;
-  }
-  const summary = route.noNeed ? undefined : escalationSummary(ask.latest);
-  const escalate = (
-    reason: Escalation["reason"],
-    report: string
-  ): Escalation => ({ reason, report, ...(summary ? { summary } : {}) });
-  if (asksForPerson(route)) {
-    return escalate("asked_for_human", "The customer asked for a person.");
-  }
-  if (route.cancel) {
-    return escalate("cancel", "The customer asked to cancel.");
-  }
-  if (route.refund) {
-    return escalate("refund", "The customer asked for a refund.");
-  }
-  return helpCenterOnly && (needsLook || route.bug || route.ticket)
-    ? escalate(
-        "cant_check",
-        `The customer is a workspace ${scope.role}, and only an owner or admin can start a look into their workspace.`
-      )
-    : null;
-};
-
-/**
  * How a front-door turn completes: as is, or, when it files the
  * conversation's ticket, with the answer-comes-here line. A person's ask whose
  * ticket cannot be filed keeps the asked_for_human block.
@@ -1663,29 +1592,23 @@ async function answerFromKnowledgeBase(
     { conversationId: scope.conversationId, runId: run.id },
     route
   );
-  const escalation = escalationFor(
-    scope,
-    route,
-    ask,
-    helpCenterOnly,
-    needsLook
-  );
+  const person = asksForPerson(route);
+  const needs = teamAsk(scope, route, { helpCenterOnly, needsLook, person });
+  // A front-door refund goes to Fixy for every role: nothing here investigates it.
+  const escalation = escalationFor(scope, needs, route, ask.latest, {
+    refund: true,
+  });
   if (escalation) {
     drafting.abort();
-    return completeEscalation(run, scope, escalation, deps);
+    return completeEscalation(deps.complete, run.id, scope, escalation);
   }
-  const person = asksForPerson(route);
-  if (person && route.noNeed && customerTurn(scope)) {
+  if (needs === "person" && route.noNeed) {
     drafting.abort();
     return completeInvite(run, scope, deps);
   }
-  const why = frontDoorTicketReason(
-    scope,
-    route,
-    helpCenterOnly,
-    needsLook,
-    Boolean(deps.fileTicket)
-  );
+  // No filer wired, as in a replay harness: a member's turn stays an ordinary answer.
+  const why: FrontDoorTicket | null =
+    needs === "member" && !deps.fileTicket ? null : needs;
   if (why && !(route.refund || route.ticket)) {
     // Only a turn that files and answers gets the notification exception. Every other draft is unchanged.
     drafting.abort();
@@ -1809,14 +1732,18 @@ async function startInvestigation(
       clearTimeout(timeout);
     }
   } catch (error) {
-    await deps
+    const handed = couldNotStart({ ...run, scope });
+    const saved = await deps
       .complete(
         run.id,
-        blockedOutcome("session_unavailable", "failed"),
-        null,
+        handed?.result ?? blockedOutcome("session_unavailable", "failed"),
+        handed?.findings ?? null,
         sessionId ?? run.id
       )
-      .catch(() => undefined);
+      .catch(() => null);
+    if (handed && saved) {
+      return saved;
+    }
     throw error;
   }
 }
@@ -1883,11 +1810,10 @@ async function investigationDenied(
 }
 
 /**
- * A toggled ask for a person, a refund or a cancel hands the chat to Fixy
- * when escalation is on. With it off, an ask for a person that states no need
+ * A toggled ask for a person or a cancel hands the chat to Fixy when
+ * escalation is on. With it off, an ask for a person that states no need
  * gets an invitation and no ticket; otherwise the conversation's ticket is
- * filed now, its receipt
- * supplies the answer-comes-here line and the findings' ticket at finish,
+ * filed now, its receipt supplies the answer-comes-here line and the findings' ticket at finish,
  * and a note tells the investigator not to hand off. Unfiled, the note asks
  * the investigator to hand off, so the finish files it. An empty note
  * continues the investigation.
@@ -1900,11 +1826,19 @@ async function toggledPersonAsk(
   signal: AbortSignal,
   deps: WidgetDependencies
 ): Promise<string | WidgetRun | null> {
-  const escalation = escalationFor(scope, route, ask, false, true);
+  const person = asksForPerson(route);
+  // An owner's toggled refund keeps investigating: the investigator files it in billing's queue.
+  const escalation = escalationFor(
+    scope,
+    person ? "person" : null,
+    route,
+    ask.latest,
+    { refund: false }
+  );
   if (escalation) {
-    return completeEscalation(run, scope, escalation, deps);
+    return completeEscalation(deps.complete, run.id, scope, escalation);
   }
-  if (!asksForPerson(route)) {
+  if (!person) {
     return "";
   }
   if (route.noNeed) {

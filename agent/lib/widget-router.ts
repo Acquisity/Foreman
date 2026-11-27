@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { logOpsEvent } from "./ops-log.js";
+import { escalatesToFixy } from "./widget-escalation.js";
 import {
   askJev,
   FRONT_DOOR_JEV_MS,
@@ -340,7 +341,10 @@ export async function routeWidgetMessage(
       (score ?? 0) >= bar;
     const refund = flag(answers.asks_for_refund?.noul, REFUND_REQUEST);
     const ticket = flag(answers.asks_for_ticket?.noul, TICKET_REQUEST);
-    const cancel = flag(answers.asks_to_cancel?.noul, CANCEL_REQUEST);
+    // With escalation off a cancel changes nothing, so the old person-ask
+    // invitation still stands.
+    const cancel =
+      escalatesToFixy() && flag(answers.asks_to_cancel?.noul, CANCEL_REQUEST);
     return {
       asksForHuman: answers.asks_for_human.noul,
       source: "jev",

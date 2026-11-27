@@ -111,7 +111,11 @@ describe("routeWidgetMessage", () => {
     assert.equal((await route({})).noNeed, undefined);
   });
 
-  it("flags a cancel at its bar, in the same Jev call", async () => {
+  it("flags a cancel at its bar, in the same Jev call, while chats escalate to Fixy", async (t) => {
+    process.env.WIDGET_ESCALATE_TO_FIXY = "on";
+    t.after(() => {
+      delete process.env.WIDGET_ESCALATE_TO_FIXY;
+    });
     const route = (noul: number) =>
       routeWidgetMessage("please cancel my subscription", {
         apiKey: "test-key",
@@ -121,7 +125,11 @@ describe("routeWidgetMessage", () => {
     assert.equal((await route(0.3)).cancel, undefined);
   });
 
-  it("never flags a refund, cancel or ticket ask as stating no need", async () => {
+  it("never flags a refund, cancel or ticket ask as stating no need", async (t) => {
+    process.env.WIDGET_ESCALATE_TO_FIXY = "on";
+    t.after(() => {
+      delete process.env.WIDGET_ESCALATE_TO_FIXY;
+    });
     for (const ask of [
       "asks_for_refund",
       "asks_to_cancel",
