@@ -82,11 +82,17 @@ export const escalatedOutcome = (reason: EscalationReason): WidgetOutcome => ({
   status: "completed",
 });
 
+export interface Escalation {
+  reason: EscalationReason;
+  report: string;
+  summary?: string;
+}
+
 /** Complete a customer's turn by handing the chat to Fixy. */
 export const completeEscalation = (
   run: Pick<WidgetRun, "id">,
   scope: WidgetContext,
-  escalation: { reason: EscalationReason; report: string; summary?: string },
+  escalation: Escalation,
   deps: Pick<WidgetDependencies, "complete">
 ) => {
   logOpsEvent("widget.handoff.ticket", {

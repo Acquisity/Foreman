@@ -38,6 +38,7 @@ import {
   completeEscalation,
   completeInvite,
   customerTurn,
+  type Escalation,
   escalatedOutcome,
   escalatesToFixy,
   escalationFindings,
@@ -1492,15 +1493,15 @@ const escalationFor = (
   ask: WidgetAsk,
   helpCenterOnly: boolean,
   needsLook: boolean
-): Parameters<typeof completeEscalation>[2] | null => {
+): Escalation | null => {
   if (!(escalatesToFixy() && customerTurn(scope))) {
     return null;
   }
   const summary = route.noNeed ? undefined : escalationSummary(ask.latest);
   const escalate = (
-    reason: Parameters<typeof completeEscalation>[2]["reason"],
+    reason: Escalation["reason"],
     report: string
-  ) => ({ reason, report, ...(summary ? { summary } : {}) });
+  ): Escalation => ({ reason, report, ...(summary ? { summary } : {}) });
   if (asksForPerson(route)) {
     return escalate("asked_for_human", "The customer asked for a person.");
   }
@@ -1883,8 +1884,9 @@ async function investigationDenied(
 
 /**
  * A toggled ask for a person, a refund or a cancel hands the chat to Fixy
- * when escalation is on. Otherwise an ask for a person that states no need gets an invitation and
- * no ticket; otherwise the conversation's ticket is filed now, its receipt
+ * when escalation is on. With it off, an ask for a person that states no need
+ * gets an invitation and no ticket; otherwise the conversation's ticket is
+ * filed now, its receipt
  * supplies the answer-comes-here line and the findings' ticket at finish,
  * and a note tells the investigator not to hand off. Unfiled, the note asks
  * the investigator to hand off, so the finish files it. An empty note
