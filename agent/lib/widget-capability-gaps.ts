@@ -1,9 +1,12 @@
 // Capability gaps (ENG-20299): something a widget investigation could not
-// check. Each gap key `<area>: <missing fact>` has one open ENG ticket with the
-// `fixy` label, which Fixy judges and builds or cancels; every conversation that
-// hits it adds one comment and one to its count. No customer data is written:
-// only the area, the fact, the conversation and run ids, and the reason.
+// check. Each gap key `<area>: <missing fact>` has one open ENG ticket, which
+// Fixy's daily triage judges, labelling `fixy` only what it builds; every
+// conversation that hits it adds one comment and one to its count. Internal
+// workspaces and conversations a closed ticket already judged file nothing.
+// No customer data is written: only the area, the fact, the conversation and
+// run ids, and the reason.
 import { z } from "zod";
+import { INTERNAL_ORGS } from "./internal-orgs.js";
 import { logOpsEvent } from "./ops-log.js";
 import {
   commentIdFor,
@@ -302,11 +305,11 @@ export const distinctGaps = (gaps: readonly CapabilityGap[]) => {
 
 export interface GapOccurrence {
   conversationId: string;
+  organizationId: string;
   runId: string;
 }
 
 const LABELS = { docs: "Docs Gap", tool: "Capability Gap" } as const;
-const FIXY = "fixy";
 const COUNT_LINE = /^([-*] Conversations: )(\d{1,9})$/mu;
 
 export const gapTitle = (gap: CapabilityGap) =>
@@ -332,7 +335,7 @@ const INTRO = {
 export const gapDescription = (gap: CapabilityGap) =>
   [
     INTRO[gap.source === "reply" ? "reply" : gap.kind],
-    "Each comment below names one support conversation that hit this gap. Fixy first checks whether this would have changed the reply and can be known from our data, then builds the fix or cancels the ticket with the reason, with no plan card, question card or draft (Aaron, 2026-11-25). A fix that would add an action, write customer data or move money becomes its own ENG ticket without the `fixy` label, linked from this one. After a read or Help Centre fix is live, Fixy reruns the check for each conversation and answers the ones whose question it now answers and that are still waiting.",
+    "Each comment below names one support conversation that hit this gap. Fixy's daily triage judges whether this would have changed the reply and can be known from our data, and adds the `fixy` label only when there is something to build; otherwise it cancels the ticket with the reason, with no plan card, question card or draft (Aaron, 2026-11-25). A fix that would add an action, write customer data or move money becomes its own ENG ticket without the `fixy` label, linked from this one. After a read or Help Centre fix is live, Fixy reruns the check for each conversation and answers the ones whose question it now answers and that are still waiting.",
     "## Capability gap",
     [
       `- Gap key: ${gapKey(gap)}`,
@@ -382,13 +385,19 @@ export const withDetails = (
   return `${head}${COULD_NOT_CHECK}${[...listed, ...added].join(DETAIL_SEPARATOR)}.`;
 };
 
-const FIND = `query CapabilityGapFind($team: String!, $title: String!) {
-  issues(first: 5, filter: { team: { key: { eq: $team } }, title: { eqIgnoreCase: $title }, state: { type: { nin: ["completed", "canceled"] } } }) {
+// Linear's Duplicate state has its own type, `duplicate`.
+const FIND = `query CapabilityGapFind($team: String!, $title: String!, $since: DateTimeOrDuration!, $seen: String!) {
+  issues(first: 5, filter: { team: { key: { eq: $team } }, title: { eqIgnoreCase: $title }, state: { type: { nin: ["completed", "canceled", "duplicate"] } } }) {
     nodes { id identifier description labels { nodes { id } } comments(first: 250) { nodes { id body } } }
   }
+  judged: issues(first: 1, filter: { team: { key: { eq: $team } }, title: { eqIgnoreCase: $title }, state: { type: { in: ["completed", "canceled", "duplicate"] } }, or: [{ completedAt: { gt: $since } }, { canceledAt: { gt: $since } }], comments: { some: { body: { startsWith: $seen } } } }) {
+    nodes { identifier }
+  }
   teams(filter: { key: { eq: $team } }) { nodes { id } }
-  issueLabels(first: 20, filter: { name: { in: ["Capability Gap", "Docs Gap", "fixy"] }, or: [{ team: { key: { eq: $team } } }, { team: { null: true } }] }) { nodes { id name } }
+  issueLabels(first: 20, filter: { name: { in: ["Capability Gap", "Docs Gap"] }, or: [{ team: { key: { eq: $team } } }, { team: { null: true } }] }) { nodes { id name } }
 }`;
+/** How long after closing a ticket still counts as having judged its conversations; Duplicate sets canceledAt. */
+const JUDGED_WINDOW = "-P30D";
 const CREATE = `mutation CapabilityGapCreate($input: IssueCreateInput!) {
   issueCreate(input: $input) { issue { id identifier } }
 }`;
@@ -413,21 +422,28 @@ interface Found {
       labels: { nodes: { id: string }[] };
     }[];
   };
+  judged: { nodes: { identifier: string }[] };
   teams: { nodes: { id: string }[] };
 }
 
+const occurrences = (comments: readonly { body: string }[]) =>
+  comments.filter((comment) => comment.body.startsWith(OCCURRENCE)).length;
+
 export type GapFiling =
-  | { identifier: string; outcome: "counted" | "filed" | "seen" }
+  | { identifier: string; outcome: "counted" | "filed" | "judged" | "seen" }
   | { outcome: "failed"; reason: string };
 
 /**
  * Files the gap's ticket or counts this conversation on the open one. Each
  * conversation is one comment under a fixed id per ticket and conversation,
  * so it is counted once however often it hits the gap, and the count is
- * read back from those comments. `fixy` goes on last, after the ticket holds
- * what Fixy's run reads. Every write is checked and every call reconciles
- * the open ticket, so a retry repairs a count or label an earlier failure
- * left behind.
+ * read back from those comments. A conversation already on a ticket with
+ * this title that closed in the last 30 days has been judged: nothing is
+ * written. The kind label goes on last, after the ticket holds what Fixy's
+ * daily triage reads, because the triage picks tickets up by that label; the
+ * `fixy` label is never added here. Every write is checked and every call
+ * reconciles the open ticket, so a retry repairs a count or label an earlier
+ * failure left behind.
  */
 export async function fileCapabilityGap(
   gap: CapabilityGap,
@@ -440,9 +456,18 @@ export async function fileCapabilityGap(
   const found = await request<Found>(
     "CapabilityGapFind",
     FIND,
-    { team: teamKey, title },
+    {
+      seen: `${OCCURRENCE}${seen.conversationId} `,
+      since: JUDGED_WINDOW,
+      team: teamKey,
+      title,
+    },
     signal
   );
+  const [judged] = found.judged.nodes;
+  if (judged) {
+    return { identifier: judged.identifier, outcome: "judged" };
+  }
   const write = async (name: string, query: string, variables: object) => {
     const result = await request<Record<string, { success: boolean }>>(
       name,
@@ -454,12 +479,9 @@ export async function fileCapabilityGap(
       throw new Error(`Linear did not confirm ${name}.`);
     }
   };
-  const label = (name: string) =>
-    found.issueLabels.nodes.find((node) => node.name === name)?.id;
-  const fixyLabel = label(FIXY);
-  if (!fixyLabel) {
-    return { outcome: "failed", reason: `Linear has no ${FIXY} label.` };
-  }
+  const kindLabel = found.issueLabels.nodes.find(
+    (node) => node.name === LABELS[gap.kind]
+  )?.id;
   const commentId = (issueId: string) =>
     commentIdFor(`capability-gap:${issueId}:${seen.conversationId}`);
   const record = (issueId: string) =>
@@ -485,10 +507,7 @@ export async function fileCapabilityGap(
         id: mine.id,
       });
     }
-    const count =
-      open.comments.nodes.filter((comment) =>
-        comment.body.startsWith(OCCURRENCE)
-      ).length + (added ? 1 : 0);
+    const count = occurrences(open.comments.nodes) + Number(added);
     const description = open.description ?? "";
     const counted = countedDescription(description, count);
     if (counted !== description) {
@@ -497,16 +516,15 @@ export async function fileCapabilityGap(
         id: open.id,
       });
     }
-    if (!open.labels.nodes.some(({ id }) => id === fixyLabel)) {
+    if (kindLabel && !open.labels.nodes.some(({ id }) => id === kindLabel)) {
       await write("CapabilityGapLabel", ADD_LABEL, {
         id: open.id,
-        label: fixyLabel,
+        label: kindLabel,
       });
     }
     return { identifier: open.identifier, outcome: added ? "counted" : "seen" };
   }
   const teamId = found.teams.nodes[0]?.id;
-  const kindLabel = label(LABELS[gap.kind]);
   if (!(teamId && kindLabel)) {
     return {
       outcome: "failed",
@@ -521,7 +539,6 @@ export async function fileCapabilityGap(
     {
       input: {
         description: gapDescription(gap),
-        labelIds: [kindLabel],
         teamId,
         title,
       },
@@ -535,7 +552,7 @@ export async function fileCapabilityGap(
   await record(issue.id);
   await write("CapabilityGapLabel", ADD_LABEL, {
     id: issue.id,
-    label: fixyLabel,
+    label: kindLabel,
   });
   return { identifier: issue.identifier, outcome: "filed" };
 }
@@ -545,7 +562,8 @@ const GAPS_MS = 60_000;
 /**
  * Files every gap a run recorded, one after another. It starts beside the
  * run's finish and the finish awaits it only after the reply is saved, so it
- * never delays the customer; a failure is logged and never reaches them.
+ * never delays the customer; a failure is logged and never reaches them. A
+ * run in an internal workspace files nothing and logs each gap skipped.
  */
 export async function fileRunGaps(
   gaps: readonly CapabilityGap[],
@@ -553,7 +571,17 @@ export async function fileRunGaps(
   signal: AbortSignal = AbortSignal.timeout(GAPS_MS),
   file: typeof fileCapabilityGap = fileCapabilityGap
 ): Promise<void> {
+  const internal = INTERNAL_ORGS.has(seen.organizationId.toLowerCase());
   for (const gap of distinctGaps(gaps)) {
+    if (internal) {
+      logOpsEvent("widget.capability_gap", {
+        conversationId: seen.conversationId,
+        outcome: "skipped_internal",
+        runId: seen.runId,
+        tool: gap.area,
+      });
+      continue;
+    }
     // biome-ignore lint/performance/noAwaitInLoops: one ticket per key, filed in order.
     const filed = await file(gap, seen, signal).catch(
       (error): GapFiling => ({

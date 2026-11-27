@@ -1700,7 +1700,11 @@ test("what a run could not check is filed after its reply is saved", async () =>
   assert.deepEqual(filed, [
     {
       facts: ["the stripe section could not be read", "why an order waits"],
-      seen: { conversationId: scope.conversationId, runId: run.id },
+      seen: {
+        conversationId: scope.conversationId,
+        organizationId: scope.organizationId,
+        runId: run.id,
+      },
     },
   ]);
   assert.deepEqual(order, ["complete", "gaps filed"]);
