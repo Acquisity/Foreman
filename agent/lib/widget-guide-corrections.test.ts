@@ -422,6 +422,8 @@ test("wrong summary lines from Foreman#370 are dropped", () => {
     `- Only Owners buy credits for AI Website Builder. A prompt appears when your balance runs low. {${SITE_CREDITS}}`,
     `- DFY inboxes can't be added to a live campaign. Check the warm-up status first. {${INBOX_FAQ}}`,
     `- You can't add DFY inboxes to a running campaign. {${DFY}}`,
+    `- You can't add a DFY inbox to a campaign that's already live. {${DFY}}`,
+    `- Prompt top-ups are owner-only, even if you never open Settings. {${SITE_CREDITS}}`,
   ];
   const right = [
     `- Client role has Client Portal, view-only; clients never see campaigns/AI SDR unless partner enables. {${PORTAL}}`,
@@ -435,6 +437,10 @@ test("wrong summary lines from Foreman#370 are dropped", () => {
     `- A DFY inbox marked "Ready to send" can be added to a live campaign. {${DFY}}`,
     `- Each website can have more than one domain. {${SITE_DOMAINS}}`,
     `- You can change or disconnect a domain under "Manage domain" without contacting support. {${SITE_DOMAINS}}`,
+    `- You do not need support to change or disconnect a domain under "Manage domain". {${SITE_DOMAINS}}`,
+    `- "Settings" > "Billing" > "Buy credits": only Owners can buy credits here. {${SITE_CREDITS}}`,
+    `- They only get widgets built from results they can already see. {${PORTAL}}`,
+    `- Clients only see campaigns when their partner enables them. {${PORTAL}}`,
   ];
   assert.deepEqual(refuseSummaryLines({ cannot: wrong, who: right }), {
     kept: { cannot: [], who: right },
