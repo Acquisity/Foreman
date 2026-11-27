@@ -80,8 +80,8 @@ export interface Escalation {
  * then a refund (only where Foreman would not investigate and file it itself),
  * then an ask for a person (a bare one too: Fixy asks what they need), then a
  * member or client whose workspace needs a look they cannot start, then an
- * owner or admin asking for a ticket again after Foreman's fixed redirect to
- * the magnifying glass, which repeated the redirect (ENG-21099). Null while
+ * owner or admin asking for a ticket after Foreman's fixed magnifying-glass
+ * reply, so the redirect is never given twice (ENG-21099). Null while
  * escalation is off and for every other turn.
  */
 export const escalationFor = (
@@ -122,7 +122,7 @@ export const escalationFor = (
     ? {
         reason: "asked_for_human",
         report:
-          "The customer asked for a ticket again after being pointed to the magnifying glass.",
+          "The customer asked for a ticket after Foreman had already pointed them to the magnifying glass.",
       }
     : null;
 };

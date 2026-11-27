@@ -2,7 +2,9 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { verifiedWidgetContext as scope } from "./widget.fixture.js";
 import {
+  COMPOSER_PROMPT,
   composerInput,
+  composerRequest,
   composeWithin,
   defaultGateDeps,
   extractIdentifiers,
@@ -1330,4 +1332,40 @@ test("re-ask repairs ignore details supplied only by Support or screenshot readi
     ),
     ["email address (customer@example.com)"]
   );
+});
+
+test("with escalation on, a customer's composer is told asking here reaches a person; off, or on a teammate's run, it is not", async (t) => {
+  for (const [flag, source, escalates] of [
+    ["on", "widget", true],
+    ["on", "inbox", undefined],
+    [undefined, "widget", undefined],
+  ] as const) {
+    // biome-ignore lint/performance/noAwaitInLoops: each case restores the flag before the next.
+    await t.test(`${flag ?? "off"} ${source}`, async (st) => {
+      const previous = process.env.WIDGET_ESCALATE_TO_FIXY;
+      st.after(() => {
+        if (previous === undefined) {
+          delete process.env.WIDGET_ESCALATE_TO_FIXY;
+        } else {
+          process.env.WIDGET_ESCALATE_TO_FIXY = previous;
+        }
+      });
+      if (flag) {
+        process.env.WIDGET_ESCALATE_TO_FIXY = flag;
+      } else {
+        delete process.env.WIDGET_ESCALATE_TO_FIXY;
+      }
+      const { calls, deps: d } = deps();
+      await gate({ ...scope, source }, question, findings(), d);
+      const [composed] = calls.compose as { escalates?: true }[];
+      assert.equal(composed.escalates, escalates);
+    });
+  }
+  const off = composerRequest({ question }).system;
+  const on = composerRequest({ question }, true).system;
+  assert.equal(off, COMPOSER_PROMPT);
+  assert.ok(off.includes("nobody will"));
+  assert.ok(!on.includes("nobody will"));
+  assert.ok(on.includes("ask for one right here in this chat at any time"));
+  assert.ok(on.includes('such as "human agent"'));
 });
