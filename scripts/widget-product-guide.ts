@@ -612,11 +612,19 @@ const distillBatch = (batch: Article[], label: string, main?: MainReference) =>
         batch.map((a) => a.slug)
       );
       assertOwnAnswers(repaired);
+      const sections = splitGuideSections(repaired);
       const problems = batchProblems(
         batch.map((a) => a.slug),
-        splitGuideSections(repaired)
+        sections
       );
       if (problems.length) {
+        for (const a of batch) {
+          if (batchProblems([a.slug], sections).length) {
+            console.log(
+              `  refused section ${a.slug}:\n${sections.get(a.slug) ?? "(missing)"}`
+            );
+          }
+        }
         throw new Error(`corrections refused: ${problems.join("; ")}`);
       }
       return repaired;

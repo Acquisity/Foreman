@@ -74,8 +74,9 @@ const CANT = String.raw`\b(?:can[’']?t|cannot|can not|unable|not able|don[’'
 
 /** The agent pausing a campaign, not a campaign that is already paused. */
 const PAUSES = String.raw`\b(?:pauses|pausing)\b`;
-const ANY_SPACE = String.raw`(?:\b(?:however much|no matter how much|any amount of)\b|\bplenty of (?:free )?(?:lead )?(?:space|room|slots)\b|\beven (?:when|if|with)\b[^.;\n]*\b(?:space|room|slots?)\b|\b(?:whatever|regardless of) (?:\S+ ){0,3}?(?:\S+-)?(?:space|room|storage|slots?|check)\b)`;
-const LOW_SPACE = String.raw`(?:\b2,?000\b|\b2k\b|\bfree (?:lead )?(?:slots|space)\b|\b(?:running out of|short (?:of|on)|low on) (?:lead )?(?:space|slots|room)\b|\b(?:space|room|storage) is (?:tight|short|low|full|running out)\b|\bworkspace is (?:nearly |almost )?full\b)`;
+const LOW_SPACE = String.raw`(?:\b2,?000\b|\b2k\b|\bfree (?:lead )?(?:slots|space)\b|\b(?:running out of|short (?:of|on)|low on) (?:lead )?(?:space|slots|room)\b|\b(?:space|room) is (?:tight|short|low|running out)\b)`;
+/** Limited to low space, as Foreman#374 said of "Clear out old leads". */
+const ONLY_LOW_SPACE = String.raw`[^.;\n]*(?<!\bnot )\bonly\b[^.;\n]*${LOW_SPACE}`;
 
 export const GUIDE_CORRECTIONS: readonly GuideCorrection[] = [
   {
@@ -254,21 +255,21 @@ export const GUIDE_CORRECTIONS: readonly GuideCorrection[] = [
   },
   {
     note: "\"Clear out old leads\" removes leads in two cases. Clearing space: when a check finds fewer than 2,000 free lead slots, it removes people who got every email or whose email bounced, from paused or completed campaigns at least 90 days old that haven't changed for 30 days. Pausing a campaign: when the agent pauses a campaign, it can remove that campaign's bounced leads, however much space you have. A summary line about when it removes leads names both cases.",
+    reject: [
+      new RegExp(CLAUSE + IN_CLAUSE(PAUSES) + `(?=${ONLY_LOW_SPACE})`, "imu"),
+    ],
     rejectSummary: [
-      new RegExp(
-        String.raw`^(?=[^{\n]*\b(?:clear(?:s|ing)? out|remov|delet))(?![^\n]*${ANY_SPACE})[^\n]*${LOW_SPACE}`,
-        "iu"
-      ),
+      new RegExp(String.raw`^(?![^{\n]*${PAUSES})[^{\n]*${LOW_SPACE}`, "iu"),
     ],
     require: [
       new RegExp(
         CLAUSE +
           IN_CLAUSE(PAUSES) +
           IN_CLAUSE(
-            String.raw`(?<!\b(?:never|not|doesn[’']?t|won[’']?t|can[’']?t|cannot)\s)\b(?:remov|delet|clear)`
+            String.raw`(?<!\b(?:never|not|no|[a-z]+n[’']t|keeps?|rather than)\b[^.;\n]*)\b(?:remov|delet|clear)`
           ) +
           IN_CLAUSE(String.raw`\bbounc`) +
-          `(?:${IN_CLAUSE(ANY_SPACE)}|(?![^.;\\n]*${LOW_SPACE}))`,
+          `(?!${ONLY_LOW_SPACE})`,
         "imu"
       ),
     ],
