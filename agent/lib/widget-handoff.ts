@@ -75,15 +75,13 @@ export const withAnswerHere = (message: string, turns: Turns) =>
     ? message
     : `${message}\n\n${ANSWER_HERE}`;
 
-const INVITE =
-  "Tell me what you need help with and I'll try to sort it out now. Anything I can't, I'll pass to our team, and their answer will come here in this chat.";
+const INVITE_OPENING = "Tell me what you need help with";
+const INVITE = `${INVITE_OPENING} and I'll try to sort it out now. Anything I can't, I'll pass to our team, and their answer will come here in this chat.`;
 
 /** An earlier reply was the invitation, so a second bare ask files the ticket instead of looping (ENG-21230). */
 export const invitedBefore = (turns: Turns) =>
   turns?.some(
-    (turn) =>
-      turn.role === "assistant" &&
-      turn.text.includes("Tell me what you need help with")
+    (turn) => turn.role === "assistant" && turn.text.includes(INVITE_OPENING)
   ) ?? false;
 
 /**
