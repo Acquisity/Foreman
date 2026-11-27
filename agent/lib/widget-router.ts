@@ -312,7 +312,32 @@ export function routerInput(input: string | WidgetAsk): string {
   return `FOREMAN'S PREVIOUS REPLY, which the latest message answers:\n${previous.length > PREVIOUS_REPLY_CHARS ? `[start cut] ${previous.slice(-PREVIOUS_REPLY_CHARS)}` : previous}\n\n${rest.startsWith("LATEST CUSTOMER MESSAGE") ? rest : `LATEST CUSTOMER MESSAGE (the one to work on):\n${rest}`}`;
 }
 
+/**
+ * A message that is only an ask for a person ("human agent", "live agent",
+ * "I need to speak to a live agent"). Jev scored bare "human agent" under the
+ * bar in 19 of 83 chats in the 30 days to 27 Nov 2026 (ENG-21230), and a
+ * failed call scores it zero, so this match routes it whatever Jev says.
+ */
+const PERSON_ASK =
+  /^(?:(?:hi|hello|hey)[\s,.!]+)?(?:please )?(?:(?:can|could|may) (?:i|you) |i(?: want| need| would like|['’]d like) )?(?:(?:to )?(?:speak|talk|chat)(?: to| with)? |(?:connect|get|put|transfer|pass|send|hand) (?:me|this)(?: off| over| through)?(?: to| with)? )?(?:an? |the )?(?:live |human |real )?(?:agent|person|human|representative|rep)(?: please)?(?: now)?[\s.!?]*$/i;
+
 export async function routeWidgetMessage(
+  ask: string | WidgetAsk,
+  opts?: {
+    apiKey?: string;
+    fetch?: FetchLike;
+    signal?: AbortSignal;
+  }
+): Promise<WidgetRoute> {
+  const route = await scoreWidgetMessage(ask, opts);
+  const latest = toAsk(ask)
+    .latest.replace(/\s+/g, " ")
+    .replace(/^["'“‘]|["'”’]$/g, "")
+    .trim();
+  return PERSON_ASK.test(latest) ? { ...route, asksForHuman: 1 } : route;
+}
+
+async function scoreWidgetMessage(
   ask: string | WidgetAsk,
   opts?: {
     apiKey?: string;

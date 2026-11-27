@@ -157,6 +157,13 @@ describe("routeWidgetMessage", () => {
       "I need to speak to a live agent",
       "Can I talk to a human?",
       "I\u2019d like to speak with a real person",
+      "connect me to a human agent",
+      "put me through to a human",
+      "get me a human now",
+      "transfer this to a human",
+      "hand this over to a human agent",
+      '"human agent"',
+      "i need a human  please",
     ];
     for (const message of asks) {
       // biome-ignore lint/performance/noAwaitInLoops: one fake call per ask.
