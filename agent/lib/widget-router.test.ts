@@ -147,7 +147,7 @@ describe("routeWidgetMessage", () => {
     }
   });
 
-  it("routes a bare ask for a person to a person whatever Jev scored, a failed call too", async () => {
+  it("marks a bare ask for a person whatever Jev scored, a failed call too, and keeps Jev's score", async () => {
     const asks = [
       "Human agent",
       "human agent please.",
@@ -162,8 +162,10 @@ describe("routeWidgetMessage", () => {
       "get me a human now",
       "transfer this to a human",
       "hand this over to a human agent",
+      "pass this on to a human",
       '"human agent"',
       "i need a human  please",
+      "Please, agent",
     ];
     for (const message of asks) {
       // biome-ignore lint/performance/noAwaitInLoops: one fake call per ask.
@@ -172,24 +174,42 @@ describe("routeWidgetMessage", () => {
         fetch: () =>
           Promise.resolve(jevReply({ asks_for_human: { noul: 0.3 } })),
       });
-      assert.equal(scored.asksForHuman, 1, message);
-      assert.equal(scored.source, "jev", message);
+      assert.equal(scored.personAsk, true, message);
+      assert.equal(scored.asksForHuman, 0.3, message);
+      assert.equal(scored.noNeed, undefined, message);
       const failed = await routeWidgetMessage(message, {
         apiKey: "test-key",
         fetch: () => Promise.reject(new Error("boom")),
       });
-      assert.equal(failed.asksForHuman, 1, message);
+      assert.equal(failed.personAsk, true, message);
       assert.equal(failed.source, "fallback", message);
+      assert.equal(failed.noNeed, true, message);
     }
   });
 
-  it("leaves Jev's score alone for a message that only mentions a person or says more", async () => {
+  it("marks a queued turn when any of its messages is a bare ask, with a need when another says more", async () => {
+    const route = (question: string) =>
+      routeWidgetMessage(question, {
+        apiKey: "test-key",
+        fetch: () => Promise.reject(new Error("boom")),
+      });
+    const bare = await route("Human agent\n\nI need to speak to a live agent");
+    assert.equal(bare.personAsk, true);
+    assert.equal(bare.noNeed, true);
+    const more = await route("Human agent\n\nMy campaign stopped sending");
+    assert.equal(more.personAsk, true);
+    assert.equal(more.noNeed, undefined);
+  });
+
+  it("leaves a message that only mentions a person or says more to Jev", async () => {
     for (const message of [
       "I'm looking for anthony",
       "my agent stopped replying to leads",
       "human agent, my campaign stopped sending",
       "How do I add a person to my workspace?",
       "AI SDR agent",
+      "the agent",
+      "The person.",
     ]) {
       // biome-ignore lint/performance/noAwaitInLoops: one fake call per message.
       const route = await routeWidgetMessage(message, {
@@ -197,6 +217,7 @@ describe("routeWidgetMessage", () => {
         fetch: () =>
           Promise.resolve(jevReply({ asks_for_human: { noul: 0.3 } })),
       });
+      assert.equal(route.personAsk, undefined, message);
       assert.equal(route.asksForHuman, 0.3, message);
     }
   });
