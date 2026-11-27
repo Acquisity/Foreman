@@ -2,9 +2,30 @@ import type { ChannelSendOptions } from "eve/channels";
 import { z } from "zod";
 import { GAP_AREAS } from "./widget-capability-gaps.js";
 
+/**
+ * Why a chat moves to Fixy (ENG-21094), as Acquisity's handSupportChatToFixy
+ * names it. Only Foreman's code sets one; the investigator never does.
+ */
+export const ESCALATION_REASONS = [
+  "asked_for_human",
+  "refund",
+  "cancel",
+  "blocked",
+  "cant_check",
+] as const;
+export type EscalationReason = (typeof ESCALATION_REASONS)[number];
+
 /** The investigator's only output. It has no customer-facing text field on purpose. */
 export const findingsSchema = z.strictObject({
   confidence: z.enum(["low", "medium", "high"]),
+  // Acquisity hands the chat to Fixy and files nothing for the escalation.
+  escalate: z
+    .strictObject({
+      reason: z.enum(ESCALATION_REASONS),
+      // One plain line naming the problem, for Fixy's top post.
+      summary: z.string().min(1).max(200).optional(),
+    })
+    .optional(),
   facts: z
     .array(
       z.strictObject({

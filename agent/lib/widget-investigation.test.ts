@@ -3663,3 +3663,179 @@ test("what the turn's workspace reads returned reaches the gate to vouch for the
   await finishWidgetRun(run, "widget-session-vouch", outcome, deps);
   assert.deepEqual(passed, [vouched]);
 });
+
+const escalating = (t: TestContext) => {
+  enabled(t);
+  setEnv(t, "WIDGET_ESCALATE_TO_FIXY", "on");
+};
+// The guide lane starts drafting while the router scores; an escalation drops it unread.
+const neverAnswered = () => new Promise<never>(() => undefined);
+
+test("with escalation on, an ask for a person, a refund or a cancel hands the chat to Fixy with no ticket and no reply", async (t) => {
+  escalating(t);
+  for (const [route, reason, summary] of [
+    [{ asksForHuman: 0.95, noNeed: true }, "asked_for_human", undefined],
+    [
+      { asksForHuman: 0.95 },
+      "asked_for_human",
+      "My campaign stopped sending, get me a person",
+    ],
+    [
+      { asksForHuman: 0, refund: true },
+      "refund",
+      "My campaign stopped sending, get me a person",
+    ],
+    [
+      { asksForHuman: 0, cancel: true },
+      "cancel",
+      "My campaign stopped sending, get me a person",
+    ],
+  ] as const) {
+    for (const mode of [undefined, "investigate"] as const) {
+      const { deps, run } = dependencies();
+      const { fileTicket, filed } = ticketFiler();
+      deps.route = () => Promise.resolve({ ...route, source: "jev" as const });
+      deps.fileTicket = fileTicket;
+      deps.answerChat = neverAnswered;
+      // biome-ignore lint/performance/noAwaitInLoops: each case needs its own fresh run.
+      const response = await receiveWidgetMessage(
+        request({
+          ...start,
+          question: "My campaign stopped sending,\n get me a person",
+          ...(mode ? { mode } : {}),
+        }),
+        noWork(),
+        200,
+        verify,
+        deps
+      );
+      const body = (await response.json()) as Record<string, unknown>;
+      assert.equal(body.decision, "allow");
+      assert.equal(body.message, null);
+      assert.equal(run.outcome?.reason, `escalated_to_fixy ${reason}`);
+      const stored = run.findings as WidgetFindings;
+      assert.deepEqual(stored.escalate, {
+        reason,
+        ...(summary ? { summary } : {}),
+      });
+      assert.deepEqual(
+        (body.findings as WidgetFindings).escalate,
+        stored.escalate
+      );
+      assert.equal(stored.ticket, undefined);
+      assert.equal(filed.length, 0);
+    }
+  }
+});
+
+test("with escalation off, the same ask for a person still files the ticket", async (t) => {
+  enabled(t);
+  const { deps, run } = dependencies();
+  const { fileTicket, filed } = ticketFiler();
+  deps.route = asksForPerson;
+  deps.fileTicket = fileTicket;
+  deps.answerChat = () => Promise.resolve(kbAnswer);
+  await receiveWidgetMessage(
+    request({ ...start, question: "get me a person" }),
+    noWork(),
+    200,
+    verify,
+    deps
+  );
+  assert.equal(filed.length, 1);
+  assert.equal((run.findings as WidgetFindings).escalate, undefined);
+  assert.equal((run.findings as WidgetFindings).ticket?.id, "ENG-1");
+});
+
+test("with escalation on, a member whose workspace needs a look hands the chat to Fixy as cant_check, and a teammate's run never escalates", async (t) => {
+  escalating(t);
+  for (const role of ["member", "client"] as const) {
+    const { deps, run } = dependencies();
+    const { fileTicket, filed } = ticketFiler();
+    deps.route = () =>
+      Promise.resolve({ asksForHuman: 0, bug: true, source: "jev" as const });
+    deps.fileTicket = fileTicket;
+    deps.answerChat = neverAnswered;
+    // biome-ignore lint/performance/noAwaitInLoops: each case needs its own fresh run.
+    await receiveWidgetMessage(
+      request({ ...start, question: "My campaign stopped sending" }),
+      noWork(),
+      200,
+      () => Promise.resolve({ ...scope, role }),
+      deps
+    );
+    assert.equal(run.outcome?.reason, "escalated_to_fixy cant_check");
+    assert.equal(
+      (run.findings as WidgetFindings).escalate?.reason,
+      "cant_check"
+    );
+    assert.equal(filed.length, 0);
+  }
+  const { deps, run } = dependencies();
+  deps.route = asksForPerson;
+  deps.fileTicket = ticketFiler().fileTicket;
+  run.scope = { ...scope, source: "inbox" };
+  const blocked = await finishWidgetRun(
+    run,
+    "widget-session-inbox",
+    { status: "failed" },
+    deps
+  );
+  assert.equal(blocked?.outcome?.decision, "block");
+  assert.equal((run.findings as WidgetFindings | null)?.escalate, undefined);
+});
+
+test("with escalation on, findings that need a person and a blocked finish hand the chat to Fixy with no ticket; a retryable block stays a resend", async (t) => {
+  escalating(t);
+  const needsPerson = dependencies();
+  const needs = ticketFiler();
+  needsPerson.deps.extract = () =>
+    Promise.resolve({ ...findings, needsHuman: true });
+  needsPerson.deps.fileTicket = needs.fileTicket;
+  await finishWidgetRun(
+    needsPerson.run,
+    "widget-session-needs",
+    { findings: null, status: "completed", text: "Needs a person." },
+    needsPerson.deps
+  );
+  assert.equal(needsPerson.gated.length, 0, "nothing is composed");
+  assert.equal(needsPerson.run.outcome?.message, null);
+  assert.equal(needsPerson.run.outcome?.reason, "escalated_to_fixy cant_check");
+  const stored = needsPerson.run.findings as WidgetFindings;
+  assert.deepEqual(stored.escalate, {
+    reason: "cant_check",
+    summary: "Why did my campaign stop sending?",
+  });
+  assert.equal(stored.report, findings.report);
+  assert.equal(needs.filed.length, 0);
+
+  for (const [reason, escalated] of [
+    ["model_gate:unsafe", true],
+    ["gate_unavailable", false],
+  ] as const) {
+    const { deps, run } = dependencies({
+      decision: "block",
+      findings,
+      message: null,
+      reason,
+    });
+    const { fileTicket, filed } = ticketFiler();
+    deps.fileTicket = fileTicket;
+    // biome-ignore lint/performance/noAwaitInLoops: each case needs its own fresh run.
+    await finishWidgetRun(
+      run,
+      "widget-session-block",
+      { findings: null, status: "completed", text: "Blocked." },
+      deps
+    );
+    assert.equal(filed.length, 0);
+    assert.equal(
+      run.outcome?.reason,
+      escalated ? "escalated_to_fixy blocked" : reason
+    );
+    assert.equal(
+      (run.findings as WidgetFindings).escalate?.reason,
+      escalated ? "blocked" : undefined
+    );
+  }
+});

@@ -35,8 +35,13 @@ import { extractWidgetFindings } from "./widget-extract.js";
 import { parseFindings, type WidgetFindings } from "./widget-findings.js";
 import {
   ANSWER_HERE,
+  completeEscalation,
   completeInvite,
   customerTurn,
+  escalatedOutcome,
+  escalatesToFixy,
+  escalationFindings,
+  escalationSummary,
   type FrontDoorTicket,
   followUpNote,
   frontDoorTicket,
@@ -901,7 +906,7 @@ interface HandoffContext {
   roomMs: () => number;
 }
 
-/** Findings that still need a person file the conversation's ticket instead, and the reply says the answer will come here. */
+/** Findings that still need a person hand the chat to Fixy, or with escalation off file the conversation's ticket, and the reply says the answer will come here. */
 async function withHandoffTicket(
   findings: WidgetFindings | null,
   run: Pick<WidgetRun, "id" | "question" | "scope">,
@@ -909,9 +914,16 @@ async function withHandoffTicket(
   deps: Partial<Pick<WidgetDependencies, "draftTicket" | "fileTicket">>,
   context: HandoffContext,
   signal?: AbortSignal
-): Promise<{ filed?: HandoffTicketRef; structured: WidgetFindings | null }> {
+): Promise<{
+  escalate?: true;
+  filed?: HandoffTicketRef;
+  structured: WidgetFindings | null;
+}> {
   if (!findings?.needsHuman) {
     return { structured: findings };
+  }
+  if (escalatesToFixy() && customerTurn(run.scope)) {
+    return { escalate: true, structured: findings };
   }
   const filed = await ticketInsteadOfHandoff(
     run.scope,
@@ -947,6 +959,7 @@ async function structureWriteUp(
   context: HandoffContext,
   signal?: AbortSignal
 ): Promise<{
+  escalate?: true;
   filed?: HandoffTicketRef;
   gateDeps: GateDeps | undefined;
   structured: WidgetFindings | null;
@@ -1061,6 +1074,33 @@ const startReplyGapFiling = (
     )
   );
 
+/**
+ * A finish that skips the gate: findings that need a person hand the chat to
+ * Fixy when escalation is on, and a write-up with no structured findings still
+ * hands the teammate a note. Null when the findings go through the gate.
+ */
+const settledWithoutGate = (
+  run: Pick<WidgetRun, "question">,
+  structured: WidgetFindings | null,
+  escalate: true | undefined,
+  text: string | null
+) => {
+  if (structured) {
+    return escalate
+      ? {
+          findings: escalationFindings(
+            "cant_check",
+            "Foreman's investigation found something only the team can settle and handed the chat to Fixy.",
+            escalationSummary(run.question),
+            structured
+          ),
+          result: escalatedOutcome("cant_check"),
+        }
+      : null;
+  }
+  return (text && humanHandoff(text, "no_structured_findings")) || null;
+};
+
 /** Gate, then persist. Runs once per session outcome; a replay finds the fenced row unchanged. */
 export async function finishWidgetRun(
   run: Pick<
@@ -1161,12 +1201,15 @@ export async function finishWidgetRun(
     const structured =
       written.structured && withoutUnchecked(written.structured);
     const extractMs = Date.now() - extractStartedAt;
-    const handoff = structured
-      ? null
-      : (outcome.text &&
-          humanHandoff(outcome.text, "no_structured_findings")) ||
-        null;
-    if (structured) {
+    const handoff = settledWithoutGate(
+      run,
+      structured,
+      written.escalate,
+      outcome.text
+    );
+    if (handoff) {
+      ({ findings, result } = handoff);
+    } else if (structured) {
       findings = structured;
       const gated = await deps.gate(
         run.scope,
@@ -1218,8 +1261,6 @@ export async function finishWidgetRun(
         deadline,
         history
       ));
-    } else if (handoff) {
-      ({ findings, result } = handoff);
     } else {
       result = blockedOutcome("invalid_findings", "completed");
     }
@@ -1440,6 +1481,44 @@ const frontDoorTicketReason = (
 };
 
 /**
+ * Why a customer's turn hands the chat to Fixy (ENG-21094): an ask for a
+ * person (a bare one too: Fixy asks what they need), a refund or a cancel, or
+ * a member or client whose workspace needs a look they cannot start. Null for
+ * a teammate's run and every other message, and while escalation is off.
+ */
+const escalationFor = (
+  scope: WidgetContext,
+  route: WidgetRoute,
+  ask: WidgetAsk,
+  helpCenterOnly: boolean,
+  needsLook: boolean
+): Parameters<typeof completeEscalation>[2] | null => {
+  if (!(escalatesToFixy() && customerTurn(scope))) {
+    return null;
+  }
+  const summary = route.noNeed ? undefined : escalationSummary(ask.latest);
+  const escalate = (
+    reason: Parameters<typeof completeEscalation>[2]["reason"],
+    report: string
+  ) => ({ reason, report, ...(summary ? { summary } : {}) });
+  if (asksForPerson(route)) {
+    return escalate("asked_for_human", "The customer asked for a person.");
+  }
+  if (route.cancel) {
+    return escalate("cancel", "The customer asked to cancel.");
+  }
+  if (route.refund) {
+    return escalate("refund", "The customer asked for a refund.");
+  }
+  return helpCenterOnly && (needsLook || route.bug || route.ticket)
+    ? escalate(
+        "cant_check",
+        `The customer is a workspace ${scope.role}, and only an owner or admin can start a look into their workspace.`
+      )
+    : null;
+};
+
+/**
  * How a front-door turn completes: as is, or, when it files the
  * conversation's ticket, with the answer-comes-here line. A person's ask whose
  * ticket cannot be filed keeps the asked_for_human block.
@@ -1583,6 +1662,17 @@ async function answerFromKnowledgeBase(
     { conversationId: scope.conversationId, runId: run.id },
     route
   );
+  const escalation = escalationFor(
+    scope,
+    route,
+    ask,
+    helpCenterOnly,
+    needsLook
+  );
+  if (escalation) {
+    drafting.abort();
+    return completeEscalation(run, scope, escalation, deps);
+  }
   const person = asksForPerson(route);
   if (person && route.noNeed && customerTurn(scope)) {
     drafting.abort();
@@ -1792,7 +1882,8 @@ async function investigationDenied(
 }
 
 /**
- * A toggled ask for a person. One that states no need gets an invitation and
+ * A toggled ask for a person, a refund or a cancel hands the chat to Fixy
+ * when escalation is on. Otherwise an ask for a person that states no need gets an invitation and
  * no ticket; otherwise the conversation's ticket is filed now, its receipt
  * supplies the answer-comes-here line and the findings' ticket at finish,
  * and a note tells the investigator not to hand off. Unfiled, the note asks
@@ -1807,6 +1898,10 @@ async function toggledPersonAsk(
   signal: AbortSignal,
   deps: WidgetDependencies
 ): Promise<string | WidgetRun | null> {
+  const escalation = escalationFor(scope, route, ask, false, true);
+  if (escalation) {
+    return completeEscalation(run, scope, escalation, deps);
+  }
   if (!asksForPerson(route)) {
     return "";
   }

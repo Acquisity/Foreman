@@ -11,7 +11,11 @@ import {
   handoffReport,
   handoffTicketBody,
 } from "./widget-bug-report.js";
-import { parseFindings, type WidgetFindings } from "./widget-findings.js";
+import {
+  type EscalationReason,
+  parseFindings,
+  type WidgetFindings,
+} from "./widget-findings.js";
 import type { WidgetDependencies } from "./widget-investigation.js";
 import { isLiveActive } from "./widget-live-policy.js";
 import {
@@ -30,6 +34,78 @@ import type { TicketNote } from "./widget-ticket-followup.js";
  * have handed the chat to a person files the conversation's one ticket
  * instead, the team answers it, and the answer is posted back into this chat.
  */
+
+/**
+ * WIDGET_ESCALATE_TO_FIXY=on hands every chat that needs more than Foreman to
+ * Fixy (ENG-21094): Foreman returns why in the findings, says nothing to the
+ * customer (Fixy sends the one acknowledgement) and files no ticket for the
+ * escalation. Off, those turns file the conversation's ticket as before. It
+ * stays off until Fixy answers the chats it is given (ENG-21093).
+ */
+export const escalatesToFixy = (env: NodeJS.ProcessEnv = process.env) =>
+  env.WIDGET_ESCALATE_TO_FIXY === "on";
+
+/** The outcome reason prefix of a turn that handed the chat to Fixy. */
+export const ESCALATED = "escalated_to_fixy";
+
+/** The customer's words cut to one line, for Fixy's top post. */
+export const escalationSummary = (text: string | undefined) => {
+  const line = text?.replace(/\s+/gu, " ").trim();
+  return line ? line.slice(0, 200) : undefined;
+};
+
+/**
+ * Findings that hand the chat to Fixy. What the turn found, when it found
+ * anything, stays for the team-only note.
+ */
+export const escalationFindings = (
+  reason: EscalationReason,
+  report: string,
+  summary?: string,
+  found?: WidgetFindings | null
+) =>
+  parseFindings({
+    confidence: found?.confidence ?? "low",
+    escalate: { reason, ...(summary ? { summary } : {}) },
+    facts: found?.facts ?? [],
+    needsHuman: false,
+    recommendation: found?.recommendation ?? report,
+    report: (found?.report ?? report).slice(0, 1000),
+  });
+
+/** The outcome of a turn that handed the chat to Fixy: no message, because Fixy sends the acknowledgement. */
+export const escalatedOutcome = (reason: EscalationReason): WidgetOutcome => ({
+  citations: [],
+  decision: "allow",
+  message: null,
+  reason: `${ESCALATED} ${reason}`,
+  status: "completed",
+});
+
+/** Complete a customer's turn by handing the chat to Fixy. */
+export const completeEscalation = (
+  run: Pick<WidgetRun, "id">,
+  scope: WidgetContext,
+  escalation: { reason: EscalationReason; report: string; summary?: string },
+  deps: Pick<WidgetDependencies, "complete">
+) => {
+  logOpsEvent("widget.handoff.ticket", {
+    conversationId: scope.conversationId,
+    decision: `escalate ${escalation.reason}`,
+    runId: run.id,
+  });
+  return deps.complete(
+    run.id,
+    escalatedOutcome(escalation.reason),
+    escalationFindings(
+      escalation.reason,
+      escalation.report,
+      escalation.summary
+    ),
+    // No session exists on this lane, so the run id is the fencing session id.
+    run.id
+  );
+};
 
 /** The outcome reason, or its prefix, of a reply that filed the conversation's ticket in place of a handoff. */
 export const TICKET_INSTEAD = "ticket_instead_of_handoff";
@@ -245,10 +321,10 @@ export const RETRYABLE_BLOCK =
   /^(?:deadline$|gate_unavailable$|bug_report_unfiled$|(?:composed:)?(?:foreign_identifier|internal_artifact):)/u;
 
 /**
- * Nobody takes a blocked chat over, so a block the customer cannot fix by
- * sending again files the conversation's ticket and says the team's answer
- * will come here. A teammate's run, a retryable block and a ticket that could
- * not be filed keep the block.
+ * A block the customer cannot fix by sending again hands the chat to Fixy, or
+ * with escalation off files the conversation's ticket and says the team's
+ * answer will come here. A teammate's run, a retryable block and a ticket that
+ * could not be filed keep the block.
  */
 export async function ticketInsteadOfBlock(
   run: Pick<WidgetRun, "id" | "question" | "scope">,
@@ -270,6 +346,17 @@ export async function ticketInsteadOfBlock(
     return { findings, result };
   }
   const found = parseFindings(findings);
+  if (escalatesToFixy() && customerTurn(run.scope)) {
+    return {
+      findings: escalationFindings(
+        "blocked",
+        `Foreman could not answer this (${reason}) and handed the chat to Fixy.`,
+        escalationSummary(run.question),
+        found
+      ),
+      result: escalatedOutcome("blocked"),
+    };
+  }
   const filed = await handoffTicket(
     run.scope,
     {

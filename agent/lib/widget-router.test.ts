@@ -40,6 +40,7 @@ describe("routeWidgetMessage", () => {
       "asks_for_human",
       "asks_for_refund",
       "asks_for_ticket",
+      "asks_to_cancel",
       "offers_recording",
       "reports_bug",
       "states_need",
@@ -110,8 +111,22 @@ describe("routeWidgetMessage", () => {
     assert.equal((await route({})).noNeed, undefined);
   });
 
-  it("never flags a refund or ticket ask as stating no need", async () => {
-    for (const ask of ["asks_for_refund", "asks_for_ticket"]) {
+  it("flags a cancel at its bar, in the same Jev call", async () => {
+    const route = (noul: number) =>
+      routeWidgetMessage("please cancel my subscription", {
+        apiKey: "test-key",
+        fetch: () => Promise.resolve(jevReply({ asks_to_cancel: { noul } })),
+      });
+    assert.equal((await route(0.9)).cancel, true);
+    assert.equal((await route(0.3)).cancel, undefined);
+  });
+
+  it("never flags a refund, cancel or ticket ask as stating no need", async () => {
+    for (const ask of [
+      "asks_for_refund",
+      "asks_to_cancel",
+      "asks_for_ticket",
+    ]) {
       // biome-ignore lint/performance/noAwaitInLoops: two independent asks.
       const route = await routeWidgetMessage("refund me, I need a person", {
         apiKey: "test-key",

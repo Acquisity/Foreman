@@ -42,6 +42,8 @@ export const HUMAN_REQUEST_SCORE = 0.6;
 const TICKET_REQUEST = 0.5;
 /** At or above this, the customer asked for a refund. */
 const REFUND_REQUEST = 0.5;
+/** At or above this, the customer asked to cancel their plan or account. */
+const CANCEL_REQUEST = 0.5;
 /** At or above this, the customer is reporting a bug, and the app asks for a screen recording. */
 const BUG_REPORT = 0.7;
 /** At or above this, the customer asks or offers to send a screen recording, and the app offers one. */
@@ -201,6 +203,13 @@ const QUESTIONS = {
       "The customer asks for a ticket to be opened, filed, raised or escalated to engineering or the technical team, or asks to report a bug.",
     type: "noul",
   },
+  // Asked in the same request, so it costs nothing. A cancel goes to Fixy, as a
+  // refund does (ENG-21094).
+  asks_to_cancel: {
+    instructions:
+      "The customer asks to cancel their subscription, plan or account, to stop being billed, or to downgrade, or the latest message continues such a request from the earlier turns. Asking how cancelling works or what happens if they cancel, without asking to cancel, is NOT this. Cancelling or pausing a campaign, sequence, inbox or other item inside the product is NOT this.",
+    type: "noul",
+  },
   // Asked in the same request, so it costs nothing. Like reports_bug, it only
   // decides whether an investigation offers the app's recording button.
   // "can i send a screen reco0rding" slipped past a pattern and got a Loom tip.
@@ -230,6 +239,7 @@ const responseSchema = z.object({
     asks_for_human: z.object({ noul: z.number().min(0).max(1) }),
     asks_for_refund: z.object({ noul: z.number().min(0).max(1) }).optional(),
     asks_for_ticket: z.object({ noul: z.number().min(0).max(1) }).optional(),
+    asks_to_cancel: z.object({ noul: z.number().min(0).max(1) }).optional(),
     offers_recording: z.object({ noul: z.number().min(0).max(1) }).optional(),
     reports_bug: z.object({ noul: z.number().min(0).max(1) }).optional(),
     states_need: z.object({ noul: z.number().min(0).max(1) }).optional(),
@@ -240,6 +250,8 @@ export interface WidgetRoute {
   asksForHuman: number;
   /** The customer is reporting a bug, so an investigation offers a screen recording. */
   bug?: boolean;
+  /** The customer asked to cancel their plan or account, which goes to Fixy. */
+  cancel?: boolean;
   /** Why Jev gave no route, for the log: a fixed code and the time it took. */
   failure?: string;
   /** Scored and below the bar: the customer has said nothing they need beyond a person. */
@@ -328,13 +340,20 @@ export async function routeWidgetMessage(
       (score ?? 0) >= bar;
     const refund = flag(answers.asks_for_refund?.noul, REFUND_REQUEST);
     const ticket = flag(answers.asks_for_ticket?.noul, TICKET_REQUEST);
+    const cancel = flag(answers.asks_to_cancel?.noul, CANCEL_REQUEST);
     return {
       asksForHuman: answers.asks_for_human.noul,
       source: "jev",
       ...(flag(answers.reports_bug?.noul, BUG_REPORT) ? { bug: true } : {}),
-      // A refund or ticket ask is a need, whatever states_need scored.
+      ...(cancel ? { cancel: true } : {}),
+      // A refund, cancel or ticket ask is a need, whatever states_need scored.
       ...(answers.states_need &&
-      !(refund || ticket || flag(answers.states_need.noul, NEED_STATED))
+      !(
+        refund ||
+        cancel ||
+        ticket ||
+        flag(answers.states_need.noul, NEED_STATED)
+      )
         ? { noNeed: true }
         : {}),
       ...(flag(answers.offers_recording?.noul, RECORDING_REQUEST)
@@ -410,7 +429,7 @@ export function logRouteDecision(
   logOpsEvent("widget.router.decision", {
     conversationId: fields.conversationId,
     decision: route.source,
-    message: `human=${route.asksForHuman.toFixed(2)}${route.refund ? " refund" : ""}${route.ticket ? " ticket" : ""}${route.bug ? " bug" : ""}${route.recording ? " recording" : ""}${route.noNeed ? " no_need" : ""}${route.failure ? ` ${route.failure}` : ""}`,
+    message: `human=${route.asksForHuman.toFixed(2)}${route.refund ? " refund" : ""}${route.cancel ? " cancel" : ""}${route.ticket ? " ticket" : ""}${route.bug ? " bug" : ""}${route.recording ? " recording" : ""}${route.noNeed ? " no_need" : ""}${route.failure ? ` ${route.failure}` : ""}`,
     runId: fields.runId,
   });
 }
