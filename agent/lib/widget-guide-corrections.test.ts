@@ -317,6 +317,15 @@ test("credits never expiring is said only of plan credits and one-time packs", (
       ),
     ],
     [
+      BILLING,
+      section(
+        BILLING,
+        "- Plan credits and one-time packs never expire.",
+        exception,
+        "- Domains are $18/year."
+      ),
+    ],
+    [
       CREDITS,
       section(
         CREDITS,

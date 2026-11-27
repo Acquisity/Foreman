@@ -25,7 +25,7 @@ export interface GuideCorrection {
 }
 
 const CREDITS_NOTE =
-  'Only plan credits and one-time packs never expire or reset. Say that in its own sentence, apart from monthly packs. Monthly-pack credits carry over only while the pack is active, so also say: "If the pack ends, its credits end with it."';
+  'Only plan credits and one-time packs never expire. No credit resets on the billing date. Say the never-expire rule in its own sentence, apart from monthly packs. Monthly-pack credits carry over only while the pack is active, so also say: "If the pack ends, its credits end with it."';
 
 const NEVER =
   "(?:never|don['’]?t|doesn['’]?t|do not|does not|won['’]?t|will not|aren['’]?t meant to)";
@@ -61,7 +61,7 @@ export const GUIDE_CORRECTIONS: readonly GuideCorrection[] = [
     note: `${CREDITS_NOTE} Domains are $18/year only when pre-warmed, so keep "Pre-warmed" on that price.`,
     reject: [
       ...CREDITS_CHECKS.reject,
-      /(?<!pre-warmed )\bdomains? (?:cost )?\$18/iu,
+      /(?<!pre-warmed )\bdomains? (?:cost |are )?\$18/iu,
     ],
     require: CREDITS_CHECKS.require,
     slugs: ["workspace-settings/billing"],
