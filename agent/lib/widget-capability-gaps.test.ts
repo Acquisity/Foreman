@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import { INTERNAL_ORGS } from "./internal-orgs.js";
 import {
   type CapabilityGap,
   countedDescription,
@@ -233,6 +234,8 @@ test("the count line takes the given count and nothing else changes", () => {
 });
 
 const NO_PLAN_CARD = /with no plan card, question card or draft/;
+const DAILY_TRIAGE =
+  /Fixy's daily triage judges .* and adds the `fixy` label only when there is something to build/;
 const OWN_TICKET =
   /move money becomes its own ENG ticket without the `fixy` label, linked from this one/;
 const WAITS_FOR_APPROVAL = /waits for approval/;
@@ -245,6 +248,7 @@ test("the description tells Fixy's reader no plan card waits and an action fix b
     source: "reply",
   });
   assert.match(text, NO_PLAN_CARD);
+  assert.match(text, DAILY_TRIAGE);
   assert.match(text, OWN_TICKET);
   assert.doesNotMatch(text, WAITS_FOR_APPROVAL);
 });
@@ -254,7 +258,8 @@ interface Call {
   variables: Record<string, unknown>;
 }
 interface FakeIssue {
-  closed?: boolean;
+  /** Days since the ticket was closed; open when unset. */
+  closedDaysAgo?: number;
   comments: { body: string; id: string }[];
   description: string;
   id: string;
@@ -278,7 +283,7 @@ const taken = () =>
  * A fake Linear holding one team, its labels, and the tickets and comments
  * written. A call named in `failing` throws once, after nothing was written.
  */
-const fakeLinear = (labels = ["Capability Gap", "Docs Gap", "fixy"]) => {
+const fakeLinear = (labels = ["Capability Gap", "Docs Gap"]) => {
   const calls: Call[] = [];
   const issues: FakeIssue[] = [];
   const failing = new Set<string>();
@@ -307,7 +312,7 @@ const fakeLinear = (labels = ["Capability Gap", "Docs Gap", "fixy"]) => {
           description: String(input?.description),
           id: `issue-${issues.length + 1}`,
           identifier: `ENG-${issues.length + 1}`,
-          labels: [...(input as { labelIds: string[] }).labelIds],
+          labels: [...((input?.labelIds as string[] | undefined) ?? [])],
         };
         issues.push(issue);
         return { issueCreate: { issue } };
@@ -327,13 +332,24 @@ const fakeLinear = (labels = ["Capability Gap", "Docs Gap", "fixy"]) => {
         },
         issues: {
           nodes: issues
-            .filter((issue) => !issue.closed)
+            .filter((issue) => issue.closedDaysAgo === undefined)
             .slice(0, 1)
             .map((issue) => ({
               ...issue,
               comments: { nodes: [...issue.comments] },
               labels: { nodes: issue.labels.map((id) => ({ id })) },
             })),
+        },
+        judged: {
+          nodes: issues
+            .filter(
+              ({ closedDaysAgo, comments }) =>
+                closedDaysAgo !== undefined &&
+                closedDaysAgo <= 30 &&
+                comments.some((c) => c.body.startsWith(String(variables.seen)))
+            )
+            .slice(0, 1)
+            .map(({ identifier }) => ({ identifier })),
         },
         teams: { nodes: [{ id: "team-eng" }] },
       }),
@@ -367,17 +383,22 @@ const gap: CapabilityGap = {
   source: "code",
 };
 const { signal } = new AbortController();
+const CUSTOMER_ORG = "11111111-1111-4111-8111-111111111111";
+const DUPLICATE_NOT_OPEN = /nin: \["completed", "canceled", "duplicate"\]/u;
+const CLOSED_BY_CLOSURE_TIME =
+  /or: \[\{ completedAt: \{ gt: \$since \} \}, \{ canceledAt: \{ gt: \$since \} \}\]/u;
+const UPDATED_AT = /updatedAt/u;
 const fileWith =
   (linear: ReturnType<typeof fakeLinear>, filed: CapabilityGap = gap) =>
   (conversationId: string, runId: string) =>
     fileCapabilityGap(
       filed,
-      { conversationId, runId },
+      { conversationId, organizationId: CUSTOMER_ORG, runId },
       signal,
       linear.request as never
     );
 
-test("a new gap files one ticket with its kind label, comments for the conversation, then adds fixy last", async () => {
+test("a new gap files one ticket, comments for the conversation, then adds its kind label last and never fixy", async () => {
   const linear = fakeLinear();
   assert.deepEqual(await fileWith(linear)("conv-1", "run-1"), {
     identifier: "ENG-1",
@@ -397,11 +418,8 @@ test("a new gap files one ticket with its kind label, comments for the conversat
     create.title,
     "Capability gap: billing: the stripe section could not be read"
   );
-  assert.deepEqual(create.labelIds, ["label-Capability Gap"]);
-  assert.deepEqual(linear.issues[0]?.labels, [
-    "label-Capability Gap",
-    "label-fixy",
-  ]);
+  assert.equal(create.labelIds, undefined);
+  assert.deepEqual(linear.issues[0]?.labels, ["label-Capability Gap"]);
   assert.equal(
     linear.issues[0]?.comments[0]?.body,
     "Seen in support conversation conv-1 (Foreman run run-1). Reason: timeout."
@@ -428,20 +446,63 @@ test("a second conversation counts once on the open ticket; the same conversatio
   assert.match(linear.issues[0]?.description ?? "", COUNT_TWO);
 });
 
-test("a fixy label that failed to land is added by the next call", async () => {
+test("a first comment that failed leaves the ticket without its kind label until a retry saves it", async () => {
   const linear = fakeLinear();
   const file = fileWith(linear);
-  linear.failing.add("CapabilityGapLabel");
+  linear.failing.add("WidgetTicketComment");
   await assert.rejects(file("conv-1", "run-1"));
-  assert.deepEqual(linear.issues[0]?.labels, ["label-Capability Gap"]);
+  assert.deepEqual(linear.issues[0]?.labels, []);
   assert.deepEqual(await file("conv-1", "run-2"), {
     identifier: "ENG-1",
-    outcome: "seen",
+    outcome: "counted",
   });
-  assert.deepEqual(linear.issues[0]?.labels, [
-    "label-Capability Gap",
-    "label-fixy",
-  ]);
+  assert.equal(linear.issues.length, 1);
+  assert.equal(linear.issues[0]?.comments.length, 1);
+  assert.deepEqual(linear.issues[0]?.labels, ["label-Capability Gap"]);
+});
+
+test("the find reads closed tickets by closure time and never treats Duplicate as open", async () => {
+  const queries: string[] = [];
+  const linear = fakeLinear();
+  await fileCapabilityGap(
+    gap,
+    { conversationId: "conv-1", organizationId: CUSTOMER_ORG, runId: "run-1" },
+    signal,
+    ((name: string, query: string, variables?: Record<string, unknown>) => {
+      queries.push(query);
+      return linear.request(name, query, variables);
+    }) as never
+  );
+  const [find] = queries;
+  assert.match(find ?? "", DUPLICATE_NOT_OPEN);
+  assert.match(find ?? "", CLOSED_BY_CLOSURE_TIME);
+  assert.doesNotMatch(find ?? "", UPDATED_AT);
+});
+
+test("an open ticket still takes the conversation when Linear returns no kind label", async () => {
+  const linear = fakeLinear();
+  await fileWith(linear)("conv-1", "run-1");
+  const without = fakeLinear([]);
+  without.issues.push(...linear.issues);
+  assert.deepEqual(await fileWith(without)("conv-2", "run-2"), {
+    identifier: "ENG-1",
+    outcome: "counted",
+  });
+  assert.equal(linear.issues[0]?.comments.length, 2);
+});
+
+test("a ticket closed more than 30 days ago no longer holds its conversations back", async () => {
+  const linear = fakeLinear();
+  const file = fileWith(linear);
+  await file("conv-1", "run-1");
+  const [first] = linear.issues;
+  if (first) {
+    first.closedDaysAgo = 31;
+  }
+  assert.deepEqual(await file("conv-1", "run-2"), {
+    identifier: "ENG-2",
+    outcome: "filed",
+  });
 });
 
 test("a count that failed to update is set from the comments on the next call", async () => {
@@ -458,32 +519,47 @@ test("a count that failed to update is set from the comments on the next call", 
   assert.match(linear.issues[0]?.description ?? "", COUNT_TWO);
 });
 
-test("a gap whose ticket was closed gets a new ticket", async () => {
+test("a conversation a closed ticket already judged writes nothing; a new conversation files a new ticket", async () => {
   const linear = fakeLinear();
   const file = fileWith(linear);
   await file("conv-1", "run-1");
   const [first] = linear.issues;
   if (first) {
-    first.closed = true;
+    first.closedDaysAgo = 1;
   }
+  const calls = linear.calls.length;
   assert.deepEqual(await file("conv-1", "run-2"), {
+    identifier: "ENG-1",
+    outcome: "judged",
+  });
+  assert.deepEqual(
+    linear.calls.slice(calls).map((call) => call.name),
+    ["CapabilityGapFind"]
+  );
+  assert.deepEqual(linear.calls.at(-1)?.variables, {
+    seen: "Seen in support conversation conv-1 ",
+    since: "-P30D",
+    team: "ENG",
+    title: "Capability gap: billing: the stripe section could not be read",
+  });
+  assert.equal(linear.issues.length, 1);
+  assert.deepEqual(await file("conv-2", "run-3"), {
     identifier: "ENG-2",
     outcome: "filed",
   });
+  assert.deepEqual(
+    linear.issues[1]?.comments.map((comment) => comment.body),
+    [
+      "Seen in support conversation conv-2 (Foreman run run-3). Reason: timeout.",
+    ]
+  );
+  // The judged conversation stays off the new ticket too.
+  assert.equal((await file("conv-1", "run-4")).outcome, "judged");
   assert.equal(linear.issues[1]?.comments.length, 1);
 });
 
-test("with no fixy label in Linear, an open ticket is reported failed, not counted", async () => {
-  const linear = fakeLinear();
-  await fileWith(linear)("conv-1", "run-1");
-  const without = fakeLinear(["Capability Gap", "Docs Gap"]);
-  without.issues.push(...linear.issues);
-  const filed = await fileWith(without)("conv-2", "run-2");
-  assert.equal(filed.outcome, "failed");
-});
-
 test("a docs gap needs the Docs Gap label, and a missing label files nothing", async () => {
-  const linear = fakeLinear(["Capability Gap", "fixy"]);
+  const linear = fakeLinear(["Capability Gap"]);
   const filed = await fileWith(linear, { ...gap, kind: "docs" })(
     "conv-1",
     "run-1"
@@ -500,7 +576,7 @@ test("a run files each gap key once, and a failure never throws", async () => {
   const reasons: (string | undefined)[] = [];
   await fileRunGaps(
     [gap, { ...gap, reason: "error" }, { ...gap, fact: "another fact" }],
-    { conversationId: "conv-1", runId: "run-1" },
+    { conversationId: "conv-1", organizationId: CUSTOMER_ORG, runId: "run-1" },
     signal,
     (filed): Promise<GapFiling> => {
       seen.push(filed.fact);
@@ -515,6 +591,48 @@ test("a run files each gap key once, and a failure never throws", async () => {
     "the stripe section could not be read",
     "another fact",
   ]);
+});
+
+test("a run in an internal workspace files nothing and logs each gap skipped_internal", async () => {
+  const lines: string[] = [];
+  const { info } = console;
+  console.info = (line: string) => {
+    lines.push(line);
+  };
+  let filed = 0;
+  try {
+    for (const organizationId of INTERNAL_ORGS) {
+      // biome-ignore lint/performance/noAwaitInLoops: one run per workspace, in order.
+      await fileRunGaps(
+        [gap, { ...gap, area: "orders" }],
+        {
+          conversationId: "conv-1",
+          organizationId: organizationId.toUpperCase(),
+          runId: "run-1",
+        },
+        signal,
+        () => {
+          filed += 1;
+          return Promise.resolve({ identifier: "ENG-1", outcome: "filed" });
+        }
+      );
+    }
+  } finally {
+    console.info = info;
+  }
+  assert.equal(filed, 0);
+  assert.deepEqual(
+    lines.map((line) => JSON.parse(line)),
+    [...INTERNAL_ORGS].flatMap(() =>
+      ["billing", "orders"].map((tool) => ({
+        conversationId: "conv-1",
+        event: "widget.capability_gap",
+        outcome: "skipped_internal",
+        runId: "run-1",
+        tool,
+      }))
+    )
+  );
 });
 
 test("what a reply couldn't check is one gap per area and kind, never a ticket per wording (ENG-20478)", () => {
