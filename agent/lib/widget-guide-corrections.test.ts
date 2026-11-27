@@ -22,6 +22,13 @@ const DOMAINS =
   "workspace-settings/faq/billing-subscriptions/what-happens-to-my-domains-if-i-cancel";
 const CALLING = "crm/calling-and-texting";
 const FORGOT = "account-settings/faq/i-didnt-receive-the-forgot-password-email";
+const BILLING = "workspace-settings/billing";
+const CREDITS = "cold-email-agent/concepts/credits";
+const SPLIT =
+  "workspace-settings/faq/billing-subscriptions/can-i-split-an-invoice-into-two";
+const RESET_FAQ =
+  "workspace-settings/faq/billing-subscriptions/when-do-my-credits-reset";
+const MEET = "sales-call-analyzer/faq/can-i-use-google-meet-or-teams";
 
 const section = (slug: string, ...lines: string[]) =>
   [`### Title {slug: ${slug}}`, ...lines].join("\n");
@@ -250,5 +257,142 @@ test("wrong summary lines from Foreman#353 are dropped, the rest kept", () => {
   assert.deepEqual(refuseSummaryLines({ cannot: untouched, who: [] }), {
     kept: { cannot: untouched, who: [] },
     refused: [],
+  });
+});
+
+// Wrong lines are Foreman#370's at 4bf4c290 (ENG-21282), or the same claim
+// reworded in review. Right lines follow the Help Centre at Acquisity
+// 5a844527333d: plan credits and one-time packs never expire, monthly-pack
+// credits carry over only while the pack is active, and no credit resets on
+// the billing date.
+test("credits never expiring is said only of plan credits and one-time packs", () => {
+  const exception = "- If the pack ends, its credits end with it.";
+  const wrong: [string, string][] = [
+    [
+      BILLING,
+      section(
+        BILLING,
+        '- Credits never expire or reset. "Buy credits" > "One time" or "Every month" > pack > "Buy for".',
+        exception
+      ),
+    ],
+    [
+      CREDITS,
+      section(
+        CREDITS,
+        "- Credits never reset. Monthly packs add on top.",
+        exception
+      ),
+    ],
+    ...[
+      "- When your plan renews, credits never expire.",
+      "- Credits on every plan never expire.",
+      "- Monthly packs and plan credits never expire.",
+      "- Plan credits and one-time packs never expire; monthly-pack credits never expire either.",
+      "- Plan credits never expire, and monthly-pack credits never expire either.",
+      "- Credits aren’t meant to reset.",
+      "- Credits doesn't expire.",
+      "- Plan credits never expire. Credits never expire or reset.",
+      "- Plan credits never expire, but credits never expire or reset.",
+      "- Credits never reset or expire, even after your plan renews.",
+    ].map((line): [string, string] => [
+      CREDITS,
+      section(CREDITS, line, exception),
+    ]),
+    [
+      BILLING,
+      section(
+        BILLING,
+        "- Plan credits and one-time packs never expire.",
+        "- Monthly-pack credits carry over after the pack ends."
+      ),
+    ],
+    [
+      BILLING,
+      section(
+        BILLING,
+        "- Plan credits and one-time packs never expire.",
+        exception,
+        "- Domains $18/year, inboxes $8/month."
+      ),
+    ],
+    [
+      BILLING,
+      section(
+        BILLING,
+        "- Plan credits and one-time packs never expire.",
+        exception,
+        "- Domains are $18/year."
+      ),
+    ],
+    [
+      CREDITS,
+      section(
+        CREDITS,
+        "- Plan credits and one-time packs never expire.",
+        "- If the pack ends, its credits don't end with it."
+      ),
+    ],
+    [
+      CREDITS,
+      section(
+        CREDITS,
+        "- Plan credits and one-time packs never expire.",
+        "- If the pack ends, its credits don't automatically end with it."
+      ),
+    ],
+  ];
+  for (const [slug, text] of wrong) {
+    assert.notDeepEqual(sectionProblems(slug, text), [], text);
+  }
+  const right: [string, string][] = [
+    [
+      BILLING,
+      section(
+        BILLING,
+        "- Plan badges: Active, Trial.",
+        "- Plan credits and one-time packs never expire. Monthly-pack credits carry over while the pack is active. If the pack ends, its credits end with it.",
+        "- Credits don't reset on your billing date.",
+        "- Credits don't reset when your plan renews.",
+        "- Pre-warmed domains $18/year, inboxes $8/month."
+      ),
+    ],
+    [
+      CREDITS,
+      section(
+        CREDITS,
+        "- Plan-included and one-time credits never reset or expire.",
+        "- When your plan renews, credits don't reset.",
+        "- Monthly packs add on top each month while active; unused credits end with the pack."
+      ),
+    ],
+  ];
+  for (const [slug, text] of right) {
+    assert.deepEqual(sectionProblems(slug, text), [], text);
+  }
+  const lines = [
+    `- Credits never expire or reset. {${BILLING}}`,
+    `- Credits never reset. {${CREDITS}}`,
+    `- When your plan renews, credits never expire. {${CREDITS}}`,
+    `- Credits never reset. {${RESET_FAQ}}`,
+    `- Plan and one-time pack credits never reset. {${BILLING}}`,
+  ];
+  assert.deepEqual(refuseSummaryLines({ cannot: lines, who: [] }), {
+    kept: { cannot: [lines[4]], who: [] },
+    refused: lines.slice(0, 4),
+  });
+});
+
+test("summary lines Foreman#370 kept from main's guide are dropped", () => {
+  const lines = [
+    `- Only the Owner can split or manage invoice payment actions here; Admins lack the "Invoices" and "Payment method" permissions. {${SPLIT}}`,
+    `- Client users can't dismiss the "leads were skipped during upload" notification. {${MEET}}`,
+    `- An invoice can't be split into two. {${SPLIT}}`,
+    `- No one can split an invoice, the Owner included. {${SPLIT}}`,
+    `- Client users can't dismiss the skipped leads card. {cold-email-agent/faq/lead-search/how-do-i-hide-the-leads-were-skipped-during-upload-notification}`,
+  ];
+  assert.deepEqual(refuseSummaryLines({ cannot: lines, who: [] }), {
+    kept: { cannot: lines.slice(2), who: [] },
+    refused: lines.slice(0, 2),
   });
 });
