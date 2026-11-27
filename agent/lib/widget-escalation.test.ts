@@ -8,6 +8,7 @@ import {
   receiveWidgetMessage,
   WIDGET_DEADLINE_MS,
   type WidgetDependencies,
+  waitForWidgetInvestigation,
   widgetRunResponse,
 } from "./widget-investigation.js";
 import { routeWidgetMessage, type WidgetRoute } from "./widget-router.js";
@@ -381,4 +382,41 @@ test("with escalation off, the cancel score leaves the old invitation alone and 
   await send(deps, {});
   assert.equal(escalateOf(run), undefined);
   assert.equal(filed.length, 1, "the old path still files the ticket");
+});
+
+test("an escalation the investigator's own output claims is dropped", async () => {
+  const events = [
+    {
+      data: {
+        result: {
+          ...findings,
+          escalate: { reason: "refund" },
+        },
+      },
+      type: "result.completed",
+    },
+    { data: {}, type: "turn.completed" },
+  ];
+  const outcome = await waitForWidgetInvestigation(
+    {
+      getEventStream: () =>
+        Promise.resolve(
+          new ReadableStream({
+            start(controller) {
+              for (const event of events) {
+                controller.enqueue(event);
+              }
+              controller.close();
+            },
+          })
+        ),
+      id: "widget-session-claims",
+    } as never,
+    0,
+    1000
+  );
+  assert.equal(outcome.status, "completed");
+  if (outcome.status === "completed") {
+    assert.deepEqual(outcome.findings, findings);
+  }
 });

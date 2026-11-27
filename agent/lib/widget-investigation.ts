@@ -309,6 +309,16 @@ export type WaitOutcome =
       vouched?: Required<IdentifierCandidates>;
     };
 
+/** The investigator's structured findings. Only Foreman's code escalates, so an `escalate` it claims is dropped. */
+const investigatorFindings = (value: unknown): WidgetFindings | null => {
+  const parsed = parseFindings(value);
+  if (!parsed) {
+    return null;
+  }
+  const { escalate: _claimed, ...reported } = parsed;
+  return reported;
+};
+
 const TEXT_MAX = 4000;
 const messageText = (data: unknown): string | null => {
   const value = (data as { message?: unknown } | null | undefined)?.message;
@@ -598,7 +608,7 @@ export async function waitForWidgetInvestigation(
       } else if (event.type === "action.result") {
         so = recorded(event.data.result, so);
       } else if (event.type === "result.completed") {
-        findings = parseFindings(event.data.result);
+        findings = investigatorFindings(event.data.result);
       } else if (event.type === "message.completed") {
         text = messageText(event.data) ?? text;
       } else if (event.type === "turn.completed") {
