@@ -3,7 +3,6 @@ import { type TestContext, test } from "node:test";
 import { verifiedWidgetContext as scope } from "./widget.fixture.js";
 import type { GateResult } from "./widget-egress.js";
 import type { WidgetFindings } from "./widget-findings.js";
-import type { KbCustomer } from "./widget-kb.js";
 import {
   finishWidgetRun,
   INVESTIGATE_REDIRECT,
@@ -13,6 +12,7 @@ import {
   waitForWidgetInvestigation,
   widgetRunResponse,
 } from "./widget-investigation.js";
+import type { KbCustomer } from "./widget-kb.js";
 import { routeWidgetMessage, type WidgetRoute } from "./widget-router.js";
 import type { WidgetRun } from "./widget-run-store.js";
 import type { WidgetContext } from "./widget-scope.js";
@@ -437,7 +437,7 @@ test("an owner asking for a ticket again after the magnifying glass escalates in
     const { deps, filed, run } = harness({ asksForHuman: 0, ticket: true });
     // biome-ignore lint/performance/noAwaitInLoops: each case needs its own fresh run.
     const body = (await (
-      await send(deps, { question: "Please raise a ticket", history })
+      await send(deps, { history, question: "Please raise a ticket" })
     ).json()) as Record<string, unknown>;
     assert.equal(run.outcome?.reason, reason);
     assert.equal(body.message, on && history ? null : INVESTIGATE_REDIRECT);
@@ -453,6 +453,10 @@ test("on, the front-door writer is told asking here reaches a person and gets no
     nextOpenAt: null,
     nextOpenText: null,
     open: false,
+    replyTimeMinutes: 20,
+    replyTimeText: "20 minutes",
+    showReplyTime: true,
+    timeZone: "America/New_York",
     timeZoneName: "Eastern Time",
     upcomingClosures: [],
   };
@@ -460,15 +464,15 @@ test("on, the front-door writer is told asking here reaches a person and gets no
     enable(t, on);
     const { deps } = harness({ asksForHuman: 0 });
     const seen: (KbCustomer | undefined)[] = [];
-    deps.answerChat = (_ask, _log, customer) => {
-      seen.push(customer);
+    deps.answerChat = (_ask, _log, writer) => {
+      seen.push(writer);
       return Promise.resolve({ citations: [], message: "Here is how." });
     };
     // biome-ignore lint/performance/noAwaitInLoops: each case needs its own fresh run.
     await send(deps, { question: "When is support open?" }, {
       ...scope,
       officeHours,
-    } as WidgetContext);
+    });
     const customer = seen.at(-1);
     assert.equal(customer?.escalates, on ? true : undefined);
     assert.equal(Boolean(customer?.officeSchedule), !on);

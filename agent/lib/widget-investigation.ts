@@ -61,7 +61,11 @@ import {
   withAnswerHere,
   withAnswerLine,
 } from "./widget-handoff.js";
-import { answerFromHelpCenter, type KbAnswer } from "./widget-kb.js";
+import {
+  answerFromHelpCenter,
+  type KbAnswer,
+  type KbCustomer,
+} from "./widget-kb.js";
 import { liveDependencies } from "./widget-live-store.js";
 import {
   askedResult,
@@ -1465,6 +1469,17 @@ async function offerRecording(
   return offered;
 }
 
+/** With escalation on, asking here reaches a person at any time, so the writers get no hours to quote. */
+const whenPersonAnswers = (
+  scope: WidgetContext
+): Pick<KbCustomer, "escalates" | "officeSchedule"> => {
+  if (escalatesToFixy() && customerTurn(scope)) {
+    return { escalates: true };
+  }
+  const schedule = officeSchedule(scope);
+  return schedule ? { officeSchedule: schedule } : {};
+};
+
 interface FrontDoorOptions {
   /** A member or client pressed the magnifying glass, which only an owner or admin can use. */
   needsLook?: boolean;
@@ -1588,14 +1603,10 @@ async function answerFromKnowledgeBase(
   helpCenterOnly: boolean,
   { note = null, needsLook = false }: FrontDoorOptions = {}
 ): Promise<WidgetRun | null> {
-  // With escalation on, asking here reaches a person at any time, so there are no hours to quote.
-  const escalates = escalatesToFixy() && customerTurn(scope);
-  const schedule = escalates ? null : officeSchedule(scope);
   const customer = {
     canInvestigate: !helpCenterOnly,
-    ...(escalates ? { escalates: true as const } : {}),
+    ...whenPersonAnswers(scope),
     ...(scope.helpCenter ? { helpCenter: scope.helpCenter } : {}),
-    ...(schedule ? { officeSchedule: schedule } : {}),
     ...(note ? { ticketNote: note.forWriters } : {}),
     role: scope.role,
     workspace: scope.organizationName,
