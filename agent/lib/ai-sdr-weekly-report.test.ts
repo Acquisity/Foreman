@@ -23,7 +23,7 @@ describe("aiSdrWeeklyReportQueries", () => {
     );
   });
 
-  test("counts only live AI SDR appointments and attributes methods safely", () => {
+  test("counts every AI SDR booking made once per guest and attributes methods safely", () => {
     const bookingQuery =
       aiSdrWeeklyReportQueries(aiSdrReportWindows(NOW))[1] ?? "";
     assert.ok(
@@ -33,7 +33,16 @@ describe("aiSdrWeeklyReportQueries", () => {
     );
     assert.ok(bookingQuery.includes("a.origin = 'ai_sdr'"));
     assert.ok(bookingQuery.includes("a.deleted_at is null"));
-    assert.ok(bookingQuery.includes("a.status = 'scheduled'"));
+    assert.ok(bookingQuery.includes("count(distinct a.guest_key)"));
+    assert.ok(
+      bookingQuery.includes(
+        "a.organization_id::text || ':' || coalesce(ac.prospect_email, a.id::text) as guest_key"
+      ),
+      "a guest is the prospect email, not the attendee list"
+    );
+    assert.ok(
+      bookingQuery.includes("and a.status = 'scheduled') as report_lost")
+    );
     assert.ok(bookingQuery.includes("select distinct on (t.appointment_id)"));
     assert.ok(!bookingQuery.includes("scheduling_external_booking"));
   });
@@ -130,14 +139,20 @@ describe("readAiSdrWeeklyReport", () => {
         {
           method: "__total__",
           month_booked: "2",
+          month_lost: "1",
           previous_booked: "4",
+          previous_lost: "1",
           report_booked: "6",
+          report_lost: "2",
         },
         {
           method: "podcast",
           month_booked: "1",
+          month_lost: "0",
           previous_booked: "2",
+          previous_lost: "1",
           report_booked: "5",
+          report_lost: "1",
         },
       ]),
       JSON.stringify([
@@ -175,6 +190,13 @@ describe("readAiSdrWeeklyReport", () => {
       sameWeekLastMonth: 2,
       wowPercent: 50,
     });
+    assert.deepEqual(result.volume.lostMeetings, {
+      momPercent: 100,
+      previous: 1,
+      report: 2,
+      sameWeekLastMonth: 1,
+      wowPercent: 100,
+    });
     assert.equal(result.conversion.replyRate.report, 10);
     assert.equal(result.conversion.positiveReplyRate.report, 50);
     assert.equal(result.conversion.bookedMeetingRate.report, 40);
@@ -209,8 +231,11 @@ describe("readAiSdrWeeklyReport", () => {
         {
           method: "__total__",
           month_booked: 0,
+          month_lost: 0,
           previous_booked: 0,
+          previous_lost: 0,
           report_booked: 1,
+          report_lost: 0,
         },
       ]),
       "[]",

@@ -2,18 +2,18 @@
   "campaignTypes": [
     {
       "bookedMeetingRate": {
-        "previous": 20.599112426035504,
-        "report": 20.453746042912417,
-        "sameWeekLastMonth": 15.121317157712305,
-        "momPercentagePoints": 5.3324288852001125,
-        "wowPercentagePoints": -0.14536638312308625
+        "previous": 25.554733727810653,
+        "report": 24.322898346816743,
+        "sameWeekLastMonth": 19.08578856152513,
+        "momPercentagePoints": 5.2371097852916115,
+        "wowPercentagePoints": -1.2318353809939104
       },
       "bookedMeetings": {
-        "previous": 1114,
-        "report": 1163,
-        "sameWeekLastMonth": 698,
-        "momPercent": 66.6189111747851,
-        "wowPercent": 4.3985637342908435
+        "previous": 1382,
+        "report": 1383,
+        "sameWeekLastMonth": 881,
+        "momPercent": 56.980703745743476,
+        "wowPercent": 0.0723589001447178
       },
       "method": "podcast",
       "positiveReplies": {
@@ -26,18 +26,18 @@
     },
     {
       "bookedMeetingRate": {
-        "previous": 11.131059245960502,
-        "report": 10.987726475745179,
-        "sameWeekLastMonth": 8.926261319534282,
-        "momPercentagePoints": 2.0614651562108968,
-        "wowPercentagePoints": -0.14333277021532354
+        "previous": 12.836624775583482,
+        "report": 12.682641729982466,
+        "sameWeekLastMonth": 10.866752910737388,
+        "momPercentagePoints": 1.8158888192450782,
+        "wowPercentagePoints": -0.1539830456010165
       },
       "bookedMeetings": {
-        "previous": 124,
-        "report": 188,
-        "sameWeekLastMonth": 69,
-        "momPercent": 172.46376811594203,
-        "wowPercent": 51.61290322580645
+        "previous": 143,
+        "report": 217,
+        "sameWeekLastMonth": 84,
+        "momPercent": 158.33333333333331,
+        "wowPercent": 51.74825174825175
       },
       "method": "direct",
       "positiveReplies": {
@@ -50,18 +50,18 @@
     },
     {
       "bookedMeetingRate": {
-        "previous": 16.181229773462782,
-        "report": 15.561959654178676,
-        "sameWeekLastMonth": 21.26865671641791,
-        "momPercentagePoints": -5.706697062239236,
-        "wowPercentagePoints": -0.6192701192841064
+        "previous": 21.035598705501616,
+        "report": 16.714697406340058,
+        "sameWeekLastMonth": 25.37313432835821,
+        "momPercentagePoints": -8.65843692201815,
+        "wowPercentagePoints": -4.320901299161559
       },
       "bookedMeetings": {
-        "previous": 50,
-        "report": 54,
-        "sameWeekLastMonth": 57,
-        "momPercent": -5.263157894736842,
-        "wowPercent": 8
+        "previous": 65,
+        "report": 58,
+        "sameWeekLastMonth": 68,
+        "momPercent": -14.705882352941178,
+        "wowPercent": -10.76923076923077
       },
       "method": "interview",
       "positiveReplies": {
@@ -74,18 +74,18 @@
     },
     {
       "bookedMeetingRate": {
-        "previous": 6.451612903225806,
+        "previous": 8.064516129032258,
         "report": 6.976744186046512,
-        "sameWeekLastMonth": 6.944444444444445,
-        "momPercentagePoints": 0.032299741602066945,
-        "wowPercentagePoints": 0.5251312828207055
+        "sameWeekLastMonth": 11.11111111111111,
+        "momPercentagePoints": -4.134366925064599,
+        "wowPercentagePoints": -1.0877719429857464
       },
       "bookedMeetings": {
-        "previous": 4,
+        "previous": 5,
         "report": 3,
-        "sameWeekLastMonth": 5,
-        "momPercent": -40,
-        "wowPercent": -25
+        "sameWeekLastMonth": 8,
+        "momPercent": -62.5,
+        "wowPercent": -40
       },
       "method": "lead-magnet",
       "positiveReplies": {
@@ -99,25 +99,25 @@
   ],
   "conversion": {
     "bookedMeetingRate": {
-      "previous": 19.03454256395433,
-      "report": 18.079529471934535,
-      "sameWeekLastMonth": 14.5189301840917,
-      "momPercentagePoints": 3.5605992878428356,
-      "wowPercentagePoints": -0.9550130920197937
+      "previous": 23.543864720335307,
+      "report": 21.416698631888504,
+      "sameWeekLastMonth": 18.374435567905522,
+      "momPercentagePoints": 3.0422630639829826,
+      "wowPercentagePoints": -2.1271660884468027
     },
     "positiveReplyRate": {
       "previous": 38.74020156774916,
-      "report": 39.82381995009929,
+      "report": 39.82787594846463,
       "sameWeekLastMonth": 38.45845578413037,
-      "momPercentagePoints": 1.36536416596892,
-      "wowPercentagePoints": 1.0836183823501315
+      "momPercentagePoints": 1.369420164334258,
+      "wowPercentagePoints": 1.0876743807154696
     },
     "replyRate": {
-      "previous": 1.1725099591131465,
-      "report": 1.2500930933932017,
+      "previous": 1.1731599911717412,
+      "report": 1.251930939467797,
       "sameWeekLastMonth": 1.152795444255888,
-      "momPercentagePoints": 0.09729764913731365,
-      "wowPercentagePoints": 0.07758313428005525
+      "momPercentagePoints": 0.09913549521190901,
+      "wowPercentagePoints": 0.07877094829605591
     }
   },
   "lifecycle": [
@@ -208,18 +208,25 @@
   "success": true,
   "volume": {
     "bookedMeetings": {
-      "previous": 1317,
-      "report": 1414,
-      "sameWeekLastMonth": 836,
-      "momPercent": 69.13875598086125,
-      "wowPercent": 7.365223993925589
+      "previous": 1629,
+      "report": 1675,
+      "sameWeekLastMonth": 1058,
+      "momPercent": 58.317580340264655,
+      "wowPercent": 2.823818293431553
     },
     "emailsSent": {
-      "previous": 1523228,
-      "report": 1571003,
+      "previous": 1522384,
+      "report": 1568537,
       "sameWeekLastMonth": 1298756,
-      "momPercent": 20.96213607482853,
-      "wowPercent": 3.136431315600816
+      "momPercent": 20.772262072321514,
+      "wowPercent": 3.0316267117888787
+    },
+    "lostMeetings": {
+      "previous": 320,
+      "report": 267,
+      "sameWeekLastMonth": 222,
+      "momPercent": 20.27027027027027,
+      "wowPercent": -16.5625
     },
     "positiveReplies": {
       "previous": 6919,
@@ -230,10 +237,10 @@
     },
     "replies": {
       "previous": 17860,
-      "report": 19639,
+      "report": 19637,
       "sameWeekLastMonth": 14972,
-      "momPercent": 31.17152017098584,
-      "wowPercent": 9.96080627099664
+      "momPercent": 31.158161902217472,
+      "wowPercent": 9.949608062709967
     }
   },
   "windows": {

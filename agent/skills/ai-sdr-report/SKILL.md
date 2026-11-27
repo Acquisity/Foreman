@@ -20,10 +20,12 @@ Post exactly one message: three short, plain-language lines labelled `Trend:`, `
 
 Completed meetings lag because a meeting only completes after its date, so a low completed count is not a Watch item on its own.
 
+Booked meetings count every AI SDR booking made in the week, once per guest, including ones cancelled or declined since, so a week's count doesn't change later. Cancelled or declined since keeps growing for recent weeks, so a lower figure this week than last is not an Improvement on its own.
+
 Example (the 16 to 20 Nov 2026 report):
 
-Trend: Booked meetings rose 7.4% on last week and 69.1% on the same week last month, and the booked meeting rate held near 18%, down 1.0pp on the week.
-Improvement: Podcast's booked meeting rate is up 5.3pp and direct's 2.1pp on the same week last month, and replies grew 10.0% on the week.
-Watch: Booked per slots sent fell 5.8pp, no response grew 40.4% on the week, and interview's booked meeting rate is down 5.7pp on last month.
+Trend: Booked meetings rose 2.8% on last week and 58.1% on the same week last month, but the booked meeting rate fell 2.1pp on the week to 21.4%.
+Improvement: Podcast's booked meeting rate is up 5.2pp and direct's 1.8pp on the same week last month, and replies grew 9.9% on the week.
+Watch: Interview's booked meeting rate is down 8.7pp on last month, and no response grew 40.4% on the week.
 
 No headings, tables, code fences, bold or em dashes.

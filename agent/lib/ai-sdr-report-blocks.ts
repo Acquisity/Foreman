@@ -154,6 +154,7 @@ export const renderAiSdrReportBlocks = (
     countRow("Replies", volume.replies),
     countRow("Positive replies", volume.positiveReplies),
     countRow("Booked meetings", volume.bookedMeetings),
+    countRow("Cancelled or declined since", volume.lostMeetings),
     rateRow("Reply rate", conversion.replyRate, 2),
     rateRow("Positive reply rate", conversion.positiveReplyRate),
     rateRow("Booked meeting rate", conversion.bookedMeetingRate),
@@ -172,7 +173,7 @@ export const renderAiSdrReportBlocks = (
       section("*Volume and conversion*"),
       table(volumeRows),
       context(
-        "Booked meeting rate is AI SDR booked meetings over positive replies."
+        "Booked meetings count every AI SDR booking made in the week, once per guest, including ones cancelled or declined since. Booked meeting rate is booked meetings over positive replies."
       ),
       section("*Booked meeting rate by campaign type*"),
       barChart(
