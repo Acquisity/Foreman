@@ -54,6 +54,7 @@ import {
   type HandoffTicketRef,
   handoffFindings,
   investigatorNote,
+  invitedBefore,
   RETRYABLE_BLOCK,
   TICKET_INSTEAD,
   ticketInsteadOfBlock,
@@ -848,7 +849,7 @@ function humanHandoff(
 }
 
 const asksForPerson = (route: WidgetRoute) =>
-  route.asksForHuman >= HUMAN_REQUEST_SCORE;
+  route.personAsk === true || route.asksForHuman >= HUMAN_REQUEST_SCORE;
 
 const CONFIRMED_TICKET_NOTE =
   "\n\nThe customer asked for a person. Nobody takes over this chat: the app has already filed or reused this conversation's ticket for the team, and the team's answer will be posted back into this chat. Answer the customer's remaining question as usual, and do not set needsHuman for the ask. Do not promise a person, a reply or a time yourself: the server appends a line saying where the answer will come.";
@@ -1674,7 +1675,7 @@ async function answerFromKnowledgeBase(
     drafting.abort();
     return completeEscalation(deps.complete, run.id, scope, escalation);
   }
-  if (needs === "person" && route.noNeed) {
+  if (needs === "person" && route.noNeed && !invitedBefore(ask.turns)) {
     drafting.abort();
     return completeInvite(run, scope, deps);
   }
@@ -1920,7 +1921,7 @@ async function toggledPersonAsk(
   if (!person || (escalatesToFixy() && route.refund)) {
     return "";
   }
-  if (route.noNeed) {
+  if (route.noNeed && !invitedBefore(ask.turns)) {
     return completeInvite(run, scope, deps);
   }
   const filed = await ticketInsteadOfHandoff(

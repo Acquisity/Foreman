@@ -21,7 +21,8 @@ import {
  * an investigation, so a message without one always ends at the front door in a
  * fixed refund or ticket redirect, the one help-center writer or, when the
  * customer asks for a person, a handoff. A missing key or a Jev failure scores
- * everything zero, which is a help-center answer. Inside an investigation the
+ * everything zero, which is a help-center answer, except a message that is only
+ * an ask for a person (`PERSON_ASK`), which still reaches one. Inside an investigation the
  * same call decides whether the app offers its screen recording button.
  */
 
@@ -271,6 +272,8 @@ export interface WidgetRoute {
   failure?: string;
   /** Scored and below the bar: the customer has said nothing they need beyond a person. */
   noNeed?: boolean;
+  /** A message in the turn is only an ask for a person (`PERSON_ASK`), whatever Jev scored. */
+  personAsk?: boolean;
   /** The customer asks or offers to send a screen recording, so an investigation offers one. */
   recording?: boolean;
   /** The customer asked for a refund, which only an investigation can file. */
@@ -326,13 +329,64 @@ export function routerInput(input: string | WidgetAsk): string {
   return `FOREMAN'S PREVIOUS REPLY, which the latest message answers:\n${previous.length > PREVIOUS_REPLY_CHARS ? `[start cut] ${previous.slice(-PREVIOUS_REPLY_CHARS)}` : previous}\n\n${rest.startsWith("LATEST CUSTOMER MESSAGE") ? rest : `LATEST CUSTOMER MESSAGE (the one to work on):\n${rest}`}`;
 }
 
+/**
+ * A message that is only an ask for a person ("human agent", "live agent",
+ * "I need to speak to a live agent"). Jev scored bare "human agent" under the
+ * bar in 19 of 83 chats in the 30 days to 27 Nov 2026 (ENG-21230), and a
+ * failed call scores it zero, so this match routes it whatever Jev says. A
+ * bare "the agent" needs a verb, since it can answer Foreman's own question.
+ */
+const PERSON_ASK =
+  /^(?:(?:hi|hello|hey)[\s,.!]+)?(?:please[\s,]+)?(?:(?:can|could|may) (?:i|you) |i(?: want| need| would like|['’]d like) )?(?:(?:(?:to )?(?:speak|talk|chat)(?: to| with)?|(?:connect|get|put|transfer|pass|send|hand) (?:me|this)(?: off| over| through| on)?(?: to| with)?) (?:an? |the )?|(?:an? )?)(?:live |human |real )?(?:agent|person|human|representative|rep)(?:[\s,]+please)?(?: now)?[\s.!?]*$/i;
+
+const SPACES = /\s+/g;
+const OUTER_QUOTES = /^["'“‘]|["'”’]$/g;
+const QUEUED_MESSAGES = /\n\s*\n/;
+
+const bareAsk = (message: string) =>
+  PERSON_ASK.test(
+    message.replace(SPACES, " ").trim().replace(OUTER_QUOTES, "")
+  );
+
+interface RouteOptions {
+  apiKey?: string;
+  fetch?: FetchLike;
+  signal?: AbortSignal;
+}
+
+/**
+ * Jev's route, plus `personAsk` when the turn is nothing but asks for a person
+ * (queued messages are joined by blank lines, so each part must be one). A
+ * fallback route has no need score, so it states no need only when no earlier
+ * customer turn says more than such an ask either.
+ */
 export async function routeWidgetMessage(
   ask: string | WidgetAsk,
-  opts?: {
-    apiKey?: string;
-    fetch?: FetchLike;
-    signal?: AbortSignal;
+  opts?: RouteOptions
+): Promise<WidgetRoute> {
+  const route = await scoreWidgetMessage(ask, opts);
+  const { latest, turns = [] } = toAsk(ask);
+  const onlyAsks = (text: string) =>
+    text
+      .split(QUEUED_MESSAGES)
+      .filter((part) => part.trim())
+      .every(bareAsk);
+  if (!(latest.trim() && onlyAsks(latest))) {
+    return route;
   }
+  const saidMore = turns.some(
+    (turn) => turn.role === "customer" && !onlyAsks(turn.text)
+  );
+  return {
+    ...route,
+    personAsk: true,
+    ...(route.source === "fallback" && !saidMore ? { noNeed: true } : {}),
+  };
+}
+
+async function scoreWidgetMessage(
+  ask: string | WidgetAsk,
+  opts?: RouteOptions
 ): Promise<WidgetRoute> {
   const apiKey = opts?.apiKey ?? jevKey();
   if (!apiKey) {
@@ -450,7 +504,7 @@ export function logRouteDecision(
   logOpsEvent("widget.router.decision", {
     conversationId: fields.conversationId,
     decision: route.source,
-    message: `human=${route.asksForHuman.toFixed(2)}${route.refund ? " refund" : ""}${route.cancel ? " cancel" : ""}${route.ticket ? " ticket" : ""}${route.bug ? " bug" : ""}${route.recording ? " recording" : ""}${route.noNeed ? " no_need" : ""}${route.failure ? ` ${route.failure}` : ""}`,
+    message: `human=${route.asksForHuman.toFixed(2)}${route.refund ? " refund" : ""}${route.cancel ? " cancel" : ""}${route.ticket ? " ticket" : ""}${route.bug ? " bug" : ""}${route.recording ? " recording" : ""}${route.noNeed ? " no_need" : ""}${route.personAsk ? " person_ask" : ""}${route.failure ? ` ${route.failure}` : ""}`,
     runId: fields.runId,
   });
 }

@@ -75,6 +75,15 @@ export const withAnswerHere = (message: string, turns: Turns) =>
     ? message
     : `${message}\n\n${ANSWER_HERE}`;
 
+const INVITE_OPENING = "Tell me what you need help with";
+const INVITE = `${INVITE_OPENING} and I'll try to sort it out now. Anything I can't, I'll pass to our team, and their answer will come here in this chat.`;
+
+/** An earlier reply was the invitation, so a second bare ask files the ticket instead of looping (ENG-21230). */
+export const invitedBefore = (turns: Turns) =>
+  turns?.some(
+    (turn) => turn.role === "assistant" && turn.text.includes(INVITE_OPENING)
+  ) ?? false;
+
 /**
  * The whole reply to an ask for a person that says nothing else. No ticket:
  * one is filed only once the customer describes something Foreman cannot settle.
@@ -84,7 +93,7 @@ export const personInvite = (ids: {
   runId: string;
 }) => {
   logOpsEvent("widget.handoff.ticket", { ...ids, decision: "invite" });
-  return "Tell me what you need help with and I'll try to sort it out now. Anything I can't, I'll pass to our team, and their answer will come here in this chat.";
+  return INVITE;
 };
 
 type Filed = Exclude<

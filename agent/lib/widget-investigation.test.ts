@@ -2847,6 +2847,41 @@ test("an ask for a person that states no need gets an invitation, with no ticket
   }
 });
 
+test("a second bare ask for a person after the invitation files the ticket instead of inviting again", async (t) => {
+  enabled(t);
+  for (const mode of [undefined, "investigate"] as const) {
+    const { deps, run } = dependencies();
+    const { fileTicket, filed } = ticketFiler();
+    deps.route = () =>
+      Promise.resolve({
+        asksForHuman: 0.3,
+        noNeed: true,
+        personAsk: true,
+        source: "jev",
+      });
+    deps.fileTicket = fileTicket;
+    deps.answerChat = () => Promise.resolve(kbAnswer);
+    // biome-ignore lint/performance/noAwaitInLoops: each case needs its own fresh run.
+    await receiveWidgetMessage(
+      request({
+        ...start,
+        history: [
+          { role: "customer", text: "Human agent" },
+          { role: "assistant", text: INVITE },
+        ],
+        question: "I need to speak to a live agent",
+        ...(mode ? { mode } : {}),
+      }),
+      noWork(),
+      200,
+      verify,
+      deps
+    );
+    assert.notEqual(run.outcome?.reason, "person_invite", mode);
+    assert.equal(filed.length, 1, mode);
+  }
+});
+
 test("the answer-comes-here line is not repeated in a conversation that already has it", async (t) => {
   enabled(t);
   for (const [history, expected] of [
