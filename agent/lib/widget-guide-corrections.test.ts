@@ -169,10 +169,7 @@ test("right wording for the same articles passes", () => {
     assert.deepEqual(sectionProblems(slug, text), [], text);
   }
   assert.deepEqual(
-    batchProblems(
-      [IMPORT, CALLING],
-      new Map(right.slice(0, 1).map(([, t]) => [IMPORT, t]))
-    ),
+    batchProblems([IMPORT], new Map([[IMPORT, right[0][1]]])),
     []
   );
   assert.notDeepEqual(batchProblems([FORGOT], new Map()), []);
