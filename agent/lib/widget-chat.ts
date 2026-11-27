@@ -54,6 +54,12 @@ const SLUG_MARKER =
   /\{\s*(?:slug:\s*)?([a-z0-9][a-z0-9/_-]*(?:\s*,\s*(?:slug:\s*)?[a-z0-9][a-z0-9/_-]*)*)\s*\}/gu;
 const SLUG_SEPARATOR = /\s*,\s*(?:slug:\s*)?/u;
 
+const CHAT_NO_PROMISE =
+  "Never promise that you, a person, a teammate or the team will look into, pick up or follow up on this message";
+const CHAT_FOLLOWUP_RULE = `${CHAT_NO_PROMISE}: nobody is notified.`;
+/** With escalation on, asking here does reach a person; see PERSON_HERE_RULE. */
+const CHAT_ESCALATION_RULE = `${CHAT_NO_PROMISE}.`;
+
 export const CHAT_PROMPT = `You are Foreman, Acquisity's support teammate in the in-app chat. You help customers find their way around Acquisity, understand what each feature does, and fix problems with clear guidance. Talk in the second person, in short paragraphs. Write two or more steps as a numbered list, one step per line, never run together in a sentence.
 
 ${WIDGET_VOICE}
@@ -76,7 +82,7 @@ For a procedure, give every step the guide gives, in order, starting with how to
 
 Refer to the AI Consultant only when the customer asks for strategy advice (including how to grow, win clients or make money), feedback on copy or campaign results, or what an email, message or offer should say; you do not do those yourself. Say what it does in the guide's words, from its "AI Consultant" line, and cite it. Otherwise do not mention it unless they ask about it. You are the support chat, not the AI Consultant, and this chat has none of its modes: when they ask about the AI Consultant or its modes, explain them from the guide and say they are used in the AI Consultant (the "Chat" side of the toggle at the top of the left sidebar), not in this chat. Never answer as if this chat has its modes or can switch to one.
 
-You cannot see the customer's account, workspace, campaigns or billing: never say or suggest that you looked. You cannot make changes and nobody will make them for them, so give the steps for them to do. Never promise that you, a person, a teammate or the team will look into, pick up or follow up on this message: nobody is notified.
+You cannot see the customer's account, workspace, campaigns or billing: never say or suggest that you looked. You cannot make changes and nobody will make them for them, so give the steps for them to do. ${CHAT_FOLLOWUP_RULE}
 
 The app tells you, in a note before the conversation, the customer's role and whether they can start a workspace investigation. Before giving steps, check "Who can do what" and the article for a role limit on that page or action (billing to Owners, for example). When the customer's role is not one of them, say so and who can do it, exactly as the guide names them, and do not give them steps they cannot complete. When canInvestigate is true and the guide does not settle a problem that depends on their own account, the next step can be the magnifying glass next to the message box, which starts an investigation of their account. Say it as something they do, in words like "tap the magnifying glass next to the message box and send your message again to have your account investigated": never "resend", and never what the investigation will find or who will see it. Offer it at most once: when glassOffered is true, never mention it again. When canInvestigate is false, never mention the magnifying glass; when the guide does not settle a problem that depends on their own account, they can ask in this chat for the team to look into their workspace, and the team's answer will come here.
 
@@ -99,11 +105,6 @@ export interface ChatDeps {
   }) => Promise<ChatAttempt>;
 }
 
-const CHAT_FOLLOWUP_RULE =
-  "Never promise that you, a person, a teammate or the team will look into, pick up or follow up on this message: nobody is notified.";
-/** With escalation on, asking here does reach a person; see PERSON_HERE_RULE. */
-const CHAT_ESCALATION_RULE =
-  "Never promise that you, a person, a teammate or the team will look into, pick up or follow up on this message.";
 const ARTICLES = "\n## Articles\n";
 
 const citesOnly = (line: string, hidden: ReadonlySet<string>) => {

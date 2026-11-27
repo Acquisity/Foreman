@@ -80,15 +80,22 @@ export interface Escalation {
  * then a refund (only where Foreman would not investigate and file it itself),
  * then an ask for a person (a bare one too: Fixy asks what they need), then a
  * member or client whose workspace needs a look they cannot start, then an
- * owner or admin asking for a ticket again after being pointed to the
- * magnifying glass, which repeated the redirect (ENG-21099). Null while
+ * owner or admin asking for a ticket again after Foreman's fixed redirect to
+ * the magnifying glass, which repeated the redirect (ENG-21099). Null while
  * escalation is off and for every other turn.
  */
 export const escalationFor = (
   scope: WidgetContext,
   ask: TeamAsk | null,
   route: WidgetRoute,
-  { glassOffered = false, refund }: { glassOffered?: boolean; refund: boolean }
+  {
+    redirected = false,
+    refund,
+  }: {
+    /** An earlier reply was Foreman's fixed magnifying-glass redirect. */
+    redirected?: boolean;
+    refund: boolean;
+  }
 ): Escalation | null => {
   if (!(escalatesToFixy() && customerTurn(scope))) {
     return null;
@@ -111,7 +118,7 @@ export const escalationFor = (
       report: `The customer is a workspace ${scope.role}, and only an owner or admin can start a look into their workspace.`,
     };
   }
-  return glassOffered && route.ticket
+  return redirected && route.ticket
     ? {
         reason: "asked_for_human",
         report:

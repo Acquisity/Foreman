@@ -32,7 +32,6 @@ import {
   escalatesToFixy,
   escalationFor,
   needsTheTeam,
-  offeredGlass,
   teamAsk,
 } from "./widget-escalation.js";
 import {
@@ -1633,7 +1632,10 @@ async function answerFromKnowledgeBase(
   const needs = teamAsk(scope, route, { helpCenterOnly, needsLook, person });
   // A front-door refund goes to Fixy for every role: nothing here investigates it.
   const escalation = escalationFor(scope, needs, route, {
-    glassOffered: offeredGlass(ask.turns),
+    redirected: (ask.turns ?? []).some(
+      (turn) =>
+        turn.role === "assistant" && turn.text.includes(INVESTIGATE_REDIRECT)
+    ),
     refund: true,
   });
   if (escalation) {

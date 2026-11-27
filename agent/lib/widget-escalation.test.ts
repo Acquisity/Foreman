@@ -428,20 +428,34 @@ test("an owner asking for a ticket again after the magnifying glass escalates in
     { role: "customer", text: "Can you open a ticket for this?" },
     { role: "assistant", text: INVESTIGATE_REDIRECT },
   ];
+  // A mention that is not the fixed redirect leaves the first ticket ask on the redirect.
+  const mention = [
+    { role: "customer", text: "Do I need the magnifying glass for settings?" },
+    {
+      role: "assistant",
+      text: "You don't need the magnifying glass to check those settings.",
+    },
+  ];
   for (const [on, history, reason] of [
     [true, undefined, "investigate_redirect"],
+    [true, mention, "investigate_redirect"],
     [true, earlier, "escalated_to_fixy asked_for_human"],
     [false, earlier, "investigate_redirect"],
   ] as const) {
-    enable(t, on);
-    const { deps, filed, run } = harness({ asksForHuman: 0, ticket: true });
-    // biome-ignore lint/performance/noAwaitInLoops: each case needs its own fresh run.
-    const body = (await (
-      await send(deps, { history, question: "Please raise a ticket" })
-    ).json()) as Record<string, unknown>;
-    assert.equal(run.outcome?.reason, reason);
-    assert.equal(body.message, on && history ? null : INVESTIGATE_REDIRECT);
-    assert.equal(filed.length, 0);
+    // biome-ignore lint/performance/noAwaitInLoops: each case restores the flag before the next.
+    await t.test(`${on ? "on" : "off"}, ${reason}`, async (st) => {
+      enable(st, on);
+      const { deps, filed, run } = harness({ asksForHuman: 0, ticket: true });
+      const body = (await (
+        await send(deps, { history, question: "Please raise a ticket" })
+      ).json()) as Record<string, unknown>;
+      assert.equal(run.outcome?.reason, reason);
+      assert.equal(
+        body.message,
+        reason === "investigate_redirect" ? INVESTIGATE_REDIRECT : null
+      );
+      assert.equal(filed.length, 0);
+    });
   }
 });
 
@@ -461,20 +475,24 @@ test("on, the front-door writer is told asking here reaches a person and gets no
     upcomingClosures: [],
   };
   for (const on of [true, false]) {
-    enable(t, on);
-    const { deps } = harness({ asksForHuman: 0 });
-    const seen: (KbCustomer | undefined)[] = [];
-    deps.answerChat = (_ask, _log, writer) => {
-      seen.push(writer);
-      return Promise.resolve({ citations: [], message: "Here is how." });
-    };
-    // biome-ignore lint/performance/noAwaitInLoops: each case needs its own fresh run.
-    await send(deps, { question: "When is support open?" }, {
-      ...scope,
-      officeHours,
+    // biome-ignore lint/performance/noAwaitInLoops: each case restores the flag before the next.
+    await t.test(on ? "on" : "off", async (st) => {
+      enable(st, on);
+      const { deps } = harness({ asksForHuman: 0 });
+      const seen: (KbCustomer | undefined)[] = [];
+      deps.answerChat = (_ask, _log, writer) => {
+        seen.push(writer);
+        return Promise.resolve({ citations: [], message: "Here is how." });
+      };
+      await send(
+        deps,
+        { question: "When is support open?" },
+        { ...scope, officeHours }
+      );
+      const customer = seen.at(-1);
+      assert.equal(customer?.escalates, on ? true : undefined);
+      assert.equal(Boolean(customer?.officeSchedule), !on);
+      assert.equal(process.env.WIDGET_ESCALATE_TO_FIXY, on ? "on" : undefined);
     });
-    const customer = seen.at(-1);
-    assert.equal(customer?.escalates, on ? true : undefined);
-    assert.equal(Boolean(customer?.officeSchedule), !on);
   }
 });
