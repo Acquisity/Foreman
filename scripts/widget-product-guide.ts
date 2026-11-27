@@ -501,7 +501,7 @@ for (const article of pending) {
 /** Main's sections as distilled: the opt-in note is added after this step. */
 const mainSections = MAIN_GUIDE.replaceAll(`\n- ${OPT_IN_NOTE}`, "");
 const mainBySlug = splitGuideSections(mainSections);
-/** Sections that lost ground against main distilled again per run, worst first. */
+/** Retries a run makes model calls for, worst first; stored ones don't count. */
 const RETRY_LIMIT = 12;
 const sourceText = new Map(available.map((a) => [a.slug, a.text]));
 
@@ -566,29 +566,45 @@ const allowance = (a: Article, main?: MainReference) =>
     main?.words ?? 0
   );
 
+const DISTILL_MAX_TOKENS = 32_000;
+const distillPrompts = (batch: Article[], main?: MainReference) => ({
+  prompt: batch
+    .map(
+      (a) =>
+        `ARTICLE title: ${a.title}\nslug: ${a.slug}\nwords: ${allowance(a, main)}\n\n${a.text}${reviewNote(a.slug).join("")}${previousNote(a.slug, main)}`
+    )
+    .join("\n\n=====\n\n"),
+  system: DISTILL_PROMPT.replace(
+    "WORDS",
+    String(
+      Math.max(
+        MIN_BATCH_WORDS,
+        batch.reduce((sum, a) => sum + allowance(a, main), 0)
+      )
+    )
+  ).replace("SIDEBAR_BLOCK", SIDEBAR),
+});
+
+/** Whether this distill call's output is stored, so making it costs nothing. */
+const distillStored = (batch: Article[], main?: MainReference) => {
+  const { prompt, system } = distillPrompts(batch, main);
+  return (
+    cachedGuideText(
+      productGuideCache,
+      guideCallKey(MODEL, String(DISTILL_MAX_TOKENS), system, prompt),
+      values.full ?? false
+    ) !== undefined
+  );
+};
+
 const distillBatch = (batch: Article[], label: string, main?: MainReference) =>
   checkedGuideCall(
     label,
     BATCH_TRIES,
-    () =>
-      call(
-        DISTILL_PROMPT.replace(
-          "WORDS",
-          String(
-            Math.max(
-              MIN_BATCH_WORDS,
-              batch.reduce((sum, a) => sum + allowance(a, main), 0)
-            )
-          )
-        ).replace("SIDEBAR_BLOCK", SIDEBAR),
-        batch
-          .map(
-            (a) =>
-              `ARTICLE title: ${a.title}\nslug: ${a.slug}\nwords: ${allowance(a, main)}\n\n${a.text}${reviewNote(a.slug).join("")}${previousNote(a.slug, main)}`
-          )
-          .join("\n\n=====\n\n"),
-        32_000
-      ),
+    () => {
+      const { prompt, system } = distillPrompts(batch, main);
+      return call(system, prompt, DISTILL_MAX_TOKENS);
+    },
     (text) => {
       const repaired = relink(text);
       assertGuideSections(
@@ -651,9 +667,9 @@ await inPool(batches, async (batch, index) => {
  * stays inside the workflow's time limit. A retry's section replaces the
  * earlier one only when it drops no label the earlier one kept, and fewer of
  * main's labels or more words. While the section stays behind main its retry
- * output is stored under its own call, so a rerun with the same docs makes no
- * call for it and leaves its section as it was; past the limit, the next run
- * takes the next worst. A new article whose retry call fails
+ * output is stored under its own call and reused without counting toward
+ * RETRY_LIMIT, so a rerun with the same docs makes no call for it and leaves
+ * its section as it was, and past the limit the next run takes the next worst. A new article whose retry call fails
  * keeps its batch section but stays out of the cache, so the next run tries it
  * again; a stored one keeps its entry. A failed call never stops this run.
  */
@@ -670,9 +686,20 @@ const lost = losses(distilledText())
       b.dropped.length - a.dropped.length || a.now / a.was - b.now / b.was
   );
 const articleBySlug = new Map(available.map((a) => [a.slug, a]));
-const retries = lost.slice(0, RETRY_LIMIT).flatMap(({ slug, was }) => {
+let uncached = 0;
+const retries = lost.flatMap(({ slug, was }) => {
   const article = articleBySlug.get(slug);
-  return article ? [{ article, main: mainReference(article, was) }] : [];
+  if (!article) {
+    return [];
+  }
+  const main = mainReference(article, was);
+  if (!distillStored([article], main)) {
+    if (uncached >= RETRY_LIMIT) {
+      return [];
+    }
+    uncached += 1;
+  }
+  return [{ article, main }];
 });
 const references = new Map(retries.map((r) => [r.article.slug, r.main]));
 const shortened = [

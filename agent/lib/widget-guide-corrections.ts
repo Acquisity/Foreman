@@ -121,13 +121,18 @@ export const GUIDE_CORRECTIONS: readonly GuideCorrection[] = [
     ],
   },
   {
-    note: '"US numbers only" is said of the phone line search, not of iMessage lines. Do not contact status and the do-not-contact list block calls and texts; only a STOP reply leaves calls unaffected.',
+    note: '"US numbers only" is said of the phone line search, not of iMessage lines. Do not contact status and the do-not-contact list block calls and texts; only a STOP reply leaves calls unaffected. Caller ID is the assigned number or a verified personal phone, and an owner or admin verifies it on "My phone"; say both options. Keep the workspace recording default ("Record outgoing calls by default" on the "Calling" tab, owners and admins) and that "Dialling speed" is for owners and admins (ENG-21319).',
     reject: [
       /iMessage lines?"?[\s.(:]*(?:are\s+)?US[- ](?:numbers\s+)?only/iu,
       /US[- ]only iMessage/iu,
       /\bUS (?:numbers?|only)[^.;\n]{0,30}\bfor iMessage/iu,
       /(?<!calls and )texts? (?:are )?blocked by (?:Do not contact|do-not-contact)/iu,
       /(?:Do not contact|do-not-contact)(?:(?!STOP)[^.;\n])*\bblocks? (?:only texts|texts only)/iu,
+    ],
+    require: [
+      /\bassigned number\b/iu,
+      /"Record outgoing calls by default"/u,
+      /\bowners?\b[^\n]*"Dialling speed"|"Dialling speed"[^\n]*\b(?:owners?|admins?)\b/iu,
     ],
     slugs: ["crm/calling-and-texting"],
   },
