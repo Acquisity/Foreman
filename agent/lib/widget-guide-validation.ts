@@ -70,20 +70,13 @@ const STEP = /^\s*\d+\. /gmu;
 export const numberedSteps = (text: string) => text.match(STEP)?.length ?? 0;
 
 /** Each section's fact words, not counting its heading and "Get here:" line. */
-export function answerWords(text: string): Map<string, number> {
-  const words = new Map<string, number>();
-  let slug = "";
-  for (const line of text.split("\n")) {
-    const heading = SECTION.exec(line)?.[1];
-    if (heading) {
-      slug = heading;
-      words.set(slug, 0);
-    } else if (slug && !line.startsWith("Get here:")) {
-      words.set(slug, (words.get(slug) ?? 0) + (line.match(WORD)?.length ?? 0));
-    }
-  }
-  return words;
-}
+export const answerWords = (text: string): Map<string, number> =>
+  new Map(
+    [...factLines(text)].map(([slug, facts]) => [
+      slug,
+      facts.match(WORD)?.length ?? 0,
+    ])
+  );
 
 /**
  * The slugs whose section answers a long article in fewer than
@@ -108,22 +101,81 @@ export function shortAnswers(
 
 /** A regenerated section keeping less than this share of main's words has shrunk. */
 export const SHRUNK_SHARE = 0.8;
+const QUOTED = /"([^"\n]+)"/gu;
+
+/** Each section's fact lines, without its heading and "Get here:" line. */
+function factLines(text: string): Map<string, string> {
+  const facts = new Map<string, string[]>();
+  let slug = "";
+  for (const line of text.split("\n")) {
+    const heading = SECTION.exec(line)?.[1];
+    if (heading) {
+      slug = heading;
+      facts.set(slug, []);
+    } else if (slug && !line.startsWith("Get here:")) {
+      facts.get(slug)?.push(line);
+    }
+  }
+  return new Map([...facts].map(([key, lines]) => [key, lines.join("\n")]));
+}
+
+export interface AnswerLoss {
+  /** Labels main's section quotes that the article still has and this one lacks. */
+  dropped: string[];
+  now: number;
+  slug: string;
+  was: number;
+}
 
 /**
- * The sections of `text` that say less than SHRUNK_SHARE of the words the same
- * article's section says in `previous`, the guide on main. A model that keeps
- * to a long article's word allowance can drop half its facts (ENG-21319).
+ * Each section of `text` measured against the same article's section in
+ * `previous`, the guide on main: its fact words, main's, and the UI labels it
+ * dropped. A model that keeps to a long article's word allowance can drop half
+ * its facts (ENG-21319); a label counts as dropped only while the article in
+ * `sources` still names it. Articles main doesn't have are left out.
  */
-export function shrunkAnswers(
+export function answerLosses(
   text: string,
-  previous: string
-): { now: number; slug: string; was: number }[] {
-  const before = answerWords(previous);
-  return [...answerWords(text)].flatMap(([slug, now]) => {
-    const was = before.get(slug) ?? 0;
-    return now < was * SHRUNK_SHARE ? [{ now, slug, was }] : [];
+  previous: string,
+  sources: ReadonlyMap<string, string>
+): AnswerLoss[] {
+  const before = factLines(previous);
+  return [...factLines(text)].flatMap(([slug, facts]) => {
+    const main = before.get(slug);
+    if (main === undefined) {
+      return [];
+    }
+    const source = sources.get(slug) ?? "";
+    const dropped = [
+      ...new Set([...main.matchAll(QUOTED)].map((m) => m[1])),
+    ].filter(
+      (label) => source.includes(label) && !facts.includes(`"${label}"`)
+    );
+    return [
+      {
+        dropped,
+        now: facts.match(WORD)?.length ?? 0,
+        slug,
+        was: main.match(WORD)?.length ?? 0,
+      },
+    ];
   });
 }
+
+/** A section that dropped one of main's labels or most of main's words. */
+export const lostGround = (loss: AnswerLoss): boolean =>
+  loss.dropped.length > 0 || loss.now < loss.was * SHRUNK_SHARE;
+
+/**
+ * A retry's section replaces the earlier one when it drops fewer of main's
+ * labels, or as many in more words.
+ */
+export const retryKeeps = (
+  before: Pick<AnswerLoss, "dropped" | "now">,
+  after: Pick<AnswerLoss, "dropped" | "now">
+): boolean =>
+  after.dropped.length < before.dropped.length ||
+  (after.dropped.length === before.dropped.length && after.now > before.now);
 
 const BLOCK_SCALAR = /^[>|][+-]?$/u;
 const INDENTED = /^[ \t]/u;

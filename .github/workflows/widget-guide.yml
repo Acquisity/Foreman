@@ -108,7 +108,7 @@ jobs:
           fi
           commit=$(git -C acquisity rev-parse HEAD)
           changed=$(grep -m1 '^regenerated=' "$RUNNER_TEMP/guide.log" | cut -d= -f2- | sed 's/,/, /g')
-          shrunk=$(grep -m1 '^shrunk=' "$RUNNER_TEMP/guide.log" | cut -d= -f2- | sed 's/),/), /g')
+          lost=$(grep -m1 '^lost=' "$RUNNER_TEMP/guide.log" | cut -d= -f2-)
           calls=$(grep -o 'successful_calls=[0-9]*' "$RUNNER_TEMP/guide.log" | tail -1 | cut -d= -f2)
           attempts=$(grep -o 'attempts=[0-9]*' "$RUNNER_TEMP/guide.log" | tail -1 | cut -d= -f2)
           unpriced=$(grep -o 'unpriced_calls=[0-9]*' "$RUNNER_TEMP/guide.log" | tail -1 | cut -d= -f2)
@@ -118,7 +118,7 @@ jobs:
 
           Regenerated sections: $changed
 
-          Sections still under four fifths of main's length after a retry: ${shrunk:-none}. Check each against its Help Centre page for dropped facts.
+          Sections that still say much less than main's after a retry, or drop a label main's section quotes: ${lost:-none}. Check each against its Help Centre page for dropped facts.
 
           Model calls: $calls successful responses over $attempts attempts, all through the CLI Proxy, which reports no cost ($unpriced unpriced calls).
 

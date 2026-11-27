@@ -72,14 +72,16 @@ import {
 } from "../agent/lib/widget-guide-sidebar.js";
 import { guideSourcePath } from "../agent/lib/widget-guide-source.js";
 import {
+  answerLosses,
   answerWords,
   assertGuideSections,
   assertOwnAnswers,
   frontmatterField,
+  lostGround,
   numberedSteps,
   plainDashes,
+  retryKeeps,
   shortAnswers,
-  shrunkAnswers,
 } from "../agent/lib/widget-guide-validation.js";
 import { PRODUCT_GUIDE as MAIN_GUIDE } from "../agent/lib/widget-product-guide.js";
 
@@ -255,6 +257,8 @@ ${ENTRY_POINTS.map((entry) => `- ${entry.text.replace("SETTINGS_MENU", SETTINGS_
 console.log(SIDEBAR);
 
 interface Article {
+  /** The page's path in the Acquisity repository. */
+  file: string;
   /** The whole page is behind an opt-in feature (front matter `features:`). */
   optIn: boolean;
   section: string;
@@ -337,6 +341,7 @@ const articles: Article[] = order(root).map((path) => {
   const slug = relative(root, path).replace(MDX, "").replace(INDEX_PAGE, "");
   const { body, optIn, title } = stripMdx(scrub(readFileSync(path, "utf8")));
   return {
+    file: join(DOCS, relative(root, path)),
     optIn,
     section: slug.split("/")[0] || "index",
     slug: slug || "index",
@@ -495,36 +500,73 @@ for (const article of pending) {
 
 /** Main's sections as distilled: the opt-in note is added after this step. */
 const mainSections = MAIN_GUIDE.replaceAll(`\n- ${OPT_IN_NOTE}`, "");
-/** Main's section and its words, for an article distilled again because it shrank. */
-const shrunkFrom = new Map<string, { section: string; words: number }>();
+const mainBySlug = splitGuideSections(mainSections);
+/** Sections that lost ground against main distilled again per run, worst first. */
+const RETRY_LIMIT = 24;
+const sourceText = new Map(available.map((a) => [a.slug, a.text]));
+
+const MAIN_SHA = MAIN_GUIDE.match(/content\/docs at ([0-9a-f]{12})\)/u)?.[1];
+
+/** Main's section for a retry, without its heading so the article is headed once. */
+interface MainReference {
+  /** Bold labels the page gained since main's guide was distilled. */
+  added: string[];
+  section: string;
+  words: number;
+}
+
 /**
- * Main's section goes with an article distilled again for saying much less,
- * so the retry keeps the facts the page still states (ENG-21319).
+ * Main's section for an article that lost ground against it. The words asked
+ * for grow with the page since main's commit, and the labels it gained are
+ * named, so a part the page added (Dialling speed, ENG-21319) is covered.
  */
-const previousNote = (slug: string) => {
-  const section = shrunkFrom.get(slug)?.section;
-  return section
-    ? `\n\nPREVIOUS SECTION for ${slug} (not part of the article; your last version dropped facts this one kept): keep every fact below that the article still states, and add what the article states that it lacks.\n${section}`
-    : "";
+const mainReference = (a: Article, was: number): MainReference => {
+  let before: string | undefined;
+  try {
+    before = MAIN_SHA
+      ? stripMdx(scrub(git("show", `${MAIN_SHA}:${a.file}`))).body
+      : undefined;
+  } catch {
+    // The page is new since main's commit, or that commit isn't fetched.
+  }
+  const labels = [...new Set(a.text.match(BOLD_LABEL))];
+  return {
+    added: before
+      ? labels.filter((l) => !before.includes(l)).map((l) => l.slice(2, -2))
+      : [],
+    section: (mainBySlug.get(a.slug) ?? "").split("\n").slice(1).join("\n"),
+    words: Math.round(
+      was * Math.max(1, before ? a.text.length / before.length : 1)
+    ),
+  };
 };
+
+/**
+ * Main's section goes with an article distilled again for losing ground
+ * against it, so the retry keeps the facts the page still states (ENG-21319).
+ */
+const previousNote = (slug: string, main?: MainReference) =>
+  main
+    ? `\n\nPREVIOUS SECTION for ${slug} (not part of the article; your last version dropped facts this one kept): keep every fact below that the article still states, and add what the article states that it lacks${main.added.length ? `, including what the article added since: "${main.added.join('", "')}"` : ""}.\n${main.section}`
+    : "";
 
 /**
  * Words asked for one article: its share of the ratio, never below a floor,
  * and enough for every numbered step and every bold UI label it names, so a
  * how-to or settings page keeps its steps and settings (ENG-20601), and never
- * less than main's section when it is distilled again for saying much less
- * (ENG-21319).
+ * less than main's section when it is distilled again for losing ground
+ * against it (ENG-21319).
  */
-const allowance = (a: Article) =>
+const allowance = (a: Article, main?: MainReference) =>
   Math.max(
     MIN_ARTICLE_WORDS,
     Math.round(a.text.length * RATIO),
     numberedSteps(a.text) * WORDS_PER_STEP,
     new Set(a.text.match(BOLD_LABEL)).size * WORDS_PER_LABEL,
-    shrunkFrom.get(a.slug)?.words ?? 0
+    main?.words ?? 0
   );
 
-const distillBatch = (batch: Article[], label: string) =>
+const distillBatch = (batch: Article[], label: string, main?: MainReference) =>
   checkedGuideCall(
     label,
     BATCH_TRIES,
@@ -535,14 +577,14 @@ const distillBatch = (batch: Article[], label: string) =>
           String(
             Math.max(
               MIN_BATCH_WORDS,
-              batch.reduce((sum, a) => sum + allowance(a), 0)
+              batch.reduce((sum, a) => sum + allowance(a, main), 0)
             )
           )
         ).replace("SIDEBAR_BLOCK", SIDEBAR),
         batch
           .map(
             (a) =>
-              `ARTICLE title: ${a.title}\nslug: ${a.slug}\nwords: ${allowance(a)}\n\n${a.text}${reviewNote(a.slug).join("")}${previousNote(a.slug)}`
+              `ARTICLE title: ${a.title}\nslug: ${a.slug}\nwords: ${allowance(a, main)}\n\n${a.text}${reviewNote(a.slug).join("")}${previousNote(a.slug, main)}`
           )
           .join("\n\n=====\n\n"),
         32_000
@@ -565,77 +607,121 @@ const distillBatch = (batch: Article[], label: string) =>
     }
   );
 
+/** Runs `work` over `items` on CONCURRENCY workers. */
+const inPool = async <T>(
+  items: readonly T[],
+  work: (item: T, index: number) => Promise<void>
+) => {
+  let next = 0;
+  await Promise.all(
+    Array.from({ length: CONCURRENCY }, async () => {
+      while (next < items.length) {
+        const index = next;
+        next += 1;
+        // biome-ignore lint/performance/noAwaitInLoops: a fixed pool of workers.
+        await work(items[index], index);
+      }
+    })
+  );
+};
+
 const startedAt = Date.now();
 const rewritten: string[] = [];
-let next = 0;
-await Promise.all(
-  Array.from({ length: CONCURRENCY }, async () => {
-    while (next < batches.length) {
-      const index = next;
-      next += 1;
-      const batch = batches[index];
-      // biome-ignore lint/performance/noAwaitInLoops: a fixed pool of workers.
-      const out = await distillBatch(
-        batch,
-        `batch ${index + 1}/${batches.length} ${batch[0].slug}`
-      );
-      for (const [slug, section] of splitGuideSections(out.text)) {
-        distilled.set(slug, section);
-      }
-      if (out.fresh) {
-        rewritten.push(...batch.map((a) => a.slug));
-        console.log(`batch ${index + 1}/${batches.length} ${batch[0].slug}`);
-      }
-    }
-  })
-);
+await inPool(batches, async (batch, index) => {
+  const out = await distillBatch(
+    batch,
+    `batch ${index + 1}/${batches.length} ${batch[0].slug}`
+  );
+  for (const [slug, section] of splitGuideSections(out.text)) {
+    distilled.set(slug, section);
+  }
+  if (out.fresh) {
+    rewritten.push(...batch.map((a) => a.slug));
+    console.log(`batch ${index + 1}/${batches.length} ${batch[0].slug}`);
+  }
+});
 
 /**
  * A long article a batch answered in a line or two is distilled once more on
- * its own (ENG-20575), and so is any section, stored ones included, that says
- * much less than main's, asking for at least main's length (ENG-21319). Its
- * section replaces the earlier one only when it says more. One still short is
- * logged and kept, so a rerun with the same docs leaves the guide as it was.
- * One whose call fails keeps its earlier section but stays out of the cache,
- * so the next run tries it again; it never stops this run.
+ * its own (ENG-20575), and so is any section, stored ones included, that lost
+ * ground against main's: it dropped a UI label main's section quotes and the
+ * page still names, or most of main's words. That retry is asked for at least
+ * main's length, with main's section as a reference (ENG-21319), and at most
+ * RETRY_LIMIT of them run, worst first, so a run that rewrites every section
+ * stays inside the workflow's time limit. A retry's section replaces the
+ * earlier one only when it drops fewer of main's labels or says more, and its
+ * output is stored under its own call, so a rerun with the same docs makes no
+ * call and leaves the guide as it was. A new article whose retry call fails
+ * keeps its batch section but stays out of the cache, so the next run tries it
+ * again; a stored one keeps its entry. A failed call never stops this run.
  */
 const retryFailed = new Set<string>();
+const retryOutputs = new Map<string, { key: string; text: string }>();
 const distilledText = () =>
   slugs.map((slug) => distilled.get(slug)).join("\n\n");
-const mainBySlug = splitGuideSections(mainSections);
-for (const { slug, was } of shrunkAnswers(distilledText(), mainSections)) {
-  // Without its heading, so the retry heads the article once.
-  const section = (mainBySlug.get(slug) ?? "").split("\n").slice(1).join("\n");
-  shrunkFrom.set(slug, { section, words: was });
-}
+const losses = (text: string) =>
+  answerLosses(plainDashes(text), mainSections, sourceText);
+const lost = losses(distilledText())
+  .filter(lostGround)
+  .sort(
+    (a, b) =>
+      b.dropped.length - a.dropped.length || a.now / a.was - b.now / b.was
+  );
+const articleBySlug = new Map(available.map((a) => [a.slug, a]));
+const references = new Map(
+  lost.slice(0, RETRY_LIMIT).flatMap(({ slug, was }) => {
+    const article = articleBySlug.get(slug);
+    return article ? [[slug, mainReference(article, was)] as const] : [];
+  })
+);
 const shortened = available.filter(
   (a) =>
-    shrunkFrom.has(a.slug) ||
+    references.has(a.slug) ||
     (pending.includes(a) &&
       shortAnswers(distilled.get(a.slug) ?? "", [a]).length > 0)
 );
-for (const article of shortened) {
+const standing = (slug: string, section: string) =>
+  losses(section)[0] ?? {
+    dropped: [],
+    now: answerWords(section).get(slug) ?? 0,
+  };
+await inPool(shortened, async (article) => {
   const label = `alone ${article.slug}`;
-  const before = distilled.get(article.slug) ?? "";
   try {
-    // biome-ignore lint/performance/noAwaitInLoops: a few calls, one at a time.
-    const out = await distillBatch([article], label);
+    const out = await distillBatch(
+      [article],
+      label,
+      references.get(article.slug)
+    );
+    retryOutputs.set(article.slug, { key: out.key, text: out.text });
     const section = splitGuideSections(out.text).get(article.slug);
-    const words = (text: string) => answerWords(text).get(article.slug) ?? 0;
-    if (section && words(section) > words(before)) {
+    const before = distilled.get(article.slug) ?? "";
+    if (
+      section &&
+      retryKeeps(
+        standing(article.slug, before),
+        standing(article.slug, section)
+      )
+    ) {
       distilled.set(article.slug, section);
-      rewritten.push(article.slug);
+      if (out.fresh) {
+        rewritten.push(article.slug);
+      }
     }
   } catch (error) {
-    retryFailed.add(article.slug);
+    if (pending.includes(article)) {
+      retryFailed.add(article.slug);
+    }
     console.log(`  ${label} failed: ${String(error).slice(0, 160)}`);
   }
   if (shortAnswers(distilled.get(article.slug) ?? "", [article]).length) {
     console.log(`  still short ${article.slug}`);
   }
-}
-const shrunk = shrunkAnswers(distilledText(), mainSections).map(
-  ({ now, slug, was }) => `${slug} (${was} words on main, ${now} now)`
+});
+const stillBehind = losses(distilledText()).filter(lostGround);
+const stillLost = stillBehind.map(
+  (loss) =>
+    `${loss.slug} (${loss.now} words, ${loss.was} on main${loss.dropped.length ? `; dropped "${loss.dropped.join('", "')}"` : ""})`
 );
 
 const linked = distilledText();
@@ -654,7 +740,6 @@ const SECTION_HEAD = /^### .*\{slug: ([^}]+)\}$/u;
 const GET_HERE = /^Get here: (.*)$/u;
 const HELP_CENTER_PATH =
   /\bnot stated\b|\bFAQ\b|\bhelp center\b|"Getting Started"|\bsee (?:the )?\S+ section\b/iu;
-const sourceText = new Map(available.map((a) => [a.slug, a.text]));
 const pageOptIn = new Set(available.filter((a) => a.optIn).map((a) => a.slug));
 const usablePath = (slug: string, path: string): boolean => {
   const labels = labelsIn(path).map((l) => l.label);
@@ -810,6 +895,13 @@ for (const article of available) {
 for (const slug of slugs) {
   cache.set(limitsKey(slug), JSON.stringify(summarised.get(slug)));
 }
+// Only a section still behind main is retried next run, with this same call.
+for (const { slug } of stillBehind) {
+  const retry = retryOutputs.get(slug);
+  if (retry) {
+    cache.set(retry.key, retry.text);
+  }
+}
 const regenerated = [
   ...rewritten,
   ...(limitsFresh
@@ -872,7 +964,7 @@ if (
 const tokens = Math.round(plain.length / 4);
 const getHere = (body.match(/^Get here:/gmu) ?? []).length;
 console.log(`regenerated=${regenerated.join(",") || "none"}`);
-console.log(`shrunk=${shrunk.join(",")}`);
+console.log(`lost=${stillLost.join("; ")}`);
 console.log(
   `successful_calls=${stats.successfulCalls} attempts=${stats.attempts} get_here=${getHere} rejected=${dropped} headed=${slugs.filter((slug) => headed.has(slug)).length} articles=${articles.length} distilled=${available.length} batches=${batches.length} source_chars=${available.reduce((s, a) => s + a.text.length, 0)} guide_chars=${plain.length} ~tokens=${tokens} unpriced_calls=${unpriced} s=${Math.round((Date.now() - startedAt) / 1000)}`
 );
