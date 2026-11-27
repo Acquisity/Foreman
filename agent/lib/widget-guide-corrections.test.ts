@@ -545,6 +545,10 @@ test("wrong summary lines from Foreman#374 are dropped", () => {
     `- Change plans in "Settings" > "Billing" > "View plans". {${LEAD_LIMIT}}`,
     `- Owners and admins change plans in "Settings" > "Billing" > "View plans". {${LEAD_LIMIT}}`,
     `- At the limit, existing campaigns stop sending. {${LEAD_LIMIT}}`,
+    `- At the limit, existing campaigns stop sending and no new leads can be added. {${LEAD_LIMIT}}`,
+    `- At the limit, existing campaigns stop sending, so you won't reach new leads. {${LEAD_LIMIT}}`,
+    `- Existing campaigns are no longer sending at the limit. {${LEAD_LIMIT}}`,
+    `- Existing campaigns are still unable to send at the limit. {${LEAD_LIMIT}}`,
   ];
   const right = [
     `- "Clear out old leads" removes finished leads from campaigns 90+ days old under 2,000 free slots, and when it pauses a campaign, that campaign's bounced leads however much space you have. {${CLEAR_OUT}}`,
@@ -614,6 +618,14 @@ test("the sections Foreman#374 got wrong are refused, the right ones pass", () =
       LEAD_LIMIT,
       section(
         LEAD_LIMIT,
+        "- At capacity, existing campaigns are still blocked from sending. Nothing is deleted automatically.",
+        ROUTES
+      ),
+    ],
+    [
+      LEAD_LIMIT,
+      section(
+        LEAD_LIMIT,
         STILL_SENDS,
         '- Admins use "View plans" in the warning; members "Compare plans"; Client users can\'t change plans.'
       ),
@@ -657,6 +669,14 @@ test("the sections Foreman#374 got wrong are refused, the right ones pass", () =
         CLEAR_OUT,
         "- Under 2,000 free slots it clears finished leads from campaigns 90+ days old and unchanged for 30 days.",
         "- When the agent pauses a campaign, it keeps the bounced leads, regardless of space."
+      ),
+    ],
+    [
+      CLEAR_OUT,
+      section(
+        CLEAR_OUT,
+        "- Under 2,000 free slots it clears finished leads from campaigns 90+ days old and unchanged for 30 days.",
+        "- When the agent pauses a campaign, it never removes its bounced leads, whatever your space."
       ),
     ],
     [
@@ -719,6 +739,14 @@ test("the sections Foreman#374 got wrong are refused, the right ones pass", () =
         CLEAR_OUT,
         "- Under 2,000 free slots it clears finished leads from campaigns 90+ days old and unchanged for 30 days.",
         "- It can remove bounced leads of campaigns it pauses, whatever your space."
+      ),
+    ],
+    [
+      CLEAR_OUT,
+      section(
+        CLEAR_OUT,
+        "- Under 2,000 free slots it clears finished leads from campaigns 90+ days old and unchanged for 30 days.",
+        "- When the agent pauses a campaign, it can remove that campaign's bounced leads regardless of the 2,000 free-slot check, or regardless of remaining space."
       ),
     ],
   ];

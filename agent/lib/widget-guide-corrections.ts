@@ -74,7 +74,7 @@ const CANT = String.raw`\b(?:can[’']?t|cannot|can not|unable|not able|don[’'
 
 /** The agent pausing a campaign, not a campaign that is already paused. */
 const PAUSES = String.raw`\b(?:pauses|pausing)\b`;
-const ANY_SPACE = String.raw`(?:\b(?:however much|no matter how much|any amount of)\b|\b(?:whatever|regardless of) (?:the |your |how much |available )?(?:free )?(?:lead )?(?:space|room|storage|slots)\b)`;
+const ANY_SPACE = String.raw`(?:\b(?:however much|no matter how much|any amount of)\b|\b(?:whatever|regardless of) (?:\S+ ){0,3}?(?:\S+-)?(?:space|room|storage|slots?|check)\b)`;
 const LOW_SPACE = String.raw`(?:\b2,?000\b|\b2k\b|\bfree (?:lead )?(?:slots|space)\b|\b(?:running out of|short (?:of|on)|low on) (?:lead )?(?:space|slots|room)\b|\b(?:space|room|storage) is (?:tight|short|low|full|running out)\b|\bworkspace is (?:nearly |almost )?full\b)`;
 
 export const GUIDE_CORRECTIONS: readonly GuideCorrection[] = [
@@ -203,7 +203,7 @@ export const GUIDE_CORRECTIONS: readonly GuideCorrection[] = [
         "imu"
       ),
       new RegExp(
-        String.raw`${CLAUSE}(?![^.;\n]*\b(?:doesn[’']?t|does not|don[’']?t|do not|won[’']?t|will not|never|not|no)\b)[^.;\n]*\bstop(?:s|ped)? sending\b|\b(?:can[’']?t|cannot|can not|won[’']?t|will not|no longer) (?:\w+ )?send\b`,
+        String.raw`${CLAUSE}(?:(?!\b(?:doesn[’']?t|does not|don[’']?t|do not|won[’']?t|will not|never|not|no)\b)[^.;\n])*?\bstop(?:s|ped)? sending\b|\b(?:can[’']?t|cannot|can not|won[’']?t|will not|no longer|unable to|blocked from) (?:\w+ )?send(?:s|ing)?\b|\bstill not send(?:s|ing)?\b|\b(?:aren[’']?t|are not|isn[’']?t|is not) sending\b`,
         "imu"
       ),
     ],
@@ -257,6 +257,7 @@ export const GUIDE_CORRECTIONS: readonly GuideCorrection[] = [
       new RegExp(
         CLAUSE +
           IN_CLAUSE(PAUSES) +
+          String.raw`(?![^.;\n]*\b(?:never|not|doesn[’']?t|won[’']?t|keeps?)\b)` +
           IN_CLAUSE(String.raw`\b(?:remov|delet|clear)`) +
           IN_CLAUSE(String.raw`\bbounc`) +
           IN_CLAUSE(ANY_SPACE),
