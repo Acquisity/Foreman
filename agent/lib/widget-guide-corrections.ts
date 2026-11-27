@@ -139,7 +139,7 @@ export const GUIDE_CORRECTIONS: readonly GuideCorrection[] = [
   {
     note: 'Clients lose only workspace settings, "Members", "Billing" and credits. They keep personal settings (Profile, Appearance, Security, Availability, Email & Calendar, Conferencing), so say "workspace settings", never just "settings", and list personal settings whenever you list what Clients see.',
     reject: [
-      /\b(?:never|no|not|can[’']?t|cannot)(?: (?:see|open|change|access|use|get|have))?(?: access to)?(?: (?:any|the))? "?settings\b/iu,
+      /\b(?:never|no|not|can[’']?t|cannot|don[’']?t|doesn[’']?t)(?: (?:see|open|change|access|use|get|have))?(?: access to)?(?: (?:any|the))? "?settings\b/iu,
       /^(?!#)(?![^{\n]*\bpersonal)[^{\n]*(?:\b(?:sees?|gets?) only\b|\bonly (?:sees?|gets?)\b)[^.;{\n]*"[^.;{\n]*,.*$/imu,
     ],
     slugs: ["client-portal"],
@@ -155,7 +155,7 @@ export const GUIDE_CORRECTIONS: readonly GuideCorrection[] = [
   {
     note: "Only a DFY inbox still warming up can't be added to a live campaign. Say warming up in the same sentence as any line saying a DFY inbox can't join a live campaign.",
     reject: [
-      /(?:^|[.;])(?![^.;{\n]*\bwarm)[^.;{\n]*(?:\b(?:DFY|done-for-you)\b[^.;{\n]*\b(?:can[’']?t|cannot|not)\b|\b(?:can[’']?t|cannot)\s+(?:add|use)\s+(?:any |a )?(?:DFY|done-for-you)\b)[^.;{\n]*\b(?:(?:live|running|active|launched) campaign|campaign (?:that[’']?s|that is) (?:already )?live)/imu,
+      /(?:^|[.;])(?![^.;{\n]*\bwarm)[^.;{\n]*(?:\b(?:DFY|done-for-you)\b[^.;{\n]*\b(?:can[’']?t|cannot|not|don[’']?t|doesn[’']?t)\b|\b(?:can[’']?t|cannot|don[’']?t|do not)\s+(?:add|use)\s+(?:any |a )?(?:DFY|done-for-you)\b)[^.;{\n]*\b(?:(?:live|running|active|launched) campaign|campaign (?:that[’']?s|that is) (?:already )?live)/imu,
     ],
     slugs: [
       "cold-email-agent/faq/email-accounts",
@@ -166,10 +166,11 @@ export const GUIDE_CORRECTIONS: readonly GuideCorrection[] = [
     note: 'A domain can be assigned to one website at a time. You change or disconnect a domain yourself under "Manage domain" ("Change website", "Disconnect"). This article says nothing about support, counties or lead location.',
     reject: [
       /\bone domain (?:per|for each|a) website\b/iu,
-      /\b(?:each|a|one|per) website\b[^.;\n]{0,30}(?<!more than |than )\bone domain\b/iu,
+      /\b(?:each|a|one|per) website\b[^.;\n]{0,30}(?<!(?<!\bno )more than )\bone domain\b/iu,
       /\b(?:no|can[’']?t|cannot|not)\b[^.;\n]*\bwithout (?:contacting |asking )?support\b/iu,
       /(?<!\b(?:no|not|don[’']?t|never)\b[^.;\n]{0,15})\b(?:ask|contact|needs?|requires?)\b[^.;\n]{0,10}\bsupport\b/iu,
       /\bcount(?:y|ies)\b/iu,
+      /\blead location\b/iu,
     ],
     slugs: ["ai-website-builder/domains"],
   },

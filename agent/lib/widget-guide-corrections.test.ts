@@ -424,6 +424,10 @@ test("wrong summary lines from Foreman#370 are dropped", () => {
     `- You can't add DFY inboxes to a running campaign. {${DFY}}`,
     `- You can't add a DFY inbox to a campaign that's already live. {${DFY}}`,
     `- Prompt top-ups are owner-only, even if you never open Settings. {${SITE_CREDITS}}`,
+    `- DFY inboxes don't join a live campaign. {${DFY}}`,
+    `- Clients don't see settings. {${PORTAL}}`,
+    `- Each website can have no more than one domain. {${SITE_DOMAINS}}`,
+    `- Lead location is not supported. {${SITE_DOMAINS}}`,
   ];
   const right = [
     `- Client role has Client Portal, view-only; clients never see campaigns/AI SDR unless partner enables. {${PORTAL}}`,
