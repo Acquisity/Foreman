@@ -35,7 +35,7 @@ const NEVER =
  * on the billing date is true of every credit, so that claim is left alone.
  */
 const RENEWAL = String.raw`\b(?:renews|renewal|billing date)\b`;
-const NEVER_ENDS = String.raw`(?:\b${NEVER} expire|(?<!${RENEWAL}[^.;\n]*)\b${NEVER} reset(?![^.;\n]*${RENEWAL}))`;
+const NEVER_ENDS = String.raw`(?:\b${NEVER} (?:reset (?:or|and) )?expire|(?<!${RENEWAL}[^.;\n]*)\b${NEVER} reset(?![^.;\n]*${RENEWAL}))`;
 
 const ONLY_PLAN_AND_ONE_TIME = String.raw`\b(?:plan(?:-included)? credits|plan and one-time|one-time|one-off|top-?ups?)\b`;
 
@@ -43,13 +43,16 @@ const ONLY_PLAN_AND_ONE_TIME = String.raw`\b(?:plan(?:-included)? credits|plan a
 const CREDITS_CHECKS = {
   reject: [
     new RegExp(
-      String.raw`(?<!^#[^\n]*)(?<!${ONLY_PLAN_AND_ONE_TIME}[^.;\n]*)${NEVER_ENDS}`,
+      String.raw`(?<!^#[^\n]*)(?<!${ONLY_PLAN_AND_ONE_TIME}[^.;,\n]*)${NEVER_ENDS}`,
       "imu"
     ),
     new RegExp(String.raw`\bmonthly\b[^.;\n]*${NEVER_ENDS}`, "iu"),
   ],
   require: [
-    new RegExp(String.raw`(?<!\b${NEVER} )\bend with (?:it|the pack)\b`, "iu"),
+    new RegExp(
+      String.raw`(?<!\b${NEVER} (?:\w+ )?)\bend with (?:it|the pack)\b`,
+      "iu"
+    ),
   ],
 };
 

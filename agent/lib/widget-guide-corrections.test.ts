@@ -293,6 +293,8 @@ test("credits never expiring is said only of plan credits and one-time packs", (
       "- Credits aren’t meant to reset.",
       "- Credits doesn't expire.",
       "- Plan credits never expire. Credits never expire or reset.",
+      "- Plan credits never expire, but credits never expire or reset.",
+      "- Credits never reset or expire, even after your plan renews.",
     ].map((line): [string, string] => [
       CREDITS,
       section(CREDITS, line, exception),
@@ -320,6 +322,14 @@ test("credits never expiring is said only of plan credits and one-time packs", (
         CREDITS,
         "- Plan credits and one-time packs never expire.",
         "- If the pack ends, its credits don't end with it."
+      ),
+    ],
+    [
+      CREDITS,
+      section(
+        CREDITS,
+        "- Plan credits and one-time packs never expire.",
+        "- If the pack ends, its credits don't automatically end with it."
       ),
     ],
   ];
