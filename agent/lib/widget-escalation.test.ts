@@ -503,19 +503,23 @@ test("an owner's toggled refund marks the run for the finish, only with escalati
     [true, { asksForHuman: 0 }, 0],
     [false, { asksForHuman: 0, refund: true }, 0],
   ] as const) {
-    await t.test(`${on ? "on" : "off"}, refund ${"refund" in route}`, async (st) => {
-      enable(st, on);
-      const { deps } = harness(route);
-      const marked: string[] = [];
-      deps.markRefund = (id) => {
-        marked.push(id);
-        return Promise.resolve();
-      };
-      await send(deps, { mode: "investigate" }, scope, () => {
-        throw new Error("session unavailable");
-      });
-      assert.deepEqual(marked, marks ? [runId] : []);
-    });
+    // biome-ignore lint/performance/noAwaitInLoops: each case needs its own fresh run.
+    await t.test(
+      `${on ? "on" : "off"}, refund ${"refund" in route}`,
+      async (st) => {
+        enable(st, on);
+        const { deps } = harness(route);
+        const marked: string[] = [];
+        deps.markRefund = (id) => {
+          marked.push(id);
+          return Promise.resolve();
+        };
+        await send(deps, { mode: "investigate" }, scope, () => {
+          throw new Error("session unavailable");
+        });
+        assert.deepEqual(marked, marks ? [runId] : []);
+      }
+    );
   }
 });
 
@@ -525,7 +529,8 @@ test("a marked refund whose investigation filed no refund ticket escalates as re
     ...findings,
     facts: [
       {
-        claim: "Two $252.00 charges for domains and inboxes in October; one is refunded.",
+        claim:
+          "Two $252.00 charges for domains and inboxes in October; one is refunded.",
         entityIds: [],
         evidence: { ref: "", tool: "billing summary" },
       },
@@ -569,6 +574,11 @@ test("a marked refund whose investigation filed no refund ticket escalates as re
 
   const unmarked = harness();
   unmarked.deps.extract = () => Promise.resolve(read);
-  await finishWidgetRun(unmarked.run, "widget-session-plain", asked, unmarked.deps);
+  await finishWidgetRun(
+    unmarked.run,
+    "widget-session-plain",
+    asked,
+    unmarked.deps
+  );
   assert.equal(escalateOf(unmarked.run), undefined);
 });

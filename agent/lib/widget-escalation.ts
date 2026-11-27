@@ -183,6 +183,22 @@ export const needsTheTeam = (
     { conversationId: run.scope.conversationId, runId: run.id, sessionId }
   );
 
+/** An owner's toggled refund whose investigation filed no refund ticket, handed to Fixy with what it read (ENG-21231). */
+export const refundNotFiled = (
+  run: RunIds,
+  sessionId: string,
+  found: WidgetFindings | null
+) =>
+  escalated(
+    {
+      reason: "refund",
+      report:
+        "The customer asked for a refund and Foreman's investigation filed no refund ticket, so the chat was handed to Fixy with what it read.",
+    },
+    found,
+    { conversationId: run.scope.conversationId, runId: run.id, sessionId }
+  );
+
 /**
  * A customer's investigation that could not start goes to Fixy rather than a
  * dead end. Null for a teammate's run and while escalation is off, which keep

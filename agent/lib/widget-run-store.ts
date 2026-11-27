@@ -411,6 +411,22 @@ export async function requestWidgetRecording(id: string) {
   );
 }
 
+/**
+ * An owner's toggled refund (ENG-21231), kept on the pending findings beside
+ * the ticket receipt so the finish can hand an unfiled refund to Fixy. The
+ * finish's own findings replace it.
+ */
+export async function markWidgetRefund(id: string) {
+  await privateDatabase().query(
+    `UPDATE widget_support_runs SET findings = jsonb_set(COALESCE(findings, '{}'::jsonb), '{refundAsked}', 'true'::jsonb)
+     WHERE id = $1 AND completed_at IS NULL`,
+    [id]
+  );
+}
+
+export const refundAsked = (findings: unknown) =>
+  z.object({ refundAsked: z.literal(true) }).safeParse(findings).success;
+
 /** Stopped by the customer. A finish that lands later finds the run settled and changes nothing. */
 export async function cancelWidgetRun(id: string) {
   const outcome: WidgetOutcome = {

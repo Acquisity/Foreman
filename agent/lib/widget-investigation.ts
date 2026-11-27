@@ -32,6 +32,7 @@ import {
   escalatesToFixy,
   escalationFor,
   needsTheTeam,
+  refundNotFiled,
   teamAsk,
 } from "./widget-escalation.js";
 import {
@@ -108,10 +109,12 @@ import {
   expireSessionlessWidgetRuns,
   FINISH_CLAIM_SECONDS,
   latestWidgetScope,
+  markWidgetRefund,
   readWidgetRun,
   readWidgetTicketReceipt,
   recentInboxTurns,
   recentWidgetTurns,
+  refundAsked,
   requestWidgetRecording,
   saveWidgetProgress,
   type WidgetOutcome,
@@ -655,6 +658,8 @@ export const defaultWidgetDependencies = {
   history: recentWidgetTurns,
   inboxHistory: recentInboxTurns,
   latestScope: latestWidgetScope,
+  /** Marks an owner's toggled refund, so a finish that filed none hands it to Fixy. */
+  markRefund: markWidgetRefund,
   plan: planWidgetChecks,
   progress: saveWidgetProgress,
   read: readWidgetRun,
@@ -681,6 +686,7 @@ export type WidgetDependencies = Omit<
   | "fileGaps"
   | "fileTicket"
   | "inboxHistory"
+  | "markRefund"
   | "plan"
   | "progress"
   | "requestRecording"
@@ -700,6 +706,7 @@ export type WidgetDependencies = Omit<
       | "fileGaps"
       | "fileTicket"
       | "inboxHistory"
+      | "markRefund"
       | "plan"
       | "progress"
       | "requestRecording"
@@ -1092,6 +1099,27 @@ const startReplyGapFiling = (
     )
   );
 
+/** An owner's marked refund whose turn filed no refund ticket goes to Fixy with what it read, whatever else it found. */
+const unfiledRefund = (
+  run: Pick<WidgetRun, "findings" | "id" | "question" | "scope">,
+  sessionId: string,
+  structured: WidgetFindings | null,
+  ticket: FiledTicket | null | undefined
+) => {
+  if (
+    !(
+      structured &&
+      refundAsked(run.findings) &&
+      !ticket?.refund &&
+      escalatesToFixy() &&
+      customerTurn(run.scope)
+    )
+  ) {
+    return null;
+  }
+  return refundNotFiled(run, sessionId, withFiledTicket(ticket, structured));
+};
+
 /**
  * A finish that skips the gate: findings that need a person hand the chat to
  * Fixy when escalation is on, and a write-up with no structured findings still
@@ -1122,7 +1150,12 @@ const settledWithoutGate = (
 export async function finishWidgetRun(
   run: Pick<
     WidgetRun,
-    "created_at" | "id" | "question" | "recording_requested" | "scope"
+    | "created_at"
+    | "findings"
+    | "id"
+    | "question"
+    | "recording_requested"
+    | "scope"
   >,
   sessionId: string,
   outcome: WaitOutcome,
@@ -1218,14 +1251,16 @@ export async function finishWidgetRun(
     const structured =
       written.structured && withoutUnchecked(written.structured);
     const extractMs = Date.now() - extractStartedAt;
-    const handoff = settledWithoutGate(
-      run,
-      sessionId,
-      structured,
-      written.escalate,
-      outcome.text,
-      outcome.ticket
-    );
+    const handoff =
+      unfiledRefund(run, sessionId, structured, outcome.ticket) ??
+      settledWithoutGate(
+        run,
+        sessionId,
+        structured,
+        written.escalate,
+        outcome.text,
+        outcome.ticket
+      );
     if (handoff) {
       ({ findings, result } = handoff);
     } else if (structured) {
@@ -1466,6 +1501,33 @@ async function offerRecording(
     run.recording_requested = true;
   }
   return offered;
+}
+
+/**
+ * An owner's toggled refund still investigates and files its own ticket, but
+ * only once the charge is named (ENG-21231): the mark lets a finish that filed
+ * none hand the chat to Fixy. A failed write loses only that handoff.
+ */
+async function markToggledRefund(
+  run: WidgetRun,
+  scope: WidgetContext,
+  route: WidgetRoute,
+  deps: Pick<WidgetDependencies, "markRefund">
+) {
+  if (!(route.refund && escalatesToFixy() && customerTurn(scope))) {
+    return;
+  }
+  const marked = await deps.markRefund?.(run.id).then(
+    () => true,
+    () => false
+  );
+  if (marked) {
+    // The in-process finish reads this same row object.
+    run.findings = {
+      ...(run.findings as Record<string, unknown> | null),
+      refundAsked: true,
+    };
+  }
 }
 
 /** With escalation on, asking here reaches a person at any time, so the writers get no hours to quote. */
@@ -2096,6 +2158,7 @@ async function answerFreshRun(
       return json(widgetRunResponse(person ?? (await deps.read(run.id))));
     }
     personNote = person;
+    await markToggledRefund(run, scope, route, deps);
     if (!input.recording) {
       await offerRecording(run, route, ask, deps);
     }
