@@ -11,6 +11,10 @@ import { GUIDE_CITATION, type GuideLimits } from "./widget-guide-cache.js";
  * section keeps the fact. A correction with a `path` sets the articles'
  * "Get here:" line outright, with no model call. Add one when a guide review
  * finds a line the article contradicts and the article is already clear.
+ * A section refused on every try stops the whole regeneration, so a new check
+ * refuses the wrong claim only: test it against the article's own text and the
+ * last good generated section, and dispatch the widget-guide workflow once it
+ * merges (ENG-21344, where a too-strict check stopped three runs).
  */
 export interface GuideCorrection {
   /** What a past run got wrong, in the article's own terms. */
