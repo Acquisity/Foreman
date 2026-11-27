@@ -638,3 +638,44 @@ test("a toggled refund in a conversation that already has a refund ticket is not
   });
   assert.deepEqual(marked, []);
 });
+
+test("a marked refund that blocks still reaches Fixy as a refund, and a question-only turn carries the write-up", async (t) => {
+  enable(t);
+  const failed = harness();
+  failed.run.findings = { refundAsked: true };
+  await finishWidgetRun(
+    failed.run,
+    "widget-session-failed",
+    { status: "failed" },
+    failed.deps
+  );
+  assert.equal(failed.run.outcome?.reason, "escalated_to_fixy refund");
+
+  const { deps, run } = harness({ asksForHuman: 0, refund: true });
+  deps.markRefund = () => Promise.resolve();
+  await send(deps, { mode: "investigate" }, scope, () => {
+    throw new Error("session unavailable");
+  });
+  assert.equal(run.outcome?.reason, "escalated_to_fixy refund");
+
+  setEnv(t, "WIDGET_NEXT_ACTION", "jev");
+  const asked = harness();
+  asked.run.findings = { refundAsked: true };
+  asked.deps.extract = () => Promise.resolve(null);
+  const text =
+    "Billing shows two $252 charges in October, one refunded. Which charge do they mean?";
+  await finishWidgetRun(
+    asked.run,
+    "widget-session-asked",
+    {
+      afterReads: true,
+      asked: "Which charge do you mean?",
+      findings: null,
+      status: "completed",
+      text,
+    },
+    asked.deps
+  );
+  assert.equal(asked.run.outcome?.reason, "escalated_to_fixy refund");
+  assert.equal((asked.run.findings as WidgetFindings).recommendation, text);
+});

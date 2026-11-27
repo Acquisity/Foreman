@@ -252,7 +252,8 @@ export const RETRYABLE_BLOCK =
  * could not be filed keep the block.
  */
 export async function ticketInsteadOfBlock(
-  run: Pick<WidgetRun, "id" | "question" | "scope">,
+  run: Pick<WidgetRun, "id" | "question" | "scope"> &
+    Partial<Pick<WidgetRun, "findings">>,
   result: WidgetOutcome,
   findings: unknown,
   history: HandoffFacts["history"],

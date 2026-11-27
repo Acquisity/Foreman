@@ -43,6 +43,7 @@ describe("routeWidgetMessage", () => {
       "asks_to_cancel",
       "offers_recording",
       "reports_bug",
+      "reports_double_charge",
       "states_need",
     ]);
     // A question about when a person is available is a need, not a bare ask (ENG-15262).
@@ -54,6 +55,32 @@ describe("routeWidgetMessage", () => {
       (sent as { headers: Record<string, string> }).headers.authorization,
       "Bearer test-key"
     );
+  });
+
+  it("counts a double charge as a refund only with escalation on", async (t) => {
+    const previous = process.env.WIDGET_ESCALATE_TO_FIXY;
+    t.after(() => {
+      if (previous === undefined) {
+        Reflect.deleteProperty(process.env, "WIDGET_ESCALATE_TO_FIXY");
+      } else {
+        process.env.WIDGET_ESCALATE_TO_FIXY = previous;
+      }
+    });
+    const route = () =>
+      routeWidgetMessage("you charged me twice for my subscription", {
+        apiKey: "test-key",
+        fetch: () =>
+          Promise.resolve(
+            jevReply({
+              asks_for_refund: { noul: 0.2 },
+              reports_double_charge: { noul: 0.95 },
+            })
+          ),
+      });
+    process.env.WIDGET_ESCALATE_TO_FIXY = "on";
+    assert.equal((await route()).refund, true);
+    Reflect.deleteProperty(process.env, "WIDGET_ESCALATE_TO_FIXY");
+    assert.equal((await route()).refund, undefined);
   });
 
   it("flags a refund, a ticket, a bug and a recording offer at their bars", async () => {

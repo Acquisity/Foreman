@@ -166,10 +166,16 @@ export function escalated(
 }
 
 interface RunIds {
+  /** The pending findings, which carry a toggled refund's mark. */
+  findings?: unknown;
   id: string;
   question: string;
   scope: WidgetContext;
 }
+
+/** A marked refund that blocks still reaches Fixy as a refund (ENG-21231). */
+const blockedReason = (run: RunIds): EscalationReason =>
+  refundAsked(run.findings) ? "refund" : "blocked";
 
 /** Findings that still need a person after the investigation, handed to Fixy as cant_check. */
 export const needsTheTeam = (
@@ -296,7 +302,7 @@ export const couldNotStart = (run: RunIds) =>
   escalatesToFixy() && customerTurn(run.scope)
     ? escalated(
         {
-          reason: "blocked",
+          reason: blockedReason(run),
           report:
             "Foreman's investigation could not start, so the chat was handed to Fixy.",
         },
@@ -315,7 +321,7 @@ export const blockedForCustomer = (
 ) =>
   escalated(
     {
-      reason: "blocked",
+      reason: blockedReason(run),
       report: `Foreman could not answer this (${reason}) and handed the chat to Fixy.`,
     },
     found,

@@ -1099,6 +1099,15 @@ const startReplyGapFiling = (
     )
   );
 
+/** What a refund handed to Fixy carries: the findings, or the write-up as written when nothing structured came of it. */
+const refundFindings = (
+  structured: WidgetFindings | null,
+  text: string | null
+) => {
+  const written = text ? (humanHandoff(text, "")?.findings ?? null) : null;
+  return structured?.facts.length ? structured : (written ?? structured);
+};
+
 /**
  * A finish that skips the gate: findings that need a person hand the chat to
  * Fixy when escalation is on, and a write-up with no structured findings still
@@ -1235,14 +1244,10 @@ export async function finishWidgetRun(
         run,
         sessionId,
         { read: deps.readTicket, signal: deadline, ticket: outcome.ticket },
-        // A write-up the extractor could not structure still goes as written.
         (ticket) =>
           withReadings(
             outcome.readings,
-            withFiledTicket(
-              ticket,
-              structured ?? humanHandoff(outcome.text, "")?.findings ?? null
-            )
+            withFiledTicket(ticket, refundFindings(structured, outcome.text))
           )
       )) ??
       settledWithoutGate(

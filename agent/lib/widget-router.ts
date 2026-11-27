@@ -191,12 +191,10 @@ const QUESTIONS = {
     type: "noul",
   },
   // A refund needs a look at billing and a ticket, which only an investigation
-  // can do: members are pointed to their owner, owners to the toggle. A
-  // double-charge report counts, since it reached no one when the customer had
-  // not yet asked for the money back (ENG-21231).
+  // can do: members are pointed to their owner, owners to the toggle.
   asks_for_refund: {
     instructions:
-      "The customer asks for a refund, their money back or a charge to be reversed, or says they were charged or billed twice for the same thing even without asking for the money back, or the latest message continues such a request from the earlier turns, for example by saying which charge it was or why they want it back. Asking how refunds work in general, or what a single charge was for, without asking for money back is NOT this.",
+      "The customer asks for a refund, their money back or a charge to be reversed, or the latest message continues such a request from the earlier turns, for example by saying which charge it was or why they want it back. Asking how refunds work in general, or what a charge was for, without asking for money back is NOT this.",
     type: "noul",
   },
   // Filing a ticket is the one thing Foreman can do for a customer, and only an
@@ -228,6 +226,14 @@ const QUESTIONS = {
       "The customer reports something in the product not working as it should: an error message, a page or button that does nothing or breaks, something that fails to load, save, send or generate, or a result that is wrong. A how-to question, a billing or refund request, a request for a change, or a message that only answers a question Support just asked is NOT this.",
     type: "noul",
   },
+  // Asked in the same request, so it costs nothing. With escalation on it counts
+  // as a refund, so a double charge reaches Fixy before the customer has asked
+  // for the money back (ENG-21231).
+  reports_double_charge: {
+    instructions:
+      "The customer says they were charged or billed twice, or more than once, for the same thing, in the latest message or earlier in the conversation, whether or not they ask for the money back. A question about what a single charge was for is NOT this.",
+    type: "noul",
+  },
   // Asked in the same request, so it costs nothing. It only decides what an
   // after-hours ask for a person gets when there is nothing to act on (ENG-15262).
   states_need: {
@@ -245,6 +251,9 @@ const responseSchema = z.object({
     asks_to_cancel: z.object({ noul: z.number().min(0).max(1) }).optional(),
     offers_recording: z.object({ noul: z.number().min(0).max(1) }).optional(),
     reports_bug: z.object({ noul: z.number().min(0).max(1) }).optional(),
+    reports_double_charge: z
+      .object({ noul: z.number().min(0).max(1) })
+      .optional(),
     states_need: z.object({ noul: z.number().min(0).max(1) }).optional(),
   }),
 });
@@ -341,7 +350,10 @@ export async function routeWidgetMessage(
     const { answers } = responseSchema.parse(response);
     const flag = (score: number | undefined, bar: number) =>
       (score ?? 0) >= bar;
-    const refund = flag(answers.asks_for_refund?.noul, REFUND_REQUEST);
+    const refund =
+      flag(answers.asks_for_refund?.noul, REFUND_REQUEST) ||
+      (escalatesToFixy() &&
+        flag(answers.reports_double_charge?.noul, REFUND_REQUEST));
     const ticket = flag(answers.asks_for_ticket?.noul, TICKET_REQUEST);
     // With escalation off a cancel changes nothing, so the old person-ask
     // invitation still stands.
