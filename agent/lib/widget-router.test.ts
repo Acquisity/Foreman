@@ -147,6 +147,53 @@ describe("routeWidgetMessage", () => {
     }
   });
 
+  it("routes a bare ask for a person to a person whatever Jev scored, a failed call too", async () => {
+    const asks = [
+      "Human agent",
+      "human agent please.",
+      "agent",
+      "Live agent",
+      "live person",
+      "I need to speak to a live agent",
+      "Can I talk to a human?",
+      "I\u2019d like to speak with a real person",
+    ];
+    for (const message of asks) {
+      // biome-ignore lint/performance/noAwaitInLoops: one fake call per ask.
+      const scored = await routeWidgetMessage(message, {
+        apiKey: "test-key",
+        fetch: () =>
+          Promise.resolve(jevReply({ asks_for_human: { noul: 0.3 } })),
+      });
+      assert.equal(scored.asksForHuman, 1, message);
+      assert.equal(scored.source, "jev", message);
+      const failed = await routeWidgetMessage(message, {
+        apiKey: "test-key",
+        fetch: () => Promise.reject(new Error("boom")),
+      });
+      assert.equal(failed.asksForHuman, 1, message);
+      assert.equal(failed.source, "fallback", message);
+    }
+  });
+
+  it("leaves Jev's score alone for a message that only mentions a person or says more", async () => {
+    for (const message of [
+      "I'm looking for anthony",
+      "my agent stopped replying to leads",
+      "human agent, my campaign stopped sending",
+      "How do I add a person to my workspace?",
+      "AI SDR agent",
+    ]) {
+      // biome-ignore lint/performance/noAwaitInLoops: one fake call per message.
+      const route = await routeWidgetMessage(message, {
+        apiKey: "test-key",
+        fetch: () =>
+          Promise.resolve(jevReply({ asks_for_human: { noul: 0.3 } })),
+      });
+      assert.equal(route.asksForHuman, 0.3, message);
+    }
+  });
+
   it("scores everything zero without a key and never calls out", async () => {
     let called = false;
     const route = await routeWidgetMessage("hello", {
