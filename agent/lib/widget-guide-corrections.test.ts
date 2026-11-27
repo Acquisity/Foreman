@@ -32,9 +32,9 @@ test("every correction names an article the guide has", () => {
   }
 });
 
-// The first wrong line of each article is copied from Foreman#353 at d9475c02
-// (ENG-21059); the rest are the same claims reworded, from review. The right
-// lines are written to the Help Centre at Acquisity a649441c6431.
+// Wrong lines are Foreman#353's at d9475c02 (ENG-21059) or the same claims
+// reworded in review. Right lines are written to the Help Centre at Acquisity
+// a649441c6431.
 test("the sections Foreman#353 got wrong are refused, reworded too", () => {
   const wrong: [string, string][] = [
     [
@@ -54,6 +54,15 @@ test("the sections Foreman#353 got wrong are refused, reworded too", () => {
       ),
     ],
     [CALLING, section(CALLING, "- iMessage lines: US-only.")],
+    [CALLING, section(CALLING, "- Do not contact blocks texts only.")],
+    [
+      IMPORT,
+      section(
+        IMPORT,
+        "- Skipped: duplicates, already emailed, blocked, do-not-contact.",
+        '- Use "Delete selected" on the other campaign\'s "Leads" tab, then re-import.'
+      ),
+    ],
     [CALLING, section(CALLING, "- US-only iMessage lines.")],
     [
       CALLING,
@@ -154,6 +163,7 @@ test("right wording for the same articles passes", () => {
         "- Choose iMessage or Phone line (US numbers only for Phone line).",
         "- Do not contact status and the do-not-contact list block calls and texts; only a STOP reply leaves calls unaffected.",
         "- Calls and texts are blocked by Do not contact status or the do-not-contact list; a STOP reply blocks texts only (calls unaffected).",
+        "- Calls and texts are blocked by Do not contact status, and a STOP reply blocks texts only (calls unaffected).",
         "- Do not contact blocks calls and texts, while STOP leaves calls unaffected."
       ),
     ],
