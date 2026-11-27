@@ -396,3 +396,125 @@ test("summary lines Foreman#370 kept from main's guide are dropped", () => {
     refused: lines.slice(0, 2),
   });
 });
+
+const PORTAL = "client-portal";
+const SITE_CREDITS = "ai-website-builder/credits-and-limits";
+const INBOX_FAQ = "cold-email-agent/faq/email-accounts";
+const DFY = "cold-email-agent/email-accounts/dfy-warmup-and-reconnect-errors";
+const SITE_DOMAINS = "ai-website-builder/domains";
+
+// Wrong lines are Foreman#370's at 8b46dd20 (ENG-21290). Right lines are
+// written to the Help Centre at Acquisity 6085af2ac0b6, and include #370's own
+// sections for these articles where they were right.
+test("wrong summary lines from Foreman#370 are dropped", () => {
+  const wrong = [
+    `- Only Owners buy credits for AI Website Builder ("Settings" > "Billing" > "Buy credits"). {${SITE_CREDITS}}`,
+    `- Clients see only "Client Portal", "Dashboard", CRM (unless off) and partner-enabled campaigns; they never see settings, "Members", "Billing" or credits. {${PORTAL}}`,
+    `- DFY inboxes can't be added to a live campaign. {${INBOX_FAQ}}`,
+    `- Website Builder: no domain changes to a bought domain without support; one domain per website at a time; counties unsupported for lead location. {${SITE_DOMAINS}}`,
+    `- Clients can't open settings. {${PORTAL}}`,
+    `- Done-for-you inboxes cannot join a running campaign. {${DFY}}`,
+    `- Website Builder top-ups are owner only. {${SITE_CREDITS}}`,
+    `- Each website can have one domain at a time. {${SITE_DOMAINS}}`,
+    `- Clients never see "Settings", "Members" or "Billing". {${PORTAL}}`,
+    `- Clients can't open the settings. {${PORTAL}}`,
+    `- Clients see only "Client Portal", "Dashboard", CRM (unless off) and partner-enabled campaigns; never workspace settings, "Members", "Billing". {${PORTAL}}`,
+    `- Only Owners buy credits for AI Website Builder. A prompt appears when your balance runs low. {${SITE_CREDITS}}`,
+    `- DFY inboxes can't be added to a live campaign. Check the warm-up status first. {${INBOX_FAQ}}`,
+    `- You can't add DFY inboxes to a running campaign. {${DFY}}`,
+    `- You can't add a DFY inbox to a campaign that's already live. {${DFY}}`,
+    `- Prompt top-ups are owner-only, even if you never open Settings. {${SITE_CREDITS}}`,
+    `- DFY inboxes don't join a live campaign. {${DFY}}`,
+    `- Clients don't see settings. {${PORTAL}}`,
+    `- Each website can have no more than one domain. {${SITE_DOMAINS}}`,
+    `- Lead location is not supported. {${SITE_DOMAINS}}`,
+  ];
+  const right = [
+    `- Client role has Client Portal, view-only; clients never see campaigns/AI SDR unless partner enables. {${PORTAL}}`,
+    `- Clients never see workspace settings, "Members", "Billing" or credits; they keep personal settings. {${PORTAL}}`,
+    `- Only Owners buy Website Builder credits from "Settings" > "Billing"; anyone can top up from the prompt. {${SITE_CREDITS}}`,
+    `- A DFY inbox still warming up can't be added to a live campaign. {${DFY}}`,
+    `- A domain can be assigned to one website at a time. {${SITE_DOMAINS}}`,
+    `- Clients see only "Client Portal", "Dashboard", CRM and personal settings; never workspace settings. {${PORTAL}}`,
+    `- Only workspace owners can buy credits through "Settings" > "Billing". {${SITE_CREDITS}}`,
+    `- Low balance: top up from the prompt; only owners can also buy in "Settings" > "Billing". {${SITE_CREDITS}}`,
+    `- A DFY inbox marked "Ready to send" can be added to a live campaign. {${DFY}}`,
+    `- Each website can have more than one domain. {${SITE_DOMAINS}}`,
+    `- You can change or disconnect a domain under "Manage domain" without contacting support. {${SITE_DOMAINS}}`,
+    `- You do not need support to change or disconnect a domain under "Manage domain". {${SITE_DOMAINS}}`,
+    `- "Settings" > "Billing" > "Buy credits": only Owners can buy credits here. {${SITE_CREDITS}}`,
+    `- They only get widgets built from results they can already see. {${PORTAL}}`,
+    `- Clients only see campaigns when their partner enables them. {${PORTAL}}`,
+  ];
+  assert.deepEqual(refuseSummaryLines({ cannot: wrong, who: right }), {
+    kept: { cannot: [], who: right },
+    refused: wrong,
+  });
+});
+
+test("the sections Foreman#370 got wrong are refused, the right ones pass", () => {
+  const wrong: [string, string][] = [
+    [
+      PORTAL,
+      section(
+        PORTAL,
+        '- Clients see "Dashboard", CRM (unless off), personal settings; campaigns/AI SDR only if partner enables; never settings, "Members", "Billing", credits.'
+      ),
+    ],
+    [
+      SITE_DOMAINS,
+      section(
+        SITE_DOMAINS,
+        '- Assign: click "Connect website" on the row (or "..." > "Manage domain"), pick the website. One domain per website at a time.'
+      ),
+    ],
+    [SITE_DOMAINS, section(SITE_DOMAINS, "- Counties unsupported.")],
+    [SITE_CREDITS, section(SITE_CREDITS, "- Only owners can buy credits.")],
+  ];
+  for (const [slug, text] of wrong) {
+    assert.notDeepEqual(sectionProblems(slug, text), [], text);
+  }
+  const right: [string, string][] = [
+    [
+      PORTAL,
+      section(
+        PORTAL,
+        "- Client role sees stats, AI Account Manager chat, help cards; view-only.",
+        '- Clients see "Dashboard", CRM (unless off), personal settings; campaigns/AI SDR only if partner enables; never workspace settings, "Members", "Billing", credits.'
+      ),
+    ],
+    [
+      SITE_CREDITS,
+      section(
+        SITE_CREDITS,
+        'Get here: "Settings" > "Billing" > "Buy credits" (owners only).',
+        "Low balance: top up from the prompt, resend."
+      ),
+    ],
+    [
+      DFY,
+      section(
+        DFY,
+        '- New DFY inboxes warm up for 2 weeks: "Status" "Warming up". They can\'t send campaign emails. They can\'t be added to a live campaign.'
+      ),
+    ],
+    [
+      INBOX_FAQ,
+      section(
+        INBOX_FAQ,
+        "- Covers sender accounts, inboxes, warmup, domain setup."
+      ),
+    ],
+    [
+      SITE_DOMAINS,
+      section(
+        SITE_DOMAINS,
+        'Assign: click "Connect website" on the row, pick the website. A domain goes to one website at a time.',
+        '"Manage domain": "Change website", "Disconnect", renewal settings, DNS records.'
+      ),
+    ],
+  ];
+  for (const [slug, text] of right) {
+    assert.deepEqual(sectionProblems(slug, text), [], text);
+  }
+});
