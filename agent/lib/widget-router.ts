@@ -227,6 +227,14 @@ const QUESTIONS = {
       "The customer reports something in the product not working as it should: an error message, a page or button that does nothing or breaks, something that fails to load, save, send or generate, or a result that is wrong. A how-to question, a billing or refund request, a request for a change, or a message that only answers a question Support just asked is NOT this.",
     type: "noul",
   },
+  // Asked in the same request, and only with escalation on, where it counts as
+  // a refund, so a double charge reaches Fixy before the customer has asked for
+  // the money back (ENG-21231).
+  reports_double_charge: {
+    instructions:
+      "In the latest message the customer says they were charged or billed twice, or more than once, for the same thing, or the latest message continues such a report from the earlier turns, whether or not they ask for the money back. A question about what a single charge was for is NOT this, and neither is a latest message about something else.",
+    type: "noul",
+  },
   // Asked in the same request, so it costs nothing. It only decides what an
   // after-hours ask for a person gets when there is nothing to act on (ENG-15262).
   states_need: {
@@ -236,6 +244,9 @@ const QUESTIONS = {
   },
 } as const;
 
+const { reports_double_charge: _onlyEscalating, ...WITHOUT_DOUBLE_CHARGE } =
+  QUESTIONS;
+
 const responseSchema = z.object({
   answers: z.object({
     asks_for_human: z.object({ noul: z.number().min(0).max(1) }),
@@ -244,6 +255,9 @@ const responseSchema = z.object({
     asks_to_cancel: z.object({ noul: z.number().min(0).max(1) }).optional(),
     offers_recording: z.object({ noul: z.number().min(0).max(1) }).optional(),
     reports_bug: z.object({ noul: z.number().min(0).max(1) }).optional(),
+    reports_double_charge: z
+      .object({ noul: z.number().min(0).max(1) })
+      .optional(),
     states_need: z.object({ noul: z.number().min(0).max(1) }).optional(),
   }),
 });
@@ -381,7 +395,7 @@ async function scoreWidgetMessage(
   const startedAt = Date.now();
   try {
     const response = await askJev(
-      QUESTIONS,
+      escalatesToFixy() ? QUESTIONS : WITHOUT_DOUBLE_CHARGE,
       routerInput(ask).slice(0, MAX_STATE_CHARS),
       apiKey,
       {
@@ -393,7 +407,10 @@ async function scoreWidgetMessage(
     const { answers } = responseSchema.parse(response);
     const flag = (score: number | undefined, bar: number) =>
       (score ?? 0) >= bar;
-    const refund = flag(answers.asks_for_refund?.noul, REFUND_REQUEST);
+    const refund =
+      flag(answers.asks_for_refund?.noul, REFUND_REQUEST) ||
+      (escalatesToFixy() &&
+        flag(answers.reports_double_charge?.noul, REFUND_REQUEST));
     const ticket = flag(answers.asks_for_ticket?.noul, TICKET_REQUEST);
     // With escalation off a cancel changes nothing, so the old person-ask
     // invitation still stands.
