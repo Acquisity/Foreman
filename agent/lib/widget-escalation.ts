@@ -231,7 +231,10 @@ export async function markToggledRefund(
   };
 }
 
-type FiledTicket = NonNullable<WidgetFindings["ticket"]> & { refund?: true };
+/** A ticket the turn filed, with whether it went to billing as a refund. */
+export type FiledTicket = NonNullable<WidgetFindings["ticket"]> & {
+  refund?: true;
+};
 
 /**
  * A marked refund's finish: the turn's ticket, else its saved receipt (an

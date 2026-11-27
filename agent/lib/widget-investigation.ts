@@ -31,6 +31,7 @@ import {
   customerTurn,
   escalatesToFixy,
   escalationFor,
+  type FiledTicket,
   markToggledRefund,
   needsTheTeam,
   refundHandoff,
@@ -334,7 +335,6 @@ const messageText = (data: unknown): string | null => {
 };
 
 /** `refund` is ours alone: the findings contract carries only the id and url. */
-type FiledTicket = NonNullable<WidgetFindings["ticket"]> & { refund?: true };
 const TICKET_URL =
   /^https:\/\/linear\.app\/acquisity\/issue\/(ENG-\d+)(?:[/?#]|$)/u;
 const ticketOutput = z.object({
