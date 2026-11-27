@@ -540,6 +540,8 @@ test("wrong summary lines from Foreman#374 are dropped", () => {
     `- "Clear out old leads" removes bounced leads from paused campaigns 90+ days old when under 2,000 free slots. {${CLEAR_OUT}}`,
     `- Clear out old leads only runs when space is tight. {${CLEAR_OUT}}`,
     `- When the agent pauses a campaign, Clear out old leads removes its bounced leads only when you have under 2,000 free slots. {${CLEAR_OUT}}`,
+    `- When the agent pauses a campaign, Clear out old leads removes its bounced leads only when you have under 2,000 free slots, regardless of plan. {${CLEAR_OUT}}`,
+    `- Owners and Client users use "Settings" > "Billing" > "View plans". {${LEAD_LIMIT}}`,
     `- Change plans in "Settings" > "Billing" > "View plans". {${LEAD_LIMIT}}`,
     `- Owners and admins change plans in "Settings" > "Billing" > "View plans". {${LEAD_LIMIT}}`,
     `- At the limit, existing campaigns stop sending. {${LEAD_LIMIT}}`,
@@ -600,6 +602,22 @@ test("the sections Foreman#374 got wrong are refused, the right ones pass", () =
         ROUTES
       ),
     ],
+    [
+      LEAD_LIMIT,
+      section(
+        LEAD_LIMIT,
+        "- At capacity, existing campaigns still will not send. Nothing is deleted automatically.",
+        ROUTES
+      ),
+    ],
+    [
+      LEAD_LIMIT,
+      section(
+        LEAD_LIMIT,
+        STILL_SENDS,
+        '- Admins use "View plans" in the warning; members "Compare plans"; Client users can\'t change plans.'
+      ),
+    ],
     // The real heading says "still" and its slug "sending", so it must not
     // count as the sending line.
     [
@@ -633,6 +651,29 @@ test("the sections Foreman#374 got wrong are refused, the right ones pass", () =
         "- When the agent pauses a campaign, it removes its bounced leads only when you have under 2,000 free slots."
       ),
     ],
+    [
+      CLEAR_OUT,
+      section(
+        CLEAR_OUT,
+        "- Under 2,000 free slots it clears finished leads from campaigns 90+ days old and unchanged for 30 days.",
+        "- When the agent pauses a campaign, it keeps the bounced leads, regardless of space."
+      ),
+    ],
+    [
+      CLEAR_OUT,
+      section(
+        CLEAR_OUT,
+        "- When the agent pauses a campaign, it removes its bounced leads only when you have under 2,000 free slots, regardless of plan."
+      ),
+    ],
+    [
+      CLEAR_OUT,
+      section(
+        CLEAR_OUT,
+        "- Under 2,000 free slots it clears finished leads from paused or completed campaigns 90+ days old.",
+        "- When it pauses a campaign, it can remove that campaign's bounced leads, however much space you have."
+      ),
+    ],
   ];
   for (const [slug, text] of wrong) {
     assert.notDeepEqual(sectionProblems(slug, text), [], text);
@@ -651,7 +692,7 @@ test("the sections Foreman#374 got wrong are refused, the right ones pass", () =
       LEAD_LIMIT,
       section(
         LEAD_LIMIT,
-        "- Existing campaigns keep sending. The limit does not automatically delete anything.",
+        "- Existing campaigns keep sending. The limit does not automatically delete anything. Full storage does not cause existing campaigns to stop sending.",
         '- Workspace owners: Settings → Billing → View plans. Owners and admins: "View plans" in the campaign-lead warning. Members: "Compare plans" there. Clients cannot change plans.'
       ),
     ],
@@ -676,6 +717,7 @@ test("the sections Foreman#374 got wrong are refused, the right ones pass", () =
       CLEAR_OUT,
       section(
         CLEAR_OUT,
+        "- Under 2,000 free slots it clears finished leads from campaigns 90+ days old and unchanged for 30 days.",
         "- It can remove bounced leads of campaigns it pauses, whatever your space."
       ),
     ],

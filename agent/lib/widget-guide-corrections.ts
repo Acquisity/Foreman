@@ -73,7 +73,7 @@ const CANT = String.raw`\b(?:can[’']?t|cannot|can not|unable|not able|don[’'
 
 /** The agent pausing a campaign, not a campaign that is already paused. */
 const PAUSES = String.raw`\b(?:pauses|pausing)\b`;
-const ANY_SPACE = String.raw`\b(?:however much|whatever|regardless of|no matter how much|any amount of)\b`;
+const ANY_SPACE = String.raw`(?:\b(?:however much|no matter how much|any amount of)\b|\b(?:whatever|regardless of) (?:the |your |how much |available )?(?:free )?(?:lead )?(?:space|room|storage|slots)\b)`;
 const LOW_SPACE = String.raw`(?:\b2,?000\b|\b2k\b|\bfree (?:lead )?(?:slots|space)\b|\b(?:running out of|short (?:of|on)|low on) (?:lead )?(?:space|slots|room)\b|\b(?:space|room|storage) is (?:tight|short|low|full|running out)\b|\bworkspace is (?:nearly |almost )?full\b)`;
 
 export const GUIDE_CORRECTIONS: readonly GuideCorrection[] = [
@@ -198,12 +198,22 @@ export const GUIDE_CORRECTIONS: readonly GuideCorrection[] = [
     note: 'While storage is full, existing campaigns can still send, and hitting the limit deletes nothing on its own; say both. "Settings" > "Billing" > "View plans" is for workspace owners only: give it to owners alone, in its own sentence. Then say, a sentence each: owners and admins can use "View plans" in the campaign-lead warning; members use "Compare plans" there; Client users can\'t change the plan.',
     reject: [
       new RegExp(
-        String.raw`${CLAUSE}(?:(?![^.;\n]*\bowners?\b)|${IN_CLAUSE(String.raw`\b(?:admins?|members?|everyone|anyone|all (?:roles|users))\b`)})[^.;\n]*${BILLING_PLANS}`,
+        String.raw`${CLAUSE}(?:(?![^.;\n]*\bowners?\b)|${IN_CLAUSE(String.raw`\b(?:admins?|members?|clients?|everyone|anyone|all (?:roles|users))\b`)})[^.;\n]*${BILLING_PLANS}`,
         "imu"
       ),
-      /(?<!\b(?:doesn[’']?t|does not|don[’']?t|do not|won[’']?t|will not|never|not)\s)\bstop(?:s|ped)? sending\b|\b(?:can[’']?t|cannot|can not|won[’']?t) (?:\w+ )?send\b/iu,
+      new RegExp(
+        String.raw`${CLAUSE}(?![^.;\n]*\b(?:doesn[’']?t|does not|don[’']?t|do not|won[’']?t|will not|never|not|no)\b)[^.;\n]*\bstop(?:s|ped)? sending\b|\b(?:can[’']?t|cannot|can not|won[’']?t|will not|no longer) (?:\w+ )?send\b`,
+        "imu"
+      ),
     ],
     require: [
+      new RegExp(
+        CLAUSE +
+          IN_CLAUSE(String.raw`\bowners?\b`) +
+          "(?![^.;\\n]*\\b(?:admins?|members?|clients?)\\b)" +
+          IN_CLAUSE(BILLING_PLANS),
+        "imu"
+      ),
       /^(?!#)[^\n]*(?:\bstill\b[^.\n]*\bsend|\bsend(?:ing)?\b[^.\n]*\bstill\b|\bkeeps? sending\b|\bcontinues? (?:to send|sending)\b)/imu,
       /\b(?:nothing|no leads?)\b[^.;\n]*\b(?:auto(?:matically)?[- ]?deleted|deleted automatically)|\b(?:doesn[’']?t|does not|never|won[’']?t|will not)\b[^.;\n]*\bauto(?:matically)?[- ]?delete|\bdeletes? (?:nothing|no leads)\b/iu,
       new RegExp(
@@ -246,10 +256,12 @@ export const GUIDE_CORRECTIONS: readonly GuideCorrection[] = [
       new RegExp(
         CLAUSE +
           IN_CLAUSE(PAUSES) +
+          IN_CLAUSE(String.raw`\b(?:remov|delet|clear)`) +
           IN_CLAUSE(String.raw`\bbounc`) +
           IN_CLAUSE(ANY_SPACE),
         "imu"
       ),
+      /\b30[- ]days?\b/iu,
     ],
     slugs: [
       "cold-email-agent/faq/campaigns/does-acquisity-delete-my-leads-automatically",
