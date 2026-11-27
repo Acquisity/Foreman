@@ -502,7 +502,7 @@ for (const article of pending) {
 const mainSections = MAIN_GUIDE.replaceAll(`\n- ${OPT_IN_NOTE}`, "");
 const mainBySlug = splitGuideSections(mainSections);
 /** Sections that lost ground against main distilled again per run, worst first. */
-const RETRY_LIMIT = 24;
+const RETRY_LIMIT = 12;
 const sourceText = new Map(available.map((a) => [a.slug, a.text]));
 
 const MAIN_SHA = MAIN_GUIDE.match(/content\/docs at ([0-9a-f]{12})\)/u)?.[1];
@@ -649,9 +649,11 @@ await inPool(batches, async (batch, index) => {
  * main's length, with main's section as a reference (ENG-21319), and at most
  * RETRY_LIMIT of them run, worst first, so a run that rewrites every section
  * stays inside the workflow's time limit. A retry's section replaces the
- * earlier one only when it drops fewer of main's labels or says more. While
- * the section stays behind main its retry output is stored under its own call,
- * so a rerun with the same docs makes no call and leaves the guide as it was. A new article whose retry call fails
+ * earlier one only when it drops no label the earlier one kept, and fewer of
+ * main's labels or more words. While the section stays behind main its retry
+ * output is stored under its own call, so a rerun with the same docs makes no
+ * call for it and leaves its section as it was; past the limit, the next run
+ * takes the next worst. A new article whose retry call fails
  * keeps its batch section but stays out of the cache, so the next run tries it
  * again; a stored one keeps its entry. A failed call never stops this run.
  */
@@ -674,12 +676,14 @@ const references = new Map(
     return article ? [[slug, mainReference(article, was)] as const] : [];
   })
 );
-const shortened = available.filter(
-  (a) =>
-    references.has(a.slug) ||
-    (pending.includes(a) &&
-      shortAnswers(distilled.get(a.slug) ?? "", [a]).length > 0)
-);
+const shortened = [
+  ...[...references.keys()].flatMap((slug) => articleBySlug.get(slug) ?? []),
+  ...pending.filter(
+    (a) =>
+      !references.has(a.slug) &&
+      shortAnswers(distilled.get(a.slug) ?? "", [a]).length > 0
+  ),
+];
 const standing = (slug: string, section: string) =>
   losses(section)[0] ?? {
     dropped: [],

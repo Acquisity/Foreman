@@ -209,10 +209,11 @@ test("a section that drops a label the page still names, or most of main's words
   );
 });
 
-test("a retry is kept when it drops fewer of main's labels, or as many in more words", () => {
+test("a retry is kept when it drops fewer of main's labels, or as many in more words, and never a label the earlier one kept", () => {
   const thin = { dropped: ["Send later", "Power dialler"], now: 107 };
   assert.equal(retryKeeps(thin, { dropped: ["Power dialler"], now: 90 }), true);
-  assert.equal(retryKeeps(thin, { dropped: ["Allow texts"], now: 183 }), true);
+  assert.equal(retryKeeps(thin, { dropped: [], now: 224 }), true);
+  assert.equal(retryKeeps(thin, { dropped: ["Allow texts"], now: 183 }), false);
   assert.equal(
     retryKeeps(thin, {
       dropped: ["Send later", "Allow texts", "Load more"],

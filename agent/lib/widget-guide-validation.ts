@@ -167,15 +167,15 @@ export const lostGround = (loss: AnswerLoss): boolean =>
   loss.dropped.length > 0 || loss.now < loss.was * SHRUNK_SHARE;
 
 /**
- * A retry's section replaces the earlier one when it drops fewer of main's
- * labels, or as many in more words.
+ * A retry's section replaces the earlier one when it drops no label the
+ * earlier one kept, and drops fewer of main's labels or as many in more words.
  */
 export const retryKeeps = (
   before: Pick<AnswerLoss, "dropped" | "now">,
   after: Pick<AnswerLoss, "dropped" | "now">
 ): boolean =>
-  after.dropped.length < before.dropped.length ||
-  (after.dropped.length === before.dropped.length && after.now > before.now);
+  after.dropped.every((label) => before.dropped.includes(label)) &&
+  (after.dropped.length < before.dropped.length || after.now > before.now);
 
 const BLOCK_SCALAR = /^[>|][+-]?$/u;
 const INDENTED = /^[ \t]/u;
