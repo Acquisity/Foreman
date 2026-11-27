@@ -7,6 +7,7 @@ import {
   frontmatterField,
   plainDashes,
   shortAnswers,
+  shrunkAnswers,
 } from "./widget-guide-validation.js";
 import {
   PRODUCT_GUIDE,
@@ -156,4 +157,32 @@ test("a how-to with many steps answered in a line is short, even when its page i
     ]),
     ["porkbun"]
   );
+});
+
+test("a section with under four fifths of main's words has shrunk, and a new or near-equal one has not", () => {
+  // Foreman#374 at dc68cdb2: Calling and Texting went from 216 words to 107 (ENG-21319).
+  const words = (count: number) => Array.from({ length: count }, () => "w").join(" ");
+  const main = [
+    "### Calling and Texting {slug: crm/calling-and-texting}",
+    'Get here: "People"',
+    words(20),
+    "### People {slug: crm/people}",
+    words(10),
+    "### Deals {slug: crm/deals}",
+    words(10),
+  ].join("\n");
+  const regenerated = [
+    "### Calling and Texting {slug: crm/calling-and-texting}",
+    'Get here: "People" > "Call"',
+    words(15),
+    "### People {slug: crm/people}",
+    words(8),
+    "### Deals {slug: crm/deals}",
+    words(30),
+    "### Dialling {slug: crm/dialling}",
+    words(1),
+  ].join("\n");
+  assert.deepEqual(shrunkAnswers(regenerated, main), [
+    { now: 15, slug: "crm/calling-and-texting", was: 20 },
+  ]);
 });
