@@ -649,9 +649,9 @@ await inPool(batches, async (batch, index) => {
  * main's length, with main's section as a reference (ENG-21319), and at most
  * RETRY_LIMIT of them run, worst first, so a run that rewrites every section
  * stays inside the workflow's time limit. A retry's section replaces the
- * earlier one only when it drops fewer of main's labels or says more, and its
- * output is stored under its own call, so a rerun with the same docs makes no
- * call and leaves the guide as it was. A new article whose retry call fails
+ * earlier one only when it drops fewer of main's labels or says more. While
+ * the section stays behind main its retry output is stored under its own call,
+ * so a rerun with the same docs makes no call and leaves the guide as it was. A new article whose retry call fails
  * keeps its batch section but stays out of the cache, so the next run tries it
  * again; a stored one keeps its entry. A failed call never stops this run.
  */
@@ -719,7 +719,7 @@ await inPool(shortened, async (article) => {
   }
 });
 const stillBehind = losses(distilledText()).filter(lostGround);
-const stillLost = stillBehind.map(
+const lostReport = stillBehind.map(
   (loss) =>
     `${loss.slug} (${loss.now} words, ${loss.was} on main${loss.dropped.length ? `; dropped "${loss.dropped.join('", "')}"` : ""})`
 );
@@ -964,7 +964,7 @@ if (
 const tokens = Math.round(plain.length / 4);
 const getHere = (body.match(/^Get here:/gmu) ?? []).length;
 console.log(`regenerated=${regenerated.join(",") || "none"}`);
-console.log(`lost=${stillLost.join("; ")}`);
+console.log(`lost=${lostReport.join("; ")}`);
 console.log(
   `successful_calls=${stats.successfulCalls} attempts=${stats.attempts} get_here=${getHere} rejected=${dropped} headed=${slugs.filter((slug) => headed.has(slug)).length} articles=${articles.length} distilled=${available.length} batches=${batches.length} source_chars=${available.reduce((s, a) => s + a.text.length, 0)} guide_chars=${plain.length} ~tokens=${tokens} unpriced_calls=${unpriced} s=${Math.round((Date.now() - startedAt) / 1000)}`
 );
