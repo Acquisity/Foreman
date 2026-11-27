@@ -518,3 +518,111 @@ test("the sections Foreman#370 got wrong are refused, the right ones pass", () =
     assert.deepEqual(sectionProblems(slug, text), [], text);
   }
 });
+
+const LEAD_LIMIT =
+  "cold-email-agent/faq/lead-search/why-does-the-lead-limit-prompt-block-sending-when-i-have-leads-and-credits";
+const CLEAR_OUT =
+  "cold-email-agent/faq/campaigns/does-acquisity-delete-my-leads-automatically";
+
+// Wrong lines are Foreman#374's at 7eea8f8e (ENG-21344). Right lines are
+// written to the Help Centre at Acquisity 9b42bbafe194.
+test("wrong summary lines from Foreman#374 are dropped", () => {
+  const wrong = [
+    `- "Clear out old leads" keeps repliers, and targets campaigns 90+ days old only when you have under 2,000 free slots. {${CLEAR_OUT}}`,
+    `- Clear out old leads runs only when your workspace is running out of lead space. {${CLEAR_OUT}}`,
+    `- Change plans in "Settings" > "Billing" > "View plans". {${LEAD_LIMIT}}`,
+  ];
+  const right = [
+    `- "Clear out old leads" removes bounced or fully emailed leads from campaigns 90+ days old under 2,000 free slots, and a paused campaign's bounced leads however much space you have. {${CLEAR_OUT}}`,
+    `- Leads are deleted only when someone deletes them or via the agent's "Clear out old leads". {${CLEAR_OUT}}`,
+    `- Only owners use "Settings" > "Billing" > "View plans"; admins use "View plans" in the warning. {${LEAD_LIMIT}}`,
+    `- Credits and campaign-lead storage are separate. {${LEAD_LIMIT}}`,
+  ];
+  assert.deepEqual(
+    refuseSummaryLines({ cannot: [...wrong, ...right], who: [] }),
+    {
+      kept: { cannot: right, who: [] },
+      refused: wrong,
+    }
+  );
+});
+
+test("the sections Foreman#374 got wrong are refused, the right ones pass", () => {
+  const wrong: [string, string][] = [
+    [
+      LEAD_LIMIT,
+      section(
+        LEAD_LIMIT,
+        "- Credits and campaign-lead storage are separate.",
+        "- Growth stores 5,000 leads (warning at 4,000, blocked at 5,000). Pro stores 25,000.",
+        '- Click "Export", then delete leads or use "Delete all".',
+        '- Plans: "Settings" > "Billing" > "View plans".'
+      ),
+    ],
+    [
+      LEAD_LIMIT,
+      section(
+        LEAD_LIMIT,
+        "- At 5,000, adding or importing is blocked. Existing campaigns can still send. Nothing is deleted automatically.",
+        '- Plans: Settings → Billing → View plans; members "Compare plans" in the warning; Client users can\'t change plans.'
+      ),
+    ],
+    [
+      LEAD_LIMIT,
+      section(
+        LEAD_LIMIT,
+        "- At 5,000, adding or importing is blocked. Nothing is deleted automatically.",
+        '- Plans: owners use "Settings" > "Billing" > "View plans"; admins use "View plans" in the warning; members "Compare plans"; Client users can\'t change plans.'
+      ),
+    ],
+    [
+      LEAD_LIMIT,
+      [
+        `### Why can’t I add campaign leads when I still have credits? {slug: ${LEAD_LIMIT}}`,
+        "- At 5,000, adding or importing is blocked. Nothing is deleted automatically.",
+        '- Plans: owners use "Settings" > "Billing" > "View plans"; admins use "View plans" in the warning; members "Compare plans"; Client users can\'t change plans.',
+      ].join("\n"),
+    ],
+    [
+      CLEAR_OUT,
+      section(
+        CLEAR_OUT,
+        '- No. Leads go only when someone deletes them, or via the agent\'s "Clear out old leads". That action targets campaigns 90+ days old when you have under 2,000 free slots, and repliers are kept.',
+        '- Set it to "Never" to stop it. Deletion is permanent.'
+      ),
+    ],
+  ];
+  for (const [slug, text] of wrong) {
+    assert.notDeepEqual(sectionProblems(slug, text), [], text);
+  }
+  const right: [string, string][] = [
+    [
+      LEAD_LIMIT,
+      section(
+        LEAD_LIMIT,
+        "- Sourcing credits and campaign-lead storage are separate; credits add no room.",
+        "- Growth warns at 4,000. At 5,000, adding or importing (CSV, lead database, CRM) is blocked. Sending, viewing, replies, export and delete still work. Nothing is auto-deleted.",
+        '- Plans: owners use "Settings" > "Billing" > "View plans"; admins use "View plans" in the warning; members "Compare plans"; Client users can\'t change plans.'
+      ),
+    ],
+    [
+      LEAD_LIMIT,
+      section(
+        LEAD_LIMIT,
+        "- Existing campaigns can still send, and nothing is deleted automatically.",
+        '- Workspace owners: Settings → Billing → View plans. Owners and admins: "View plans" in the campaign-lead warning. Members: "Compare plans" there. Client users cannot change the plan.'
+      ),
+    ],
+    [
+      CLEAR_OUT,
+      section(
+        CLEAR_OUT,
+        "- No. Acquisity never deletes campaign leads on its own to make room.",
+        "- The agent's \"Clear out old leads\": under 2,000 free slots it removes fully emailed or bounced leads from paused or completed campaigns 90+ days old; when it pauses a campaign it can remove that campaign's bounced leads, however much space you have. Repliers are kept."
+      ),
+    ],
+  ];
+  for (const [slug, text] of right) {
+    assert.deepEqual(sectionProblems(slug, text), [], text);
+  }
+});
