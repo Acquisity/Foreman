@@ -496,3 +496,79 @@ test("on, the front-door writer is told asking here reaches a person and gets no
     });
   }
 });
+
+test("an owner's toggled refund marks the run for the finish, only with escalation on", async (t) => {
+  for (const [on, route, marks] of [
+    [true, { asksForHuman: 0, refund: true }, 1],
+    [true, { asksForHuman: 0 }, 0],
+    [false, { asksForHuman: 0, refund: true }, 0],
+  ] as const) {
+    await t.test(`${on ? "on" : "off"}, refund ${"refund" in route}`, async (st) => {
+      enable(st, on);
+      const { deps } = harness(route);
+      const marked: string[] = [];
+      deps.markRefund = (id) => {
+        marked.push(id);
+        return Promise.resolve();
+      };
+      await send(deps, { mode: "investigate" }, scope, () => {
+        throw new Error("session unavailable");
+      });
+      assert.deepEqual(marked, marks ? [runId] : []);
+    });
+  }
+});
+
+test("a marked refund whose investigation filed no refund ticket escalates as refund with what Foreman read; a filed refund ticket replies as before", async (t) => {
+  enable(t);
+  const read: WidgetFindings = {
+    ...findings,
+    facts: [
+      {
+        claim: "Two $252.00 charges for domains and inboxes in October; one is refunded.",
+        entityIds: [],
+        evidence: { ref: "", tool: "billing summary" },
+      },
+    ],
+    recommendation: "Ask which charge they want back, then pass it to billing.",
+  };
+  const asked = {
+    findings: null,
+    status: "completed" as const,
+    text: "Which charge do you want back?",
+  };
+  const { deps, gated, run } = harness();
+  run.findings = { refundAsked: true };
+  deps.extract = () => Promise.resolve(read);
+  await finishWidgetRun(run, "widget-session-refund", asked, deps);
+  assert.equal(gated.length, 0, "nothing is composed");
+  assert.equal(run.outcome?.message, null);
+  assert.equal(run.outcome?.reason, "escalated_to_fixy refund");
+  const returned = run.findings as WidgetFindings;
+  assert.deepEqual(returned.escalate, { reason: "refund" });
+  assert.deepEqual(returned.facts, read.facts);
+
+  const filed = harness();
+  filed.run.findings = { refundAsked: true };
+  filed.deps.extract = () => Promise.resolve(read);
+  await finishWidgetRun(
+    filed.run,
+    "widget-session-refund-filed",
+    {
+      ...asked,
+      ticket: {
+        id: "ENG-9",
+        refund: true,
+        url: "https://linear.app/acquisity/issue/ENG-9/refund",
+      },
+    },
+    filed.deps
+  );
+  assert.equal(filed.gated.length, 1, "the reply is composed as before");
+  assert.equal(escalateOf(filed.run), undefined);
+
+  const unmarked = harness();
+  unmarked.deps.extract = () => Promise.resolve(read);
+  await finishWidgetRun(unmarked.run, "widget-session-plain", asked, unmarked.deps);
+  assert.equal(escalateOf(unmarked.run), undefined);
+});
