@@ -73,24 +73,23 @@ export const escalationFor = (
   if (!(escalatesToFixy() && customerTurn(scope))) {
     return null;
   }
-  const escalate = (reason: EscalationReason, report: string) => ({
-    reason,
-    report,
-  });
   if (route.cancel) {
-    return escalate("cancel", "The customer asked to cancel.");
+    return { reason: "cancel", report: "The customer asked to cancel." };
   }
   if (refund && route.refund) {
-    return escalate("refund", "The customer asked for a refund.");
+    return { reason: "refund", report: "The customer asked for a refund." };
   }
   if (ask === "person") {
-    return escalate("asked_for_human", "The customer asked for a person.");
+    return {
+      reason: "asked_for_human",
+      report: "The customer asked for a person.",
+    };
   }
   return ask === "member"
-    ? escalate(
-        "cant_check",
-        `The customer is a workspace ${scope.role}, and only an owner or admin can start a look into their workspace.`
-      )
+    ? {
+        reason: "cant_check",
+        report: `The customer is a workspace ${scope.role}, and only an owner or admin can start a look into their workspace.`,
+      }
     : null;
 };
 
