@@ -174,6 +174,32 @@ export const GUIDE_CORRECTIONS: readonly GuideCorrection[] = [
     ],
     slugs: ["ai-website-builder/domains"],
   },
+  {
+    note: 'While storage is full, existing campaigns can still send and nothing is deleted automatically; say both. "Settings" > "Billing" > "View plans" is for workspace owners only, so name owners in the same sentence. Owners and admins can use "View plans" in the campaign-lead warning, members use "Compare plans" there, and Client users can\'t change the plan.',
+    reject: [
+      /(?:^|[.;])(?![^.;\n]*\bowners?\b)[^.;\n]*\bBilling"?\s*(?:>|→)\s*"?View plans/imu,
+    ],
+    require: [
+      /^(?!#)[^\n]*(?:\bstill\b[^.\n]*\bsend|\bsend(?:ing)?\b[^.\n]*\bstill\b)/imu,
+      /\b(?:nothing|no leads?)\b[^.;\n]*\b(?:auto(?:matically)?[- ]?deleted|deleted automatically)/iu,
+      /\badmins?\b/iu,
+      /Compare plans/u,
+      /\bClient users?\b/iu,
+    ],
+    slugs: [
+      "cold-email-agent/faq/lead-search/why-does-the-lead-limit-prompt-block-sending-when-i-have-leads-and-credits",
+    ],
+  },
+  {
+    note: '"Clear out old leads" removes leads in two cases: under 2,000 free lead slots, from paused or completed campaigns 90+ days old; and when the agent pauses a campaign, that campaign\'s bounced leads, however much space you have. Any line about when it removes leads says both cases in that line.',
+    reject: [
+      /^(?!#)(?![^\n]*\b(?:paus|bounc))[^\n]*(?:\b2,?000\b|\b2k\b|\bfree (?:lead )?(?:slots|space)\b|\b(?:running out of|short (?:of|on)|low on) (?:lead )?(?:space|slots|room)\b)/imu,
+    ],
+    require: [/\bpaus[^\n]*\bbounc|\bbounc[^\n]*\bpaus/iu],
+    slugs: [
+      "cold-email-agent/faq/campaigns/does-acquisity-delete-my-leads-automatically",
+    ],
+  },
 ];
 
 const bySlug = new Map(
