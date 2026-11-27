@@ -5,7 +5,11 @@ import {
   type WidgetFindings,
 } from "./widget-findings.js";
 import type { WidgetRoute } from "./widget-router.js";
-import type { WidgetOutcome } from "./widget-run-store.js";
+import {
+  refundAsked,
+  type WidgetOutcome,
+  type WidgetTicketReceipt,
+} from "./widget-run-store.js";
 import type { WidgetContext } from "./widget-scope.js";
 
 /**
@@ -183,21 +187,102 @@ export const needsTheTeam = (
     { conversationId: run.scope.conversationId, runId: run.id, sessionId }
   );
 
-/** An owner's toggled refund whose investigation filed no refund ticket, handed to Fixy with what it read (ENG-21231). */
-export const refundNotFiled = (
-  run: RunIds,
-  sessionId: string,
-  found: WidgetFindings | null
+/**
+ * An owner's toggled refund still investigates and files its own ticket, but
+ * the investigator files only once the charge is named (ENG-21231). A refund
+ * the conversation has no refund ticket for yet is marked on the run, so a
+ * finish that files none hands it to Fixy.
+ */
+export const marksRefund = (
+  scope: WidgetContext,
+  route: WidgetRoute,
+  refundTicketed: boolean
 ) =>
-  escalated(
+  route.refund === true &&
+  !refundTicketed &&
+  escalatesToFixy() &&
+  customerTurn(scope);
+
+/** Marks a toggled refund for the finish. A failed write loses only that handoff. */
+export async function markToggledRefund(
+  run: { findings: unknown; id: string },
+  scope: WidgetContext,
+  route: WidgetRoute,
+  note: { refund?: true } | null,
+  mark: ((id: string) => Promise<void>) | undefined
+) {
+  if (!(mark && marksRefund(scope, route, note?.refund === true))) {
+    return;
+  }
+  try {
+    await mark(run.id);
+  } catch {
+    logOpsEvent(
+      "widget.refund.mark_failed",
+      { conversationId: scope.conversationId, runId: run.id },
+      console.warn
+    );
+    return;
+  }
+  // The in-process finish reads this same row object.
+  run.findings = {
+    ...(run.findings as Record<string, unknown> | null),
+    refundAsked: true,
+  };
+}
+
+type FiledTicket = NonNullable<WidgetFindings["ticket"]> & { refund?: true };
+
+/**
+ * A marked refund's finish: the turn's ticket, else its saved receipt (an
+ * unreadable one counts as none), says whether a refund ticket was filed.
+ * Without one the chat goes to Fixy with what Foreman read. Null otherwise.
+ */
+export async function refundHandoff(
+  run: RunIds & { findings: unknown },
+  sessionId: string,
+  turn: {
+    read?: (
+      scope: WidgetContext,
+      id: string,
+      signal: AbortSignal
+    ) => Promise<WidgetTicketReceipt | null>;
+    signal: AbortSignal;
+    ticket: FiledTicket | null | undefined;
+  },
+  findingsWith: (
+    ticket: FiledTicket | null | undefined
+  ) => WidgetFindings | null
+) {
+  if (
+    !(refundAsked(run.findings) && escalatesToFixy() && customerTurn(run.scope))
+  ) {
+    return null;
+  }
+  const receipt = turn.ticket
+    ? null
+    : await turn.read?.(run.scope, run.id, turn.signal).catch(() => null);
+  const ticket =
+    receipt && "existing" in receipt
+      ? {
+          id: receipt.identifier,
+          url: receipt.url,
+          ...(receipt.refund ? { refund: true as const } : {}),
+        }
+      : turn.ticket;
+  if (ticket?.refund) {
+    return null;
+  }
+  return escalated(
     {
       reason: "refund",
       report:
         "The customer asked for a refund and Foreman's investigation filed no refund ticket, so the chat was handed to Fixy with what it read.",
     },
-    found,
+    findingsWith(ticket),
     { conversationId: run.scope.conversationId, runId: run.id, sessionId }
   );
+}
 
 /**
  * A customer's investigation that could not start goes to Fixy rather than a

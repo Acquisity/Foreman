@@ -191,10 +191,12 @@ const QUESTIONS = {
     type: "noul",
   },
   // A refund needs a look at billing and a ticket, which only an investigation
-  // can do: members are pointed to their owner, owners to the toggle.
+  // can do: members are pointed to their owner, owners to the toggle. A
+  // double-charge report counts, since it reached no one when the customer had
+  // not yet asked for the money back (ENG-21231).
   asks_for_refund: {
     instructions:
-      "The customer asks for a refund, their money back or a charge to be reversed, or the latest message continues such a request from the earlier turns, for example by saying which charge it was or why they want it back. Asking how refunds work in general, or what a charge was for, without asking for money back is NOT this.",
+      "The customer asks for a refund, their money back or a charge to be reversed, or says they were charged or billed twice for the same thing even without asking for the money back, or the latest message continues such a request from the earlier turns, for example by saying which charge it was or why they want it back. Asking how refunds work in general, or what a single charge was for, without asking for money back is NOT this.",
     type: "noul",
   },
   // Filing a ticket is the one thing Foreman can do for a customer, and only an

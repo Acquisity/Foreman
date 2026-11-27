@@ -241,6 +241,8 @@ export interface TicketNote {
   forInvestigator: string;
   /** Code-written status only, for the ungated front-door writers. */
   forWriters: string;
+  /** The conversation already has a refund ticket, so a refund ask is not marked for Fixy again. */
+  refund?: true;
 }
 
 /**

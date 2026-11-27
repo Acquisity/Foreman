@@ -148,6 +148,8 @@ Acquiring the stream is exempt for the same reason the marker calls are. The `re
 
 Widget ticket receipt reads and writes (`readWidgetTicketReceipt` and `saveWidgetTicketReceipt` in `widget-run-store.ts`) use its 15-second deadline composed with the filing or finish signal; a blocked turn handed to Fixy (ENG-21094) reads the run's receipt under its own 5-second signal, since the finish deadline may already be spent. The confirmation lives in the pending run's existing findings JSON and needs no table or migration; source and verified owner checks fence it. The local live harness persists the same receipt to its existing filesystem store, and live receipts mark simulated filing rather than an external write.
 
+The refund mark (`markWidgetRefund` in `widget-run-store.ts`, ENG-21231) is one more write to the same pending findings JSON, with the store's 15-second deadline: with `WIDGET_ESCALATE_TO_FIXY=on`, a customer's toggled turn the router scores as a refund, in a conversation with no refund ticket yet, awaits it after access is checked and before the investigation starts. A failure logs `widget.refund.mark_failed` and the investigation starts unmarked, so that turn ends as it did before the mark existed. At the finish, a marked run whose turn reported no ticket reads its receipt with `readWidgetTicketReceipt` under the finish signal. The local live harness marks its filesystem store.
+
 Widget progress writes use the same private-DB transport with a 1.5-second deadline. Progress storage failure never blocks the investigation result.
 
 ## Local widget live harness (ENG-15026)

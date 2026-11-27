@@ -582,3 +582,59 @@ test("a marked refund whose investigation filed no refund ticket escalates as re
   );
   assert.equal(escalateOf(unmarked.run), undefined);
 });
+
+test("a marked refund counts the run's saved refund receipt, and a write-up the extractor cannot structure still escalates as refund", async (t) => {
+  enable(t);
+  const prose = {
+    findings: null,
+    status: "completed" as const,
+    text: "Two $252 charges in October, one refunded. Which charge do they want back?",
+  };
+  const saved = harness();
+  saved.run.findings = { refundAsked: true };
+  saved.deps.readTicket = () =>
+    Promise.resolve({
+      existing: false,
+      identifier: "ENG-9",
+      refund: true,
+      url: "https://linear.app/acquisity/issue/ENG-9/refund",
+    });
+  await finishWidgetRun(saved.run, "widget-session-receipt", prose, saved.deps);
+  assert.equal(escalateOf(saved.run), undefined);
+  assert.equal(saved.gated.length, 1, "the reply is composed as before");
+
+  const unstructured = harness();
+  unstructured.run.findings = { refundAsked: true };
+  unstructured.deps.extract = () => Promise.resolve(null);
+  await finishWidgetRun(
+    unstructured.run,
+    "widget-session-prose-refund",
+    prose,
+    unstructured.deps
+  );
+  assert.equal(unstructured.run.outcome?.reason, "escalated_to_fixy refund");
+  assert.equal(
+    (unstructured.run.findings as WidgetFindings).recommendation,
+    prose.text
+  );
+});
+
+test("a toggled refund in a conversation that already has a refund ticket is not marked", async (t) => {
+  enable(t);
+  const { deps } = harness({ asksForHuman: 0, refund: true });
+  const marked: string[] = [];
+  deps.markRefund = (id) => {
+    marked.push(id);
+    return Promise.resolve();
+  };
+  deps.ticketNote = () =>
+    Promise.resolve({
+      forInvestigator: "The refund ticket is with billing.",
+      forWriters: "The refund ticket is with billing.",
+      refund: true,
+    });
+  await send(deps, { mode: "investigate" }, scope, () => {
+    throw new Error("session unavailable");
+  });
+  assert.deepEqual(marked, []);
+});
