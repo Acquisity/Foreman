@@ -46,9 +46,11 @@ import {
   splitGuideSections,
 } from "../agent/lib/widget-guide-cache.js";
 import {
+  batchProblems,
+  correctionKeyInputs,
   correctionNotes,
+  correctionPath,
   refuseSummaryLines,
-  sectionProblems,
 } from "../agent/lib/widget-guide-corrections.js";
 import {
   OPT_IN_NOTE,
@@ -435,8 +437,9 @@ const relink = (text: string) =>
   });
 
 /**
- * A correction's note goes with its article to the model and into the cache
- * key, so a new correction redoes only its own article (widget-guide-corrections).
+ * A correction's note goes with its article to the model, and its note and
+ * checks into the cache keys, so a new correction redoes only its own articles
+ * (widget-guide-corrections).
  */
 const reviewNote = (slug: string) =>
   correctionNotes(slug).map(
@@ -457,7 +460,7 @@ const articleKey = (a: Article) =>
     a.title,
     a.slug,
     a.text,
-    ...correctionNotes(a.slug)
+    ...correctionKeyInputs(a.slug)
   );
 const distilled = new Map<string, string>();
 const pending = available.filter((a) => {
@@ -531,9 +534,9 @@ const distillBatch = (batch: Article[], label: string) =>
         batch.map((a) => a.slug)
       );
       assertOwnAnswers(repaired);
-      const sections = splitGuideSections(repaired);
-      const problems = batch.flatMap((a) =>
-        sectionProblems(a.slug, sections.get(a.slug) ?? "")
+      const problems = batchProblems(
+        batch.map((a) => a.slug),
+        splitGuideSections(repaired)
       );
       if (problems.length) {
         throw new Error(`corrections refused: ${problems.join("; ")}`);
@@ -659,6 +662,13 @@ for (const line of lines) {
     console.log(`  rejected ${current}: ${path}`);
   }
 }
+for (const slug of slugs) {
+  const path = correctionPath(slug);
+  if (path) {
+    paths.set(slug, path);
+    refused.delete(slug);
+  }
+}
 const body = lines
   .flatMap((line) => {
     if (GET_HERE.test(line)) {
@@ -692,7 +702,7 @@ const limitsKey = (slug: string) =>
     LIMITS_MODEL,
     LIMITS_PROMPT,
     finished.get(slug) ?? "",
-    ...correctionNotes(slug)
+    ...correctionKeyInputs(slug)
   );
 const summarised = new Map<string, GuideLimits>();
 const stale = slugs.filter((slug) => {
@@ -747,8 +757,8 @@ if (stale.length) {
     console.log(`  summary line cites no summarised article: ${line}`);
   }
   for (const [slug, summary] of limits) {
-    const { kept, refused } = refuseSummaryLines(slug, summary);
-    for (const line of refused) {
+    const { kept, refused: refusedLines } = refuseSummaryLines(summary);
+    for (const line of refusedLines) {
       console.log(`  summary line refused by a correction: ${line}`);
     }
     summarised.set(slug, kept);

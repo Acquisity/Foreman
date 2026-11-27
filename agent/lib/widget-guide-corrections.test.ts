@@ -1,7 +1,11 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import { guideCallKey } from "./widget-guide-cache.js";
 import {
+  batchProblems,
+  correctionKeyInputs,
   correctionNotes,
+  correctionPath,
   GUIDE_CORRECTIONS,
   refuseSummaryLines,
   sectionProblems,
@@ -23,22 +27,37 @@ const section = (slug: string, ...lines: string[]) =>
   [`### Title {slug: ${slug}}`, ...lines].join("\n");
 
 test("every correction names an article the guide has", () => {
-  for (const { slug } of GUIDE_CORRECTIONS) {
+  for (const slug of GUIDE_CORRECTIONS.flatMap((c) => c.slugs)) {
     assert.ok(slug in PRODUCT_GUIDE_ARTICLES, slug);
   }
 });
 
-// The wrong lines are copied from Foreman#353 at d9475c02 (ENG-21059); the
-// right ones from main's guide at Acquisity 8ad1a87ad0b1.
-test("the sections Foreman#353 got wrong are refused", () => {
+// The first wrong line of each article is copied from Foreman#353 at d9475c02
+// (ENG-21059); the rest are the same claims reworded, from review. The right
+// lines are written to the Help Centre at Acquisity a649441c6431.
+test("the sections Foreman#353 got wrong are refused, reworded too", () => {
   const wrong: [string, string][] = [
     [
-      CLIENT_TOOL,
+      IMPORT,
       section(
-        CLIENT_TOOL,
-        'Get here: left sidebar "Client Portal"',
-        'Clients see only "Client Portal", "Dashboard", CRM, partner-enabled campaigns/AI SDR; make them Member for more.'
+        IMPORT,
+        "- Skipped: duplicates in any existing campaign, already emailed, blocked, do-not-contact.",
+        '- To force-add, use "Delete selected" on the other campaign\'s "Leads" tab, then re-import.'
       ),
+    ],
+    [
+      DOMAINS,
+      section(
+        DOMAINS,
+        "- Cancel subscription stops all domain charges.",
+        '- Domains billed with your plan cancel when it ends; others from "Email domains and inboxes".'
+      ),
+    ],
+    [CALLING, section(CALLING, "- iMessage lines: US-only.")],
+    [CALLING, section(CALLING, "- US-only iMessage lines.")],
+    [
+      CALLING,
+      section(CALLING, "- Only US numbers are available for iMessage lines."),
     ],
     [
       IMPORT,
@@ -93,16 +112,8 @@ test("the sections Foreman#353 got wrong are refused", () => {
   }
 });
 
-test("main's right wording for the same articles passes", () => {
+test("right wording for the same articles passes", () => {
   const right: [string, string][] = [
-    [
-      CLIENT_TOOL,
-      section(
-        CLIENT_TOOL,
-        'Get here: "Settings" > "Members"',
-        '- Expected. Clients see only "Client Portal", "Dashboard", CRM (unless off), and Cold Email Agent/AI SDR if the partner enabled them.'
-      ),
-    ],
     [
       IMPORT,
       section(
@@ -136,6 +147,17 @@ test("main's right wording for the same articles passes", () => {
       ),
     ],
     [
+      CALLING,
+      section(
+        CALLING,
+        '- "iMessage line" or "Phone line" (US numbers only).',
+        "- Choose iMessage or Phone line (US numbers only for Phone line).",
+        "- Do not contact status and the do-not-contact list block calls and texts; only a STOP reply leaves calls unaffected.",
+        "- Calls and texts are blocked by Do not contact status or the do-not-contact list; a STOP reply blocks texts only (calls unaffected).",
+        "- Do not contact blocks calls and texts, while STOP leaves calls unaffected."
+      ),
+    ],
+    [
       FORGOT,
       section(
         FORGOT,
@@ -146,6 +168,34 @@ test("main's right wording for the same articles passes", () => {
   for (const [slug, text] of right) {
     assert.deepEqual(sectionProblems(slug, text), [], text);
   }
+  assert.deepEqual(
+    batchProblems(
+      [IMPORT, CALLING],
+      new Map(right.slice(0, 1).map(([, t]) => [IMPORT, t]))
+    ),
+    []
+  );
+  assert.notDeepEqual(batchProblems([FORGOT], new Map()), []);
+});
+
+test("the Client Portal FAQs get the owner's Members path with no model call", () => {
+  assert.equal(correctionPath(CLIENT_TOOL), '"Settings" > "Members"');
+  assert.equal(correctionPath("client-portal/faq"), '"Settings" > "Members"');
+  assert.equal(correctionPath("client-portal"), undefined);
+  assert.deepEqual(correctionKeyInputs(CLIENT_TOOL), []);
+});
+
+test("cache keys change only for corrected articles, and with any check", () => {
+  assert.deepEqual(correctionKeyInputs("crm/deals"), []);
+  assert.equal(
+    guideCallKey("m", "p", "text", ...correctionKeyInputs("crm/deals")),
+    guideCallKey("m", "p", "text")
+  );
+  const calling = JSON.parse(correctionKeyInputs(CALLING)[0]);
+  assert.equal(calling.note, correctionNotes(CALLING)[0]);
+  assert.ok(calling.reject.includes("/US[- ]only iMessage/iu"));
+  const forgot = JSON.parse(correctionKeyInputs(FORGOT)[0]);
+  assert.deepEqual(forgot.require, ["/\\b(?:team|teammate)\\b/iu"]);
 });
 
 test("an article with no correction is never refused", () => {
@@ -160,20 +210,20 @@ test("wrong summary lines from Foreman#353 are dropped, the rest kept", () => {
     `- iMessage lines are US only. {${CALLING}}`,
     `- Texts are blocked by Do not contact status, list, or STOP (calls unaffected). {${CALLING}}`,
     `- A STOP reply blocks texts only; calls are not affected. {${CALLING}}`,
+    `- iMessage lines are US only. {crm/deals}, {${CALLING}}`,
+    `- Cancel subscription stops all domain charges. {${DOMAINS}}`,
+    `- Pausing a campaign doesn't stop billing. {${PAUSING}}`,
   ];
   assert.deepEqual(
-    refuseSummaryLines(AI_SDR_FAQ, { cannot: lines.slice(0, 2), who: [] }),
-    { kept: { cannot: [lines[1]], who: [] }, refused: [lines[0]] }
-  );
-  assert.deepEqual(
-    refuseSummaryLines(CALLING, { cannot: lines.slice(2, 4), who: [lines[4]] }),
-    { kept: { cannot: [], who: [lines[4]] }, refused: [lines[2], lines[3]] }
-  );
-  assert.deepEqual(
-    refuseSummaryLines("crm/deals", { cannot: lines, who: [] }),
+    refuseSummaryLines({ cannot: lines.slice(0, 4), who: lines.slice(4) }),
     {
-      kept: { cannot: lines, who: [] },
-      refused: [],
+      kept: { cannot: [lines[1]], who: [lines[4], lines[7]] },
+      refused: [lines[5], lines[6], lines[0], lines[2], lines[3]],
     }
   );
+  const untouched = ["- Deals can be dragged. {crm/deals}"];
+  assert.deepEqual(refuseSummaryLines({ cannot: untouched, who: [] }), {
+    kept: { cannot: untouched, who: [] },
+    refused: [],
+  });
 });
