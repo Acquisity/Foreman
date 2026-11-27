@@ -670,14 +670,13 @@ const lost = losses(distilledText())
       b.dropped.length - a.dropped.length || a.now / a.was - b.now / b.was
   );
 const articleBySlug = new Map(available.map((a) => [a.slug, a]));
-const references = new Map(
-  lost.slice(0, RETRY_LIMIT).flatMap(({ slug, was }) => {
-    const article = articleBySlug.get(slug);
-    return article ? [[slug, mainReference(article, was)] as const] : [];
-  })
-);
+const retries = lost.slice(0, RETRY_LIMIT).flatMap(({ slug, was }) => {
+  const article = articleBySlug.get(slug);
+  return article ? [{ article, main: mainReference(article, was) }] : [];
+});
+const references = new Map(retries.map((r) => [r.article.slug, r.main]));
 const shortened = [
-  ...[...references.keys()].flatMap((slug) => articleBySlug.get(slug) ?? []),
+  ...retries.map((r) => r.article),
   ...pending.filter(
     (a) =>
       !references.has(a.slug) &&
