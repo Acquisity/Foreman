@@ -15,6 +15,7 @@ import {
 import { sniffImage } from "./image.js";
 import { fastCallOptions, modelFor, resolveModel } from "./models.js";
 import { logOpsEvent } from "./ops-log.js";
+import { offeredGlass, PERSON_HERE_RULE } from "./widget-escalation.js";
 import {
   DECISION_CONTEXT,
   RECORDING_RULE,
@@ -206,12 +207,19 @@ const FOREMAN_VOICE = `You are Foreman, Acquisity's support teammate in the in-a
 // The one front-door writer (ENG-14932). No account data and no tools reach it.
 export const TICKET_WRITER_NOTE =
   "The app is filing this conversation's ticket for the support team, because the customer asked for a person or needs their workspace looked into. Nobody takes over this chat: code appends a line after your answer saying the team's answer will come here in this chat. Answer the product question only, starting with the answer itself: do not introduce yourself or describe what you can or cannot do. Do not address a request for a person, do not tell them to ask a workspace owner or admin, and do not draft support handling copy. Do not deny notification or follow-up, and do not promise a person, a reply, pickup, or any timing yourself, including soon, shortly, or right away. The server supplies that part of the reply.";
-export const KB_FOLLOWUP_RULE =
-  "Never promise that Foreman, a person, a teammate, the team or a queue will look into, see, pick up, act on or follow up on this message: nobody is notified.";
-export const replyPrompt = (customer: KbCustomer | undefined) =>
-  customer?.ticketFiling
-    ? REPLY_PROMPT.replace(KB_FOLLOWUP_RULE, TICKET_WRITER_NOTE)
+const KB_NO_PROMISE =
+  "Never promise that Foreman, a person, a teammate, the team or a queue will look into, see, pick up, act on or follow up on this message";
+export const KB_FOLLOWUP_RULE = `${KB_NO_PROMISE}: nobody is notified.`;
+/** With escalation on, asking here does reach a person (ENG-21099). */
+const KB_ESCALATION_RULE = `${KB_NO_PROMISE}. ${PERSON_HERE_RULE}`;
+export const replyPrompt = (customer: KbCustomer | undefined) => {
+  if (customer?.ticketFiling) {
+    return REPLY_PROMPT.replace(KB_FOLLOWUP_RULE, TICKET_WRITER_NOTE);
+  }
+  return customer?.escalates
+    ? REPLY_PROMPT.replace(KB_FOLLOWUP_RULE, KB_ESCALATION_RULE)
     : REPLY_PROMPT;
+};
 
 export const REPLY_PROMPT = `${FOREMAN_VOICE}
 
@@ -229,7 +237,7 @@ Refer to the AI Consultant, using its help article and rather than another tool,
 
 When the articles do not give a product fact you need, say plainly that you are not sure, then ask the one question that would help find it, or give the next step. When canInvestigate is true, that next step can be the magnifying glass next to the message box: they can tap it and send their message again to start a look into their workspace. Say it as something they do, never that you, we or anyone will take a look. It is offered at most once in a conversation: when glassOffered is true, Support already offered it, so never mention it again and answer the latest message on its own terms, with the next thing to try from the articles or the one question that would help. When it is false, you never mention the magnifying glass, and for a problem that depends on their own account the next step is that they can ask in this chat for the team to look into their workspace; the team's answer will come here.
 
-You cannot see the customer's account, workspace, campaigns or billing: never say or suggest that you looked. You cannot make changes and nobody will make them for them, so give the steps for them to do it themselves. Never promise that Foreman, a person, a teammate, the team or a queue will look into, see, pick up, act on or follow up on this message: nobody is notified. A thanks, greeting or reaction gets a short friendly reply with no product facts.
+You cannot see the customer's account, workspace, campaigns or billing: never say or suggest that you looked. You cannot make changes and nobody will make them for them, so give the steps for them to do it themselves. ${KB_FOLLOWUP_RULE} A thanks, greeting or reaction gets a short friendly reply with no product facts.
 
 Plain text only: no markdown, no headings, no asterisks, no em dashes. A numbered list puts each step on its own line, starting with its number and a full stop, such as "1. ".
 
@@ -259,6 +267,17 @@ Then set stillAnswers: false only when your reply, after trimming, gives the cus
 
 Plain text only, no markdown and no em dashes.`;
 
+/**
+ * With escalation on, the check keeps the same-chat line and drops the old
+ * route-outs an article may still carry (ENG-21099).
+ */
+export const groundPrompt = (customer: KbCustomer | undefined) =>
+  customer?.escalates
+    ? `${GROUND_PROMPT}
+
+The customer can ask for a person right here in this chat at any time, and Support will answer here: a reply saying that is supported, not a promise of follow-up. A reply telling the customer to type a set phrase such as "human agent", to contact support as a step or anywhere else, or to wait for support hours, or giving support hours, is unsupported even when an article says it.`
+    : GROUND_PROMPT;
+
 /** REPLY_PROMPT's own next step for an answer the articles do not give. */
 const nextStep = (customer: KbCustomer | undefined) => {
   // A filing turn already says where the team's answer will come.
@@ -278,6 +297,11 @@ const promptFacts = (customer: KbCustomer | undefined) => [
   "Foreman, the writer, does not write or review copy, give strategy, or assess campaign performance, and says so.",
   "The AI Consultant is under the Chat toggle at the top of the left sidebar, for advice, strategy, copywriting and campaign performance reviews.",
   "Foreman cannot see the customer's account and cannot make changes; nobody makes changes on the customer's behalf, so the customer does the steps themselves.",
+  ...(customer?.escalates
+    ? [
+        "The customer can ask for a person right here in this chat at any time, and Support will answer here.",
+      ]
+    : []),
   ...(customer?.officeSchedule ? [customer.officeSchedule] : []),
   ...(customer?.ticketNote ? [customer.ticketNote] : []),
   ...featuresOffNames(customer?.helpCenter).map(
@@ -365,6 +389,8 @@ export async function hedged<T>(
 export interface KbCustomer {
   /** An owner or admin outside help-center mode, who can start a look with the magnifying glass. */
   canInvestigate: boolean;
+  /** A customer's turn with escalation on: asking here reaches a person; see PERSON_HERE_RULE. */
+  escalates?: true;
   /**
    * An earlier reply already offered the magnifying glass, so no reply offers
    * it again. Read from Foreman's own earlier turns, which word it one way.
@@ -431,7 +457,7 @@ export const writerCustomer = (customer: KbCustomer | undefined) => {
   if (!customer) {
     return { canInvestigate: false, role: "unknown", workspace: "unknown" };
   }
-  const { helpCenter, ...rest } = customer;
+  const { escalates: _escalates, helpCenter, ...rest } = customer;
   const featuresOff = featuresOffNames(helpCenter);
   return featuresOff.length > 0 ? { ...rest, featuresOff } : rest;
 };
@@ -491,7 +517,7 @@ export const defaultKbDeps: KbDeps = {
         }),
         ...fastCallOptions(model),
         schema: groundSchema,
-        system: GROUND_PROMPT,
+        system: groundPrompt(customer),
       })
     );
     return object;
@@ -892,10 +918,7 @@ export async function answerFromHelpCenter(
   // Offered once, then never again: the writer repeated it turn after turn.
   const reader = customer && {
     ...customer,
-    glassOffered: (ask.turns ?? []).some(
-      (turn) =>
-        turn.role === "assistant" && turn.text.includes("magnifying glass")
-    ),
+    glassOffered: offeredGlass(ask.turns),
   };
   const startedAt = Date.now();
   const signal = AbortSignal.timeout(KB_TIMEOUT_MS);

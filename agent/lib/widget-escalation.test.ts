@@ -5,12 +5,14 @@ import type { GateResult } from "./widget-egress.js";
 import type { WidgetFindings } from "./widget-findings.js";
 import {
   finishWidgetRun,
+  INVESTIGATE_REDIRECT,
   receiveWidgetMessage,
   WIDGET_DEADLINE_MS,
   type WidgetDependencies,
   waitForWidgetInvestigation,
   widgetRunResponse,
 } from "./widget-investigation.js";
+import type { KbCustomer } from "./widget-kb.js";
 import { routeWidgetMessage, type WidgetRoute } from "./widget-router.js";
 import type { WidgetRun } from "./widget-run-store.js";
 import type { WidgetContext } from "./widget-scope.js";
@@ -418,5 +420,79 @@ test("an escalation the investigator's own output claims is dropped", async () =
   assert.equal(outcome.status, "completed");
   if (outcome.status === "completed") {
     assert.deepEqual(outcome.findings, findings);
+  }
+});
+
+test("an owner asking for a ticket again after the magnifying glass escalates instead of hearing the redirect twice; off, the redirect repeats as before", async (t) => {
+  const earlier = [
+    { role: "customer", text: "Can you open a ticket for this?" },
+    { role: "assistant", text: INVESTIGATE_REDIRECT },
+  ];
+  // A mention that is not the fixed redirect leaves the first ticket ask on the redirect.
+  const mention = [
+    { role: "customer", text: "Do I need the magnifying glass for settings?" },
+    {
+      role: "assistant",
+      text: "You don't need the magnifying glass to check those settings.",
+    },
+  ];
+  for (const [on, history, reason] of [
+    [true, undefined, "investigate_redirect"],
+    [true, mention, "investigate_redirect"],
+    [true, earlier, "escalated_to_fixy asked_for_human"],
+    [false, earlier, "investigate_redirect"],
+  ] as const) {
+    // biome-ignore lint/performance/noAwaitInLoops: each case restores the flag before the next.
+    await t.test(`${on ? "on" : "off"}, ${reason}`, async (st) => {
+      enable(st, on);
+      const { deps, filed, run } = harness({ asksForHuman: 0, ticket: true });
+      const body = (await (
+        await send(deps, { history, question: "Please raise a ticket" })
+      ).json()) as Record<string, unknown>;
+      assert.equal(run.outcome?.reason, reason);
+      assert.equal(
+        body.message,
+        reason === "investigate_redirect" ? INVESTIGATE_REDIRECT : null
+      );
+      assert.equal(filed.length, 0);
+    });
+  }
+});
+
+test("on, the front-door writer is told asking here reaches a person and gets no office hours; off, it gets the hours and no such note", async (t) => {
+  const officeHours = {
+    customerTimeZone: "America/New_York",
+    enabled: true,
+    hoursText: ["Monday–Friday: 9:00 AM–5:00 PM"],
+    nextOpenAt: null,
+    nextOpenText: null,
+    open: false,
+    replyTimeMinutes: 20,
+    replyTimeText: "20 minutes",
+    showReplyTime: true,
+    timeZone: "America/New_York",
+    timeZoneName: "Eastern Time",
+    upcomingClosures: [],
+  };
+  for (const on of [true, false]) {
+    // biome-ignore lint/performance/noAwaitInLoops: each case restores the flag before the next.
+    await t.test(on ? "on" : "off", async (st) => {
+      enable(st, on);
+      const { deps } = harness({ asksForHuman: 0 });
+      const seen: (KbCustomer | undefined)[] = [];
+      deps.answerChat = (_ask, _log, writer) => {
+        seen.push(writer);
+        return Promise.resolve({ citations: [], message: "Here is how." });
+      };
+      await send(
+        deps,
+        { question: "When is support open?" },
+        { ...scope, officeHours }
+      );
+      const customer = seen.at(-1);
+      assert.equal(customer?.escalates, on ? true : undefined);
+      assert.equal(Boolean(customer?.officeSchedule), !on);
+      assert.equal(process.env.WIDGET_ESCALATE_TO_FIXY, on ? "on" : undefined);
+    });
   }
 });

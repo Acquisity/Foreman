@@ -221,6 +221,34 @@ test("the guide writer's ticket note replaces the no-notification rule while its
   );
 });
 
+test("with escalation on, the guide writer is told asking here reaches a person, never a set phrase or hours", async () => {
+  const { CHAT_PROMPT, chatPrompt } = await import("./widget-chat.js");
+  const on = chatPrompt(undefined, undefined, true);
+  assert.ok(!on.includes("nobody is notified"));
+  assert.ok(on.includes("pick up or follow up on this message."));
+  assert.equal(on.length, CHAT_PROMPT.length - ": nobody is notified".length);
+  const calls: Parameters<
+    import("./widget-chat.js").ChatDeps["generate"]
+  >[0][] = [];
+  await answerFromGuide(
+    "Can I talk to a human?",
+    { conversationId: "c", runId: "r" },
+    { canInvestigate: true, escalates: true, role: "owner", workspace: "W" },
+    undefined,
+    {
+      generate: (input) => {
+        calls.push(input);
+        return Promise.reject(new Error("mock"));
+      },
+    }
+  );
+  assert.equal(calls[0].escalates, true);
+  const note = calls[0].messages[0].content;
+  assert.ok(note.includes("ask for one right here in this chat at any time"));
+  assert.ok(note.includes('such as "human agent"'));
+  assert.ok(note.includes("never give support hours"));
+});
+
 const helpCenter = {
   featuresOff: [
     {

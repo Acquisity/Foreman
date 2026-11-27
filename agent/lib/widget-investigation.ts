@@ -60,7 +60,11 @@ import {
   withAnswerHere,
   withAnswerLine,
 } from "./widget-handoff.js";
-import { answerFromHelpCenter, type KbAnswer } from "./widget-kb.js";
+import {
+  answerFromHelpCenter,
+  type KbAnswer,
+  type KbCustomer,
+} from "./widget-kb.js";
 import { liveDependencies } from "./widget-live-store.js";
 import {
   askedResult,
@@ -1464,6 +1468,17 @@ async function offerRecording(
   return offered;
 }
 
+/** With escalation on, asking here reaches a person at any time, so the writers get no hours to quote. */
+const whenPersonAnswers = (
+  scope: WidgetContext
+): Pick<KbCustomer, "escalates" | "officeSchedule"> => {
+  if (escalatesToFixy() && customerTurn(scope)) {
+    return { escalates: true };
+  }
+  const schedule = officeSchedule(scope);
+  return schedule ? { officeSchedule: schedule } : {};
+};
+
 interface FrontDoorOptions {
   /** A member or client pressed the magnifying glass, which only an owner or admin can use. */
   needsLook?: boolean;
@@ -1587,11 +1602,10 @@ async function answerFromKnowledgeBase(
   helpCenterOnly: boolean,
   { note = null, needsLook = false }: FrontDoorOptions = {}
 ): Promise<WidgetRun | null> {
-  const schedule = officeSchedule(scope);
   const customer = {
     canInvestigate: !helpCenterOnly,
+    ...whenPersonAnswers(scope),
     ...(scope.helpCenter ? { helpCenter: scope.helpCenter } : {}),
-    ...(schedule ? { officeSchedule: schedule } : {}),
     ...(note ? { ticketNote: note.forWriters } : {}),
     role: scope.role,
     workspace: scope.organizationName,
@@ -1617,7 +1631,13 @@ async function answerFromKnowledgeBase(
   const person = asksForPerson(route);
   const needs = teamAsk(scope, route, { helpCenterOnly, needsLook, person });
   // A front-door refund goes to Fixy for every role: nothing here investigates it.
-  const escalation = escalationFor(scope, needs, route, { refund: true });
+  const escalation = escalationFor(scope, needs, route, {
+    redirected: (ask.turns ?? []).some(
+      (turn) =>
+        turn.role === "assistant" && turn.text.includes(INVESTIGATE_REDIRECT)
+    ),
+    refund: true,
+  });
   if (escalation) {
     drafting.abort();
     return completeEscalation(deps.complete, run.id, scope, escalation);

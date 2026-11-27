@@ -21,6 +21,24 @@ export const escalatesToFixy = (env: NodeJS.ProcessEnv = process.env) =>
 /** A customer's own turn. A teammate's inbox run is team-only and never files or escalates. */
 export const customerTurn = (scope: WidgetContext) => scope.source === "widget";
 
+/**
+ * With escalation on, asking for a person in this chat reaches one at any
+ * time, so the front-door writers say that in place of "nobody is notified",
+ * a set phrase to type, or support hours, which the generated guide may still
+ * carry (ENG-21099).
+ */
+export const PERSON_HERE_RULE =
+  'When the customer needs a person, tell them they can ask for one right here in this chat at any time, and Support will answer here. Never tell them to type a set phrase such as "human agent", to contact support as a step or anywhere else, or to wait for support hours, and never give support hours, even where the help center says so.';
+
+/** An earlier Foreman reply offered the magnifying glass; Foreman words it one way. */
+export const offeredGlass = (
+  turns: { role: "customer" | "assistant"; text: string }[] | undefined
+) =>
+  (turns ?? []).some(
+    (turn) =>
+      turn.role === "assistant" && turn.text.includes("magnifying glass")
+  );
+
 const ESCALATED = "escalated_to_fixy";
 
 /**
@@ -61,14 +79,23 @@ export interface Escalation {
  * The escalation a customer's turn gets, most specific need first: a cancel,
  * then a refund (only where Foreman would not investigate and file it itself),
  * then an ask for a person (a bare one too: Fixy asks what they need), then a
- * member or client whose workspace needs a look they cannot start. Null while
+ * member or client whose workspace needs a look they cannot start, then an
+ * owner or admin asking for a ticket after Foreman's fixed magnifying-glass
+ * reply, so the redirect is never given twice (ENG-21099). Null while
  * escalation is off and for every other turn.
  */
 export const escalationFor = (
   scope: WidgetContext,
   ask: TeamAsk | null,
   route: WidgetRoute,
-  { refund }: { refund: boolean }
+  {
+    redirected = false,
+    refund,
+  }: {
+    /** An earlier reply was Foreman's fixed magnifying-glass redirect. */
+    redirected?: boolean;
+    refund: boolean;
+  }
 ): Escalation | null => {
   if (!(escalatesToFixy() && customerTurn(scope))) {
     return null;
@@ -85,10 +112,17 @@ export const escalationFor = (
       report: "The customer asked for a person.",
     };
   }
-  return ask === "member"
+  if (ask === "member") {
+    return {
+      reason: "cant_check",
+      report: `The customer is a workspace ${scope.role}, and only an owner or admin can start a look into their workspace.`,
+    };
+  }
+  return redirected && route.ticket
     ? {
-        reason: "cant_check",
-        report: `The customer is a workspace ${scope.role}, and only an owner or admin can start a look into their workspace.`,
+        reason: "asked_for_human",
+        report:
+          "The customer asked for a ticket after Foreman had already pointed them to the magnifying glass.",
       }
     : null;
 };
