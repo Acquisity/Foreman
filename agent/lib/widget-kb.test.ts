@@ -910,3 +910,18 @@ test("the legacy writer's ticket note replaces the no-notification rule while it
   assert.ok(away.includes("Do not deny notification or follow-up"));
   assert.ok(away.includes("do not introduce yourself"));
 });
+
+test("with escalation on, the legacy writer points a person ask to this chat in place of the no-notification rule", async () => {
+  const { replyPrompt, writerCustomer } = await import("./widget-kb.js");
+  const customer = {
+    canInvestigate: true,
+    escalates: true as const,
+    role: "owner",
+    workspace: "Company One",
+  };
+  const on = replyPrompt(customer);
+  assert.ok(!on.includes("nobody is notified"));
+  assert.ok(on.includes("ask for one right here in this chat at any time"));
+  assert.ok(on.includes('such as "human agent"'));
+  assert.ok(!("escalates" in writerCustomer(customer)));
+});

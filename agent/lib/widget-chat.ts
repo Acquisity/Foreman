@@ -9,6 +9,7 @@ import {
 } from "./help-center.js";
 import { fastCallOptions, modelFor, resolveModel } from "./models.js";
 import { logOpsEvent } from "./ops-log.js";
+import { offeredGlass, PERSON_HERE_RULE } from "./widget-escalation.js";
 import { GUIDE_CITATION, splitGuideSections } from "./widget-guide-cache.js";
 import { WIDGET_VOICE } from "./widget-instructions.js";
 import {
@@ -90,6 +91,7 @@ ${PRODUCT_GUIDE}`;
 export interface ChatDeps {
   /** One model attempt: the streamed reply and when its first text arrived. */
   generate: (input: {
+    escalates?: true;
     ticketFiling?: true;
     messages: ChatMessage[];
     signal: AbortSignal;
@@ -99,6 +101,9 @@ export interface ChatDeps {
 
 const CHAT_FOLLOWUP_RULE =
   "Never promise that you, a person, a teammate or the team will look into, pick up or follow up on this message: nobody is notified.";
+/** With escalation on, asking here does reach a person; see PERSON_HERE_RULE. */
+const CHAT_ESCALATION_RULE =
+  "Never promise that you, a person, a teammate or the team will look into, pick up or follow up on this message.";
 const ARTICLES = "\n## Articles\n";
 
 const citesOnly = (line: string, hidden: ReadonlySet<string>) => {
@@ -130,7 +135,11 @@ export function guideFor(hidden: ReadonlySet<string>, guide = PRODUCT_GUIDE) {
 
 const promptsByView = new Map<string, string>();
 
-export const chatPrompt = (ticketFiling?: true, view?: HelpCenterView) => {
+export const chatPrompt = (
+  ticketFiling?: true,
+  view?: HelpCenterView,
+  escalates?: true
+) => {
   const key = helpViewKey(view);
   let prompt = promptsByView.get(key);
   if (!prompt) {
@@ -139,8 +148,11 @@ export const chatPrompt = (ticketFiling?: true, view?: HelpCenterView) => {
     );
     promptsByView.set(key, prompt);
   }
-  return ticketFiling
-    ? prompt.replace(CHAT_FOLLOWUP_RULE, TICKET_WRITER_NOTE)
+  if (ticketFiling) {
+    return prompt.replace(CHAT_FOLLOWUP_RULE, TICKET_WRITER_NOTE);
+  }
+  return escalates
+    ? prompt.replace(CHAT_FOLLOWUP_RULE, CHAT_ESCALATION_RULE)
     : prompt;
 };
 
@@ -198,6 +210,7 @@ export function chatMessages(
         REMINDER,
         ...(featuresOff.length > 0 ? [FEATURES_OFF_RULE] : []),
         ...(customer?.ticketFiling ? [TICKET_WRITER_NOTE] : []),
+        ...(customer?.escalates ? [PERSON_HERE_RULE] : []),
         ...(customer?.officeSchedule ? [customer.officeSchedule] : []),
         ...(customer?.ticketNote ? [customer.ticketNote] : []),
         ...(note.role === "owner" || !limits
@@ -296,6 +309,7 @@ const chatFailure = (error: unknown) => {
 export const defaultChatDeps = {
   async generate(
     {
+      escalates,
       ticketFiling,
       messages,
       signal,
@@ -315,7 +329,7 @@ export const defaultChatDeps = {
       maxRetries: 0,
       messages: [
         {
-          content: chatPrompt(ticketFiling, view),
+          content: chatPrompt(ticketFiling, view, escalates),
           // The stable prefix: Anthropic caches up to this breakpoint, and the
           // gateway turns on caching for providers that need it asked.
           providerOptions: {
@@ -375,10 +389,7 @@ export async function answerFromGuide(
   const ask = toAsk(input);
   const reader = customer && {
     ...customer,
-    glassOffered: (ask.turns ?? []).some(
-      (turn) =>
-        turn.role === "assistant" && turn.text.includes("magnifying glass")
-    ),
+    glassOffered: offeredGlass(ask.turns),
   };
   const startedAt = Date.now();
   const scoped = AbortSignal.any([
@@ -392,6 +403,7 @@ export async function answerFromGuide(
         messages,
         signal: abortSignal,
         ...(reader?.ticketFiling ? { ticketFiling: true } : {}),
+        ...(reader?.escalates ? { escalates: true } : {}),
         ...(reader?.helpCenter ? { view: reader.helpCenter } : {}),
       })
     );

@@ -32,6 +32,7 @@ import {
   escalatesToFixy,
   escalationFor,
   needsTheTeam,
+  offeredGlass,
   teamAsk,
 } from "./widget-escalation.js";
 import {
@@ -1587,9 +1588,12 @@ async function answerFromKnowledgeBase(
   helpCenterOnly: boolean,
   { note = null, needsLook = false }: FrontDoorOptions = {}
 ): Promise<WidgetRun | null> {
-  const schedule = officeSchedule(scope);
+  // With escalation on, asking here reaches a person at any time, so there are no hours to quote.
+  const escalates = escalatesToFixy() && customerTurn(scope);
+  const schedule = escalates ? null : officeSchedule(scope);
   const customer = {
     canInvestigate: !helpCenterOnly,
+    ...(escalates ? { escalates: true as const } : {}),
     ...(scope.helpCenter ? { helpCenter: scope.helpCenter } : {}),
     ...(schedule ? { officeSchedule: schedule } : {}),
     ...(note ? { ticketNote: note.forWriters } : {}),
@@ -1617,7 +1621,10 @@ async function answerFromKnowledgeBase(
   const person = asksForPerson(route);
   const needs = teamAsk(scope, route, { helpCenterOnly, needsLook, person });
   // A front-door refund goes to Fixy for every role: nothing here investigates it.
-  const escalation = escalationFor(scope, needs, route, { refund: true });
+  const escalation = escalationFor(scope, needs, route, {
+    glassOffered: offeredGlass(ask.turns),
+    refund: true,
+  });
   if (escalation) {
     drafting.abort();
     return completeEscalation(deps.complete, run.id, scope, escalation);
