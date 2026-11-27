@@ -1897,20 +1897,14 @@ async function answerBugReport(
   try {
     await (deps.verifyMember ?? defaultWidgetDependencies.verifyMember)(scope);
   } catch {
-    // An outage, not a denial: a customer goes to Fixy, as when the
-    // investigation itself cannot start; access stays closed either way.
-    const handed = couldNotStart({ ...run, scope });
-    const saved = await deps
+    await deps
       .complete(
         run.id,
-        handed?.result ?? blockedOutcome("workspace_access_denied", "failed"),
-        handed?.findings ?? null,
+        blockedOutcome("workspace_access_denied", "failed"),
+        null,
         run.id
       )
-      .catch(() => null);
-    if (handed && saved) {
-      return json(widgetRunResponse(saved));
-    }
+      .catch(() => undefined);
     return json({ error: "Workspace could not be verified." }, 403);
   }
   const report =
