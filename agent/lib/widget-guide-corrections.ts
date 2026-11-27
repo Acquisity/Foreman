@@ -25,27 +25,56 @@ export interface GuideCorrection {
 }
 
 const CREDITS_NOTE =
-  "Only plan credits and one-time packs never expire or reset. Monthly-pack credits carry over only while the pack is active: if the pack ends, its credits end with it. Never write that credits never expire or reset without naming plan credits and one-time packs, and say what happens to monthly-pack credits.";
+  'Only plan credits and one-time packs never expire or reset. Say that in its own sentence, apart from monthly packs. Monthly-pack credits carry over only while the pack is active, so also say: "If the pack ends, its credits end with it."';
+
+const NEVER =
+  "(?:never|don['’]?t|doesn['’]?t|do not|does not|won['’]?t|will not|aren['’]?t meant to)";
+
+/**
+ * A credit never expiring or resetting. Not resetting on the billing or
+ * renewal date is true of every credit, so that claim is left alone.
+ */
+const NEVER_ENDS = String.raw`(?:\b${NEVER} expire|(?<!\b(?:renews|renewal|billing date)\b[^.;\n]*)\b${NEVER} reset(?![^.;\n]*\b(?:billing|renewal) date))`;
+
+const ONLY_PLAN_AND_ONE_TIME = String.raw`\b(?:plan(?:-included)? credits|plan and one-time|one-time|one-off|top-?ups?)\b`;
 
 const CREDITS_CHECKS = {
   reject: [
-    /^(?!#)(?=.*\b(?:never|don'?t|do not|won'?t) (?:expire|reset))(?!.*\b(?:plan|one-time|one-off|top-?ups?)\b[^.;\n]*\b(?:never|don'?t|do not|won'?t) (?:expire|reset)).*$/imu,
+    new RegExp(
+      String.raw`^(?!#)(?=.*${NEVER_ENDS})(?!.*${ONLY_PLAN_AND_ONE_TIME}[^.;\n]*${NEVER_ENDS}).*$`,
+      "imu"
+    ),
+    new RegExp(String.raw`\bmonthly\b[^.;\n]*${NEVER_ENDS}`, "iu"),
   ],
-  require: [
-    /\bpack (?:is |stays |remains )?active|\bpack ends|\bend with (?:it|the pack)/iu,
-  ],
+  require: [/\bend with (?:it|the pack)\b/iu],
 };
 
 export const GUIDE_CORRECTIONS: readonly GuideCorrection[] = [
   {
     note: `${CREDITS_NOTE} Domains are $18/year only when pre-warmed, so keep "Pre-warmed" on that price.`,
-    ...CREDITS_CHECKS,
+    reject: [
+      ...CREDITS_CHECKS.reject,
+      /(?<!pre-warmed )\bdomains? (?:cost )?\$18/iu,
+    ],
+    require: CREDITS_CHECKS.require,
     slugs: ["workspace-settings/billing"],
   },
   {
     note: CREDITS_NOTE,
     ...CREDITS_CHECKS,
     slugs: ["cold-email-agent/concepts/credits"],
+  },
+  {
+    note: 'No one can split an invoice, the Owner included. Only the Owner sees "Invoices" and "Payment method".',
+    reject: [/\bcan split\b/iu],
+    slugs: [
+      "workspace-settings/faq/billing-subscriptions/can-i-split-an-invoice-into-two",
+    ],
+  },
+  {
+    note: "This article is about meeting platforms only. Write no line about skipped leads from it.",
+    reject: [/\bskipped\b/iu],
+    slugs: ["sales-call-analyzer/faq/can-i-use-google-meet-or-teams"],
   },
   {
     note: "This article is about the AI SDR only. The Acquisity Agent is a different feature and can update a deal when asked, so write no line about the Acquisity Agent from this article.",
