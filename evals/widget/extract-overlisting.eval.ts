@@ -25,11 +25,17 @@ const LIST_CHECK_ONLY = (unchecked: Unchecked) =>
   );
 const CHARGE = /charge|refund/iu;
 const PARTIAL = /partial/iu;
-const ON_SCREEN = /screen|section|\bshows?\b|\bsees?\b/iu;
-const EMAIL_SAID = /\bemail\b[^,;]*\bsaid\b|wording|(content|text) of/iu;
-const FUTURE =
-  /\bwill\b|year[- ]end|future|\bsucceed|go(es)? through|\brenew(s|ed)? with/iu;
 const PLAYBOOKS = /playbook/iu;
+// ENG-21513: each replayed case may file only the item that was a real open question on our side;
+// anything else, however worded, is the screen, the email or a future outcome over-listed.
+const FUTURE =
+  /\bwill\b|going to|succe|outcome|go(es)? through|year[- ]end|future|project|forecast/iu;
+const WHY_PLAN_NONE = /^why\b.*\b(plan|subscription)\b/iu;
+const END_DATE_OR_PRICE = /end date|price|cost/iu;
+const PRICE = /price|cost/iu;
+const only = (keep: (fact: string) => boolean) => (unchecked: Unchecked) =>
+  unchecked.every((gap) => keep(gap.fact) && !FUTURE.test(gap.fact));
+const LINE_ITEMS = /line item|charge|invoice/iu;
 
 const CASES = [
   {
@@ -73,18 +79,14 @@ const CASES = [
   // ENG-21513: three replies from 27 Nov whose extraction still filed what the reply asked the customer,
   // and outcomes nobody can know before they happen. Their other items are judged by triage, so only these fail.
   {
-    allowed: (unchecked: Unchecked) =>
-      !unchecked.some((gap) => ON_SCREEN.test(gap.fact)),
+    allowed: only((fact) => WHY_PLAN_NONE.test(fact)),
     investigatorText:
       'The billing read shows the plan as none, no active subscription, and no pending upgrade or downgrade. The last Pro invoice was $185, paid on 29 Oct 2026, with a period end of 29 Nov 2026, and each domain add-on has a cancellation date with a period end of 29 Nov 2026. There are no unpaid invoices. That is why the customer doesn\'t see "Change plan": there is no plan to change, so they need to start a new one. I can\'t confirm why the Pro plan now reads as none, and I can\'t see what the Plan section on their billing screen shows them, so I told them to open Settings > Billing, click "Upgrade" or "Enable Acquisity" in the Plan section and choose Growth, and if neither button appears, to tell me what the Plan section shows or send a screenshot.',
     name: "ENG-21513 asked what the Plan section shows",
     question: "why i cant downgrade to growth",
   },
   {
-    allowed: (unchecked: Unchecked) =>
-      !unchecked.some(
-        (gap) => EMAIL_SAID.test(gap.fact) || FUTURE.test(gap.fact)
-      ),
+    allowed: only((fact) => END_DATE_OR_PRICE.test(fact)),
     investigatorText:
       "The orders read shows end warnings sent on 12 November for all six domains: five at the 30-day checkpoint with an end date of 2 December 2026, and one at the expired checkpoint with an end date of 2 November 2026. The domains record in the same read shows all six active with an expiry of 29 December 2026, auto-renew on and a billing label of Paid. All 18 inboxes are connected and active, and no cancellations or unpaid flags are recorded. No renewal price or renewal date is recorded for any domain, and no renewal notice is showing in the app. I can't confirm the renewals will go through with the registrar, or which end date the email was referring to, and I can't see what the customer's email actually said. I asked them to check each domain's billing badge under Settings > Billing > Email domains and inboxes, and to paste the wording of the email or attach a screenshot, with the domains and the date it names.",
     name: "ENG-21513 asked for the email, and whether renewals will go through",
@@ -92,8 +94,7 @@ const CASES = [
       "i had an email saying domains need replacing or renewing by year end but im confused",
   },
   {
-    allowed: (unchecked: Unchecked) =>
-      !unchecked.some((gap) => FUTURE.test(gap.fact)),
+    allowed: only((fact) => PRICE.test(fact)),
     investigatorText:
       "The workspace has 6 managed domains with 3 inboxes each, all active. In the 14-day domain review (13 to 26 November), 3 domains carry the Few replies flag: one with 900 sent and 0 replies, one with 900 sent and 1 reply, and one with 900 sent and 2 replies. The other three have no flag, at 2.6%, 1.5% and 0.67% reply rates. No domain was flagged for bounces or low warm-up, there are no open deliverability alerts, DNS passes on all 6 domains and every inbox shows 100% health. This is a 14-day snapshot, so it can't tell what the numbers will be at year end. All 6 domains expire on 29 December 2026 with auto-renew on and billing showing Paid, but the records show no renewal price or outcome, so I can't confirm the renewals will go through. I asked whether they meant replacing the flagged domains or the domains that expire at year end.",
     name: "ENG-21513 year-end numbers and renewals going through",
@@ -126,6 +127,19 @@ const CASES = [
       "I can't make changes to the account. I couldn't find a campaign playbooks setting in the Help Centre, so I couldn't confirm that campaign playbooks exists or whether it can be turned on for this workspace. No known issue matches, and nothing in the workspace explains the API message the customer mentioned. The AI SDR Knowledge Base is 3,152 characters and covers one offer, and there are no saved rules. I gave them the ways to get different AI SDR instructions per campaign: a separate workspace with its own Knowledge Base, facts labelled with the campaign name, or Rules under Settings > AI SDR Agent. I asked them to paste the exact request and the full error text if they want to chase the API message.",
     name: "control: ENG-21513 campaign playbooks the Help Centre doesn't cover",
     question: "campaign playbooks",
+  },
+  {
+    allowed: (unchecked: Unchecked) =>
+      unchecked.some(
+        (gap) =>
+          gap.area === "billing" &&
+          gap.kind === "tool" &&
+          LINE_ITEMS.test(gap.fact)
+      ),
+    investigatorText:
+      "The billing read answered and shows the latest invoice, $185 paid on 29 Oct 2026, but it returned no line items for it, so I couldn't see what the charge was for. I asked the customer to send the invoice PDF or a screenshot of it so I can explain the charge.",
+    name: "control: ENG-21513 a missing read still files when the reply also asked the customer",
+    question: "what was the $185 charge on 29 Oct for?",
   },
 ];
 
@@ -163,7 +177,7 @@ export default defineEval({
       misses.length === 0,
       satisfies(
         Boolean,
-        "no over-listed item in the five cases, and every control still files"
+        "no over-listed item in any case, and every control still files"
       )
     );
   },
