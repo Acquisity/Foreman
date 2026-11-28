@@ -63,7 +63,7 @@ const strArr = (v: unknown, maxItems: number, maxLen: number): string[] =>
 const WHITESPACE = /\s+/gu;
 const uncheckedArea = z.enum(GAP_AREAS).catch("other");
 const uncheckedKind = z.enum(["docs", "tool"]).catch("tool");
-// ENG-21513: told only to leave these out, the model still listed them in about one run in three.
+// ENG-21513: told only to leave these out, the model still listed them in 21 of 30 replayed runs.
 const NOT_OUR_GAP = new Set([
   "asked_customer",
   "customer_only",
