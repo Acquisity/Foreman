@@ -137,8 +137,8 @@ const CASES = [
           LINE_ITEMS.test(gap.fact)
       ),
     investigatorText:
-      "The billing read answered and shows the latest invoice, $185 paid on 29 Oct 2026, but it returned no line items for it, so I couldn't see what the charge was for. I asked the customer to send the invoice PDF or a screenshot of it so I can explain the charge.",
-    name: "control: ENG-21513 a missing read still files when the reply also asked the customer",
+      "The billing read shows the plan is active, but the invoices section timed out, so I couldn't see the line items of the latest invoice or what the charge on 29 Oct was for. I asked the customer to send the invoice PDF or a screenshot of it so I can explain the charge.",
+    name: "control: ENG-21513 a failed read still files when the reply also asked the customer",
     question: "what was the $185 charge on 29 Oct for?",
   },
 ];

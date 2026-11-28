@@ -302,7 +302,7 @@ test("an unchecked fact the customer, the future or a person holds is dropped, a
 });
 
 const NEVER_UNCHECKED_RULE =
-  /Never list in unchecked a question the investigator asked the customer[^;]*whether something will happen later[^;]*; a read that failed or timed out, a source reported as unavailable, and a product question the Help Centre does not explain \(kind docs\) are still listed/;
+  /Never list in unchecked a question the investigator asked the customer[^;]*whether something will happen later[^;]*; a read that failed or timed out, a source reported as unavailable, and a product question the Help Centre does not explain \(kind docs\) are still listed, even when the investigator also asked the customer to send what it could not read/;
 
 test("unchecked never holds a question for the customer, what only they know, a future outcome, or what the investigator did not say it could not check", () => {
   // ENG-20988: "which site is meant" and "whether HTTPS works" on a domain with no public records were filed as capability gaps.
