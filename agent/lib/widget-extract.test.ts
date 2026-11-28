@@ -229,11 +229,68 @@ test("what the investigator could not check comes back as unchecked facts for th
   assert.match(EXTRACT_PROMPT, UNCHECKED_RULE);
 });
 
-const NEVER_UNCHECKED_RULE =
-  /if only the customer could answer it or act on it first, leave it out\. Never list in unchecked a question the investigator asked the customer[^;]*something only the customer can know[^;]*whether two things they saw are linked[^;]*a check that could not run yet only because of something the customer still has to do[^;]*a decision still with a person[^;]*anything the investigator did not itself say it could not check; a read that failed or timed out, a source reported as unavailable, and a product question the Help Centre does not explain \(kind docs\) are still listed/;
+test("an unchecked fact the customer, the future or a person holds is dropped, and one on our side is kept", async () => {
+  // ENG-21513: the reply asked what the Plan section shows, and renewals going through can't be known yet.
+  const out = await extractWidgetFindings(input, {
+    generate: () =>
+      Promise.resolve({
+        ...lenient,
+        unchecked: [
+          {
+            area: "billing",
+            fact: "what the plan section shows",
+            reason: "asked_customer",
+          },
+          {
+            area: "orders",
+            fact: "what the customer's email said",
+            reason: "customer_only",
+          },
+          {
+            area: "orders",
+            fact: "whether domain renewals will go through",
+            reason: "future",
+          },
+          {
+            area: "website",
+            fact: "whether https works",
+            reason: "waiting_on_customer",
+          },
+          {
+            area: "billing",
+            fact: "whether a refund will be approved",
+            reason: "person_decides",
+          },
+          {
+            area: "billing",
+            fact: "the latest charge",
+            reason: "read_failed",
+          },
+          {
+            area: "other",
+            fact: "whether campaign playbooks exist",
+            kind: "docs",
+            reason: "docs_missing",
+          },
+          { area: "orders", fact: "which end date is correct", reason: "?" },
+          { area: "orders", fact: "the renewal price" },
+        ],
+      }),
+  });
+  assert.deepEqual(out?.unchecked, [
+    { area: "billing", fact: "the latest charge", kind: "tool" },
+    { area: "other", fact: "whether campaign playbooks exist", kind: "docs" },
+    { area: "orders", fact: "which end date is correct", kind: "tool" },
+    { area: "orders", fact: "the renewal price", kind: "tool" },
+  ]);
+});
 
-test("unchecked never holds a question for the customer, what only they know, or what the investigator did not say it could not check", () => {
+const NEVER_UNCHECKED_RULE =
+  /if only the customer could answer it or act on it first, or the investigator asked them to tell, paste, send or show it, leave it out\. Never list in unchecked a question the investigator asked the customer[^;]*what a page, screen or section of the app shows them, since we read their data and never their screen, or what an email or message they received says[^;]*something only the customer can know[^;]*whether two things they saw are linked[^;]*whether something will happen later or what a number will be at a future date[^;]*a check that could not run yet only because of something the customer still has to do[^;]*a decision still with a person[^;]*anything the investigator did not itself say it could not check, and leave these out even when the investigator wrote that it could not see, check or confirm them; a read that failed or timed out, a source reported as unavailable, and a product question the Help Centre does not explain \(kind docs\) are still listed/;
+
+test("unchecked never holds a question for the customer, what only they know, a future outcome, or what the investigator did not say it could not check", () => {
   // ENG-20988: "which site is meant" and "whether HTTPS works" on a domain with no public records were filed as capability gaps.
+  // ENG-21513: "what the Plan section shows" and "whether renewals will go through" still were, worded as the investigator's own "can't see" or "can't confirm".
   assert.match(EXTRACT_PROMPT, NEVER_UNCHECKED_RULE);
 });
 

@@ -25,6 +25,11 @@ const LIST_CHECK_ONLY = (unchecked: Unchecked) =>
   );
 const CHARGE = /charge|refund/iu;
 const PARTIAL = /partial/iu;
+const ON_SCREEN = /screen|section|\bshows?\b|\bsees?\b/iu;
+const EMAIL_SAID = /\bemail\b[^,;]*\bsaid\b|wording|(content|text) of/iu;
+const FUTURE =
+  /\bwill\b|year[- ]end|future|\bsucceed|go(es)? through|\brenew(s|ed)? with/iu;
+const PLAYBOOKS = /playbook/iu;
 
 const CASES = [
   {
@@ -65,6 +70,35 @@ const CASES = [
     question:
       "I'm looking for a contact in my CRM but I only remember her first name starts with Am. Can you find who that is and what email I have saved for her?",
   },
+  // ENG-21513: three replies from 27 Nov whose extraction still filed what the reply asked the customer,
+  // and outcomes nobody can know before they happen. Their other items are judged by triage, so only these fail.
+  {
+    allowed: (unchecked: Unchecked) =>
+      !unchecked.some((gap) => ON_SCREEN.test(gap.fact)),
+    investigatorText:
+      'The billing read shows the plan as none, no active subscription, and no pending upgrade or downgrade. The last Pro invoice was $185, paid on 29 Oct 2026, with a period end of 29 Nov 2026, and each domain add-on has a cancellation date with a period end of 29 Nov 2026. There are no unpaid invoices. That is why the customer doesn\'t see "Change plan": there is no plan to change, so they need to start a new one. I can\'t confirm why the Pro plan now reads as none, and I can\'t see what the Plan section on their billing screen shows them, so I told them to open Settings > Billing, click "Upgrade" or "Enable Acquisity" in the Plan section and choose Growth, and if neither button appears, to tell me what the Plan section shows or send a screenshot.',
+    name: "ENG-21513 asked what the Plan section shows",
+    question: "why i cant downgrade to growth",
+  },
+  {
+    allowed: (unchecked: Unchecked) =>
+      !unchecked.some(
+        (gap) => EMAIL_SAID.test(gap.fact) || FUTURE.test(gap.fact)
+      ),
+    investigatorText:
+      "The orders read shows end warnings sent on 12 November for all six domains: five at the 30-day checkpoint with an end date of 2 December 2026, and one at the expired checkpoint with an end date of 2 November 2026. The domains record in the same read shows all six active with an expiry of 29 December 2026, auto-renew on and a billing label of Paid. All 18 inboxes are connected and active, and no cancellations or unpaid flags are recorded. No renewal price or renewal date is recorded for any domain, and no renewal notice is showing in the app. I can't confirm the renewals will go through with the registrar, or which end date the email was referring to, and I can't see what the customer's email actually said. I asked them to check each domain's billing badge under Settings > Billing > Email domains and inboxes, and to paste the wording of the email or attach a screenshot, with the domains and the date it names.",
+    name: "ENG-21513 asked for the email, and whether renewals will go through",
+    question:
+      "i had an email saying domains need replacing or renewing by year end but im confused",
+  },
+  {
+    allowed: (unchecked: Unchecked) =>
+      !unchecked.some((gap) => FUTURE.test(gap.fact)),
+    investigatorText:
+      "The workspace has 6 managed domains with 3 inboxes each, all active. In the 14-day domain review (13 to 26 November), 3 domains carry the Few replies flag: one with 900 sent and 0 replies, one with 900 sent and 1 reply, and one with 900 sent and 2 replies. The other three have no flag, at 2.6%, 1.5% and 0.67% reply rates. No domain was flagged for bounces or low warm-up, there are no open deliverability alerts, DNS passes on all 6 domains and every inbox shows 100% health. This is a 14-day snapshot, so it can't tell what the numbers will be at year end. All 6 domains expire on 29 December 2026 with auto-renew on and billing showing Paid, but the records show no renewal price or outcome, so I can't confirm the renewals will go through. I asked whether they meant replacing the flagged domains or the domains that expire at year end.",
+    name: "ENG-21513 year-end numbers and renewals going through",
+    question: "need to know how many domains need replacing at year end",
+  },
   // Controls: a read that failed, and a product question the Help Centre doesn't explain, still file.
   {
     allowed: (unchecked: Unchecked) =>
@@ -85,11 +119,19 @@ const CASES = [
     name: "control: Help Centre doesn't explain it",
     question: "What does partial mean on my domain order?",
   },
+  {
+    allowed: (unchecked: Unchecked) =>
+      unchecked.some((gap) => gap.kind === "docs" && PLAYBOOKS.test(gap.fact)),
+    investigatorText:
+      "I can't make changes to the account. I couldn't find a campaign playbooks setting in the Help Centre, so I couldn't confirm that campaign playbooks exists or whether it can be turned on for this workspace. No known issue matches, and nothing in the workspace explains the API message the customer mentioned. The AI SDR Knowledge Base is 3,152 characters and covers one offer, and there are no saved rules. I gave them the ways to get different AI SDR instructions per campaign: a separate workspace with its own Knowledge Base, facts labelled with the campaign name, or Rules under Settings > AI SDR Agent. I asked them to paste the exact request and the full error text if they want to chase the API message.",
+    name: "control: ENG-21513 campaign playbooks the Help Centre doesn't cover",
+    question: "campaign playbooks",
+  },
 ];
 
 export default defineEval({
   description:
-    "ENG-20988: the extraction pass lists no question the reply asked the customer, nothing only the customer knows and nothing the investigator did not say it couldn't check, in 10 of 10 runs of five replayed write-ups, while a failed read and a Help Centre gap still file in 10 of 10.",
+    "ENG-20988 and ENG-21513: the extraction pass lists no question the reply asked the customer, nothing only the customer knows, no outcome that can only be known later and nothing the investigator did not say it couldn't check, in 10 of 10 runs of eight replayed write-ups, while a failed read and two Help Centre gaps still file in 10 of 10.",
   tags: ["widget"],
   async test(t) {
     if (!(process.env.AI_GATEWAY_API_KEY || process.env.VERCEL_OIDC_TOKEN)) {
