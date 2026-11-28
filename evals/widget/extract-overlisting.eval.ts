@@ -29,12 +29,18 @@ const PLAYBOOKS = /playbook/iu;
 // ENG-21513: each replayed case may file only the item that was a real open question on our side;
 // anything else, however worded, is the screen, the email or a future outcome over-listed.
 const FUTURE =
-  /\bwill\b|going to|succe|outcome|go(es)? through|year[- ]end|future|project|forecast/iu;
+  /\bwill\b|going to|succe|outcome|go(es)? through|year[- ]end|future|project|forecast|\brenews?\b/iu;
+// What the customer has: their screen, or the email they received.
+const CUSTOMER_HAS =
+  /screen|section|look|display|visible|button|received|written|said|says|wording/iu;
 const WHY_PLAN_NONE = /^why\b.*\b(plan|subscription)\b/iu;
 const END_DATE_OR_PRICE = /end date|price|cost/iu;
 const PRICE = /price|cost/iu;
 const only = (keep: (fact: string) => boolean) => (unchecked: Unchecked) =>
-  unchecked.every((gap) => keep(gap.fact) && !FUTURE.test(gap.fact));
+  unchecked.every(
+    (gap) =>
+      keep(gap.fact) && !FUTURE.test(gap.fact) && !CUSTOMER_HAS.test(gap.fact)
+  );
 const LINE_ITEMS = /line item|charge|invoice/iu;
 
 const CASES = [

@@ -283,6 +283,15 @@ test("an unchecked fact the customer, the future or a person holds is dropped, a
             kind: "docs",
             reason: "asked_customer",
           },
+          {
+            area: "orders",
+            fact: "whether domain renewals will process successfully",
+            reason: "no_read",
+          },
+          {
+            area: "inboxes",
+            fact: "what reply rates are going to be next month",
+          },
           { area: "orders", fact: "which end date is correct", reason: "?" },
           { area: "orders", fact: "the renewal price" },
         ],
