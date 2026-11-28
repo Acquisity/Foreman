@@ -290,7 +290,17 @@ test("an unchecked fact the customer, the future or a person holds is dropped, a
           },
           {
             area: "inboxes",
-            fact: "what reply rates are going to be next month",
+            fact: "whether reply rates are going to drop next month",
+          },
+          {
+            area: "billing",
+            fact: "when the lead credit allowance will renew",
+            reason: "no_read",
+          },
+          {
+            area: "billing",
+            fact: "whether the next charge will go through",
+            reason: "read_failed",
           },
           { area: "orders", fact: "which end date is correct", reason: "?" },
           { area: "orders", fact: "the renewal price" },
@@ -304,6 +314,16 @@ test("an unchecked fact the customer, the future or a person holds is dropped, a
       area: "other",
       fact: "where an api error message comes from",
       kind: "docs",
+    },
+    {
+      area: "billing",
+      fact: "when the lead credit allowance will renew",
+      kind: "tool",
+    },
+    {
+      area: "billing",
+      fact: "whether the next charge will go through",
+      kind: "tool",
     },
     { area: "orders", fact: "which end date is correct", kind: "tool" },
     { area: "orders", fact: "the renewal price", kind: "tool" },

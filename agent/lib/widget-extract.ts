@@ -85,9 +85,10 @@ const UNCHECKED_REASONS = [
     means: "our data should hold it but there was no way to read it",
   },
 ] as const;
-// The fact is written in general terms, so "will" marks an outcome nobody can read yet; with the
-// reasons alone, 2 of 60 replays still filed "whether domain renewals will go through" (ENG-21513).
-const FUTURE_FACT = /\b(will|going to)\b/iu;
+// "Whether something will happen" is an outcome nobody can read yet ("when a credit will renew" is a
+// stored date, so only "whether" counts); with the reasons alone, 2 of 60 replays still filed
+// "whether domain renewals will go through" (ENG-21513). A read that failed is always kept.
+const FUTURE_FACT = /\bwhether\b.*\b(will|going to)\b/iu;
 const DROPPED_REASONS = new Set<string>(
   UNCHECKED_REASONS.filter((r) => "drop" in r).map((r) => r.id)
 );
@@ -123,6 +124,7 @@ function uncheckedFacts(
     .filter(
       ({ fact, kind, reason }) =>
         kind === "docs" ||
+        reason === "read_failed" ||
         !(DROPPED_REASONS.has(reason) || FUTURE_FACT.test(fact))
     )
     .map(({ reason: _reason, ...item }) => item)
