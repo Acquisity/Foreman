@@ -83,7 +83,7 @@ const CASES = [
       "I'm looking for a contact in my CRM but I only remember her first name starts with Am. Can you find who that is and what email I have saved for her?",
   },
   // ENG-21513: three replies from 27 Nov whose extraction still filed what the reply asked the customer,
-  // and outcomes nobody can know before they happen. Their other items are judged by triage, so only these fail.
+  // and outcomes nobody can know before they happen. Each may list only its one real open item, or nothing.
   {
     allowed: only((fact) => WHY_PLAN_NONE.test(fact)),
     investigatorText:
